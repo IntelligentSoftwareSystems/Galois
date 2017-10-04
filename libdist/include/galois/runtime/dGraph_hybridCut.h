@@ -207,28 +207,12 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       galois::runtime::reportParam("(NULL)", "ONLINE VERTEX CUT PL", "0");
 
-      galois::StatTimer StatTimer_graph_construct(
+      galois::StatTimer Tgraph_construct(
         "TIME_GRAPH_CONSTRUCT", GRNAME);
-      galois::StatTimer StatTimer_graph_construct_comm(
+      galois::StatTimer Tgraph_construct_comm(
         "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
-      galois::StatTimer StatTimer_local_distributed_edges(
-        "TIMER_LOCAL_DISTRIBUTE_EDGES", GRNAME);
-      galois::StatTimer StatTimer_exchange_edges(
-        "TIMER_EXCHANGE_EDGES", GRNAME);
-      galois::StatTimer StatTimer_fill_local_mirrorNodes(
-        "TIMER_FILL_LOCAL_MIRRORNODES", GRNAME);
-      galois::StatTimer StatTimer_distributed_edges_test_set_bit(
-        "TIMER_DISTRIBUTE_EDGES_TEST_SET_BIT", GRNAME);
-      galois::StatTimer StatTimer_allocate_local_DS(
-        "TIMER_ALLOCATE_LOCAL_DS", GRNAME);
-      galois::StatTimer StatTimer_distributed_edges_get_edges(
-        "TIMER_DISTRIBUTE_EDGES_GET_EDGES", GRNAME);
-      galois::StatTimer StatTimer_distributed_edges_inner_loop(
-        "TIMER_DISTRIBUTE_EDGES_INNER_LOOP", GRNAME);
-      galois::StatTimer StatTimer_distributed_edges_next_src(
-        "TIMER_DISTRIBUTE_EDGES_NEXT_SRC", GRNAME);
 
-      StatTimer_graph_construct.start();
+      Tgraph_construct.start();
 
       galois::graphs::OfflineGraph g(filename);
       isBipartite = bipartite;
@@ -298,7 +282,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
        * Assign edges to the hosts using heuristics
        * and send/recv from other hosts.
        * ******************************************/
-      StatTimer_exchange_edges.start();
 
       std::vector<uint64_t> prefixSumOfEdges;
       assign_edges_phase1(g, fileGraph, numEdges_distribute, VCutThreshold, 
@@ -320,8 +303,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
        * Allocate and construct the graph
        *****************************************/
 
-      StatTimer_allocate_local_DS.start();
-
       base_hGraph::graph.allocateFrom(numNodes, numEdges);
       base_hGraph::graph.constructNodes();
 
@@ -336,10 +317,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         galois::no_stats()
       );
 
-      StatTimer_allocate_local_DS.stop();
-
       loadEdges(base_hGraph::graph, fileGraph, numEdges_distribute, VCutThreshold);
-      StatTimer_exchange_edges.stop();
 
       /*******************************************/
 
@@ -350,27 +328,27 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::transposed = true;
       } else {
         // else because transpose will find thread ranges for you
-        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", GRNAME);
+        galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
 
-        StatTimer_thread_ranges.start();
+        Tthread_ranges.start();
         base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
-        StatTimer_thread_ranges.stop();
+        Tthread_ranges.stop();
       }
 
       base_hGraph::determine_thread_ranges_master();
       base_hGraph::determine_thread_ranges_with_edges();
       base_hGraph::initialize_specific_ranges();
 
-      StatTimer_graph_construct.stop();
+      Tgraph_construct.stop();
 
       /*****************************************
        * Communication PreProcessing:
        * Exchange mirrors and master nodes among
        * hosts
        ****************************************/
-      StatTimer_graph_construct_comm.start();
+      Tgraph_construct_comm.start();
       base_hGraph::setup_communication();
-      StatTimer_graph_construct_comm.stop();
+      Tgraph_construct_comm.stop();
     }
 
     template<typename GraphTy>
@@ -717,7 +695,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     template<typename GraphTy>
     void receive_edges(GraphTy& graph){
-      galois::StatTimer StatTimer_exchange_edges("RECEIVE_EDGES_TIME", GRNAME);
       auto& net = galois::runtime::getSystemNetworkInterface();
 
       //receive the edges from other hosts

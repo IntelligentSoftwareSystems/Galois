@@ -637,12 +637,12 @@ protected:
    * different parts of the graph by exchanging master/mirror information.
    */
   void setup_communication() {
-    galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
+    galois::StatTimer Tcomm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
 
     // barrier so that all hosts start the timer together
     galois::runtime::getHostBarrier().wait();
 
-    StatTimer_comm_setup.start();
+    Tcomm_setup.start();
 
     // Exchange information for memoization optimization.
     exchange_info_init();
@@ -667,7 +667,7 @@ protected:
                      galois::no_stats());
     }
 
-    StatTimer_comm_setup.stop();
+    Tcomm_setup.stop();
 
     // report masters/mirrors to/from other hosts as statistics
     for (auto x = 0U; x < masterNodes.size(); ++x) {
@@ -981,20 +981,10 @@ private:
     galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
-    float replication_factor_new = (float)(global_total_mirror_nodes + 
-                                           global_total_owned_nodes) /
-                                   (float)(global_total_owned_nodes);
-
-    galois::runtime::reportStat_Single(GRNAME, 
-        "REPLICATION_FACTOR_NEW_" + get_run_identifier(), 
-        replication_factor_new);
-
     galois::runtime::reportStat_Single(GRNAME, 
         "TOTAL_NODES_" + get_run_identifier(), numGlobalNodes);
     galois::runtime::reportStat_Single(GRNAME, 
-        "TOTAL_OWNED_" + get_run_identifier(), global_total_owned_nodes);
-    galois::runtime::reportStat_Single(GRNAME, 
-        "TOTAL_GLOBAL_GHOSTNODES_" + get_run_identifier(), 
+        "TOTAL_GLOBAL_MIRROR_NODES_" + get_run_identifier(), 
         global_total_mirror_nodes);
   }
 
@@ -1036,6 +1026,7 @@ private:
     }
     ++galois::runtime::evilPhase;
 
+    assert(numGlobalNodes == global_total_owned_nodes);
     // report stats
     if (net.ID == 0) {
       report_master_mirror_stats(global_total_mirror_nodes, 
@@ -1064,9 +1055,9 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_offsets(offsets_timer_str.c_str(), GRNAME);
+    galois::StatTimer Toffsets(offsets_timer_str.c_str(), GRNAME);
 
-    StatTimer_offsets.start();
+    Toffsets.start();
 
 
     auto activeThreads = galois::getActiveThreads();
@@ -1134,7 +1125,7 @@ private:
         }
       );
     }
-    StatTimer_offsets.stop();
+    Toffsets.stop();
   }
 
   /**
@@ -1503,11 +1494,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
+    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
-    StatTimer_extract.start();
+    Textract.start();
 
     if (num > 0) {
       data_mode = onlyData;
@@ -1530,7 +1521,7 @@ private:
       gSerialize(b, noData);
     }
 
-    StatTimer_extract.stop();
+    Textract.stop();
 
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + "_" + 
@@ -1554,11 +1545,11 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
+    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
-    StatTimer_extract.start();
+    Textract.start();
 
     if (num > 0) {
       bit_set_comm.resize(num);
@@ -1625,7 +1616,7 @@ private:
       gSerialize(b, noData);
     }
 
-    StatTimer_extract.stop();
+    Textract.stop();
 
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + 
@@ -1759,12 +1750,12 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
+    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
-    StatTimer_SendTime.start();
+    TSendTime.start();
     sync_net_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
-    StatTimer_SendTime.stop();
+    TSendTime.stop();
   }
   
   /**
@@ -1777,9 +1768,9 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string set_timer_str(syncTypeStr + "_SET_" + 
                               get_run_identifier(loopName));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
+    galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
 
-    StatTimer_set.start();
+    Tset.start();
 
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
@@ -1851,7 +1842,7 @@ private:
       }
     }
 
-    StatTimer_set.stop();
+    Tset.stop();
 
     return retval;
   }
@@ -1957,12 +1948,12 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_recv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
+    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
-    StatTimer_RecvTime.start();
+    TRecvTime.start();
     sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
-    StatTimer_RecvTime.stop();
+    TRecvTime.stop();
   }
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -1973,16 +1964,16 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_nonblocking_mpi(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
+    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
-    galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
+    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
     static std::vector<std::vector<uint8_t>> rb;
     static std::vector<MPI_Request> request;
 
     if (rb.size() == 0) { // create the receive buffers
-      StatTimer_RecvTime.start();
+      TRecvTime.start();
       auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
       rb.resize(numHosts);
       request.resize(numHosts, MPI_REQUEST_NULL);
@@ -1997,15 +1988,15 @@ private:
 
         rb[x].resize(size);
       }
-      StatTimer_RecvTime.stop();
+      TRecvTime.stop();
     }
 
-    StatTimer_RecvTime.start();
+    TRecvTime.start();
     sync_mpi_recv_post<writeLocation, readLocation, syncType, SyncFnTy, 
       BitsetFnTy>(loopName, request, rb);
-    StatTimer_RecvTime.stop();
+    TRecvTime.stop();
 
-    StatTimer_SendTime.start();
+    TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy, 
         BitsetFnTy>(loopName);
@@ -2013,12 +2004,12 @@ private:
       sync_mpi_send<writeLocation, readLocation, syncType, SyncFnTy, 
         galois::InvalidBitsetFnTy>(loopName);
     }
-    StatTimer_SendTime.stop();
+    TSendTime.stop();
 
-    StatTimer_RecvTime.start();
+    TRecvTime.start();
     sync_mpi_recv_wait<writeLocation, readLocation, syncType, SyncFnTy, 
       BitsetFnTy>(loopName, request, rb);
-    StatTimer_RecvTime.stop();
+    TRecvTime.stop();
   }
 
   /**
@@ -2028,16 +2019,16 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_onesided_mpi(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer StatTimer_SendTime((syncTypeStr + "_SEND_" + 
+    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
-    galois::StatTimer StatTimer_RecvTime((syncTypeStr + "_RECV_" + 
+    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
     static std::vector<MPI_Win> window;
     static std::vector<std::vector<uint8_t>> rb;
 
     if (window.size() == 0) { // create the windows
-      StatTimer_RecvTime.start();
+      TRecvTime.start();
       auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
       window.resize(numHosts);
       rb.resize(numHosts);
@@ -2059,10 +2050,10 @@ private:
         if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
         MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
       }
-      StatTimer_RecvTime.stop();
+      TRecvTime.stop();
     }
 
-    StatTimer_SendTime.start();
+    TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, 
         BitsetFnTy>(loopName, window);
@@ -2070,12 +2061,12 @@ private:
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, 
         galois::InvalidBitsetFnTy>(loopName, window);
     }
-    StatTimer_SendTime.stop();
+    TSendTime.stop();
 
-    StatTimer_RecvTime.start();
+    TRecvTime.start();
     sync_mpi_get<writeLocation, readLocation, syncType, SyncFnTy, 
       BitsetFnTy>(loopName, window, rb);
-    StatTimer_RecvTime.stop();
+    TRecvTime.stop();
   }
 #endif
   
@@ -2087,8 +2078,8 @@ private:
            typename ReduceFnTy, typename BitsetFnTy>
   inline void reduce(std::string loopName) {
     std::string timer_str("REDUCE_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
-    StatTimer_syncReduce.start();
+    galois::StatTimer TsyncReduce(timer_str.c_str(), GRNAME);
+    TsyncReduce.start();
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
     switch (bare_mpi) {
@@ -2113,7 +2104,7 @@ private:
     }
 #endif
 
-    StatTimer_syncReduce.stop();
+    TsyncReduce.stop();
   }
   
   /**
@@ -2124,9 +2115,9 @@ private:
            typename BroadcastFnTy, typename BitsetFnTy>
   inline void broadcast(std::string loopName) {
     std::string timer_str("BROADCAST_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_syncBroadcast(timer_str.c_str(), GRNAME);
+    galois::StatTimer TsyncBroadcast(timer_str.c_str(), GRNAME);
 
-    StatTimer_syncBroadcast.start();
+    TsyncBroadcast.start();
 
     bool use_bitset = true;
 
@@ -2178,7 +2169,7 @@ private:
     }
 #endif
 
-    StatTimer_syncBroadcast.stop();
+    TsyncBroadcast.stop();
   }
 
   // OEC - outgoing edge-cut : source of any edge is master
@@ -2336,8 +2327,8 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
-    galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
-    StatTimer_sync.start();
+    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    Tsync.start();
 
     if (writeLocation == writeSource) {
       if (readLocation == readSource) {
@@ -2365,7 +2356,7 @@ public:
       }
     }
 
-    StatTimer_sync.stop();
+    Tsync.stop();
   }
 
 private:
@@ -2584,8 +2575,8 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_sync(timer_str.c_str(), GRNAME);
-    StatTimer_sync.start();
+    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    Tsync.start();
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
 
@@ -2595,7 +2586,7 @@ public:
 
     currentBVFlag = nullptr;
 
-    StatTimer_sync.stop();
+    Tsync.stop();
   }
 
 #ifdef __GALOIS_CHECKPOINT__
@@ -2624,8 +2615,8 @@ private:
                         std::string loopName) {
     std::string set_timer_str("SYNC_SET_" + get_run_identifier(loopName));
     std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + get_run_identifier(loopName));
-    galois::StatTimer StatTimer_set(set_timer_str.c_str(), GRNAME);
-    StatTimer_set.start();
+    galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+    Tset.start();
 
     uint32_t num = masterNodes[from_id].size();
     std::vector<typename FnTy::ValTy> val_vec(num);
@@ -2652,7 +2643,7 @@ private:
       checkpoint_recvBuffer = std::move(buf);
     }
 
-    StatTimer_set.stop();
+    Tset.stop();
   }
 
   template<typename FnTy>
@@ -2666,9 +2657,9 @@ private:
                                   get_run_identifier(loopName));
     std::string doall_str("LAMBDA::REDUCE_" + get_run_identifier(loopName));
 
-    galois::StatTimer StatTimer_syncReduce(timer_str.c_str(), GRNAME);
+    galois::StatTimer TsyncReduce(timer_str.c_str(), GRNAME);
     galois::StatTimer StatTimerBarrier_syncReduce(timer_barrier_str.c_str(), GRNAME);
-    galois::StatTimer StatTimer_extract(extract_timer_str.c_str(), GRNAME);
+    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
 
     std::string statChkPtBytes_str("CHECKPOINT_BYTES_REDUCE_" + 
                                    get_run_identifier(loopName));
@@ -2677,9 +2668,9 @@ private:
     std::string checkpoint_timer_str("TIME_CHECKPOINT_REDUCE_MEM_" +
                                      get_run_identifier(loopName));
 
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint(checkpoint_timer_str.c_str(), GRNAME);
 
-    StatTimer_syncReduce.start();
+    TsyncReduce.start();
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     size_t SyncReduce_send_bytes = 0;
@@ -2690,7 +2681,7 @@ private:
 
       galois::runtime::SendBuffer b;
 
-      StatTimer_extract.start();
+      Textract.start();
       std::vector<typename FnTy::ValTy> val_vec(num);
 
       if (num > 0) {
@@ -2718,7 +2709,7 @@ private:
       SyncReduce_send_bytes += b.size();
       auto send_bytes = b.size();
 
-      StatTimer_checkpoint.start();
+      Tcheckpoint.start();
       if (x == (id + 1) % numHosts) {
         // checkpoint owned nodes.
         std::vector<typename FnTy::ValTy> checkpoint_val_vec(numOwned);
@@ -2734,8 +2725,8 @@ private:
         checkpoint_bytes += (b.size() - send_bytes);
       }
 
-      StatTimer_checkpoint.stop();
-      StatTimer_extract.stop();
+      Tcheckpoint.stop();
+      Textract.stop();
 
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
@@ -2763,7 +2754,7 @@ private:
     }
     ++galois::runtime::evilPhase;
 
-    StatTimer_syncReduce.stop();
+    TsyncReduce.stop();
   }
 
  /****************************************
@@ -2778,10 +2769,10 @@ public:
     std::string checkpoint_timer_str("TIME_CHECKPOINT_" + get_run_identifier());
     std::string checkpoint_fsync_timer_str("TIME_CHECKPOINT_FSYNC_" + 
                                            get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
-    galois::StatTimer StatTimer_checkpoint_fsync(checkpoint_fsync_timer_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint(checkpoint_timer_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint_fsync(checkpoint_fsync_timer_str.c_str(), GRNAME);
 
-    StatTimer_checkpoint.start();
+    Tcheckpoint.start();
 
     std::string statChkPtBytes_str("CHECKPOINT_BYTES_" + 
                                    get_run_identifier(loopName));
@@ -2848,16 +2839,16 @@ public:
     write(fd, reinterpret_cast<char*>(val_vec.data()), 
           val_vec.size() * sizeof(typename FnTy::ValTy));
     //chkPt_file.write(reinterpret_cast<char*>(val_vec.data()), val_vec.size()*sizeof(uint32_t));
-    StatTimer_checkpoint_fsync.start();
+    Tcheckpoint_fsync.start();
     #ifdef __CHECKPOINT_NO_FSYNC__
     #else
     fsync(fd);
     #endif
-    StatTimer_checkpoint_fsync.stop();
+    Tcheckpoint_fsync.stop();
 
     close(fd);
     //chkPt_file.close();
-    StatTimer_checkpoint.stop();
+    Tcheckpoint.stop();
   }
 
   template<typename FnTy>
@@ -2913,19 +2904,19 @@ public:
 
     std::string checkpoint_timer_str("TIME_CHECKPOINT_TOTAL_MEM_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint(checkpoint_timer_str.c_str(), GRNAME);
 
     std::string checkpoint_timer_send_str("TIME_CHECKPOINT_TOTAL_MEM_SEND_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint_send(checkpoint_timer_send_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint_send(checkpoint_timer_send_str.c_str(), GRNAME);
 
     std::string checkpoint_timer_recv_str("TIME_CHECKPOINT_TOTAL_MEM_recv_" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint_recv(checkpoint_timer_recv_str.c_str(), GRNAME);
+    galois::StatTimer Tcheckpoint_recv(checkpoint_timer_recv_str.c_str(), GRNAME);
 
-    StatTimer_checkpoint.start();
+    Tcheckpoint.start();
 
-    StatTimer_checkpoint_send.start();
+    Tcheckpoint_send.start();
     // checkpoint owned nodes.
     std::vector<typename FnTy::ValTy> val_vec(numOwned);
     galois::do_all(galois::iterate(0u, numOwned), 
@@ -2943,11 +2934,11 @@ public:
     // send to your neighbor on your left.
     net.sendTagged((net.ID + 1) % numHosts, galois::runtime::evilPhase, b);
 
-    StatTimer_checkpoint_send.stop();
+    Tcheckpoint_send.stop();
 
     net.flush();
 
-    StatTimer_checkpoint_recv.start();
+    Tcheckpoint_recv.start();
     // receiving the checkpointed data.
     decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
 
@@ -2959,8 +2950,8 @@ public:
     checkpoint_recvBuffer = std::move(p->second);
 
     ++galois::runtime::evilPhase;
-    StatTimer_checkpoint_recv.stop();
-    StatTimer_checkpoint.stop();
+    Tcheckpoint_recv.stop();
+    Tcheckpoint.stop();
   }
 
   template<typename FnTy>
@@ -2971,8 +2962,8 @@ public:
 
     std::string checkpoint_timer_str("TIME_CHECKPOINT_MEM_APPLY" + 
         get_run_identifier());
-    galois::StatTimer StatTimer_checkpoint(checkpoint_timer_str.c_str(), GRNAME);
-    StatTimer_checkpoint.start();
+    galois::StatTimer Tcheckpoint(checkpoint_timer_str.c_str(), GRNAME);
+    Tcheckpoint.start();
 
     uint32_t from_id;
     galois::runtime::RecvBuffer recv_checkpoint_buf;

@@ -280,9 +280,9 @@ public:
       GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
     }
 
-    galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
-    StatTimer_graph_construct.start();
-    galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM",
+    galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
+    Tgraph_construct.start();
+    galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM",
                                                      GRNAME);
 
     // only used to determine node splits among hosts; abandonded later
@@ -361,20 +361,20 @@ public:
 
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
-    galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", GRNAME);
-    StatTimer_thread_ranges.start();
+    galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+    Tthread_ranges.start();
     base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
-    StatTimer_thread_ranges.stop();
+    Tthread_ranges.stop();
 
     base_hGraph::determine_thread_ranges_master();
     base_hGraph::determine_thread_ranges_with_edges();
     base_hGraph::initialize_specific_ranges();
 
-    StatTimer_graph_construct.stop();
+    Tgraph_construct.stop();
 
-    StatTimer_graph_construct_comm.start();
+    Tgraph_construct_comm.start();
     base_hGraph::setup_communication();
-    StatTimer_graph_construct_comm.stop();
+    Tgraph_construct_comm.stop();
   }
 
   void loadStatistics(galois::graphs::OfflineGraph& g, 

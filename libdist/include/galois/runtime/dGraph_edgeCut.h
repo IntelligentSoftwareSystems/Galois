@@ -106,10 +106,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    std::vector<unsigned>& scalefactor, 
                    bool transpose = false) : 
                     base_hGraph(host, _numHosts) {
-      galois::StatTimer StatTimer_graph_construct("TIME_GRAPH_CONSTRUCT", 
+      galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", 
                                                   GRNAME);
-      StatTimer_graph_construct.start();
-      galois::StatTimer StatTimer_graph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
+      Tgraph_construct.start();
+      galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
                                                        GRNAME);
       uint32_t _numNodes;
       uint64_t _numEdges;
@@ -284,10 +284,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       // !transpose because tranpose finds thread ranges for you
       if (!transpose) {
-        galois::StatTimer StatTimer_thread_ranges("TIME_THREAD_RANGES", 
+        galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", 
                                                   GRNAME);
 
-        StatTimer_thread_ranges.start();
+        Tthread_ranges.start();
 
         base_hGraph::determine_thread_ranges(_numNodes, prefixSumOfEdges);
 
@@ -295,7 +295,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         //base_hGraph::determine_thread_ranges(0, _numNodes, 
         //                              base_hGraph::graph.getThreadRangesVector());
 
-        StatTimer_thread_ranges.stop();
+        Tthread_ranges.stop();
       }
 
       // find ranges for master + nodes with edges
@@ -303,11 +303,11 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::determine_thread_ranges_with_edges();
       base_hGraph::initialize_specific_ranges();
 
-      StatTimer_graph_construct.stop();
+      Tgraph_construct.stop();
 
-      StatTimer_graph_construct_comm.start();
+      Tgraph_construct_comm.start();
       base_hGraph::setup_communication();
-      StatTimer_graph_construct_comm.stop();
+      Tgraph_construct_comm.stop();
     }
 
   uint32_t G2L(uint64_t gid) const {
