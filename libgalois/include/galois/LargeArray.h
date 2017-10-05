@@ -32,7 +32,7 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
-#include "galois/gstl.h"
+#include "galois/ParallelSTL.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
 #include "galois/substrate/NumaMem.h"
@@ -226,12 +226,16 @@ public:
 
   void destroy() {
     if (!m_data) return;
-    uninitialized_destroy(m_data, m_data + m_size);
+    galois::ParallelSTL::destroy(m_data, m_data + m_size);
   }
 
-  void destroyAt(size_type n) {
+  template<typename U = T>
+  std::enable_if_t<!std::is_scalar<U>::value> destroyAt(size_type n) {
     (&m_data[n])->~T();
   }
+
+  template<typename U = T>
+  std::enable_if_t<std::is_scalar<U>::value> destroyAt(size_type n) { }
 
   // The following methods are not shared with void specialization
   const_pointer data() const { return m_data; }
