@@ -294,6 +294,19 @@ T map_reduce(InputIterator first, InputIterator last, MapFn mapFn, ReduceFn redu
 
 }
 
+template<typename I>
+std::enable_if_t<!std::is_scalar<internal::Val_ty<I> >::value> destroy (I first, I last) {
+  using T = internal::Val_ty<I>;
+  do_all(iterate(first, last),
+    [=] (T& i) {
+      (&i)->~T();
+    },
+    no_stats());
+}
+
+template<class I>
+std::enable_if_t<std::is_scalar<internal::Val_ty<I> >::value> destroy (I, I) { }
+
 } // end namespace ParallelSTL
 } // end namespace galois
 #endif
