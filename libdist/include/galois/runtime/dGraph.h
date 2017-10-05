@@ -656,6 +656,7 @@ protected:
                      },
                      galois::loopname(get_run_identifier("MASTER_NODES").c_str()),
                      galois::timeit(),
+                     galois::steal<false>(),
                      galois::no_stats());
     }
 
@@ -666,6 +667,7 @@ protected:
                      },
                      galois::loopname(get_run_identifier("MIRROR_NODES").c_str()),
                      galois::timeit(),
+                     galois::steal<false>(),
                      galois::no_stats());
     }
 
@@ -1185,6 +1187,7 @@ private:
                      },
                      galois::loopname(get_run_identifier(doall_str).c_str()),
                      galois::timeit(),
+                     galois::steal<false>(),
                      galois::no_stats());
 
       // get the number of set bits and the offsets into the comm bitset
@@ -1251,6 +1254,7 @@ private:
                      },
                      galois::loopname(get_run_identifier(doall_str).c_str()),
                      galois::timeit(),
+                     galois::steal<false>(),
                      galois::no_stats());
     } else {
       for (unsigned n = start; n < start + size; ++n) {
@@ -1289,6 +1293,7 @@ private:
             gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
           }, 
           galois::loopname(get_run_identifier(doall_str).c_str()),
+          galois::steal<false>(),
           galois::timeit(),
           galois::no_stats());
     } else {
@@ -1408,6 +1413,7 @@ private:
             set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
           }, 
           galois::loopname(get_run_identifier(doall_str).c_str()),
+          galois::steal<false>(),
           galois::timeit(),
           galois::no_stats());
     } else {
@@ -1481,6 +1487,7 @@ private:
         }, 
         galois::loopname(get_run_identifier(doall_str).c_str()), 
         galois::timeit(),
+        galois::steal<false>(),
         galois::no_stats());
   }
   
@@ -1499,6 +1506,7 @@ private:
           offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
         }, 
         galois::loopname(get_run_identifier(doall_str).c_str()), 
+        galois::steal<false>(),
         galois::timeit(),
         galois::no_stats());
   }
