@@ -60,36 +60,6 @@ class SharedMemApp(GraphBMKSharedMem):
     def get_run_spec(self, bmkinput, config):
         return self.get_default_run_specs(bmkinput, config)
 
-class BFS(SharedMemApp):
-    relativeAppPath = "bfs/bfs"
-    benchmark = "bfs"
-    startThread = 80
-    endThread = 80
-    step = 10
-
-class SSSP(SharedMemApp):
-    relativeAppPath = "sssp/sssp"
-    benchmark = "sssp"
-    startThread = 80
-    endThread = 80
-    step = 10
-
-    def get_run_spec(self, bmkinput, config):
-        """Adds delta argument to runs."""
-        specs = self.get_default_run_specs(bmkinput, config)
-
-        for s in specs:
-            s.set_arg("-delta=8")
-        
-        return specs
-
-class DMR(SharedMemApp):
-    relativeAppPath = "delaunayrefinement/delaunayrefinement"
-    benchmark = "dmr"
-    startThread = 80
-    endThread = 80
-    step = 10
-
 class BarnesHut(SharedMemApp):
     relativeAppPath = "barneshut/barneshut"
     benchmark = "barneshut"
@@ -122,6 +92,54 @@ class BCInner(SharedMemApp):
     endThread = 80
     step = 10
 
+class BFS(SharedMemApp):
+    relativeAppPath = "bfs/bfs"
+    benchmark = "bfs"
+    startThread = 80
+    endThread = 80
+    step = 10
+
+class DMR(SharedMemApp):
+    relativeAppPath = "delaunayrefinement/delaunayrefinement"
+    benchmark = "dmr"
+    startThread = 80
+    endThread = 80
+    step = 10
+
+class GMetis(SharedMemApp):
+    relativeAppPath = "gmetis/gmetis"
+    benchmark = "gmetis"
+    startThread = 80
+    endThread = 80
+    step = 10
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds gmetis specific arguments (num partitions)"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("256")
+        
+        return specs
+
+
+class SSSP(SharedMemApp):
+    relativeAppPath = "sssp/sssp"
+    benchmark = "sssp"
+    startThread = 80
+    endThread = 80
+    step = 10
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds delta argument to runs."""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-delta=8")
+        
+        return specs
+
+
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [BCOuter(), BCInner()]
+BINARIES = [GMetis()]
