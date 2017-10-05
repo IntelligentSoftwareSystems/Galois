@@ -34,3 +34,4 @@ distApp(bfs_push-filter_od)
 
 distApp(pagerank_pull_od)
 distAppNoGPU(toy_read)
+distAppNoGPU(toyinspect)
