@@ -36,6 +36,7 @@
 #define GALOIS_BAG_H
 
 #include "galois/gstl.h"
+#include "galois/runtime/Executor_OnEach.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
@@ -183,7 +184,7 @@ private:
   }
 
   void destruct_parallel(void) {
-    galois::on_each(
+    galois::runtime::on_each_gen(
         [this] (const unsigned tid, const unsigned numT) {
           PerThread& hpair = *heads.getLocal(tid);
           header*& h = hpair.first;
@@ -197,7 +198,7 @@ private:
               galois::runtime::pagePoolFree(h2);
           }
           hpair.second = 0;
-        });
+        }, std::make_tuple(galois::no_stats()));
   }
 
 public:

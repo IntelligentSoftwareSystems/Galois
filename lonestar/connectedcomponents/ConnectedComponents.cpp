@@ -186,7 +186,7 @@ struct SynchronousAlgo {
   };
 
   void operator()(Graph& graph) {
-    size_t rounds;
+    size_t rounds = 0;
     galois::GAccumulator<size_t> emptyMerges;
 
     galois::InsertBag<Edge> wls[2];
@@ -650,10 +650,13 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
 
   using GNode = typename Graph::GraphNode;
   using component_type = typename Graph::node_data_type::component_type;
-  using Map = galois::gstl::Map<component_type, int>;
-  using ComponentSizePair = typename Map::value_type;
+
+  using ReducerMap = galois::GMapPerItemReduce<component_type, int, std::plus<int> >;
+  using Map = typename ReducerMap::container_type;
+
+  using ComponentSizePair = std::pair<component_type, int>;
   
-  galois::GMapElementAccumulator<Map> accumMap;
+  ReducerMap accumMap;
   galois::GAccumulator<size_t> accumReps;
 
   galois::do_all(galois::iterate(graph), 
@@ -680,7 +683,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
     return b;
   };
 
-  using MaxComp = galois::GSimpleReducible<ComponentSizePair, decltype(sizeMax)>;
+  using MaxComp = galois::GSimpleReducible<decltype(sizeMax), ComponentSizePair>;
   MaxComp maxComp(sizeMax);
 
 

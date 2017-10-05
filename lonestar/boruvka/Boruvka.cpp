@@ -444,13 +444,10 @@ void run() {
 
   auto get_weight = [] (const Edge& e) { return *e.weight; };
 
-  std::cout << "MST weight: "
-    << galois::ParallelSTL::map_reduce(algo.mst.begin(), algo.mst.end(),
-        get_weight, 0.0, std::plus<double>())
-    << " ("
-    << galois::ParallelSTL::map_reduce(algo.mst.begin(), algo.mst.end(),
-        get_weight, 0UL, std::plus<size_t>())
-    << ")\n";
+  auto w = galois::ParallelSTL::map_reduce(algo.mst.begin(), algo.mst.end()
+      , get_weight, std::plus<size_t>(), 0ul);
+
+  std::cout << "MST weight: " << w << std::endl;
 
   if (!skipVerify && !algo.verify()) {
     GALOIS_DIE("verification failed");

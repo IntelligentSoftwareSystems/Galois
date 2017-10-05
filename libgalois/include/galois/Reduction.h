@@ -348,7 +348,7 @@ struct ReduceVecPerItemWrap {
   template<typename C>
   void operator()(C& lhs, const C& rhs) const {
     if (lhs.size() < rhs.size())
-      lhs.resize(rhs.size(), identity);
+      lhs.resize(rhs.size(), elemIdentity);
     typename C::iterator ii = lhs.begin();
     for (typename C::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++ii, ++jj) {
       func(*ii, *jj);
@@ -378,26 +378,33 @@ struct ReduceMapPerItemWrap {
   }
 };
 
+template <typename ItemReduceFn, typename T>
+using VecItemReduceFn = ReduceVecPerItemWrap<ReduceAssignWrap<ItemReduceFn>, T >;
+
+template <typename ItemReduceFn, typename T>
+using MapItemReduceFn = ReduceMapPerItemWrap<ReduceAssignWrap<ItemReduceFn>, T >;
 } // end namespace internal
 
 //! Accumulator for vector where a vector is treated as a map and accumulate
 //! does element-wise addition among all entries
-template<typename T, typename ItemReduceFn=std::plus<T>, typename VectorTy = galois::gstl::Vector<T> >
+template<typename T, typename ItemReduceFn=std::plus<T>, typename VecTy = galois::gstl::Vector<T> >
 class GVectorPerItemReduce: 
-  public GBigReducible<VectorTy, internal::ReduceVecPerItemWrap<internal::ReduceAssignWrap<ItemReduceFn>, T > > {
+  public GBigReducible<internal::VecItemReduceFn<ItemReduceFn, T>, VecTy > {
 
-  typedef internal::ReduceAssignWrap<ItemReduceFn> ElemFn;
-  typedef internal::ReduceVecPerItemWrap<ElemFn, T> VecReduceFn;
-  typedef GBigReducible<VectorTy, VecReduceFn> base_type;
+  using VecReduceFn =  internal::VecItemReduceFn<ItemReduceFn, T>;
+  using base_type =  GBigReducible<VecReduceFn, VecTy>;
 
-  assert(std::is_same<VectorTy::value_type, T>::value, "T doesn't match VectorTy::value_type");
+  static_assert(std::is_same<typename VecTy::value_type, T>::value, "T doesn't match VecTy::value_type");
 
   VecReduceFn vecFn;
 
 public:
 
+  using container_type = VecTy;
+  using value_type = typename VecTy::value_type;
+
   GVectorPerItemReduce(const ItemReduceFn& func=ItemReduceFn(), const T& identity=T())
-    : base_type(), vecFn(func, identity), elemIdentity(identity)
+    : base_type(), vecFn(func, identity)
   {}
 
   void resizeAll(size_t s) {
@@ -406,12 +413,12 @@ public:
     }
   }
 
-  void update(size_t index, const T& rhs) {
-    VectorTy& v = *this->m_data.getLocal();
+  void update(size_t index, const T& value) {
+    VecTy& v = *this->m_data.getLocal();
     if (v.size() <= index) {
       v.resize(index + 1, vecFn.elemIdentity);
     }
-    vecFn.func(v[index], rhs);
+    vecFn.func(v[index], value);
   }
 };
 
@@ -420,30 +427,33 @@ using GDequePerItemReduce = GVectorPerItemReduce<T, ItemReduceFn, Deq>;
 
 //! Accumulator for map where accumulate does element-wise addition among
 //! all entries
-template <typename K, typename V, typename C=std::less<K>, typename ItemReduceFn=std::plus<V>
+template <typename K, typename V, typename ItemReduceFn=std::plus<V>, typename C=std::less<K>
           , typename MapTy=gstl::Map<K, V, C> >
 class GMapPerItemReduce: 
-  public GBigReducible<MapTy, internal::ReduceMapPerItemWrap<internal::ReduceAssignWrap<ItemReduceFn>, V > > {
+  public GBigReducible<internal::MapItemReduceFn<ItemReduceFn, V>, MapTy> {
 
-  typedef internal::ReduceAssignWrap<ItemReduceFn> ElemFn;
-  typedef internal::ReduceMapPerItemWrap<ElemFn, V> MapReduceFn;
-  typedef GBigReducible<MapTy, ReduceMapPerItemWrap<ElemFn> > base_type;
+  using MapReduceFn =  internal::MapItemReduceFn<ItemReduceFn, V>;
+  using base_type =  GBigReducible<MapReduceFn, MapTy>;
 
-  assert(std::is_same<typename MapTy::key_type, K>::value, "K doesn't match MapTy::key_type");
-  assert(std::is_same<typename MapTy::mapped_type, V>::value, "V doesn't match MapTy::mapped_type");
+  static_assert(std::is_same<typename MapTy::key_type, K>::value, "K doesn't match MapTy::key_type");
+  static_assert(std::is_same<typename MapTy::mapped_type, V>::value, "V doesn't match MapTy::mapped_type");
 
   MapReduceFn mapFn;
 
 public:
+
+  using container_type = MapTy;
+  using value_type = typename MapTy::value_type;
+
   GMapPerItemReduce(const ItemReduceFn& func=ItemReduceFn(), const V& identity=V())
-    : base_type(), vecFn(func, identity)
+    : base_type(), mapFn(func, identity)
   {}
 
 
-  void update(const key_type& key, const V& value) {
+  void update(const K& key, const V& value) {
     MapTy& v = *this->m_data.getLocal();
     v.insert(typename MapTy::value_type(key, mapFn.elemIdentity)); // insert v[key] if absent, v[] must return valid
-    mapFn.func(v[key], rhs);
+    mapFn.func(v[key], value);
   }
 };
 
@@ -533,6 +543,9 @@ struct ContAccum: public GBigReducible<MergeFunc, C> {
 
   using Base = GBigReducible<MergeFunc, C>;
 
+  using container_type = C;
+  using value_type = typename C::value_type;
+
   ContAccum(const MergeFunc& f=MergeFunc(), const C& identity=C())
     : Base(f, identity)
   {}
@@ -562,8 +575,8 @@ class GListAccumulator: public internal::ContAccum<internal::ListMerger<ListTy>,
 // class GSetAccumulator: public GCollectionAccumulator<SetTy, std::insert_iterator> { };
 // 
 // //! Accumulator for vector where accumulation is concatenation
-// template<typename VectorTy>
-// class GVectorAccumulator: public GCollectionAccumulator<VectorTy, std::back_insert_iterator> { };
+// template<typename VecTy>
+// class GVectorAccumulator: public GCollectionAccumulator<VecTy, std::back_insert_iterator> { };
 
 } // namespace galois
 #endif// GALOIS_REDUCTION_H

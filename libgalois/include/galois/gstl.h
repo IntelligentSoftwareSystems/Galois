@@ -174,18 +174,22 @@ std::pair<IntTy, IntTy> block_range(IntTy b, IntTy e, unsigned id,
   return std::make_pair(b,e);
 }
 
-//! Destroy a range
-template<class InputIterator>
-typename _U = std::enable_if_t<!std::is_scalar<T>::value>::type uninitialized_destroy (InputIterator first, InputIterator last) {
+namespace internal {
+template <typename I>
+using Val_ty = typename std::iterator_traits<I>::value_type;
+} // end internal
 
-  typedef typename std::iterator_traits<InputIterator>::value_type T;
+//! Destroy a range
+template<typename I>
+std::enable_if_t<!std::is_scalar<internal::Val_ty<I> >::value> uninitialized_destroy (I first, I last) {
+
+  using T = internal::Val_ty<I>;
   for (; first!=last; ++first)
     (&*first)->~T();
 }
 
-template<class InputIterator>
-typename _U = std::enable_if_t<!std::is_scalar<T>::value>::type uninitialized_destroy (InputIterator, InputIterator) {
-}
+template<class I>
+std::enable_if_t<std::is_scalar<internal::Val_ty<I> >::value> uninitialized_destroy (I, I) { }
 
 }
 #endif
