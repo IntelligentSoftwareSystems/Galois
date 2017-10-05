@@ -6,6 +6,7 @@ gmetis USA-road-d.USA
 independentset r4-2e26
 mcm nothing
 preflowpush r4-2e26
+pta nothing
 sssp r4-2e26
 # TODO get graphs for bc
 #bc-outer

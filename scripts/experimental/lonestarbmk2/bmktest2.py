@@ -151,6 +151,20 @@ class PreflowPush(SharedMemApp):
         
         return specs
 
+class PointsToAnalysis(SharedMemApp):
+    relativeAppPath = "pta/pta"
+    benchmark = "pta"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds pta specific arguments"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("0") # TODO what are contraints?
+        
+        return specs
+
+
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
     benchmark = "sssp"
@@ -167,4 +181,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [PreflowPush()]
+BINARIES = [PointsToAnalysis()]
