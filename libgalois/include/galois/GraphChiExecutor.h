@@ -16,7 +16,7 @@ namespace internal {
 template<bool PassWrappedGraph>
 struct DispatchOperator {
   template<typename O,typename G,typename N>
-  void run(O&& o, G&& g, N&& n) {
+  static void run(O&& o, G&& g, N&& n) {
     std::forward<O>(o)(std::forward<G>(g), std::forward<N>(n));
   }
 };
@@ -24,103 +24,12 @@ struct DispatchOperator {
 template<>
 struct DispatchOperator<false> {
   template<typename O,typename G,typename N>
-  void run(O&& o, G&& g, N&& n) {
+  static void run(O&& o, G&& g, N&& n) {
     std::forward<O>(o)(std::forward<N>(n));
   }
 };
 
-template<bool PassWrappedGraph,typename Graph,typename WrappedGraph,typename VertexOperator>
-class SparseVertexMap: public DispatchOperator<PassWrappedGraph> {
-  typedef typename Graph::segment_type segment_type;
-  typedef typename Graph::GraphNode GNode;
 
-  Graph& graph;
-  WrappedGraph& wrappedGraph;
-  VertexOperator op;
-  int& first;
-  segment_type& prev;
-  segment_type& cur;
-  segment_type& next;
-  bool updated;
-
-public:
-  typedef int tt_does_not_need_push;
-  typedef int tt_does_not_need_aborts;
-
-  SparseVertexMap(Graph& g, WrappedGraph& w, VertexOperator op, int& f,
-      segment_type& p, segment_type& c, segment_type& n):
-    graph(g), wrappedGraph(w), op(op), first(f), prev(p), cur(c), next(n), updated(false) { }
-
-  void operator()(size_t n, galois::UserContext<size_t>&) {
-    (*this)(n);
-  }
-
-  void operator()(size_t n) {
-    if (!updated) {
-      if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
-        if (prev.loaded()) {
-          graph.unload(prev);
-        }
-        if (next) {
-          graph.load(next);
-        }
-      }
-      updated = true;
-    }
-    // Check if range
-    if (!cur.containsNode(n)) {
-      return;
-    }
-
-    this->run(op, wrappedGraph, graph.nodeFromId(n));
-  }
-};
-
-template<bool CheckInput,bool PassWrappedGraph,typename Graph,typename WrappedGraph,typename VertexOperator,typename Bag>
-class DenseVertexMap: public DispatchOperator<PassWrappedGraph> {
-  typedef typename Graph::segment_type segment_type;
-  typedef typename Graph::GraphNode GNode;
-
-  Graph& graph;
-  WrappedGraph& wrappedGraph;
-  VertexOperator op;
-  Bag* bag;
-  int& first;
-  segment_type& prev;
-  segment_type& cur;
-  segment_type& next;
-  bool updated;
-
-public:
-  typedef int tt_does_not_need_push;
-  typedef int tt_does_not_need_aborts;
-
-  DenseVertexMap(Graph& g, WrappedGraph& w, VertexOperator op, Bag* b, int& f,
-      segment_type& p, segment_type& c, segment_type& n):
-    graph(g), wrappedGraph(w), op(op), bag(b), first(f), prev(p), cur(c), next(n), updated(false) { }
-
-  void operator()(GNode n, galois::UserContext<GNode>&) {
-    (*this)(n);
-  }
-
-  void operator()(GNode n) {
-    if (!updated) {
-      if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
-        if (prev.loaded()) {
-          graph.unload(prev);
-        }
-        if (next) {
-          graph.load(next);
-        }
-      }
-      updated = true;
-    }
-    if (CheckInput && !bag->contains(graph.idFromNode(n)))
-      return;
-
-    this->run(op, wrappedGraph, n);
-  }
-};
 
 template<typename Graph,typename Bag>
 struct contains_node {
@@ -184,7 +93,7 @@ bool fitsInMemory(Graph& graph, size_t memoryLimit) {
 template<bool CheckInput, bool PassWrappedGraph, typename Graph, typename WrappedGraph, typename VertexOperator, typename Bag>
 void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input, size_t memoryLimit) {
   typedef typename Graph::segment_type segment_type;
-  galois::Statistic rounds("GraphChiRounds");
+  galois::GAccumulator<size_t> rounds;
   
   size_t edges = computeEdgeLimit(graph, memoryLimit);
   segment_type prev;
@@ -212,14 +121,56 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
       segment_type next = graph.nextSegment(cur, edges);
 
       int first = 0;
+      bool updated = false;
       wgraph.setSegment(cur);
 
       if (useDense) {
-        DenseVertexMap<CheckInput,PassWrappedGraph,Graph,WrappedGraph,VertexOperator,Bag> vop(graph, wgraph, op, input, first, prev, cur, next);
-        galois::for_each(galois::iterate(graph.begin(cur), graph.end(cur)), vop);
+
+        galois::do_all(galois::iterate(graph.begin(cur), graph.end(cur)), 
+            [&] (typename Graph::GraphNode n) {
+              if (!updated) {
+                if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
+                  if (prev.loaded()) {
+                    graph.unload(prev);
+                  }
+                  if (next) {
+                    graph.load(next);
+                  }
+                }
+                updated = true;
+              }
+              if (CheckInput && !input->contains(graph.idFromNode(n)))
+                return;
+
+              DispatchOperator<PassWrappedGraph>::run(op, wgraph, n);
+            },
+            galois::loopname("DenseVertexMap"));
+
+
       } else {
-        SparseVertexMap<PassWrappedGraph,Graph,WrappedGraph,VertexOperator> vop(graph, wgraph, op, first, prev, cur, next);
-        galois::for_each(galois::iterate(*input), vop);
+        galois::do_all(galois::iterate(*input), 
+            [&] (size_t n) {
+              if (!updated) {
+                if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
+                  if (prev.loaded()) {
+                    graph.unload(prev);
+                  }
+                  if (next) {
+                    graph.load(next);
+                  }
+                }
+                updated = true;
+              }
+              // Check if range
+              if (!cur.containsNode(n)) {
+                return;
+              }
+
+              DispatchOperator<PassWrappedGraph>::run(op, wgraph, graph.nodeFromId(n));
+
+
+            },
+            galois::loopname("SparseVertexMap"));
       }
 
       // XXX Shouldn't be necessary
@@ -244,6 +195,9 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
 
   if (prev.loaded())
     graph.unload(prev);
+
+
+  galois::runtime::reportStat_Single("GraphChiExec", "Rounds", rounds.reduce());
 }
 } // end namespace
 

@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galois is a framework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -37,9 +37,191 @@
 namespace galois {
 
 /**
- * GReducible stores per thread values of a variable of type T
+ * GSimpleReducible stores per thread values of a variable of type T, suitable
+ * for small, cheap to copy, plain T types, where T is not a container, is small
+ * and does not allocate memory
  *
  * The final value is obtained by performing a reduction on per thread values
+ * using the provided binary functor BinFunc. BinFunc conforms to STL semantics, 
+ * such as std::plus<T>, with signature:
+ *  T operator()(const T& lhs, const T& rhs)
+ *
+ * The identity value provided to the constructor is the identity element for the
+ * binary functor.
+ * i.e. f(x, identity) == x
+ */
+template<typename BinFunc, typename T>
+class GSimpleReducible {
+
+protected:
+  BinFunc m_func;
+  const T m_identity;
+  galois::substrate::PerThreadStorage<T> m_data;
+
+  void initialize (void) {
+    for (unsigned i = 0; i < m_data.size (); ++i) {
+      *(m_data.getRemote (i)) = m_identity;
+    }
+  }
+
+public:
+
+  /**
+   * @param f the binary functor acting as the reduction operator
+   * @param identity is the identity value for the functor f, 
+   * i.e., f(x,identity) == x
+   */
+  explicit GSimpleReducible(const BinFunc& func=BinFunc(), const T& identity=T())
+    : m_func(func), m_identity(identity) { 
+    initialize ();
+  }
+
+
+  /**
+   * Updates the thread local value by applying the reduction operator to
+   * current and newly provided value
+   */
+  template<typename T2>
+  void update(const T2& rhs) {
+    T& lhs = *m_data.getLocal();
+    lhs = m_func(lhs, rhs);
+  }
+
+  /**
+   * Returns the final reduction value. Only valid outside the parallel region.
+   */
+  T reduce() const {
+    T res = *m_data.getLocal();
+    for (unsigned int i = 1; i < m_data.size(); ++i) {
+      const T& d = *m_data.getRemote(i);
+      res = m_func(res, d);
+    }
+    return res;
+  }
+
+  /**
+   * Returns the final reduction value. Only valid outside the parallel region.
+   */
+  template<typename FnAlt>
+  T reduce(FnAlt fn) {
+    T res = *m_data.getLocal();
+    for (unsigned int i = 1; i < m_data.size(); ++i) {
+      const T& d = *m_data.getRemote(i);
+      res = fn(res, d);
+    }
+    return res;
+  }
+
+  /**
+   * reset value 
+   */
+  void reset() {
+    for (unsigned int i = 0; i < m_data.size(); ++i) {
+      *m_data.getRemote(i) = m_identity;
+    }
+  }
+
+
+  /**
+   * @return read the current local value for this thread
+   * performs an unsynchronized read
+   *
+   */
+  T peekLocal(void) const {
+    return *m_data.getLocal();
+  }
+
+  /**
+   * @param thread id tid
+   * reads (in unsynchronized manner) the value of another thread 'tid'
+   * value may be incorrect and may be usafe to use as it may return an object 
+   * in an intermediate state while its being updated
+   */
+  T peekRemote(unsigned tid) {
+    return *m_data.getRemote(tid);
+  }
+
+  size_t size(void) const {
+    return m_data.size();
+  }
+
+};
+
+
+//! Operator form of max
+template<typename T>
+struct gmax {
+  const T& operator()(const T& lhs, const T& rhs) const {
+    return std::max<T>(lhs, rhs);
+  }
+};
+
+//! Operator form of min
+template<typename T>
+struct gmin {
+  const T& operator()(const T& lhs, const T& rhs) const {
+    return std::min<T>(lhs, rhs);
+  }
+};
+
+
+//! Accumulator for T where accumulation is sum
+template<typename T>
+class GAccumulator: public GSimpleReducible<std::plus<T>, T> {
+  typedef GSimpleReducible<std::plus<T>, T> base_type;
+
+public:
+
+  GAccumulator& operator+=(const T& rhs) {
+    base_type::update(rhs);
+    return *this;
+  }
+
+  GAccumulator& operator-=(const T& rhs) {
+    base_type::update(-rhs);
+    return *this;
+ }
+
+};
+
+//! Accumulator for T where accumulation is max
+template<typename T>
+class GReduceMax: public GSimpleReducible<gmax<T>, T> {
+  typedef GSimpleReducible<gmax<T>, T > base_type;
+public:
+  GReduceMax(): base_type(gmax<T> (), std::numeric_limits<T>::min()) { }
+};
+
+//! Accumulator for T where accumulation is min
+template<typename T>
+class GReduceMin: public GSimpleReducible<gmin<T>, T > {
+  typedef GSimpleReducible<gmin<T>, T > base_type;
+public:
+  GReduceMin(): base_type(gmin<T> (), std::numeric_limits<T>::max()) { }
+};
+
+
+//! logical AND reduction
+class GReduceLogicalAND: public GSimpleReducible<std::logical_and<bool>, bool > {
+  typedef GSimpleReducible<std::logical_and<bool>, bool > base_type;
+public:
+  GReduceLogicalAND (void): base_type (std::logical_and<bool> (), true) {}
+};
+
+class GReduceLogicalOR: public GSimpleReducible<std::logical_or<bool>, bool > {
+  typedef GSimpleReducible<std::logical_or<bool>, bool > base_type;
+public:
+  GReduceLogicalOR (void): base_type (std::logical_or<bool> (), false) {}
+
+};
+
+/**
+ * GBigReducible stores per thread values of a variable of type T. Suitable 
+ * for large objects, objects that are not trivially copyable or are inefficient to 
+ * copy, such as containers, or objects that allocate memory internally
+ *
+ * The final value is obtained by performing a reduction on per thread values
+ * and accumulating the result on master thread (thread 0), 
  * using the provided binary functor BinFunc. BinFunc updates values in place
  * and conforms to:
  *
@@ -49,8 +231,8 @@ namespace galois {
  * binary functor.
  * i.e. f(x, identity) == x
  */
-template<typename T, typename BinFunc>
-class GReducible {
+template<typename BinFunc, typename T>
+class GBigReducible {
 protected:
   BinFunc m_func;
   galois::substrate::PerThreadStorage<T> m_data;
@@ -66,20 +248,14 @@ public:
 
   /**
    * @param f the binary functor acting as the reduction operator
-   * @param identity is the identity value for the functor f,
+   * @param identity is the identity value for the functor f, 
    * i.e., f(x,identity) == x
    */
-  explicit GReducible(const BinFunc& f, const T& identity): m_func(f), m_identity(identity) {
+  explicit GBigReducible(const BinFunc& f=BinFunc(), const T& identity=T())
+    : m_func(f), m_identity(identity) { 
     initialize ();
   }
 
-  /**
-   * @param f the binary functor acting as the reduction operator
-   * default constructor T() assumed to yield identity value
-   */
-  explicit GReducible(const BinFunc& f = BinFunc()): m_func(f), m_identity(T()) {
-    initialize ();
-  }
 
   /**
    * Updates the thread local value by applying the reduction operator to
@@ -119,31 +295,27 @@ public:
   }
 
   /**
-   * reset value
+   * reset value 
    */
   void reset() {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
       *m_data.getRemote(i) = m_identity;
     }
   }
-};
 
-
-//! Operator form of max
-template<typename T>
-struct gmax {
-  const T& operator()(const T& lhs, const T& rhs) const {
-    return std::max<T>(lhs, rhs);
+  T& peekLocal(void) {
+    return *m_data.getLocal();
   }
+
+  const T& peekLocal(void) const {
+    return *m_data.getLocal();
+  }
+
+  
+
 };
 
-//! Operator form of min
-template<typename T>
-struct gmin {
-  const T& operator()(const T& lhs, const T& rhs) const {
-    return std::min<T>(lhs, rhs);
-  }
-};
+namespace internal {
 
 //! Turns binary functions over values into functions over references
 //!
@@ -163,17 +335,23 @@ struct ReduceAssignWrap {
 //!
 //! void operator()(T& a, const T& b) =>
 //! void operator()(std::vector<T>& a, const std::vector<T>& b)
-template<typename BinFunc>
-struct ReduceVectorWrap {
-  BinFunc fn;
-  ReduceVectorWrap(const BinFunc& f = BinFunc()): fn(f) { }
-  template<typename T>
-  void operator()(T& lhs, const T& rhs) const {
+template<typename BinFunc, typename T>
+struct ReduceVecPerItemWrap {
+
+  BinFunc func;
+  const T elemIdentity;
+
+  explicit ReduceVecPerItemWrap(const BinFunc& f = BinFunc(), const T& identity=T())
+    : func(f), elemIdentity(identity)
+  { }
+
+  template<typename C>
+  void operator()(C& lhs, const C& rhs) const {
     if (lhs.size() < rhs.size())
-      lhs.resize(rhs.size());
-    typename T::iterator ii = lhs.begin();
-    for (typename T::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++ii, ++jj) {
-      fn(*ii, *jj);
+      lhs.resize(rhs.size(), identity);
+    typename C::iterator ii = lhs.begin();
+    for (typename C::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++ii, ++jj) {
+      func(*ii, *jj);
     }
   }
 };
@@ -182,15 +360,90 @@ struct ReduceVectorWrap {
 //!
 //! void operator()(V& a, const V& b) =>
 //! void operator()(std::map<K,V>& a, const std::map<K,V>& b)
-template<typename BinFunc>
-struct ReduceMapWrap {
-  BinFunc fn;
-  ReduceMapWrap(const BinFunc& f = BinFunc()): fn(f) { }
-  template<typename T>
-  void operator()(T& lhs, const T& rhs) const {
-    for (typename T::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++jj) {
-      fn(lhs[jj->first], jj->second);
+template<typename BinFunc, typename T>
+struct ReduceMapPerItemWrap {
+  BinFunc func;
+  const T elemIdentity;
+
+  ReduceMapPerItemWrap(const BinFunc& f = BinFunc(), const T& identity=T())
+    : func(f), elemIdentity(identity)
+  { }
+
+  template<typename C>
+  void operator()(C& lhs, const C& rhs) const {
+    for (typename C::const_iterator jj = rhs.begin(), ej = rhs.end(); jj != ej; ++jj) {
+      lhs.insert(typename C::value_type(jj->first, elemIdentity)); // rhs key must be in lhs for lhs[] to work
+      func(lhs[jj->first], jj->second);
     }
+  }
+};
+
+} // end namespace internal
+
+//! Accumulator for vector where a vector is treated as a map and accumulate
+//! does element-wise addition among all entries
+template<typename T, typename ItemReduceFn=std::plus<T>, typename VectorTy = galois::gstl::Vector<T> >
+class GVectorPerItemReduce: 
+  public GBigReducible<VectorTy, internal::ReduceVecPerItemWrap<internal::ReduceAssignWrap<ItemReduceFn>, T > > {
+
+  typedef internal::ReduceAssignWrap<ItemReduceFn> ElemFn;
+  typedef internal::ReduceVecPerItemWrap<ElemFn, T> VecReduceFn;
+  typedef GBigReducible<VectorTy, VecReduceFn> base_type;
+
+  assert(std::is_same<VectorTy::value_type, T>::value, "T doesn't match VectorTy::value_type");
+
+  VecReduceFn vecFn;
+
+public:
+
+  GVectorPerItemReduce(const ItemReduceFn& func=ItemReduceFn(), const T& identity=T())
+    : base_type(), vecFn(func, identity), elemIdentity(identity)
+  {}
+
+  void resizeAll(size_t s) {
+    for (int i = 0; i < this->m_data.size(); ++i) {
+      this->m_data.getRemote(i)->resize(s, vecFn.elemIdentity);
+    }
+  }
+
+  void update(size_t index, const T& rhs) {
+    VectorTy& v = *this->m_data.getLocal();
+    if (v.size() <= index) {
+      v.resize(index + 1, vecFn.elemIdentity);
+    }
+    vecFn.func(v[index], rhs);
+  }
+};
+
+template<typename T, typename ItemReduceFn=std::plus<T>, typename Deq = galois::gstl::Deque<T> >
+using GDequePerItemReduce = GVectorPerItemReduce<T, ItemReduceFn, Deq>;
+
+//! Accumulator for map where accumulate does element-wise addition among
+//! all entries
+template <typename K, typename V, typename C=std::less<K>, typename ItemReduceFn=std::plus<V>
+          , typename MapTy=gstl::Map<K, V, C> >
+class GMapPerItemReduce: 
+  public GBigReducible<MapTy, internal::ReduceMapPerItemWrap<internal::ReduceAssignWrap<ItemReduceFn>, V > > {
+
+  typedef internal::ReduceAssignWrap<ItemReduceFn> ElemFn;
+  typedef internal::ReduceMapPerItemWrap<ElemFn, V> MapReduceFn;
+  typedef GBigReducible<MapTy, ReduceMapPerItemWrap<ElemFn> > base_type;
+
+  assert(std::is_same<typename MapTy::key_type, K>::value, "K doesn't match MapTy::key_type");
+  assert(std::is_same<typename MapTy::mapped_type, V>::value, "V doesn't match MapTy::mapped_type");
+
+  MapReduceFn mapFn;
+
+public:
+  GMapPerItemReduce(const ItemReduceFn& func=ItemReduceFn(), const V& identity=V())
+    : base_type(), vecFn(func, identity)
+  {}
+
+
+  void update(const key_type& key, const V& value) {
+    MapTy& v = *this->m_data.getLocal();
+    v.insert(typename MapTy::value_type(key, mapFn.elemIdentity)); // insert v[key] if absent, v[] must return valid
+    mapFn.func(v[key], rhs);
   }
 };
 
@@ -198,170 +451,119 @@ struct ReduceMapWrap {
 //!
 //! void operator()(T a) =>
 //! void operator()(Collection<T>& a, const Collection<T>& b)
-template<typename CollectionTy,template<class> class AdaptorTy>
-struct ReduceCollectionWrap {
-  typedef typename CollectionTy::value_type value_type;
-
-  void operator()(CollectionTy& lhs, const CollectionTy& rhs) {
-    AdaptorTy<CollectionTy> adapt(lhs, lhs.begin());
-    std::copy(rhs.begin(), rhs.end(), adapt);
-  }
-
-  void operator()(CollectionTy& lhs, const value_type& rhs) {
-    AdaptorTy<CollectionTy> adapt(lhs, lhs.begin());
-    *adapt = rhs;
-  }
-};
-
-/**
- * Simplification of GReducible where BinFunc calculates results by
- * value, i.e., BinFunc conforms to:
- *
- *  T operator()(const T& a, const T& b);
- */
-template<typename T, typename BinFunc>
-class GSimpleReducible: public GReducible<T, ReduceAssignWrap<BinFunc> >  {
-  typedef GReducible<T, ReduceAssignWrap<BinFunc> > base_type;
-public:
-  explicit GSimpleReducible(const BinFunc& func = BinFunc(), const T& identity=T()): base_type(func, identity) { }
-
-  //! read-only reduction on values computed by each thread,
-  //! valid outside parallel section
-  //! use inside parallel section at your own risk
-  T reduceRO () const {
-    T d0 = *this->m_data.getRemote(0);
-    for (unsigned int i = 1; i < this->m_data.size(); ++i) {
-      const T& d = *this->m_data.getRemote(i);
-      this->m_func(d0, d);
-    }
-    return d0;
-  }
-};
-
-//! Accumulator for T where accumulation is sum
-template<typename T>
-class GAccumulator: public GSimpleReducible<T, std::plus<T> > {
-  typedef GSimpleReducible<T, std::plus<T> > base_type;
-
-public:
-
-  GAccumulator& operator+=(const T& rhs) {
-    base_type::update(rhs);
-    return *this;
-  }
-
-  GAccumulator& operator-=(const T& rhs) {
-    base_type::update(-rhs);
-    return *this;
- }
-
-};
+// template<typename CollectionTy,template<typename> class AdaptorTy>
+// struct ReduceCollectionWrap {
+  // typedef typename CollectionTy::value_type value_type;
+// 
+  // void operator()(CollectionTy& lhs, const CollectionTy& rhs) {
+    // AdaptorTy<CollectionTy> adapt(lhs, lhs.begin());
+    // std::copy(rhs.begin(), rhs.end(), adapt);
+  // }
+// 
+  // void operator()(CollectionTy& lhs, const value_type& rhs) {
+    // AdaptorTy<CollectionTy> adapt(lhs, lhs.begin());
+    // *adapt = rhs;
+  // }
+// };
+// 
 
 //! General accumulator for collections following STL interface where
 //! accumulate means collection union. Since union/append/push_back are
 //! not standard among collections, the AdaptorTy template parameter
 //! allows users to provide an iterator adaptor along the lines of
-//! std::inserter or std::back_inserter.
-template<typename CollectionTy,template<class> class AdaptorTy>
-class GCollectionAccumulator: public GReducible<CollectionTy, ReduceCollectionWrap<CollectionTy, AdaptorTy> > {
-  typedef ReduceCollectionWrap<CollectionTy, AdaptorTy> Func;
-  typedef GReducible<CollectionTy, Func> base_type;
-  typedef typename CollectionTy::value_type value_type;
+// //! std::inserter or std::back_inserter.
+// template<typename CollectionTy,template<typename> class AdaptorTy>
+// class GCollectionAccumulator: public GBigReducible<CollectionTy, ReduceCollectionWrap<CollectionTy, AdaptorTy> > {
+  // typedef ReduceCollectionWrap<CollectionTy, AdaptorTy> Func;
+  // typedef GBigReducible<CollectionTy, Func> base_type;
+  // typedef typename CollectionTy::value_type value_type;
+// 
+  // Func func;
+// 
+// public:
+  // void update(const value_type& rhs) {
+    // CollectionTy& v = *this->m_data.getLocal();
+    // func(v, rhs);
+  // }
+// };
 
-  Func func;
 
-public:
-  void update(const value_type& rhs) {
-    CollectionTy& v = *this->m_data.getLocal();
-    func(v, rhs);
+namespace internal {
+
+template <typename C>
+struct VecMerger: public std::binary_function<void, C&, const C&> {
+
+  void operator () (C& lhs, const C& rhs) const {
+    lhs.insert(lhs.end(), rhs.begin(), rhs.end());
+  }
+
+  void operator () (C& lhs, const typename C::value_type& val) const {
+    lhs.push_back(val);
   }
 };
 
+
+template <typename C>
+struct SetMerger: public std::binary_function<void, C&, const C&> {
+
+  void operator () (C& lhs, const C& rhs) const {
+    lhs.insert(rhs.begin(), rhs.end());
+  }
+
+  void operator () (C& lhs, const typename C::value_type& val) const {
+    lhs.insert(val);
+  }
+};
+
+template <typename C>
+struct ListMerger: public std::binary_function<void, C&, const C&> {
+
+  void operator () (C& lhs, const C& rhs) const {
+    lhs.splice(lhs.end(), static_cast<C&> (rhs));
+  }
+
+  void operator () (C& lhs, const typename C::value_type& val) const {
+    lhs.push_front(val);
+  }
+};
+
+
+template<typename MergeFunc, typename C>
+struct ContAccum: public GBigReducible<MergeFunc, C> {
+
+  using Base = GBigReducible<MergeFunc, C>;
+
+  ContAccum(const MergeFunc& f=MergeFunc(), const C& identity=C())
+    : Base(f, identity)
+  {}
+
+  void update(const typename C::value_type& val) {
+    auto& myCont = *Base::m_data.getLocal();
+    Base::m_func(myCont, val);
+  }
+};
+
+} // end namespace internal
+
+
+template <typename T, typename VecTy=gstl::Vector<T> >
+class GVectorAccumulator: public internal::ContAccum<internal::VecMerger<VecTy>, VecTy> {};
+
+template <typename T, typename Deq=gstl::Deque<T> >
+class GDequeAccumulator: public internal::ContAccum<internal::VecMerger<Deq>, Deq> {};
+
+template <typename T, typename C=std::less<T>, typename SetTy=gstl::Set<T, C> >
+class GSetAccumulator: public internal::ContAccum<internal::SetMerger<SetTy>, SetTy> {};
+
+template <typename T, typename ListTy=gstl::List<T> >
+class GListAccumulator: public internal::ContAccum<internal::ListMerger<ListTy>, ListTy> {};
 //! Accumulator for set where accumulation is union
-template<typename SetTy>
-class GSetAccumulator: public GCollectionAccumulator<SetTy, std::insert_iterator> { };
+// template<typename SetTy>
+// class GSetAccumulator: public GCollectionAccumulator<SetTy, std::insert_iterator> { };
+// 
+// //! Accumulator for vector where accumulation is concatenation
+// template<typename VectorTy>
+// class GVectorAccumulator: public GCollectionAccumulator<VectorTy, std::back_insert_iterator> { };
 
-//! Accumulator for vector where accumulation is concatenation
-template<typename VectorTy>
-class GVectorAccumulator: public GCollectionAccumulator<VectorTy, std::back_insert_iterator> { };
-
-//! Accumulator for vector where a vector is treated as a map and accumulate
-//! does element-wise addition among all entries
-template<typename VectorTy>
-class GVectorElementAccumulator: public GReducible<VectorTy, ReduceVectorWrap<ReduceAssignWrap<std::plus<typename VectorTy::value_type> > > > {
-  typedef ReduceAssignWrap<std::plus<typename VectorTy::value_type> > ElementFunc;
-  typedef GReducible<VectorTy, ReduceVectorWrap<ElementFunc> > base_type;
-  typedef typename VectorTy::value_type value_type;
-
-  ElementFunc func;
-
-public:
-
-  void resize(size_t s) {
-    for (int i = 0; i < this->m_data.size(); ++i)
-      this->m_data.getRemote(i)->resize(s);
-  }
-
-  VectorTy& getLocal() {
-    return *this->m_data.getLocal();
-  }
-
-  void update(size_t index, const value_type& rhs) {
-    VectorTy& v = *this->m_data.getLocal();
-    if (v.size() <= index)
-      v.resize(index + 1);
-    func(v[index], rhs);
-  }
-};
-
-//! Accumulator for map where accumulate does element-wise addition among
-//! all entries
-template<typename MapTy>
-class GMapElementAccumulator: public GReducible<MapTy, ReduceMapWrap<ReduceAssignWrap<std::plus<typename MapTy::mapped_type> > > > {
-  typedef ReduceAssignWrap<std::plus<typename MapTy::mapped_type> > ElementFunc;
-  typedef GReducible<MapTy, ReduceMapWrap<ElementFunc> > base_type;
-  typedef typename MapTy::mapped_type mapped_type;
-  typedef typename MapTy::key_type key_type;
-
-  ElementFunc func;
-
-public:
-  void update(const key_type& index, const mapped_type& rhs) {
-    MapTy& v = *this->m_data.getLocal();
-    func(v[index], rhs);
-  }
-};
-
-//! Accumulator for T where accumulation is max
-template<typename T>
-class GReduceMax: public GSimpleReducible<T, gmax<T> > {
-  typedef GSimpleReducible<T, gmax<T> > base_type;
-public:
-  GReduceMax(): base_type(gmax<T> (), std::numeric_limits<T>::min()) { }
-};
-
-//! Accumulator for T where accumulation is min
-template<typename T>
-class GReduceMin: public GSimpleReducible<T, gmin<T > > {
-  typedef GSimpleReducible<T, gmin<T> > base_type;
-public:
-  GReduceMin(): base_type(gmin<T> (), std::numeric_limits<T>::max()) { }
-};
-
-
-//! logical AND reduction
-class GReduceLogicalAND: public GSimpleReducible<bool, std::logical_and<bool> > {
-  typedef GSimpleReducible<bool, std::logical_and<bool> > base_type;
-public:
-  GReduceLogicalAND (void): base_type (std::logical_and<bool> (), true) {}
-};
-
-class GReduceLogicalOR: public GSimpleReducible<bool, std::logical_or<bool> > {
-  typedef GSimpleReducible<bool, std::logical_or<bool> > base_type;
-public:
-  GReduceLogicalOR (void): base_type (std::logical_or<bool> (), false) {}
-
-};
-
-}
+} // namespace galois
 #endif

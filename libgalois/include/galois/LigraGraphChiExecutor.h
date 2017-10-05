@@ -14,7 +14,7 @@ void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {
   WrappedGraph wgraph(graph);
   
   output.densify();
-  galois::graphsChi::internal::vertexMap<false,false>(graph, wgraph,
+  galois::graphChi::internal::vertexMap<false,false>(graph, wgraph,
       galois::Ligra::internal::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,true>(wgraph, output, output, op),
       static_cast<Bag*>(0),
       size);
@@ -32,18 +32,18 @@ void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output
     if (denseForward) {
       abort(); // Never used now
       output.densify();
-      galois::graphsChi::internal::vertexMap<false,false>(graph, wgraph,
+      galois::graphChi::internal::vertexMap<false,false>(graph, wgraph,
         galois::Ligra::internal::DenseForwardOperator<WrappedGraph,Bag,EdgeOperator,Forward,false>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     } else {
-      galois::graphsChi::internal::vertexMap<false,false>(graph, wgraph,
+      galois::graphChi::internal::vertexMap<false,false>(graph, wgraph,
         galois::Ligra::internal::DenseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, input, output, op),
         static_cast<Bag*>(0),
         size);
     }
   } else {
-    galois::graphsChi::internal::vertexMap<true,false>(graph, wgraph,
+    galois::graphChi::internal::vertexMap<true,false>(graph, wgraph,
       galois::Ligra::internal::SparseOperator<WrappedGraph,Bag,EdgeOperator,Forward>(wgraph, output, op),
       &input,
       size);
@@ -81,7 +81,7 @@ struct ChooseExecutor {
 
   template<typename Graph>
   void checkIfInMemoryGraph(Graph& g, size_t size) {
-    if (galois::graphsChi::internal::fitsInMemory(g, size)) {
+    if (galois::graphChi::internal::fitsInMemory(g, size)) {
       g.keepInMemory();
     }
   }

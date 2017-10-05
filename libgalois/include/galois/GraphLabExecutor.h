@@ -109,7 +109,8 @@ class AsyncEngine {
     AsyncEngine* self;
     Process(AsyncEngine* s): self(s) { }
 
-    void operator()(const WorkItem& item, galois::UserContext<WorkItem>& ctx) {
+    template <typename C>
+    void operator()(const WorkItem& item, C& ctx) {
       Operator op(self->origOp);
 
       GNode node = item.first;
@@ -200,8 +201,6 @@ class SyncEngine {
 
   struct Gather {
     SyncEngine* self;
-    typedef int tt_does_not_need_push;
-    typedef int tt_does_not_need_aborts;
 
     Gather(SyncEngine* s): self(s) { }
     void operator()(GNode node, galois::UserContext<GNode>&) {
@@ -229,8 +228,6 @@ class SyncEngine {
 
   template<typename Container>
   struct Scatter {
-    typedef int tt_does_not_need_push;
-    typedef int tt_does_not_need_aborts;
 
     SyncEngine* self;
     Context<Graph,Operator> context;
@@ -265,8 +262,6 @@ class SyncEngine {
 
   template<bool IsFirst>
   struct Initialize {
-    typedef int tt_does_not_need_push;
-    typedef int tt_does_not_need_aborts;
 
     SyncEngine* self;
     Initialize(SyncEngine* s): self(s) { }
@@ -327,14 +322,14 @@ class SyncEngine {
 
   template<bool IsFirst,typename Container1, typename Container2>
   void executeStep(Container1& cur, Container2& next) {
-    galois::for_each(galois::iterate(cur), Initialize<IsFirst>(this), galois::wl<WL>());
+    galois::do_all(galois::iterate(cur), Initialize<IsFirst>(this), galois::no_stats());
     
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
-      galois::for_each(galois::iterate(cur), Gather(this), galois::wl<WL>());
+      galois::do_all(galois::iterate(cur), Gather(this), galois::no_stats());
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-      galois::for_each(galois::iterate(cur), Scatter<Container2>(this, next), galois::wl<WL>());
+      galois::do_all(galois::iterate(cur), Scatter<Container2>(this, next), galois::no_stats());
     }
   }
 
@@ -354,7 +349,7 @@ public:
   }
 
   void execute() {
-    galois::Statistic rounds("GraphLabRounds");
+    size_t rounds;
     galois::InsertBag<GNode>* next = &wls[0];
     galois::InsertBag<GNode>* cur = &wls[1];
 
@@ -366,6 +361,7 @@ public:
       rounds += 1;
       cur->clear();
     }
+    galois::runtime::reportStat_Single("GraphLab-Exec", "Rounds", rounds);
   }
 };
 
