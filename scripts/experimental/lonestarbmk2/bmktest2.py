@@ -40,11 +40,11 @@ class SharedMemApp(GraphBMKSharedMem):
             x.set_binary("", os.path.join(config.get_var("pathToApps"),
                                           self.relativeAppPath))
             x.set_arg("-t=%d" % numThreads)
-            x.set_arg("-statFile=" +
-                      os.path.join(config.get_var("logOutputDirectory"),
-                                   self.getUniqueStatFile(numThreads, 
-                                                          bmkinput.name)))
+
+            nameToAppend = bmkinput.name
+
             if bmkinput.props.format == "nothing":
+                nameToAppend = "gen"
                 pass
             elif bmkinput.props.format != "mesh":
                 x.set_arg(bmkinput.props.file, bmk2.AT_INPUT_FILE)
@@ -53,6 +53,11 @@ class SharedMemApp(GraphBMKSharedMem):
                 # loads multiple files, so the file specified in the inputdb
                 # isn't an actual file
                 x.set_arg(bmkinput.props.file)
+
+            x.set_arg("-statFile=" +
+                      os.path.join(config.get_var("logOutputDirectory"),
+                                   self.getUniqueStatFile(numThreads, 
+                                                          nameToAppend)))
 
             listOfRunSpecs.append(x)
 
@@ -104,13 +109,15 @@ class GMetis(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("256")
+            s.set_arg("256") # num of partitions
         
         return specs
 
 class IndependentSet(SharedMemApp):
     relativeAppPath = "independentset/independentset"
     benchmark = "independentset"
+
+#class IndependentSet(SharedMemApp):
 
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
@@ -128,4 +135,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [IndependentSet()]
+BINARIES = [BarnesHut()]
