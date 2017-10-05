@@ -1246,6 +1246,7 @@ private:
                        val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid);
                      },
                      galois::loopname(get_run_identifier(doall_str).c_str()),
+                     galois::timeit(),
                      galois::no_stats());
     } else {
       for (unsigned n = start; n < start + size; ++n) {
@@ -1284,6 +1285,7 @@ private:
             gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
           }, 
           galois::loopname(get_run_identifier(doall_str).c_str()),
+          galois::timeit(),
           galois::no_stats());
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
