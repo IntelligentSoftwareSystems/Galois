@@ -35,6 +35,7 @@
 #include "galois/Galois.h"
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
+#include "galois/Timer.h"
 
 namespace galois {
 namespace graphs {
@@ -145,18 +146,36 @@ struct ReadGraphConstructInEdgesFrom {
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_with_aux_first_graph_tag, FileGraph& f) {
   typedef typename GraphTy::ReadGraphAuxData Aux;
+  constexpr static const bool profile = false;
 
-  Aux aux;
-  graph.allocateFrom(f, aux);
+  galois::CondStatTimer<profile> TAlloc("AllocateAux");
+  TAlloc.start();
+  Aux* auxPtr  = new Aux;
+  graph.allocateFrom(f, *auxPtr);
+  TAlloc.stop();
 
-  ReadGraphConstructNodesFrom<GraphTy, Aux> nodeReader(graph, f, aux);
+  galois::CondStatTimer<profile> TNode("ConstructNode");
+  TNode.start();
+  ReadGraphConstructNodesFrom<GraphTy, Aux> nodeReader(graph, f, *auxPtr);
   galois::on_each(nodeReader);
+  TNode.stop();
 
-  ReadGraphConstructOutEdgesFrom<GraphTy, Aux> outEdgeReader(graph, f, aux);
+  galois::CondStatTimer<profile> TOutEdge("ConstructOutEdge");
+  TOutEdge.start();
+  ReadGraphConstructOutEdgesFrom<GraphTy, Aux> outEdgeReader(graph, f, *auxPtr);
   galois::on_each(outEdgeReader);
+  TOutEdge.stop();
 
-  ReadGraphConstructInEdgesFrom<GraphTy, Aux> inEdgeReader(graph, f, aux);
+  galois::CondStatTimer<profile> TInEdge("ConstructInEdge");
+  TInEdge.start();
+  ReadGraphConstructInEdgesFrom<GraphTy, Aux> inEdgeReader(graph, f, *auxPtr);
   galois::on_each(inEdgeReader);
+  TInEdge.stop();
+
+  galois::CondStatTimer<profile> TDestruct("DestructAux");
+  TDestruct.start();
+  delete auxPtr;
+  TDestruct.stop();
 }
 
 template<typename GraphTy>
