@@ -6,6 +6,10 @@ class SharedMemApp(GraphBMKSharedMem):
     """Base class that has default run spec construction behavior for
     most if not all shared memory apps.
     """
+    startThread = 80
+    endThread = 80
+    step = 10
+
     def filter_inputs(self, inputs):
         """Ignore inputs that aren't currently supported."""
         def finput(x):
@@ -63,9 +67,6 @@ class SharedMemApp(GraphBMKSharedMem):
 class BarnesHut(SharedMemApp):
     relativeAppPath = "barneshut/barneshut"
     benchmark = "barneshut"
-    startThread = 80
-    endThread = 80
-    step = 10
 
     def get_run_spec(self, bmkinput, config):
         """Adds barnes hut specific arguments"""
@@ -81,37 +82,22 @@ class BarnesHut(SharedMemApp):
 class BCOuter(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
     benchmark = "bc-outer"
-    startThread = 80
-    endThread = 80
-    step = 10
 
 class BCInner(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
     benchmark = "bc-inner"
-    startThread = 80
-    endThread = 80
-    step = 10
 
 class BFS(SharedMemApp):
     relativeAppPath = "bfs/bfs"
     benchmark = "bfs"
-    startThread = 80
-    endThread = 80
-    step = 10
 
 class DMR(SharedMemApp):
     relativeAppPath = "delaunayrefinement/delaunayrefinement"
     benchmark = "dmr"
-    startThread = 80
-    endThread = 80
-    step = 10
 
 class GMetis(SharedMemApp):
     relativeAppPath = "gmetis/gmetis"
     benchmark = "gmetis"
-    startThread = 80
-    endThread = 80
-    step = 10
 
     def get_run_spec(self, bmkinput, config):
         """Adds gmetis specific arguments (num partitions)"""
@@ -122,13 +108,13 @@ class GMetis(SharedMemApp):
         
         return specs
 
+class IndependentSet(SharedMemApp):
+    relativeAppPath = "independentset/independentset"
+    benchmark = "independentset"
 
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
     benchmark = "sssp"
-    startThread = 80
-    endThread = 80
-    step = 10
 
     def get_run_spec(self, bmkinput, config):
         """Adds delta argument to runs."""
@@ -142,4 +128,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [GMetis()]
+BINARIES = [IndependentSet()]

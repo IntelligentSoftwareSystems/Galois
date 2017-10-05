@@ -1,9 +1,10 @@
 #v1
+barneshut nothing
 bfs r4-2e26
-sssp r4-2e26
 dmr r5M
 gmetis USA-road-d.USA
-barneshut nothing
+independentset r4-2e26
+sssp r4-2e26
 # TODO get graphs for bc
 #bc-outer
 #bc-inner
