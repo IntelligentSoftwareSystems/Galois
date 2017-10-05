@@ -655,6 +655,7 @@ protected:
                        masterNodes[h][n] = G2L(masterNodes[h][n]);
                      },
                      galois::loopname(get_run_identifier("MASTER_NODES").c_str()),
+                     galois::timeit(),
                      galois::no_stats());
     }
 
@@ -664,6 +665,7 @@ protected:
                        mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
                      },
                      galois::loopname(get_run_identifier("MIRROR_NODES").c_str()),
+                     galois::timeit(),
                      galois::no_stats());
     }
 
@@ -1175,12 +1177,14 @@ private:
       // sychronized
       galois::do_all(galois::iterate(0ul, indices.size()),
                      [&](unsigned int n) {
-                       size_t lid = indices[n];
+                       // assumes each lid is unique as test is not thread safe
+                       size_t lid = indices[n]; 
                        if (bitset_compute.test(lid)) {
                          bitset_comm.set(n);
                        }
                      },
                      galois::loopname(get_run_identifier(doall_str).c_str()),
+                     galois::timeit(),
                      galois::no_stats());
 
       // get the number of set bits and the offsets into the comm bitset
@@ -1404,6 +1408,7 @@ private:
             set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
           }, 
           galois::loopname(get_run_identifier(doall_str).c_str()),
+          galois::timeit(),
           galois::no_stats());
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
@@ -1475,6 +1480,7 @@ private:
           offsets[n] = static_cast<uint32_t>(getGID(offsets[n]));
         }, 
         galois::loopname(get_run_identifier(doall_str).c_str()), 
+        galois::timeit(),
         galois::no_stats());
   }
   
@@ -1493,6 +1499,7 @@ private:
           offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
         }, 
         galois::loopname(get_run_identifier(doall_str).c_str()), 
+        galois::timeit(),
         galois::no_stats());
   }
   
