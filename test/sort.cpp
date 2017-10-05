@@ -123,12 +123,12 @@ int do_accumulate() {
 
     galois::Timer t;
     t.start();
-    x1 = galois::ParallelSTL::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    x1 = galois::ParallelSTL::accumulate(V.begin(), V.end(), 0u, mymax<unsigned>());
     t.stop();
     
     galois::Timer t2;
     t2.start();
-    x2 = std::accumulate(V.begin(), V.end(), 0U, mymax<unsigned>());
+    x2 = std::accumulate(V.begin(), V.end(), 0u, mymax<unsigned>());
     t2.stop();
 
     std::cout << "Galois: " << t.get() 

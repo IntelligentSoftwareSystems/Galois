@@ -53,7 +53,7 @@ size_t count_if(InputIterator first, InputIterator last, Predicate pred)
 
   galois::do_all(galois::iterate(first, last), 
       [&] (const auto& v) {
-        if (prev(v)) {
+        if (pred(v)) {
           count += 1;
         }
       });
@@ -268,7 +268,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
 }
 
 template <class InputIterator, class T, typename BinaryOperation>
-T accumulate (InputIterator first, InputIterator last, const BinaryOperation& binary_op, const T& identity) {
+T accumulate (InputIterator first, InputIterator last, const T& identity, const BinaryOperation& binary_op) {
 
   GSimpleReducible<BinaryOperation, T> R(binary_op, identity);
 

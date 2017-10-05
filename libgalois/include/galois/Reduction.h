@@ -31,6 +31,7 @@
 #define GALOIS_REDUCTION_H
 
 #include "galois/substrate/PerThreadStorage.h"
+#include "galois/gstl.h"
 
 #include <limits>
 
