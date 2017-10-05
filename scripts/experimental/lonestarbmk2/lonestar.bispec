@@ -1,6 +1,12 @@
 #v1
 barneshut nothing
 bfs r4-2e26
+#TODO needs graph
+bc-inner nothing
+#TODO needs graph
+bc-outer nothing
+#TODO needs graph
+connectedcomponents nothing
 dmr r5M
 gmetis USA-road-d.USA
 independentset r4-2e26

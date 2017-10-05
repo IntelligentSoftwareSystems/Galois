@@ -72,6 +72,8 @@ class SharedMemApp(GraphBMKSharedMem):
     def get_run_spec(self, bmkinput, config):
         return self.get_default_run_specs(bmkinput, config)
 
+################################################################################
+
 class BarnesHut(SharedMemApp):
     relativeAppPath = "barneshut/barneshut"
     benchmark = "barneshut"
@@ -87,17 +89,21 @@ class BarnesHut(SharedMemApp):
         
         return specs
 
-class BCOuter(SharedMemApp):
-    relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
-    benchmark = "bc-outer"
-
 class BCInner(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
     benchmark = "bc-inner"
 
+class BCOuter(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
+    benchmark = "bc-outer"
+
 class BFS(SharedMemApp):
     relativeAppPath = "bfs/bfs"
     benchmark = "bfs"
+
+class ConnectedComponents(SharedMemApp):
+    relativeAppPath = "connectedcomponents/connectedcomponents"
+    benchmark = "connectedcomponents"
 
 class DMR(SharedMemApp):
     relativeAppPath = "delaunayrefinement/delaunayrefinement"
@@ -175,7 +181,6 @@ class PointsToAnalysis(SharedMemApp):
         
         return specs
 
-
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
     benchmark = "sssp"
@@ -189,7 +194,6 @@ class SSSP(SharedMemApp):
         
         return specs
 
-
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [PageRank()]
+BINARIES = [BCInner(), BCOuter()]
