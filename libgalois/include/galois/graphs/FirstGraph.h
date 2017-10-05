@@ -32,7 +32,7 @@
 #ifndef GALOIS_GRAPH_FIRSTGRAPH_H
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
-#define AUX_MAP
+//#define AUX_MAP
 
 #include "galois/Bag.h"
 #include "galois/gstl.h"
@@ -455,7 +455,9 @@ public:
     galois::gstl::Vector<std::pair<GraphNode, EdgeTy*> > inNghs;
   };
   using AuxNodePadded = typename galois::substrate::CacheLineStorage<AuxNode>;
-  using ReadGraphAuxData = LargeArray<AuxNodePadded>;
+
+  constexpr static const bool DirectedNotInOut = (Directional && !InOut);
+  using ReadGraphAuxData = typename std::conditional<DirectedNotInOut, LargeArray<GraphNode>, LargeArray<AuxNodePadded> >::type;
 #endif
 
 private:
@@ -976,14 +978,17 @@ public:
     size_t numNodes = graph.size();
     aux.allocateInterleaved(numNodes);
 
-    galois::do_all(galois::iterate(0ul, aux.size()),
-        [&] (size_t index) {
-          aux.constructAt(index);
-        },
-	galois::no_stats());
+    if (!DirectedNotInOut) {
+      galois::do_all(galois::iterate(0ul, aux.size()),
+          [&] (size_t index) {
+            aux.constructAt(index);
+          },
+	  galois::no_stats());
+    }
   }
 
-  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<!V> constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       auto& auxNode = aux[*ii].get();
@@ -992,7 +997,17 @@ public:
     }
   }
 
-  void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<V> constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      aux[*ii] = createNode();
+      addNode(aux[*ii], galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<!V> constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
     typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
@@ -1001,29 +1016,41 @@ public:
         auto src = aux[*ii].get().n;
         auto& dstAux = aux[graph.getEdgeDst(nn)].get();
         auto e = constructOutEdgeValue(graph, nn, src, dstAux.n);
-        if (!Directional || InOut) {
-          dstAux.lock.lock();
-          dstAux.inNghs.push_back({src, e});
-          dstAux.lock.unlock();
-        }
+        dstAux.lock.lock();
+        dstAux.inNghs.push_back({src, e});
+        dstAux.lock.unlock();
       }
     }
   }
 
-  void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<V> constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        constructOutEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
+      }
+    }
+  }
+
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<!V> constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
     typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
 
-    if (!Directional || InOut) {
-      auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
-      for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
-        auto& auxNode = aux[*ii].get();
-        for (auto ie: auxNode.inNghs) {
-          constructInEdgeValue(graph, ie.second, ie.first, auxNode.n);
-        }
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      auto& auxNode = aux[*ii].get();
+      for (auto ie: auxNode.inNghs) {
+        constructInEdgeValue(graph, ie.second, ie.first, auxNode.n);
       }
     }
   }
+
+  template<bool V = DirectedNotInOut>
+  std::enable_if_t<V> constructInEdgesFrom(FileGraph&, unsigned, unsigned, ReadGraphAuxData&) { }
 #endif
 };
 
