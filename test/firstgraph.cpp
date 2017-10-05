@@ -2,7 +2,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 
 #include <iostream>
 #include <string>
@@ -54,11 +54,13 @@ void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
   galois::preAlloc(numThreads + approxGraphSize / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  galois::runtime::beginSampling();
   timer.start();
-  galois::graphs::readGraphDispatch(g, typename Graph::read_tag(), f);
+  galois::runtime::profileVtune(
+      [&g, &f] () {
+        galois::graphs::readGraphDispatch(g, typename Graph::read_tag(), f);
+      },
+      "Construct FirstGraph");
   timer.stop();
-  galois::runtime::endSampling();
 
   galois::reportPageAlloc("MeminfoPost");
 
