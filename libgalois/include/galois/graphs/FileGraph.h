@@ -46,7 +46,7 @@
 #include "galois/substrate/CacheLineStorage.h"
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/substrate/NumaMem.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include "galois/graphs/GraphHelpers.h"
 

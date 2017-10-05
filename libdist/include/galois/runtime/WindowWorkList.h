@@ -30,7 +30,7 @@
 #ifndef GALOIS_RUNTIME_WINDOW_WORKLIST_H
 #define GALOIS_RUNTIME_WINDOW_WORKLIST_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/RangePQ.h"
 #include "galois/PerThreadContainer.h"
 

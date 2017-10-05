@@ -25,8 +25,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_REDUCTION_H
-#define GALOIS_REDUCTION_H
+#ifndef GALOIS_OLD_DIST_REDUCTION_H
+#define GALOIS_OLD_DIST_REDUCTION_H
 
 //FIXME: This duplicates and subsumes much of Accumulator.h
 //FIXME: This is complete bogusness

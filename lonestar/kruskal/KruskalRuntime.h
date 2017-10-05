@@ -7,7 +7,7 @@
 #include "galois/graphs/Graph.h"
 #include "galois/runtime/OrderedSpeculation.h"
 #include "galois/runtime/KDGtwoPhase.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/PerThreadContainer.h"
 
 #include <boost/iterator/transform_iterator.hpp>

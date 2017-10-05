@@ -35,7 +35,7 @@
 #include "galois/Atomic.h"
 #include "galois/Timer.h"
 #include "galois/util/Markable.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/PerThreadContainer.h"
 
 #include "galois/runtime/DoAllCoupled.h"

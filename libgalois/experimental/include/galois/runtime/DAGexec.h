@@ -35,7 +35,7 @@
 #define GALOIS_RUNTIME_DAGEXEC_H
 
 #include "galois/GaloisForwardDecl.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Atomic.h"
 #include "galois/gdeque.h"
 #include "galois/PriorityQueue.h"

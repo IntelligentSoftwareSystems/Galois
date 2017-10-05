@@ -28,7 +28,7 @@
 #ifndef WAVEFRONT_BFS_H_
 #define WAVEFRONT_BFS_H_
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/AltBag.h"
 #include "galois/DoAllWrap.h"
 #include "galois/PerThreadContainer.h"

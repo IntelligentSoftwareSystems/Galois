@@ -22,7 +22,7 @@
 #include <dai/enum.h>
 #include "galois/UserContext.h"
 #include "galois/CheckedObject.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 namespace dai {
 

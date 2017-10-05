@@ -32,7 +32,7 @@
 #define _DES_UNORDERED_H_
 
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Atomic.h"
 #include "galois/worklists/WorkList.h"
 #include "galois/gIO.h"

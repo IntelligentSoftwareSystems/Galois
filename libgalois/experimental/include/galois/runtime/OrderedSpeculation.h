@@ -33,7 +33,7 @@
 #include "galois/PriorityQueue.h"
 #include "galois/DoAllWrap.h"
 #include "galois/Atomic.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/optional.h"
 

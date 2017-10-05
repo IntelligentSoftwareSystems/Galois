@@ -26,7 +26,7 @@
  * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "llvm/Support/CommandLine.h"

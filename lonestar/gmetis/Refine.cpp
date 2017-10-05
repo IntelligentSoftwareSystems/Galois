@@ -23,7 +23,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "Metis.h"
 #include <set>

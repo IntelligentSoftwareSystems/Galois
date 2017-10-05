@@ -32,7 +32,7 @@
 
 #include <limits>
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/runtime/bare_mpi.h"
 
 #ifdef __GALOIS_HET_OPENCL__

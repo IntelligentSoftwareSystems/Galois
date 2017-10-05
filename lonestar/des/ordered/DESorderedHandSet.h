@@ -30,7 +30,7 @@
 #ifndef DES_ORDERED_HAND_SET_H
 #define DES_ORDERED_HAND_SET_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Atomic.h"
 #include "galois/PerThreadContainer.h"

@@ -1,7 +1,7 @@
 #ifndef GRAPH_COLORING_BASE_H
 #define GRAPH_COLORING_BASE_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"

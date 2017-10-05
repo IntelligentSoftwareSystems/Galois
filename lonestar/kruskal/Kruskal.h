@@ -47,7 +47,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"

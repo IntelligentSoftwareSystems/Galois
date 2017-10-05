@@ -24,7 +24,7 @@
 
 #include "galois/config.h"
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/runtime/PerThreadStorage.h"

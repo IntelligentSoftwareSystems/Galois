@@ -24,7 +24,7 @@
 #include "TcpServer.h"
 
 #include "galois/config.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"

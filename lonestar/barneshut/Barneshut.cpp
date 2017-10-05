@@ -25,7 +25,7 @@
 #include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/Bag.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/math/constants/constants.hpp>

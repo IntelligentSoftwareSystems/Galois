@@ -14,7 +14,7 @@
 #include "galois/Galois.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include <iostream>
 #include <unordered_set>

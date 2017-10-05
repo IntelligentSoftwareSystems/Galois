@@ -22,7 +22,7 @@
  */
 
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/UserContext.h"
 #include "galois/graphs/LCGraph.h"

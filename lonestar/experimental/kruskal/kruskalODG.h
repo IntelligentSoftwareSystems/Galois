@@ -31,7 +31,7 @@
 #include <tr1/unordered_set>
 
 #include "galois/Atomic.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include "kruskal.h"
 

@@ -29,7 +29,7 @@
 #ifndef GALOIS_RUNTIME_DET_CHROMATIC_H
 #define GALOIS_RUNTIME_DET_CHROMATIC_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/AltBag.h"
 #include "galois/DoAllWrap.h"
 #include "galois/Galois.h"

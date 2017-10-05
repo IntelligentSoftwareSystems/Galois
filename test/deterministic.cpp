@@ -1,5 +1,5 @@
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/graphs/Graph.h"
 #include <iostream>
 

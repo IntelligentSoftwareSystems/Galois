@@ -32,7 +32,7 @@
 #include "galois/graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include <iostream>
 #include <fstream>

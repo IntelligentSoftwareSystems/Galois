@@ -27,8 +27,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_ACCUMULATOR_H
-#define GALOIS_ACCUMULATOR_H
+#ifndef GALOIS_REDUCTION_H
+#define GALOIS_REDUCTION_H
 
 #include "galois/substrate/PerThreadStorage.h"
 
@@ -566,4 +566,4 @@ class GListAccumulator: public internal::ContAccum<internal::ListMerger<ListTy>,
 // class GVectorAccumulator: public GCollectionAccumulator<VectorTy, std::back_insert_iterator> { };
 
 } // namespace galois
-#endif
+#endif// GALOIS_REDUCTION_H

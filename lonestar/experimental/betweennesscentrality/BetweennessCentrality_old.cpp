@@ -21,7 +21,7 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"
 #include "galois/UserContext.h"

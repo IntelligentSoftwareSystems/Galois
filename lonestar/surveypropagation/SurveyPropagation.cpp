@@ -27,7 +27,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include "llvm/Support/CommandLine.h"
 

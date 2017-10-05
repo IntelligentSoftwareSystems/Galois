@@ -25,7 +25,7 @@
 
 #include "Point.h"
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/array.hpp>
 

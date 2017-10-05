@@ -46,7 +46,7 @@
 
 
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Atomic.h"
 #include "galois/Galois.h"
 #include "galois/graphs/Graph.h"

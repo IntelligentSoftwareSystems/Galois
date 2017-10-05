@@ -30,7 +30,7 @@
 #ifndef DES_ORDERED_EXP_H
 #define DES_ORDERED_EXP_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/PerThreadContainer.h"
 

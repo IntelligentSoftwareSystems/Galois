@@ -5,7 +5,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 #include <iostream>
 #include <fstream>

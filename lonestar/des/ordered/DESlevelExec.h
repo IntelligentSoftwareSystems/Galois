@@ -25,7 +25,7 @@
 #define DES_ORDERED_LEVEL_EXEC_H
 
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Atomic.h"
 #include "galois/Galois.h"

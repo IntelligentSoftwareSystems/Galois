@@ -28,7 +28,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/ParallelSTL.h"
 #include "galois/substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"

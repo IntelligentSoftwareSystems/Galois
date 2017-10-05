@@ -30,7 +30,7 @@
 #define GALOIS_RUNTIME_LEVELEXECUTOR_H
 
 #if 0
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Galois.h"
 #include "galois/optional.h"
 #include "galois/PriorityQueue.h"

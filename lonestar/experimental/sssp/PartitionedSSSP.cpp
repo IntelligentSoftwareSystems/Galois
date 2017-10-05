@@ -25,7 +25,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"

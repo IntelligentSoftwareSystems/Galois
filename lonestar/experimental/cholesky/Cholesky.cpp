@@ -28,7 +28,7 @@
 // A bunch of this is copied from SpanningTree
 
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"

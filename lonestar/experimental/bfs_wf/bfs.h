@@ -45,7 +45,7 @@
   #include "galois/graphs/LC_CSR_Graph.h"
 #endif
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/DoAllWrap.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"

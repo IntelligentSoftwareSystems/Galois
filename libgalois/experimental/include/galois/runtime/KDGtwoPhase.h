@@ -33,7 +33,7 @@
 #define GALOIS_RUNTIME_KDGTWOPHASE_H
 
 #include "galois/GaloisForwardDecl.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Atomic.h"
 #include "galois/BoundedVector.h"
 #include "galois/gdeque.h"

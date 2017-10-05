@@ -31,7 +31,7 @@
 #ifndef GALOIS_PARALLELSTL_H
 #define GALOIS_PARALLELSTL_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/GaloisForwardDecl.h"
 #include "galois/NoDerefIterator.h"
 #include "galois/Traits.h"

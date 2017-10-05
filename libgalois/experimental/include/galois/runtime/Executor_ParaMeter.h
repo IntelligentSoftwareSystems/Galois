@@ -35,7 +35,7 @@
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
 #include "galois/gtuple.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Traits.h"
 #include "galois/Mem.h"
 #include "galois/runtime/Context.h"

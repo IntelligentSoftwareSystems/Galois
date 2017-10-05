@@ -3,7 +3,7 @@
 
 
 #include "galois/AltBag.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/OrderedTraits.h"
 #include "galois/DoAllWrap.h"
 

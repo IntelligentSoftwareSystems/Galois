@@ -27,7 +27,7 @@
 #include "galois/Graph/FileGraph.h"
 #include "galois/Graph/LC_CSR_Graph.h"
 #include "galois/Graph/Util.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "PGraph.h"
 
 #include "Lonestar/BoilerPlate.h"

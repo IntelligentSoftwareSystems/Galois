@@ -26,7 +26,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"

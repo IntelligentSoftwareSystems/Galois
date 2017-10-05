@@ -32,7 +32,7 @@
 #ifndef GALOIS_GRAPHNODEBAG_H
 #define GALOIS_GRAPHNODEBAG_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/LargeArray.h"
 #include "galois/Bag.h"
 

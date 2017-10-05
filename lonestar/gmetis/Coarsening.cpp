@@ -26,7 +26,7 @@
 
 #include "Metis.h"
 #include "galois/Galois.h"
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/substrate/PerThreadStorage.h"
 
 #include <iostream>

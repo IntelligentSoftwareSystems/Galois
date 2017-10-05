@@ -29,7 +29,7 @@
 #ifndef GALOIS_RUNTIME_ROB_EXECUTOR_H
 #define GALOIS_RUNTIME_ROB_EXECUTOR_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Atomic.h"
 #include "galois/BoundedVector.h"
 #include "galois/Galois.h"

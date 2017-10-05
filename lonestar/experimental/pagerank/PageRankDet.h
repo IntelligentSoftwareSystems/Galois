@@ -1,7 +1,7 @@
 #ifndef PAGERANK_DETERMINISTIC_H
 #define PAGERANK_DETERMINISTIC_H
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
 #include "galois/Galois.h"

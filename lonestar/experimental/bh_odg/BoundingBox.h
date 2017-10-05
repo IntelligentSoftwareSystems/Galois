@@ -4,7 +4,7 @@
 #include "Point.h"
 #include "Octree.h"
 
-#include "galois/Accumulator.h"
+#include "galois/Reduction.h"
 
 namespace bh {
 
