@@ -88,6 +88,10 @@ int main(int argc, char** argv) {
 
   MPI_Init(&argc, &argv);
 
+  if (argc >= 3) {
+    galois::setActiveThreads(std::stoi(argv[2]));
+  }
+
   int hostID = 0;
   int numHosts = 0;
 
@@ -153,6 +157,7 @@ int main(int argc, char** argv) {
     },
     galois::loopname("EdgeInspection"),
     galois::timeit(),
+    galois::steal<false>(),
     galois::no_stats()
   );
   timer.stop();
