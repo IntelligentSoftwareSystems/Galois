@@ -44,23 +44,20 @@ namespace galois {
 // TODO: rename to gstl?
 namespace ParallelSTL {
 
-template<typename Predicate, typename TO>
-struct count_if_helper {
-  Predicate f;
-  GReducible<ptrdiff_t, TO>& ret;
-  count_if_helper(Predicate p, GReducible<ptrdiff_t,TO>& c): f(p), ret(c) { }
-  template<typename T>
-  void operator()(const T& v) const {
-    if (f(v)) ret.update(1);
-  }
-};
 
 template<class InputIterator, class Predicate>
-ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
+size_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  auto R = [] (ptrdiff_t& lhs, ptrdiff_t rhs) { lhs += rhs; };
-  GReducible<ptrdiff_t,decltype(R)> count(R);
-  do_all(galois::iterate(first, last), count_if_helper<Predicate, decltype(R)>(pred, count));
+
+  galois::GAccumulator<size_t> count;
+
+  galois::do_all(galois::iterate(first, last), 
+      [&] (const auto& v) {
+        if (prev(v)) {
+          count += 1;
+        }
+      });
+
   return count.reduce();
 }
 
@@ -271,47 +268,32 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
 }
 
 template <class InputIterator, class T, typename BinaryOperation>
-T accumulate (InputIterator first, InputIterator last, T init, const BinaryOperation& binary_op) {
-  struct updater {
-    BinaryOperation op;
-    updater(const BinaryOperation& f) :op(f) {}
-    void operator()(T& lhs, const T& rhs) { lhs = this->op(lhs, rhs); }
-  };
-  GReducible<T, updater> R{updater(binary_op)};
-  R.update(init);
+T accumulate (InputIterator first, InputIterator last, const BinaryOperation& binary_op, const T& identity) {
+
+  GSimpleReducible<BinaryOperation, T> R(binary_op, identity);
+
   do_all(galois::iterate(first, last), [&R] (const T& v) { R.update(v); });
-  return R.reduce(updater(binary_op));
+  return R.reduce();
 }
 
 template<class InputIterator, class T>
-T accumulate(InputIterator first, InputIterator last, T init) {
-  return accumulate(first, last, init, std::plus<T>());
+T accumulate(InputIterator first, InputIterator last, const T& identity=T()) {
+  return accumulate(first, last, identity, std::plus<T>());
 }
-
-template<typename T, typename MapFn, typename ReduceFn>
-struct map_reduce_helper {
-  substrate::PerThreadStorage<T>& init;
-  MapFn fn;
-  ReduceFn reduce;
-  map_reduce_helper(galois::substrate::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
-    :init(i), fn(fn), reduce(reduce) {}
-  template<typename U>
-  void operator()(U&& v) const {
-    *init.getLocal() = reduce(fn(std::forward<U>(v)), *init.getLocal());
-  }
-};
-
 template<class InputIterator, class MapFn, class T, class ReduceFn>
-T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  galois::substrate::PerThreadStorage<T> reduced;
-  do_all(galois::iterate(first, last),
-         map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
-  //         galois::loopname("map_reduce"));
-  for (unsigned i = 0; i < reduced.size(); ++i)
-    init = reduce(init, *reduced.getRemote(i));
-  return init;
-}
+T map_reduce(InputIterator first, InputIterator last, MapFn mapFn, ReduceFn reduceFn, const T& identity) {
+
+  galois::GSimpleReducible<ReduceFn, T> reducer(reduceFn, identity);
+
+  galois::do_all(galois::iterate(first, last),
+      [&] (const auto& v) {
+        reducer.update(mapFn(v));
+      });
+
+  return reducer.reduce();
 
 }
-}
+
+} // end namespace ParallelSTL
+} // end namespace galois
 #endif

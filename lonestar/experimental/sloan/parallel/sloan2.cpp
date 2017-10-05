@@ -703,62 +703,6 @@ void findStartingNode(GNode& starting) {
   std::cerr << "Starting Node: " << data.id << " degree: " << degree(starting) << "\n";
 }
 
-template<typename T>
-class GReduceAverage {
-  typedef std::pair<T, unsigned> TP;
-  struct AVG {
-    void operator() (TP& lhs, const TP& rhs) const {
-      lhs.first += rhs.first;
-      lhs.second += rhs.second;
-    }
-  };
-  galois::GReducible<std::pair<T, unsigned>, AVG> data;
-
-public:
-  void update(const T& _newVal) {
-    data.update(std::make_pair(_newVal, 1));
-  }
-
-  /**
-   * returns the thread local value if in a parallel loop or
-   * the final reduction if in serial mode
-   */
-  const T reduce() {
-#ifdef GALOIS_JUNE
-    const TP& d = data.get();
-#else
-    const TP& d = data.reduce();
-#endif
-    return d.first / d.second;
-  }
-
-  void reset(const T& d) {
-    data.reset(std::make_pair(d, 0));
-  }
-
-  GReduceAverage& insert(const T& rhs) {
-#ifdef GALOIS_JUNE
-    TP& d = data.get();
-#else
-    TP& d = data.reduce();
-#endif
-    d.first += rhs;
-    d.second++;
-    return *this;
-  }
-};
-
-//Compute mean distance from the source
-struct avg_dist {
-  GReduceAverage<unsigned int>& m;
-  avg_dist(GReduceAverage<unsigned int>& _m): m(_m) { }
-
-  void operator()(const GNode& n) const {
-    if(graph.getData(n).dist < DIST_INFINITY)
-      m.update(graph.getData(n).dist);
-  }
-};
-
 //Compute variance around mean distance from the source
 static void variance(unsigned long int mean) {
   unsigned long int n = 0;
@@ -804,16 +748,6 @@ struct not_visited {
   }
 };
 
-struct max_dist {
-  galois::GReduceMax<unsigned int>& m;
-  max_dist(galois::GReduceMax<unsigned int>& _m): m(_m) { }
-
-  void operator()(const GNode& n) const {
-    if(graph.getData(n).dist < DIST_INFINITY)
-      m.update(graph.getData(n).dist);
-  }
-};
-
 //! Simple verifier
 static bool verify(GNode& source) {
   if (graph.getData(source).dist != 0) {
@@ -830,17 +764,22 @@ static bool verify(GNode& source) {
 #endif
 
   //if (okay) {
-    galois::GReduceMax<unsigned int> m;
-    GReduceAverage<unsigned int> mean;
-    galois::do_all(graph.begin(), graph.end(), max_dist(m));
-#ifdef GALOIS_JUNE
-    std::cout << "max dist: " << m.get() << "\n";
-#else
-    std::cout << "max dist: " << m.reduce() << "\n";
-#endif
-    galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
-    galois::do_all(graph.begin(), graph.end(), avg_dist(mean));
-    std::cout << "avg dist: " << mean.reduce() << "\n";
+    galois::GReduceMax<unsigned int> maxDist;
+    galois::GAccumulator<unsigned> sum;
+    galois::GAccumulator<unsigned> count;
+    
+    galois::do_all(galois::iterate(graph),
+        [&] (const GNode& n) {
+          auto d = graph.getData(n, galois::MethodFlag::UNPROTECTED).dist;
+          if (d < INFINITY) {
+            maxDist.update(d);
+            sum += d;
+            count += 1;
+          }
+        });
+    std::cout << "max dist: " << maxDist.reduce() << "\n";
+    unsigned mean = sum.reduce() / count.reduce() ;
+    std::cout << "avg dist: " << mean << "\n";
 
     variance(mean.reduce());
   //}

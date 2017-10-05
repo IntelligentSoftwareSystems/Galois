@@ -211,19 +211,30 @@ This graph extends {@link galois::graphs::LC_CSR_Graph} to give limited graph mu
      
 When using abstract locks, whenever a graph operation is called in parallel region, the runtime will check if the nodes or edges the graph operations will access has been locked by other threads. If yes, the runtime will roll back the computation. Otherwise, the runtime will log the information for un-do the computation when roll back happens. There are overheads associated with such conflict detection. The users can control such conflict detection by passing method flags into the graph operations to indicate the runtime not performing certain checks. One of {@link galois::MethodFlag::WRITE}, {@link galois::READ_INTENT}, or {@link galois::MethodFlag::UNPROTECTED}, that dictates what support the runtime will provide for each call. By default, the runtime assumes galois::WRITE. Note: the current version of Galois, version 2.1, does not support saving undo information. Version 2.0 does support saving undo information. 
 
-@subsection reducers Reducers
+@subsection reduction Reduction Operations
 
-The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen in the following sections.     
+The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The reducers fall into two categories, {@link galois::GSimpleReducible} and {@link galois::GBigReducible}. GSimpleReducible are trying to reduce values of primitive types or types with low copy cost; e.g. GAccumulator is for accumulating values such as ints. The details can be seen in the following sections.     
 
 \image html galois_parallel_reducers.png "Galois Parallel Reducers"
 
 @subsubsection greducible General Reducer 
 
-<H4> @link galois::GReducible </H4>
+<H4> @link galois::GSimpleReducible </H4>
 
   - Defining a reducer
+
+{@link galois::GSimpleReducible} is used to reduce mutliple values of type T to a single value. It is suitable for  basic types or low copy overhead types. It takes the type T of the values to be reduced and a functor BinFunc as template parameters, where the BinFunc conforms to:
     
-    {@link galois::GReducible} is used to reduce a set of values of type T to a single value. It takes the type T of the values to be reduced and a functor BinFunc as template parameters. The functor BinFunc represents an associate two-input, one output reduction operator.   
+    T operator()(const T& a, const T& b);
+
+  - Reducing values
+   
+    {@link galois::GSimpleReducible} starts with the default value of Type T. {@link galois::GSimpleReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link galois::GSimpleReducible::reduce}  
+
+
+    
+<H4> @link galois::GBigReducible </H4>
+    {@link galois::GBigReducible} is used to reduce a set of large or non-trivial objects of type T to a single copy. The underlying assumption is that T is expensive to copy.  The functor BinFunc takes two arguments and applies the reduction in such a way the left argument is updated inplace.   
 
     The BinFunc functor should conform to:
 
@@ -239,10 +250,6 @@ The relationships among the reducers available in Galois can be seen in the abov
 
     @snippet apps/bfs/Diameter.cpp Define GReducible 
 
-  - Reducing values
-   
-    {@link galois::GReducible} starts with the default value of Type T. {@link galois::GReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link galois::GReducible::reduce}  
-
     An example of using {@link galois::GReducible} in parallel region can be seen in the {@link apps/bfs/Diameter.cpp}:
 
     @snippet apps/bfs/Diameter.cpp Use GReducible in parallel 
@@ -253,17 +260,18 @@ The relationships among the reducers available in Galois can be seen in the abov
 
 There are several built-in special reducers.
 
-{@link galois::GSimpleReducible} is used for basic types or low copy overhead types where the BinFunc conforms to:
-    
-    T operator()(const T& a, const T& b);
  
 {@link galois::GReduceMax} and {@link galois::GReduceMin} are used to reduce the maximum and minimum values. The type T has to meet the type requirements of std::max and std::min respectively.   
 
 {@link galois::GAccumulator} is used to accumulate a set of values. It provides {@link galois::GAccumulator::operator+=} and {@link galois::GAccumulator::operator-=} for adding or minusing new values.     
    
-{@link galois::GCollectionAccumulator} is used to union collections. Since union/append/push_back are not standard among collections, the AdaptorTy template parameter of {@link galois::GCollectionAccumulator} allows users to provide an iterator adaptor along the lines of std::inserter or std::back_inserter. {@link galois::GSetAccumulator} is used to union set. Special collection accumulators exist. {@link galois::GSetAccumulator} is used to union sets. {@link galois::GVectorAccumulator} is used to concatenate vectors.   
+{@link galois::GSetAccumulator} is used to union sets 
+
+{@link galois::GVectorAccumulator} is used to concatenate vectors.   
+
+{@link galois::GListAccumulator} is used to splice std::list instances together.   
   
-{@link galois::GVectorElementAccumulator} and {@link galois::GMapElementAccumulator} provides element-wise accumulation over vector and map. {@link galois::GVectorElementAccumulator} accumulates vectors where the accumulation operator is element-wise plus operator of the type of the elements inside the vector. Here assumes the accumulated vectors have equal size. {@link galois::GMapElementAccumulator} accumulates maps each of which is a set of key-value pairs. The accumulation operator performs the plus operator on the values of the maps with the same keys. The plus operator is defined by the value type of the maps.   
+{@link galois::GVectorPerItemReduce} and {@link galois::GMapPerItemReduce} provides element-wise reduction over vector and map. {@link galois::GVectorPerItemReduce} reduces vectors where the reduction operator is element-wise binary operator of the type of the elements inside the vector. {@link galois::GMapPerItemReduce} reduces maps, each of which is a set of key-value pairs. The reduction operator reduces the values with the same keys.   
 
 <hr>
 

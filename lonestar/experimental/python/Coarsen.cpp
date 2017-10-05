@@ -30,7 +30,7 @@ struct Reducer {
 };
 
 struct LocateCoarsenEdges {
-  galois::GReducible<EdgeMap, Updater>* pg;
+  galois::GBigReducible<Updater, EdgeMap>* pg;
   Graph& fg;
   KeyAltTy key;
 

@@ -105,7 +105,7 @@ struct TwoHopMatcher {
  5. You can enable/disable 4th by changing variantMetis::mergeMatching
 */
 
-typedef galois::GReducible<unsigned, galois::ReduceAssignWrap<std::plus<unsigned> > > Pcounter;
+typedef galois::GAccumulator<unsigned> Pcounter;
 
 
 template<typename MatchingPolicy>

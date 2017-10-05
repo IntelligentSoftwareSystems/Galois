@@ -154,7 +154,7 @@ struct default_reduce {
 
 struct BFS {
   struct Result {
-    std::deque<size_t> counts;
+    galois::gstl::Vector<size_t> counts;
     size_t max_width;
     GNode source;
     bool complete;
@@ -234,14 +234,6 @@ private:
     explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
     void operator()(const GNode& n) const {
-      SNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
-      
-      assert(data.dist != DIST_INFINITY);
-      if (data.dist == DIST_INFINITY)
-        return;
-      counts.update(data.dist);
-      if (reset)
-        data.dist = DIST_INFINITY;
     }
 
     static void reduce(std::deque<size_t>& dest, std::deque<size_t>& src) {
@@ -271,9 +263,25 @@ private:
         ++lhs[rhs];
       }
     };
-    galois::GReducible<std::deque<size_t>, updater> counts{updater()};
-    galois::do_all(graph, CountLevels<decltype(counts)>(reset, counts));
-    res.counts = counts.reduce(CountLevels<decltype(counts)>::reduce);
+
+
+
+    galois::GVectorPerItemReduce<size_t, std::plus<size_t> > counts;
+    galois::do_all(galois::iterate(graph), 
+        [&] (const GNode& n) {
+          SNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
+          
+          assert(data.dist != DIST_INFINITY);
+          if (data.dist == DIST_INFINITY)
+            return;
+          counts.update(data.dist, 1);
+          if (reset)
+            data.dist = DIST_INFINITY;
+          
+        });
+
+
+    res.counts = counts.reduce();
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
     return res;

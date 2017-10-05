@@ -139,48 +139,25 @@ struct has_dist {
 
 template<typename Graph>
 struct CountLevels {
-  // Reduce function
-  struct reducer {
-    template<typename G>
-    void operator()(G& a, G& b) {
-      if (a.size() < b.size())
-        a.resize(b.size());
-      std::transform(b.begin(), b.end(), a.begin(), a.begin(), std::plus<size_t>());
-    }
-  };
-  //! [Define BinFunc for GReducible]
-  struct updater {
-    void operator()(std::deque<size_t>& lhs, size_t rhs) {
-      if (lhs.size() <= rhs)
-        lhs.resize(rhs + 1);
-      ++lhs[rhs];
-    }
-  };
-
-  //! [Define BinFunc for GReducible]
 
   Graph& graph;
-  //! [Define GReducible]
-  galois::GReducible<std::deque<size_t>, updater>* counts;
   //! [Define GReducible]
   CountLevels(Graph& g): graph(g) { }
   
   //! [Use GReducible in parallel]
-  void operator()(typename Graph::GraphNode n) const {
-    Dist d = graph.getData(n).dist;
-    if (d == DIST_INFINITY)
-      return;
-    counts->update(d);
-  }
-  //! [Use GReducible in parallel]
   
-  std::deque<size_t> count() {
-    galois::GReducible<std::deque<size_t>, updater> C{updater()};
-    counts = &C;
-    galois::do_all(graph, *this);
-   //![Reduce the final value] 
-    return C.reduce(reducer());
-   //![Reduce the final value] 
+  const gstl::Vector<size_t>& count() {
+    galois::GVectorPerItemReduce<size_t, std::plus<size_t> > reducer;
+
+    galois::do_all(galois::iterate(graph),
+        [&] (typename Graph::GraphNode n) const {
+          Dist d = graph.getData(n).dist;
+          if (d == DIST_INFINITY)
+            return;
+          reducer.update(d, 1);
+        });
+
+    return reducer.reduce();
   }
 };
 
@@ -236,7 +213,7 @@ struct SimpleAlgo {
 
     bfs(graph, start);
     CountLevels<Graph> cl(graph);
-    std::deque<size_t> counts = cl.count();
+    const auto& counts = cl.count();
 
     size_t ecc = counts.size() - 1;
     //size_t maxWidth = *std::max_element(counts.begin(), counts.end());
@@ -359,7 +336,7 @@ struct PickKAlgo {
 
     bfs(graph, start);
     CountLevels<Graph> cl(graph);
-    std::deque<size_t> counts = cl.count();
+    const auto& counts = cl.count();
 
     res.source = start;
     res.ecc = counts.size() - 1;

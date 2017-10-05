@@ -118,38 +118,6 @@ class PQuadTree {
   }
 
 
-  //! Provide appropriate initial values for reduction
-  template<bool isMax>
-  struct MTuple: public Tuple {
-    MTuple(): Tuple(isMax ? std::numeric_limits<TupleDataTy>::min() : std::numeric_limits<TupleDataTy>::max()) { }
-    MTuple(const Tuple& t): Tuple(t) { }
-  };
-
-  template<bool isMax>
-  struct MTupleReducer {
-    void operator()(MTuple<isMax>& lhs, const MTuple<isMax>& rhs) const {
-      for (int i = 0; i < 2; ++i)
-        lhs[i] = isMax ? std::max(lhs[i], rhs[i]) : std::min(lhs[i], rhs[i]);
-    }
-  };
-
-  struct MinBox: public galois::GReducible<MTuple<false>, MTupleReducer<false> > { 
-    MinBox() { }
-  };
-
-  struct MaxBox: public galois::GReducible<MTuple<true>, MTupleReducer<true> > { 
-    MaxBox() { }
-  };
-
-  struct ComputeBox {
-    MinBox& least;
-    MaxBox& most;
-    ComputeBox(MinBox& l, MaxBox& m): least(l), most(m) { }
-    void operator()(const Point* p) const {
-      least.update(p->t());
-      most.update(p->t());
-    }
-  };
 
   template<typename IterTy>
   struct WorkItem {
@@ -198,13 +166,25 @@ class PQuadTree {
 
   template<typename IterTy>
   void init(IterTy begin, IterTy end) {
-    MinBox least;
-    MaxBox most;
-    galois::do_all(galois::iterate(begin, end), ComputeBox(least, most));
-    //std::for_each(begin, end, ComputeBox(least, most));
 
-    MTuple<true> mmost = most.reduce();
-    MTuple<false> lleast = least.reduce();
+    galois::GReduceMin<TupleDataTy> minX;
+    galois::GReduceMin<TupleDataTy> minY;
+
+    galois::GReduceMin<TupleDataTy> maxX;
+    galois::GReduceMin<TupleDataTy> maxY;
+
+    galois::do_all(galois::iterate(begin, end), 
+        [&] (const Point* p) {
+          minX.update(p->t().x());
+          minY.update(p->t().y());
+
+          maxX.update(p->t().x());
+          maxY.update(p->t().y());
+
+        });
+
+    Tuple mmost(maxX.reduce(), maxY.reduce());
+    Tuple lleast(minX.reduce(), minY.reduce());
     
     m_radius = std::max(mmost.x() - lleast.x(), mmost.y() - lleast.y()) / 2.0;
     

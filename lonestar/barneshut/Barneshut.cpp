@@ -475,8 +475,7 @@ double checkAllPairs(Bodies& bodies, int N) {
   
   return galois::ParallelSTL::map_reduce(bodies.begin(), end,
       CheckAllPairs(bodies),
-      0.0,
-      std::plus<double>()) / N;
+      std::plus<double>(), 0.0) / N;
 }
 
 void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
@@ -492,7 +491,8 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     auto MB = [] (BoundingBox& lhs, const Point& rhs) { lhs.merge(rhs); };
 
     // Do tree building sequentially
-    galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
+    galois::GBigReducible<decltype(MB), BoundingBox> boxes(MB);
+
     galois::do_all(galois::iterate(pBodies), 
         [&boxes] (const Body* b) {
           boxes.update(b->pos);
