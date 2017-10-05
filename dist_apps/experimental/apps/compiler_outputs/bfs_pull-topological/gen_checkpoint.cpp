@@ -439,11 +439,9 @@ int main(int argc, char** argv) {
       galois::runtime::getHostBarrier().wait();
       (*hg).reset_num_iter(run);
 
-      galois::runtime::beginSampling();
       StatTimer_main.start();
     BFS::go((*hg), run);
       StatTimer_main.stop();
-      galois::runtime::endSampling();
 
       if((run + 1) != numRuns){
         (*hg).reset_num_iter(run);

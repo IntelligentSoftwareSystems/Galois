@@ -11,7 +11,7 @@
 #include "galois/PerThreadContainer.h"
 // #include "galois/Graph/FileGraph.h"
 
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

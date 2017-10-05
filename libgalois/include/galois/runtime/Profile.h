@@ -23,13 +23,44 @@
 #ifndef GALOIS_RUNTIME_SAMPLING_H
 #define GALOIS_RUNTIME_SAMPLING_H
 
+#include "galois/Timer.h"
+#include "galois/gIO.h"
+
 namespace galois {
 namespace runtime {
 
-void beginSampling();
-void endSampling();
-void beginThreadSampling();
-void endThreadSampling();
+#ifdef GALOIS_USE_VTUNE
+#include "ittnotify.h"
+
+template <typename F>
+void profileVtune(const F& func, const char* region) {
+
+  region = region ? region : "(NULL)";
+
+  GALOIS_ASSERT(galois::substrate::ThreadPool::getTID() == 0
+      , "profileVtune can only be called from master thread (thread 0)");
+
+  __itt_resume();
+
+  timeThis(func, region);
+
+  __itt_pause();
+
+}
+
+#else
+
+template <typename F>
+void profileVtune(const F& func, const char* region) {
+
+  region = region ? region : "(NULL)";
+  galois::gWarn("Vtune not enabled or found");
+
+  timeThis(func, region);
+}
+
+#endif
+
 
 }
 } // end namespace galois

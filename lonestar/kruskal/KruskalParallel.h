@@ -535,24 +535,20 @@ struct UnionFindWindow {
         break;
       }
 
-      // galois::runtime::beginSampling ();
       findTimer.start ();
       galois::do_all (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
           galois::steal<true>(),
           galois::loopname("find_loop"));
       findTimer.stop ();
-      // galois::runtime::endSampling ();
 
 
-      // galois::runtime::beginSampling ();
       linkUpTimer.start ();
       galois::do_all (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
           galois::steal<true>(),
           galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
-      // galois::runtime::endSampling ();
 
       int u = linkUpIter.reduce () - numUnions;
       numUnions = linkUpIter.reduce ();

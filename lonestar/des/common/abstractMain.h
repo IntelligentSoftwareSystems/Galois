@@ -38,7 +38,7 @@
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/Galois.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 
 #include "llvm/Support/CommandLine.h"
 

@@ -27,7 +27,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/EnvCheck.h"
 #include "galois/substrate/ThreadPool.h"

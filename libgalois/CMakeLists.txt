@@ -4,7 +4,6 @@ set(sources
         src/PreAlloc.cpp
         src/Support.cpp
         src/Threads.cpp
-        src/Sampling.cpp
         src/Timer.cpp
         src/Mem.cpp
         src/PagePool.cpp

@@ -44,7 +44,7 @@
 #include "galois/runtime/Executor_ParaMeter.h"
 #include "galois/runtime/ForEachTraits.h"
 #include "galois/runtime/Range.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 #include "galois/runtime/Support.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
@@ -1161,7 +1161,6 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
   exec.push_initial (range);
   exec.execute ();
 
-  // galois::runtime::beginSampling ();
 //
   // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
 //
@@ -1171,7 +1170,6 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 //
     // getThreadPool ().run (activeThreads, std::ref(exec));
 //
-    // galois::runtime::endSampling ();
 //
     // exec.printStats ();
   // }

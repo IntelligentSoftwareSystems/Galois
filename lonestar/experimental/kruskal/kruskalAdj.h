@@ -121,7 +121,6 @@ void kruskalAdjNoCopy (
   galois::TimeAccumulator mergeTimer;
   galois::TimeAccumulator removeTimer;
 
-  galois::runtime::beginSampling ();
 
   while (true) {
     ++round;
@@ -164,7 +163,6 @@ void kruskalAdjNoCopy (
     mergeList.clear_all ();
   }
 
-  galois::runtime::endSampling ();
 
   totalWeight = mstSum.reduce ();
   totalIter = matchIter.reduce ();
@@ -372,7 +370,6 @@ void kruskalAdjCopyBased (
   bool first = true;
 
 
-  galois::runtime::beginSampling ();
 
   while (true) {
     ++round;
@@ -438,7 +435,6 @@ void kruskalAdjCopyBased (
     
   }
 
-  galois::runtime::endSampling ();
 
   totalIter = matchIter.reduce ();
   totalWeight = mstSum.reduce ();

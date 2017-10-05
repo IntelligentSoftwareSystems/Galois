@@ -12,7 +12,7 @@
 #include "galois/graphs/Graph.h"
 // #include "galois/Graph/FileGraph.h"
 
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 #include "galois/runtime/DetChromatic.h"
 #include "galois/runtime/DetPartInputDAG.h"
 #include "galois/runtime/DetKDGexecutor.h"

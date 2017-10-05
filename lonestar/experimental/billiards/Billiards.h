@@ -41,7 +41,7 @@
 #include "galois/Galois.h"
 #include "galois/DoAllWrap.h"
 #include "galois/Reduction.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -205,9 +205,7 @@ private:
     galois::StatTimer timer;
 
     timer.start ();
-    galois::runtime::beginSampling ();
     size_t numEvents = static_cast<Derived*> (this)->runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
-    galois::runtime::endSampling ();
     timer.stop ();
     galois::reportPageAlloc("MeminfoPost");
 

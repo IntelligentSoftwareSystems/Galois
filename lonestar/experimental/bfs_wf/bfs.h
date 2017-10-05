@@ -55,7 +55,7 @@
 #include "llvm/Support/CommandLine.h"
 
 #include "galois/substrate/CacheLineStorage.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 #include "galois/substrate/CompilerSpecific.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -256,9 +256,7 @@ public:
     galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();
-    galois::runtime::beginSampling ();
     size_t numIter = runBFS (graph, startNode);
-    galois::runtime::endSampling ();
     timer.stop ();
     galois::reportPageAlloc("MeminfoPost");
 

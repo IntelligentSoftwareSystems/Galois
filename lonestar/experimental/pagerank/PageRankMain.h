@@ -11,7 +11,7 @@
 #include "galois/graphs/Graph.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/FileGraph.h"
-#include "galois/runtime/Sampling.h"
+#include "galois/runtime/Profile.h"
 
 
 #include <iostream>

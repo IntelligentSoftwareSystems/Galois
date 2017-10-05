@@ -75,44 +75,6 @@ public:
   TimeAccumulator& operator+=(const Timer& rhs);
 };
 
-template <bool enabled>
-class ThreadTimer: private boost::noncopyable {
-  timespec m_start;
-  timespec m_stop;
-  int64_t  m_nsec;
-
-public:
-  ThreadTimer (): m_nsec (0) {};
-
-  void start (void) {
-    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_start);
-  }
-
-  void stop (void) {
-    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_stop);
-    m_nsec += (m_stop.tv_nsec - m_start.tv_nsec);
-    m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
-  }
-
-  int64_t get_nsec(void) const { return m_nsec; }
-
-  int64_t get_sec(void) const { return (m_nsec >> 30); }
-
-  int64_t get_msec(void) const { return (m_nsec >> 20); }
-
-};
-
-template <>
-class ThreadTimer<false> {
-public:
-  void start (void) const  {}
-  void stop (void) const  {}
-  int64_t get_nsec (void) const { return 0; }
-  int64_t get_sec (void) const  { return 0; }
-  int64_t get_msec (void) const  { return 0; }
-};
-
-
 //! Galois Timer that automatically reports stats upon destruction
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
@@ -187,6 +149,44 @@ void timeThis(F& f, const char* const name) {
 
   t.stop();
 }
+
+template <bool enabled>
+class ThreadTimer: private boost::noncopyable {
+  timespec m_start;
+  timespec m_stop;
+  int64_t  m_nsec;
+
+public:
+  ThreadTimer (): m_nsec (0) {};
+
+  void start (void) {
+    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_start);
+  }
+
+  void stop (void) {
+    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_stop);
+    m_nsec += (m_stop.tv_nsec - m_start.tv_nsec);
+    m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
+  }
+
+  int64_t get_nsec(void) const { return m_nsec; }
+
+  int64_t get_sec(void) const { return (m_nsec >> 30); }
+
+  int64_t get_msec(void) const { return (m_nsec >> 20); }
+
+};
+
+template <>
+class ThreadTimer<false> {
+public:
+  void start (void) const  {}
+  void stop (void) const  {}
+  int64_t get_nsec (void) const { return 0; }
+  int64_t get_sec (void) const  { return 0; }
+  int64_t get_msec (void) const  { return 0; }
+};
+
 
 
 template <bool enabled>
