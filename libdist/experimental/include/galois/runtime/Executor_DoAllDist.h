@@ -232,8 +232,8 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, numrun_tag{}, steal_tag{}),
-        std::make_tuple(loopname{}, numrun{}, steal<>{})));
+        std::make_tuple(loopname_tag{}, steal_tag{}),
+        std::make_tuple(loopname{}, steal<>{})));
 
   do_all_impl( r, fn, dtpl);
 }
@@ -246,8 +246,8 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, numrun_tag{}, steal_tag{}),
-        std::make_tuple(loopname{}, numrun{}, steal<>{})));
+        std::make_tuple(loopname_tag{}, steal_tag{}),
+        std::make_tuple(loopname{}, steal<>{})));
 
 #if 0
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);

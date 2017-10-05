@@ -179,15 +179,6 @@ struct loopname_tag {};
 struct loopname: public trait_has_value<const char*>, loopname_tag {
   loopname(const char* p = "ANON_LOOP"): trait_has_value<const char*>(p) { }
 };
-/**
-   - * Indicate run-number to appear in statistics. Optional argument to {@link do_all()}
-   - */
-// TODO remove numrun
-struct numrun_tag {};
-struct numrun: public trait_has_value<const std::string>, numrun_tag {
-   numrun(const std::string& p = ""): trait_has_value<const std::string>(p) { }
-};
-
 
 /**
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
