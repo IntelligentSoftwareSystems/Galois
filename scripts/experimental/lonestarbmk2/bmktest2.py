@@ -141,6 +141,12 @@ class MCM(SharedMemApp):
         
         return specs
 
+class PageRank(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank"
+    benchmark = "pagerank"
+
+    # TODO specify tolerance?
+
 # TODO this is currently crashing
 class PreflowPush(SharedMemApp):
     relativeAppPath = "preflowpush/preflowpush"
@@ -186,4 +192,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [MatrixCompletion()]
+BINARIES = [PageRank()]

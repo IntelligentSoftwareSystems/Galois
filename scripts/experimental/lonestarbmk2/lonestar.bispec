@@ -7,6 +7,8 @@ independentset r4-2e26
 # TODO add graph for matrix completion
 matrixcompletion nothing
 mcm nothing
+# TODO add graph for page rank
+pagerank nothing
 preflowpush r4-2e26
 pta nothing
 sssp r4-2e26
