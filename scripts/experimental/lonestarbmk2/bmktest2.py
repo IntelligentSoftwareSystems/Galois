@@ -6,8 +6,11 @@ class SharedMemApp(GraphBMKSharedMem):
     """Base class that has default run spec construction behavior for
     most if not all shared memory apps.
     """
-    startThread = 80
+    # thread to start from
+    startThread = 80 
+    # thread to end at (inclusive)
     endThread = 80
+    # step to use for looping through threads
     step = 10
 
     def filter_inputs(self, inputs):
@@ -134,6 +137,20 @@ class MCM(SharedMemApp):
         
         return specs
 
+class PreflowPush(SharedMemApp):
+    relativeAppPath = "preflowpush/preflowpush"
+    benchmark = "preflowpush"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds preflow push specific arguments"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("0") # source id
+            s.set_arg("100") # sink id
+        
+        return specs
+
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
     benchmark = "sssp"
@@ -150,4 +167,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [MCM()]
+BINARIES = [PreflowPush()]
