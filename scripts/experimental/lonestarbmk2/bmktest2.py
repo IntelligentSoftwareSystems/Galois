@@ -120,6 +120,10 @@ class IndependentSet(SharedMemApp):
     relativeAppPath = "independentset/independentset"
     benchmark = "independentset"
 
+class MatrixCompletion(SharedMemApp):
+    relativeAppPath = "matrixcompletion/mc"
+    benchmark = "matrixcompletion"
+
 class MCM(SharedMemApp):
     relativeAppPath = "matching/bipartite-mcm"
     benchmark = "mcm"
@@ -137,6 +141,7 @@ class MCM(SharedMemApp):
         
         return specs
 
+# TODO this is currently crashing
 class PreflowPush(SharedMemApp):
     relativeAppPath = "preflowpush/preflowpush"
     benchmark = "preflowpush"
@@ -181,4 +186,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [PointsToAnalysis()]
+BINARIES = [MatrixCompletion()]
