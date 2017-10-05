@@ -322,22 +322,9 @@ struct local_state_tag {};
 template<typename T>
 struct local_state: public trait_has_type<T>, local_state_tag {};
 
-
 // TODO: separate to libdist
 /** For distributed Galois **/
 struct op_tag {};
-
-/**
- * Array of uint32_t. Could be used for various things, but main use case now
- * is to pass in information for thread work splitting.
- */
-// TODO: delete this feature
-struct thread_range_tag {};
-
-struct thread_range: public trait_has_value<const uint32_t*>, thread_range_tag {
-  thread_range(const uint32_t* t = nullptr) : 
-    trait_has_value<const uint32_t*>(t) {}
-};
 
 struct chunk_size_tag {
   enum { MIN = 1, MAX = 4096 };

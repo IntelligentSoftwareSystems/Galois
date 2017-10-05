@@ -51,8 +51,7 @@ namespace galois {
 
 enum DoAllTypes {
   DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL,
-  DO_ALL_RANGE,
-  DOALL_CILK, DOALL_OPENMP, DOALL_RANGE
+  DOALL_CILK, DOALL_OPENMP 
 };
 
 namespace cll = llvm::cl;
@@ -65,10 +64,8 @@ static cll::opt<DoAllTypes> doAllKind (
           clEnumVal (DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
           clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
           clEnumVal (DO_ALL, "DO_ALL"),
-          clEnumVal (DO_ALL_RANGE, "DO_ALL_RANGE"),
           clEnumVal (DOALL_CILK, "DOALL_CILK"),
           clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
-          clEnumVal (DOALL_RANGE, "DOALL_RANGE"),
           clEnumValEnd),
         cll::init (DO_ALL_OLD)); // default is regular DOALL
 
@@ -146,34 +143,6 @@ struct DoAllImpl<DO_ALL> {
   }
 };
 
-/* Better do all coupled that takes into account even distribution of edges
- * among threads
- */
-template <>
-struct DoAllImpl<DO_ALL_RANGE> {
-  template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    auto defaultArgsTuple = std::tuple_cat(
-      argsTuple,
-      get_default_trait_values(
-        argsTuple,
-        std::make_tuple(thread_range_tag{}),
-        std::make_tuple(thread_range{})
-      )
-    );
-
-    const uint32_t *thread_ranges =
-      get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
-
-    assert(thread_ranges != nullptr);
-
-    galois::runtime::do_all_gen(runtime::makeSpecificRange(range.begin(),
-                                    range.end(), thread_ranges),
-                                    func, argsTuple);
-  }
-};
-
-
 #ifdef HAVE_CILK
 template <>
 struct DoAllImpl<DOALL_CILK> {
@@ -206,48 +175,6 @@ struct DoAllImpl<DOALL_OPENMP> {
   }
 };
 
-/**
- * Not a standard do-all loop as the work distribution among threads is
- * specified by an iterator array. All iterations should be independent.
- * Operator should conform to <code>fn(item)</code> where item is i
- *
- * @param range Begin/end of range of do-all
- * @param func operator
- * @param argsTuple optional arguments to loop;
- * TODO currently should have a non-optional iterator array that tells you
- * where each thread starts/stops work; make this optional in the future
- */
-template <>
-struct DoAllImpl<DOALL_RANGE> {
-  // TODO make it so the work splitting happens within this function(?) instead
-  // of at graph initialization (then it would work with all ranges
-  // and not just an all vertices range as is being assumed currently)
-  template <typename R, typename F, typename ArgsTuple>
-  static inline void go(const R& range, const F& func,
-                        const ArgsTuple& argsTuple) {
-
-    auto defaultArgsTuple = std::tuple_cat(
-      argsTuple,
-      get_default_trait_values(
-        argsTuple,
-        std::make_tuple(thread_range_tag{}),
-        std::make_tuple(thread_range{})
-      )
-    );
-
-    const uint32_t *thread_ranges =
-      get_by_supertype<thread_range_tag>(defaultArgsTuple).getValue();
-    assert(thread_ranges != nullptr);
-
-    galois::runtime::do_all_gen(
-      runtime::makeSpecificRange(range.begin(), range.end(), thread_ranges),
-      func,
-      std::tuple_cat(std::make_tuple(steal<false>()), argsTuple)
-    );
-  }
-};
-
-
 template <typename R, typename F, typename ArgsTuple>
 void do_all_choice(const R& range, const F& func, const DoAllTypes& type,
                    const ArgsTuple& argsTuple) {
@@ -264,18 +191,12 @@ void do_all_choice(const R& range, const F& func, const DoAllTypes& type,
     case DO_ALL:
       DoAllImpl<DO_ALL>::go(range, func, argsTuple);
       break;
-    case DO_ALL_RANGE:
-      DoAllImpl<DO_ALL_RANGE>::go(range, func, argsTuple);
-      break;
     case DOALL_CILK:
       DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
       break;
     case DOALL_OPENMP:
       // DoAllImpl<DOALL_OPENMP>::go(range, func, argsTuple);
       std::abort ();
-      break;
-    case DOALL_RANGE:
-      DoAllImpl<DOALL_RANGE>::go(range, func, argsTuple);
       break;
     default:
       abort ();
