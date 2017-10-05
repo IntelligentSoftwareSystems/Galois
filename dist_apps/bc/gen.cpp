@@ -293,10 +293,7 @@ struct FirstIterationSSSP {
   /* Does SSSP, push/filter based */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    for (auto current_edge = graph->edge_begin(src), 
-              end_edge = graph->edge_end(src); 
-         current_edge != end_edge; 
-         ++current_edge) {
+    for (auto current_edge : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(current_edge);
 
       if (src == dst) {
@@ -402,10 +399,7 @@ struct SSSP {
     if (src_data.old_length > src_data.current_length) {
       src_data.old_length = src_data.current_length;
 
-      for (auto current_edge = graph->edge_begin(src), 
-                end_edge = graph->edge_end(src); 
-           current_edge != end_edge; 
-           ++current_edge) {
+      for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
 
         if (src == dst) {
@@ -488,10 +482,7 @@ struct PredAndSucc {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
-      for (auto current_edge = graph->edge_begin(src),  
-                end_edge = graph->edge_end(src); 
-           current_edge != end_edge; 
-           ++current_edge) {
+      for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
         // ignore self loops
         if (dst == src) {
@@ -704,10 +695,8 @@ struct NumShortestPaths {
       // can do a num succ check for optimization
       //if (src_data.propogation_flag && src_data.num_successors > 0) {
       if (src_data.propogation_flag) {
-        for (auto current_edge = graph->edge_begin(src), 
-                  end_edge = graph->edge_end(src); 
-             current_edge != end_edge; 
-             ++current_edge) {
+
+        for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
 
           // ignore self loops
@@ -978,10 +967,7 @@ struct DependencyPropagation {
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors > 0) {
         if (graph->getGID(src) != local_current_src_node) {
-          for (auto current_edge = graph->edge_begin(src), 
-                    end_edge = graph->edge_end(src); 
-               current_edge != end_edge; 
-               ++current_edge) {
+          for (auto current_edge : graph->edges(src)) {
             GNode dst = graph->getEdgeDst(current_edge);
 
             // ignore self loops

@@ -173,7 +173,7 @@ struct BFS {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
+    for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       uint32_t new_dist = dnode.dist_current + 1;

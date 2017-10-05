@@ -276,8 +276,8 @@ struct PageRank {
     if (sdata.delta > 0) {
       float _delta = sdata.delta;
       sdata.delta = 0;
-      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); 
-          nbr != ee; ++nbr) {
+
+      for (auto nbr : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(nbr);
         NodeData& ddata = graph->getData(dst);
 

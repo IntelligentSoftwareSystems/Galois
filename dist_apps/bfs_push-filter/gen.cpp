@@ -171,9 +171,7 @@ struct FirstItr_BFS {
     NodeData& snode = graph->getData(src);
     snode.dist_old = snode.dist_current;
 
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-         jj != ee; 
-         ++jj) {
+    for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       uint32_t new_dist = 1 + snode.dist_current;
@@ -245,9 +243,7 @@ struct BFS {
     if (snode.dist_old > snode.dist_current) {
       snode.dist_old = snode.dist_current;
 
-      for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-           jj != ee;
-           ++jj) {
+      for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
         uint32_t new_dist = 1 + snode.dist_current;

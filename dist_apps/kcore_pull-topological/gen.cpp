@@ -122,15 +122,16 @@ struct DegreeCounting {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // technically can use std::dist, but this is more easily recognizable
-    // by compiler + this is init so it doesn't matter much
-    for (auto current_edge = graph->edge_begin(src), 
-              end_edge = graph->edge_end(src);
-         current_edge != end_edge;
-         current_edge++) {
-      src_data.current_degree++;
-      bitset_current_degree.set(src);
-    }
+    src_data.current_degree = std::distance(graph->edge_begin(src), 
+                                            graph->edge_end(src));
+    bitset_current_degree.set(src);
+
+    //// technically can use std::dist above, but this is more easily 
+    //// recognizable by dist compiler + this is init so it doesn't matter much
+    //for (auto current_edge : graph->edges(src)) {
+    //  src_data.current_degree++;
+    //  bitset_current_degree.set(src);
+    //}
   }
 };
 
@@ -290,10 +291,7 @@ struct KCore {
     if (src_data.flag) {
       // if dst node is dead, increment trim by one so we can decrement
       // our degree later
-      for (auto current_edge = graph->edge_begin(src), 
-                end_edge = graph->edge_end(src);
-           current_edge != end_edge; 
-           ++current_edge) {
+      for (auto current_edge : graph->edges(src)) {
          GNode dst = graph->getEdgeDst(current_edge);
          NodeData& dst_data = graph->getData(dst);
 
@@ -338,7 +336,6 @@ struct GetAliveDead {
     galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
                    GetAliveDead(&_graph, dga1, dga2), 
                    galois::loopname("GetAliveDead"),
-                   galois::numrun(_graph.get_run_identifier()),
                    galois::no_stats());
 
     uint32_t num_alive = dga1.reduce();

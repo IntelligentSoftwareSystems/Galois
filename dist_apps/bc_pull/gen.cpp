@@ -315,11 +315,7 @@ struct SSSP {
   /* Does SSSP */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-
-    for (auto current_edge = graph->edge_begin(src), 
-              end_edge = graph->edge_end(src); 
-         current_edge != end_edge; 
-         ++current_edge) {
+    for (auto current_edge : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
@@ -386,10 +382,7 @@ struct PredAndSucc {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
-      for (auto current_edge = graph->edge_begin(src),  
-                end_edge = graph->edge_end(src); 
-           current_edge != end_edge; 
-           ++current_edge) {
+      for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
@@ -560,10 +553,7 @@ struct NumShortestPaths {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_predecessors > 0) {
-        for (auto current_edge = graph->edge_begin(src), 
-                  end_edge = graph->edge_end(src); 
-             current_edge != end_edge; 
-             ++current_edge) {
+        for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
           auto& dst_data = graph->getData(dst);
 
@@ -764,10 +754,7 @@ struct DependencyPropagation {
       if (src_data.propogation_flag) {
         assert(src_data.num_successors == 0);
   
-        for (auto current_edge = graph->edge_begin(src), 
-                  end_edge = graph->edge_end(src); 
-             current_edge != end_edge; 
-             ++current_edge) {
+        for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
   
           // ignore current source node of bc iteration

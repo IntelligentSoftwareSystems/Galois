@@ -157,10 +157,7 @@ struct InitializeGraph {
   // Calculate "outgoing" edges for destination nodes (note we are using
   // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
-    for (auto nbr = graph->edge_begin(src), 
-              ee = graph->edge_end(src); 
-         nbr != ee; 
-         ++nbr) {
+    for (auto nbr : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
       galois::atomicAdd(ddata.nout, (uint32_t)1);
@@ -283,10 +280,8 @@ struct PageRank {
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
 
-    for(auto nbr = graph->edge_begin(src), 
-             ee = graph->edge_end(src); 
-        nbr != ee; 
-        ++nbr) {
+
+    for (auto nbr : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
 

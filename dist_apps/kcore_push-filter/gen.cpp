@@ -117,10 +117,7 @@ struct InitializeGraph2 {
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
    * adding for every dest */
   void operator()(GNode src) const {
-    for (auto current_edge = graph->edge_begin(src), 
-              end_edge = graph->edge_end(src);
-         current_edge != end_edge;
-         current_edge++) {
+    for (auto current_edge : graph->edges(src)) {
       GNode dest_node = graph->getEdgeDst(current_edge);
 
       NodeData& dest_data = graph->getData(dest_node);
@@ -293,10 +290,7 @@ struct KCoreStep1 {
         src_data.flag = false;
         DGAccumulator_accum += 1; // can be optimized: node may not have edges
 
-        for (auto current_edge = graph->edge_begin(src), 
-                  end_edge = graph->edge_end(src);
-             current_edge != end_edge; 
-             ++current_edge) {
+        for (auto current_edge : graph->edges(src)) {
            GNode dst = graph->getEdgeDst(current_edge);
 
            auto& dst_data = graph->getData(dst);
@@ -341,7 +335,6 @@ struct GetAliveDead {
     galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
                    GetAliveDead(&_graph, dga1, dga2), 
                    galois::loopname("GetAliveDead"),
-                   galois::numrun(_graph.get_run_identifier()),
                    galois::no_stats());
 
     uint32_t num_alive = dga1.reduce();

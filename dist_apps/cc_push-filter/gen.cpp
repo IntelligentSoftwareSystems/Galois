@@ -151,7 +151,7 @@ struct FirstItr_ConnectedComp{
     NodeData& snode = graph->getData(src);
     snode.comp_old = snode.comp_current;
 
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
+    for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned long long new_dist = snode.comp_current;
@@ -226,8 +226,7 @@ struct ConnectedComp {
     if (snode.comp_old > snode.comp_current) {
       snode.comp_old = snode.comp_current;
 
-      for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-           jj != ee; ++jj) {
+      for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
         unsigned long long new_dist = snode.comp_current;
