@@ -182,6 +182,24 @@ private:
     }
   }
 
+  void destruct_parallel(void) {
+    galois::on_each(
+        [this] (const unsigned tid, const unsigned numT) {
+          PerThread& hpair = *heads.getLocal(tid);
+          header*& h = hpair.first;
+          while (h) {
+            uninitialized_destroy(h->dbegin, h->dend);
+            header* h2 = h;
+            h = h->next;
+            if (BlockSize)
+              heap.deallocate(h2);
+            else
+              galois::runtime::pagePoolFree(h2);
+          }
+          hpair.second = 0;
+        });
+  }
+
 public:
   // static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
   //     "BlockSize should larger than sizeof(T) + O(1)");
@@ -202,11 +220,15 @@ public:
   InsertBag& operator=(const InsertBag&) = delete;
 
   ~InsertBag() {
-    destruct();
+    destruct_parallel();
   }
 
   void clear() {
     destruct();
+  }
+
+  void clear_parallel() {
+    destruct_parallel();
   }
 
   void swap(InsertBag& o) {
