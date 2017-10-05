@@ -117,32 +117,23 @@ int main(int argc, char** argv) {
   galois::Timer timer;
   timer.start();
 
-
   // vector to hold a prefix sum for use in thread work distribution
   std::vector<uint64_t> prefixSumOfEdges(nodeEnd - nodeBegin);
-
 
   uint64_t position = 4 * sizeof(uint64_t);
   outIndex = (uint64_t*)malloc(sizeof(uint64_t)*numGlobalNodes);
   edgeDest = (uint32_t*)malloc(sizeof(uint32_t) * g.sizeEdges());
+
   if (outIndex == nullptr || edgeDest == nullptr) {
     printf("[%d] null ptr mlalc\n", hostID);
   }
-  MPI_Barrier(MPI_COMM_WORLD);
-  //printf("[%d] malloc success\n", hostID);
 
   MPI_Status mpiStat;
   MPI_File_read_at(mpiFile, position, (char*)outIndex, 
                    sizeof(uint64_t)*numGlobalNodes, MPI_BYTE, &mpiStat); 
-
   position = (4 + numGlobalNodes) * sizeof(uint64_t);
-
   MPI_File_read_at(mpiFile, position, (char*)edgeDest, 
                    sizeof(uint32_t)*g.sizeEdges(), MPI_BYTE, &mpiStat); 
-
-
-  MPI_Barrier(MPI_COMM_WORLD);
-  //printf("[%d] Get nodes now\n", hostID);
 
   auto edgeOffset = mpi_edge_begin(mpiFile, nodeBegin);
 
