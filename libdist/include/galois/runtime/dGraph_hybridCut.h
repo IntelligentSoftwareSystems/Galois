@@ -90,10 +90,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       return OwnerVec[lid];
     }
 
-    size_t getOwner_lid(size_t lid) const {
-      return OwnerVec[lid];
-    }
-
 #if 0
     virtual bool isLocal(uint64_t gid) const {
       return (GlobalVec_map.find(gid) != GlobalVec_map.end());

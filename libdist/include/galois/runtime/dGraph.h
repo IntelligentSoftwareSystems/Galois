@@ -180,10 +180,6 @@ public:
   virtual uint64_t L2G(uint32_t) const = 0;
   virtual bool is_vertex_cut() const = 0;
   virtual unsigned getHostID(uint64_t) const = 0;
-  virtual size_t getOwner_lid(size_t lid) const {
-    auto gid = L2G(lid);
-    return getHostID(gid);
-  }
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
 
