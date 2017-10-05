@@ -117,7 +117,22 @@ class IndependentSet(SharedMemApp):
     relativeAppPath = "independentset/independentset"
     benchmark = "independentset"
 
-#class IndependentSet(SharedMemApp):
+class MCM(SharedMemApp):
+    relativeAppPath = "matching/bipartite-mcm"
+    benchmark = "mcm"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds max card bipartite matching specific arguments"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-inputType=generated")
+            s.set_arg("-n=1000000") # nodes in each bipartite set
+            s.set_arg("-numEdges=100000000") 
+            s.set_arg("-numGroups=10000") 
+            s.set_arg("-seed=0") # seed for rng; keep it consistent
+        
+        return specs
 
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
@@ -135,4 +150,4 @@ class SSSP(SharedMemApp):
 
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [BarnesHut()]
+BINARIES = [MCM()]
