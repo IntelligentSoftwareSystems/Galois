@@ -27,11 +27,17 @@ function(distApp name)
 endfunction()
 
 
-distApp(bfs_push-filter_wl)
-distApp(sssp_push-filter_wl)
-distApp(pagerank_push-filter_wl)
-distApp(bfs_push-filter_od)
+distApp(bfs_push_wl)
+distApp(sssp_push_wl)
+distApp(pagerank_push_wl)
+distApp(bfs_push_od)
 
 distApp(pagerank_pull_od)
+
+distAppNoGPU(bc_push)
+distAppNoGPU(bc_pull)
+
+distAppNoGPU(sgd_pull)
+
 distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)

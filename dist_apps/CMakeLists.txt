@@ -46,22 +46,17 @@ function(distAppNoGPU name)
   target_link_libraries(${name} galois_dist distbench)
 endfunction()
 
-distApp(bfs_pull-topological)
-distApp(bfs_push-filter)
+distApp(bfs_pull)
+distApp(bfs_push)
 
-distApp(cc_pull-topological)
-distApp(cc_push-filter)
+distApp(cc_pull)
+distApp(cc_push)
 
-distApp(pagerank_pull-topological)
-distApp(pagerank_push-filter)
+distApp(pagerank_pull)
+distApp(pagerank_push)
 
-distApp(sssp_pull-topological)
-distApp(sssp_push-filter)
+distApp(sssp_pull)
+distApp(sssp_push)
 
-distApp(kcore_push-filter)
-distAppNoGPU(kcore_pull-topological)
-
-distAppNoGPU(bc)
-distAppNoGPU(bc_pull)
-
-#distAppNoGPU(sgd_pull-topological)
+distApp(kcore_push)
+distAppNoGPU(kcore_pull)

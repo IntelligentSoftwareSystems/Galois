@@ -25,28 +25,28 @@ if (USE_GGC)
   ##############################
   # bfs
   ##############################
-  cudaLibs(bfs_pull-topological)
-  cudaLibs(bfs_push-filter)
+  cudaLibs(bfs_pull)
+  cudaLibs(bfs_push)
   ##############################
   # sssp
   ##############################
-  cudaLibs(sssp_pull-topological)
-  cudaLibs(sssp_push-filter)
+  cudaLibs(sssp_pull)
+  cudaLibs(sssp_push)
   ##############################
   # cc
   ##############################
-  cudaLibs(cc_pull-topological)
-  cudaLibs(cc_push-filter)
+  cudaLibs(cc_pull)
+  cudaLibs(cc_push)
   ##############################
   # pagerank
   ##############################
-  cudaLibs(pagerank_pull-topological)
-  cudaLibs(pagerank_push-filter)
+  cudaLibs(pagerank_pull)
+  cudaLibs(pagerank_push)
 
   ##############################
   # kcore
   ##############################
-  cudaLibs(kcore_push-filter)
+  cudaLibs(kcore_push)
   # TODO kcore pull version?
 
   # TODO bc
@@ -125,36 +125,36 @@ endfunction()
 # BFS
 ################################################################################
 
-versionGen(bfs_pull-topological)
-versionGen(bfs_push-filter)
+versionGen(bfs_pull)
+versionGen(bfs_push)
 
 ################################################################################
 # SSSP
 ################################################################################
 
-versionGen(sssp_pull-topological)
-versionGen(sssp_push-filter)
+versionGen(sssp_pull)
+versionGen(sssp_push)
 
 ################################################################################
 # CC
 ################################################################################
 
-versionGen(cc_pull-topological)
-versionGen(cc_push-filter)
+versionGen(cc_pull)
+versionGen(cc_push)
 
 ################################################################################
 # PageRank
 ################################################################################
 
-versionGen(pagerank_pull-topological)
-versionGen(pagerank_push-filter)
+versionGen(pagerank_pull)
+versionGen(pagerank_push)
 
 ################################################################################
 # KCore
 ################################################################################
 
-versionGen(kcore_push-filter)
-versionGenNoGPU(kcore_pull-topological)
+versionGen(kcore_push)
+versionGenNoGPU(kcore_pull)
 
 ################################################################################
 # BC

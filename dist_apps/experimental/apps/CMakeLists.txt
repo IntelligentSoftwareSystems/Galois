@@ -1,3 +1,0 @@
-add_subdirectory(compiler_inputs)
-add_subdirectory(compiler_outputs)
-add_subdirectory(cgo)
