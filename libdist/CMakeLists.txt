@@ -20,6 +20,10 @@ add_library(galois_dist STATIC ${sources})
 
 target_link_libraries(galois_dist galois_shmem gllvm)
 
+if (USE_BARE_MPI)
+  target_compile_definitions(galois_dist PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+endif()
+
 if (USE_LWCI)
   target_link_libraries(galois_dist ${LWCI_LIBRARY} -lpsm2)
 endif()
