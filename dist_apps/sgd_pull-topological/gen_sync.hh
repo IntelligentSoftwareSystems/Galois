@@ -1,6 +1,6 @@
-#include "Galois/Runtime/sync_structures.h"
-#include "Galois/Atomic_wrapper.h"
-#include "Galois/Array_wrapper.h"
+#include "Galois/Runtime/SyncStructures.h"
+#include "Galois/AtomicWrapper.h"
+#include "Galois/ArrayWrapper.h"
 
 #define LATENT_VECTOR_SIZE 20
 

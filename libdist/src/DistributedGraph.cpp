@@ -28,7 +28,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#include <galois/runtime/dGraph.h>
+#include <galois/graphs/DistributedGraph.h>
 
 namespace cll = llvm::cl;
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__

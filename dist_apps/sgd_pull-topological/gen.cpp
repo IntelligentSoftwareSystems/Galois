@@ -33,19 +33,15 @@
 #include "DistBenchStart.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "Galois/DistAccumulator.h"
-#include "Galois/Atomic_wrapper.h"
-#include "Galois/Array_wrapper.h"
+#include "Galois/AtomicWrapper.h"
+#include "Galois/ArrayWrapper.h"
 #include "Galois/Runtime/Tracer.h"
 
-#include "galois/runtime/dGraphLoader.h"
+#include "galois/graphs/DistributedGraphLoader.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Runtime/Cuda/cuda_device.h"
+#include "galois/cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 

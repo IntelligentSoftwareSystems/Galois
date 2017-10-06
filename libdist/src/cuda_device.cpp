@@ -1,4 +1,4 @@
-#include "galois/runtime/Cuda/cuda_device.h"
+#include "galois/cuda/cuda_device.h"
 #include "galois/Galois.h"
 #include "galois/runtime/Network.h"
 #include <algorithm>

@@ -26,7 +26,7 @@
 #ifndef _GALOIS_DIST_HGRAPHEC_H
 #define _GALOIS_DIST_HGRAPHEC_H
 
-#include "galois/runtime/dGraph.h"
+#include "galois/graphs/DistributedGraph.h"
 
 //template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
 //class hGraph;

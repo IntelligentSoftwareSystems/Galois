@@ -46,19 +46,19 @@
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/GlobalObj.h"
 #include "galois/graphs/OfflineGraph.h"
-#include "galois/runtime/sync_structures.h"
+#include "galois/runtime/SyncStructures.h"
 #include "galois/runtime/DataCommMode.h"
-#include "galois/runtime/Dynamic_bitset.h"
+#include "galois/DynamicBitset.h"
 #include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/runtime/Cuda/cuda_mtypes.h"
+#include "galois/cuda/cuda_mtypes.h"
 #endif
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
 #endif
 
-#include "galois/runtime/bare_mpi.h"
+#include "galois/runtime/BareMPI.h"
 
 #include "llvm/Support/CommandLine.h"
 

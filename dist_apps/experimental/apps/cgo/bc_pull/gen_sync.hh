@@ -1,4 +1,4 @@
-#include "galois/runtime/sync_structures.h"
+#include "galois/runtime/SyncStructures.h"
 
 ////////////////////////////////////////////////////////////////////////////
 // ToAdd

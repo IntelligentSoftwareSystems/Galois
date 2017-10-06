@@ -1,4 +1,4 @@
-/**sync_structures helpers -*- C++ -*-
+/**SyncStructures helpers -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,12 +20,12 @@
  *
  * @section Description
  *
- * sync_structures helper functions (see .h for macros)
+ * SyncStructures helper functions (see .h for macros)
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#include <galois/runtime/sync_structures.h>
+#include <galois/runtime/SyncStructures.h>
 
 // TODO put in a sensible namespace
 bool src_invalid(BITVECTOR_STATUS bv_flag) {

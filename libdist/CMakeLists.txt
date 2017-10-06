@@ -10,10 +10,10 @@ set(sources
         src/Network.cpp
         src/Barrier.cpp
         src/hash/crc32.cpp
-        src/sync_structures.cpp
+        src/SyncStructures.cpp
         src/GlobalObj.cpp
-        src/dGraph.cpp
-        src/dGraphLoader.cpp
+        src/DistributedGraph.cpp
+        src/DistributedGraphLoader.cpp
 )
 
 add_library(galois_dist STATIC ${sources})

@@ -1,7 +1,7 @@
 #pragma once
-#include "galois/runtime/Cuda/cuda_mtypes.h"
+#include "galois/cuda/cuda_mtypes.h"
 #include "galois/runtime/DataCommMode.h"
-#include "galois/runtime/Cuda/cuda_context_decl.h"
+#include "galois/cuda/cuda_context_decl.h"
 
 void bitset_betweeness_centrality_clear_cuda(struct CUDA_Context *ctx);
 float get_node_betweeness_centrality_cuda(struct CUDA_Context *ctx, unsigned LID);

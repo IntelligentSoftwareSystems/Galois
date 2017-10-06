@@ -26,7 +26,7 @@
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 
-#include "galois/runtime/dGraph.h"
+#include "galois/graphs/DistributedGraph.h"
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, bool BSPNode = false, bool BSPEdge = false, unsigned DecomposeFactor = 1>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {

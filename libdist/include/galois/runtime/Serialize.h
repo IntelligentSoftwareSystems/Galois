@@ -35,8 +35,8 @@
 #include "galois/runtime/Extra_dist_traits.h"
 
 #include <galois/gdeque.h>
-#include <galois/runtime/Dynamic_bitset.h>
-#include <galois/Atomic_wrapper.h>
+#include <galois/DynamicBitset.h>
+#include <galois/AtomicWrapper.h>
 #include "galois/Bag.h"
 
 namespace galois {

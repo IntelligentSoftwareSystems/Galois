@@ -33,7 +33,7 @@
 #include <limits>
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
-#include "galois/runtime/bare_mpi.h"
+#include "galois/runtime/BareMPI.h"
 
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"

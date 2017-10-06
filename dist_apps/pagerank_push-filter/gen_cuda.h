@@ -1,7 +1,7 @@
 #pragma once
-#include "galois/runtime/Cuda/cuda_mtypes.h"
+#include "galois/cuda/cuda_mtypes.h"
 #include "galois/runtime/DataCommMode.h"
-#include "galois/runtime/Cuda/cuda_context_decl.h"
+#include "galois/cuda/cuda_context_decl.h"
 
 void get_bitset_nout_cuda(struct CUDA_Context *ctx, unsigned long long int *bitset_compute);
 void bitset_nout_reset_cuda(struct CUDA_Context *ctx);

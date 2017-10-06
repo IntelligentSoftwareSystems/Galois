@@ -81,7 +81,7 @@ public:
 */
 
 #include <iostream>
-#include "galois/runtime/bare_mpi.h"
+#include "galois/runtime/BareMPI.h"
 
 namespace {
 class HostBarrier : public galois::substrate::Barrier {

@@ -1,4 +1,4 @@
-#include "galois/runtime/sync_structures.h"
+#include "galois/runtime/SyncStructures.h"
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(nout, unsigned int);
 GALOIS_SYNC_STRUCTURE_BROADCAST(nout, unsigned int);

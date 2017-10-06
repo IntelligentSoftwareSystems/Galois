@@ -26,7 +26,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#include <galois/runtime/dGraphLoader.h>
+#include <galois/graphs/DistributedGraphLoader.h>
 
 namespace cll = llvm::cl;
 

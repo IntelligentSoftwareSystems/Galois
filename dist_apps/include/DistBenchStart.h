@@ -37,13 +37,15 @@
 #include "galois/Galois.h"
 #include "galois/Version.h"
 #include "llvm/Support/CommandLine.h"
-#include "galois/runtime/dGraphLoader.h"
-#include "galois/runtime/AtomicHelpers.h"
-#include "galois/runtime/CompilerHelpers.h"
+#include "galois/graphs/DistributedGraphLoader.h"
+#include "galois/AtomicHelpers.h"
+#ifdef GALOIS_USE_EXP
+#include "galois/CompilerHelpers.h"
+#endif
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/runtime/Cuda/cuda_device.h"
-#include "galois/runtime/Cuda/cuda_context_decl.h"
+#include "galois/cuda/cuda_device.h"
+#include "galois/cuda/cuda_context_decl.h"
 #else
 // dummy struct declaration to allow non-het code to compile without
 // having to include cuda_context_decl

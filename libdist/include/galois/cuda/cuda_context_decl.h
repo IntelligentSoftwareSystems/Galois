@@ -33,7 +33,7 @@
 
 #ifndef __CUDA_CONTEXT_DECL__
 #define __CUDA_CONTEXT_DECL__
-#include "galois/runtime/Cuda/cuda_mtypes.h"
+#include "galois/cuda/cuda_mtypes.h"
 
 struct CUDA_Context;
 

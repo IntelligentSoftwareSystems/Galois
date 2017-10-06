@@ -1,6 +1,6 @@
 //Dynamic bit set for CPU
 
-#include "galois/Atomic_wrapper.h"
+#include "galois/AtomicWrapper.h"
 #include <iostream>
 #include <bitset>
 #include <climits> // CHAR_BIT

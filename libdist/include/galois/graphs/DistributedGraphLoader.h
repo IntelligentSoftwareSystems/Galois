@@ -29,10 +29,10 @@
 #ifndef D_GRAPH_LOADER
 #define D_GRAPH_LOADER
 
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-#include "galois/runtime/dGraph_jaggedCut.h"
+#include "galois/graphs/DistributedGraph_EdgeCut.h"
+#include "galois/graphs/DistributedGraph_CartesianCut.h"
+#include "galois/graphs/DistributedGraph_HybridCut.h"
+#include "galois/graphs/DistributedGraph_JaggedCut.h"
 
 /*******************************************************************************
  * Supported partitioning schemes

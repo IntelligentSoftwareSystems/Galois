@@ -26,7 +26,7 @@
 #ifndef _GALOIS_DIST_HGRAPHHYBRID_H
 #define _GALOIS_DIST_HGRAPHHYBRID_H
 
-#include "galois/runtime/dGraph.h"
+#include "galois/graphs/DistributedGraph.h"
 #include <sstream>
 
 #define BATCH_MSG_SIZE 1000

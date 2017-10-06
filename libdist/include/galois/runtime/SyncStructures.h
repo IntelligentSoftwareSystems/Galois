@@ -1,4 +1,4 @@
-/**sync_structures.h -*- C++ -*-
+/**SyncStructures.h -*- C++ -*-
  * @file
  * @section License
  *
