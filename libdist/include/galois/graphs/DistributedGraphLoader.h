@@ -42,6 +42,20 @@ enum PARTITIONING_SCHEME {
   JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT
 };
 
+inline const char* EnumToString(PARTITIONING_SCHEME e) {
+  switch(e) {
+    case OEC: return "oec";
+    case IEC: return "iec";
+    case HOVC: return "hovc";
+    case HIVC: return "hivc";
+    case BOARD2D_VCUT: return "board2d_vcut";
+    case CART_VCUT: return "cvc";
+    case JAGGED_CYCLIC_VCUT: return "jcvc";
+    case JAGGED_BLOCKED_VCUT: return "jbvc";
+    case OVER_DECOMPOSE_2_VCUT: return "od2vc";
+    case OVER_DECOMPOSE_4_VCUT: return "od4vc";
+  }
+}
 /*******************************************************************************
  * Graph-loading-related command line arguments
  ******************************************************************************/

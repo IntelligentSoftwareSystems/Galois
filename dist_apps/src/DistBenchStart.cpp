@@ -157,6 +157,10 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
     galois::runtime::reportParam("DistBench", "Runs", (unsigned long)numRuns);
     galois::runtime::reportParam("DistBench", "Run_UUID", 
                                  galois::runtime::getRandUUID());
+    galois::runtime::reportParam("DistBench", "Input", 
+                                   inputFile);
+    galois::runtime::reportParam("DistBench", "PartitionScheme", 
+                                   EnumToString(partitionScheme));
   }
 
   char name[256];
