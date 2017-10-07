@@ -1,5 +1,5 @@
-/** Forward declarations for cuda context -*- C++ -*-
- * @file cuda_context_decl.h
+/** Forward declarations for cuda host -*- C++ -*-
+ * @file HostDecls.h
  * @section License
  *
  * This file is part of Galois.  Galois is a framework to exploit
@@ -26,17 +26,43 @@
  *
  * @section Description
  *
- * Forward declarations for common CUDA context functions
+ * Forward declarations for CUDA host
  *
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#ifndef __CUDA_CONTEXT_DECL__
-#define __CUDA_CONTEXT_DECL__
-#include "galois/cuda/cuda_mtypes.h"
+#ifndef __HOST_FORWARD_DECL__
+#define __HOST_FORWARD_DECL__
+#include <string>
 
-struct CUDA_Context;
+#ifndef LSG_CSR_GRAPH
+typedef unsigned int index_type; // GPU kernels choke on size_t 
+typedef unsigned int node_data_type;
+typedef unsigned int edge_data_type;
+#endif
 
+struct MarshalGraph {
+  size_t nnodes;  
+  size_t nedges;
+  unsigned int nowned;
+  int id;
+  index_type *row_start;
+  index_type *edge_dst;
+  node_data_type *node_data;
+  edge_data_type *edge_data;
+  unsigned int *num_master_nodes;
+  unsigned int **master_nodes;
+  unsigned int *num_mirror_nodes;
+  unsigned int **mirror_nodes;
+};
+
+// to determine the GPU device id
+int get_gpu_device_id(std::string personality_set, int num_nodes); // defined on the host
+
+struct CUDA_Context; // forward declaration only because rest is dependent on the dist_app
+
+// defined on the device
 struct CUDA_Context *get_CUDA_context(int id);
 bool init_CUDA_context(struct CUDA_Context *ctx, int device);
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g, unsigned num_hosts);

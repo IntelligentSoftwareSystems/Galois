@@ -1,5 +1,4 @@
 #pragma once
-#include "galois/cuda/cuda_mtypes.h"
 #include "galois/runtime/DataCommMode.h"
 
 struct CUDA_Context;

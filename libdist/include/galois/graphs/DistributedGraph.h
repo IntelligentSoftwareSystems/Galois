@@ -52,7 +52,7 @@
 #include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/cuda/cuda_mtypes.h"
+#include "galois/cuda/HostDecls.h"
 #endif
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
