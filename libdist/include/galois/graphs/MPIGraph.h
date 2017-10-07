@@ -29,6 +29,7 @@
 #ifndef GALOIS_GRAPH_MPIGRAPH_H
 #define GALOIS_GRAPH_MPIGRAPH_H
 
+#include <limits>
 #include <galois/gIO.h>
 #include <galois/Reduction.h>
 #include <mpi.h>
@@ -73,6 +74,7 @@ private:
     }
   }
 
+
   /**
    * Load the out indices (i.e. where a particular node's edges begin in the
    * array of edges) from the file.
@@ -92,8 +94,24 @@ private:
     // position to start of contiguous chunk of nodes to read
     uint64_t readPosition = (4 + nodeStart) * sizeof(uint64_t);
 
-    MPI_File_read_at(graphFile, readPosition, (char*)outIndexBuffer, 
-                     numNodesToLoad, MPI_UINT64_T, MPI_STATUS_IGNORE); 
+    uint64_t nodesLoaded = 0;
+    MPI_Status mpiStatus;
+
+    while (numNodesToLoad > 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numNodesToLoad, (uint64_t)std::numeric_limits<int>::max());
+
+      MPI_File_read_at(graphFile, readPosition + (nodesLoaded * sizeof(uint64_t)), 
+                       ((char*)outIndexBuffer) + nodesLoaded * sizeof(uint64_t), 
+                       toLoad, MPI_UINT64_T, &mpiStatus); 
+
+      int itemsRead; 
+      MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
+
+      numNodesToLoad -= itemsRead;
+      nodesLoaded += itemsRead;
+      //printf("read %d nodes, %lu remaining\n", itemsRead, numNodesToLoad);
+    }
 
     nodeOffset = nodeStart;
   }
@@ -120,9 +138,23 @@ private:
     uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                             (sizeof(uint32_t) * edgeStart);
 
-    MPI_File_read_at(graphFile, readPosition, (char*)edgeDestBuffer, 
-                     numEdgesToLoad, MPI_UINT32_T, MPI_STATUS_IGNORE); 
+    uint64_t edgesLoaded = 0;
+    MPI_Status mpiStatus;
 
+    while (numEdgesToLoad > 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numEdgesToLoad, (uint64_t)std::numeric_limits<int>::max());
+
+      MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
+                       ((char*)edgeDestBuffer) + edgesLoaded * sizeof(uint32_t), 
+                       toLoad, MPI_UINT32_T, &mpiStatus); 
+      int itemsRead; 
+      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
+
+      numEdgesToLoad -= itemsRead;
+      edgesLoaded += itemsRead;
+      //printf("read %d edges, %lu remaining\n", itemsRead, numEdgesToLoad);
+    }
 
     edgeOffset = edgeStart;
   }
