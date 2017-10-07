@@ -559,10 +559,7 @@ struct PreflowPush {
   }
 
 
-  struct Counter {
-    galois::GAccumulator<int> accum;
-    galois::substrate::PerThreadStorage<int> local;
-  };
+  using Counter = galois::GAccumulator<int>;
 
   template <DetAlgo version>
     struct Process {
@@ -587,7 +584,7 @@ struct PreflowPush {
         Process<version>* self;
         bool operator()() {
           if (self->app.global_relabel_interval > 0 &&
-              self->counter.accum.reduce() >= self->app.global_relabel_interval) {
+              self->counter.reduce() >= self->app.global_relabel_interval) {
             self->app.should_global_relabel = true;
             return true;
           }
@@ -618,7 +615,7 @@ struct PreflowPush {
           increment += BETA;
         }
 
-        counter.accum += increment;
+        counter += increment;
       }
     };
 
@@ -627,9 +624,7 @@ struct PreflowPush {
 
     Counter& counter;
     PreflowPush& app;
-    int limit;
     ProcessNonDet(Counter& c, PreflowPush& a) : counter(c), app(a) {
-      limit = app.global_relabel_interval / numThreads;
     }
 
     template <typename C>
@@ -640,8 +635,9 @@ struct PreflowPush {
           increment += BETA;
         }
 
-        int v = *counter.local.getLocal() += increment;
-        if (app.global_relabel_interval > 0 && v >= limit) {
+        if (self->app.global_relabel_interval > 0 &&
+            self->counter.reduce() >= self->app.global_relabel_interval) {
+
           app.should_global_relabel = true;
           ctx.breakLoop();
           return;
