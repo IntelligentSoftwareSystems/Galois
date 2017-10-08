@@ -1,0 +1,191 @@
+#!/usr/bin/env Rscript
+
+#######################################################
+# Author: Gurbinder Gill
+# Email:  gill@cs.utexas.edu
+# Date:   Oct 8, 2017
+######################################################
+library("optparse")
+library('data.table')
+
+####START: @function to parse commadline##################
+# Parses the command line to get the arguments used
+parseCmdLine <- function (logData, isSharedMemGaloisLog) {
+  cmdLineRow <- subset(logData, CATEGORY == "CommandLine")
+
+  ## Distributed has extra column: HostID
+  if(isTRUE(isSharedMemGaloisLog))
+    cmdLine <- substring(cmdLineRow[,5], 0)
+  else
+    cmdLine <- substring(cmdLineRow[,6], 0)
+
+  cmdLineSplit = strsplit(cmdLine, "\\s+")[[1]]
+
+  ## First postitional argument is always name of the executable
+  ### WORKING: split the exePath name found at the position 1 of the argument list and split on "/".
+  exePathSplit <- strsplit(cmdLineSplit[1], "/")[[1]]
+  benchmark <- exePathSplit[length(exePathSplit)]
+
+  ## subset the threads row from the table
+  numThreads <- (subset(logData, CATEGORY == "Threads"))$TOTAL
+
+  ## subset the input row from the table
+  inputPath <- (subset(logData, CATEGORY == "Input"))$TOTAL
+  inputPathSplit <- strsplit(inputPath[[1]], "/")[[1]]
+  input <- inputPathSplit[length(inputPathSplit)]
+
+ if(isTRUE(isSharedMemGaloisLog)){
+   returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads)
+   return(returnList)
+ }
+
+ ## Need more params for distributed galois logs
+ numHosts <- (subset(logData, CATEGORY == "Hosts"))$TOTAL
+
+ partitionScheme <- (subset(logData, CATEGORY == "PartitionScheme"))$TOTAL
+
+ runID <- (subset(logData, CATEGORY == "Run_UUID"))$TOTAL
+
+ numIterations <- (subset(logData, CATEGORY == "NUM_ITERATIONS_0"))$TOTAL
+
+ ## returnList for distributed galois log
+ returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations)
+ return(returnList)
+}
+#### END: @function to parse commadline ##################
+
+#### START: @function to values of timers for shared memory galois log ##################
+# Parses to get the timer values
+getTimersShared <- function (logData) {
+ ##XXX NULL should not be a string
+ totalTimeRow <- subset(logData, CATEGORY == "Time" & REGION == "(NULL)")
+ totalTime <- totalTimeRow$TOTAL
+ print(paste("totalTime:", totalTime))
+ returnList <- list("totalTime" = totalTime)
+ return(returnList)
+}
+#### END: @function to values of timers for shared memory galois log ##################
+
+#### START: @function to values of timers for distributed memory galois log ##################
+# Parses to get the timer values
+getTimersDistributed <- function (logData) {
+ ##XXX NULL should not be a string
+ ## Taking mean of all the runs
+ totalTimeMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY))$TOTAL))
+ print(paste("totalTimeMean:", totalTimeMean))
+
+ ## To get the name of benchmark to be used with other queries to get right timers.
+ ### It assumes that there will always with TIMER_0 with REGION name as benchmark
+ ### name used with other queries.
+ benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0")$REGION
+ print(paste("benchmark:", benchmarkRegionName))
+
+ ## Number of runs
+ numRuns <- as.numeric((subset(logData, CATEGORY == "Runs"))$TOTAL)
+ print(paste("numRuns:", numRuns))
+
+ ## Total compute time (galois::do_alls)
+ computeTimePerIter <- numeric()
+ for(i in 0:(numRuns - 1)) {
+   j = i - 1 #Vectors are 1 indexed in r
+   computeTimeRows <- subset(logData, grepl(paste(benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & CATEGORY == "Time")$TOTAL
+   if(!is.null(computeTimeRows)){
+     computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
+   }
+ }
+ computeTimeMean <- (mean(computeTimePerIter))
+ print(paste("computeTimeMean:", computeTimeMean))
+
+ ##Total sync time.
+ syncTimePerIter <- numeric()
+ for(i in 0:(numRuns - 1)) {
+   j = i - 1 #Vectors are 1 indexed in r
+   syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY))$TOTAL
+   if(!is.null(syncTimeRows)){
+     syncTimePerIter[i] <- sum(as.numeric(syncTimeRows))
+   }
+ }
+ syncTimeMean <- (mean(syncTimePerIter))
+ print(paste("syncTimeMean", syncTimeMean))
+
+
+ ## Mean time spent in the implicit barrier: DGReducible
+ barrierTimePerIter <- numeric()
+ for(i in 1:(numRuns)) {
+  j = i - 1 #Vectors are 1 indexed in r
+  barrierTimeRows <- subset(logData, REGION =="DGReducible" & grepl(paste( "REDUCE_DGACCUM_", j, "_[0-9]+", sep=""), CATEGORY))$TOTAL
+  if(!is.null(barrierTimeRows)){
+    barrierTimePerIter[i] <- sum(as.numeric(barrierTimeRows))
+  }
+ }
+ barrierTimeMean <- (mean(barrierTimePerIter))
+ print(paste("barrierTimeMean:", barrierTimeMean))
+
+ ## Total bytes sent in reduce and broadcast phase in run 0.
+ ### Same number of bytes are being sent in all the runs.
+ syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY))$TOTAL))
+ print(paste("syncBytes:", syncBytes))
+
+
+ returnList <- list("totalTime" = totalTimeMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes)
+ return(returnList)
+
+}
+#### END: @function to values of timers for distributed memory galois log ##################
+
+#### START: @function entry point for galois log parser ##################
+galoisLogParser <- function(input, output, isSharedMemGaloisLog) {
+  logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
+
+  if(isTRUE(isSharedMemGaloisLog)){
+    print("Parsing commadline")
+    paramList <- parseCmdLine(logData, T)
+    print("Parsing timers for shared memory galois log")
+    timersList <- getTimersShared(logData)
+  }
+  else{
+    print("Parsing commadline")
+    paramList <- parseCmdLine(logData, F)
+    print("Parsing timers for distributed memory galois log")
+    timersList <- getTimersDistributed(logData)
+  }
+
+  outDataList <- append(paramList, timersList)
+  if(!file.exists(output)){
+    print(paste(output, "Does not exist. Creating new file"))
+    write.csv(as.data.frame(outDataList), file=output, row.names=F, quote=F)
+  } else {
+    print(paste("Appending data to the existing file", output))
+    write.table(as.data.frame(outDataList), file=output, row.names=F, col.names=F, quote=F, append=T, sep=",")
+  }
+}
+#### END: @function entry point for shared memory galois log ##################
+
+
+#############################################
+##  Commandline options.
+############################################
+option_list = list(
+                     make_option(c("-i", "--input"), action="store", default=NA, type='character',
+                                               help="name of the input file to parse"),
+                     make_option(c("-o", "--output"), action="store", default=NA, type='character',
+                                               help="name of the output file to store output"),
+                     make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
+                                               help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]")
+                     )
+
+opt_parser <- OptionParser(usage = "%prog [options] -i input.log -o output.csv", option_list=option_list)
+opt <- parse_args(opt_parser)
+
+if (is.na(opt$i)){
+  print_help(opt_parser)
+  stop("At least one argument must be supplied (input file)", call.=FALSE)
+} else {
+  if (is.na(opt$o)){
+    print("Output file name is not specified. Using name ouput.csv as default")
+    opt$o <- "output.csv"
+  }
+  galoisLogParser(opt$i, opt$o, opt$s)
+}
+
+##################### END #####################
