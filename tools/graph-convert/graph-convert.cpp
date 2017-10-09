@@ -81,7 +81,8 @@ enum ConvertMode {
   mtx2gr,
   nodelist2gr,
   pbbs2gr,
-  svmlight2gr
+  svmlight2gr,
+  edgelist2binary
 };
 
 enum EdgeType {
@@ -155,6 +156,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(nodelist2gr, "Convert node list to binary gr"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
       clEnumVal(svmlight2gr, "Convert svmlight file to binary gr"),
+      clEnumVal(edgelist2binary, "Convert edge list to binary edgelist format (assumes vertices of type uin32_t)"),
       clEnumValEnd), cll::Required);
 static cll::opt<uint32_t> sourceNode("sourceNode", 
     cll::desc("Source node ID for BFS traversal"), cll::init(0));
@@ -348,6 +350,56 @@ struct Edgelist2Gr: public Conversion {
     printStatus(numNodes, numEdges);
   }
 };
+
+/**
+ * Convert edgelist to binary edgelist format
+ * Assumes no edge data.
+ */
+struct Edgelist2Binary: public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    std::ifstream infile(infilename.c_str());
+    std::ofstream outfile(outfilename.c_str());
+
+    size_t numNodes = 0;
+    size_t numEdges = 0;
+
+    uint32_t bufferSize = 10000;
+    std::vector<uint32_t> buffer(bufferSize);
+    uint32_t counter = 0;
+    while (infile) {
+      //size_t src;
+      //size_t dst;
+      uint32_t src;
+      uint32_t dst;
+
+      infile >> src >> dst;
+
+      buffer[counter++] = src;
+      buffer[counter++] = dst;
+      if(counter == bufferSize){
+        //flush it to the output file.
+        outfile.write(reinterpret_cast<char*>(&buffer[0]), sizeof(uint32_t)*counter);
+        counter = 0;
+      }
+      if (infile) {
+        ++numEdges;
+        if (src > numNodes)
+          numNodes = src;
+        if (dst > numNodes)
+          numNodes = dst;
+      }
+    }
+
+    if(counter){
+      //flush it to the output file.
+      outfile.write(reinterpret_cast<char*>(&buffer[0]), sizeof(uint32_t)*counter);
+    }
+
+    printStatus(numNodes, numEdges);
+  }
+};
+
 
 /**
  * Convert matrix market matrix to binary graph.
@@ -2454,6 +2506,7 @@ int main(int argc, char** argv) {
     case nodelist2gr: convert<Nodelist2Gr>(); break;
     case pbbs2gr: convert<Pbbs2Gr>(); break;
     case svmlight2gr: convert<Svmlight2Gr>(); break;
+    case edgelist2binary: convert<Edgelist2Binary>(); break;
     default: abort();
   }
   return 0;
