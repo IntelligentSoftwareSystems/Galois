@@ -672,14 +672,17 @@ protected:
 
     // report masters/mirrors to/from other hosts as statistics
     for (auto x = 0U; x < masterNodes.size(); ++x) {
-      std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
+      if (x == id) continue;
+      std::string master_nodes_str = "MASTER_NODES_FROM_" + std::to_string(id)
+                                      + "_TO_" + std::to_string(x);
       galois::runtime::reportStat_Tsum(GRNAME, master_nodes_str, 
                                        masterNodes[x].size());
     }
 
     for (auto x = 0U; x < mirrorNodes.size(); ++x) {
-      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
       if (x == id) continue;
+      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x)
+                                      + "_TO_" + std::to_string(id);
       galois::runtime::reportStat_Tsum(GRNAME, mirror_nodes_str, 
                                        mirrorNodes[x].size());
     }
