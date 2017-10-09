@@ -1,10 +1,13 @@
 #!/bin/sh
 
-EXECS=( "bfs_push-filter" "pagerank_pull-topological" "kcore_push-filter" "cc_push-filter" "sssp_push-filter" )
+# fastest variants
+EXECS=( "bfs_push" "pagerank_pull" "kcore_push" "cc_push" "sssp_push" )
+# all benchmarks
+EXECS=( "bfs_push" "bfs_pull" "kcore_push" "kcore_pull" "cc_push" "cc_pull" "sssp_push" "sssp_pull" )
 
 SET="1,2:00:00 2,01:30:00 4,01:00:00 8,00:45:00 16,00:30:00 32,00:20:00"
 SET="128,00:30:00 64,00:45:00 32,01:00:00"
-SET="64,01:45:00 32,02:00:00 16,02:30:00" #clueweb12 rmat30
+SET="64,01:00:00 32,01:30:00 16,02:00:00" 
 
 INPUTS=("uk-2007;\"${SET}\"")
 INPUTS=("twitter-ICWSM10-component;\"${SET}\"")
