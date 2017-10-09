@@ -558,11 +558,10 @@ private:
     assert(provided >= MPI_THREAD_FUNNELED);
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
-    if (taskRank != id) GALOIS_DIE("Mismatch in MPI rank");
+    if ((unsigned)taskRank != id) GALOIS_DIE("Mismatch in MPI rank");
     int numTasks;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (numTasks != numHosts) GALOIS_DIE("Mismatch in MPI rank");
+    if ((unsigned)numTasks != numHosts) GALOIS_DIE("Mismatch in MPI rank");
 #endif
 
     MPI_Group world_group;
