@@ -292,9 +292,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         base_hGraph::beginMaster = 0;
       }
 
-      base_hGraph::printStatistics();
-
-
       /******************************************
        * Allocate and construct the graph
        *****************************************/
@@ -312,6 +309,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         galois::timeit(),
         galois::no_stats()
       );
+
+      base_hGraph::printStatistics();
 
       loadEdges(base_hGraph::graph, fileGraph, numEdges_distribute, VCutThreshold);
 

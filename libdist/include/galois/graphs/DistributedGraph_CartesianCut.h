@@ -325,8 +325,6 @@ public:
     std::vector<uint64_t> prefixSumOfEdges;
     loadStatistics(g, fileGraph, prefixSumOfEdges); // first pass of the graph file
 
-    base_hGraph::printStatistics();
-
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
     base_hGraph::graph.allocateFrom(numNodes, numEdges);
 
@@ -356,6 +354,7 @@ public:
       base_hGraph::beginMaster = 0; 
     }
 
+    base_hGraph::printStatistics();
 
     loadEdges(base_hGraph::graph, g, fileGraph); // second pass of the graph file
 

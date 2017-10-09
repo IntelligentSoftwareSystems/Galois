@@ -241,8 +241,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
 
-      base_hGraph::printStatistics();
-
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
       prefixSumOfEdges.resize(_numNodes, prefixSumOfEdges.back());
@@ -272,6 +270,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         galois::no_stats()
       );
 
+      base_hGraph::printStatistics();
 
       loadEdges(base_hGraph::graph, fileGraph);
       
