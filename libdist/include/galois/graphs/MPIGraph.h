@@ -53,6 +53,8 @@ private:
   uint64_t edgeOffset;
   bool graphLoaded;
 
+  int myHostID;
+
   typedef boost::counting_iterator<uint64_t> EdgeIterator;
 
   // accumulators for tracking bytes read
@@ -70,8 +72,19 @@ private:
 
     if (!mpiInitialized) {
       char*** dummyBuffer = nullptr;
-      MPI_Init(0, dummyBuffer);
+      int supportProvided;
+      int initSuccess = MPI_Init_thread(0, dummyBuffer, MPI_THREAD_FUNNELED, 
+                                        &supportProvided);
+      if (initSuccess != MPI_SUCCESS) {
+        MPI_Abort(MPI_COMM_WORLD, initSuccess);
+      }
+      if (supportProvided < MPI_THREAD_FUNNELED) {
+        GALOIS_DIE("Thread funneling (MPI) not supported.");
+      }
     }
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &myHostID);
+    //MPI_Comm_size(MPI_COMM_WORLD, &numHosts);
   }
 
 
@@ -85,11 +98,17 @@ private:
    */
   void loadOutIndex(MPI_File& graphFile, uint64_t nodeStart, 
                     uint64_t numNodesToLoad) {
+
+    //printf("in node reading calling file read\n");
     if (numNodesToLoad == 0) {
       return;
     }
     assert(outIndexBuffer == nullptr);
     outIndexBuffer = (uint64_t*)malloc(sizeof(uint64_t) * numNodesToLoad);
+
+    if (outIndexBuffer == nullptr) {
+      GALOIS_DIE("Failed to allocate memory for out index buffer.");
+    }
 
     // position to start of contiguous chunk of nodes to read
     uint64_t readPosition = (4 + nodeStart) * sizeof(uint64_t);
@@ -101,6 +120,7 @@ private:
       // File_read can only go up to the max int
       uint64_t toLoad = std::min(numNodesToLoad, (uint64_t)std::numeric_limits<int>::max());
 
+      //printf("node reading calling file read\n");
       MPI_File_read_at(graphFile, readPosition + (nodesLoaded * sizeof(uint64_t)), 
                        ((char*)outIndexBuffer) + nodesLoaded * sizeof(uint64_t), 
                        toLoad, MPI_UINT64_T, &mpiStatus); 
@@ -134,10 +154,15 @@ private:
     assert(edgeDestBuffer == nullptr);
     edgeDestBuffer = (uint32_t*)malloc(sizeof(uint32_t) * numEdgesToLoad);
 
+    if (edgeDestBuffer == nullptr) {
+      GALOIS_DIE("Failed to allocate memory for edge dest buffer.");
+    }
+
     // position to start of contiguous chunk of edges to read
     uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                             (sizeof(uint32_t) * edgeStart);
 
+    //printf("size of offset type is %d\n", sizeof(MPI_Offset));
     uint64_t edgesLoaded = 0;
     MPI_Status mpiStatus;
 
@@ -219,29 +244,47 @@ public:
   void loadPartialGraph(const std::string& filename, uint64_t nodeStart,
                         uint64_t nodeEnd, uint64_t edgeStart, 
                         uint64_t edgeEnd, uint64_t numGlobalNodes) {
+    //sleep(10);
     if (graphLoaded) {
       GALOIS_DIE("Cannot load an MPI graph more than once.");
     }
-    printf("edge start %lu edge end %lu\n", edgeStart, edgeEnd);
+    //printf("edge start %lu edge end %lu\n", edgeStart, edgeEnd);
 
     MPI_File graphFile;
+    //printf("file open start\n");
     // TODO can give striping info to file open?
-    MPI_File_open(MPI_COMM_WORLD, filename.c_str(), MPI_MODE_RDONLY, 
-                  MPI_INFO_NULL, &graphFile);
+
+    int fileSuccess = MPI_File_open(MPI_COMM_SELF, filename.c_str(), 
+                                    MPI_MODE_RDONLY, MPI_INFO_NULL, &graphFile);
+    
+    if (fileSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, fileSuccess);
+    }
+
+    //printf("starting out index load\n");
 
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
     loadOutIndex(graphFile, nodeStart, numLocalNodes);
 
+    //printf("out index loaded\n");
+
     assert(edgeEnd >= edgeStart);
     numLocalEdges = edgeEnd - edgeStart;
     loadEdgeDest(graphFile, edgeStart, numLocalEdges, numGlobalNodes);
+
+    //printf("edge dest loaded\n");
 
     // TODO edge data stuff
 
     graphLoaded = true;
 
-    int d = MPI_File_close(&graphFile);
+    int closeSuccess = MPI_File_close(&graphFile);
+
+    if (closeSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, closeSuccess);
+    }
+    //printf("exiting load partial graph\n");
   }
 
   /**
@@ -253,6 +296,9 @@ public:
    */
   EdgeIterator edgeBegin(uint64_t globalNodeID) {
     assert(graphLoaded);
+    if (numLocalNodes == 0) {
+      return EdgeIterator(0);
+    }
     assert(nodeOffset <= globalNodeID);
     assert(globalNodeID < (nodeOffset + numLocalNodes));
 
@@ -274,6 +320,9 @@ public:
    */
   EdgeIterator edgeEnd(uint64_t globalNodeID) {
     assert(graphLoaded);
+    if (numLocalNodes == 0) {
+      return EdgeIterator(0);
+    }
     assert(nodeOffset <= globalNodeID);
     assert(globalNodeID < (nodeOffset + numLocalNodes));
 
@@ -291,8 +340,8 @@ public:
    */
   uint64_t edgeDestination(uint64_t globalEdgeID) {
     assert(graphLoaded);
-    if (edgeOffset > globalEdgeID) {
-      printf("edge offset is %lu, id %lu\n", edgeOffset, globalEdgeID);
+    if (numLocalEdges == 0) {
+      return 0;
     }
     assert(edgeOffset <= globalEdgeID); 
     assert(globalEdgeID < (edgeOffset + numLocalEdges));
