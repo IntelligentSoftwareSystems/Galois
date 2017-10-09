@@ -417,9 +417,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         numOutgoingEdges[i].assign(base_hGraph::numOwned, 0);
       }
 
-      auto activeThreads = galois::runtime::activeThreads;
-      galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
-
       galois::Timer timer;
       timer.start();
       mpiGraph.resetReadCounters();
@@ -464,8 +461,6 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                      mpiGraph.getBytesRead(), " bytes (",
                      mpiGraph.getBytesRead()/(float)timer.get_usec(),
                      " MBPS)\n");
-
-      galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       uint64_t check_numEdges = 0;
       for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
