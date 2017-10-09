@@ -53,6 +53,8 @@ private:
   uint64_t edgeOffset;
   bool graphLoaded;
 
+  //MPI_Info stripingInfo;
+
   int myHostID;
 
   typedef boost::counting_iterator<uint64_t> EdgeIterator;
@@ -84,7 +86,22 @@ private:
     }
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myHostID);
+
     //MPI_Comm_size(MPI_COMM_WORLD, &numHosts);
+
+    //// setup striping info (this is for stampede)
+    //MPI_Info_create(&stripingInfo);    
+    //int factorSuccess = MPI_Info_set(stripingInfo, "striping_factor", "22");
+
+    //if (factorSuccess != MPI_SUCCESS) {
+    //  MPI_Abort(MPI_COMM_WORLD, factorSuccess);
+    //}
+
+    //int unitSuccess = MPI_Info_set(stripingInfo, "striping_unit", "2097152");
+
+    //if (unitSuccess != MPI_SUCCESS) {
+    //  MPI_Abort(MPI_COMM_WORLD, unitSuccess);
+    //}
   }
 
 
@@ -98,8 +115,6 @@ private:
    */
   void loadOutIndex(MPI_File& graphFile, uint64_t nodeStart, 
                     uint64_t numNodesToLoad) {
-
-    //printf("in node reading calling file read\n");
     if (numNodesToLoad == 0) {
       return;
     }
@@ -120,7 +135,6 @@ private:
       // File_read can only go up to the max int
       uint64_t toLoad = std::min(numNodesToLoad, (uint64_t)std::numeric_limits<int>::max());
 
-      //printf("node reading calling file read\n");
       MPI_File_read_at(graphFile, readPosition + (nodesLoaded * sizeof(uint64_t)), 
                        ((char*)outIndexBuffer) + nodesLoaded * sizeof(uint64_t), 
                        toLoad, MPI_UINT64_T, &mpiStatus); 
@@ -162,7 +176,6 @@ private:
     uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                             (sizeof(uint32_t) * edgeStart);
 
-    //printf("size of offset type is %d\n", sizeof(MPI_Offset));
     uint64_t edgesLoaded = 0;
     MPI_Status mpiStatus;
 
@@ -231,28 +244,17 @@ public:
   }
 
   /**
-   * Load the entire graph specified by the filename.
-   */
-  // UNIMPLEMENTED
-  //void loadFullGraph() {
-  //}
-
-  /**
    * Given a node/edge range to load, loads the specified portion of the graph 
    * into memory buffers using MPI read.
    */
   void loadPartialGraph(const std::string& filename, uint64_t nodeStart,
                         uint64_t nodeEnd, uint64_t edgeStart, 
                         uint64_t edgeEnd, uint64_t numGlobalNodes) {
-    //sleep(10);
     if (graphLoaded) {
       GALOIS_DIE("Cannot load an MPI graph more than once.");
     }
-    //printf("edge start %lu edge end %lu\n", edgeStart, edgeEnd);
 
     MPI_File graphFile;
-    //printf("file open start\n");
-    // TODO can give striping info to file open?
 
     int fileSuccess = MPI_File_open(MPI_COMM_SELF, filename.c_str(), 
                                     MPI_MODE_RDONLY, MPI_INFO_NULL, &graphFile);
@@ -261,19 +263,13 @@ public:
       MPI_Abort(MPI_COMM_WORLD, fileSuccess);
     }
 
-    //printf("starting out index load\n");
-
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
     loadOutIndex(graphFile, nodeStart, numLocalNodes);
 
-    //printf("out index loaded\n");
-
     assert(edgeEnd >= edgeStart);
     numLocalEdges = edgeEnd - edgeStart;
     loadEdgeDest(graphFile, edgeStart, numLocalEdges, numGlobalNodes);
-
-    //printf("edge dest loaded\n");
 
     // TODO edge data stuff
 
@@ -284,7 +280,6 @@ public:
     if (closeSuccess != MPI_SUCCESS) {
       MPI_Abort(MPI_COMM_WORLD, closeSuccess);
     }
-    //printf("exiting load partial graph\n");
   }
 
   /**
