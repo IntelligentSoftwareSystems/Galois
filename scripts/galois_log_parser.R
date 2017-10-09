@@ -33,6 +33,11 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
   inputPath <- (subset(logData, CATEGORY == "Input"))$TOTAL
   inputPathSplit <- strsplit(inputPath[[1]], "/")[[1]]
   input <- inputPathSplit[length(inputPathSplit)]
+  ### This is to remore the extension for example .gr or .sgr
+  inputsplit <- strsplit(input, "[.]")[[1]]
+  if(length(inputsplit) > 1) {
+    input <- inputsplit[1]
+  }
 
  if(isTRUE(isSharedMemGaloisLog)){
    returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads)
@@ -69,10 +74,14 @@ getTimersShared <- function (logData) {
 #### START: @function to values of timers for distributed memory galois log ##################
 # Parses to get the timer values
 getTimersDistributed <- function (logData) {
- ##XXX NULL should not be a string
+
+ ## Total time including the graph construction and initialization
+ totalTime <- (subset(logData, CATEGORY == "TIMER_TOTAL")$TOTAL)
+ print(paste("totalTime:", totalTime))
+
  ## Taking mean of all the runs
- totalTimeMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY))$TOTAL))
- print(paste("totalTimeMean:", totalTimeMean))
+ totalTimeExecMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY))$TOTAL))
+ print(paste("totalTimeExecMean:", totalTimeExecMean))
 
  ## To get the name of benchmark to be used with other queries to get right timers.
  ### It assumes that there will always with TIMER_0 with REGION name as benchmark
@@ -126,8 +135,15 @@ getTimersDistributed <- function (logData) {
  syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY))$TOTAL))
  print(paste("syncBytes:", syncBytes))
 
+ ##Graph construction time
+ graphConstructTime <- subset(logData, CATEGORY == "TIME_GRAPH_CONSTRUCT")$TOTAL
+ print(paste("graphConstructTime:", graphConstructTime))
 
- returnList <- list("totalTime" = totalTimeMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes)
+ ## Replication factor
+ replicationFactor <- subset(logData, CATEGORY == "REPLICATION_FACTOR_0_0")$TOTAL
+ print(paste("replicationFactor:", replicationFactor))
+
+ returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime)
  return(returnList)
 
 }
