@@ -65,25 +65,20 @@ private:
   galois::GAccumulator<uint64_t> numBytesReadEdgeData;
 
   /**
-   * Initialize the MPI system if it hasn't been initialized.
+   * Initialize the MPI system. 
    */
   void initializeMPI() {
-    int mpiInitialized = 0;
-
-    MPI_Initialized(&mpiInitialized);
-
-    if (!mpiInitialized) {
-      char*** dummyBuffer = nullptr;
-      int supportProvided;
-      int initSuccess = MPI_Init_thread(0, dummyBuffer, MPI_THREAD_FUNNELED, 
-                                        &supportProvided);
-      if (initSuccess != MPI_SUCCESS) {
-        MPI_Abort(MPI_COMM_WORLD, initSuccess);
-      }
-      if (supportProvided < MPI_THREAD_FUNNELED) {
-        GALOIS_DIE("Thread funneling (MPI) not supported.");
-      }
+    #ifdef GALOIS_USE_LWCI
+    int supportProvided;
+    int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, 
+                                      &supportProvided);
+    if (initSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, initSuccess);
     }
+    if (supportProvided < MPI_THREAD_FUNNELED) {
+      GALOIS_DIE("Thread funneling (MPI) not supported.");
+    }
+    #endif
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myHostID);
 
@@ -154,7 +149,7 @@ private:
    * Load the edge destination information from the file.
    *
    * @param graphFile loaded MPI file for the graph
-   * @param edgeStart the first node to load
+   * @param edgeStart the first edge to load
    * @param numEdgesToLoad number of edges to load
    * @param numGlobalNodes total number of nodes in the graph file; needed
    * to determine offset into the file
@@ -181,7 +176,8 @@ private:
 
     while (numEdgesToLoad > 0) {
       // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numEdgesToLoad, (uint64_t)std::numeric_limits<int>::max());
+      uint64_t toLoad = std::min(numEdgesToLoad, 
+                                 (uint64_t)std::numeric_limits<int>::max());
 
       MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
                        ((char*)edgeDestBuffer) + edgesLoaded * sizeof(uint32_t), 
@@ -197,24 +193,87 @@ private:
     edgeOffset = edgeStart;
   }
 
-  //template<typename std::enable_if<!std::is_void(EdgeDataType)>::type* = nullptr>
-  //void loadOutIndex() {
-
-  //}
-
   /**
-   * TODO
+   * Load the edge data information from the file.
+   *
+   * @tparam EdgeType must be non-void in order to call this function
+   *
+   * @param edgeStart the first edge to load
+   * @param numEdgesToLoad number of edges to load
+   * @param numGlobalNodes total number of nodes in the graph file; needed
+   * to determine offset into the file
+   * @param numGlobalEdges total number of edges in the graph file; needed
+   * to determine offset into the file
    */
-  template<typename std::enable_if<std::is_void<EdgeDataType>::value>::type* = 
+  template<typename EdgeType, 
+           typename std::enable_if<!std::is_void<EdgeType>::value>::type* = 
                                    nullptr>
   void loadEdgeData(MPI_File& graphFile, uint64_t edgeStart, 
-                    uint64_t numEdgesToLoad, uint64_t numGlobalNodes) {
+                    uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
+                    uint64_t numGlobalEdges) {
+    galois::gDebug("Loading edge data with MPI read");
+
+    if (numEdgesToLoad == 0) {
+      return;
+    }
+
+    assert(edgeDataBuffer == nullptr);
+    edgeDataBuffer = (EdgeDataType*)malloc(sizeof(EdgeDataType) * numEdgesToLoad);
+
+    // current position = after nodes + edges
+    uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
+                            (sizeof(uint32_t) * numGlobalEdges);
+    
+    // version 1 padding TODO make version agnostic
+    if (readPosition % 2) {
+      readPosition += sizeof(uint32_t);
+    }
+
+    // jump to first byte of edge data
+    readPosition += sizeof(EdgeDataType) * edgeStart;
+
+    MPI_Status mpiStatus;
+    uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
+    uint64_t bytesLoaded = 0;
+
+    while (numBytesToLoad != 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numBytesToLoad, 
+                                 (uint64_t)std::numeric_limits<int>::max());
+
+      MPI_File_read_at(graphFile, readPosition + bytesLoaded, 
+                       ((char*)edgeDataBuffer) + bytesLoaded, 
+                       toLoad, MPI_BYTE, &mpiStatus); 
+
+      int bytesRead; 
+      MPI_Get_count(&mpiStatus, MPI_BYTE, &bytesRead);
+
+      numBytesToLoad -= bytesRead;
+      bytesLoaded += bytesRead;
+    }
+  }
+
+  /**
+   * Load edge data function for when the edge data type is void, i.e.
+   * no edge data to load.
+   *
+   * Does nothing of importance.
+   *
+   * @tparam EdgeType if EdgeType is void, this function will be used
+   */
+  template<typename EdgeType, 
+           typename std::enable_if<std::is_void<EdgeType>::value>::type* = 
+                                   nullptr>
+  void loadEdgeData(MPI_File& graphFile, uint64_t edgeStart, 
+                    uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
+                    uint64_t numGlobalEdges) {
+    galois::gDebug("Not loading edge data with MPI read");
     // do nothing (edge data is void, i.e. no edge data)
   }
 
 public:
   /**
-   * Initialize class variables and MPI if necessary.
+   * Initialize class variables and MPI.
    */
   MPIGraph() {
     outIndexBuffer = nullptr;
@@ -229,7 +288,7 @@ public:
   }
 
   /**
-   * On destruction, free allocated buffers.
+   * On destruction, free allocated buffers (if necessary).
    */
   ~MPIGraph() {
     if (outIndexBuffer != nullptr) {
@@ -246,10 +305,21 @@ public:
   /**
    * Given a node/edge range to load, loads the specified portion of the graph 
    * into memory buffers using MPI read.
+   *
+   * @param filename name of graph to load; should be in Galois binary graph
+   * format
+   * @param nodeStart First node to load
+   * @param nodeEnd Last node to load, non-inclusive
+   * @param edgeStart First edge to load; should correspond to first edge of
+   * first node
+   * @param edgeEnd Last edge to load, non-inclusive
+   * @param numGlobalNodes Total number of nodes in the graph
+   * @param numGlobalEdges Total number of edges in the graph
    */
   void loadPartialGraph(const std::string& filename, uint64_t nodeStart,
                         uint64_t nodeEnd, uint64_t edgeStart, 
-                        uint64_t edgeEnd, uint64_t numGlobalNodes) {
+                        uint64_t edgeEnd, uint64_t numGlobalNodes,
+                        uint64_t numGlobalEdges) {
     if (graphLoaded) {
       GALOIS_DIE("Cannot load an MPI graph more than once.");
     }
@@ -271,7 +341,9 @@ public:
     numLocalEdges = edgeEnd - edgeStart;
     loadEdgeDest(graphFile, edgeStart, numLocalEdges, numGlobalNodes);
 
-    // TODO edge data stuff
+    // may or may not do something depending on EdgeDataType
+    loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges, 
+                               numGlobalNodes, numGlobalEdges);
 
     graphLoaded = true;
 
@@ -287,7 +359,7 @@ public:
    *
    * @param globalNodeID the global node id of the node to get the edge
    * for
-   * @returns a GLOBAL edge id
+   * @returns a GLOBAL edge id iterator
    */
   EdgeIterator edgeBegin(uint64_t globalNodeID) {
     assert(graphLoaded);
@@ -312,6 +384,7 @@ public:
    *
    * @param globalNodeID the global node id of the node to get the edge
    * for
+   * @returns a GLOBAL edge id iterator
    */
   EdgeIterator edgeEnd(uint64_t globalNodeID) {
     assert(graphLoaded);
@@ -330,7 +403,7 @@ public:
   /**
    * Get the global node id of the destination of the provided edge.
    *
-   * @param localEdgeID the LOCAL edge id of the edge to get the destination
+   * @param globalEdgeID the global edge id of the edge to get the destination
    * for (should obtain from edgeBegin/End)
    */
   uint64_t edgeDestination(uint64_t globalEdgeID) {
@@ -345,6 +418,30 @@ public:
 
     uint64_t localEdgeID = globalEdgeID - edgeOffset;
     return edgeDestBuffer[localEdgeID];
+  }
+
+  /**
+   * Get the edge data of some edge.
+   *
+   * @param globalEdgeID the global edge id of the edge to get the data of
+   * @returns the edge data of the requested edge id
+   */
+  EdgeDataType edgeData(uint64_t globalEdgeID) {
+    assert(graphLoaded);
+    // shouldn't call this unless edge data was instantiated
+    assert(edgeDataBuffer != nullptr);
+
+    if (numLocalEdges == 0) {
+      return 0;
+    }
+
+    assert(edgeOffset <= globalEdgeID); 
+    assert(globalEdgeID < (edgeOffset + numLocalEdges));
+
+    numBytesReadEdgeData += sizeof(uint32_t);
+
+    uint64_t localEdgeID = globalEdgeID - edgeOffset;
+    return edgeDataBuffer[localEdgeID];
   }
 
   /**
