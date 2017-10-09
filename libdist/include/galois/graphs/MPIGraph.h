@@ -65,25 +65,20 @@ private:
   galois::GAccumulator<uint64_t> numBytesReadEdgeData;
 
   /**
-   * Initialize the MPI system if it hasn't been initialized.
+   * Initialize the MPI system. 
    */
   void initializeMPI() {
-    int mpiInitialized = 0;
-
-    MPI_Initialized(&mpiInitialized);
-
-    if (!mpiInitialized) {
-      char*** dummyBuffer = nullptr;
-      int supportProvided;
-      int initSuccess = MPI_Init_thread(0, dummyBuffer, MPI_THREAD_FUNNELED, 
-                                        &supportProvided);
-      if (initSuccess != MPI_SUCCESS) {
-        MPI_Abort(MPI_COMM_WORLD, initSuccess);
-      }
-      if (supportProvided < MPI_THREAD_FUNNELED) {
-        GALOIS_DIE("Thread funneling (MPI) not supported.");
-      }
+    #ifdef GALOIS_USE_LWCI
+    int supportProvided;
+    int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, 
+                                      &supportProvided);
+    if (initSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, initSuccess);
     }
+    if (supportProvided < MPI_THREAD_FUNNELED) {
+      GALOIS_DIE("Thread funneling (MPI) not supported.");
+    }
+    #endif
 
     MPI_Comm_rank(MPI_COMM_WORLD, &myHostID);
 
