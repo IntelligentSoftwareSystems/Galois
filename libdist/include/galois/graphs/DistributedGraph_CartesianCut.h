@@ -320,7 +320,9 @@ public:
       std::stringstream ss;
       ss << "Host : " << base_hGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
       mpiGraph[d].loadPartialGraph(filename, nodeBegin[d], nodeEnd[d],
-                                   *edgeBegin[d], *edgeEnd[d], base_hGraph::numGlobalNodes);
+                                   *edgeBegin[d], *edgeEnd[d], 
+                                   base_hGraph::numGlobalNodes,
+                                   base_hGraph::numGlobalEdges);
     }
 
     std::vector<uint64_t> prefixSumOfEdges;
@@ -644,16 +646,15 @@ public:
         }
         for (; ii < ee; ++ii) {
           uint64_t gdst = mpiGraph[d].edgeDestination(*ii);
-          // TODO
-          //auto gdata = fileGraph[d].getEdgeData<typename GraphTy::edge_data_type>(ii);
+          auto gdata = mpiGraph[d].edgeData(*ii);
           int i = getColumnHostID(gdst);
           if ((h_offset + i) == (base_hGraph::id)) {
             assert(isLocal(n));
             uint32_t ldst = G2L(gdst);
-            //graph.constructEdge(cur++, ldst, gdata);
+            graph.constructEdge(cur++, ldst, gdata);
           } else {
             gdst_vec[i].push_back(gdst);
-            //gdata_vec[i].push_back(gdata);
+            gdata_vec[i].push_back(gdata);
           }
         }
         for (unsigned i = 0; i < numColumnHosts; ++i) {

@@ -115,7 +115,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       uint64_t _numEdges;
 
       // only used to determine node splits among hosts; abandonded later
-      // for the FileGraph which mmaps appropriate regions of memory
+      // for the MPIGraph
       galois::graphs::OfflineGraph g(filename);
 
       base_hGraph::numGlobalNodes = g.size();
@@ -135,16 +135,6 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::numOwned = (nodeEnd - nodeBegin);
       
-      // file graph that is mmapped for much faster reading; will use this
-      // when possible from now on in the code
-      //galois::graphs::FileGraph fileGraph;
-
-      //fileGraph.partFromFile(filename,
-      //  std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
-      //                 boost::make_counting_iterator<uint64_t>(nodeEnd)),
-      //  std::make_pair(edgeBegin, edgeEnd), true);
-
-      // TODO
       // currently not being used, may not be updated
       if (isBipartite) {
         uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
@@ -175,7 +165,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::graphs::MPIGraph<EdgeTy> mpiGraph;
 
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
-                                *edgeEnd, base_hGraph::numGlobalNodes);
+                                *edgeEnd, base_hGraph::numGlobalNodes,
+                                base_hGraph::numGlobalEdges);
 
       mpiGraph.resetReadCounters();
 
@@ -358,9 +349,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         for (; ii < ee; ++ii) {
           auto gdst = mpiGraph.edgeDestination(*ii);
           decltype(gdst) ldst = this->G2L(gdst);
-          // TODO
-          //auto gdata = mpiGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
-          //graph.constructEdge(cur++, ldst, gdata);
+          auto gdata = mpiGraph.edgeData(*ii);
+          graph.constructEdge(cur++, ldst, gdata);
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
