@@ -54,6 +54,7 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     case JAGGED_BLOCKED_VCUT: return "jbvc";
     case OVER_DECOMPOSE_2_VCUT: return "od2vc";
     case OVER_DECOMPOSE_4_VCUT: return "od4vc";
+    default: GALOIS_DIE("Unsupported partition");
   }
 }
 /*******************************************************************************
