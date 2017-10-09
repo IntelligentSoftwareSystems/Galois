@@ -137,12 +137,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       
       // file graph that is mmapped for much faster reading; will use this
       // when possible from now on in the code
-      //galois::graphs::FileGraph fileGraph;
+      galois::graphs::FileGraph fileGraph;
 
-      //fileGraph.partFromFile(filename,
-      //  std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
-      //                 boost::make_counting_iterator<uint64_t>(nodeEnd)),
-      //  std::make_pair(edgeBegin, edgeEnd), true);
+      fileGraph.partFromFile(filename,
+        std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
+                       boost::make_counting_iterator<uint64_t>(nodeEnd)),
+        std::make_pair(edgeBegin, edgeEnd), true);
 
       // TODO
       // currently not being used, may not be updated
@@ -170,17 +170,12 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::DynamicBitSet ghosts;
       ghosts.resize(g.size());
 
-      //auto activeThreads = galois::runtime::activeThreads;
-      //galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+      auto activeThreads = galois::runtime::activeThreads;
+      galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
       galois::Timer timer;
       timer.start();
-      galois::graphs::MPIGraph<EdgeTy> mpiGraph;
-
-      mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
-                                *edgeEnd, base_hGraph::numGlobalNodes);
-
-      mpiGraph.resetReadCounters();
+      fileGraph.reset_byte_counters();
 
       // vector to hold a prefix sum for use in thread work distribution
       std::vector<uint64_t> prefixSumOfEdges(base_hGraph::numOwned);
@@ -189,14 +184,14 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // we own can also be marked a ghost here if there's an outgoing edge to 
       // it)
       // Also determine prefix sums
-      auto edgeOffset = mpiGraph.edgeBegin(nodeBegin);
+      auto edgeOffset = fileGraph.edge_begin(nodeBegin);
 
       galois::do_all(galois::iterate(nodeBegin, nodeEnd),
         [&] (auto n) {
-          auto ii = mpiGraph.edgeBegin(n);
-          auto ee = mpiGraph.edgeEnd(n);
+          auto ii = fileGraph.edge_begin(n);
+          auto ee = fileGraph.edge_end(n);
           for (; ii < ee; ++ii) {
-            ghosts.set(mpiGraph.edgeDestination(*ii));
+            ghosts.set(fileGraph.getEdgeDst(ii));
           }
           prefixSumOfEdges[n - nodeBegin] = std::distance(edgeOffset, ee);
         },
@@ -207,10 +202,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       timer.stop();
       galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
-          " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-          mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+          " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+          fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
 
-      //galois::setActiveThreads(activeThreads); // revert to prior active threads
+      galois::setActiveThreads(activeThreads); // revert to prior active threads
 
       // only nodes we do not own are actual ghosts (i.e. filter the "ghosts"
       // found above)
@@ -277,7 +272,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       base_hGraph::printStatistics();
 
-      loadEdges(base_hGraph::graph, mpiGraph);
+      loadEdges(base_hGraph::graph, fileGraph);
       
       if (transpose) {
         base_hGraph::graph.transpose();
@@ -343,29 +338,28 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<typename GraphTy::edge_data_type>& mpiGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       galois::gPrint("Loading edge-data while creating edges\n");
     }
 
     galois::Timer timer;
     timer.start();
-    mpiGraph.resetReadCounters();
+    fileGraph.reset_byte_counters();
 
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
                       base_hGraph::gid2host[base_hGraph::id].second),
       [&] (auto n) {
-        auto ii = mpiGraph.edgeBegin(n);
-        auto ee = mpiGraph.edgeEnd(n);
+        auto ii = fileGraph.edge_begin(n);
+        auto ee = fileGraph.edge_end(n);
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         for (; ii < ee; ++ii) {
-          auto gdst = mpiGraph.edgeDestination(*ii);
+          auto gdst = fileGraph.getEdgeDst(ii);
           decltype(gdst) ldst = this->G2L(gdst);
-          // TODO
-          //auto gdata = mpiGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
-          //graph.constructEdge(cur++, ldst, gdata);
+          auto gdata = fileGraph.getEdgeData<typename GraphTy::edge_data_type>(ii);
+          graph.constructEdge(cur++, ldst, gdata);
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
@@ -376,30 +370,30 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     timer.stop();
     galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
-        " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-        mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<typename GraphTy::edge_data_type>& mpiGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::FileGraph& fileGraph) {
     if (base_hGraph::id == 0) {
       galois::gPrint("Loading void edge-data while creating edges\n");
     }
 
     galois::Timer timer;
     timer.start();
-    mpiGraph.resetReadCounters();
+    fileGraph.reset_byte_counters();
 
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
                       base_hGraph::gid2host[base_hGraph::id].second),
       [&] (auto n) {
-        auto ii = mpiGraph.edgeBegin(n);
-        auto ee = mpiGraph.edgeEnd(n);
+        auto ii = fileGraph.edge_begin(n);
+        auto ee = fileGraph.edge_end(n);
         uint32_t lsrc = this->G2L(n);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         for (; ii < ee; ++ii) {
-          auto gdst = mpiGraph.edgeDestination(*ii);
+          auto gdst = fileGraph.getEdgeDst(ii);
           decltype(gdst) ldst = this->G2L(gdst);
           graph.constructEdge(cur++, ldst);
         }
@@ -413,8 +407,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     timer.stop();
     galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
-        " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-        mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+        " seconds to read ", fileGraph.num_bytes_read(), " bytes (",
+        fileGraph.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
