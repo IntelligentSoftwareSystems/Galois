@@ -261,8 +261,6 @@ public:
     std::vector<uint64_t> prefixSumOfEdges; // TODO use LargeArray
     loadStatistics(g, fileGraph, prefixSumOfEdges); // second pass of the graph file
 
-    base_hGraph::printStatistics();
-
     assert(prefixSumOfEdges.size() == numNodes);
 
     base_hGraph::graph.allocateFrom(numNodes, numEdges);
@@ -291,6 +289,8 @@ public:
       // no owned nodes, therefore empty masters
       base_hGraph::beginMaster = 0; 
     }
+
+    base_hGraph::printStatistics();
 
     loadEdges(base_hGraph::graph, g, fileGraph); // third pass of the graph file
 

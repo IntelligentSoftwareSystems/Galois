@@ -1,6 +1,7 @@
 #pragma once
 #include <cuda.h>
 #include "gg.h"
+#include "galois/cuda/HostDecls.h"
 
 struct CUDA_Context_Shared {
   unsigned int *num_nodes; // per host

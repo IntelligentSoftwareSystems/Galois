@@ -10,83 +10,21 @@
 #include "galois/runtime/Range.h"
 #include "galois/Galois.h"
 #include "galois/DistGalois.h"
+#include "galois/graphs/MPIGraph.h"
 
 static uint64_t numBytesRead = 0;
 static uint64_t count = 0;
 static uint64_t* outIndex = nullptr;
 static uint32_t* edgeDest = nullptr;
 
-#define _BATCH
-
-//#ifdef _BATCH
-uint64_t mpi_out_index(MPI_File mpiFile, uint64_t nodeIndex) {
-  numBytesRead += sizeof(uint64_t);
-  return outIndex[nodeIndex];
-}
-
-uint64_t mpi_edge_begin(MPI_File mpiFile, uint64_t nodeIndex) {
-  if (nodeIndex != 0) {
-    return mpi_out_index(mpiFile, nodeIndex - 1);
-  } else {
-    return 0;
-  }
-}
-
-uint64_t mpi_edge_end(MPI_File mpiFile, uint64_t nodeIndex) {
-  return mpi_out_index(mpiFile, nodeIndex);
-}
-
-uint64_t mpi_edge_dest(MPI_File mpiFile, uint64_t edgeIndex, uint64_t numNodes) {
-  //printf("test\n");
-  numBytesRead += sizeof(uint32_t);
-  count++;
-  return edgeDest[edgeIndex];
-}
-//#else
-//uint64_t mpi_out_index(MPI_File mpiFile, uint64_t nodeIndex) {
-//  uint64_t position = (4 + nodeIndex) * sizeof(uint64_t);
-//
-//  uint64_t retval;
-//
-//  MPI_Status mpiStat;
-//  MPI_File_read_at(mpiFile, position, reinterpret_cast<char*>(&retval), 
-//                   sizeof(uint64_t), MPI_BYTE, &mpiStat); 
-//  numBytesRead += sizeof(uint64_t);
-//  return retval;
-//}
-//
-//uint64_t mpi_edge_begin(MPI_File mpiFile, uint64_t nodeIndex) {
-//  if (nodeIndex != 0) {
-//    return mpi_out_index(mpiFile, nodeIndex - 1);
-//  } else {
-//    return 0;
-//  }
-//}
-//
-//uint64_t mpi_edge_end(MPI_File mpiFile, uint64_t nodeIndex) {
-//  return mpi_out_index(mpiFile, nodeIndex);
-//}
-//
-//uint64_t mpi_edge_dest(MPI_File mpiFile, uint64_t edgeIndex, uint64_t numNodes) {
-//  // ASSUMES V1 GRAPH WHERE SIZE OF EDGE IS UINT32
-//  uint64_t position = (4 + numNodes) * sizeof(uint64_t) + 
-//                      edgeIndex * sizeof(uint32_t);
-//
-//  uint64_t retval;
-//
-//  MPI_Status mpiStat;
-//  MPI_File_read_at(mpiFile, position, reinterpret_cast<char*>(&retval), 
-//                   sizeof(uint32_t), MPI_BYTE, &mpiStat); 
-//  numBytesRead += sizeof(uint32_t);
-//  return retval;
-//}
-//#endif
-
-
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
   MPI_Init(&argc, &argv);
+
+  if (argc >= 3) {
+    galois::setActiveThreads(std::stoi(argv[2]));
+  }
 
   int hostID = 0;
   int numHosts = 0;
@@ -108,58 +46,43 @@ int main(int argc, char** argv) {
   uint64_t nodeBegin = nodeSplit.first;
   uint64_t nodeEnd = nodeSplit.second;
 
+
   galois::DynamicBitSet ghosts;
   ghosts.resize(numGlobalNodes);
 
-  MPI_File mpiFile;
-  MPI_File_open(MPI_COMM_WORLD, argv[1], MPI_MODE_RDONLY, 
-                MPI_INFO_NULL, &mpiFile);
-
-
-  printf("[%d] file open\n", hostID);
-
-  // vector to hold a prefix sum for use in thread work distribution
   std::vector<uint64_t> prefixSumOfEdges(nodeEnd - nodeBegin);
-
-  outIndex = (uint64_t*)malloc(sizeof(uint64_t)*numGlobalNodes);
-  edgeDest = (uint32_t*)malloc(sizeof(uint32_t) * g.sizeEdges());
-
-  if (outIndex == nullptr || edgeDest == nullptr) {
-    printf("[%d] null ptr mlalc\n", hostID);
-  }
 
   galois::Timer timer;
   timer.start();
 
-  uint64_t position = 4 * sizeof(uint64_t);
-  MPI_Status mpiStat;
-  MPI_File_read_at(mpiFile, position, (char*)outIndex, 
-                   numGlobalNodes, MPI_UINT64_T, &mpiStat); 
-  position = (4 + numGlobalNodes) * sizeof(uint64_t);
-  MPI_File_read_at(mpiFile, position, (char*)edgeDest, 
-                   g.sizeEdges(), MPI_UINT32_T, &mpiStat); 
+  galois::graphs::MPIGraph<void> test;
+  test.loadPartialGraph(std::string(argv[1]), nodeBegin, nodeEnd,
+                        *g.edge_begin(nodeBegin), *g.edge_begin(nodeEnd),
+                        numGlobalNodes);
 
-  auto edgeOffset = mpi_edge_begin(mpiFile, nodeBegin);
+  auto edgeOffset = test.edgeBegin(nodeBegin);
 
   galois::do_all(galois::iterate(nodeBegin, nodeEnd),
     [&] (auto n) {
-      auto ii = mpi_edge_begin(mpiFile, n);
-      auto ee = mpi_edge_end(mpiFile, n);
+      auto ii = test.edgeBegin(n);
+      auto ee = test.edgeEnd(n);
 
       for (; ii < ee; ++ii) {
-        ghosts.set(mpi_edge_dest(mpiFile, ii, numGlobalNodes));
+        ghosts.set(test.edgeDestination(*ii));
       }
       prefixSumOfEdges[n - nodeBegin] = edgeOffset - ee;
     },
     galois::loopname("EdgeInspection"),
     galois::timeit(),
+    galois::steal<false>(),
     galois::no_stats()
   );
+
   timer.stop();
 
   fprintf(stderr, "[%d] Edge inspection time : %f seconds to read %lu bytes (%f MBPS)\n", 
-      hostID, timer.get_usec()/1000000.0f, numBytesRead, 
-      numBytesRead/(float)timer.get_usec());
+      hostID, timer.get_usec()/1000000.0f, test.getBytesRead(), 
+      test.getBytesRead()/(float)timer.get_usec());
 
   printf("count is %lu\n", count);
   free(outIndex);

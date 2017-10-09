@@ -44,8 +44,7 @@
 #endif
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/cuda/cuda_device.h"
-#include "galois/cuda/cuda_context_decl.h"
+#include "galois/cuda/HostDecls.h"
 #else
 // dummy struct declaration to allow non-het code to compile without
 // having to include cuda_context_decl

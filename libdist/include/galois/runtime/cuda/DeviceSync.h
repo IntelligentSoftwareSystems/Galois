@@ -1,6 +1,6 @@
 #pragma once
 #include "galois/cuda/DynamicBitset.h"
-#include "galois/cuda/cuda_context.h"
+#include "galois/cuda/Context.h"
 #include "galois/runtime/DataCommMode.h"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__

@@ -42,6 +42,7 @@
 #include "galois/gstl.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/MPIGraph.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/GlobalObj.h"
@@ -52,7 +53,7 @@
 #include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/cuda/cuda_mtypes.h"
+#include "galois/cuda/HostDecls.h"
 #endif
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
@@ -671,14 +672,17 @@ protected:
 
     // report masters/mirrors to/from other hosts as statistics
     for (auto x = 0U; x < masterNodes.size(); ++x) {
-      std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
+      if (x == id) continue;
+      std::string master_nodes_str = "MASTER_NODES_FROM_" + std::to_string(id)
+                                      + "_TO_" + std::to_string(x);
       galois::runtime::reportStat_Tsum(GRNAME, master_nodes_str, 
                                        masterNodes[x].size());
     }
 
     for (auto x = 0U; x < mirrorNodes.size(); ++x) {
-      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x);
       if (x == id) continue;
+      std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x)
+                                      + "_TO_" + std::to_string(id);
       galois::runtime::reportStat_Tsum(GRNAME, mirror_nodes_str, 
                                        mirrorNodes[x].size());
     }
@@ -1007,19 +1011,19 @@ private:
   void send_info_to_host() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
+    uint64_t global_total_mirror_nodes = size() - numOwned;
+    uint64_t global_total_owned_nodes = numOwned;
+
     // send info to host
     for (unsigned x = 0; x < numHosts; ++x) {
       if(x == id) continue;
 
       galois::runtime::SendBuffer b;
-      gSerialize(b, size() - numOwned, numOwned);
+      gSerialize(b, global_total_mirror_nodes, global_total_owned_nodes);
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
 
     // receive
-    uint64_t global_total_mirror_nodes = size() - numOwned;
-    uint64_t global_total_owned_nodes = numOwned;
-
     for (unsigned x = 0; x < numHosts; ++x) {
       if (x == id) continue;
 
