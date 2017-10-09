@@ -584,7 +584,7 @@ public:
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
       galois::graphs::OfflineGraph& g,
-      std::vector<galois::graphs::MPIGraph<typename GraphTy::edge_data_type>>& mpiGraph) {
+      std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -620,7 +620,7 @@ public:
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<typename GraphTy::edge_data_type>>& mpiGraph) {
+                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
 
     //XXX h_offset not correct
     for(unsigned d = 0; d < DecomposeFactor; ++d){
@@ -681,7 +681,7 @@ public:
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<typename GraphTy::edge_data_type>>& mpiGraph) {
+                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
