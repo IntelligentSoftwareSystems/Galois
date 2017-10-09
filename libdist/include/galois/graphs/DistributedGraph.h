@@ -1038,7 +1038,7 @@ private:
     }
     ++galois::runtime::evilPhase;
 
-    assert(numGlobalNodes == global_total_owned_nodes);
+    //assert(numGlobalNodes == global_total_owned_nodes);
     // report stats
     if (net.ID == 0) {
       report_master_mirror_stats(global_total_mirror_nodes, 
