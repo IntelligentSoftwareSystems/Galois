@@ -1007,19 +1007,19 @@ private:
   void send_info_to_host() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
+    uint64_t global_total_mirror_nodes = size() - numOwned;
+    uint64_t global_total_owned_nodes = numOwned;
+
     // send info to host
     for (unsigned x = 0; x < numHosts; ++x) {
       if(x == id) continue;
 
       galois::runtime::SendBuffer b;
-      gSerialize(b, size() - numOwned, numOwned);
+      gSerialize(b, global_total_mirror_nodes, global_total_owned_nodes);
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
 
     // receive
-    uint64_t global_total_mirror_nodes = size() - numOwned;
-    uint64_t global_total_owned_nodes = numOwned;
-
     for (unsigned x = 0; x < numHosts; ++x) {
       if (x == id) continue;
 
