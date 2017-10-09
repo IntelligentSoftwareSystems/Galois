@@ -35,7 +35,7 @@ target_include_directories(galois_dist PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include 
 )
 if (USE_LWCI)
-  target_include_directories(galois_dist PUBLIC $ENV{LWCI_ROOT}/include)
+  target_include_directories(galois_dist PUBLIC ${LWCI_INCLUDE})
 endif()
 
 set_target_properties (galois_dist PROPERTIES 
