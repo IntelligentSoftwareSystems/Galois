@@ -42,6 +42,7 @@
 #include "galois/gstl.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/MPIGraph.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/GlobalObj.h"
@@ -1038,7 +1039,7 @@ private:
     }
     ++galois::runtime::evilPhase;
 
-    //assert(numGlobalNodes == global_total_owned_nodes);
+    assert(numGlobalNodes == global_total_owned_nodes);
     // report stats
     if (net.ID == 0) {
       report_master_mirror_stats(global_total_mirror_nodes, 
