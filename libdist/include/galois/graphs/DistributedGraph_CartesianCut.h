@@ -414,9 +414,6 @@ public:
       }
     }
 
-    auto activeThreads = galois::runtime::activeThreads;
-    galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
-
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       inspectionTimer.start();
       mpiGraph[d].resetReadCounters();
@@ -449,8 +446,6 @@ public:
           " seconds to read ", mpiGraph[d].getBytesRead(), " bytes (",
           mpiGraph[d].getBytesRead()/(float)inspectionTimer.get_usec(), " MBPS)\n");
     }
-
-    galois::setActiveThreads(activeThreads); // revert to prior active threads
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
