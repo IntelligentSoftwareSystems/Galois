@@ -1,4 +1,4 @@
-/** Single source shortest paths -*- C++ -*-
+/** Agglomerative Clustering -*- C++ -*-
  * @file
  * @section License
  *
@@ -19,8 +19,6 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
- *
- * Agglomerative Clustering.
  *
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */

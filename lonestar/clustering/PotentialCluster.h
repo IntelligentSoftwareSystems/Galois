@@ -1,4 +1,4 @@
-/** Single source shortest paths -*- C++ -*-
+/**  Agglomerative Clustering -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,37 +20,34 @@
  *
  * @section Description
  *
- * Agglomerative Clustering.
- *
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 #ifndef POTENTIALCLUSTER_H_
 #define POTENTIALCLUSTER_H_
-#include<limits>
-#include"NodeWrapper.h"
+#include "NodeWrapper.h"
+#include <limits>
 
 using namespace std;
 class PotentialCluster {
 public:
-  const NodeWrapper & original;
-  NodeWrapper  * closest;
+  const NodeWrapper& original;
+  NodeWrapper* closest;
   double clusterSize;
 
-  PotentialCluster(NodeWrapper & pOriginal): original(pOriginal) {
-    closest = NULL;
+  PotentialCluster(NodeWrapper& pOriginal) : original(pOriginal) {
+    closest     = NULL;
     clusterSize = numeric_limits<float>::max();
   }
-  friend ostream & operator<<(ostream & s, const PotentialCluster & p);
-
+  friend ostream& operator<<(ostream& s, const PotentialCluster& p);
 };
-ostream & operator<<(ostream & s, const PotentialCluster & p){
-	s<<"PC : ["<<p.original<<", ?";
-	if(p.closest!=NULL)
-		s<<*(p.closest);
-	else
-		s<<"NULL";
-	s<<","<<p.clusterSize<<"]";
-	return s;
+ostream& operator<<(ostream& s, const PotentialCluster& p) {
+  s << "PC : [" << p.original << ", ?";
+  if (p.closest != NULL)
+    s << *(p.closest);
+  else
+    s << "NULL";
+  s << "," << p.clusterSize << "]";
+  return s;
 }
 
 #endif /* POTENTIALCLUSTER_H_ */

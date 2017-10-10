@@ -1,4 +1,4 @@
-/** Single source shortest paths -*- C++ -*-
+/** Agglomerative Clustering -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,177 +20,197 @@
  *
  * @section Description
  *
- * Agglomerative Clustering.
- *
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 #ifndef CLUSTERNODE_H_
 #define CLUSTERNODE_H_
-#include"LeafNode.h"
-#include"NodeWrapper.h"
-#include<assert.h>
-class ClusterNode : public AbstractNode{
-private :
-  AbstractNode *leftChild;
-  AbstractNode *rightChild;
+#include "LeafNode.h"
+#include "NodeWrapper.h"
+#include <assert.h>
+class ClusterNode : public AbstractNode {
+private:
+  AbstractNode* leftChild;
+  AbstractNode* rightChild;
   vector<LeafNode*> reps;
   Point3 boxRadius;
   Point3 coneDirection;
   double coneCos;
 
 public:
-  ClusterNode():boxRadius(0),coneDirection(0){
+  ClusterNode() : boxRadius(0), coneDirection(0) {}
+  virtual ~ClusterNode() {
+    //	  cout<<"Clearing reps"<<endl;
+    reps.clear();
   }
-  virtual ~ClusterNode(){
-//	  cout<<"Clearing reps"<<endl;
-	  reps.clear();
+  void setBox(double minX, double maxX, double minY, double maxY, double minZ,
+              double maxZ) {
+    myLoc.set(0.5f * (minX + maxX), 0.5f * (minY + maxY), 0.5f * (minZ + maxZ));
+    boxRadius.set(0.5f * (maxX - minX), 0.5f * (maxY - minY),
+                  0.5f * (maxZ - minZ));
   }
-  void setBox(double minX, double maxX, double minY, double maxY, double minZ, double maxZ) {
-	myLoc.set(0.5f * (minX + maxX),0.5f * (minY + maxY),0.5f * (minZ + maxZ));
-    boxRadius.set(0.5f * (maxX - minX),0.5f * (maxY - minY),0.5f * (maxZ - minZ));
+  void setBox(Point3& min, Point3& max) {
+    myLoc.set(min);
+    myLoc.add(max);
+    myLoc.scale(0.5);
+    boxRadius.set(max);
+    boxRadius.sub(min);
+    boxRadius.scale(0.5);
   }
-  void setBox(Point3 & min, Point3 & max) {
-  	myLoc.set(min);
-  	myLoc.add(max);
-  	myLoc.scale(0.5);
-  	boxRadius.set(max);
-  	boxRadius.sub(min);
-  	boxRadius.scale(0.5);
-    }
 
-  void setChildren(AbstractNode *inLeft, AbstractNode *inRight, double repRandomNum) {
-    leftChild = inLeft;
+  void setChildren(AbstractNode* inLeft, AbstractNode* inRight,
+                   double repRandomNum) {
+    leftChild  = inLeft;
     rightChild = inRight;
     setSummedIntensity(*leftChild, *rightChild);
-//    setCombinedFlags(leftChild, rightChild);
-    //we only apply clamping to nodes that are low in the tree
-    vector<double> *ranVec = repRandomNums[(int) (repRandomNum * numRepRandomNums)];
+    //    setCombinedFlags(leftChild, rightChild);
+    // we only apply clamping to nodes that are low in the tree
+    vector<double>* ranVec =
+        repRandomNums[(int)(repRandomNum * numRepRandomNums)];
     if (globalMultitime) {
-    	assert(false&&"Should  not have time true!");
-//      int numReps = endTime - startTime + 1;
-//      if (reps == null || reps.length < numReps) {
-//        reps = new LeafNode[numReps];
-//      } else {
-//        for (int j = numReps; j < reps.length; j++) {
-//          reps[j] = null;
-//        } //fill unused values will nulls
-//      }
-//      if (leftChild.isLeaf()) {
-//        LeafNode leftLeaf = (LeafNode) leftChild;
-//        if (rightChild.isLeaf()) {
-//          chooseRepsWithTime(reps, this, ranVec, leftLeaf, (LeafNode) rightChild);
-//        } else {
-//          chooseRepsWithTime(reps, this, ranVec, (ClusterNode) rightChild, leftLeaf); //note: operation is symmectric so we just interchange the children in the call
-//        }
-//      } else {
-//        ClusterNode leftClus = (ClusterNode) leftChild;
-//        if (rightChild.isLeaf()) {
-//          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafNode) rightChild);
-//        } else {
-//          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterNode) rightChild);
-//        }
-//      }
-    } else
-    {
-      if (reps.size() == 0 || reps.size()!= (unsigned int)globalNumReps) {
-    	  reps.clear();
+      assert(false && "Should  not have time true!");
+      //      int numReps = endTime - startTime + 1;
+      //      if (reps == null || reps.length < numReps) {
+      //        reps = new LeafNode[numReps];
+      //      } else {
+      //        for (int j = numReps; j < reps.length; j++) {
+      //          reps[j] = null;
+      //        } //fill unused values will nulls
+      //      }
+      //      if (leftChild.isLeaf()) {
+      //        LeafNode leftLeaf = (LeafNode) leftChild;
+      //        if (rightChild.isLeaf()) {
+      //          chooseRepsWithTime(reps, this, ranVec, leftLeaf, (LeafNode)
+      //          rightChild);
+      //        } else {
+      //          chooseRepsWithTime(reps, this, ranVec, (ClusterNode)
+      //          rightChild, leftLeaf); //note: operation is symmectric so we
+      //          just interchange the children in the call
+      //        }
+      //      } else {
+      //        ClusterNode leftClus = (ClusterNode) leftChild;
+      //        if (rightChild.isLeaf()) {
+      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafNode)
+      //          rightChild);
+      //        } else {
+      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterNode)
+      //          rightChild);
+      //        }
+      //      }
+    } else {
+      if (reps.size() == 0 || reps.size() != (unsigned int)globalNumReps) {
+        reps.clear();
         reps.resize(globalNumReps);
       }
       if (leftChild->isLeaf()) {
-        LeafNode *leftLeaf = (LeafNode*) leftChild;
+        LeafNode* leftLeaf = (LeafNode*)leftChild;
         if (rightChild->isLeaf()) {
-          chooseRepsNoTime(reps, *this, ranVec, *leftLeaf, (LeafNode&) *rightChild);
+          chooseRepsNoTime(reps, *this, ranVec, *leftLeaf,
+                           (LeafNode&)*rightChild);
         } else {
-          chooseRepsNoTime(reps, *this, ranVec, (ClusterNode&) *rightChild, *leftLeaf); //note: operation is symmectric so we just interchange the children in the call
+          chooseRepsNoTime(reps, *this, ranVec, (ClusterNode&)*rightChild,
+                           *leftLeaf); // note: operation is symmectric so we
+                                       // just interchange the children in the
+                                       // call
         }
       } else {
-        ClusterNode *leftClus = (ClusterNode*) leftChild;
+        ClusterNode* leftClus = (ClusterNode*)leftChild;
         if (rightChild->isLeaf()) {
-          chooseRepsNoTime(reps, *this, ranVec, *leftClus, (LeafNode&) *rightChild);
+          chooseRepsNoTime(reps, *this, ranVec, *leftClus,
+                           (LeafNode&)*rightChild);
         } else {
-          chooseRepsNoTime(reps, *this, ranVec, *leftClus, (ClusterNode&) *rightChild);
+          chooseRepsNoTime(reps, *this, ranVec, *leftClus,
+                           (ClusterNode&)*rightChild);
         }
       }
     }
   }
 
-  static void chooseRepsNoTime(vector<LeafNode*> & repArr, AbstractNode & parent, vector<double> * ranVec, LeafNode &left,LeafNode & right) {
-	  double totalInten = parent.getScalarTotalIntensity();
-	  double leftInten = left.getScalarTotalIntensity();
-	  double nextTest = (*ranVec)[0] * totalInten;
+  static void chooseRepsNoTime(vector<LeafNode*>& repArr, AbstractNode& parent,
+                               vector<double>* ranVec, LeafNode& left,
+                               LeafNode& right) {
+    double totalInten = parent.getScalarTotalIntensity();
+    double leftInten  = left.getScalarTotalIntensity();
+    double nextTest   = (*ranVec)[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
-    	double test = nextTest;
-      nextTest = (*ranVec)[i + 1] * totalInten;
-      repArr[i] = (test < leftInten) ? &left : &right;
+      double test = nextTest;
+      nextTest    = (*ranVec)[i + 1] * totalInten;
+      repArr[i]   = (test < leftInten) ? &left : &right;
     }
     repArr[repArr.size() - 1] = (nextTest < leftInten) ? &left : &right;
   }
 
-
-  static void chooseRepsNoTime(vector<LeafNode*>& repArr, AbstractNode &parent, vector<double> *ranVec, ClusterNode &left, LeafNode &right) {
+  static void chooseRepsNoTime(vector<LeafNode*>& repArr, AbstractNode& parent,
+                               vector<double>* ranVec, ClusterNode& left,
+                               LeafNode& right) {
     double totalInten = parent.getScalarTotalIntensity();
-    double leftInten = left.getScalarTotalIntensity();
-    double nextTest = (*ranVec)[0] * totalInten;
+    double leftInten  = left.getScalarTotalIntensity();
+    double nextTest   = (*ranVec)[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
-    	double test = nextTest;
-      nextTest = (*ranVec)[i + 1] * totalInten;
-      repArr[i] = (test < leftInten) ? (left.reps[i]) : &right;
+      double test = nextTest;
+      nextTest    = (*ranVec)[i + 1] * totalInten;
+      repArr[i]   = (test < leftInten) ? (left.reps[i]) : &right;
     }
-    repArr[repArr.size() - 1] = (nextTest < leftInten) ? (left.reps[repArr.size() - 1]) : &right;
+    repArr[repArr.size() - 1] =
+        (nextTest < leftInten) ? (left.reps[repArr.size() - 1]) : &right;
   }
 
-  static void chooseRepsNoTime(vector<LeafNode*> &repArr, AbstractNode &parent, vector<double> *ranVec,
-                                       ClusterNode &left, ClusterNode &right) {
-	  double totalInten = parent.getScalarTotalIntensity();
-	  double leftInten = left.getScalarTotalIntensity();
-	  double nextTest = (*ranVec)[0] * totalInten;
+  static void chooseRepsNoTime(vector<LeafNode*>& repArr, AbstractNode& parent,
+                               vector<double>* ranVec, ClusterNode& left,
+                               ClusterNode& right) {
+    double totalInten = parent.getScalarTotalIntensity();
+    double leftInten  = left.getScalarTotalIntensity();
+    double nextTest   = (*ranVec)[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
-    	double test = nextTest;
-      nextTest = (*ranVec)[i + 1] * totalInten;
-      repArr[i] = (test < leftInten) ? (left.reps[i]) : (right.reps[i]);
+      double test = nextTest;
+      nextTest    = (*ranVec)[i + 1] * totalInten;
+      repArr[i]   = (test < leftInten) ? (left.reps[i]) : (right.reps[i]);
     }
-    repArr[repArr.size() - 1] = (nextTest < leftInten) ? (left.reps[repArr.size() - 1])
-        : (right.reps[repArr.size() - 1]);
+    repArr[repArr.size() - 1] = (nextTest < leftInten)
+                                    ? (left.reps[repArr.size() - 1])
+                                    : (right.reps[repArr.size() - 1]);
   }
 
-  void setDirectionCone(double dirX, double dirY, double dirZ, double inConeCos) {
-	  coneDirection.set(dirX,dirY,dirZ);
+  void setDirectionCone(double dirX, double dirY, double dirZ,
+                        double inConeCos) {
+    coneDirection.set(dirX, dirY, dirZ);
     coneCos = inConeCos;
   }
 
-//  float getConeDirX() {
-//    return coneDirX;
-//  }
-//
-//  public float getConeDirY() {
-//    return coneDirY;
-//  }
-//
-//  public float getConeDirZ() {
-//    return coneDirZ;
-//  }
+  //  float getConeDirX() {
+  //    return coneDirX;
+  //  }
+  //
+  //  public float getConeDirY() {
+  //    return coneDirY;
+  //  }
+  //
+  //  public float getConeDirZ() {
+  //    return coneDirZ;
+  //  }
 
-  float getConeCos() {
-    return coneCos;
-  }
+  float getConeCos() { return coneCos; }
   /**
-  	 *
-  	 */
-  	void findConeDirsRecursive(vector<double> * coordArr, vector<ClusterNode*> & tempClusterArr){
-  		//TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
-  		findConeDirsRecursive(*leftChild, coordArr, 0, tempClusterArr, 3);
-  		findConeDirsRecursive(*rightChild, coordArr, 0, tempClusterArr, 3);
+   *
+   */
+  void findConeDirsRecursive(vector<double>* coordArr,
+                             vector<ClusterNode*>& tempClusterArr) {
+    // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
+    findConeDirsRecursive(*leftChild, coordArr, 0, tempClusterArr, 3);
+    findConeDirsRecursive(*rightChild, coordArr, 0, tempClusterArr, 3);
+  }
 
-  	}
-
-  static int findConeDirsRecursive(AbstractNode & node, vector<double> *fArr, int numDirs, vector<ClusterNode*> & cArr,int recurseDepth) {
+  static int findConeDirsRecursive(AbstractNode& node, vector<double>* fArr,
+                                   int numDirs, vector<ClusterNode*>& cArr,
+                                   int recurseDepth) {
     if (!node.isLeaf()) {
-      ClusterNode & clus = (ClusterNode&) node;
+      ClusterNode& clus = (ClusterNode&)node;
       if (clus.coneCos == 1.0) {
-        numDirs = addConeDir(fArr, numDirs, clus.coneDirection.getX(), clus.coneDirection.getY(), clus.coneDirection.getZ());
+        numDirs =
+            addConeDir(fArr, numDirs, clus.coneDirection.getX(),
+                       clus.coneDirection.getY(), clus.coneDirection.getZ());
       } else if (recurseDepth <= 0) {
-        //find first empty slot and add this cluster there
-        for (int i = 0; ; i++) {
+        // find first empty slot and add this cluster there
+        for (int i = 0;; i++) {
           if (cArr[i] == NULL) {
             cArr[i] = &clus;
             if (cArr[i + 1] != NULL) {
@@ -200,33 +220,35 @@ public:
           }
         }
       } else {
-        numDirs = findConeDirsRecursive(*(clus.leftChild), fArr, numDirs, cArr, recurseDepth - 1);
-        numDirs = findConeDirsRecursive(*(clus.rightChild), fArr, numDirs, cArr, recurseDepth - 1);
+        numDirs = findConeDirsRecursive(*(clus.leftChild), fArr, numDirs, cArr,
+                                        recurseDepth - 1);
+        numDirs = findConeDirsRecursive(*(clus.rightChild), fArr, numDirs, cArr,
+                                        recurseDepth - 1);
       }
     } else {
-      LeafNode &light = (LeafNode&) node;
-      numDirs = addConeDir(fArr, numDirs, light.getDirX(), light.getDirY(), light.getDirZ());
+      LeafNode& light = (LeafNode&)node;
+      numDirs = addConeDir(fArr, numDirs, light.getDirX(), light.getDirY(),
+                           light.getDirZ());
     }
     return numDirs;
   }
 
-  static int addConeDir(vector<double>  *fArr, int numDirs, double x, double y, double z) {
-    //only add direction if it does not match any existing directions
+  static int addConeDir(vector<double>* fArr, int numDirs, double x, double y,
+                        double z) {
+    // only add direction if it does not match any existing directions
     for (int i = 0; i < 3 * numDirs; i++) {
       if (((*fArr)[i] == x) && ((*fArr)[i + 1] == y) && ((*fArr)[i + 2] == z)) {
         return numDirs;
       }
     }
-    int index = 3 * numDirs;
-    (*fArr)[index] = x;
+    int index          = 3 * numDirs;
+    (*fArr)[index]     = x;
     (*fArr)[index + 1] = y;
     (*fArr)[index + 2] = z;
     return numDirs + 1;
   }
 
-  bool isLeaf() {
-    return false;
-  }
+  bool isLeaf() { return false; }
 
   int size() {
     // only leafs are counted
