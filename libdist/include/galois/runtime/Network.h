@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #ifndef GALOIS_RUNTIME_NETWORK_H
@@ -36,7 +37,7 @@
 #include <utility>
 #include <tuple>
 #include <type_traits>
-namespace { //anon
+namespace { // anon
 template <class F, class Tuple, size_t... I>
 constexpr decltype(auto) apply_impl(  // exposition only
         F&& f, Tuple&& t, std::index_sequence<I...>) {
@@ -45,11 +46,15 @@ constexpr decltype(auto) apply_impl(  // exposition only
 template <class F, class Tuple>
 constexpr decltype(auto) apply(F&& f, Tuple&& t) {
   return apply_impl(std::forward<F>(f), std::forward<Tuple>(t),
-          std::make_index_sequence<std::tuple_size<typename std::decay<Tuple>::type>::value>{});
+    std::make_index_sequence<std::tuple_size<
+      typename std::decay<Tuple>::type
+    >::value>{});
 }
-} //end anon namespace
+} // end anon namespace
 #include <boost/optional.hpp>
 #endif
+
+#include <mpi.h>
 
 namespace galois {
 namespace runtime {
@@ -66,16 +71,24 @@ using optional_t = boost::optional<T>;
 #endif
 
 class NetworkInterface {
-
+private:
+  void initializeMPI();
 public:
-
   static uint32_t ID;
   static uint32_t Num;
 
-  virtual ~NetworkInterface();
+  /**
+   * Constructor initializes MPI.
+   */
+  NetworkInterface();
 
-  //!send a message to a given (dest) host.  A message is simply a
-  //!landing pad (recv, funciton pointer) and some data (buf)
+  /**
+   * Destructor kills MPI.
+   */
+  ~NetworkInterface();
+
+  //! send a message to a given (dest) host.  A message is simply a
+  //! landing pad (recv, funciton pointer) and some data (buf)
   //! on the receiver, recv(buf) will be called durring handleReceives()
   //! buf is invalidated by this operation
   void sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf);
@@ -85,28 +98,29 @@ public:
   template<typename... Args>
   void sendSimple(uint32_t dest, void (*recv)(uint32_t, Args...), Args... param);
 
-  //!send a message to a given (dest) host.  A message is simply a
-  //!tag (tag) and some data (buf)
+  //! send a message to a given (dest) host.  A message is simply a
+  //! tag (tag) and some data (buf)
   //! on the receiver, buf will be returned on a receiveTagged(tag)
   //! buf is invalidated by this operation
   virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) = 0;
 
-  //!send a message to all hosts.  A message is simply a
-  //!landing pad (recv) and some data (buf)
+  //! send a message to all hosts.  A message is simply a
+  //! landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
   void broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf, bool self = false);
 
-  //! broadcast a mssage allowing the network to handle serialization and deserialization
+  //! broadcast a mssage allowing the network to handle serialization and 
+  //! deserialization
   template<typename... Args>
   void broadcastSimple(void (*recv)(uint32_t, Args...), Args... param);
 
-  //!receive and dispatch messages
+  //! receive and dispatch messages
   void handleReceives();
 
-  //!receive tagged message
+  //! receive tagged message
   virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg) = 0;
 
-  //!move send buffers out to network
+  //! move send buffers out to network
   virtual void flush() = 0;
 
   virtual unsigned long reportSendBytes() const = 0;

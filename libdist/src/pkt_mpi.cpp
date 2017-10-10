@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -25,65 +25,39 @@
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
 
-//#include "hash/crc32.h"
-
-#include <cassert>
-#include <cstring>
-#include <mpi.h>
-#include <deque>
-#include <string>
-#include <fstream>
-#include <unistd.h>
-#include <vector>
-
-
+/**
+ * MPI implementation of network IO. ASSUMES THAT MPI IS INITIALIZED
+ * UPON CREATION OF AN OBJECT.
+ */
 class NetworkIOMPI : public galois::runtime::NetworkIO {
-
-  static void handleError(int rc) {
-    if (rc != MPI_SUCCESS) {
-      //GALOIS_ERROR(false, "MPI ERROR"); 
-      MPI_Abort(MPI_COMM_WORLD, rc);
-    }
-  }
-
+private:
+  /**
+   * Get the host id of the caller.
+   *
+   * @returns host id of the caller with regard to the MPI setup
+   */
   static int getID() {
     int taskRank;
     handleError(MPI_Comm_rank(MPI_COMM_WORLD, &taskRank));
     return taskRank;
   }
 
+  /**
+   * Get the total number of hosts in the system.
+   *
+   * @returns number of hosts with regard to the MPI setup
+   */
   static int getNum() {
     int numTasks;
     handleError(MPI_Comm_size(MPI_COMM_WORLD, &numTasks));
     return numTasks;
   }
   
-  std::pair<int, int> initMPI() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    int provided;
-    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_MULTIPLE, &provided));
-    if(!(provided >= MPI_THREAD_MULTIPLE)){
-      //std::cerr << " MPI_THREAD_MULTIPLE not supported\n Abort\n";
-      abort();
-    }
-    else{
-      //std::cerr << " MPI_THREAD_MULTIPLE supported : MPI_THREAD_MULTIPLE val : " << MPI_THREAD_MULTIPLE <<" , provided : " << provided  <<"\n";
-    }
-    assert(provided >= MPI_THREAD_MULTIPLE);
+  /**
+   * Get both the ID of the caller + number of hosts.
+   */
+  std::pair<int, int> getIDAndHostNum() {
     return std::make_pair(getID(), getNum());
-#else
-    int provided;
-    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
-    if(!(provided >= MPI_THREAD_FUNNELED)){
-      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
-      abort();
-    }
-    else{
-      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
-    }
-    assert(provided >= MPI_THREAD_FUNNELED);
-    return std::make_pair(getID(), getNum());
-#endif
   }
 
   struct mpiMessage {
@@ -92,8 +66,10 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
     std::vector<uint8_t> data;
     MPI_Request req;
     //mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
-    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data) :host(host), tag(tag), data(std::move(data)) {}
-    mpiMessage(uint32_t host, uint32_t tag, size_t len) :host(host), tag(tag), data(len) {}
+    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data) 
+      : host(host), tag(tag), data(std::move(data)) {}
+    mpiMessage(uint32_t host, uint32_t tag, size_t len) 
+      : host(host), tag(tag), data(len) {}
   };
 
   struct sendQueueTy {
@@ -127,31 +103,35 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
     std::deque<message> done;
     std::deque<mpiMessage> inflight;
 
-    //FIXME: Does synchronous recieves overly halt forward progress?
+    // FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
       int flag = 0;
       MPI_Status status;
-      //check for new messages
-      int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      // check for new messages
+      int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag,
+                          &status);
       handleError(rv);
       if (flag) {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+        #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         assert(status.MPI_TAG <= 32767);
         if (status.MPI_TAG != 32767) {
-#endif
+        #endif
           inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
           auto& m = inflight.back();
-          rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &m.req);
+          rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, 
+                         status.MPI_TAG, MPI_COMM_WORLD, &m.req);
           handleError(rv);
-          galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+          galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, 
+                                 status.MPI_TAG, m.data.size());
+        #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         }
-#endif
+        #endif
       }
-      //complete messages
+
+      // complete messages
       if (!inflight.empty()) {
         auto& m = inflight.front();
         int flag = 0;
@@ -168,20 +148,13 @@ class NetworkIOMPI : public galois::runtime::NetworkIO {
   sendQueueTy sendQueue;
   recvQueueTy recvQueue;
 
-
 public:
-
   NetworkIOMPI(uint32_t& ID, uint32_t& NUM) {
-    auto p = initMPI();
+    auto p = getIDAndHostNum();
     ID = p.first;
     NUM = p.second;
   }
 
-  ~NetworkIOMPI() {
-    int rv = MPI_Finalize();
-    handleError(rv);
-  }
-  
   virtual void enqueue(message m) {
     sendQueue.send(std::move(m));
   }
@@ -199,12 +172,12 @@ public:
     sendQueue.complete();
     recvQueue.probe();
   }
+}; // end NetworkIOMPI class
 
-};
-
-std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,uint32_t,uint32_t> galois::runtime::makeNetworkIOMPI() {
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,
+                           uint32_t,
+                           uint32_t> galois::runtime::makeNetworkIOMPI() {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOMPI(ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
-

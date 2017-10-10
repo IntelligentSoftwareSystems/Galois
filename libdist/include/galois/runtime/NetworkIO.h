@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -28,31 +28,50 @@
 #include <vector>
 #include <tuple>
 #include <memory>
+#include <cassert>
+#include <cstring>
+#include <deque>
+#include <string>
+#include <fstream>
+#include <unistd.h>
+#include <vector>
+#include <mpi.h>
 
 namespace galois {
 namespace runtime {
-
 class NetworkIO {
+protected:
+  /**
+   * Wrapper for dealing with MPI error codes. Dies if the error code isn't
+   * MPI_SUCCESS.
+   *
+   * @param rc Error code to check for success
+   */
+  static void handleError(int rc) {
+    if (rc != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, rc);
+    }
+  }
 public:
-
   struct message {
     uint32_t host;
     uint32_t tag;
     std::vector<uint8_t> data;
 
     message() :host(~0), tag(~0) {}
-    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) :host(h), tag(t), data(d) {}
+    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) 
+      : host(h), tag(t), data(d) {}
 
     bool valid() const { return !data.empty(); }
   };
 
   virtual ~NetworkIO();
   
-  //takes ownership of data buffer
+  // Takes ownership of data buffer
   virtual void enqueue(message m) = 0;
-  //returns empty if no message
+  // Returns empty if no message
   virtual message dequeue() = 0;
-  //make progress.  other functions don't have to
+  // Make progress.  other functions don't have to
   virtual void progress() = 0;
 
   //void operator() () -- make progress

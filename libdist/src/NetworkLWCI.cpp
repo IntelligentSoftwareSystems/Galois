@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,26 +23,14 @@
  */
 
 #ifdef GALOIS_USE_LWCI
-
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
-
-//#include "hash/crc32.h"
 
 #include "lc.h"
 #include "ult/helper.h"
 
 #include <iostream>
-
-#include <cassert>
-#include <cstring>
-#include <mpi.h>
-#include <deque>
-#include <string>
-#include <fstream>
-#include <unistd.h>
-#include <vector>
 #include <list>
 #include <limits>
 
@@ -66,8 +54,10 @@ struct mpiMessage {
     rank(r), tag(t), buf(std::move(b))  {};
 };
 
+/**
+ * LWCI implementation of network IO.
+ */
 class NetworkIOLWCI : public galois::runtime::NetworkIO {
-
   static int getID() {
     return lc_id(mv);
   }
@@ -76,6 +66,9 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
     return lc_size(mv);
   }
 
+  /**
+   * Initializes LWCI's communication layer.
+   */
   std::pair<int, int> initMPI() {
     lc_open((size_t) 128 * 1024 * 1024, &mv);
     __ctx = this;
@@ -156,10 +149,17 @@ public:
     probe();
     lc_progress(mv);
   }
-
 };
 
-std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,uint32_t,uint32_t> galois::runtime::makeNetworkIOLWCI() {
+/**
+ * Creates the LWCI network IO for use in an network interface.
+ *
+ * @returns Tuple with a pointer to the LWCI network IO as well as the id of
+ * the caller in the network layer + total number of hosts in the system.
+ */
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,
+                           uint32_t,
+                           uint32_t> galois::runtime::makeNetworkIOLWCI() {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOLWCI(ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);

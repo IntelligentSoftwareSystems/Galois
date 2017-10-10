@@ -53,52 +53,12 @@ private:
   uint64_t edgeOffset;
   bool graphLoaded;
 
-  //MPI_Info stripingInfo;
-
-  int myHostID;
-
   typedef boost::counting_iterator<uint64_t> EdgeIterator;
 
   // accumulators for tracking bytes read
   galois::GAccumulator<uint64_t> numBytesReadOutIndex;
   galois::GAccumulator<uint64_t> numBytesReadEdgeDest;
   galois::GAccumulator<uint64_t> numBytesReadEdgeData;
-
-  /**
-   * Initialize the MPI system. 
-   */
-  void initializeMPI() {
-    #ifdef GALOIS_USE_LWCI
-    int supportProvided;
-    int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, 
-                                      &supportProvided);
-    if (initSuccess != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, initSuccess);
-    }
-    if (supportProvided < MPI_THREAD_FUNNELED) {
-      GALOIS_DIE("Thread funneling (MPI) not supported.");
-    }
-    #endif
-
-    MPI_Comm_rank(MPI_COMM_WORLD, &myHostID);
-
-    //MPI_Comm_size(MPI_COMM_WORLD, &numHosts);
-
-    //// setup striping info (this is for stampede)
-    //MPI_Info_create(&stripingInfo);    
-    //int factorSuccess = MPI_Info_set(stripingInfo, "striping_factor", "22");
-
-    //if (factorSuccess != MPI_SUCCESS) {
-    //  MPI_Abort(MPI_COMM_WORLD, factorSuccess);
-    //}
-
-    //int unitSuccess = MPI_Info_set(stripingInfo, "striping_unit", "2097152");
-
-    //if (unitSuccess != MPI_SUCCESS) {
-    //  MPI_Abort(MPI_COMM_WORLD, unitSuccess);
-    //}
-  }
-
 
   /**
    * Load the out indices (i.e. where a particular node's edges begin in the
@@ -273,7 +233,10 @@ private:
 
 public:
   /**
-   * Initialize class variables and MPI.
+   * Initialize class variables. 
+   *
+   * NOTE THAT IT IS ASSUMED THAT MPI HAS BEEN INITIALIZED ALREADY
+   * WHEN THIS CLASS IS CREATED.
    */
   MPIGraph() {
     outIndexBuffer = nullptr;
@@ -284,7 +247,6 @@ public:
     edgeOffset = 0;
 
     resetReadCounters();
-    initializeMPI();
   }
 
   /**

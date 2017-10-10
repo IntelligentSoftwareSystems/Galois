@@ -542,52 +542,38 @@ protected:
   }
 
 private:
+  /**
+   * Initalize MPI related things. The MPI layer itself should have been 
+   * initialized when the network interface was initiailized.
+   */
   void initBareMPI() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+    #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
     if (bare_mpi == noBareMPI) return;
 
-#ifdef GALOIS_USE_LWCI
-    int provided;
-    int rv = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
-    if (rv != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, rv);
-    }
-    if(!(provided >= MPI_THREAD_FUNNELED)){
-      GALOIS_DIE("MPI_THREAD_FUNNELED not supported\n");
-    }
-    assert(provided >= MPI_THREAD_FUNNELED);
+    #ifdef GALOIS_USE_LWCI
+    // sanity check of ranks
     int taskRank;
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
     if ((unsigned)taskRank != id) GALOIS_DIE("Mismatch in MPI rank");
     int numTasks;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     if ((unsigned)numTasks != numHosts) GALOIS_DIE("Mismatch in MPI rank");
-#endif
+    #endif
 
+    // group setup
     MPI_Group world_group;
     MPI_Comm_group(MPI_COMM_WORLD, &world_group);
     mpi_identity_groups.resize(numHosts);
+
     for (unsigned x = 0; x < numHosts; ++x) {
       const int g[1] = {(int)x};
       MPI_Group_incl(world_group, 1, g, &mpi_identity_groups[x]);
     }
 
     if (id == 0) galois::gDebug("Using bare MPI\n");
-#endif
+    #endif
   }
 
-  void finalizeBareMPI() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    if (bare_mpi == noBareMPI) return;
-
-#ifdef GALOIS_USE_LWCI
-    int rv = MPI_Finalize();
-    if (rv != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, rv);
-    }
-#endif
-#endif
-  }
 
 public:
   typedef typename GraphTy::GraphNode GraphNode;
@@ -621,10 +607,6 @@ public:
     currentBVFlag = nullptr;
 
     initBareMPI();
-  }
-
-  ~hGraph() {
-    finalizeBareMPI();
   }
 
 protected:

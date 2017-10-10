@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,17 +19,14 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #include "galois/runtime/Tracer.h"
-//#include "galois/runtime/Barrier.h"
-//#include "galois/runtime/Directory.h"
 #include "galois/runtime/Network.h"
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/NetworkBackend.h"
 
-#include <type_traits>
-#include <cassert>
 #include <iostream>
 #include <mutex>
 
@@ -44,10 +41,54 @@ uint32_t galois::runtime::getHostID() { return NetworkInterface::ID; }
 
 galois::runtime::NetworkIO::~NetworkIO() {}
 
-//anchor vtable
-NetworkInterface::~NetworkInterface() {}
+/**
+ * Initialize the MPI system. Should only be called once per process.
+ */
+void NetworkInterface::initializeMPI() {
+  int supportProvided;
+  int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_MULTIPLE, 
+                                    &supportProvided);
+  if (initSuccess != MPI_SUCCESS) {
+    MPI_Abort(MPI_COMM_WORLD, initSuccess);
+  }
 
-//forward decl
+  if (supportProvided < MPI_THREAD_MULTIPLE) {
+    GALOIS_DIE("Thread multiple (MPI) not supported.");
+  }
+}
+
+NetworkInterface::NetworkInterface() {
+  initializeMPI();
+  int rank;
+  int hostSize;
+
+  int rankSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  if (rankSuccess != MPI_SUCCESS) {
+    MPI_Abort(MPI_COMM_WORLD, rankSuccess);
+  }
+
+  int sizeSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &hostSize);
+  if (sizeSuccess != MPI_SUCCESS) {
+    MPI_Abort(MPI_COMM_WORLD, sizeSuccess);
+  }
+
+  NetworkInterface::ID = rank;
+  NetworkInterface::Num = hostSize;
+
+  galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
+}
+
+NetworkInterface::~NetworkInterface() {
+  int finalizeSuccess = MPI_Finalize();
+
+  if (finalizeSuccess != MPI_SUCCESS) {
+    MPI_Abort(MPI_COMM_WORLD, finalizeSuccess);
+  }
+
+  galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
+}
+
+// forward decl
 static void bcastLandingPad(uint32_t src, ::RecvBuffer& buf);
 
 //receive broadcast message over the network
@@ -128,6 +169,5 @@ NetworkBackend::~NetworkBackend() {
 NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
 NetworkInterface& galois::runtime::getSystemNetworkInterface() {
-  //return makeNetworkRouted();
   return makeNetworkBuffered();
 }
