@@ -871,7 +871,7 @@ protected:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      galois::gDebug("Manually det. master thread ranges\n");
+      galois::gDebug("Manually det. master thread ranges");
       graph.determineThreadRanges(beginMaster, beginMaster + numOwned, masterRanges,
                                   nodeAlphaRanges);
     }
