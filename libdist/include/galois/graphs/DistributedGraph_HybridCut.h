@@ -200,7 +200,6 @@ public:
      * Assign edges to the hosts using heuristics
      * and send/recv from other hosts.
      * ******************************************/
-
     std::vector<uint64_t> prefixSumOfEdges;
 
     galois::Timer edgeInspectionTimer;
@@ -211,9 +210,8 @@ public:
                               *edgeEnd, base_hGraph::numGlobalNodes,
                               base_hGraph::numGlobalEdges);
 
-    assign_edges_phase1(mpiGraph, numEdges_distribute, VCutThreshold, 
-                        prefixSumOfEdges, base_hGraph::mirrorNodes,
-                        edgeInspectionTimer);
+    assignEdges(mpiGraph, numEdges_distribute, VCutThreshold, prefixSumOfEdges,
+                base_hGraph::mirrorNodes, edgeInspectionTimer);
 
     base_hGraph::numNodesWithEdges = numNodes;
 
@@ -223,6 +221,8 @@ public:
     } else {
       base_hGraph::beginMaster = 0;
     }
+
+    // at this point, we know where each edge belongs
 
     /******************************************
      * Allocate and construct the graph
@@ -319,93 +319,25 @@ private:
         mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
   }
 
-  // Just calculating the number of edges to send to other hosts
-  // Go over assigned nodes and distribute edges.
-  void assign_edges_phase1(galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                           uint64_t numEdges_distribute, 
-                           uint32_t VCutThreshold, 
-                           std::vector<uint64_t>& prefixSumOfEdges, 
-                           std::vector<std::vector<size_t>>& mirrorNodes,
-                           galois::Timer& edgeInspectionTimer) {
+  /**
+   * Given an assignment of edges to hosts, send messages to each host
+   * informing them of assigned edges/outgoing edges
+   *
+   * TODO params
+   */
+  void exchangeAssignedEdgeInfo(
+     std::vector<galois::GAccumulator<uint64_t>>& assignedEdgesPerHost,
+     std::vector<std::vector<uint64_t>>& numOutgoingEdges
+   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::DynamicBitSet ghosts;
-    ghosts.resize(base_hGraph::numGlobalNodes);
-
-    // number of outgoing edges for each node on a particular host that this
-    // host is aware of
-    std::vector<std::vector<uint64_t>> numOutgoingEdges(base_hGraph::numHosts);
-
-    // how many edges we will give to a particular host
-    std::vector<galois::GAccumulator<uint64_t>> 
-        num_assigned_edges_perhost(base_hGraph::numHosts);
     num_total_edges_to_receive = 0; 
-
-    base_hGraph::numOwned = base_hGraph::gid2host[base_hGraph::id].second -
-                            base_hGraph::gid2host[base_hGraph::id].first;
-
-    for (uint32_t i = 0; i < base_hGraph::numHosts; ++i){
-      numOutgoingEdges[i].assign(base_hGraph::numOwned, 0);
-    }
-
-    mpiGraph.resetReadCounters();
-
-    uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
-    auto& id = base_hGraph::id;
-
-    // Assign edges to hosts
-    galois::do_all(
-      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
-                      base_hGraph::gid2host[base_hGraph::id].second),
-      [&] (auto src) {
-        auto ee = mpiGraph.edgeBegin(src);
-        auto ee_end = mpiGraph.edgeEnd(src);
-        auto num_edges = std::distance(ee, ee_end);
-        // Assign edges for high degree nodes to the destination
-        if (num_edges > VCutThreshold){
-          for(; ee != ee_end; ++ee){
-            auto gdst = mpiGraph.edgeDestination(*ee);
-            auto h = this->find_hostID(gdst);
-            numOutgoingEdges[h][src - globalOffset]++;
-            num_assigned_edges_perhost[h] += 1;
-          }
-        } else {
-        // otherwise if not high degree keep all edges with the source node
-          for(; ee != ee_end; ++ee) {
-            numOutgoingEdges[id][src - globalOffset]++;
-            num_assigned_edges_perhost[id] += 1;
-            auto gdst = mpiGraph.edgeDestination(*ee);
-            if(!this->isOwned(gdst))
-              ghosts.set(gdst);
-          }
-        }
-      },
-      galois::loopname("EdgeInspection"),
-      galois::timeit(),
-      galois::no_stats()
-    );
-
-    edgeInspectionTimer.stop();
-    galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ",
-                   edgeInspectionTimer.get_usec()/1000000.0f, " seconds to read ",
-                   mpiGraph.getBytesRead(), " bytes (",
-                   mpiGraph.getBytesRead()/(float)edgeInspectionTimer.get_usec(),
-                   " MBPS)\n");
-
-    uint64_t check_numEdges = 0;
-    for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
-      check_numEdges += num_assigned_edges_perhost[h].reduce();
-    }
-
-    assert(check_numEdges == numEdges_distribute);
-
-    // TODO split the below parts into functions; this function is too long
 
     /****** Exchange numOutgoingEdges sets *********/
     // send and clear assigned_edges_perhost to receive from other hosts
     for (unsigned x = 0; x < net.Num; ++x) {
       if (x == base_hGraph::id) continue;
       galois::runtime::SendBuffer b;
-      galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
+      galois::runtime::gSerialize(b, assignedEdgesPerHost[x].reduce());
       galois::runtime::gSerialize(b, numOutgoingEdges[x]);
       net.sendTagged(x, galois::runtime::evilPhase, b);
     }
@@ -428,10 +360,20 @@ private:
       num_total_edges_to_receive += num_edges_from_host;
     }
     ++galois::runtime::evilPhase;
+  }
 
-
-    // determine master/mirror nodes
-    // TODO move to separate function
+  /**
+   * Given information about what edges we have been assigned, create the 
+   * master and mirror mappings.
+   *
+   * TODO params
+   */
+  void createMasterMirrorNodes(
+      std::vector<std::vector<uint64_t>>& numOutgoingEdges,
+      galois::DynamicBitSet& ghosts,
+      std::vector<uint64_t>& prefixSumOfEdges,
+      std::vector<std::vector<size_t>>& mirrorNodes
+  ) {
     numNodes = 0;
     numEdges = 0;
 
@@ -471,6 +413,90 @@ private:
         mirrorNodes[h].push_back(x);
       }
     }
+  }
+
+  // Go over assigned nodes and determine where edges should go.
+  void assignEdges(galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                   uint64_t numEdges_distribute, 
+                   uint32_t VCutThreshold, 
+                   std::vector<uint64_t>& prefixSumOfEdges, 
+                   std::vector<std::vector<size_t>>& mirrorNodes,
+                   galois::Timer& edgeInspectionTimer) {
+    galois::DynamicBitSet ghosts;
+    ghosts.resize(base_hGraph::numGlobalNodes);
+
+    // number of outgoing edges for each node on a particular host that this
+    // host is aware of
+    std::vector<std::vector<uint64_t>> numOutgoingEdges(base_hGraph::numHosts);
+
+    // how many edges we will give to a particular host
+    std::vector<galois::GAccumulator<uint64_t>> 
+        num_assigned_edges_perhost(base_hGraph::numHosts);
+
+    base_hGraph::numOwned = base_hGraph::gid2host[base_hGraph::id].second -
+                            base_hGraph::gid2host[base_hGraph::id].first;
+
+    for (uint32_t i = 0; i < base_hGraph::numHosts; ++i) {
+      numOutgoingEdges[i].assign(base_hGraph::numOwned, 0);
+    }
+
+    mpiGraph.resetReadCounters();
+
+    uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
+    auto& id = base_hGraph::id;
+    // Assign edges to hosts
+    galois::do_all(
+      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                      base_hGraph::gid2host[base_hGraph::id].second),
+      [&] (auto src) {
+        auto ee = mpiGraph.edgeBegin(src);
+        auto ee_end = mpiGraph.edgeEnd(src);
+        auto num_edges = std::distance(ee, ee_end);
+        // Assign edges for high degree nodes to the destination
+        if (num_edges > VCutThreshold) {
+          for(; ee != ee_end; ++ee){
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            auto h = this->find_hostID(gdst);
+            numOutgoingEdges[h][src - globalOffset]++;
+            num_assigned_edges_perhost[h] += 1;
+          }
+        } else {
+        // otherwise if not high degree keep all edges with the source node
+          for(; ee != ee_end; ++ee) {
+            numOutgoingEdges[id][src - globalOffset]++;
+            num_assigned_edges_perhost[id] += 1;
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            if(!this->isOwned(gdst))
+              ghosts.set(gdst);
+          }
+        }
+      },
+      galois::loopname("EdgeInspection"),
+      galois::timeit(),
+      galois::no_stats()
+    );
+
+    edgeInspectionTimer.stop();
+    galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ",
+                   edgeInspectionTimer.get_usec()/1000000.0f, " seconds to read ",
+                   mpiGraph.getBytesRead(), " bytes (",
+                   mpiGraph.getBytesRead()/(float)edgeInspectionTimer.get_usec(),
+                   " MBPS)\n");
+
+    #ifndef NDEBUG
+    uint64_t check_numEdges = 0;
+    for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
+      check_numEdges += num_assigned_edges_perhost[h].reduce();
+    }
+    assert(check_numEdges == numEdges_distribute);
+    #endif
+
+    // send off messages letting hosts know which edges they were assigned
+    exchangeAssignedEdgeInfo(num_assigned_edges_perhost, numOutgoingEdges);
+    // create the master/mirror node mapping based on the information
+    // received
+    createMasterMirrorNodes(numOutgoingEdges, ghosts, prefixSumOfEdges, 
+                            mirrorNodes);
   }
 
 
