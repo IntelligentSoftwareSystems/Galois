@@ -23,6 +23,7 @@
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
+// clang-format off
 #include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
 #include "galois/Galois.h"
@@ -163,7 +164,7 @@ void clusterGalois(vector<LeafNode*> & lights) {
     using WL = galois::worklists::dChunkedFIFO<16>;
 
     // find matching
-		galois::for_each(galois::iterate(workList), 
+		galois::for_each(galois::iterate(workList),
         [&] (NodeWrapper* nodeA, auto& lwl) {
           if (tree->contains(*nodeA)) {
               NodeWrapper * nodeB = tree->findBestMatch((*nodeA));
@@ -192,8 +193,6 @@ void clusterGalois(vector<LeafNode*> & lights) {
               }
           }
         },
-        
-        
         galois::wl<WL>(), galois::timeit(), galois::loopname("Main"));
 
 		size += addedNodes.reduce();
@@ -204,8 +203,17 @@ void clusterGalois(vector<LeafNode*> & lights) {
 		if(size<2)
 			break;
 		size=0;
+
+    galois::StatTimer Tcleanup("cleanup-time");
+    Tcleanup.start();
 		KdCell::cleanupTree(tree);
+    Tcleanup.stop();
+
+    galois::StatTimer TcreateTree("create-tree-time");
+    TcreateTree.start();
 		tree = (KdTree::createTree(workList));
+    TcreateTree.stop();
+
 		delete newNodes;
 	}
 	T.stop();
