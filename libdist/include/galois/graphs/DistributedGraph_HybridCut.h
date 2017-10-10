@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -35,7 +35,6 @@ template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 private:
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
-  // TODO move some functions up here as they shouldn't be called otherwise
 
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
@@ -278,7 +277,7 @@ public:
     base_hGraph::setup_communication();
     Tgraph_construct_comm.stop();
   }
-
+private:
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
                  uint64_t numEdges_distribute, uint32_t VCutThreshold){
@@ -706,6 +705,7 @@ public:
     return -1;
   }
 
+public:
   bool is_vertex_cut() const {
     return true;
   }
