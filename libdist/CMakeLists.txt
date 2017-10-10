@@ -4,7 +4,6 @@ set(sources
         src/Tracer.cpp
         src/DistStats.cpp
         src/buffered.cpp
-        src/routed.cpp
         src/pkt_mpi.cpp
         src/NetworkLWCI.cpp
         src/Network.cpp
