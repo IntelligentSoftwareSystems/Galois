@@ -35,34 +35,23 @@ template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 private:
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
-
   // TODO move some functions up here as they shouldn't be called otherwise
-
 
 public:
   typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
   /** Utilities for reading partitioned graphs. **/
   struct NodeInfo {
-    NodeInfo() :
-      local_id(0), global_id(0), owner_id(0) {
-      }
-    NodeInfo(size_t l, size_t g, size_t o) :
-      local_id(l), global_id(g), owner_id(o) {
-      }
+    NodeInfo() 
+      : local_id(0), global_id(0), owner_id(0) {}
+    NodeInfo(size_t l, size_t g, size_t o) 
+      : local_id(l), global_id(g), owner_id(o) {}
     size_t local_id;
     size_t global_id;
     size_t owner_id;
   };
 
-  std::vector<NodeInfo> localToGlobalMap_meta;
-  std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
-  std::vector<uint64_t> GlobalVec; //Global Id's sorted vector.
-  std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
-
-  std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
   // To send edges to different hosts: #Src #Dst
   std::vector<std::vector<uint64_t>> assigned_edges_perhost;
-  std::vector<uint64_t> recv_assigned_edges;
   uint64_t num_total_edges_to_receive;
 
   // GID = localToGlobalVector[LID]
@@ -70,16 +59,6 @@ public:
   // LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
-  //EXPERIMENT
-  std::unordered_map<uint64_t, uint32_t> GlobalVec_map;
-
-  //XXX: initialize to ~0
-  std::vector<uint64_t> numNodes_per_host;
-
-  //XXX: Use EdgeTy to determine if need to load edge weights or not.
-  using Host_edges_map_type = typename std::conditional<!std::is_void<EdgeTy>::value, std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, uint32_t>>> , std::unordered_map<uint64_t, std::vector<uint64_t>>>::type;
-  Host_edges_map_type host_edges_map;
-  //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
   std::vector<uint64_t> numEdges_per_host;
   std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
 
@@ -88,9 +67,10 @@ public:
   bool isBipartite;
   uint64_t numEdges;
 
+  std::vector<NodeInfo> localToGlobalMap_meta;
+
   unsigned getHostID(uint64_t gid) const {
-    auto lid = G2L(gid);
-    return OwnerVec[lid];
+    return find_hostID(gid);
   }
 
   bool isOwned(uint64_t gid) const {
@@ -117,17 +97,8 @@ public:
     return localToGlobalVector[lid];
   }
 
-  std::string getMetaFileName(const std::string & basename, unsigned hostID, 
-                              unsigned num_hosts){
-    std::string result = basename;
-    result+= ".META.";
-    result+=std::to_string(hostID);
-    result+= ".OF.";
-    result+=std::to_string(num_hosts);
-    return result;
-  }
-
-  bool readMetaFile(const std::string& metaFileName, std::vector<NodeInfo>& localToGlobalMap_meta){
+  bool readMetaFile(const std::string& metaFileName, 
+                    std::vector<NodeInfo>& localToGlobalMap_meta) {
     std::ifstream meta_file(metaFileName, std::ifstream::binary);
     if (!meta_file.is_open()) {
       std::cerr << "Unable to open file " << metaFileName << "! Exiting!\n";
@@ -147,21 +118,24 @@ public:
     return true;
   }
 
-  std::string getPartitionFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
+  std::string getMetaFileName(const std::string & basename, unsigned hostID, 
+                              unsigned num_hosts){
     std::string result = basename;
-    result+= ".PART.";
+    result+= ".META.";
     result+=std::to_string(hostID);
     result+= ".OF.";
     result+=std::to_string(num_hosts);
     return result;
   }
 
-  std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
-    return std::make_pair<uint32_t, uint32_t>(~0,~0);
-  }
-
-  std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
-    return std::make_pair<uint64_t, uint64_t>(~0,~0);
+  std::string getPartitionFileName(const std::string & basename, 
+                                   unsigned hostID, unsigned num_hosts) {
+    std::string result = basename;
+    result+= ".PART.";
+    result+=std::to_string(hostID);
+    result+= ".OF.";
+    result+=std::to_string(num_hosts);
+    return result;
   }
 
   /**
@@ -716,7 +690,7 @@ public:
     }
   }
 
-  uint32_t find_hostID(uint64_t gid) {
+  uint32_t find_hostID(const uint64_t gid) const {
     for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
       if (gid >= base_hGraph::gid2host[h].first && 
           gid < base_hGraph::gid2host[h].second) {
