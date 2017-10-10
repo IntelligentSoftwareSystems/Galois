@@ -30,7 +30,10 @@
 #define GALOIS_GRAPH_MPIGRAPH_H
 
 #include <limits>
+#include <galois/Galois.h>
 #include <galois/gIO.h>
+#include <galois/gstl.h>
+#include <galois/Threads.h>
 #include <galois/Reduction.h>
 #include <mpi.h>
 
@@ -80,27 +83,48 @@ private:
       GALOIS_DIE("Failed to allocate memory for out index buffer.");
     }
 
-    // position to start of contiguous chunk of nodes to read
-    uint64_t readPosition = (4 + nodeStart) * sizeof(uint64_t);
+    // each thread reads in disjunct portion
+    galois::on_each(
+      [&](unsigned tid, unsigned nthreads) {
+        auto myWork = galois::block_range(nodeStart, nodeStart + numNodesToLoad,
+                                          tid, nthreads);
 
-    uint64_t nodesLoaded = 0;
-    MPI_Status mpiStatus;
+        uint64_t threadNodeStart = myWork.first;
+        uint64_t threadNumNodesToLoad = myWork.second - threadNodeStart;
 
-    while (numNodesToLoad > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numNodesToLoad, (uint64_t)std::numeric_limits<int>::max());
+        if (threadNumNodesToLoad == 0) {
+          return;
+        }
 
-      MPI_File_read_at(graphFile, readPosition + (nodesLoaded * sizeof(uint64_t)), 
-                       ((char*)outIndexBuffer) + nodesLoaded * sizeof(uint64_t), 
-                       toLoad, MPI_UINT64_T, &mpiStatus); 
+        // position to start of contiguous chunk of nodes to read
+        uint64_t readPosition = (4 + threadNodeStart) * sizeof(uint64_t);
+    
+        uint64_t nodesLoaded = 0;
+        MPI_Status mpiStatus;
+    
+        while (threadNumNodesToLoad > 0) {
+          // File_read can only go up to the max int
+          uint64_t toLoad = std::min(threadNumNodesToLoad, 
+                                     (uint64_t)std::numeric_limits<int>::max());
+    
+          MPI_File_read_at(graphFile, 
+                           readPosition + (nodesLoaded * sizeof(uint64_t)), 
+                           ((char*)this->outIndexBuffer) + 
+                            (threadNodeStart - nodeStart + nodesLoaded) * 
+                            sizeof(uint64_t), 
+                           toLoad, MPI_UINT64_T, &mpiStatus); 
+    
+          int itemsRead; 
+          MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
+    
+          threadNumNodesToLoad -= itemsRead;
+          nodesLoaded += itemsRead;
+        }
 
-      int itemsRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
-
-      numNodesToLoad -= itemsRead;
-      nodesLoaded += itemsRead;
-      //printf("read %d nodes, %lu remaining\n", itemsRead, numNodesToLoad);
-    }
+        assert(threadNumNodesToLoad == 0);
+      },
+      galois::no_stats()
+    );
 
     nodeOffset = nodeStart;
   }
@@ -127,28 +151,47 @@ private:
       GALOIS_DIE("Failed to allocate memory for edge dest buffer.");
     }
 
-    // position to start of contiguous chunk of edges to read
-    uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
-                            (sizeof(uint32_t) * edgeStart);
+    // each thread reads in disjunct portion
+    galois::on_each(
+      [&](unsigned tid, unsigned nthreads) {
+        auto myWork = galois::block_range(edgeStart, edgeStart + numEdgesToLoad,
+                                          tid, nthreads);
 
-    uint64_t edgesLoaded = 0;
-    MPI_Status mpiStatus;
+        uint64_t threadEdgeStart = myWork.first;
+        uint64_t threadNumEdgesToLoad = myWork.second - threadEdgeStart;
 
-    while (numEdgesToLoad > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numEdgesToLoad, 
-                                 (uint64_t)std::numeric_limits<int>::max());
+        if (threadNumEdgesToLoad == 0) {
+          return;
+        }
 
-      MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
-                       ((char*)edgeDestBuffer) + edgesLoaded * sizeof(uint32_t), 
-                       toLoad, MPI_UINT32_T, &mpiStatus); 
-      int itemsRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
+        // position to start of contiguous chunk of edges to read
+        uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
+                                (sizeof(uint32_t) * threadEdgeStart);
 
-      numEdgesToLoad -= itemsRead;
-      edgesLoaded += itemsRead;
-      //printf("read %d edges, %lu remaining\n", itemsRead, numEdgesToLoad);
-    }
+        uint64_t edgesLoaded = 0;
+        MPI_Status mpiStatus;
+    
+        while (threadNumEdgesToLoad > 0) {
+          // File_read can only go up to the max int
+          uint64_t toLoad = std::min(threadNumEdgesToLoad, 
+                                     (uint64_t)std::numeric_limits<int>::max());
+    
+          MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
+                           ((char*)this->edgeDestBuffer) + 
+                            (threadEdgeStart - edgeStart + edgesLoaded) * 
+                            sizeof(uint32_t), 
+                           toLoad, MPI_UINT32_T, &mpiStatus); 
+          int itemsRead; 
+          MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
+    
+          threadNumEdgesToLoad -= itemsRead;
+          edgesLoaded += itemsRead;
+        }
+
+        assert(threadNumEdgesToLoad == 0);
+      },
+      galois::no_stats()
+    );
 
     edgeOffset = edgeStart;
   }
@@ -180,37 +223,57 @@ private:
     assert(edgeDataBuffer == nullptr);
     edgeDataBuffer = (EdgeDataType*)malloc(sizeof(EdgeDataType) * numEdgesToLoad);
 
-    // current position = after nodes + edges
-    uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
-                            (sizeof(uint32_t) * numGlobalEdges);
+    // position after nodes + edges
+    uint64_t baseReadPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
+                                (sizeof(uint32_t) * numGlobalEdges);
     
     // version 1 padding TODO make version agnostic
-    if (readPosition % 2) {
-      readPosition += sizeof(uint32_t);
+    if (baseReadPosition % 2) {
+      baseReadPosition += sizeof(uint32_t);
     }
 
-    // jump to first byte of edge data
-    readPosition += sizeof(EdgeDataType) * edgeStart;
+    galois::on_each(
+      [&](unsigned tid, unsigned nthreads) {
+        auto myWork = galois::block_range(edgeStart, edgeStart + numEdgesToLoad,
+                                          tid, nthreads);
 
-    MPI_Status mpiStatus;
-    uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
-    uint64_t bytesLoaded = 0;
+        uint64_t threadEdgeStart = myWork.first;
+        uint64_t threadNumEdgesToLoad = myWork.second - threadEdgeStart;
 
-    while (numBytesToLoad != 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numBytesToLoad, 
-                                 (uint64_t)std::numeric_limits<int>::max());
+        if (threadNumEdgesToLoad == 0) {
+          return;
+        }
 
-      MPI_File_read_at(graphFile, readPosition + bytesLoaded, 
-                       ((char*)edgeDataBuffer) + bytesLoaded, 
-                       toLoad, MPI_BYTE, &mpiStatus); 
+        uint64_t numBytesToLoad = threadNumEdgesToLoad * sizeof(EdgeDataType);
+        uint64_t bytesLoaded = 0;
+        MPI_Status mpiStatus;
 
-      int bytesRead; 
-      MPI_Get_count(&mpiStatus, MPI_BYTE, &bytesRead);
+        // jump to first byte of edge data
+        uint64_t readPosition = baseReadPosition + 
+                                (sizeof(EdgeDataType) * threadEdgeStart);
+   
+        while (numBytesToLoad > 0) {
+          // File_read can only go up to the max int
+          uint64_t toLoad = std::min(numBytesToLoad, 
+                                     (uint64_t)std::numeric_limits<int>::max());
 
-      numBytesToLoad -= bytesRead;
-      bytesLoaded += bytesRead;
-    }
+          MPI_File_read_at(graphFile, readPosition + bytesLoaded, 
+                           ((char*)this->edgeDataBuffer) + 
+                            bytesLoaded +
+                            (threadEdgeStart - edgeStart) * sizeof(EdgeDataType),
+                           toLoad, MPI_BYTE, &mpiStatus); 
+
+          int bytesRead; 
+          MPI_Get_count(&mpiStatus, MPI_BYTE, &bytesRead);
+
+          numBytesToLoad -= bytesRead;
+          bytesLoaded += bytesRead;
+        }
+
+        assert(numBytesToLoad == 0);
+      },
+      galois::no_stats()
+    );
   }
 
   /**
@@ -295,6 +358,12 @@ public:
       MPI_Abort(MPI_COMM_WORLD, fileSuccess);
     }
 
+    unsigned int numActiveThreads = galois::getActiveThreads();
+
+    if (numActiveThreads > 4) {
+      galois::setActiveThreads(4);
+    }
+
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
     loadOutIndex(graphFile, nodeStart, numLocalNodes);
@@ -306,6 +375,8 @@ public:
     // may or may not do something depending on EdgeDataType
     loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges, 
                                numGlobalNodes, numGlobalEdges);
+
+    galois::setActiveThreads(numActiveThreads);
 
     graphLoaded = true;
 
