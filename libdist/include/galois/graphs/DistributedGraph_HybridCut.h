@@ -226,13 +226,7 @@ public:
     typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
 
-    galois::Timer edgeInspectionTimer;
-    edgeInspectionTimer.start();
  
-    galois::graphs::MPIGraph<EdgeTy> mpiGraph;
-    mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
-                              *edgeEnd, base_hGraph::numGlobalNodes,
-                              base_hGraph::numGlobalEdges);
 
 #if 0
       else {
@@ -275,7 +269,15 @@ public:
      * ******************************************/
 
     std::vector<uint64_t> prefixSumOfEdges;
-    edgeInspectionTimer.stop();
+
+    galois::Timer edgeInspectionTimer;
+    edgeInspectionTimer.start();
+
+    galois::graphs::MPIGraph<EdgeTy> mpiGraph;
+    mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
+                              *edgeEnd, base_hGraph::numGlobalNodes,
+                              base_hGraph::numGlobalEdges);
+
     assign_edges_phase1(g, mpiGraph, numEdges_distribute, VCutThreshold, 
                         prefixSumOfEdges, base_hGraph::mirrorNodes,
                         edgeInspectionTimer);
@@ -418,8 +420,6 @@ public:
     }
 
     mpiGraph.resetReadCounters();
-
-    edgeInspectionTimer.start();
 
     uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
     auto& id = base_hGraph::id;

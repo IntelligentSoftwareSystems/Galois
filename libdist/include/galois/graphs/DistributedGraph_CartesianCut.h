@@ -28,7 +28,9 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, bool BSPNode = false, bool BSPEdge = false, unsigned DecomposeFactor = 1>
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
+         bool moreColumnHosts = false, bool BSPNode = false, 
+         bool BSPEdge = false, unsigned DecomposeFactor = 1>
 class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
 
@@ -327,8 +329,6 @@ public:
 
     std::vector<uint64_t> prefixSumOfEdges;
 
-    inspectionTimer.stop();
-
     loadStatistics(g, mpiGraph, prefixSumOfEdges, inspectionTimer); // first pass of the graph file
 
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
@@ -417,7 +417,6 @@ public:
     }
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      inspectionTimer.start();
       mpiGraph[d].resetReadCounters();
 
       uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + 
@@ -442,12 +441,19 @@ public:
         galois::timeit(),
         galois::no_stats()
       );
-
-      inspectionTimer.stop();
-      galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", inspectionTimer.get_usec()/1000000.0f, 
-          " seconds to read ", mpiGraph[d].getBytesRead(), " bytes (",
-          mpiGraph[d].getBytesRead()/(float)inspectionTimer.get_usec(), " MBPS)\n");
     }
+
+    inspectionTimer.stop();
+
+    uint64_t allBytesRead = 0;
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
+      allBytesRead += mpiGraph[d].getBytesRead();
+    }
+
+    galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", 
+                   inspectionTimer.get_usec()/1000000.0f, 
+                   " seconds to read ", allBytesRead, " bytes (",
+                   allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
