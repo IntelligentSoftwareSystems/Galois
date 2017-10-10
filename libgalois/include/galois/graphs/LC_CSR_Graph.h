@@ -778,7 +778,7 @@ class LC_CSR_Graph :
    * CSR to CSC
    */
   void transpose(bool reallocate = false) {
-    galois::StatTimer timer("TIME_GRAPH_TRANSPOSE"); timer.start();
+    galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE"); timer.start();
 
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;
@@ -798,16 +798,18 @@ class LC_CSR_Graph :
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"),
                    galois::no_stats());
 
-    // parallelization makes this slower
     // get destination of edge, copy to array, and
-    for (uint64_t e = 0; e < numEdges; ++e) {
-        auto dst = edgeDst[e];
-        edgeDst_old[e] = dst;
-        // counting outgoing edges in the tranpose graph by
-        // counting incoming edges in the original graph
-        ++edgeIndData_temp[dst];
-    }
+    galois::do_all(galois::iterate(0ul, numEdges), [&](uint64_t e) {
+                     auto dst = edgeDst[e];
+                     edgeDst_old[e] = dst;
+                     // counting outgoing edges in the tranpose graph by
+                     // counting incoming edges in the original graph
+                     __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
+                   },
+                   galois::loopname("TRANSPOSE_EDGEINTDATA_INC"),
+                   galois::no_stats());
 
+    // TODO is it worth doing parallel prefix sum?
     // prefix sum calculation of the edge index array
     for (uint32_t n = 1; n < numNodes; ++n) {
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
@@ -853,29 +855,26 @@ class LC_CSR_Graph :
       edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     }
 
-    // parallelization makes this slower
-    for (uint32_t src = 0; src < numNodes; ++src) {
-      // e = start index into edge array for a particular node
-      uint64_t e;
-      if (src == 0)
-        e = 0;
-      else
-        e = edgeIndData_old[src - 1];
+    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t src) {
+                     // e = start index into edge array for a particular node
+                     uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
 
-      // get all outgoing edges of a particular node in the non-transpose and
-      // convert to incoming
-      while (e < edgeIndData_old[src]) {
-        // destination nodde
-        auto dst = edgeDst_old[e];
-        // location to save edge
-        auto e_new = edgeIndData_temp[dst]++;
-        // save src as destination
-        edgeDst[e_new] = src;
-        // copy edge data to "new" array
-        edgeDataCopy(edgeData_new, edgeData, e_new, e);
-        e++;
-      }
-    }
+                     // get all outgoing edges of a particular node in the non-transpose and
+                     // convert to incoming
+                     while (e < edgeIndData_old[src]) {
+                       // destination nodde
+                       auto dst = edgeDst_old[e];
+                       // location to save edge
+                       auto e_new = __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
+                       // save src as destination
+                       edgeDst[e_new] = src;
+                       // copy edge data to "new" array
+                       edgeDataCopy(edgeData_new, edgeData, e_new, e);
+                       e++;
+                     }
+                   },
+                   galois::loopname("TRANSPOSE_EDGEDST"),
+                   galois::no_stats());
 
     // reallocate edgeData
     if (reallocate) {
