@@ -2069,8 +2069,14 @@ private:
 
         rb[x].resize(size);
 
-        // TODO add no_locks and same_disp_unit
-        MPI_Win_create(rb[x].data(), size, 1, MPI_INFO_NULL, MPI_COMM_WORLD, &window[x]);
+        MPI_Info info;
+        MPI_Info_create(&info);
+        MPI_Info_set(info, "no_locks", "true");
+        MPI_Info_set(info, "same_disp_unit", "true");
+
+        MPI_Win_create(rb[x].data(), size, 1, info, MPI_COMM_WORLD, &window[x]);
+
+        MPI_Info_free(&info);
       }
 
       for (unsigned h = 1; h < numHosts; ++h) {
