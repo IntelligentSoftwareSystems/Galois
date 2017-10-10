@@ -319,7 +319,7 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::runtime::getHostBarrier().wait();
 
       if (transpose && (numNodes > 0)) {
-        base_hGraph::graph.transpose();
+        base_hGraph::graph.transpose(GRNAME);
         base_hGraph::transposed = true;
       } else {
         // else because transpose will find thread ranges for you

@@ -777,8 +777,8 @@ class LC_CSR_Graph :
    * Perform an in-memory transpose of the graph, replacing the original
    * CSR to CSC
    */
-  void transpose(bool reallocate = false) {
-    galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE"); timer.start();
+  void transpose(const char *regionName = NULL, bool reallocate = false) {
+    galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE", regionName); timer.start();
 
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;

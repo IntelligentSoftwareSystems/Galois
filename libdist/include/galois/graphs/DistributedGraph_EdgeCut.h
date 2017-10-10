@@ -266,7 +266,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       loadEdges(base_hGraph::graph, mpiGraph);
       
       if (transpose) {
-        base_hGraph::graph.transpose();
+        base_hGraph::graph.transpose(GRNAME);
         base_hGraph::transposed = true;
       }
 
