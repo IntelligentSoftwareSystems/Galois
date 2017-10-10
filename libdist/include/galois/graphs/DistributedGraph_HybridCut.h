@@ -21,6 +21,7 @@
  * @section Contains the vertex cut functionality to be used in dGraph.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
 #ifndef _GALOIS_DIST_HGRAPHHYBRID_H
@@ -278,9 +279,15 @@ public:
     Tgraph_construct_comm.stop();
   }
 private:
+  /**
+   * Read the edges that this host is responsible for and send them off to
+   * the host that they are assigned to if necessary.
+   *
+   * TODO params
+   */
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                 uint64_t numEdges_distribute, uint32_t VCutThreshold){
+                 uint64_t numEdges_distribute, uint32_t VCutThreshold) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -295,28 +302,24 @@ private:
 
     assigned_edges_perhost.resize(base_hGraph::numHosts);
 
-    /*******************************************************
-     * Galois:On_each loop for using multiple threads.
-     * Thread 0 : Runs the assign_send_edges functions: To
-     *            assign edges to hosts and send across.
-     * Thread 1 : Runs the receive_edges functions: To
-     *            edges assigned to this host by other hosts.
-     ********************************************************/
-    // TODO: try to parallelize this better
-    galois::on_each([&](unsigned tid, unsigned nthreads){
-        if (tid == 0)
-            assign_load_send_edges(graph, mpiGraph, 
-                                   numEdges_distribute, VCutThreshold);
-        if ((nthreads == 1) || (tid == 1))
-            receive_edges(graph);
-        });
+    readAndSendEdges(graph, mpiGraph, numEdges_distribute, VCutThreshold);
+    std::atomic<uint64_t> edgesToReceive;
+    edgesToReceive.store(num_total_edges_to_receive);
+
+    galois::on_each(
+      [&](unsigned tid, unsigned nthreads) {
+        receiveAssignedEdges(graph, edgesToReceive);
+      },
+      galois::no_stats()
+    );
 
     ++galois::runtime::evilPhase;
 
     timer.stop();
-    galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
-        " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-        mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+    galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", 
+                   timer.get_usec()/1000000.0f, " seconds to read ", 
+                   mpiGraph.getBytesRead(), " bytes (",
+                   mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
   }
 
   /**
@@ -500,180 +503,231 @@ private:
   }
 
 
-  // Edge type is not void.
+  /**
+   * Read/construct edges we are responsible for and send off edges we don't 
+   * own to the correct hosts. Non-void variant (i.e. edge data exists).
+   *
+   * TODO params
+   */
   template<typename GraphTy, 
            typename std::enable_if<
              !std::is_void<typename GraphTy::edge_data_type>::value
            >::type* = nullptr>
-  void assign_load_send_edges(GraphTy& graph, 
-                              galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                              uint64_t numEdges_distribute, 
-                              uint32_t VCutThreshold) {
-    std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
-    std::vector<std::vector<typename GraphTy::edge_data_type>> 
-        gdata_vec(base_hGraph::numHosts);
+  void readAndSendEdges(GraphTy& graph, 
+                        galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                        uint64_t numEdges_distribute, 
+                        uint32_t VCutThreshold) {
+    typedef std::vector<std::vector<uint64_t>> DstVecType;
+    galois::substrate::PerThreadStorage<DstVecType> 
+        gdst_vecs(base_hGraph::numHosts);
+
+    typedef std::vector<std::vector<typename GraphTy::edge_data_type>>
+        DataVecType;
+    galois::substrate::PerThreadStorage<DataVecType> 
+        gdata_vecs(base_hGraph::numHosts);
+
+
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
-    // Go over assigned nodes and distribute edges.
-    for (auto src = base_hGraph::gid2host[base_hGraph::id].first; 
-         src != base_hGraph::gid2host[base_hGraph::id].second; 
-         ++src) {
-      auto ee = ee_end;
-      ee_end = mpiGraph.edgeEnd(src);
+    // Go over assigned nodes and distribute edges to other hosts.
+    galois::do_all(
+      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                      base_hGraph::gid2host[base_hGraph::id].second),
+      [&] (auto src) {
+        auto ee = mpiGraph.edgeBegin(src);
+        auto ee_end = mpiGraph.edgeEnd(src);
 
-      auto num_edges = std::distance(ee, ee_end);
-      for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-        gdst_vec[i].clear();
-        gdata_vec[i].clear();
-        //gdst_vec[i].reserve(std::distance(ii, ee));
-      }
-      uint32_t lsrc = 0;
-      uint64_t cur = 0;
-      if (isLocal(src)) {
-        lsrc = G2L(src);
-        cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-      }
+        auto num_edges = std::distance(ee, ee_end);
 
-      if (num_edges > VCutThreshold) {
-        // Assign edges for high degree nodes to the destination
-        for(; ee != ee_end; ++ee){
-          auto gdst = mpiGraph.edgeDestination(*ee);
-          auto gdata = mpiGraph.edgeData(*ee);
-          auto h = find_hostID(gdst);
-          gdst_vec[h].push_back(gdst);
-          gdata_vec[h].push_back(gdata);
+        uint32_t lsrc = 0;
+        uint64_t cur = 0;
+
+        if (this->isLocal(src)) {
+          lsrc = this->G2L(src);
+          cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         }
-      } else {
-        // keep all edges with the source node
-        for(; ee != ee_end; ++ee){
-          auto gdst = mpiGraph.edgeDestination(*ee);
-          auto gdata = mpiGraph.edgeData(*ee);
-          assert(isLocal(src));
-          uint32_t ldst = G2L(gdst);
+
+        std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
+        auto& gdata_vec = *gdata_vecs.getLocal();
+
+        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+          gdst_vec[i].clear();
+          gdata_vec[i].clear();
+          gdst_vec[i].reserve(std::distance(ee, ee_end));
+          gdata_vec[i].reserve(std::distance(ee, ee_end));
+        }
+
+        if (num_edges > VCutThreshold) {
+          // Assign edges for high degree nodes to the destination
+          for (; ee != ee_end; ++ee) {
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            auto gdata = mpiGraph.edgeData(*ee);
+            auto h = this->find_hostID(gdst);
+            gdst_vec[h].push_back(gdst);
+            gdata_vec[h].push_back(gdata);
+          }
+        } else {
+          // keep all edges with the source node
+          for (; ee != ee_end; ++ee) {
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            auto gdata = mpiGraph.edgeData(*ee);
+            assert(this->isLocal(src));
+            uint32_t ldst = this->G2L(gdst);
+            graph.constructEdge(cur++, ldst, gdata);
+          }
+          if (this->isLocal(src)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+        }
+
+        // construct edges for nodes with greater than threashold edges but 
+        // assigned to local host
+        uint32_t i = 0;
+        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+          uint32_t ldst = this->G2L(gdst);
+          auto gdata = gdata_vec[this->base_hGraph::id][i++];
           graph.constructEdge(cur++, ldst, gdata);
         }
-      }
 
-      // construct edges for nodes with greater than threashold edges but 
-      // assigned to local host
-      uint32_t i = 0;
-      for (uint64_t gdst : gdst_vec[base_hGraph::id]) {
-          uint32_t ldst = G2L(gdst);
-          auto gdata = gdata_vec[base_hGraph::id][i++];
-          graph.constructEdge(cur++, ldst, gdata);
-      }
-
-      // send all edges for one source node 
-      for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
-        if(h == base_hGraph::id) continue;
-        if(gdst_vec[h].size()){
-          galois::runtime::SendBuffer b;
-          galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
-          net.sendTagged(h, galois::runtime::evilPhase, b);
+        // send 
+        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
+          if (h == this->base_hGraph::id) continue;
+          if (gdst_vec[h].size()) {
+            galois::runtime::SendBuffer b;
+            galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
+            net.sendTagged(h, galois::runtime::evilPhase, b);
+          }
         }
-      }
 
-      /*** All the outgoing edges for this src are constructed ***/
-      if (isLocal(src)) {
-        assert(cur == (*graph.edge_end(lsrc)));
-      }
-    }
+        // Make sure the outgoing edges for this src are constructed
+        if (this->isLocal(src)) {
+          assert(cur == (*graph.edge_end(lsrc)));
+        }
+      },
+      galois::loopname("EdgeLoading"),
+      galois::no_stats(),
+      galois::timeit()
+    );
     net.flush();
   }
 
-
-  // TODO do something about code duplication...; separate common things into
-  // separate functions
-  // Edge type is void.
+  /**
+   * Read/construct edges we are responsible for and send off edges we don't 
+   * own to the correct hosts. Void variant (i.e. no edge data).
+   *
+   * TODO params
+   */
   template<typename GraphTy, 
            typename std::enable_if<
              std::is_void<typename GraphTy::edge_data_type>::value
            >::type* = nullptr>
-  void assign_load_send_edges(GraphTy& graph, 
-                              galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                              uint64_t numEdges_distribute, 
-                              uint32_t VCutThreshold) {
-    std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
+  void readAndSendEdges(GraphTy& graph, 
+                        galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                        uint64_t numEdges_distribute, 
+                        uint32_t VCutThreshold) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
-    // Go over assigned nodes and distribute edges.
-    for (auto src = base_hGraph::gid2host[base_hGraph::id].first; 
-         src != base_hGraph::gid2host[base_hGraph::id].second;
-         ++src) {
-      auto ee = ee_end;
-      ee_end = mpiGraph.edgeEnd(src);
+    typedef std::vector<std::vector<uint64_t>> DstVecType;
+    galois::substrate::PerThreadStorage<DstVecType> 
+        gdst_vecs(base_hGraph::numHosts);
 
-      auto num_edges = std::distance(ee, ee_end);
-      for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-        gdst_vec[i].clear();
-        //gdst_vec[i].reserve(std::distance(ii, ee));
-      }
-      uint32_t lsrc = 0;
-      uint64_t cur = 0;
+    // Go over assigned nodes and distribute edges to other hosts.
+    galois::do_all(
+      galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                      base_hGraph::gid2host[base_hGraph::id].second),
+      [&] (auto src) {
+        auto ee = mpiGraph.edgeBegin(src);
+        auto ee_end = mpiGraph.edgeEnd(src);
 
-      if (isLocal(src)) {
-        lsrc = G2L(src);
-        cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-      }
+        auto num_edges = std::distance(ee, ee_end);
 
-      if (num_edges > VCutThreshold) {
-        //Assign edges for high degree nodes to the destination
-        for (; ee != ee_end; ++ee) {
-          auto gdst = mpiGraph.edgeDestination(*ee);
-          auto h = find_hostID(gdst);
-          gdst_vec[h].push_back(gdst);
+        uint32_t lsrc = 0;
+        uint64_t cur = 0;
+
+        if (this->isLocal(src)) {
+          lsrc = this->G2L(src);
+          cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
         }
-      } else {
-        //keep all edges with the source node
-        for (; ee != ee_end; ++ee) {
-          auto gdst = mpiGraph.edgeDestination(*ee);
-          assert(isLocal(src));
-          uint32_t ldst = G2L(gdst);
-          graph.constructEdge(cur++, ldst);
+
+        std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
+        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+          gdst_vec[i].clear();
+          gdst_vec[i].reserve(std::distance(ee, ee_end));
         }
-        if (isLocal(src)) {
+
+        if (num_edges > VCutThreshold) {
+          // Assign edges for high degree nodes to the destination
+          for (; ee != ee_end; ++ee) {
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            auto h = this->find_hostID(gdst);
+            gdst_vec[h].push_back(gdst);
+          }
+        } else {
+          // keep all edges with the source node
+          for (; ee != ee_end; ++ee) {
+            auto gdst = mpiGraph.edgeDestination(*ee);
+            assert(this->isLocal(src));
+            uint32_t ldst = this->G2L(gdst);
+            graph.constructEdge(cur++, ldst);
+          }
+          if (this->isLocal(src)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+        }
+
+        // construct edges for nodes with greater than threashold edges but 
+        // assigned to local host
+        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+            uint32_t ldst = this->G2L(gdst);
+            graph.constructEdge(cur++, ldst);
+        }
+
+        // send if reached the batch limit
+        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
+          if (h == this->base_hGraph::id) continue;
+          if (gdst_vec[h].size()) {
+            galois::runtime::SendBuffer b;
+            galois::runtime::gSerialize(b, src, gdst_vec[h]);
+            net.sendTagged(h, galois::runtime::evilPhase, b);
+          }
+        }
+
+        // Make sure the outgoing edges for this src are constructed
+        if (this->isLocal(src)) {
           assert(cur == (*graph.edge_end(lsrc)));
         }
-      }
-
-      // construct edges for nodes with greater than threashold edges but 
-      // assigned to local host
-      for (uint64_t gdst : gdst_vec[base_hGraph::id]) {
-          uint32_t ldst = G2L(gdst);
-          graph.constructEdge(cur++, ldst);
-      }
-
-      // send if reached the batch limit
-      for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
-        if(h == base_hGraph::id) continue;
-        if(gdst_vec[h].size()){
-          galois::runtime::SendBuffer b;
-          galois::runtime::gSerialize(b, src, gdst_vec[h]);
-          net.sendTagged(h, galois::runtime::evilPhase, b);
-        }
-      }
-    }
+      },
+      galois::loopname("EdgeLoading"),
+      galois::no_stats(),
+      galois::timeit()
+    );
 
     net.flush();
   }
 
 
+  /**
+   * Receive the edge dest/data assigned to this host from other hosts
+   * that are responsible for reading it.
+   *
+   * TODO params
+   */
   template<typename GraphTy>
-  void receive_edges(GraphTy& graph) {
+  void receiveAssignedEdges(GraphTy& graph, 
+                            std::atomic<uint64_t>& edgesToReceive) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // receive the edges from other hosts
-    while (num_total_edges_to_receive) {
+    while (edgesToReceive) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       net.handleReceives();
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+
       if (p) {
         std::vector<uint64_t> _gdst_vec;
         uint64_t _src;
         galois::runtime::gDeserialize(p->second, _src, _gdst_vec);
-        num_total_edges_to_receive -= _gdst_vec.size();
+        edgesToReceive -= _gdst_vec.size();
         assert(isLocal(_src));
         uint32_t lsrc = G2L(_src);
         uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
