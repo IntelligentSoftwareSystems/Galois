@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -96,12 +96,9 @@ internal::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
 };
 
 #ifdef NDEBUG
-
 template<typename... Args>
 static inline void trace(Args&& ...) {}
-
 #else
-
 template<typename... Args>
 static inline void trace(Args&&... args) {
   if (!internal::initTrace) {
@@ -114,7 +111,6 @@ static inline void trace(Args&&... args) {
     internal::printTrace(os);
   }
 }
-
 #endif
 
 template<typename... Args>

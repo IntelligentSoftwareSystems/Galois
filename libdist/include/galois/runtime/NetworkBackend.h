@@ -25,9 +25,7 @@
 #define GALOIS_RUNTIME_NETWORKBACKEND_H
 
 #include "galois/substrate/SimpleLock.h"
-
 #include <cstdint>
-
 #include <boost/intrusive/list.hpp>
 
 namespace galois {
