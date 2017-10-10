@@ -227,11 +227,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
       typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
-    
-      // file graph that is mmapped for much faster reading; will use this
-      // when possible from now on in the code
-      galois::graphs::MPIGraph<EdgeTy> mpiGraph;
 
+      galois::Timer edgeInspectionTimer;
+      edgeInspectionTimer.start();
+   
+      galois::graphs::MPIGraph<EdgeTy> mpiGraph;
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
                                 *edgeEnd, base_hGraph::numGlobalNodes,
                                 base_hGraph::numGlobalEdges);
@@ -278,8 +278,10 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
        * ******************************************/
 
       std::vector<uint64_t> prefixSumOfEdges;
+      edgeInspectionTimer.stop();
       assign_edges_phase1(g, mpiGraph, numEdges_distribute, VCutThreshold, 
-                          prefixSumOfEdges, base_hGraph::mirrorNodes);
+                          prefixSumOfEdges, base_hGraph::mirrorNodes,
+                          edgeInspectionTimer);
 
       base_hGraph::numNodesWithEdges = numNodes;
 
@@ -392,7 +394,8 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                              uint64_t numEdges_distribute, 
                              uint32_t VCutThreshold, 
                              std::vector<uint64_t>& prefixSumOfEdges, 
-                             std::vector<std::vector<size_t>>& mirrorNodes) {
+                             std::vector<std::vector<size_t>>& mirrorNodes,
+                             galois::Timer& edgeInspectionTimer) {
       //Go over assigned nodes and distribute edges.
 
       auto& net = galois::runtime::getSystemNetworkInterface();
@@ -417,9 +420,9 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         numOutgoingEdges[i].assign(base_hGraph::numOwned, 0);
       }
 
-      galois::Timer timer;
-      timer.start();
       mpiGraph.resetReadCounters();
+
+      edgeInspectionTimer.start();
 
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
       auto& id = base_hGraph::id;
@@ -455,11 +458,11 @@ class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         galois::no_stats()
       );
 
-      timer.stop();
+      edgeInspectionTimer.stop();
       galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ",
-                     timer.get_usec()/1000000.0f, " seconds to read ",
+                     edgeInspectionTimer.get_usec()/1000000.0f, " seconds to read ",
                      mpiGraph.getBytesRead(), " bytes (",
-                     mpiGraph.getBytesRead()/(float)timer.get_usec(),
+                     mpiGraph.getBytesRead()/(float)edgeInspectionTimer.get_usec(),
                      " MBPS)\n");
 
       uint64_t check_numEdges = 0;
