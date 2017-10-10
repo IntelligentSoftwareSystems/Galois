@@ -26,6 +26,9 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+// TODO version 2 Galois binary graph support; currently only suppports
+// version 1
+
 #ifndef GALOIS_GRAPH_MPIGRAPH_H
 #define GALOIS_GRAPH_MPIGRAPH_H
 
@@ -471,7 +474,7 @@ public:
     assert(edgeOffset <= globalEdgeID); 
     assert(globalEdgeID < (edgeOffset + numLocalEdges));
 
-    numBytesReadEdgeData += sizeof(uint32_t);
+    numBytesReadEdgeData += sizeof(EdgeDataType);
 
     uint64_t localEdgeID = globalEdgeID - edgeOffset;
     return edgeDataBuffer[localEdgeID];
