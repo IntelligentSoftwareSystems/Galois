@@ -570,7 +570,19 @@ private:
       MPI_Group_incl(world_group, 1, g, &mpi_identity_groups[x]);
     }
 
-    if (id == 0) galois::gDebug("Using bare MPI\n");
+    if (id == 0) {
+      switch (bare_mpi) {
+        case nonBlockingBareMPI:
+          galois::gPrint("Using non-blocking bare MPI\n");
+          break;
+        case oneSidedBareMPI:
+          galois::gPrint("Using one-sided bare MPI\n");
+          break;
+        case noBareMPI:
+        default:
+          GALOIS_DIE("Unsupported bare MPI");
+      }
+    }
     #endif
   }
 
