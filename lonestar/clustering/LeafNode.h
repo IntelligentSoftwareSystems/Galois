@@ -29,7 +29,7 @@
 #include "AbstractNode.h"
 #include "Point3.h"
 #include <iostream>
-using namespace std;
+
 class LeafNode : public AbstractNode {
 protected:
   // direction of maximum emission
@@ -56,9 +56,10 @@ public:
   bool isLeaf() { return true; }
 
   int size() { return 1; }
-  friend ostream& operator<<(ostream& s, LeafNode& pt);
+  friend std::ostream& operator<<(std::ostream& s, LeafNode& pt);
 };
-ostream& operator<<(ostream& s, LeafNode& pt) {
+
+std::ostream& operator<<(std::ostream& s, LeafNode& pt) {
   s << "LeafNode :: ";
   operator<<(s, (AbstractNode&)pt);
   s << "Dir::" << pt.direction;

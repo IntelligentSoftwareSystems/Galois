@@ -24,7 +24,6 @@
  */
 #ifndef POINT3_H_
 #define POINT3_H_
-using namespace std;
 #include <iostream>
 class Point3 {
   double x, y, z;
@@ -114,9 +113,10 @@ public:
   bool equals(const Point3& other) const {
     return (x == other.x) && (y == other.y) && (z == other.z);
   }
-  friend ostream& operator<<(ostream& s, const Point3& pt);
+  friend std::ostream& operator<<(std::ostream& s, const Point3& pt);
 };
-ostream& operator<<(ostream& s, const Point3& pt) {
+
+std::ostream& operator<<(std::ostream& s, const Point3& pt) {
   s << "[" << pt.x << "," << pt.y << "," << pt.z << "]";
   return s;
 }

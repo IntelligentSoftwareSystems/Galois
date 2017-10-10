@@ -28,6 +28,7 @@
 #include <limits>
 
 using namespace std;
+
 class PotentialCluster {
 public:
   const NodeWrapper& original;
@@ -40,6 +41,7 @@ public:
   }
   friend ostream& operator<<(ostream& s, const PotentialCluster& p);
 };
+
 ostream& operator<<(ostream& s, const PotentialCluster& p) {
   s << "PC : [" << p.original << ", ?";
   if (p.closest != NULL)

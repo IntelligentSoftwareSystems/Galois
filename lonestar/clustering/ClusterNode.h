@@ -27,6 +27,9 @@
 #include "LeafNode.h"
 #include "NodeWrapper.h"
 #include <assert.h>
+
+using namespace std;
+
 class ClusterNode : public AbstractNode {
 private:
   AbstractNode* leftChild;
@@ -38,10 +41,7 @@ private:
 
 public:
   ClusterNode() : boxRadius(0), coneDirection(0) {}
-  virtual ~ClusterNode() {
-    //	  cout<<"Clearing reps"<<endl;
-    reps.clear();
-  }
+  virtual ~ClusterNode() { reps.clear(); }
   void setBox(double minX, double maxX, double minY, double maxY, double minZ,
               double maxZ) {
     myLoc.set(0.5f * (minX + maxX), 0.5f * (minY + maxY), 0.5f * (minZ + maxZ));
@@ -62,7 +62,7 @@ public:
     leftChild  = inLeft;
     rightChild = inRight;
     setSummedIntensity(*leftChild, *rightChild);
-    //    setCombinedFlags(leftChild, rightChild);
+    // setCombinedFlags(leftChild, rightChild);
     // we only apply clamping to nodes that are low in the tree
     vector<double>* ranVec =
         repRandomNums[(int)(repRandomNum * numRepRandomNums)];
@@ -189,9 +189,7 @@ public:
   //  }
 
   float getConeCos() { return coneCos; }
-  /**
-   *
-   */
+
   void findConeDirsRecursive(vector<double>* coordArr,
                              vector<ClusterNode*>& tempClusterArr) {
     // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3

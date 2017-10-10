@@ -24,9 +24,10 @@
  */
 #ifndef BOX3D_H_
 #define BOX3D_H_
+
 #include "Point3.h"
 #include <limits>
-using namespace std;
+
 class Box3d {
 protected:
   Point3 min;

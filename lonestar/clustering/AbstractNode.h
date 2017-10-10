@@ -31,18 +31,18 @@
 #include <limits>
 #include <stdlib.h>
 #include <vector>
-using namespace std;
+
 class AbstractNode {
 public:
   static int globalNumReps;
-  static vector<vector<double>*> repRandomNums;
+  static std::vector<std::vector<double>*> repRandomNums;
   static bool globalMultitime;
 
 protected:
   Point3 myLoc;
   Point3 intensity; // Use r,g,b as x,y,z
   int startTime, endTime;
-  vector<double> timeVector;
+  std::vector<double> timeVector;
 
 public:
   AbstractNode(double x, double y, double z) : myLoc(x, y, z), intensity(0) {
@@ -116,7 +116,6 @@ public:
     }
   }
 
-  ////////////////////////////////////////////////////////
   void scaleIntensity(double inScale) { intensity.scale(inScale); }
 
   static void setGlobalNumReps() {
@@ -128,7 +127,7 @@ public:
     double inc    = 1.0f / 1;
     for (int i = 0; i < 256; i++) {
       for (unsigned int i = 0; i < repRandomNums.size(); i++) {
-        vector<double>* ranVec = new vector<double>(1);
+        std::vector<double>* ranVec = new std::vector<double>(1);
         for (int j = ranVec->size() - 1; j > 0; j++) {
           int index = (int)(j + 1) * (inc * (double)rand()) /
                       (std::numeric_limits<int>::max());
@@ -160,15 +159,18 @@ public:
     for (unsigned int i = 0; i < repRandomNums.size(); i++)
       delete AbstractNode::repRandomNums[i];
   }
-  friend ostream& operator<<(ostream& s, AbstractNode& pt);
+  friend std::ostream& operator<<(std::ostream& s, AbstractNode& pt);
 };
-ostream& operator<<(ostream& s, AbstractNode& pt) {
+
+std::ostream& operator<<(std::ostream& s, AbstractNode& pt) {
   s << "Abs Node :: Loc " << pt.myLoc << " , Int ::" << pt.intensity
     << " Time:: [" << pt.startTime << " - " << pt.endTime << "]";
   return s;
 }
+
 const int numRepRandomNums = 256;
-vector<vector<double>*> AbstractNode::repRandomNums(256);
+std::vector<std::vector<double>*> AbstractNode::repRandomNums(256);
 int AbstractNode::globalNumReps    = -1;
 bool AbstractNode::globalMultitime = false;
+
 #endif /* ABSTRACTNODE_H_ */
