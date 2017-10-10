@@ -1,4 +1,4 @@
-if(USE_GGC)
+if(ENABLE_HETERO_GALOIS)
   # for debugging 
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
@@ -17,7 +17,7 @@ function(distApp name)
   target_link_libraries(${name} galois_dist distbench)
   target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
 
-  if(USE_GGC)
+  if(ENABLE_HETERO_GALOIS)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
     target_link_libraries(${name} ${name}_cuda distbench)
     cuda_add_library(${name}_cuda ${name}/gen_cuda.cu)

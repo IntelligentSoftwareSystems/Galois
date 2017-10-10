@@ -41,7 +41,7 @@ inputApp(bc_pull)
 
 #app(bc bc/gen.cpp DISTSAFE)
 #target_link_libraries(bc galois_dist)
-#if(USE_GGC)
+#if(ENABLE_HETERO_GALOIS)
 #  target_compile_definitions(bc PRIVATE __GALOIS_HET_CUDA__=1)
 #  target_link_libraries(bc bc_cuda)
 #  cuda_add_library(bc_cuda bc/gen_cuda.cu)

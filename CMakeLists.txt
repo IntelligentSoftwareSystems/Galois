@@ -22,6 +22,13 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
+###### Distributed-heterogeneous features ######
+set(ENABLE_DIST_GALOIS OFF CACHE BOOL "Enable distributed features")
+set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
+set(USE_LWCI OFF CACHE BOOL "Use LWCI network runtime instead of MPI")
+set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
+set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
+###### General features ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
@@ -47,12 +54,9 @@ endforeach()
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
-set(USE_LWCI OFF CACHE BOOL "Use LWCI communication runtime")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
-set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
-set(USE_HETERO OFF CACHE BOOL "Use Heterogeneous features")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -115,7 +119,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
 endif()
 
 # Enable architecture-specific optimizations
-if(NOT USE_HETERO)
+if(NOT ENABLE_HETERO_GALOIS)
   find_package(ArchFlags)
   if(ARCH_FLAGS_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
@@ -163,32 +167,40 @@ if(OPENMP_FOUND)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
 endif()
 
-# TODO: make this conditional on a flag specific to building libdist stuff
-find_package(MPI REQUIRED) # for distributed
-set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
-set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
-include_directories(${MPI_INCLUDE_PATH})
-
-if (USE_LWCI)
-  add_definitions(-DGALOIS_USE_LWCI)
-  set(LWCI_ROOT $ENV{LWCI_ROOT})
-  if (EXISTS ${LWCI_ROOT})
-  else()
-    message(FATAL_ERROR "LWCI_ROOT=${LWCI_ROOT} does not exist; set environment variable LWCI_ROOT to override")
-  endif()
-  set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-  set(LWCI_LIBRARY "${LWCI_ROOT}/lib/liblwci.a")
+# Distributed-heterogeneous features
+if(ENABLE_HETERO_GALOIS)
+  set(ENABLE_DIST_GALOIS ON)
 endif()
+if(ENABLE_DIST_GALOIS)
+  find_package(MPI REQUIRED) # required even if USE_LWCI
+  set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
+  set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
+  include_directories(${MPI_INCLUDE_PATH})
 
-if(USE_HETERO)
-  find_package(CUDA REQUIRED)
-  #find_package(OpenCL REQUIRED)
-  if(CUDA_FOUND)
+  if (USE_LWCI)
+    add_definitions(-DGALOIS_USE_LWCI)
+    set(LWCI_ROOT $ENV{LWCI_ROOT})
+    if (EXISTS ${LWCI_ROOT})
+    else()
+      message(FATAL_ERROR "LWCI_ROOT=${LWCI_ROOT} does not exist; set environment variable LWCI_ROOT to override")
+    endif()
+    set(LWCI_INCLUDE "${LWCI_ROOT}/include")
+    set(LWCI_LIBRARY "${LWCI_ROOT}/lib/liblwci.a")
+  endif(USE_LWCI)
+
+  if(ENABLE_HETERO_GALOIS)
+    find_package(CUDA REQUIRED)
     set(CUDA_PROPAGATE_HOST_FLAGS off)
     set(CUDA_SEPARABLE_COMPILATION on)
     set(CUDA_HOST_COMPILER g++)
 
-    message("INSIDE GGC")
+    string(REPLACE "." "" GENCODES ${CUDA_CAPABILITY})
+    string(REPLACE "," ";" GENCODES ${GENCODES})
+    foreach(GENCODE ${GENCODES})
+      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_${GENCODE},code=sm_${GENCODE})
+    endforeach()
+
+    # GGC
     if(NOT "$ENV{GGC_PATH}" STREQUAL "")
       set(GGC_PATH $ENV{GGC_PATH})
       message(STATUS "GGC_PATH set to ${GGC_PATH}")
@@ -202,26 +214,20 @@ if(USE_HETERO)
 
     set(GGC_INCLUDE_PATH "${GGC_PATH}/rt/include")
     set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
-
-    cuda_include_directories( ${GGC_INCLUDE_PATH} ${MGPU_PATH})
-    set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -gencode arch=compute_37,code=sm_37 -gencode arch=compute_50,code=sm_50 -gencode arch=compute_60,code=sm_60 -gencode arch=compute_61,code=sm_61)
+    cuda_include_directories(${GGC_INCLUDE_PATH} ${MGPU_PATH})
     link_directories(${GGC_PATH}/rt/lib)
-  else(CUDA_FOUND)
-    message(FATAL_ERROR "Need CUDA for heterogenous code")
-  endif(CUDA_FOUND)
-endif(USE_HETERO)
+
+    #find_package(OpenCL REQUIRED)
+  endif(ENABLE_HETERO_GALOIS)
+endif(ENABLE_DIST_GALOIS)
 
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
   include_directories("libgalois/experimental/include")
-  include_directories("libdist/experimental/include")
-
-  find_package(OpenMP)
-  if(OPENMP_FOUND)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  if(ENABLE_DIST_GALOIS)
+    include_directories("libdist/experimental/include")
   endif()
 
   find_package(TBB)
@@ -458,12 +464,16 @@ add_subdirectory(scripts)
 
 if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(lonestar)
-  add_subdirectory(dist_apps)
+  if(ENABLE_DIST_GALOIS)
+    add_subdirectory(dist_apps)
+  endif(ENABLE_DIST_GALOIS)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
   if(USE_EXP)
-    add_subdirectory(dist_apps/experimental)
-    add_subdirectory(dist_apps/experimental/on_demand)
+    if(ENABLE_DIST_GALOIS)
+      add_subdirectory(dist_apps/experimental)
+      add_subdirectory(dist_apps/experimental/on_demand)
+    endif(ENABLE_DIST_GALOIS)
     add_subdirectory(lonestar/experimental)
   endif(USE_EXP)
 endif()

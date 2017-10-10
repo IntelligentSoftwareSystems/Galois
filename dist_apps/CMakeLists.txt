@@ -7,7 +7,7 @@ target_include_directories(distbench PUBLIC
 )
 
 # turn on cuda for distbench as well
-if(USE_GGC)
+if(ENABLE_HETERO_GALOIS)
   target_compile_definitions(distbench PRIVATE __GALOIS_HET_CUDA__=1)
 endif()
 
@@ -17,7 +17,7 @@ include_directories(include)
 include_directories(${CMAKE_SOURCE_DIR}/libdist/include)
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
-if(USE_GGC)
+if(ENABLE_HETERO_GALOIS)
   # for debugging 
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
     add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
@@ -35,7 +35,7 @@ function(distApp name)
     target_compile_definitions(${name} PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
   endif()
 
-  if(USE_GGC)
+  if(ENABLE_HETERO_GALOIS)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
     target_link_libraries(${name} ${name}_cuda distbench)
     cuda_add_library(${name}_cuda ${name}/gen_cuda.cu)
