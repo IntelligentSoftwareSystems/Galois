@@ -1712,26 +1712,31 @@ private:
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_mpi_put(std::string loopName,
+      const MPI_Group& mpi_access_group,
       const std::vector<MPI_Win>& window) {
+
+    MPI_Win_start(mpi_access_group, 0, window[id]);
+
+    std::vector<galois::runtime::SendBuffer> b(numHosts);
+
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + h) % numHosts;
 
       if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
-      galois::runtime::SendBuffer b;
 
-      get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b);
+      get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
 
-      MPI_Win_start(mpi_identity_groups[x], 0, window[id]);
-      size_t size = b.size();
+      size_t size = b[x].size();
       MPI_Put((uint8_t *)&size, sizeof(size_t), MPI_BYTE, 
           x, 0, sizeof(size_t), MPI_BYTE,
           window[id]);
-      MPI_Put((uint8_t *)b.linearData(), size, MPI_BYTE, 
+      MPI_Put((uint8_t *)b[x].linearData(), size, MPI_BYTE,
           x, sizeof(size_t), size, MPI_BYTE,
           window[id]);
-      MPI_Win_complete(window[id]);
     }
+
+    MPI_Win_complete(window[id]);
 
     if (BitsetFnTy::is_valid()) {
       reset_bitset(syncType, &BitsetFnTy::reset_range);
@@ -2048,6 +2053,7 @@ private:
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
     static std::vector<MPI_Win> window;
+    static MPI_Group mpi_access_group;
     static std::vector<std::vector<uint8_t>> rb;
 
     if (window.size() == 0) { // create the windows
@@ -2077,18 +2083,34 @@ private:
       for (unsigned h = 1; h < numHosts; ++h) {
         unsigned x = (id + numHosts - h) % numHosts;
         if (nothingToRecv(x, syncType, writeLocation, readLocation)) continue;
+        // exposure group of each window is same as identity group of that window
         MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
       }
       TRecvTime.stop();
+
+      TSendTime.start();
+      std::vector<int> access_hosts;
+      for (unsigned h = 1; h < numHosts; ++h) {
+        unsigned x = (id + h) % numHosts;
+
+        if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
+
+        access_hosts.push_back(x);
+      }
+      MPI_Group world_group;
+      MPI_Comm_group(MPI_COMM_WORLD, &world_group);
+      // access group for only one window since only one window is accessed
+      MPI_Group_incl(world_group, access_hosts.size(), access_hosts.data(), &mpi_access_group);
+      TSendTime.stop();
     }
 
     TSendTime.start();
     if (use_bitset_to_send) {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, 
-        BitsetFnTy>(loopName, window);
+        BitsetFnTy>(loopName, mpi_access_group, window);
     } else {
       sync_mpi_put<writeLocation, readLocation, syncType, SyncFnTy, 
-        galois::InvalidBitsetFnTy>(loopName, window);
+        galois::InvalidBitsetFnTy>(loopName, mpi_access_group, window);
     }
     TSendTime.stop();
 

@@ -633,6 +633,8 @@ public:
       galois::substrate::PerThreadStorage<DstVecVecTy> gdst_vecs(numColumnHosts);
       typedef std::vector<std::vector<typename GraphTy::edge_data_type>> DataVecVecTy;
       galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(numColumnHosts);
+      typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+      galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
       const unsigned& id = base_hGraph::id; // manually copy it because it is protected
       galois::do_all(
@@ -672,11 +674,14 @@ public:
           }
           for (unsigned i = 0; i < numColumnHosts; ++i) {
             if (gdst_vec[i].size() > 0) {
-              galois::runtime::SendBuffer b;
+              auto& b = (*sb.getLocal())[i];
               galois::runtime::gSerialize(b, n);
               galois::runtime::gSerialize(b, gdst_vec[i]);
               galois::runtime::gSerialize(b, gdata_vec[i]);
-              net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+              if (b.size() > partition_edge_send_buffer_size) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
             }
           }
           if (this->isLocal(n)) {
@@ -687,6 +692,17 @@ public:
         galois::timeit(),
         galois::no_stats()
       );
+
+      for (unsigned t = 0; t < sb.size(); ++t) {
+        auto& sbr = *sb.getRemote(t);
+        for (unsigned i = 0; i < numColumnHosts; ++i) {
+          auto& b = sbr[i];
+          if (b.size() > 0) {
+            net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+            b.getVec().clear();
+          }
+        }
+      }
     }
     net.flush();
   }

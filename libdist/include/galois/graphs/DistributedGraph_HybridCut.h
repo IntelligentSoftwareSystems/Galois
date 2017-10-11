@@ -30,11 +30,9 @@
 #include "galois/graphs/DistributedGraph.h"
 #include <sstream>
 
-#define BATCH_MSG_SIZE 1000
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, 
          bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
-private:
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
 
 public:
@@ -154,8 +152,6 @@ public:
       }
       scalefactor.clear();
     }
-
-    galois::runtime::reportParam(GRNAME, "ONLINE VERTEX CUT PL", "0");
 
     galois::StatTimer Tgraph_construct(
       "TIME_GRAPH_CONSTRUCT", GRNAME);
@@ -526,8 +522,14 @@ private:
     galois::substrate::PerThreadStorage<DataVecType> 
         gdata_vecs(base_hGraph::numHosts);
 
+    typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+    galois::substrate::PerThreadStorage<SendBufferVecTy> 
+      sendBuffers(base_hGraph::numHosts);
 
     auto& net = galois::runtime::getSystemNetworkInterface();
+
+    const unsigned& id = this->base_hGraph::id;
+    const unsigned& numHosts = this->base_hGraph::numHosts;
 
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
@@ -550,7 +552,7 @@ private:
         std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
         auto& gdata_vec = *gdata_vecs.getLocal();
 
-        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+        for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
           gdst_vec[i].reserve(std::distance(ee, ee_end));
@@ -583,19 +585,23 @@ private:
         // construct edges for nodes with greater than threashold edges but 
         // assigned to local host
         uint32_t i = 0;
-        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+        for (uint64_t gdst : gdst_vec[id]) {
           uint32_t ldst = this->G2L(gdst);
-          auto gdata = gdata_vec[this->base_hGraph::id][i++];
+          auto gdata = gdata_vec[id][i++];
           graph.constructEdge(cur++, ldst, gdata);
         }
 
         // send 
-        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
-          if (h == this->base_hGraph::id) continue;
+        for (uint32_t h = 0; h < numHosts; ++h) {
+          if (h == id) continue;
           if (gdst_vec[h].size()) {
-            galois::runtime::SendBuffer b;
-            galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
-            net.sendTagged(h, galois::runtime::evilPhase, b);
+            auto& sendBuffer = (*sendBuffers.getLocal())[h];
+            galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h], 
+                                        gdata_vec[h]);
+            if (sendBuffer.size() > partition_edge_send_buffer_size) {
+              net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+              sendBuffer.getVec().clear();
+            }
           }
         }
 
@@ -608,6 +614,20 @@ private:
       galois::no_stats(),
       galois::timeit()
     );
+
+    // flush buffers
+    for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
+      auto& sbr = *sendBuffers.getRemote(threadNum);
+      for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
+        if (h == this->base_hGraph::id) continue;
+        auto& sendBuffer = sbr[h];
+        if (sendBuffer.size() > 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+          sendBuffer.getVec().clear();
+        }
+      }
+    }
+
     net.flush();
   }
 
@@ -631,6 +651,12 @@ private:
     galois::substrate::PerThreadStorage<DstVecType> 
         gdst_vecs(base_hGraph::numHosts);
 
+    const unsigned& id = this->base_hGraph::id;
+    const unsigned& numHosts = this->base_hGraph::numHosts;
+    typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+    galois::substrate::PerThreadStorage<SendBufferVecTy> 
+      sendBuffers(base_hGraph::numHosts);
+
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -650,7 +676,7 @@ private:
         }
 
         std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
-        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+        for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
           gdst_vec[i].reserve(std::distance(ee, ee_end));
         }
@@ -677,18 +703,21 @@ private:
 
         // construct edges for nodes with greater than threashold edges but 
         // assigned to local host
-        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+        for (uint64_t gdst : gdst_vec[id]) {
             uint32_t ldst = this->G2L(gdst);
             graph.constructEdge(cur++, ldst);
         }
 
         // send if reached the batch limit
-        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
-          if (h == this->base_hGraph::id) continue;
+        for (uint32_t h = 0; h < numHosts; ++h) {
+          if (h == id) continue;
           if (gdst_vec[h].size()) {
-            galois::runtime::SendBuffer b;
-            galois::runtime::gSerialize(b, src, gdst_vec[h]);
-            net.sendTagged(h, galois::runtime::evilPhase, b);
+            auto& sendBuffer = (*sendBuffers.getLocal())[h];
+            galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h]);
+            if (sendBuffer.size() > partition_edge_send_buffer_size) {
+              net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+              sendBuffer.getVec().clear();
+            }
           }
         }
 
@@ -701,6 +730,19 @@ private:
       galois::no_stats(),
       galois::timeit()
     );
+
+    // flush buffers
+    for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
+      auto& sbr = *sendBuffers.getRemote(threadNum);
+      for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
+        if (h == this->base_hGraph::id) continue;
+        auto& sendBuffer = sbr[h];
+        if (sendBuffer.size() > 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+          sendBuffer.getVec().clear();
+        }
+      }
+    }
 
     net.flush();
   }
@@ -724,16 +766,20 @@ private:
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
 
       if (p) {
-        std::vector<uint64_t> _gdst_vec;
-        uint64_t _src;
-        galois::runtime::gDeserialize(p->second, _src, _gdst_vec);
-        edgesToReceive -= _gdst_vec.size();
-        assert(isLocal(_src));
-        uint32_t lsrc = G2L(_src);
-        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-        uint64_t cur_end = *graph.edge_end(lsrc);
-        assert((cur_end - cur) == _gdst_vec.size());
-        deserializeEdges(graph, p->second, _gdst_vec, cur, cur_end);
+        auto& receiveBuffer = p->second;
+        while (receiveBuffer.r_size() > 0) {
+          uint64_t _src;
+          std::vector<uint64_t> _gdst_vec;
+          galois::runtime::gDeserialize(receiveBuffer, _src, _gdst_vec);
+          edgesToReceive -= _gdst_vec.size();
+          assert(isLocal(_src));
+          uint32_t lsrc = G2L(_src);
+          uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          uint64_t cur_end = *graph.edge_end(lsrc);
+          assert((cur_end - cur) == _gdst_vec.size());
+
+          deserializeEdges(graph, receiveBuffer, _gdst_vec, cur, cur_end);
+        }
       }
     }
   }
