@@ -239,7 +239,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
                           base_hGraph::numGlobalNodes << " , Total edges : " << 
                           base_hGraph::numGlobalEdges << "\n";
-      uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
+      base_hGraph::computeMasters(g, scalefactor, isBipartite);
 
       //Read the vertexIDMap_filename for masters.
       auto startLoc = base_hGraph::gid2host[base_hGraph::id].first;
@@ -424,7 +424,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       edgeInspectionTimer.start();
 
       uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
-      auto& id = base_hGraph::id;
+      //auto& id = base_hGraph::id;
 
       galois::do_all(
         galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -608,7 +608,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                             localToGlobalVector.end()),
           [&] (auto src) {
               auto h = this->find_hostID(temp_vec, src, from_hostID);
-              if(h != -1){
+              if(h < std::numeric_limits<uint32_t>::max()){
                 mirror_mapping_to_hosts[this->G2L(src) - numOwned] = h;
               }
           },
@@ -631,7 +631,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     uint32_t find_hostID(uint64_t offset){
       assert(offset < vertexIDMap.size());
       return vertexIDMap[offset];
-      return -1;
+      return std::numeric_limits<uint32_t>::max();
     }
 
     uint32_t find_hostID(std::vector<uint64_t>& vec, uint64_t gid, uint32_t from_hostID){
@@ -639,69 +639,64 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if((*iter == gid) && (iter != vec.end())){
         return from_hostID;
       }
-      return -1;
+      return std::numeric_limits<uint32_t>::max();
     }
 
     //Edge type is not void.
     template<typename GraphTy, 
              typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-      void assign_load_send_edges(GraphTy& graph,
-                                  galois::graphs::MPIGraph<EdgeTy>& mpiGraph,
+      void assign_load_send_edges(GraphTy& graph, 
+                                  galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
-
         std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
         std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(base_hGraph::numHosts);
         auto& net = galois::runtime::getSystemNetworkInterface();
         uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
         auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
-        // Go over assigned nodes and distribute edges.
+        //Go over assigned nodes and distribute edges.
         for(auto src = base_hGraph::gid2host[base_hGraph::id].first; src != base_hGraph::gid2host[base_hGraph::id].second; ++src){
           auto ee = ee_end;
           ee_end = mpiGraph.edgeEnd(src);
 
-          auto num_edges = std::distance(ee, ee_end);
           for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
             gdst_vec[i].clear();
             gdata_vec[i].clear();
             //gdst_vec[i].reserve(std::distance(ii, ee));
           }
-          uint32_t lsrc = 0;
-          uint64_t cur = 0;
-          if (isLocal(src)) {
-            lsrc = G2L(src);
-            cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-          }
 
           auto h = find_hostID(src - globalOffset);
           if(h != base_hGraph::id){
-            // Assign edges for high degree nodes to the destination
+            //Assign edges for high degree nodes to the destination
             for(; ee != ee_end; ++ee){
               auto gdst = mpiGraph.edgeDestination(*ee);
               auto gdata = mpiGraph.edgeData(*ee);
               gdst_vec[h].push_back(gdst);
               gdata_vec[h].push_back(gdata);
             }
-          } else {
-            // keep all edges with the source node
+          }
+          else{
+            /*
+             * If source is owned, all outgoing edges belong to this host
+             */
+            assert(isOwned(src));
+            uint32_t lsrc = 0;
+            uint64_t cur = 0;
+            lsrc = G2L(src);
+            cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+            //keep all edges with the source node
             for(; ee != ee_end; ++ee){
               auto gdst = mpiGraph.edgeDestination(*ee);
-              auto gdata = mpiGraph.edgeData(*ee);
-              assert(isLocal(src));
               uint32_t ldst = G2L(gdst);
+              auto gdata = mpiGraph.edgeData(*ee);
               graph.constructEdge(cur++, ldst, gdata);
             }
+            assert(cur == (*graph.edge_end(lsrc)));
           }
 
-          //construct edges for nodes with greater than threashold edges but assigned to local host
-          uint32_t i = 0;
-          for(uint64_t gdst : gdst_vec[base_hGraph::id]){
-              uint32_t ldst = G2L(gdst);
-              auto gdata = gdata_vec[base_hGraph::id][i++];
-              graph.constructEdge(cur++, ldst, gdata);
-          }
-
-          //send all edges for one source node 
+          /*
+           * Send the edges to the hosts who ownes them.
+           */
           for(uint32_t h = 0; h < base_hGraph::numHosts; ++h){
             if(h == base_hGraph::id) continue;
             if(gdst_vec[h].size()){
@@ -710,14 +705,10 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               net.sendTagged(h, galois::runtime::evilPhase, b);
             }
           }
-          /*** All the outgoing edges for this src are constructed ***/
-          if (isLocal(src)) {
-            assert(cur == (*graph.edge_end(lsrc)));
-          }
         }
+
         net.flush();
       }
-
 
     //Edge type is void.
     template<typename GraphTy, 
@@ -735,16 +726,11 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           auto ee = ee_end;
           ee_end = mpiGraph.edgeEnd(src);
 
-          auto num_edges = std::distance(ee, ee_end);
           for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
             gdst_vec[i].clear();
             //gdst_vec[i].reserve(std::distance(ii, ee));
           }
 
-          //if (isLocal(src)) {
-            //lsrc = G2L(src);
-            //cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-          //}
           auto h = find_hostID(src - globalOffset);
           if(h != base_hGraph::id){
             //Assign edges for high degree nodes to the destination
