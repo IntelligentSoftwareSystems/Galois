@@ -630,8 +630,8 @@ public:
       //h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       typedef std::vector<std::vector<uint64_t>> DstVecVecTy;
-      typedef std::vector<std::vector<typename GraphTy::edge_data_type>> DataVecVecTy;
       galois::substrate::PerThreadStorage<DstVecVecTy> gdst_vecs(numColumnHosts);
+      typedef std::vector<std::vector<typename GraphTy::edge_data_type>> DataVecVecTy;
       galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(numColumnHosts);
 
       const unsigned& id = base_hGraph::id; // manually copy it because it is protected
@@ -702,6 +702,8 @@ public:
       unsigned h_offset = gridRowID() * numColumnHosts;
       typedef std::vector<std::vector<uint64_t>> DstVecVecTy;
       galois::substrate::PerThreadStorage<DstVecVecTy> gdst_vecs(numColumnHosts);
+      typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+      galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
       const unsigned& id = base_hGraph::id; // manually copy it because it is protected
       galois::do_all(
@@ -736,11 +738,14 @@ public:
           }
           for (unsigned i = 0; i < numColumnHosts; ++i) {
             if (gdst_vec[i].size() > 0) {
-              galois::runtime::SendBuffer b;
+              auto& b = (*sb.getLocal())[i];
               galois::runtime::gSerialize(b, n);
               galois::runtime::gSerialize(b, gdst_vec[i]);
               //unsigned h_offset_real = virtual2RealHost(h_offset);
-              net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+              if (b.size() > partition_edge_send_buffer_size) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
             }
           }
           if (this->isLocal(n)) {
@@ -751,6 +756,17 @@ public:
         galois::timeit(),
         galois::no_stats()
       );
+
+      for (unsigned t = 0; t < sb.size(); ++t) {
+        auto& sbr = *sb.getRemote(t);
+        for (unsigned i = 0; i < numColumnHosts; ++i) {
+          auto& b = sbr[i];
+          if (b.size() > 0) {
+            net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+            b.getVec().clear();
+          }
+        }
+      }
     }
     net.flush();
   }
@@ -760,7 +776,7 @@ public:
       std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    // receive edges for all ghost nodes
+    // receive edges for all mirror nodes
     while (numNodesWithEdges < base_hGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       net.handleReceives();
@@ -768,16 +784,18 @@ public:
 
       if (p) {
         auto& rb = p->second;
-        uint64_t n;
-        galois::runtime::gDeserialize(rb, n);
-        galois::runtime::gDeserialize(rb, gdst_vec);
-        assert(isLocal(n));
-        uint32_t lsrc = G2L(n);
-        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-        uint64_t cur_end = *graph.edge_end(lsrc);
-        assert((cur_end - cur) == gdst_vec.size());
-        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
-        ++numNodesWithEdges;
+        while (rb.r_size() > 0) {
+          uint64_t n;
+          galois::runtime::gDeserialize(rb, n);
+          galois::runtime::gDeserialize(rb, gdst_vec);
+          assert(isLocal(n));
+          uint32_t lsrc = G2L(n);
+          uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          uint64_t cur_end = *graph.edge_end(lsrc);
+          assert((cur_end - cur) == gdst_vec.size());
+          deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
+          ++numNodesWithEdges;
+        }
       }
     }
   }
