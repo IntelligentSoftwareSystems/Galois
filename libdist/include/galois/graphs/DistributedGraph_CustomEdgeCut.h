@@ -265,8 +265,8 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       galois::graphs::MPIGraph<EdgeTy> mpiGraph;
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
-          *edgeEnd, base_hGraph::numGlobalNodes,
-          base_hGraph::numGlobalEdges);
+                                *edgeEnd, base_hGraph::numGlobalNodes,
+      base_hGraph::numGlobalEdges);
 
       mpiGraph.resetReadCounters();
 
@@ -287,22 +287,15 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                           prefixSumOfEdges, base_hGraph::mirrorNodes,
                           edgeInspectionTimer);
 
-      //base_hGraph::numOwned = numNodes;
-      //base_hGraph::numNodes = base_hGraph::numNodes = numNodes;
-      //base_hGraph::numNodes = numNodes;
-      //base_hGraph::numNodesWithEdges = base_hGraph::numNodes;
+      base_hGraph::numOwned = numOwned;
+      base_hGraph::numNodesWithEdges = numNodes;
 
-#if 0
       if (base_hGraph::numOwned > 0) {
         base_hGraph::beginMaster =
           G2L(localToGlobalVector[0]) ; //base_hGraph::gid2host[base_hGraph::id].first);
-        base_hGraph::endMaster =
-          G2L(localToGlobalVector[total_owned_nodes - 1]); //base_hGraph::gid2host[base_hGraph::id].second - 1) + 1;
       } else {
         base_hGraph::beginMaster = 0;
-        base_hGraph::endMaster = 0;
       }
-#endif
 
       /******************************************
        * Allocate and construct the graph
