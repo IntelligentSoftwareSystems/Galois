@@ -155,8 +155,6 @@ public:
       scalefactor.clear();
     }
 
-    galois::runtime::reportParam(GRNAME, "ONLINE VERTEX CUT PL", "0");
-
     galois::StatTimer Tgraph_construct(
       "TIME_GRAPH_CONSTRUCT", GRNAME);
     galois::StatTimer Tgraph_construct_comm(
@@ -529,6 +527,8 @@ private:
 
     auto& net = galois::runtime::getSystemNetworkInterface();
 
+    const unsigned& id = this->base_hGraph::id;
+    const unsigned& numHosts = this->base_hGraph::numHosts;
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -550,7 +550,7 @@ private:
         std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
         auto& gdata_vec = *gdata_vecs.getLocal();
 
-        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+        for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
           gdst_vec[i].reserve(std::distance(ee, ee_end));
@@ -583,15 +583,15 @@ private:
         // construct edges for nodes with greater than threashold edges but 
         // assigned to local host
         uint32_t i = 0;
-        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+        for (uint64_t gdst : gdst_vec[id]) {
           uint32_t ldst = this->G2L(gdst);
-          auto gdata = gdata_vec[this->base_hGraph::id][i++];
+          auto gdata = gdata_vec[id][i++];
           graph.constructEdge(cur++, ldst, gdata);
         }
 
         // send 
-        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
-          if (h == this->base_hGraph::id) continue;
+        for (uint32_t h = 0; h < numHosts; ++h) {
+          if (h == id) continue;
           if (gdst_vec[h].size()) {
             galois::runtime::SendBuffer b;
             galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
@@ -631,6 +631,8 @@ private:
     galois::substrate::PerThreadStorage<DstVecType> 
         gdst_vecs(base_hGraph::numHosts);
 
+    const unsigned& id = this->base_hGraph::id;
+    const unsigned& numHosts = this->base_hGraph::numHosts;
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -650,7 +652,7 @@ private:
         }
 
         std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
-        for (unsigned i = 0; i < this->base_hGraph::numHosts; i++) {
+        for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
           gdst_vec[i].reserve(std::distance(ee, ee_end));
         }
@@ -677,14 +679,14 @@ private:
 
         // construct edges for nodes with greater than threashold edges but 
         // assigned to local host
-        for (uint64_t gdst : gdst_vec[this->base_hGraph::id]) {
+        for (uint64_t gdst : gdst_vec[id]) {
             uint32_t ldst = this->G2L(gdst);
             graph.constructEdge(cur++, ldst);
         }
 
         // send if reached the batch limit
-        for (uint32_t h = 0; h < this->base_hGraph::numHosts; ++h) {
-          if (h == this->base_hGraph::id) continue;
+        for (uint32_t h = 0; h < numHosts; ++h) {
+          if (h == id) continue;
           if (gdst_vec[h].size()) {
             galois::runtime::SendBuffer b;
             galois::runtime::gSerialize(b, src, gdst_vec[h]);
