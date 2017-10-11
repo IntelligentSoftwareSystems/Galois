@@ -75,6 +75,7 @@ extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
 extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
+extern cll::opt<unsigned> partition_edge_send_buffer_size;
 
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
@@ -570,7 +571,19 @@ private:
       MPI_Group_incl(world_group, 1, g, &mpi_identity_groups[x]);
     }
 
-    if (id == 0) galois::gDebug("Using bare MPI\n");
+    if (id == 0) {
+      switch (bare_mpi) {
+        case nonBlockingBareMPI:
+          galois::gPrint("Using non-blocking bare MPI\n");
+          break;
+        case oneSidedBareMPI:
+          galois::gPrint("Using one-sided bare MPI\n");
+          break;
+        case noBareMPI:
+        default:
+          GALOIS_DIE("Unsupported bare MPI");
+      }
+    }
     #endif
   }
 
@@ -859,7 +872,7 @@ protected:
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
-      galois::gDebug("Manually det. master thread ranges\n");
+      galois::gDebug("Manually det. master thread ranges");
       graph.determineThreadRanges(beginMaster, beginMaster + numOwned, masterRanges,
                                   nodeAlphaRanges);
     }
