@@ -65,8 +65,14 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                                   "Over decomposed by 2 cartesian Vertex-Cut"), 
                        clEnumValN(OVER_DECOMPOSE_4_VCUT, "od4vc", 
                                   "Over decomposed by 4 cartesian Vertex-Cut"), 
+                       clEnumValN(CEC, "cec", 
+                                  "Custom edge cut from vertexID mapping"),
                        clEnumValEnd),
                      cll::init(OEC));
 cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
                                  cll::desc("Threshold for high degree edges."), 
                                  cll::init(1000));
+
+cll::opt<std::string> vertexIDMapFileName("vertexIDMapFileName",
+                                       cll::desc("<file containing the vertexID to hosts mapping for the custom edge cut.>"), 
+                                       cll::init(""));
