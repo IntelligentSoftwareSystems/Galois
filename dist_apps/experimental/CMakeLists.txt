@@ -41,3 +41,5 @@ distAppNoGPU(sgd_pull)
 
 distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)
+
+distAppNoGPU(graph_reader)
