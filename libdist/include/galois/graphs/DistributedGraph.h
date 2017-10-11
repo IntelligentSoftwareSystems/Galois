@@ -1718,21 +1718,21 @@ private:
     MPI_Win_start(mpi_access_group, 0, window[id]);
 
     std::vector<galois::runtime::SendBuffer> b(numHosts);
+    std::vector<size_t> size(numHosts);
 
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + h) % numHosts;
 
       if (nothingToSend(x, syncType, writeLocation, readLocation)) continue;
 
-
       get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
 
-      size_t size = b[x].size();
-      MPI_Put((uint8_t *)&size, sizeof(size_t), MPI_BYTE, 
+      size[x] = b[x].size();
+      MPI_Put((uint8_t *)&size[x], sizeof(size_t), MPI_BYTE,
           x, 0, sizeof(size_t), MPI_BYTE,
           window[id]);
-      MPI_Put((uint8_t *)b[x].linearData(), size, MPI_BYTE,
-          x, sizeof(size_t), size, MPI_BYTE,
+      MPI_Put((uint8_t *)b[x].linearData(), size[x], MPI_BYTE,
+          x, sizeof(size_t), size[x], MPI_BYTE,
           window[id]);
     }
 
