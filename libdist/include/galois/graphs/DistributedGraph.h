@@ -1938,9 +1938,9 @@ private:
       galois::runtime::RecvBuffer rbuf(rb[x].begin() + sizeof(size_t), 
           rb[x].begin() + sizeof(size_t) + size);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
-
       MPI_Win_post(mpi_identity_groups[x], 0, window[x]);
+
+      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(x, rbuf, loopName);
     }
   }
 #endif
