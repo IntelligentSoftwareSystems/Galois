@@ -682,6 +682,10 @@ protected:
     }
 
     send_info_to_host();
+
+    // do not track memory usage of partitioning
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    net.resetMemUsage();
   }
 
 public:
@@ -1719,6 +1723,7 @@ private:
 
     std::vector<galois::runtime::SendBuffer> b(numHosts);
     std::vector<size_t> size(numHosts);
+    uint64_t send_buffers_size = 0;
 
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + h) % numHosts;
@@ -1728,6 +1733,7 @@ private:
       get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b[x]);
 
       size[x] = b[x].size();
+      send_buffers_size += size[x];
       MPI_Put((uint8_t *)&size[x], sizeof(size_t), MPI_BYTE,
           x, 0, sizeof(size_t), MPI_BYTE,
           window[id]);
@@ -1736,7 +1742,11 @@ private:
           window[id]);
     }
 
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    net.incrementMemUsage(send_buffers_size);
+
     MPI_Win_complete(window[id]);
+    net.decrementMemUsage(send_buffers_size);
 
     if (BitsetFnTy::is_valid()) {
       reset_bitset(syncType, &BitsetFnTy::reset_range);
@@ -2062,11 +2072,13 @@ private:
       window.resize(numHosts);
       rb.resize(numHosts);
 
+      uint64_t recv_buffers_size = 0;
       for (unsigned x = 0; x < numHosts; ++x) {
         size_t size = (sharedNodes[x].size() * sizeof(typename SyncFnTy::ValTy));
         size += sizeof(size_t); // vector size
         size += sizeof(DataCommMode); // data mode
         size += sizeof(size_t); // buffer size
+        recv_buffers_size += size;
 
         rb[x].resize(size);
 
@@ -2079,6 +2091,8 @@ private:
 
         MPI_Info_free(&info);
       }
+      auto& net = galois::runtime::getSystemNetworkInterface();
+      net.incrementMemUsage(recv_buffers_size);
 
       for (unsigned h = 1; h < numHosts; ++h) {
         unsigned x = (id + numHosts - h) % numHosts;

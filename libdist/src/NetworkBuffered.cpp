@@ -323,10 +323,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   void workerThread() {
     #ifdef GALOIS_USE_LWCI
-    std::tie(netio, ID, Num) = makeNetworkIOLWCI();
+    std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker);
     if (ID == 0) fprintf(stderr, "**Using LWCI Communication layer**\n");
     #else
-    std::tie(netio, ID, Num) = makeNetworkIOMPI();
+    std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
     #endif
 
     ready = 1;
@@ -404,6 +404,7 @@ public:
           if (buf) {
             ++statRecvNum;
             statRecvBytes += buf->size();
+            memUsageTracker.decrementMemUsage(buf->size());
             if (rlg)
               *rlg = std::move(lg);
             galois::runtime::trace("recvTagged", h, tag, 

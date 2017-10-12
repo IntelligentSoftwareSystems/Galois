@@ -80,7 +80,8 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
   int save;
 
 public:
-  NetworkIOLWCI(uint32_t& ID, uint32_t& NUM) {
+  NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM) 
+    : NetworkIO(tracker) {
     auto p = initMPI();
     ID = p.first;
     NUM = p.second;
@@ -95,6 +96,7 @@ public:
     while (!inflight.empty()) {
       auto& f = inflight.front();
       if (lc_test(&f.ctx)) {
+        memUsageTracker.decrementMemUsage(f.buf.size());
         inflight.pop_front();
       } else {
         break;
@@ -104,6 +106,7 @@ public:
 
   virtual void enqueue(message m) {
     inflight.emplace_back(m.host, m.tag, m.data);
+    memUsageTracker.incrementMemUsage(m.data.size());
     auto& f = inflight.back();
     while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, &f.ctx)) {
       progress();
@@ -116,6 +119,7 @@ public:
     int size;
     if (lc_recv_queue(mv, &size, (int*) &m.rank, (int*) &m.tag, &m.ctx)) {
       m.buf.resize(size);
+      memUsageTracker.incrementMemUsage(size);
       lc_recv_queue_post(mv, m.buf.data(), &m.ctx);
     } else {
       recv.pop_back();
@@ -159,9 +163,9 @@ public:
  */
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,
                            uint32_t,
-                           uint32_t> galois::runtime::makeNetworkIOLWCI() {
+                           uint32_t> galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker) {
   uint32_t ID, NUM;
-  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOLWCI(ID, NUM)};
+  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOLWCI(tracker, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 

@@ -88,6 +88,11 @@ NetworkInterface::~NetworkInterface() {
   galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
 }
 
+void NetworkInterface::reportMemUsage() const {
+  std::string str("COMMUNICATION_MEM_USAGE");
+  galois::runtime::reportStat_Tmax("dGraph", str, memUsageTracker.getMaxMemUsage());
+}
+
 // forward decl
 static void bcastLandingPad(uint32_t src, ::RecvBuffer& buf);
 

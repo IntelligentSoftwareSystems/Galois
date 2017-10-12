@@ -26,6 +26,7 @@
 #define GALOIS_RUNTIME_NETWORK_H
 
 #include "galois/runtime/Serialize.h"
+#include "galois/runtime/MemUsage.h"
 #include "galois/substrate/Barrier.h"
 
 #include <cstdint>
@@ -73,6 +74,20 @@ using optional_t = boost::optional<T>;
 class NetworkInterface {
 private:
   void initializeMPI();
+
+protected:
+  MemUsageTracker memUsageTracker;
+
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+public:
+  inline void incrementMemUsage(uint64_t size) {
+    memUsageTracker.incrementMemUsage(size);
+  }
+  inline void decrementMemUsage(uint64_t size) {
+    memUsageTracker.decrementMemUsage(size);
+  }
+#endif
+
 public:
   static uint32_t ID;
   static uint32_t Num;
@@ -116,6 +131,12 @@ public:
 
   //! receive and dispatch messages
   void handleReceives();
+
+  inline void resetMemUsage() {
+    memUsageTracker.resetMemUsage();
+  }
+
+  void reportMemUsage() const;
 
   //! receive tagged message
   virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg) = 0;
