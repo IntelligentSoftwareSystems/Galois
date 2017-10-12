@@ -85,7 +85,7 @@ public:
   /**
    * Destructor kills MPI.
    */
-  ~NetworkInterface();
+  virtual ~NetworkInterface();
 
   //! send a message to a given (dest) host.  A message is simply a
   //! landing pad (recv, funciton pointer) and some data (buf)
