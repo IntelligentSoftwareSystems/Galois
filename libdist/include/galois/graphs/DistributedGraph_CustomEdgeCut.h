@@ -688,7 +688,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               /*
                * If source is owned, all outgoing edges belong to this host
                */
-              assert(isOwned(src));
+              assert(this->isOwned(src));
               uint32_t lsrc = 0;
               uint64_t cur = 0;
               lsrc = this->G2L(src);
@@ -787,7 +787,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               /*
                * If source is owned, all outgoing edges belong to this host
                */
-              assert(isOwned(src));
+              assert(this->isOwned(src));
               uint32_t lsrc = 0;
               uint64_t cur = 0;
               lsrc = this->G2L(src);
