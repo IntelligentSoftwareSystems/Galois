@@ -304,6 +304,7 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
 endif()
 find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
+add_definitions(-DBOOST_NO_AUTO_PTR)
 
 include(CheckEndian)
 
