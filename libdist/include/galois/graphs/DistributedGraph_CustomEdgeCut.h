@@ -784,23 +784,31 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
 
-        // TODO change this to make sure it can deal with buffered sends
         if (p) {
-          std::vector<uint64_t> _gdst_vec;
-          uint64_t _src;
-          galois::runtime::gDeserialize(p->second, _src, _gdst_vec);
-          edgesToReceive -= _gdst_vec.size();
-          assert(isOwned(_src));
-          uint32_t lsrc = G2L(_src);
-          uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-          uint64_t cur_end = *graph.edge_end(lsrc);
-          assert((cur_end - cur) == _gdst_vec.size());
-          deserializeEdges(graph, p->second, _gdst_vec, cur, cur_end);
+          auto& receiveBuffer = p->second;
+
+          while (receiveBuffer.r_size() > 0) {
+            uint64_t _src;
+            std::vector<uint64_t> _gdst_vec;
+            galois::runtime::gDeserialize(receiveBuffer, _src, _gdst_vec);
+            edgesToReceive -= _gdst_vec.size();
+            assert(isOwned(_src));
+            uint32_t lsrc = G2L(_src);
+            uint64_t cur = *graph.edge_begin(lsrc, 
+                                             galois::MethodFlag::UNPROTECTED);
+            uint64_t cur_end = *graph.edge_end(lsrc);
+            assert((cur_end - cur) == _gdst_vec.size());
+
+            deserializeEdges(graph, receiveBuffer, _gdst_vec, cur, cur_end);
+          }
         }
       }
     }
 
-  template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  template<typename GraphTy,
+           typename std::enable_if<
+             !std::is_void<typename GraphTy::edge_data_type>::value
+           >::type* = nullptr>
   void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
       std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
     std::vector<typename GraphTy::edge_data_type> gdata_vec;
@@ -814,7 +822,10 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 
-  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  template<typename GraphTy,
+           typename std::enable_if<
+             std::is_void<typename GraphTy::edge_data_type>::value
+           >::type* = nullptr>
   void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
       std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
     uint64_t i = 0;
@@ -825,56 +836,56 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 
-    bool is_vertex_cut() const{
-      return true;
-    }
+  bool is_vertex_cut() const{
+    return true;
+  }
 
-    /*
+  /**
    * Returns the total nodes : master + slaves created on the local host.
    */
-    uint64_t get_local_total_nodes() const {
-      return (base_hGraph::numOwned);
-    }
+  uint64_t get_local_total_nodes() const {
+    return (base_hGraph::numOwned);
+  }
 
-    void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
-      size_t first_owned = 0;
-      size_t last_owned = 0;
+  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+    size_t first_owned = 0;
+    size_t last_owned = 0;
+
+    if (base_hGraph::numOwned > 0) {
+      first_owned = G2L(localToGlobalVector[0]);
+      last_owned = G2L(localToGlobalVector[numOwned - 1]);
+      assert(first_owned <= last_owned);
+      assert((last_owned - first_owned + 1) == base_hGraph::numOwned);
+    } 
+
+    if (syncType == base_hGraph::syncBroadcast) { // reset masters
+      // only reset if we actually own something
+      if (base_hGraph::numOwned > 0)
+        bitset_reset_range(first_owned, last_owned);
+    } else { // reset mirrors
+      assert(syncType == base_hGraph::syncReduce);
 
       if (base_hGraph::numOwned > 0) {
-        first_owned = G2L(localToGlobalVector[0]);
-        last_owned = G2L(localToGlobalVector[numOwned - 1]);
-        assert(first_owned <= last_owned);
-        assert((last_owned - first_owned + 1) == base_hGraph::numOwned);
-      } 
-
-      if (syncType == base_hGraph::syncBroadcast) { // reset masters
-        // only reset if we actually own something
-        if (base_hGraph::numOwned > 0)
-          bitset_reset_range(first_owned, last_owned);
-      } else { // reset mirrors
-        assert(syncType == base_hGraph::syncReduce);
-
-        if (base_hGraph::numOwned > 0) {
-          if (first_owned > 0) {
-            bitset_reset_range(0, first_owned - 1);
-          }
-          if (last_owned < (numNodes - 1)) {
-            bitset_reset_range(last_owned + 1, numNodes - 1);
-          }
-        } else {
-          // only time we care is if we have ghost nodes, i.e. 
-          // numNodes is non-zero
-          if (numNodes > 0) {
-            bitset_reset_range(0, numNodes - 1);
-          }
+        if (first_owned > 0) {
+          bitset_reset_range(0, first_owned - 1);
+        }
+        if (last_owned < (numNodes - 1)) {
+          bitset_reset_range(last_owned + 1, numNodes - 1);
+        }
+      } else {
+        // only time we care is if we have ghost nodes, i.e. 
+        // numNodes is non-zero
+        if (numNodes > 0) {
+          bitset_reset_range(0, numNodes - 1);
         }
       }
     }
+  }
 
-    void print_string(std::string s) {
-      std::stringstream ss_cout;
-      ss_cout << base_hGraph::id << s << "\n";
-      std::cerr << ss_cout.str();
-    }
+  void print_string(std::string s) {
+    std::stringstream ss_cout;
+    ss_cout << base_hGraph::id << s << "\n";
+    std::cerr << ss_cout.str();
+  }
 };
 #endif
