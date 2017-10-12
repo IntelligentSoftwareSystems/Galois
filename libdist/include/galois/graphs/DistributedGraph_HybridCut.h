@@ -28,7 +28,6 @@
 #define _GALOIS_DIST_HGRAPHHYBRID_H
 
 #include "galois/graphs/DistributedGraph.h"
-#include <sstream>
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, 
          bool BSPEdge = false>
@@ -138,6 +137,8 @@ public:
 
   /**
    * Constructor for Vertex Cut
+   *
+   * TODO params
    */
   hGraph_vertexCut(const std::string& filename, 
              const std::string& partitionFolder,
@@ -148,7 +149,8 @@ public:
              bool bipartite = false) : base_hGraph(host, _numHosts) {
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
-        galois::gWarn("Scalefactor not supported for PowerLyra (hybrid) vertex-cuts\n");
+        galois::gWarn("Scalefactor not supported for PowerLyra (hybrid) "
+                      "vertex-cuts");
       }
       scalefactor.clear();
     }
@@ -488,7 +490,7 @@ private:
           }
         } else {
         // otherwise if not high degree keep all edges with the source node
-          for(; ee != ee_end; ++ee) {
+          for (; ee != ee_end; ++ee) {
             numOutgoingEdges[id][src - globalOffset]++;
             num_assigned_edges_perhost[id] += 1;
             auto gdst = mpiGraph.edgeDestination(*ee);
@@ -561,6 +563,8 @@ private:
     const unsigned& id = this->base_hGraph::id;
     const unsigned& numHosts = this->base_hGraph::numHosts;
 
+    // TODO find a way to refactor into functions; can reuse in other
+    // version as well; too long
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
@@ -691,6 +695,8 @@ private:
     galois::substrate::PerThreadStorage<SendBufferVecTy> 
       sendBuffers(base_hGraph::numHosts);
 
+    // TODO find a way to refactor into functions; can reuse in other
+    // version as well; too long
     // Go over assigned nodes and distribute edges to other hosts.
     galois::do_all(
       galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
