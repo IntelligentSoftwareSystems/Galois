@@ -616,13 +616,14 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     // Helper functions
-    uint32_t find_hostID(uint64_t offset){
+    uint32_t find_hostID(uint64_t offset) {
       assert(offset < vertexIDMap.size());
       return vertexIDMap[offset];
       return std::numeric_limits<uint32_t>::max();
     }
 
-    uint32_t find_hostID(std::vector<uint64_t>& vec, uint64_t gid, uint32_t from_hostID){
+    uint32_t find_hostID(std::vector<uint64_t>& vec, uint64_t gid, 
+                         uint32_t from_hostID){
       auto iter = std::lower_bound(vec.begin(), vec.end(), gid);
       if((*iter == gid) && (iter != vec.end())){
         return from_hostID;
@@ -638,15 +639,26 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       void assign_load_send_edges(GraphTy& graph, 
                                   galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
-        std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
-        std::vector<std::vector<typename GraphTy::edge_data_type>> gdata_vec(base_hGraph::numHosts);
+        using DstVecType = std::vector<std::vector<uint64_t>>;
+        // TODO per thread storage
+        std::vector<DstVecType> gdst_vec(base_hGraph::numHosts);
+
+        using DataVecType = 
+            std::vector<std::vector<typename GraphTy::edge_data_type>>;
+        // TODO per thread storage
+        std::vector<DataVecType> gdata_vec(base_hGraph::numHosts);
+
+        // TODO use this
+        using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>; 
+        galois::substrate::PerThreadStorage<SendBufferVecTy> 
+          sendBuffers(base_hGraph::numHosts);
+
         auto& net = galois::runtime::getSystemNetworkInterface();
         uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
         auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
 
         // TODO use do all
-
         // Go over assigned nodes and distribute edges.
         for (auto src = base_hGraph::gid2host[base_hGraph::id].first;
              src != base_hGraph::gid2host[base_hGraph::id].second;
