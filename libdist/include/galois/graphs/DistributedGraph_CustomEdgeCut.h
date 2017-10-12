@@ -623,7 +623,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
 
     uint32_t find_hostID(std::vector<uint64_t>& vec, uint64_t gid, 
-                         uint32_t from_hostID){
+                         uint32_t from_hostID) {
       auto iter = std::lower_bound(vec.begin(), vec.end(), gid);
       if((*iter == gid) && (iter != vec.end())){
         return from_hostID;
@@ -640,15 +640,14 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                                   galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
         using DstVecType = std::vector<std::vector<uint64_t>>;
-        // TODO per thread storage
-        std::vector<DstVecType> gdst_vec(base_hGraph::numHosts);
+        galois::substrate::PerThreadStorage<DstVecType> 
+            gdst_vecs(base_hGraph::numHosts);
 
         using DataVecType = 
             std::vector<std::vector<typename GraphTy::edge_data_type>>;
-        // TODO per thread storage
-        std::vector<DataVecType> gdata_vec(base_hGraph::numHosts);
+        galois::substrate::PerThreadStorage<DataVecType> 
+            gdata_vecs(base_hGraph::numHosts);
 
-        // TODO use this
         using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>; 
         galois::substrate::PerThreadStorage<SendBufferVecTy> 
           sendBuffers(base_hGraph::numHosts);
@@ -656,59 +655,84 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         auto& net = galois::runtime::getSystemNetworkInterface();
         uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
-        auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
+        const unsigned& id = this->base_hGraph::id;
+        const unsigned& numHosts = this->base_hGraph::numHosts;
 
-        // TODO use do all
         // Go over assigned nodes and distribute edges.
-        for (auto src = base_hGraph::gid2host[base_hGraph::id].first;
-             src != base_hGraph::gid2host[base_hGraph::id].second;
-             ++src){
-          auto ee = ee_end;
-          ee_end = mpiGraph.edgeEnd(src);
+        galois::do_all(
+          galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                          base_hGraph::gid2host[base_hGraph::id].second),
+          [&] (auto src) {
+            auto ee = mpiGraph.edgeBegin(src);
+            auto ee_end = mpiGraph.edgeEnd(src);
 
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-            gdst_vec[i].clear();
-            gdata_vec[i].clear();
-            //gdst_vec[i].reserve(std::distance(ii, ee));
-          }
+            auto& gdst_vec = *gdst_vecs.getLocal();
+            auto& gdata_vec = *gdata_vecs.getLocal();
 
-          auto h = find_hostID(src - globalOffset);
-          if(h != base_hGraph::id){
-            //Assign edges for high degree nodes to the destination
-            for(; ee != ee_end; ++ee){
-              auto gdst = mpiGraph.edgeDestination(*ee);
-              auto gdata = mpiGraph.edgeData(*ee);
-              gdst_vec[h].push_back(gdst);
-              gdata_vec[h].push_back(gdata);
+            for (unsigned i = 0; i < numHosts; ++i) {
+              gdst_vec[i].clear();
+              gdata_vec[i].clear();
+              //gdst_vec[i].reserve(std::distance(ii, ee));
             }
-          } else {
-            /*
-             * If source is owned, all outgoing edges belong to this host
-             */
-            assert(isOwned(src));
-            uint32_t lsrc = 0;
-            uint64_t cur = 0;
-            lsrc = G2L(src);
-            cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-            //keep all edges with the source node
-            for(; ee != ee_end; ++ee){
-              auto gdst = mpiGraph.edgeDestination(*ee);
-              uint32_t ldst = G2L(gdst);
-              auto gdata = mpiGraph.edgeData(*ee);
-              graph.constructEdge(cur++, ldst, gdata);
-            }
-            assert(cur == (*graph.edge_end(lsrc)));
-          }
 
-          /*
-           * Send the edges to the hosts who ownes them.
-           */
-          for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
-            if (h == base_hGraph::id) continue;
-            if (gdst_vec[h].size()) {
-              galois::runtime::SendBuffer b;
-              galois::runtime::gSerialize(b, src, gdst_vec[h], gdata_vec[h]);
-              net.sendTagged(h, galois::runtime::evilPhase, b);
+            auto h = this->find_hostID(src - globalOffset);
+            if (h != id) {
+              // Assign edges for high degree nodes to the destination
+              for(; ee != ee_end; ++ee){
+                auto gdst = mpiGraph.edgeDestination(*ee);
+                auto gdata = mpiGraph.edgeData(*ee);
+                gdst_vec[h].push_back(gdst);
+                gdata_vec[h].push_back(gdata);
+              }
+            } else {
+              /*
+               * If source is owned, all outgoing edges belong to this host
+               */
+              assert(isOwned(src));
+              uint32_t lsrc = 0;
+              uint64_t cur = 0;
+              lsrc = this->G2L(src);
+              cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+              //keep all edges with the source node
+              for(; ee != ee_end; ++ee){
+                auto gdst = mpiGraph.edgeDestination(*ee);
+                uint32_t ldst = this->G2L(gdst);
+                auto gdata = mpiGraph.edgeData(*ee);
+                graph.constructEdge(cur++, ldst, gdata);
+              }
+              assert(cur == (*graph.edge_end(lsrc)));
+            }
+
+            // send 
+            for (uint32_t h = 0; h < numHosts; ++h) {
+              if (h == id) continue;
+              if (gdst_vec[h].size()) {
+                auto& sendBuffer = (*sendBuffers.getLocal())[h];
+                galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h], 
+                                            gdata_vec[h]);
+                if (sendBuffer.size() > partition_edge_send_buffer_size) {
+                  net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+                  sendBuffer.getVec().clear();
+                }
+              }
+            }
+          },
+          galois::loopname("EdgeLoading"),
+          galois::no_stats(),
+          galois::timeit()
+        );
+
+        // flush buffers
+        for (unsigned threadNum = 0; 
+             threadNum < sendBuffers.size(); 
+             ++threadNum) {
+          auto& sbr = *sendBuffers.getRemote(threadNum);
+          for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
+            if (h == this->base_hGraph::id) continue;
+            auto& sendBuffer = sbr[h];
+            if (sendBuffer.size() > 0) {
+              net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+              sendBuffer.getVec().clear();
             }
           }
         }
@@ -724,59 +748,88 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       void assign_load_send_edges(GraphTy& graph, 
                                   galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
-        std::vector<std::vector<uint64_t>> gdst_vec(base_hGraph::numHosts);
+        using DstVecType = std::vector<std::vector<uint64_t>>;
+        galois::substrate::PerThreadStorage<DstVecType> 
+            gdst_vecs(base_hGraph::numHosts);
+
+        using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>; 
+        galois::substrate::PerThreadStorage<SendBufferVecTy> 
+          sendBuffers(base_hGraph::numHosts);
+
         auto& net = galois::runtime::getSystemNetworkInterface();
         uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
 
-        auto ee_end = mpiGraph.edgeBegin(base_hGraph::gid2host[base_hGraph::id].first);
+        const unsigned& id = this->base_hGraph::id;
+        const unsigned& numHosts = this->base_hGraph::numHosts;
 
-        // TODO use do all
         // Go over assigned nodes and distribute edges.
-        for (auto src = base_hGraph::gid2host[base_hGraph::id].first; 
-             src != base_hGraph::gid2host[base_hGraph::id].second; 
-             ++src) {
-          auto ee = ee_end;
-          ee_end = mpiGraph.edgeEnd(src);
+        galois::do_all(
+          galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
+                          base_hGraph::gid2host[base_hGraph::id].second),
+          [&] (auto src) {
+            auto ee = mpiGraph.edgeBegin(src);
+            auto ee_end = mpiGraph.edgeEnd(src);
 
-          for (unsigned i = 0; i < base_hGraph::numHosts; ++i) {
-            gdst_vec[i].clear();
-            //gdst_vec[i].reserve(std::distance(ii, ee));
-          }
+            auto& gdst_vec = *gdst_vecs.getLocal();
 
-          auto h = find_hostID(src - globalOffset);
-          if(h != base_hGraph::id){
-            //Assign edges for high degree nodes to the destination
-            for(; ee != ee_end; ++ee){
-              auto gdst = mpiGraph.edgeDestination(*ee);
-              gdst_vec[h].push_back(gdst);
+            for (unsigned i = 0; i < numHosts; ++i) {
+              gdst_vec[i].clear();
             }
-          } else{
-            /*
-             * If source is owned, all outgoing edges belong to this host
-             */
-            assert(isOwned(src));
-            uint32_t lsrc = 0;
-            uint64_t cur = 0;
-            lsrc = G2L(src);
-            cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-            //keep all edges with the source node
-            for(; ee != ee_end; ++ee){
-              auto gdst = mpiGraph.edgeDestination(*ee);
-              uint32_t ldst = G2L(gdst);
-              graph.constructEdge(cur++, ldst);
-            }
-            assert(cur == (*graph.edge_end(lsrc)));
-          }
 
-          /*
-           * Send the edges to the hosts who ownes them.
-           */
-          for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
-            if(h == base_hGraph::id) continue;
-            if(gdst_vec[h].size()){
-              galois::runtime::SendBuffer b;
-              galois::runtime::gSerialize(b, src, gdst_vec[h]);
-              net.sendTagged(h, galois::runtime::evilPhase, b);
+            auto h = this->find_hostID(src - globalOffset);
+            if (h != id) {
+              //Assign edges for high degree nodes to the destination
+              for (; ee != ee_end; ++ee) {
+                auto gdst = mpiGraph.edgeDestination(*ee);
+                gdst_vec[h].push_back(gdst);
+              }
+            } else {
+              /*
+               * If source is owned, all outgoing edges belong to this host
+               */
+              assert(isOwned(src));
+              uint32_t lsrc = 0;
+              uint64_t cur = 0;
+              lsrc = this->G2L(src);
+              cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+              //keep all edges with the source node
+              for(; ee != ee_end; ++ee){
+                auto gdst = mpiGraph.edgeDestination(*ee);
+                uint32_t ldst = this->G2L(gdst);
+                graph.constructEdge(cur++, ldst);
+              }
+              assert(cur == (*graph.edge_end(lsrc)));
+            }
+
+            // send 
+            for (uint32_t h = 0; h < numHosts; ++h) {
+              if (h == id) continue;
+              if (gdst_vec[h].size()) {
+                auto& sendBuffer = (*sendBuffers.getLocal())[h];
+                galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h]);
+                if (sendBuffer.size() > partition_edge_send_buffer_size) {
+                  net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+                  sendBuffer.getVec().clear();
+                }
+              }
+            }
+          },
+          galois::loopname("EdgeLoading"),
+          galois::no_stats(),
+          galois::timeit()
+        );
+
+        // flush buffers
+        for (unsigned threadNum = 0; 
+             threadNum < sendBuffers.size(); 
+             ++threadNum) {
+          auto& sbr = *sendBuffers.getRemote(threadNum);
+          for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
+            if (h == this->base_hGraph::id) continue;
+            auto& sendBuffer = sbr[h];
+            if (sendBuffer.size() > 0) {
+              net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+              sendBuffer.getVec().clear();
             }
           }
         }
