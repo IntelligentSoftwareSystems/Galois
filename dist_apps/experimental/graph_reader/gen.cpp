@@ -74,10 +74,20 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  if (withEdgeData) {
-    distGraphInitialization<NodeData, unsigned>();
+  // iterate over out edges
+  if (!iterateIn) {
+    if (withEdgeData) {
+      distGraphInitialization<NodeData, unsigned>();
+    } else {
+      distGraphInitialization<NodeData, void>();
+    }
   } else {
-    distGraphInitialization<NodeData, void>();
+  // iterate over in edges
+    if (withEdgeData) {
+      distGraphInitialization<NodeData, unsigned, false>();
+    } else {
+      distGraphInitialization<NodeData, void, false>();
+    }
   }
 
   StatTimer_total.stop();
