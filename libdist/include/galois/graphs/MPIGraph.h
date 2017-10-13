@@ -348,12 +348,16 @@ public:
   /**
    * On destruction, free allocated buffers (if necessary).
    */
-  ~MPIGraph() {
+  ~MPIGraph() noexcept {
     freeMemory();
   }
 
-
-  // TODO define copy, move default ops as well (very important)
+  // copy not allowed
+  MPIGraph(const MPIGraph&) = delete;
+  MPIGraph& operator=(const MPIGraph&) = delete;
+  // move not allowed
+  MPIGraph(MPIGraph&&) = delete;
+  MPIGraph& operator=(MPIGraph&&) = delete;
 
   /**
    * Given a node/edge range to load, loads the specified portion of the graph 
