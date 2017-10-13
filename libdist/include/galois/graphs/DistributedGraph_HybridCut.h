@@ -29,8 +29,6 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-
-
 template<typename NodeTy, typename EdgeTy, bool BSPNode = false, 
          bool BSPEdge = false>
 class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
@@ -140,15 +138,23 @@ public:
   /**
    * Constructor for Vertex Cut
    *
-   * TODO params
+   * @param filename Graph to load (must be in Galois binary format)
+   * @param unused string (originally partition folder)
+   * @param host Host id of the caller
+   * @param _numHosts total number of hosts currently running
+   * @param transpose Indicates if the read graph needs to be transposed
+   * @param VCutThreshold Threshold for determining how to assign edges:
+   * if greater than threshold, edges go to the host that has the destination
+   * @param bipartite Indicates if the graph is bipartite
    */
   hGraph_vertexCut(const std::string& filename, 
-             const std::string& partitionFolder,
+             const std::string&,
              unsigned host, unsigned _numHosts, 
              std::vector<unsigned>& scalefactor, 
              bool transpose = false, 
              uint32_t VCutThreshold = 100, 
              bool bipartite = false) : base_hGraph(host, _numHosts) {
+    // TODO split constructor into more parts? quite long at the moment
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
         galois::gWarn("Scalefactor not supported for PowerLyra (hybrid) "
@@ -247,7 +253,8 @@ public:
 
     base_hGraph::printStatistics();
 
-    loadEdges(base_hGraph::graph, mpiGraph, numEdges_distribute, VCutThreshold);
+    // load the edges + send them to their assigned hosts if needed
+    loadEdges(base_hGraph::graph, mpiGraph, VCutThreshold);
 
     /*******************************************/
 
@@ -285,14 +292,16 @@ private:
    * Read the edges that this host is responsible for and send them off to
    * the host that they are assigned to if necessary.
    *
-   * @param graph TODO
-   * @param mpiGraph TODO
-   * @param numEdges_distribute TODO
-   * @param VCutThreshold TODO
+   * @param graph In memory representation of the graph: to be used in the
+   * program once loading is done
+   * @param mpiGraph In memory graph rep of the Galois binary graph: not the
+   * final representation used by the program
+   * @param VCutThreshold If number of edges on a vertex are over the 
+   * threshold, the edges go to the host that contains the destination
    */
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                 uint64_t numEdges_distribute, uint32_t VCutThreshold) {
+                 uint32_t VCutThreshold) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -310,8 +319,7 @@ private:
     std::atomic<uint64_t> edgesToReceive;
     edgesToReceive.store(num_total_edges_to_receive);
 
-    readAndSendEdges(graph, mpiGraph, numEdges_distribute, VCutThreshold,
-                     edgesToReceive);
+    readAndSendEdges(graph, mpiGraph, VCutThreshold, edgesToReceive);
 
     galois::on_each(
       [&](unsigned tid, unsigned nthreads) {
@@ -379,7 +387,8 @@ private:
    *
    * @param numOutgoingEdges TODO
    * @param ghosts bitset that is marked with ghost nodes (output)
-   * @param mirrorNodes TODO
+   * @param mirrorNodes Edited by this function to have information about which 
+   * host the mirror nodes on this host belongs to
    * @returns a prefix sum of the edges for the nodes this partition owns
    */
   std::vector<uint64_t> createMasterMirrorNodes(
@@ -438,10 +447,13 @@ private:
    * Goes over the nodes that this host is responsible for loading and 
    * determine which host the node should be assigned to.
    *
-   * @param mpiGraph TODO
-   * @param numEdges_distribute
-   * @param VCutThreshold
-   * @param mirrorNodes
+   * @param mpiGraph In memory representation of the Galois binary graph
+   * file (not the final underlying representation we will use)
+   * @param numEdges_distribute Number of edges this host should distributed/
+   * accout for; used only for sanity checking
+   * @param VCutThreshold If number of edges on a vertex are over the 
+   * threshold, the edges go to the host that contains the destination
+   * @param mirrorNodes TODO
    * @param edgeInspectionTimer
    * @returns a prefix sum of edges for the nodes this host is assigned
    */
@@ -535,11 +547,14 @@ private:
    * Read/construct edges we are responsible for and send off edges we don't 
    * own to the correct hosts. Non-void variant (i.e. edge data exists).
    *
-   * TODO params
-   * @param graph
-   * @param mpiGraph
-   * @param numEdges_distribute
-   * @param VCutThreshold
+   * @param graph Final underlying in-memory graph representation to save to
+   * @param mpiGraph Graph object that currently contains the in memory
+   * representation of the Galois binary
+   * @param VCutThreshold If number of edges on a vertex are over the 
+   * threshold, the edges go to the host that contains the destination
+   * @param edgesToReceive Number of edges that this host needs to receive
+   * from other hosts; should have been determined in edge assigning
+   * phase
    */
   template<typename GraphTy, 
            typename std::enable_if<
@@ -547,7 +562,6 @@ private:
            >::type* = nullptr>
   void readAndSendEdges(GraphTy& graph, 
                         galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                        uint64_t numEdges_distribute, 
                         uint32_t VCutThreshold,
                         std::atomic<uint64_t>& edgesToReceive) {
     typedef std::vector<std::vector<uint64_t>> DstVecType;
@@ -678,11 +692,14 @@ private:
    * Read/construct edges we are responsible for and send off edges we don't 
    * own to the correct hosts. Void variant (i.e. no edge data).
    *
-   * TODO params
-   * @param graph
-   * @param mpiGraph
-   * @param numEdges_distribute
-   * @param VCutThreshold
+   * @param graph Final underlying in-memory graph representation to save to
+   * @param mpiGraph Graph object that currently contains the in memory
+   * representation of the Galois binary
+   * @param VCutThreshold If number of edges on a vertex are over the 
+   * threshold, the edges go to the host that contains the destination
+   * @param edgesToReceive Number of edges that this host needs to receive
+   * from other hosts; should have been determined in edge assigning
+   * phase
    */
   template<typename GraphTy, 
            typename std::enable_if<
@@ -690,7 +707,6 @@ private:
            >::type* = nullptr>
   void readAndSendEdges(GraphTy& graph, 
                         galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
-                        uint64_t numEdges_distribute, 
                         uint32_t VCutThreshold,
                         std::atomic<uint64_t>& edgesToReceive) {
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -754,8 +770,8 @@ private:
         // construct edges for nodes with greater than threashold edges but 
         // assigned to local host
         for (uint64_t gdst : gdst_vec[id]) {
-            uint32_t ldst = this->G2L(gdst);
-            graph.constructEdge(cur++, ldst);
+          uint32_t ldst = this->G2L(gdst);
+          graph.constructEdge(cur++, ldst);
         }
 
         // send if reached the batch limit
@@ -916,18 +932,13 @@ private:
     return -1;
   }
 
-public:
   /**
-   * Indicates that this cut is a vertex cut when called.
+   * Called by sync: resets the correct portion of the bitset depending on
+   * which method of synchronization was used.
    *
-   * @returns true as this is a vertex cut
-   */
-  bool is_vertex_cut() const {
-    return true;
-  }
-
-  /**
-   * TODO
+   * @param syncType Specifies the synchronization type
+   * @param bitset_reset_range Function that resets the bitset given the
+   * range to reset
    */
   void reset_bitset(typename base_hGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
@@ -946,5 +957,16 @@ public:
       }
     }
   }
+
+public:
+  /**
+   * Indicates that this cut is a vertex cut when called.
+   *
+   * @returns true as this is a vertex cut
+   */
+  bool is_vertex_cut() const {
+    return true;
+  }
+
 };
 #endif
