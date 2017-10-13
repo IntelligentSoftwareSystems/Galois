@@ -1,9 +1,10 @@
 #pragma once
+#include <atomic>
 namespace galois {
 namespace runtime {
 class MemUsageTracker {
-  uint64_t currentMemUsage; // of send and receive buffers
-  uint64_t maxMemUsage; // of send and receive buffers
+  std::atomic<int64_t> currentMemUsage; // of send and receive buffers
+  int64_t maxMemUsage; // of send and receive buffers
 
 public:
   MemUsageTracker() : currentMemUsage(0), maxMemUsage(0) {}
@@ -19,7 +20,7 @@ public:
     currentMemUsage = 0;
     maxMemUsage = 0;
   }
-  inline uint64_t getMaxMemUsage() const {
+  inline int64_t getMaxMemUsage() const {
     return maxMemUsage;
   }
 };
