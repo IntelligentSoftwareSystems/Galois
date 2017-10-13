@@ -314,6 +314,8 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
       loadEdges(base_hGraph::graph, mpiGraph, numEdges_distribute);
 
+      mpiGraph.resetAndFree();
+
       /*******************************************/
 
       galois::runtime::getHostBarrier().wait();

@@ -256,6 +256,8 @@ public:
     // load the edges + send them to their assigned hosts if needed
     loadEdges(base_hGraph::graph, mpiGraph, VCutThreshold);
 
+    mpiGraph.resetAndFree();
+
     /*******************************************/
 
     galois::runtime::getHostBarrier().wait();

@@ -362,6 +362,10 @@ public:
 
     loadEdges(base_hGraph::graph, g, mpiGraph); // second pass of the graph file
 
+    for (unsigned d = 0; d < DecomposeFactor; ++d) {
+      mpiGraph[d].resetAndFree();
+    }
+
     fill_mirrorNodes(base_hGraph::mirrorNodes);
 
     galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
