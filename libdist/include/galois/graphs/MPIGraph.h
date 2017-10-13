@@ -28,6 +28,8 @@
 
 // TODO version 2 Galois binary graph support; currently only suppports
 // version 1
+// TODO factor out the mpi read function used by the loading functions into
+// 1 helper function: they all function basically the same save for arguments
 
 #ifndef GALOIS_GRAPH_MPIGRAPH_H
 #define GALOIS_GRAPH_MPIGRAPH_H
@@ -48,17 +50,16 @@ template <typename EdgeDataType>
 class MPIGraph {
 private:
   // buffers that you load data into
-  uint64_t* outIndexBuffer;
-  uint32_t* edgeDestBuffer;
-  EdgeDataType* edgeDataBuffer;
+  uint64_t* outIndexBuffer = nullptr;
+  uint32_t* edgeDestBuffer = nullptr;
+  EdgeDataType* edgeDataBuffer = nullptr;
 
-  uint64_t numLocalNodes;
-  uint64_t numLocalEdges;
+  uint64_t numLocalNodes = 0;
+  uint64_t numLocalEdges = 0;
 
-  uint64_t nodeOffset;
-  uint64_t edgeOffset;
-  bool graphLoaded;
-
+  uint64_t nodeOffset = 0;
+  uint64_t edgeOffset = 0;
+  bool graphLoaded = false;
 
   // accumulators for tracking bytes read
   galois::GAccumulator<uint64_t> numBytesReadOutIndex;
@@ -104,6 +105,7 @@ private:
         uint64_t nodesLoaded = 0;
         MPI_Status mpiStatus;
     
+        // TODO factor this out
         while (threadNumNodesToLoad > 0) {
           // File_read can only go up to the max int
           uint64_t toLoad = std::min(threadNumNodesToLoad, 
@@ -173,6 +175,7 @@ private:
         uint64_t edgesLoaded = 0;
         MPI_Status mpiStatus;
     
+        // TODO factor this out
         while (threadNumEdgesToLoad > 0) {
           // File_read can only go up to the max int
           uint64_t toLoad = std::min(threadNumEdgesToLoad, 
@@ -258,6 +261,7 @@ private:
         uint64_t readPosition = baseReadPosition + 
                                 (sizeof(EdgeDataType) * threadEdgeStart);
    
+        // TODO factor this out
         while (numBytesToLoad > 0) {
           // File_read can only go up to the max int
           uint64_t toLoad = std::min(numBytesToLoad, 
@@ -333,16 +337,14 @@ private:
 
 public:
   /**
-   * Initialize class variables. 
+   * Class vars should be initialized by in-class initialization; all
+   * left is to reset read counters.
    *
    * NOTE THAT IT IS ASSUMED THAT MPI HAS BEEN INITIALIZED ALREADY
    * WHEN THIS CLASS IS CREATED.
    */
   MPIGraph() {
-    outIndexBuffer = nullptr;
-    edgeDestBuffer = nullptr;
-    edgeDataBuffer = nullptr;
-    resetGraphStatus();
+    resetReadCounters();
   }
 
   /**
@@ -428,7 +430,10 @@ public:
    * @returns a GLOBAL edge id iterator
    */
   EdgeIterator edgeBegin(uint64_t globalNodeID) {
-    assert(graphLoaded);
+    if (!graphLoaded) {
+      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+    }
+
     if (numLocalNodes == 0) {
       return EdgeIterator(0);
     }
@@ -453,7 +458,10 @@ public:
    * @returns a GLOBAL edge id iterator
    */
   EdgeIterator edgeEnd(uint64_t globalNodeID) {
-    assert(graphLoaded);
+    if (!graphLoaded) {
+      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+    }
+
     if (numLocalNodes == 0) {
       return EdgeIterator(0);
     }
@@ -473,7 +481,10 @@ public:
    * for (should obtain from edgeBegin/End)
    */
   uint64_t edgeDestination(uint64_t globalEdgeID) {
-    assert(graphLoaded);
+    if (!graphLoaded) {
+      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+    }
+
     if (numLocalEdges == 0) {
       return 0;
     }
@@ -493,9 +504,12 @@ public:
    * @returns the edge data of the requested edge id
    */
   EdgeDataType edgeData(uint64_t globalEdgeID) {
-    assert(graphLoaded);
-    // shouldn't call this unless edge data was instantiated
-    assert(edgeDataBuffer != nullptr);
+    if (!graphLoaded) {
+      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+    }
+    if (edgeDataBuffer == nullptr) {
+      GALOIS_DIE("Trying to get edge data when graph has no edge data.");
+    }
 
     if (numLocalEdges == 0) {
       return 0;
