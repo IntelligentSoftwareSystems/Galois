@@ -36,6 +36,7 @@
 #include <unistd.h>
 #include <vector>
 #include <mpi.h>
+#include "galois/runtime/MemUsage.h"
 
 namespace galois {
 namespace runtime {
@@ -52,6 +53,8 @@ protected:
       MPI_Abort(MPI_COMM_WORLD, rc);
     }
   }
+
+  MemUsageTracker& memUsageTracker;
 public:
   struct message {
     uint32_t host;
@@ -64,6 +67,8 @@ public:
 
     bool valid() const { return !data.empty(); }
   };
+
+  NetworkIO(MemUsageTracker& tracker): memUsageTracker(tracker) {}
 
   virtual ~NetworkIO();
   
@@ -81,9 +86,9 @@ public:
   //message recv() -- receive data
 };
 
-std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI();
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
 #ifdef GALOIS_USE_LWCI
-std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI();
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker);
 #endif
 
 } //namespace runtime

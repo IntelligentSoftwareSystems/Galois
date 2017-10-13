@@ -75,6 +75,10 @@ private:
   struct sendQueueTy {
     std::deque<mpiMessage> inflight;
 
+    galois::runtime::MemUsageTracker& memUsageTracker;
+
+    sendQueueTy(galois::runtime::MemUsageTracker& tracker) : memUsageTracker(tracker) {}
+
     void complete() {
       while (!inflight.empty()) {
         int flag = 0;
@@ -82,8 +86,10 @@ private:
         auto& f = inflight.front();
         int rv = MPI_Test(&f.req, &flag, &status);
         handleError(rv);
-        if (flag)
+        if (flag) {
           inflight.pop_front();
+          memUsageTracker.decrementMemUsage(f.data.size());
+        }
         else
           break;
       }
@@ -103,6 +109,10 @@ private:
     std::deque<message> done;
     std::deque<mpiMessage> inflight;
 
+    galois::runtime::MemUsageTracker& memUsageTracker;
+
+    recvQueueTy(galois::runtime::MemUsageTracker& tracker) : memUsageTracker(tracker) {}
+
     // FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
       int flag = 0;
@@ -121,6 +131,7 @@ private:
         #endif
           inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
           auto& m = inflight.back();
+          memUsageTracker.incrementMemUsage(m.data.size());
           rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, 
                          status.MPI_TAG, MPI_COMM_WORLD, &m.req);
           handleError(rv);
@@ -149,13 +160,15 @@ private:
   recvQueueTy recvQueue;
 
 public:
-  NetworkIOMPI(uint32_t& ID, uint32_t& NUM) {
+  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM)
+    : NetworkIO(tracker), sendQueue(tracker), recvQueue(tracker) {
     auto p = getIDAndHostNum();
     ID = p.first;
     NUM = p.second;
   }
 
   virtual void enqueue(message m) {
+    memUsageTracker.incrementMemUsage(m.data.size());
     sendQueue.send(std::move(m));
   }
 
@@ -176,8 +189,8 @@ public:
 
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,
                            uint32_t,
-                           uint32_t> galois::runtime::makeNetworkIOMPI() {
+                           uint32_t> galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker) {
   uint32_t ID, NUM;
-  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOMPI(ID, NUM)};
+  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOMPI(tracker, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
