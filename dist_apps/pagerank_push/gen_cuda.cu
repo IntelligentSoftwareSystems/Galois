@@ -12,13 +12,11 @@ float * P_VALUE;
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
 static const int __tb_InitializeGraph = TB_SIZE;
-static const int __tb_InitializeGraphNout = TB_SIZE;
 __global__ void ResetGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_nout, float * p_residual, float * p_delta, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
   src_end = __end;
@@ -40,7 +38,6 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *nout_is_updated, 
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_InitializeGraphNout;
   index_type src_end;
   // FP: "1 -> 2;
   src_end = __end;
@@ -66,7 +63,6 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = __tb_InitializeGraphNout;
   float residual_old;
   index_type src_end;
   // FP: "1 -> 2;
@@ -100,7 +96,6 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
   float delta;
-  index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
   const int _NP_CROSSOVER_WP = 32;
@@ -118,7 +113,6 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   // FP: "7 -> 8;
-  src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
@@ -213,9 +207,8 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
         nbr = ns +_np_j;
         {
           index_type dst;
-          float dst_residual_old;
           dst = graph.getAbsDestination(nbr);
-          dst_residual_old = atomicAdd(&p_residual[dst], delta);
+          atomicAdd(&p_residual[dst], delta);
           is_updated->set(dst);
         }
       }
@@ -254,9 +247,8 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
           nbr = _np_w_start +_np_ii;
           {
             index_type dst;
-            float dst_residual_old;
             dst = graph.getAbsDestination(nbr);
-            dst_residual_old = atomicAdd(&p_residual[dst], delta);
+            atomicAdd(&p_residual[dst], delta);
             is_updated->set(dst);
           }
         }
@@ -291,9 +283,8 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
         nbr= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          float dst_residual_old;
           dst = graph.getAbsDestination(nbr);
-          dst_residual_old = atomicAdd(&p_residual[dst], delta);
+          atomicAdd(&p_residual[dst], delta);
           is_updated->set(dst);
         }
       }

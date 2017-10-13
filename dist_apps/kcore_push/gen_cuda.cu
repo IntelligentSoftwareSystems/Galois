@@ -20,7 +20,6 @@ __global__ void InitializeGraph2(CSRGraph graph,
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_InitializeGraph2;
-  index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
   const int _NP_CROSSOVER_WP = 32;
@@ -36,7 +35,6 @@ __global__ void InitializeGraph2(CSRGraph graph,
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
@@ -52,7 +50,6 @@ __global__ void InitializeGraph2(CSRGraph graph,
     // FP: "12 -> 13;
     struct NPInspector1 _np = {0,0,0,0,0,0};
     // FP: "13 -> 14;
-    __shared__ struct { ; } _np_closure [TB_SIZE];
     // FP: "14 -> 15;
     // FP: "15 -> 16;
     if (pop)
@@ -220,7 +217,6 @@ __global__ void InitializeGraph1(CSRGraph graph,
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
   src_end = __end;
@@ -242,7 +238,6 @@ __global__ void KCoreStep2(CSRGraph graph,
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
   src_end = __end;
@@ -275,7 +270,6 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
-  index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
   const int _NP_CROSSOVER_WP = 32;
@@ -291,7 +285,6 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
@@ -319,7 +312,6 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
       }
     }
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    __shared__ struct { ; } _np_closure [TB_SIZE];
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);

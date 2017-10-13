@@ -33,7 +33,7 @@ class LockArraySimple {
     assert(ndx >= 0 && ndx < nlocks);
     while(atomicCAS(glocks + ndx, UNLOCKED, LOCKED) == LOCKED) 
       {
-	threadfence();
+	__threadfence();
       }
     return glocks[ndx] == LOCKED;
   }

@@ -9,13 +9,11 @@ unsigned long long * P_COMP_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
-static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
 __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
-  const unsigned __kernel_tb_size = TB_SIZE;
   index_type src_end;
   // FP: "1 -> 2;
   src_end = __end;
@@ -38,7 +36,6 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
   typedef cub::BlockReduce<int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   ret_val.thread_entry();
-  index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
   const int _NP_CROSSOVER_WP = 32;
@@ -54,7 +51,6 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
-  src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
