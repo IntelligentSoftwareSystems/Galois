@@ -526,9 +526,6 @@ private:
     return retVal;
   }
 
-  /**
-   *
-   */
   void computeBoundingBoxFromPoints(vector<NodeWrapper*>& list, int size) {
     Point3 newMin(numeric_limits<double>::max());
     Point3 newMax(-numeric_limits<double>::max());
@@ -539,9 +536,7 @@ private:
     min.set(newMin);
     max.set(newMax);
   }
-  /**
-   *
-   */
+
   bool recomputeLeafBoundingBoxIfChanges() {
     Point3 newMin(numeric_limits<float>::max());
     Point3 newMax(-numeric_limits<float>::max());
@@ -553,9 +548,6 @@ private:
     }
     return updateBoundingBox(newMin, newMax);
   }
-  /**
-   *
-   */
   bool recomputeParentBoundingBoxIfChanges() {
     Point3 newMin(leftChild->min);
     newMin.setIfMin(rightChild->min);
@@ -563,18 +555,12 @@ private:
     newMax.setIfMax(rightChild->max);
     return updateBoundingBox(newMin, newMax);
   }
-  /**
-   *
-   */
   bool updateBoundingBox(Point3& newMin, Point3& newMax) {
     bool retVal = false;
     retVal      = min.setIfMin(newMin);
     retVal |= max.setIfMax(newMax);
     return retVal;
   }
-  /**
-   *
-   */
   friend ostream& operator<<(ostream& s, KdCell& cell);
 };
 const int KdCell::SPLIT_X            = 0;
@@ -583,9 +569,6 @@ const int KdCell::SPLIT_Z            = 2;
 const int KdCell::LEAF               = 3;
 const int KdCell::MAX_POINTS_IN_CELL = 4;
 
-/**
- *
- */
 ostream& operator<<(ostream& s, KdCell& cell) {
   if (cell.splitType == KdCell::LEAF) {
     s << "Leaf ::[";
