@@ -59,7 +59,6 @@ private:
   uint64_t edgeOffset;
   bool graphLoaded;
 
-  typedef boost::counting_iterator<uint64_t> EdgeIterator;
 
   // accumulators for tracking bytes read
   galois::GAccumulator<uint64_t> numBytesReadOutIndex;
@@ -297,6 +296,37 @@ private:
     // do nothing (edge data is void, i.e. no edge data)
   }
 
+  /**
+   * Resets graph metadata to default values. Does NOT touch the buffers.
+   */
+  void resetGraphStatus() {
+    graphLoaded = false;
+    nodeOffset = 0;
+    edgeOffset = 0;
+    numLocalNodes = 0;
+    numLocalEdges = 0;
+    resetReadCounters();
+  }
+
+  /**
+   * Free all of the buffers in memory.
+   */
+  void freeMemory() {
+    if (outIndexBuffer != nullptr) {
+      free(outIndexBuffer);
+      outIndexBuffer = nullptr;
+    }
+    if (edgeDestBuffer != nullptr) {
+      free(edgeDestBuffer);
+      edgeDestBuffer = nullptr;
+    }
+    if (edgeDataBuffer != nullptr) {
+      free(edgeDataBuffer);
+      edgeDataBuffer = nullptr;
+    }
+  }
+
+
 public:
   /**
    * Initialize class variables. 
@@ -308,27 +338,18 @@ public:
     outIndexBuffer = nullptr;
     edgeDestBuffer = nullptr;
     edgeDataBuffer = nullptr;
-    graphLoaded = false;
-    nodeOffset = 0;
-    edgeOffset = 0;
-
-    resetReadCounters();
+    resetGraphStatus();
   }
 
   /**
    * On destruction, free allocated buffers (if necessary).
    */
   ~MPIGraph() {
-    if (outIndexBuffer != nullptr) {
-      free(outIndexBuffer);
-    }
-    if (edgeDestBuffer != nullptr) {
-      free(edgeDestBuffer);
-    }
-    if (edgeDataBuffer != nullptr) {
-      free(edgeDataBuffer);
-    }
+    freeMemory();
   }
+
+
+  // TODO define copy, move default ops as well (very important)
 
   /**
    * Given a node/edge range to load, loads the specified portion of the graph 
@@ -390,6 +411,7 @@ public:
     }
   }
 
+  using EdgeIterator = boost::counting_iterator<uint64_t>; 
   /**
    * Get the index to the first edge of the provided node.
    *
@@ -500,9 +522,15 @@ public:
            numBytesReadEdgeDest.reduce() +
            numBytesReadEdgeData.reduce();
   }
+
+  /**
+   * Free all of the in memory buffers in this object and reset graph status.
+   */
+  void resetAndFree() {
+    freeMemory();
+    resetGraphStatus();
+  }
 };
-
-
 } // end graph namespace
 } // end galois namespace
 #endif
