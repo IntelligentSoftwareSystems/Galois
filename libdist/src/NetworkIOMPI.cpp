@@ -87,8 +87,8 @@ private:
         int rv = MPI_Test(&f.req, &flag, &status);
         handleError(rv);
         if (flag) {
-          inflight.pop_front();
           memUsageTracker.decrementMemUsage(f.data.size());
+          inflight.pop_front();
         }
         else
           break;

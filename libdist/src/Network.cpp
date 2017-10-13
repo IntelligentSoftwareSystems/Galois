@@ -90,7 +90,8 @@ NetworkInterface::~NetworkInterface() {
 
 void NetworkInterface::reportMemUsage() const {
   std::string str("COMMUNICATION_MEM_USAGE");
-  galois::runtime::reportStat_Tmax("dGraph", str, memUsageTracker.getMaxMemUsage());
+  galois::runtime::reportStat_Tmin("dGraph", str + "_MIN", memUsageTracker.getMaxMemUsage());
+  galois::runtime::reportStat_Tmax("dGraph", str + "_MAX", memUsageTracker.getMaxMemUsage());
 }
 
 // forward decl

@@ -105,8 +105,8 @@ public:
   }
 
   virtual void enqueue(message m) {
-    inflight.emplace_back(m.host, m.tag, m.data);
     memUsageTracker.incrementMemUsage(m.data.size());
+    inflight.emplace_back(m.host, m.tag, m.data);
     auto& f = inflight.back();
     while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, &f.ctx)) {
       progress();
