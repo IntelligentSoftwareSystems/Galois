@@ -456,12 +456,14 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
         check_numEdges += num_assigned_edges_perhost[h].reduce();
       }
+      galois::gPrint("[", base_hGraph::id, "] check_numEdges done\n");
 
       assert(check_numEdges == numEdges_distribute);
 
       numOwned = num_assigned_nodes_perhost[base_hGraph::id].reduce();
       /****** Exchange numOutgoingEdges sets *********/
       //send and clear assigned_edges_perhost to receive from other hosts
+      galois::gPrint("[", base_hGraph::id, "] Starting Send of the data\n");
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
         galois::runtime::SendBuffer b;
@@ -473,6 +475,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
 
       net.flush();
+      galois::gPrint("[", base_hGraph::id, "] Sent the data\n");
 
       //receive
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -493,6 +496,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         num_total_edges_to_receive += num_edges_from_host;
         numOwned += num_nodes_from_host;
       }
+      galois::gPrint("[", base_hGraph::id, "] Received the data\n");
       ++galois::runtime::evilPhase;
 
       for (unsigned x = 0; x < net.Num; ++x) {
@@ -501,6 +505,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         hasIncomingEdge[base_hGraph::id].bitwise_or(hasIncomingEdge[x]);
       }
 
+      galois::gPrint("[", base_hGraph::id, "] Start: Fill local and global vectors\n");
       numNodes = 0;
       numEdges = 0;
       localToGlobalVector.reserve(numOwned);
@@ -521,6 +526,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           ++src;
         }
       }
+      galois::gPrint("[", base_hGraph::id, "] End: Fill local and global vectors\n");
 
       /* At this point numNodes should be equal to the number of
        * nodes owned by the host.
@@ -528,6 +534,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       assert(numNodes == numOwned);
       assert(localToGlobalVector.size() == numOwned);
 
+      galois::gPrint("[", base_hGraph::id, "] Start: Fill Ghosts\n");
       /* In a separate loop for ghosts, so that all the masters can be assigned
        * contigous local ids.
        */
@@ -545,6 +552,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
+      galois::gPrint("[", base_hGraph::id, "] End: Fill Ghosts\n");
       //std::cout << base_hGraph::id <<  "] numNodes : " << numNodes << ", numOwned : " << numOwned << ", numEdges : " << numEdges  <<"\n";
 
       uint32_t numGhosts = (localToGlobalVector.size() - numOwned);
@@ -553,22 +561,30 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         mirror_mapping_to_hosts.resize(numGhosts);
       }
 
+      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes send\n");
 
       /****** Exchange assignedNodes: All to all *********/
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
         galois::runtime::SendBuffer b;
+#if 0
         galois::runtime::gSerialize(b, numOwned);
         for(uint32_t i = 0; i < numOwned; ++i) {
+          if(base_hGraph::id == 0)
+            std::cerr << localToGlobalVector[i] << "\n";
           galois::runtime::gSerialize(b,localToGlobalVector[i]);
         }
-        //std::vector<uint64_t> temp_vec(localToGlobalVector.begin(), localToGlobalVector.begin() + numOwned);
-        //galois::runtime::gSerialize(b, temp_vec);
+#endif
+        std::vector<uint64_t> temp_vec(localToGlobalVector.begin(), localToGlobalVector.begin() + numOwned);
+        galois::runtime::gSerialize(b, temp_vec);
         net.sendTagged(x, galois::runtime::evilPhase, b);
       }
+      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes receive\n");
 
+      galois::gPrint("[", base_hGraph::id, "] End: assignedNodes send\n");
       net.flush();
 
+      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes receive\n");
       //receive
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_hGraph::id) continue;
@@ -605,6 +621,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           galois::no_stats()
         );
       }
+      galois::gPrint("[", base_hGraph::id, "] End: assignedNodes receive\n");
       ++galois::runtime::evilPhase;
 
       //fill mirror nodes
