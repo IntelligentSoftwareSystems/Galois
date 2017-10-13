@@ -14,13 +14,13 @@ endif()
 
 function(cudaLibs name)
   cuda_add_library(${name}_cuda_v ${name}/gen_cuda.cu)
-  target_link_libraries(${name}_cuda_v ggrt)
+  target_link_libraries(${name}_cuda_v galois_gpu)
   # with bitset
   cuda_add_library(${name}_cuda_vbs ${name}/gen_cuda_bs.cu)
-  target_link_libraries(${name}_cuda_vbs ggrt)
+  target_link_libraries(${name}_cuda_vbs galois_gpu)
 endfunction()
 
-# GGC libraries created once then linked with correct version
+# GPU libraries created once then linked with correct version
 if (ENABLE_HETERO_GALOIS)
   ##############################
   # bfs

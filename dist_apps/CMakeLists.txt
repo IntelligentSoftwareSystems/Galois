@@ -37,10 +37,10 @@ function(distApp name)
 
   if(ENABLE_HETERO_GALOIS)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
-    target_link_libraries(${name} ${name}_cuda distbench)
+    target_link_libraries(${name} ${name}_cuda)
+
     cuda_add_library(${name}_cuda ${name}/gen_cuda.cu)
-    target_include_directories(${name}_cuda PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
-    target_link_libraries(${name}_cuda ggrt distbench)
+    target_link_libraries(${name}_cuda galois_gpu)
   endif()
 endfunction()
 
