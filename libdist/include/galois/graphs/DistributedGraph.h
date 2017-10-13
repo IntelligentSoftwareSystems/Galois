@@ -417,7 +417,6 @@ private:
     while (received < numHosts) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != id);
@@ -473,7 +472,6 @@ private:
     while (received < numHosts) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != id);
@@ -971,7 +969,6 @@ private:
 
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while(!p);
 
@@ -1027,7 +1024,6 @@ private:
 
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while(!p);
 
@@ -1969,7 +1965,6 @@ private:
 
       decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
 
@@ -2811,7 +2806,6 @@ private:
       decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
 
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
 
@@ -3008,7 +3002,6 @@ public:
     decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
 
     do {
-      net.handleReceives();
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
     } while (!p);
 

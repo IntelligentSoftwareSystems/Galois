@@ -475,7 +475,6 @@ public:
     for (unsigned i = 1; i < numColumnHosts; ++i) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
@@ -813,7 +812,6 @@ public:
     // receive edges for all mirror nodes
     while (numNodesWithEdges < base_hGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      net.handleReceives();
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
 
       if (p) {

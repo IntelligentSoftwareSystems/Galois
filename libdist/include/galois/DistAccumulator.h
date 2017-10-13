@@ -73,7 +73,6 @@ class DGAccumulator {
     while (num_Hosts_recvd < net.Num) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
@@ -239,7 +238,6 @@ public:
     while (num_Hosts_recvd < net.Num) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;
@@ -282,7 +280,6 @@ public:
     while (num_Hosts_recvd < net.Num) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       Ty x_mdata;

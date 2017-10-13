@@ -485,7 +485,6 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
-          net.handleReceives();
           p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         } while(!p);
 
@@ -593,7 +592,6 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
-          net.handleReceives();
           p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         } while(!p);
 
@@ -865,7 +863,6 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       // receive the edges from other hosts
       while (edgesToReceive) {
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
 
         if (p) {

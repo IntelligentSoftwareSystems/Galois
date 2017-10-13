@@ -117,7 +117,6 @@ public:
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
       num_work_bytes += b.size();
       net.sendTagged(x, galois::runtime::evilPhase, b);
-      //net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
 
@@ -127,16 +126,11 @@ public:
         continue;
       decltype(net.recieveTagged(galois::runtime::evilPhase,nullptr)) p;
       do {
-        net.handleReceives();
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       recv_BagItems(p->first, p->second);
     }
     ++galois::runtime::evilPhase;
-
-    //while(num_Hosts_recvd < (net.Num - 1)){
-      //net.handleReceives();
-    //}
 
     workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
     std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
