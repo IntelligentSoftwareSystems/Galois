@@ -225,6 +225,10 @@ private:
     assert(edgeDataBuffer == nullptr);
     edgeDataBuffer = (EdgeDataType*)malloc(sizeof(EdgeDataType) * numEdgesToLoad);
 
+    if (edgeDataBuffer == nullptr) {
+      GALOIS_DIE("Failed to allocate memory for edge data buffer.");
+    }
+
     // position after nodes + edges
     uint64_t baseReadPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                                 (sizeof(uint32_t) * numGlobalEdges);
