@@ -610,8 +610,8 @@ private:
         for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
-          gdst_vec[i].reserve(std::distance(ee, ee_end));
-          gdata_vec[i].reserve(std::distance(ee, ee_end));
+          //gdst_vec[i].reserve(std::distance(ee, ee_end));
+          //gdata_vec[i].reserve(std::distance(ee, ee_end));
         }
 
         if (num_edges > VCutThreshold) {
@@ -746,7 +746,7 @@ private:
         std::vector<std::vector<uint64_t>>& gdst_vec = *gdst_vecs.getLocal();
         for (unsigned i = 0; i < numHosts; i++) {
           gdst_vec[i].clear();
-          gdst_vec[i].reserve(std::distance(ee, ee_end));
+          //gdst_vec[i].reserve(std::distance(ee, ee_end));
         }
 
         if (num_edges > VCutThreshold) {
