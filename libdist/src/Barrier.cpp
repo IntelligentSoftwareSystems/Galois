@@ -98,10 +98,10 @@ public:
   virtual void wait() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    galois::runtime::SendBuffer b;
-    galois::runtime::gSerialize(b, net.ID+1); // non-zero message
     for (unsigned h = 0; h < net.Num; ++h) {
       if (h == net.ID) continue;
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, net.ID+1); // non-zero message
       net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush(); // flush all sends
