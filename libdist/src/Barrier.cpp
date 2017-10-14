@@ -85,29 +85,30 @@ public:
 
 namespace {
 class HostBarrier : public galois::substrate::Barrier {
+  std::atomic<int> count;
+
+  static void barrierLandingPad(uint32_t) {
+    --static_cast<HostBarrier&>(galois::runtime::getHostBarrier()).count;
+  }
 
   void barrier_net() {
+    if (galois::substrate::ThreadPool::getTID() == 0) {
+      count += galois::runtime::NetworkInterface::Num;
+    }
+
     auto& net = galois::runtime::getSystemNetworkInterface();
-
-    galois::runtime::SendBuffer b;
-    galois::runtime::gSerialize(b, net.ID+1); // non-zero message
-    for (unsigned h = 0; h < net.Num; ++h) {
-      if (h == net.ID) continue;
-      net.sendTagged(h, galois::runtime::evilPhase, b);
+    if (galois::substrate::ThreadPool::getTID() == 0) {
+      //      std::cerr << "@";
+      //notify global and wait on global
+      net.broadcastSimple(barrierLandingPad);
+      --count;
     }
-    net.flush();
+    //    std::cerr << "#";
 
-    unsigned received = 1; // self
-    while (received < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      assert(p->first != net.ID);
-      // ignore received data
-      ++received;
+    while (count > 0) {
+      net.handleReceives();
     }
-    ++galois::runtime::evilPhase;
+    //    std::cerr << "$";
   }
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -117,12 +118,12 @@ class HostBarrier : public galois::substrate::Barrier {
 #endif
 
 public:
+  HostBarrier() : count(0) {}
+
   virtual const char* name() const { return "HostBarrier"; }
 
   virtual void reinit(unsigned val) { }
 
-  // should not be called within a parallel region
-  // assumes only one thread is calling it
   virtual void wait() {
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
     switch (bare_mpi) {
