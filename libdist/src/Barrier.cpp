@@ -86,7 +86,16 @@ public:
 namespace {
 class HostBarrier : public galois::substrate::Barrier {
 
-  void barrier_net() {
+public:
+  virtual const char* name() const { return "HostBarrier"; }
+
+  virtual void reinit(unsigned val) { }
+
+  // control-flow barrier across distributed hosts
+  // acts as a distributed-memory behavior as well (flushes send and receives)
+  // should not be called within a parallel region
+  // assumes only one thread is calling it
+  virtual void wait() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     galois::runtime::SendBuffer b;
@@ -95,12 +104,13 @@ class HostBarrier : public galois::substrate::Barrier {
       if (h == net.ID) continue;
       net.sendTagged(h, galois::runtime::evilPhase, b);
     }
-    net.flush();
+    net.flush(); // flush all sends
 
     unsigned received = 1; // self
     while (received < net.Num) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
+        net.handleReceives(); // flush all receives from net.sendMsg() or net.sendSimple()
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != net.ID);
@@ -108,38 +118,6 @@ class HostBarrier : public galois::substrate::Barrier {
       ++received;
     }
     ++galois::runtime::evilPhase;
-  }
-
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-  void barrier_mpi() {
-    MPI_Barrier(MPI_COMM_WORLD);
-  }
-#endif
-
-public:
-  virtual const char* name() const { return "HostBarrier"; }
-
-  virtual void reinit(unsigned val) { }
-
-  // should not be called within a parallel region
-  // assumes only one thread is calling it
-  virtual void wait() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    switch (bare_mpi) {
-      case noBareMPI:
-#endif
-        barrier_net();
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-        break;
-      case nonBlockingBareMPI:
-      case oneSidedBareMPI:
-        barrier_mpi();
-        break;
-      default:
-        GALOIS_DIE("Unsupported bare MPI");
-    }
-#endif
-
   }
 };
 } // end namespace ""
