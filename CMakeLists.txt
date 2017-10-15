@@ -203,7 +203,7 @@ if(ENABLE_DIST_GALOIS)
     cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
 
     # MGPU v1.1
-    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu")
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu") # only required headers
     cuda_include_directories("${MGPU_ROOT}/include")
 
     # CUB v1.6.4
