@@ -85,62 +85,39 @@ public:
 
 namespace {
 class HostBarrier : public galois::substrate::Barrier {
-  std::atomic<int> count;
-
-  static void barrierLandingPad(uint32_t) {
-    --static_cast<HostBarrier&>(galois::runtime::getHostBarrier()).count;
-  }
-
-  void barrier_net() {
-    if (galois::substrate::ThreadPool::getTID() == 0) {
-      count += galois::runtime::NetworkInterface::Num;
-    }
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (galois::substrate::ThreadPool::getTID() == 0) {
-      //      std::cerr << "@";
-      //notify global and wait on global
-      net.broadcastSimple(barrierLandingPad);
-      --count;
-    }
-    //    std::cerr << "#";
-
-    while (count > 0) {
-      net.handleReceives();
-    }
-    //    std::cerr << "$";
-  }
-
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-  void barrier_mpi() {
-    MPI_Barrier(MPI_COMM_WORLD);
-  }
-#endif
 
 public:
-  HostBarrier() : count(0) {}
-
   virtual const char* name() const { return "HostBarrier"; }
 
   virtual void reinit(unsigned val) { }
 
+  // control-flow barrier across distributed hosts
+  // acts as a distributed-memory behavior as well (flushes send and receives)
+  // should not be called within a parallel region
+  // assumes only one thread is calling it
   virtual void wait() {
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    switch (bare_mpi) {
-      case noBareMPI:
-#endif
-        barrier_net();
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-        break;
-      case nonBlockingBareMPI:
-      case oneSidedBareMPI:
-        barrier_mpi();
-        break;
-      default:
-        GALOIS_DIE("Unsupported bare MPI");
-    }
-#endif
+    auto& net = galois::runtime::getSystemNetworkInterface();
 
+    for (unsigned h = 0; h < net.Num; ++h) {
+      if (h == net.ID) continue;
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, net.ID+1); // non-zero message
+      net.sendTagged(h, galois::runtime::evilPhase, b);
+    }
+    net.flush(); // flush all sends
+
+    unsigned received = 1; // self
+    while (received < net.Num) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      do {
+        net.handleReceives(); // flush all receives from net.sendMsg() or net.sendSimple()
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
+      assert(p->first != net.ID);
+      // ignore received data
+      ++received;
+    }
+    ++galois::runtime::evilPhase;
   }
 };
 } // end namespace ""

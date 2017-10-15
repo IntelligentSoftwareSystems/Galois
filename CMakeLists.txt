@@ -202,29 +202,13 @@ if(ENABLE_DIST_GALOIS)
 
     cuda_include_directories("${CMAKE_SOURCE_DIR}/libgpu/include")
 
-    # MGPU
-    if(NOT "$ENV{MGPU_ROOT}" STREQUAL "")
-      set(MGPU_ROOT $ENV{MGPU_ROOT})
-    else()
-      set(MGPU_ROOT "/net/ohm/export/iss/mgpu")
-    endif()
-    if (EXISTS ${MGPU_ROOT})
-      cuda_include_directories("${MGPU_ROOT}/include")
-    else()
-      message(FATAL_ERROR "Modern GPU v1.1 required - download from http://nvlabs.github.io/moderngpu and set environment variable MGPU_ROOT")
-    endif()
+    # MGPU v1.1
+    set(MGPU_ROOT "${CMAKE_SOURCE_DIR}/libgpu/moderngpu") # only required headers
+    cuda_include_directories("${MGPU_ROOT}/include")
 
-    # CUB
-    if(NOT "$ENV{CUB_ROOT}" STREQUAL "")
-      set(CUB_ROOT $ENV{CUB_ROOT})
-    else()
-      set(CUB_ROOT "/net/ohm/export/iss/cub")
-    endif()
-    if (EXISTS ${CUB_ROOT})
-      cuda_include_directories("${CUB_ROOT}")
-    else()
-      message(FATAL_ERROR "CUB v1.6.4 required - download from http://nvlabs.github.com/cub and set environment variable CUB_ROOT")
-    endif()
+    # CUB v1.6.4
+    set(CUB_ROOT "${CMAKE_SOURCE_DIR}/libgpu/cub") # only required headers
+    cuda_include_directories("${CUB_ROOT}")
 
     #find_package(OpenCL REQUIRED)
   endif(ENABLE_HETERO_GALOIS)
