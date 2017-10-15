@@ -11,7 +11,7 @@ library('data.table')
 ####START: @function to parse commadline##################
 # Parses the command line to get the arguments used
 parseCmdLine <- function (logData, isSharedMemGaloisLog) {
-  cmdLineRow <- subset(logData, CATEGORY == "CommandLine")
+  cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
 
   ## Distributed has extra column: HostID
   if(isTRUE(isSharedMemGaloisLog))
@@ -27,10 +27,10 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
   benchmark <- exePathSplit[length(exePathSplit)]
 
   ## subset the threads row from the table
-  numThreads <- (subset(logData, CATEGORY == "Threads"))$TOTAL
+  numThreads <- (subset(logData, CATEGORY == "Threads"& TOTAL_TYPE != "HostValues"))$TOTAL
 
   ## subset the input row from the table
-  inputPath <- (subset(logData, CATEGORY == "Input"))$TOTAL
+  inputPath <- (subset(logData, CATEGORY == "Input"& TOTAL_TYPE != "HostValues"))$TOTAL
   inputPathSplit <- strsplit(inputPath[[1]], "/")[[1]]
   input <- inputPathSplit[length(inputPathSplit)]
   ### This is to remore the extension for example .gr or .sgr
@@ -45,13 +45,13 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
  }
 
  ## Need more params for distributed galois logs
- numHosts <- (subset(logData, CATEGORY == "Hosts"))$TOTAL
+ numHosts <- (subset(logData, CATEGORY == "Hosts"& TOTAL_TYPE != "HostValues"))$TOTAL
 
- partitionScheme <- (subset(logData, CATEGORY == "PartitionScheme"))$TOTAL
+ partitionScheme <- (subset(logData, CATEGORY == "PartitionScheme"& TOTAL_TYPE != "HostValues"))$TOTAL
 
- runID <- (subset(logData, CATEGORY == "Run_UUID"))$TOTAL
+ runID <- (subset(logData, CATEGORY == "Run_UUID"& TOTAL_TYPE != "HostValues"))$TOTAL
 
- numIterations <- (subset(logData, CATEGORY == "NUM_ITERATIONS_0"))$TOTAL
+ numIterations <- (subset(logData, CATEGORY == "NUM_ITERATIONS_0"& TOTAL_TYPE != "HostValues"))$TOTAL
 
  ## returnList for distributed galois log
  returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations)
@@ -76,28 +76,29 @@ getTimersShared <- function (logData) {
 getTimersDistributed <- function (logData) {
 
  ## Total time including the graph construction and initialization
- totalTime <- (subset(logData, CATEGORY == "TIMER_TOTAL")$TOTAL)
+ totalTime <- (subset(logData, CATEGORY == "TIMER_TOTAL" & TOTAL_TYPE != "HostValues")$TOTAL)
  print(paste("totalTime:", totalTime))
 
  ## Taking mean of all the runs
- totalTimeExecMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY))$TOTAL))
+ totalTimeExecMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL))
  print(paste("totalTimeExecMean:", totalTimeExecMean))
 
  ## To get the name of benchmark to be used with other queries to get right timers.
  ### It assumes that there will always with TIMER_0 with REGION name as benchmark
  ### name used with other queries.
- benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0")$REGION
+ benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
  print(paste("benchmark:", benchmarkRegionName))
 
  ## Number of runs
- numRuns <- as.numeric((subset(logData, CATEGORY == "Runs"))$TOTAL)
+ numRuns <- as.numeric((subset(logData, CATEGORY == "Runs" & TOTAL_TYPE != "HostValues"))$TOTAL)
  print(paste("numRuns:", numRuns))
 
  ## Total compute time (galois::do_alls)
  computeTimePerIter <- numeric()
- for(i in 0:(numRuns - 1)) {
+ for(i in 1:(numRuns)) {
    j = i - 1 #Vectors are 1 indexed in r
-   computeTimeRows <- subset(logData, grepl(paste(benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & CATEGORY == "Time")$TOTAL
+   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
+   #computeTimeRows <- subset(logData, grepl("^BFS_0_0", REGION) & TOTAL_TYPE != "HostValues")
    if(!is.null(computeTimeRows)){
      computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
    }
@@ -107,9 +108,9 @@ getTimersDistributed <- function (logData) {
 
  ##Total sync time.
  syncTimePerIter <- numeric()
- for(i in 0:(numRuns - 1)) {
+ for(i in 1:(numRuns)) {
    j = i - 1 #Vectors are 1 indexed in r
-   syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY))$TOTAL
+   syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
    if(!is.null(syncTimeRows)){
      syncTimePerIter[i] <- sum(as.numeric(syncTimeRows))
    }
@@ -122,7 +123,7 @@ getTimersDistributed <- function (logData) {
  barrierTimePerIter <- numeric()
  for(i in 1:(numRuns)) {
   j = i - 1 #Vectors are 1 indexed in r
-  barrierTimeRows <- subset(logData, REGION =="DGReducible" & grepl(paste( "REDUCE_DGACCUM_", j, "_[0-9]+", sep=""), CATEGORY))$TOTAL
+  barrierTimeRows <- subset(logData, REGION =="DGReducible" & grepl(paste( "REDUCE_DGACCUM_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
   if(!is.null(barrierTimeRows)){
     barrierTimePerIter[i] <- sum(as.numeric(barrierTimeRows))
   }
@@ -132,15 +133,15 @@ getTimersDistributed <- function (logData) {
 
  ## Total bytes sent in reduce and broadcast phase in run 0.
  ### Same number of bytes are being sent in all the runs.
- syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY))$TOTAL))
+ syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE != "HostValues")$TOTAL))
  print(paste("syncBytes:", syncBytes))
 
  ##Graph construction time
- graphConstructTime <- subset(logData, CATEGORY == "TIME_GRAPH_CONSTRUCT")$TOTAL
+ graphConstructTime <- subset(logData, CATEGORY == "TIME_GRAPH_CONSTRUCT" & TOTAL_TYPE != "HostValues")$TOTAL
  print(paste("graphConstructTime:", graphConstructTime))
 
  ## Replication factor
- replicationFactor <- subset(logData, CATEGORY == "REPLICATION_FACTOR_0_0")$TOTAL
+ replicationFactor <- subset(logData, CATEGORY == "REPLICATION_FACTOR_0_0" & TOTAL_TYPE != "HostValues")$TOTAL
  print(paste("replicationFactor:", replicationFactor))
 
  returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime)
