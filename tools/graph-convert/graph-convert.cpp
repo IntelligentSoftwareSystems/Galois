@@ -22,6 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
+#include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/graphs/FileGraph.h"
 
@@ -2464,6 +2465,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
 #endif
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
   llvm::cl::ParseCommandLineOptions(argc, argv);
   std::ios_base::sync_with_stdio(false);
   switch (convertMode) {
