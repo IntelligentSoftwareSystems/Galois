@@ -148,19 +148,14 @@ getTimersDistributed <- function (logData) {
  communicationMemUsageMax = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MAX" & TOTAL_TYPE == "HMAX")$TOTAL)
  communicationMemUsageMin = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MIN" & TOTAL_TYPE == "HMIN")$TOTAL)
 
- memUsage = FALSE
- if(!identical(communicationMemUsageMax, numeric(0)) & !identical(communicationMemUsageMin, numeric(0))){
-  memUsage = TRUE
-  print("Printing Memory usage counter as well.")
+ if(identical(communicationMemUsageMax, numeric(0)) || identical(communicationMemUsageMin, numeric(0))){
+   communicationMemUsageMax = 0 
+   communicationMemUsageMin = 0
+   print("Printing Memory usage counter not present.")
  }
 
- if(isTRUE(memUsage)){
-   returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime, "communicationMemUsageMax" = communicationMemUsageMax, "communicationMemUsageMin" = communicationMemUsageMin)
-   return(returnList)
- }else {
-   returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime)
-   return(returnList)
- }
+ returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime, "communicationMemUsageMax" = communicationMemUsageMax, "communicationMemUsageMin" = communicationMemUsageMin)
+ return(returnList)
 }
 #### END: @function to values of timers for distributed memory galois log ##################
 
