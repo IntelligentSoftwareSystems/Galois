@@ -917,10 +917,6 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     }
   }
 
-  bool is_vertex_cut() const{
-    return true;
-  }
-
   /**
    * Returns the total nodes : master + slaves created on the local host.
    */
