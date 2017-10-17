@@ -132,6 +132,7 @@ struct FirstItr_SSSP {
       __begin = 0;
       __end = 0;
     }
+    _graph.set_num_iter(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));

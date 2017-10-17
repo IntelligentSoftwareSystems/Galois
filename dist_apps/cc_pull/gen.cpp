@@ -120,7 +120,7 @@ struct ConnectedComp {
     graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    unsigned _num_iterations = 1;
+    unsigned _num_iterations = 0;
     
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do { 

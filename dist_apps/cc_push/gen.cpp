@@ -118,6 +118,7 @@ struct FirstItr_ConnectedComp{
 
   void static go(Graph& _graph) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    _graph.set_num_iter(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
