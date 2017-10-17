@@ -964,5 +964,9 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
     ss_cout << base_hGraph::id << s << "\n";
     std::cerr << ss_cout.str();
   }
+
+  bool is_vertex_cut() const{
+    return false;
+  }
 };
 #endif
