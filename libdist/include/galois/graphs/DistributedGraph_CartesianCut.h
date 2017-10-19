@@ -569,7 +569,7 @@ public:
       if (columnBlocked) {
         bool skip = false;
         for (unsigned d = 0; d < DecomposeFactor; ++d) {
-          unsigned leaderHostID = gridRowID(base_hGraph::id + i * base_hGraph::numHosts) * 
+          unsigned leaderHostID = gridRowID(base_hGraph::id + d * base_hGraph::numHosts) *
                                   numColumnHosts;
           if ((hostID_virtual >= leaderHostID) && 
               (hostID_virtual < (leaderHostID + numColumnHosts))) {
