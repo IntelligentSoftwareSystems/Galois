@@ -511,19 +511,34 @@ private:
     globalToLocalMap.reserve(max_nodes);
     prefixSumOfEdges.reserve(max_nodes);
     unsigned leaderHostID = gridRowID() * numColumnHosts;
-    uint64_t src = base_hGraph::gid2host[leaderHostID].first;
-    uint64_t src_end = base_hGraph::gid2host[leaderHostID+numColumnHosts-1].second;
     dummyOutgoingNodes = 0;
     numNodes = 0;
     numEdges = 0;
+
+    // go over master nodes first
+    {
+      uint64_t src = base_hGraph::gid2host[base_hGraph::id].first;
+      unsigned i = gridColumnID();
+      for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
+        numEdges += numOutgoingEdges[i][j];
+        localToGlobalVector.push_back(src);
+        assert(globalToLocalMap.find(src) == globalToLocalMap.end());
+        globalToLocalMap[src] = numNodes++;
+        prefixSumOfEdges.push_back(numEdges);
+        ++src;
+      }
+      assert(src == base_hGraph::gid2host[base_hGraph::id].second);
+    }
+
     for (unsigned i = 0; i < numColumnHosts; ++i) {
+      if ((leaderHostID + i) == base_hGraph::id) continue; // skip master nodes
+      uint64_t src = base_hGraph::gid2host[leaderHostID + i].first;
+      uint64_t src_end = base_hGraph::gid2host[leaderHostID + i].second;
       for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
         bool createNode = false;
         if (numOutgoingEdges[i][j] > 0) {
           createNode = true;
           numEdges += numOutgoingEdges[i][j];
-        } else if (isOwned(src)) {
-          createNode = true;
         } else {
           for (unsigned k = 0; k < numColumnHosts; ++k) {
             auto h = getColumnHostID(k, src);
@@ -538,17 +553,19 @@ private:
         }
         if (createNode) {
           localToGlobalVector.push_back(src);
+          assert(globalToLocalMap.find(src) == globalToLocalMap.end());
           globalToLocalMap[src] = numNodes++;
           prefixSumOfEdges.push_back(numEdges);
         }
         ++src;
       }
+      assert(src == src_end);
     }
-    assert(src == src_end);
 
     base_hGraph::numNodesWithEdges = numNodes;
 
-    src = base_hGraph::gid2host[leaderHostID].first;
+    uint64_t src = base_hGraph::gid2host[leaderHostID].first;
+    uint64_t src_end = base_hGraph::gid2host[leaderHostID+numColumnHosts-1].second;
     for (uint64_t dst = 0; dst < base_hGraph::numGlobalNodes; ++dst) {
       if (src != src_end) {
         if (dst == src) { // skip nodes which have been allocated above
