@@ -523,7 +523,7 @@ class LC_CSR_Graph :
         if (i != 0) {
           assert(returnRanges[i] == *(nodeSplits.first));
         } else { // i == 0
-          assert(returnRanges[i] == 0);
+          assert(returnRanges[i] == beginNode);
         }
         returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
       } else {
