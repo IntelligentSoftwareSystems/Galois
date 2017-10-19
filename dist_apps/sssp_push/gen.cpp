@@ -283,6 +283,7 @@ struct SSSPSanityCheck {
   #endif
     dgas.reset();
     dgam.reset();
+    m.reset();
 
     galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam, m), 
