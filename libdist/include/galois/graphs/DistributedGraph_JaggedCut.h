@@ -533,7 +533,10 @@ private:
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       if ((leaderHostID + i) == base_hGraph::id) continue; // skip master nodes
       uint64_t src = base_hGraph::gid2host[leaderHostID + i].first;
+      #ifndef NDEBUG
       uint64_t src_end = base_hGraph::gid2host[leaderHostID + i].second;
+      #endif
+
       for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
         bool createNode = false;
         if (numOutgoingEdges[i][j] > 0) {

@@ -260,19 +260,20 @@ struct SSSPSanityCheck {
   const uint32_t &local_infinity;
   Graph* graph;
 
-  static uint32_t current_max;
-
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
   galois::DGAccumulator<uint32_t>& DGAccumulator_max;
+  galois::GReduceMax<uint32_t>& current_max;
 
   SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph,
                   galois::DGAccumulator<uint64_t>& dgas,
-                  galois::DGAccumulator<uint32_t>& dgam) : 
+                  galois::DGAccumulator<uint32_t>& dgam,
+                  galois::GReduceMax<uint32_t>& m) : 
     local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
-    DGAccumulator_max(dgam) {}
+    DGAccumulator_max(dgam), current_max(m) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam) {
+                 galois::DGAccumulator<uint32_t>& dgam, 
+                 galois::GReduceMax<uint32_t>& m) {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO currently no GPU support for sanity check operator
@@ -284,13 +285,12 @@ struct SSSPSanityCheck {
     dgam.reset();
 
     galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
-                   SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
+                   SSSPSanityCheck(infinity, &_graph, dgas, dgam, m), 
                    galois::loopname("SSSPSanityCheck"),
                    galois::no_stats());
 
     uint64_t num_visited = dgas.reduce();
-
-    dgam = current_max;
+    dgam = m.reduce();
     uint32_t max_distance = dgam.reduce_max();
 
     // Only node 0 will print the info
@@ -306,15 +306,11 @@ struct SSSPSanityCheck {
     if (graph->isOwned(graph->getGID(src)) && 
         src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
-
-      if (current_max < src_data.dist_current) {
-        current_max = src_data.dist_current;
-      }
+      current_max.update(src_data.dist_current);
     }
   }
 
 };
-uint32_t SSSPSanityCheck::current_max = 0;
 
 /******************************************************************************/
 /* Main */
@@ -364,6 +360,7 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint32_t> DGAccumulator_max;
+  galois::GReduceMax<uint32_t> m;
 
   for(auto run = 0; run < numRuns; ++run){
     galois::gPrint("[", net.ID, "] SSSP::go run ", run, " called\n");
@@ -374,8 +371,7 @@ int main(int argc, char** argv) {
       SSSP::go(*hg, DGAccumulator_accum);
     StatTimer_main.stop();
 
-    SSSPSanityCheck::current_max = 0;
-    SSSPSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max);
+    SSSPSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max, m);
 
     if ((run + 1) != numRuns) {
       #ifdef __GALOIS_HET_CUDA__
