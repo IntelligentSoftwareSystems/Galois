@@ -100,7 +100,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
 
     bool isOwned(uint64_t gid) const {
         //assert(isLocal(gid));
-        if(isLocal(gid) && (globalToLocalMap.at(gid) < numNodes)) {
+        if(isLocal(gid) && (globalToLocalMap.at(gid) < numOwned)) {
           return true;
         }
         return false;
