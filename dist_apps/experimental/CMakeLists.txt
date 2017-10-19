@@ -43,3 +43,4 @@ distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)
 
 distAppNoGPU(graph_reader)
+distAppNoGPU(transposecheck)
