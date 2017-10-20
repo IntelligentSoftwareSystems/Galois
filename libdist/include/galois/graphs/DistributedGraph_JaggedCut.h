@@ -568,28 +568,36 @@ private:
 
     uint64_t src = base_hGraph::gid2host[leaderHostID].first;
     uint64_t src_end = base_hGraph::gid2host[leaderHostID+numColumnHosts-1].second;
-    for (uint64_t dst = 0; dst < base_hGraph::numGlobalNodes; ++dst) {
-      if (src != src_end) {
-        if (dst == src) { // skip nodes which have been allocated above
-          dst = src_end - 1;
-          continue;
-        }
-      }
-      assert((dst < src) || (dst >= src_end));
-      bool createNode = false;
-      for (unsigned i = 0; i < numColumnHosts; ++i) {
-        auto h = getColumnHostID(i, dst);
-        if (h == gridColumnID()) {
-          if (hasIncomingEdge[i].test(getColumnIndex(i, dst))) {
-            createNode = true;
-            break;
+    for (unsigned h = 0; h < base_hGraph::numHosts; ++h) {
+      auto range = galois::block_range((uint64_t)0, base_hGraph::numGlobalNodes,
+        h, base_hGraph::numHosts);
+      galois::DynamicBitSet createNode;
+      createNode.resize(range.second - range.first);
+      galois::do_all(
+        galois::iterate(range.first,
+                        range.second),     
+        [&] (auto dst) {
+          if ((dst < src) || (dst >= src_end)) {
+            for (unsigned i = 0; i < numColumnHosts; ++i) {
+              if (this->getColumnHostID(i, dst) == this->gridColumnID()) {
+                if (hasIncomingEdge[i].test(this->getColumnIndex(i, dst))) {
+                  createNode.set(dst - range.first);
+                  break;
+                }
+              }
+            }
           }
+        },
+        galois::loopname("CreateDstNode"),
+        galois::timeit(),
+        galois::no_stats()
+      );
+      for (uint64_t dst = range.first; dst < range.second; ++dst) {
+        if (createNode.test(dst - range.first)) {
+          localToGlobalVector.push_back(dst);
+          globalToLocalMap[dst] = numNodes++;
+          prefixSumOfEdges.push_back(numEdges);
         }
-      }
-      if (createNode) {
-        localToGlobalVector.push_back(dst);
-        globalToLocalMap[dst] = numNodes++;
-        prefixSumOfEdges.push_back(numEdges);
       }
     }
   }
@@ -767,7 +775,7 @@ private:
           uint64_t gdst = mpiGraph.edgeDestination(*ii);
           int i = this->getColumnHostID(this->gridColumnID(), gdst);
           if ((h_offset + i) == id) {
-            assert(isLocal(n));
+            assert(this->isLocal(n));
             uint32_t ldst = this->G2L(gdst);
             graph.constructEdge(cur++, ldst);
           } else {
