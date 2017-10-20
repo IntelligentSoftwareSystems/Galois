@@ -141,6 +141,7 @@ void FileGraph::move_assign(FileGraph&& o) {
   std::swap(outIdx, o.outIdx);
   std::swap(outs, o.outs);
   std::swap(edgeData, o.edgeData);
+  std::swap(graphVersion, o.graphVersion);
   std::swap(nodeOffset, o.nodeOffset);
   std::swap(edgeOffset, o.edgeOffset);
 }

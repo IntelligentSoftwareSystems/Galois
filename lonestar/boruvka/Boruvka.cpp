@@ -431,7 +431,7 @@ void run() {
   algo.initializeGraph();
   Tinitial.stop();
 
-  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 10);
+  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 20);
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;
