@@ -688,7 +688,7 @@ private:
           auto gdata = mpiGraph.edgeData(*ii);
           int i = this->getColumnHostID(this->gridColumnID(), gdst);
           if ((h_offset + i) == id) {
-            assert(isLocal(n));
+            assert(this->isLocal(n));
             uint32_t ldst = this->G2L(gdst);
             graph.constructEdge(cur++, ldst, gdata);
           } else {
