@@ -679,8 +679,6 @@ private:
         for (unsigned i = 0; i < numColumnHosts; ++i) {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
-          gdst_vec[i].reserve(std::distance(ii, ee));
-          gdata_vec[i].reserve(std::distance(ii, ee));
         }
 
         for (; ii < ee; ++ii) {
@@ -768,7 +766,6 @@ private:
 
         for (unsigned i = 0; i < numColumnHosts; ++i) {
           gdst_vec[i].clear();
-          gdst_vec[i].reserve(std::distance(ii, ee));
         }
 
         for (; ii < ee; ++ii) {
