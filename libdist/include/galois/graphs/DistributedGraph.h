@@ -174,6 +174,12 @@ protected:
     galois::gPrint("[", id, "] Mirror nodes: ", size() - numOwned, "\n");
     galois::gPrint("[", id, "] Nodes with edges: ", numNodesWithEdges, "\n");
     galois::gPrint("[", id, "] Edges: ", sizeEdges(), "\n");
+
+    // reports the number of nodes + edge as well
+    galois::runtime::reportStat_Tsum("dGraph", "TotalNodes", 
+                                     numOwned);
+    galois::runtime::reportStat_Tsum("dGraph", "TotalEdges", 
+                                     sizeEdges());
   }
 
 public:
