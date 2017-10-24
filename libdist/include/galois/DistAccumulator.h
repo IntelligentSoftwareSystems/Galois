@@ -34,6 +34,7 @@
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
 #include "galois/runtime/BareMPI.h"
+#include "galois/AtomicHelpers.h"
 
 #ifdef __GALOIS_HET_OPENCL__
 #include "galois/opencl/CL_Header.h"
