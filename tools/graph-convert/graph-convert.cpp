@@ -41,8 +41,7 @@
 #include <fcntl.h>
 #include <cstdlib>
 
-namespace cll = llvm::cl;
-
+// TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {
   bipartitegr2bigpetsc,
   bipartitegr2littlepetsc,
@@ -95,6 +94,8 @@ enum EdgeType {
   uint64_,
   void_
 };
+
+namespace cll = llvm::cl;
 
 static cll::opt<std::string> inputFilename(cll::Positional, 
     cll::desc("<input file>"), cll::Required);
@@ -180,22 +181,26 @@ void convert(C& c, Conversion) {
 }
 
 template<typename EdgeTy, typename C>
-void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
+void convert(C& c, HasOnlyVoidSpecialization, 
+         typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
   c.template convert<EdgeTy>(inputFilename, outputFilename);
 }
 
 template<typename EdgeTy, typename C>
-void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
+void convert(C& c, HasOnlyVoidSpecialization, 
+    typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
   GALOIS_DIE("conversion undefined for non-void graphs");
 }
 
 template<typename EdgeTy, typename C>
-void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
+void convert(C& c, HasNoVoidSpecialization, 
+    typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
   c.template convert<EdgeTy>(inputFilename, outputFilename);
 }
 
 template<typename EdgeTy, typename C>
-void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
+void convert(C& c, HasNoVoidSpecialization, 
+    typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
   GALOIS_DIE("conversion undefined for void graphs");
 }
 
@@ -389,6 +394,8 @@ struct Edgelist2Binary: public Conversion {
           numNodes = src;
         if (dst > numNodes)
           numNodes = dst;
+      } else {
+        counter -= 2;
       }
     }
 
