@@ -193,8 +193,12 @@ void runGraphSimulation() {
   WorkQueue* cur = &w[0];
   WorkQueue* next = &w[1];
 
+  galois::StatTimer T("GraphSimulation");
+  T.start();
+
   matchLabel(qG, dG, *next);
   if (existEmptyLabelMatchQGNode(qG)) {
+    T.stop();
     return;
   }
 
@@ -236,13 +240,14 @@ void runGraphSimulation() {
             next->push_back(dn);
           }
         },
-        galois::loopname("GraphSimulation"),
+        galois::loopname("CheckChildrenLink"),
         galois::timeit());
 
     sizeCur = std::distance(cur->begin(), cur->end());
     sizeNext = std::distance(next->begin(), next->end());
   }
 
+  T.stop();
   reportSimulation(qG, dG);
 }
 
@@ -250,7 +255,7 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  galois::StatTimer T("OverheadTime");
+  galois::StatTimer T("TotalTime");
   T.start();
 
   switch(simType) {
