@@ -114,7 +114,9 @@ void matchLabel(QG& qG, DG& dG, W& w) {
         for (auto qn: qG) {
           auto& qData = qG.getData(qn);
           if (qData.label == dData.label) {
-            qData.matched = true;
+            if (!qData.matched) {
+              qData.matched = true;
+            }
             dData.matched = true;
             dData.matchedQGNode = qn;
             w.push_back(dn);
