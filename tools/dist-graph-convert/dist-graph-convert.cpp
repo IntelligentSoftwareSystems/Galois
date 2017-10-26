@@ -777,12 +777,6 @@ struct Edgelist2Gr : public Conversion {
       edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
     }
 
-    //for (unsigned i = 0; i < localNumNodes; i++) {
-    //  //printf("%lu\n", edgePrefixSum.data()[i]);
-    //  //printf("%lu\n", edgePrefixSum[i]);
-    //}
-
-
     // calculate global edge offset using edge counts from other hosts
     std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
     uint64_t globalEdgeOffset = 0;
@@ -796,8 +790,9 @@ struct Edgelist2Gr : public Conversion {
       edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
     }
 
+    // TODO refactor out to a function
+
     // begin file writing stuff
-    
     MPI_File newGR;
     MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
              MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
@@ -809,6 +804,8 @@ struct Edgelist2Gr : public Conversion {
       uint64_t nn = totalNumNodes;
       uint64_t ne = totalEdgeCount;
 
+      // I won't check status here because there should be no reason why 
+      // writing 8 bytes per write would fail.... (I hope at least)
       MPICheck(MPI_File_write_at(newGR, 0, &version, 1, MPI_UINT64_T, 
                MPI_STATUS_IGNORE));
       MPICheck(MPI_File_write_at(newGR, sizeof(uint64_t), &sizeOfEdge, 1, 
@@ -822,10 +819,20 @@ struct Edgelist2Gr : public Conversion {
     uint64_t headerSize = sizeof(uint64_t) * 4;
 
     // write node index data
-    uint64_t nodeIndexStart = headerSize + (localNodeBegin * sizeof(uint64_t));
-    // TODO make sure it writes all nodes (mpi might not; see status)....
-    MPICheck(MPI_File_write_at(newGR, nodeIndexStart, edgePrefixSum.data(),
-                               localNumNodes, MPI_UINT64_T, MPI_STATUS_IGNORE));
+    uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
+    uint64_t nodesToWrite = localNumNodes;
+
+    MPI_Status writeStatus;
+    while (nodesToWrite != 0) {
+      // make sure it writes all nodes (mpi might not; see status)....
+      MPICheck(MPI_File_write_at(newGR, nodeIndexOffset, edgePrefixSum.data(),
+                                 nodesToWrite, MPI_UINT64_T, &writeStatus));
+      
+      int itemsWritten;
+      MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
+      nodesToWrite -= itemsWritten;
+      nodeIndexOffset += itemsWritten * sizeof(uint64_t);
+    }
     
     uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
                               globalEdgeOffset * sizeof(uint32_t);
@@ -834,12 +841,17 @@ struct Edgelist2Gr : public Conversion {
     for (unsigned i = 0; i < localNumNodes; i++) {
       std::vector<uint32_t> currentDests = localSrcToDest[i];
       uint64_t numToWrite = currentDests.size();
-      MPICheck(MPI_File_write_at(newGR, edgeDestOffset, currentDests.data(),
-                                 numToWrite, MPI_UINT32_T, MPI_STATUS_IGNORE));
 
-      edgeDestOffset += sizeof(uint32_t) * numToWrite;
+      while (numToWrite != 0) {
+        MPICheck(MPI_File_write_at(newGR, edgeDestOffset, currentDests.data(),
+                                   numToWrite, MPI_UINT32_T, &writeStatus));
+
+        int itemsWritten;
+        MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+        numToWrite -= itemsWritten;
+        edgeDestOffset += sizeof(uint32_t) * itemsWritten;
+      }
     }
-
     MPI_File_close(&newGR);
 
     galois::runtime::getHostBarrier().wait();
