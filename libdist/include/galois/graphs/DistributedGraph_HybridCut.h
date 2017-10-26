@@ -343,8 +343,11 @@ private:
    * Given an assignment of edges to hosts, send messages to each host
    * informing them of assigned edges/outgoing edges
    *
-   * @param assignedEdgesPerHost TODO
-   * @param numOutgoingEdges TODO
+   * @param assignedEdgesPerHost how many edges from this host are going to be
+   * sent to each host
+   * @param numOutgoingEdges numOutgoingEdges[hostNum] is an array that tells
+   * you how many edges on each node on THIS host (i.e. the caller) that should
+   * go to host "hostNum"
    */
   void exchangeAssignedEdgeInfo(
      std::vector<galois::GAccumulator<uint64_t>>& assignedEdgesPerHost,
@@ -446,7 +449,7 @@ private:
 
   /**
    * Goes over the nodes that this host is responsible for loading and 
-   * determine which host the node should be assigned to.
+   * determine which host edges should be assigned to.
    *
    * @param mpiGraph In memory representation of the Galois binary graph
    * file (not the final underlying representation we will use)
