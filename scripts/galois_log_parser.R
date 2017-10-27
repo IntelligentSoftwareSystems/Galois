@@ -149,7 +149,7 @@ getTimersDistributed <- function (logData) {
  communicationMemUsageMin = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MIN" & TOTAL_TYPE == "HMIN")$TOTAL)
 
  if(identical(communicationMemUsageMax, numeric(0)) || identical(communicationMemUsageMin, numeric(0))){
-   communicationMemUsageMax = 0 
+   communicationMemUsageMax = 0
    communicationMemUsageMin = 0
    print("Printing Memory usage counter not present.")
  }
@@ -159,8 +159,64 @@ getTimersDistributed <- function (logData) {
 }
 #### END: @function to values of timers for distributed memory galois log ##################
 
+#### START: @function to comute per iteration RSD of compute time. ##################
+# Parses to get the timer values
+computeRSD <- function (logData, paramList, output) {
+  numIter = as.numeric(paramList["iterations"])
+
+  benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+  print(paste("benchmark:", benchmarkRegionName))
+
+  ## Number of runs
+  numRuns <- as.numeric((subset(logData, CATEGORY == "Runs" & TOTAL_TYPE != "HostValues"))$TOTAL)
+  print(paste("numRuns:", numRuns))
+
+  output_rsd_file <- paste(output, "_computeRSD", sep="")
+
+
+
+  ## Doing 1st iteration separately to see if new file is to be created or if file already exists.
+  for(r in 0:(numRuns - 1)){
+    computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", r, "_", 0, sep=""), REGION) & TOTAL_TYPE == "HostValues")$TOTAL
+    if(!identical(computeTimeRows, character(0))){
+      print(computeTimeRows)
+      computeTimePerHostArr <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
+      sd <- sd(computeTimePerHostArr)
+      mean <- mean(computeTimePerHostArr)
+      rsd <- round((sd/mean)*100, digits = 2)
+      rsdList <- list("run" = r, "iter" = 0, "sd" = sd, "mean" = mean , "rsd" = rsd)
+      outDataList <- append(paramList, rsdList)
+      if(!file.exists(output_rsd_file)){
+        print(paste(output_rsd_file, "Does not exist. Creating new file"))
+        write.csv(as.data.frame(outDataList), file=output_rsd_file, row.names=F, quote=F)
+      } else {
+        print(paste("Appending data to the existing file", output_rsd_file))
+        write.table(as.data.frame(outDataList), file=output_rsd_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+      }
+      print(rsd)
+    }
+  }
+
+  for(i in 1:(numIter - 1)) {
+    for(r in 0:(numRuns - 1)){
+      print(i)
+      computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", r, "_", i, sep=""), REGION) & TOTAL_TYPE == "HostValues")$TOTAL
+      if(!identical(computeTimeRows, character(0))){
+        computeTimePerHostArr <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
+        sd <- sd(computeTimePerHostArr)
+        mean <- mean(computeTimePerHostArr)
+        rsd <- round((sd/mean)*100, digits = 2)
+        rsdList <- list("run" = r, "iter" = i, "sd" = sd, "mean" = mean , "rsd" = rsd)
+        outDataList <- append(paramList, rsdList)
+        write.table(as.data.frame(outDataList), file=output_rsd_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+        print(rsd)
+      }
+    }
+  }
+}
+
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
   if(isTRUE(isSharedMemGaloisLog)){
@@ -173,20 +229,27 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog) {
     print("Parsing commadline")
     paramList <- parseCmdLine(logData, F)
     print("Parsing timers for distributed memory galois log")
-    timersList <- getTimersDistributed(logData)
+    if(isTRUE(isComputeRSD)){
+      computeRSD(logData, paramList, output)
+    }
+    else{
+      timersList <- getTimersDistributed(logData)
+    }
   }
 
-  outDataList <- append(paramList, timersList)
-  if(!file.exists(output)){
-    print(paste(output, "Does not exist. Creating new file"))
-    write.csv(as.data.frame(outDataList), file=output, row.names=F, quote=F)
-  } else {
-    print(paste("Appending data to the existing file", output))
-    write.table(as.data.frame(outDataList), file=output, row.names=F, col.names=F, quote=F, append=T, sep=",")
+  ## if computing RSD then normal stats are not printed
+  if(isTRUE(!isComputeRSD)){
+    outDataList <- append(paramList, timersList)
+    if(!file.exists(output)){
+      print(paste(output, "Does not exist. Creating new file"))
+      write.csv(as.data.frame(outDataList), file=output, row.names=F, quote=F)
+    } else {
+      print(paste("Appending data to the existing file", output))
+      write.table(as.data.frame(outDataList), file=output, row.names=F, col.names=F, quote=F, append=T, sep=",")
+    }
   }
 }
 #### END: @function entry point for shared memory galois log ##################
-
 
 #############################################
 ##  Commandline options.
@@ -197,7 +260,10 @@ option_list = list(
                      make_option(c("-o", "--output"), action="store", default=NA, type='character',
                                                help="name of the output file to store output"),
                      make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
-                                               help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]")
+                                               help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]"),
+                     make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
+                                               help="If want to compute the RSD of per iteration compute time[default %default]")
+
                      )
 
 opt_parser <- OptionParser(usage = "%prog [options] -i input.log -o output.csv", option_list=option_list)
@@ -211,7 +277,7 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r)
 }
 
 ##################### END #####################
