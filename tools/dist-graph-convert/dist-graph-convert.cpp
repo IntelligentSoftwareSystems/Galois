@@ -35,8 +35,6 @@
 #include "galois/runtime/Network.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "dist-graph-convert-helpers.h"
-
 namespace cll = llvm::cl;
 
 // TODO: move these enums to a common location for all graph convert tools
