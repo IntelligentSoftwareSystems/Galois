@@ -138,28 +138,22 @@ void sendEdgeCounts(
 
   printf("[%lu] Determinining edge counts\n", hostID);
 
-  //std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
-  std::vector<uint64_t> numEdgesPerHost(totalNumHosts);
+  std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
+  //std::vector<uint64_t> numEdgesPerHost(totalNumHosts);
 
-  //// determine to which host each edge will go
-  //galois::do_all(
-  //  galois::iterate((uint64_t)0, localNumEdges),
-  //  [&] (uint64_t edgeIndex) {
-  //    uint32_t src = localEdges[edgeIndex * 2];
-  //    uint32_t edgeOwner = findHostID(src, hostToNodes);
-  //    numEdgesPerHost[edgeOwner] += 1;
-  //  },
-  //  galois::loopname("EdgeInspection"),
-  //  galois::no_stats(),
-  //  galois::steal<false>(),
-  //  galois::timeit()
-  //);
-
-  for (uint64_t edgeIndex = 0; edgeIndex < localNumEdges; edgeIndex++) {
-    uint32_t src = localEdges[edgeIndex * 2];
-    uint32_t edgeOwner = findHostID(src, hostToNodes);
-    numEdgesPerHost[edgeOwner] += 1;
-  }
+  // determine to which host each edge will go
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src = localEdges[edgeIndex * 2];
+      uint32_t edgeOwner = findHostID(src, hostToNodes);
+      numEdgesPerHost[edgeOwner] += 1;
+    },
+    galois::loopname("EdgeInspection"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
 
   printf("[%lu] Sending edge counts\n", hostID);
 
@@ -168,7 +162,7 @@ void sendEdgeCounts(
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID) continue;
     galois::runtime::SendBuffer b;
-    galois::runtime::gSerialize(b, numEdgesPerHost[h]);
+    galois::runtime::gSerialize(b, numEdgesPerHost[h].reduce());
     net.sendTagged(h, galois::runtime::evilPhase, b);
   }
 }
