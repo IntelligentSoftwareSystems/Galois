@@ -140,14 +140,15 @@ IterTy split_range(IterTy b, IterTy e) {
  * Returns a continuous block from the range based on the number of
  * divisions and the id of the block requested
  */
+// TODO use something better than uint64_t....
 template<typename IterTy,
          typename std::enable_if<!std::is_integral<IterTy>::value>::type* = nullptr>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, 
                                       unsigned num) {
-  unsigned int dist = std::distance(b, e);
-  unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
-  unsigned int A = std::min(numper * id, dist);
-  unsigned int B = std::min(numper * (id + 1), dist);
+  uint64_t dist = std::distance(b, e);
+  uint64_t numper = std::max((dist + num - 1) / num, (uint64_t)1); //round up
+  uint64_t A = std::min(numper * id, dist);
+  uint64_t B = std::min(numper * (id + 1), dist);
   std::advance(b, A);
 
   if (dist != B) {
@@ -162,10 +163,10 @@ template<typename IntTy,
          typename std::enable_if<std::is_integral<IntTy>::value>::type* = nullptr>
 std::pair<IntTy, IntTy> block_range(IntTy b, IntTy e, unsigned id, 
                                     unsigned num) {
-  unsigned int dist = e - b;
-  unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
-  unsigned int A = std::min(numper * id, dist);
-  unsigned int B = std::min(numper * (id + 1), dist);
+  IntTy dist = e - b;
+  IntTy numper = std::max((dist + num - 1) / num, (IntTy)1); //round up
+  IntTy A = std::min(numper * id, dist);
+  IntTy B = std::min(numper * (id + 1), dist);
   b += A;
   if (dist != B) {
     e = b;
