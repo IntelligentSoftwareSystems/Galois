@@ -35,6 +35,8 @@
 #include "galois/runtime/Network.h"
 #include "llvm/Support/CommandLine.h"
 
+#include "dist-graph-convert-helpers.h"
+
 namespace cll = llvm::cl;
 
 // TODO: move these enums to a common location for all graph convert tools
@@ -437,6 +439,8 @@ struct Edgelist2Gr : public Conversion {
     uint64_t hostID = net.ID;
     uint64_t totalNumHosts = net.Num;
 
+    printf("[%lu] Determinining edge counts\n", hostID);
+
     std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
 
     // determine to which host each edge will go
@@ -452,6 +456,8 @@ struct Edgelist2Gr : public Conversion {
       galois::steal<false>(),
       galois::timeit()
     );
+
+    printf("[%lu] Sending edge counts\n", hostID);
 
     // tell hosts how many edges they should expect
     std::vector<uint64_t> edgeVectorToSend;
@@ -473,6 +479,8 @@ struct Edgelist2Gr : public Conversion {
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
     uint64_t totalNumHosts = net.Num;
+
+    printf("[%lu] Receiving edge counts\n", hostID);
 
     uint64_t edgesToReceive = 0;
 
@@ -509,6 +517,8 @@ struct Edgelist2Gr : public Conversion {
     uint64_t hostID = net.ID;
     uint64_t totalNumHosts = net.Num;
 
+    printf("[%lu] Going to send assigned edges\n", hostID);
+
     using DestVectorTy = std::vector<std::vector<uint32_t>>;
     galois::substrate::PerThreadStorage<DestVectorTy> 
         dstVectors(totalNumHosts);
@@ -527,6 +537,8 @@ struct Edgelist2Gr : public Conversion {
       },
       galois::no_stats()
     );
+
+    printf("[%lu] Passing through edges and assigning\n", hostID);
 
     // pass 1: determine to which host each edge will go
     galois::do_all(
@@ -578,6 +590,8 @@ struct Edgelist2Gr : public Conversion {
       galois::timeit()
     );
 
+    printf("[%lu] Buffer cleanup\n", hostID);
+
     // cleanup: each thread serialize + send out remaining stuff
     galois::on_each(
       [&] (unsigned tid, unsigned nthreads) {
@@ -614,6 +628,8 @@ struct Edgelist2Gr : public Conversion {
   {
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
+
+    printf("[%lu] Going to receive assigned edges\n", hostID);
 
     // receive edges
     galois::on_each(
@@ -658,6 +674,8 @@ struct Edgelist2Gr : public Conversion {
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
     uint64_t totalNumHosts = net.Num;
+
+    printf("[%lu] Informing other hosts about number of edges\n", hostID);
 
     std::vector<uint64_t> edgesPerHost(totalNumHosts);
 
