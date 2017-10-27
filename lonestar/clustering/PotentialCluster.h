@@ -27,8 +27,6 @@
 #include "NodeWrapper.h"
 #include <limits>
 
-using namespace std;
-
 class PotentialCluster {
 public:
   const NodeWrapper& original;
@@ -37,12 +35,12 @@ public:
 
   PotentialCluster(NodeWrapper& pOriginal) : original(pOriginal) {
     closest     = NULL;
-    clusterSize = numeric_limits<float>::max();
+    clusterSize = std::numeric_limits<float>::max();
   }
-  friend ostream& operator<<(ostream& s, const PotentialCluster& p);
+  friend std::ostream& operator<<(std::ostream& s, const PotentialCluster& p);
 };
 
-ostream& operator<<(ostream& s, const PotentialCluster& p) {
+std::ostream& operator<<(std::ostream& s, const PotentialCluster& p) {
   s << "PC : [" << p.original << ", ?";
   if (p.closest != NULL)
     s << *(p.closest);

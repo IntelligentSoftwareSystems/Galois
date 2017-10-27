@@ -33,8 +33,6 @@
 #include <limits>
 #include <vector>
 
-using namespace std;
-
 class KdTree : public KdCell {
 private:
   double minLightIntensity;
@@ -51,32 +49,22 @@ private:
   }
 
 public:
-  /**
-   *
-   */
-  static KdTree* createTree(vector<NodeWrapper*>& inPoints) {
+  static KdTree* createTree(std::vector<NodeWrapper*>& inPoints) {
     KdTree* factory = new KdTree();
     KdTree* root    = (KdTree*)KdTree::subDivide(inPoints, 0, inPoints.size(),
                                               NULL, *factory);
     delete factory;
     return root;
   }
-  /**
-   *
-   */
+
   virtual KdCell* createNewBlankCell(int inSplitType, double inSplitValue) {
-    //		cout<<"CALLED !!!!! "<<endl;
     return new KdTree(inSplitType, inSplitValue);
   }
-  /**
-   *
-   */
-  static void getAll(KdCell& tree, vector<NodeWrapper*>& allLeaves) {
+
+  static void getAll(KdCell& tree, std::vector<NodeWrapper*>& allLeaves) {
     tree.getAll(allLeaves);
   }
-  /**
-   *
-   */
+
   bool notifyPointAdded(NodeWrapper& nw, bool inChange) {
     if (inChange) {
       double b3         = nw.getLight().getScalarTotalIntensity();
@@ -109,12 +97,8 @@ public:
     }
     return inChange;
   }
-  /**
-   *
-   */
+
   NodeWrapper* findBestMatch(NodeWrapper& inLight) {
-    //		cout<<"********************************************"<<endl
-    //				<<"Finding match for "<<inLight<<endl;
     PotentialCluster cluster(inLight);
     if (splitType == LEAF) {
       findNearestRecursive(cluster);
@@ -128,17 +112,10 @@ public:
       assert(false && "Invalid split type!");
     }
     NodeWrapper* res = cluster.closest;
-    //		if(res==NULL){
-    //			cout<<"##################################\nUnable to find a
-    // match  for node "<<inLight
-    //					<<"Tree :: "<< *this<<"#######################"<<endl;
-    //		}
     return res;
   }
 
   void findNearestRecursive(PotentialCluster& potentialCluster) {
-    //	  cout<<"Recurse Base?"<<potentialCluster<<endl;
-    //	  cout<<"Find nearest recursive "<<(potentialCluster)<<endl;
     if (couldBeCloser(potentialCluster) == false) {
       return;
     }
@@ -152,8 +129,6 @@ public:
           double size =
               NodeWrapper::potentialClusterSize(from, *(pointList[i]));
           if (size < potentialCluster.clusterSize) {
-            //    	        	  cout<<"Found close match!!! " <<
-            //    *pointList[i]<<endl;
             potentialCluster.closest     = pointList[i];
             potentialCluster.clusterSize = size;
           }
@@ -171,11 +146,6 @@ public:
   }
 
   void recurse(PotentialCluster& potentialCluster, double which) {
-    //	  cout<<"Inner node, recursing for "<<potentialCluster<<"
-    // Split?"<<which<< " <= "<<splitValue<<endl;  if its a interior node
-    // recurse
-    // on the closer child first
-    //	  cout<<"Recurse "<<*this<<endl;
     if (which <= splitValue) {
       if (leftChild != NULL && leftChild->removeFromTree == false)
         ((KdTree*)leftChild)->findNearestRecursive(potentialCluster);
@@ -220,7 +190,6 @@ public:
     // expand distance by half size of from's bounding box (distance is min to
     // center of box)  and by half the minimum bounding box extents of any node
     // in this cell
-    //    cout<<"From :: " << minHalfSize<<endl;
     dx += from.getHalfSizeX() + minHalfSize.getX();
     dy += from.getHalfSizeY() + minHalfSize.getY();
     dz += from.getHalfSizeZ() + minHalfSize.getZ();
@@ -239,8 +208,6 @@ public:
     // return if our contents could be closer and so need to be checked
     // extra factor of 0.9999 is to correct for any roundoff error in computing
     // minimum size
-    //    cout<<"Could be closer computed :: "<<diff<<" , "
-    //    <<outCluster.clusterSize << " versus "<<testSize<<endl;
     return (outCluster.clusterSize >= 0.9999 * testSize);
   }
 

@@ -25,10 +25,12 @@
 
 #ifndef LEAFNODE_H_
 #define LEAFNODE_H_
-#define MATH_PI 3.1415926
+
 #include "AbstractNode.h"
 #include "Point3.h"
 #include <iostream>
+
+#define MATH_PI 3.1415926
 
 class LeafNode : public AbstractNode {
 protected:
@@ -40,13 +42,7 @@ protected:
 public:
   LeafNode(double x, double y, double z, double dirX, double dirY, double dirZ)
       : AbstractNode(x, y, z), direction(dirX, dirY, dirZ) {
-    //    this->myLoc.x = x;
-    //    this->myLoc.y = y;
-    //    this->myLoc.z = z;
     setIntensity(1.0 / MATH_PI, 0);
-    //    this->direction.x = dirX;
-    //    this->direction.y = dirY;
-    //    this->direction.z = dirZ;
   }
 
   Point3& getDirection() { return direction; }

@@ -25,6 +25,7 @@
 #ifndef POINT3_H_
 #define POINT3_H_
 #include <iostream>
+
 class Point3 {
   double x, y, z;
 
