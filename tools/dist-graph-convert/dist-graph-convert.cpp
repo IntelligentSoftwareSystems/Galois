@@ -91,10 +91,8 @@ struct Conversion { };
 struct HasOnlyVoidSpecialization { };
 struct HasNoVoidSpecialization { };
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
-// END HELPER IMPLEMENTATIONS
+// BEGIN CONVERT CODE/STRUCTS
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -138,8 +136,6 @@ void convert(C& c, Conversion) {
 }
 
 struct Edgelist2Gr : public Conversion {
-   
-
   // WARNING
   // WILL NOT WORK IF THE EDGE LIST HAS WEIGHTS
   template<typename EdgeTy>
@@ -201,8 +197,10 @@ struct Edgelist2Gr : public Conversion {
 
     sendAssignedEdges(hostToNodes, localNumEdges, localEdges, localSrcToDest,
                       nodeLocks);
+    freeVector(localEdges);
     receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
                          nodeLocks);
+    freeVector(nodeLocks);
 
     // TODO can refactor to function
     uint64_t totalAssignedEdges = 0;
@@ -210,13 +208,22 @@ struct Edgelist2Gr : public Conversion {
       totalAssignedEdges += localSrcToDest[i].size();
     }
 
-    galois::DGAccumulator<uint64_t> ecAccumulator;
-    ecAccumulator.reset();
-    ecAccumulator += totalAssignedEdges;
-    uint64_t totalEdgeCount = ecAccumulator.reduce();
-    if (hostID == 0) {
-      printf("Total number of edges is %lu\n", totalEdgeCount);
+    // calculate global edge offset using edge counts from other hosts
+    std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
+    uint64_t globalEdgeOffset = 0;
+    uint64_t totalEdgeCount = 0;
+    for (unsigned h = 0; h < hostID; h++) {
+      globalEdgeOffset += edgesPerHost[h];
+      totalEdgeCount += edgesPerHost[h];
     }
+    printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
+
+    // finish off getting total edge count
+    for (unsigned h = hostID; h < totalNumHosts; h++) {
+      totalEdgeCount += edgesPerHost[h];
+    }
+    printf("[%lu] Total number of edges is %lu\n", hostID, totalEdgeCount);
+    freeVector(edgesPerHost);
 
     // prepare edge prefix sum for file writing
     std::vector<uint64_t> edgePrefixSum(localNumNodes);
@@ -225,81 +232,28 @@ struct Edgelist2Gr : public Conversion {
       edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
     }
 
-    // calculate global edge offset using edge counts from other hosts
-    std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
-    uint64_t globalEdgeOffset = 0;
-    for (unsigned h = 0; h < hostID; h++) {
-      globalEdgeOffset += edgesPerHost[h];
-    }
-    printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
-
-    // update node index pointers using edge offset
     for (unsigned i = 0; i < localNumNodes; i++) {
       edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
     }
 
-    // TODO refactor out to a function
-
-    // begin file writing stuff
+    // begin file writing 
     MPI_File newGR;
     MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
              MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
 
-    // write header info if host id is 0
     if (hostID == 0) {
-      uint64_t version = 1;
-      uint64_t sizeOfEdge = 0;
-      uint64_t nn = totalNumNodes;
-      uint64_t ne = totalEdgeCount;
-
-      // I won't check status here because there should be no reason why 
-      // writing 8 bytes per write would fail.... (I hope at least)
-      MPICheck(MPI_File_write_at(newGR, 0, &version, 1, MPI_UINT64_T, 
-               MPI_STATUS_IGNORE));
-      MPICheck(MPI_File_write_at(newGR, sizeof(uint64_t), &sizeOfEdge, 1, 
-                                 MPI_UINT64_T, MPI_STATUS_IGNORE));
-      MPICheck(MPI_File_write_at(newGR, sizeof(uint64_t) * 2, &nn, 1, 
-                                 MPI_UINT64_T, MPI_STATUS_IGNORE));
-      MPICheck(MPI_File_write_at(newGR, sizeof(uint64_t) * 3, &ne, 1, 
-                                 MPI_UINT64_T, MPI_STATUS_IGNORE));
+      writeGrHeader(newGR, 1, 0, totalNumNodes, totalEdgeCount);
     }
 
     uint64_t headerSize = sizeof(uint64_t) * 4;
-
-    // write node index data
     uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
-    uint64_t nodesToWrite = localNumNodes;
+    writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
+    freeVector(edgePrefixSum);
 
-    MPI_Status writeStatus;
-    while (nodesToWrite != 0) {
-      // make sure it writes all nodes (mpi might not; see status)....
-      MPICheck(MPI_File_write_at(newGR, nodeIndexOffset, edgePrefixSum.data(),
-                                 nodesToWrite, MPI_UINT64_T, &writeStatus));
-      
-      int itemsWritten;
-      MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
-      nodesToWrite -= itemsWritten;
-      nodeIndexOffset += itemsWritten * sizeof(uint64_t);
-    }
-    
     uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
                               globalEdgeOffset * sizeof(uint32_t);
+    writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
 
-    // write edge dests
-    for (unsigned i = 0; i < localNumNodes; i++) {
-      std::vector<uint32_t> currentDests = localSrcToDest[i];
-      uint64_t numToWrite = currentDests.size();
-
-      while (numToWrite != 0) {
-        MPICheck(MPI_File_write_at(newGR, edgeDestOffset, currentDests.data(),
-                                   numToWrite, MPI_UINT32_T, &writeStatus));
-
-        int itemsWritten;
-        MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
-        numToWrite -= itemsWritten;
-        edgeDestOffset += sizeof(uint32_t) * itemsWritten;
-      }
-    }
     MPI_File_close(&newGR);
 
     galois::runtime::getHostBarrier().wait();

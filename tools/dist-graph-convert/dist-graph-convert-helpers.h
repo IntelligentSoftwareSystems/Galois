@@ -40,6 +40,17 @@
  */
 void MPICheck(int errcode);
 
+/**
+ * "Free" memory used by a vector by swapping it out with an empty one.
+ *
+ * @tparam VectorTy type of vector 
+ * @param toFree vector to free memory of
+ */
+template <typename VectorTy>
+void freeVector(VectorTy& toFree) {
+  VectorTy dummyVector;
+  toFree.swap(dummyVector);
+}
 
 /**
  * TODO documentation
@@ -116,4 +127,23 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
  */
 std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
 
+/**
+ * TODO
+ */
+void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
+                   uint64_t totalNumNodes, uint64_t totalEdgeCount);
+
+/**
+ * TODO
+ */
+void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
+                        uint64_t nodeIndexOffset, 
+                        std::vector<uint64_t>& edgePrefixSum);
+
+/**
+ * TODO
+ */
+void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
+                       uint64_t edgeDestOffset,
+                       std::vector<std::vector<uint32_t>>& localSrcToDest);
 #endif

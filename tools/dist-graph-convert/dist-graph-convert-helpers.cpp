@@ -392,3 +392,53 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
 
   return edgesPerHost;
 }
+
+void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
+                   uint64_t totalNumNodes, uint64_t totalEdgeCount) {
+  // I won't check status here because there should be no reason why 
+  // writing 8 bytes per write would fail.... (I hope at least)
+  MPICheck(MPI_File_write_at(gr, 0, &version, 1, MPI_UINT64_T, 
+           MPI_STATUS_IGNORE));
+  MPICheck(MPI_File_write_at(gr, sizeof(uint64_t), &sizeOfEdge, 1, 
+                             MPI_UINT64_T, MPI_STATUS_IGNORE));
+  MPICheck(MPI_File_write_at(gr, sizeof(uint64_t) * 2, &totalNumNodes, 1, 
+                             MPI_UINT64_T, MPI_STATUS_IGNORE));
+  MPICheck(MPI_File_write_at(gr, sizeof(uint64_t) * 3, &totalEdgeCount, 1, 
+                             MPI_UINT64_T, MPI_STATUS_IGNORE));
+}
+
+void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
+                        uint64_t nodeIndexOffset, 
+                        std::vector<uint64_t>& edgePrefixSum) {
+  MPI_Status writeStatus;
+  while (nodesToWrite != 0) {
+    MPICheck(MPI_File_write_at(gr, nodeIndexOffset, edgePrefixSum.data(),
+                               nodesToWrite, MPI_UINT64_T, &writeStatus));
+    
+    int itemsWritten;
+    MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
+    nodesToWrite -= itemsWritten;
+    nodeIndexOffset += itemsWritten * sizeof(uint64_t);
+  }
+}
+
+void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
+                       uint64_t edgeDestOffset,
+                       std::vector<std::vector<uint32_t>>& localSrcToDest) {
+  MPI_Status writeStatus;
+
+  for (unsigned i = 0; i < localNumNodes; i++) {
+    std::vector<uint32_t> currentDests = localSrcToDest[i];
+    uint64_t numToWrite = currentDests.size();
+
+    while (numToWrite != 0) {
+      MPICheck(MPI_File_write_at(gr, edgeDestOffset, currentDests.data(),
+                                 numToWrite, MPI_UINT32_T, &writeStatus));
+
+      int itemsWritten;
+      MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+      numToWrite -= itemsWritten;
+      edgeDestOffset += sizeof(uint32_t) * itemsWritten;
+    }
+  }
+}
