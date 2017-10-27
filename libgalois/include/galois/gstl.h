@@ -140,15 +140,14 @@ IterTy split_range(IterTy b, IterTy e) {
  * Returns a continuous block from the range based on the number of
  * divisions and the id of the block requested
  */
-// TODO use something better than uint64_t....
 template<typename IterTy,
          typename std::enable_if<!std::is_integral<IterTy>::value>::type* = nullptr>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, 
                                       unsigned num) {
-  uint64_t dist = std::distance(b, e);
-  uint64_t numper = std::max((dist + num - 1) / num, (uint64_t)1); //round up
-  uint64_t A = std::min(numper * id, dist);
-  uint64_t B = std::min(numper * (id + 1), dist);
+  size_t dist = std::distance(b, e);
+  size_t numper = std::max((dist + num - 1) / num, (size_t)1); //round up
+  size_t A = std::min(numper * id, dist);
+  size_t B = std::min(numper * (id + 1), dist);
   std::advance(b, A);
 
   if (dist != B) {
