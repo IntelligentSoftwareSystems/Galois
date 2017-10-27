@@ -371,6 +371,9 @@ struct Edgelist2Gr : public Conversion {
                                                              (uint64_t)fileSize,
                                                              hostID, 
                                                              totalNumHosts);
+
+    printf("[%lu] Initial byte %lu to %lu\n", hostID, initialStart, initialEnd);
+
     bool startGood = false;
     if (initialStart != 0) {
       // good starting point if the prev char was a new line (i.e. this start
@@ -728,8 +731,8 @@ struct Edgelist2Gr : public Conversion {
                                                                 hostID,
                                                                 totalNumHosts);
 
-    printf("[%lu] Byte start %lu byte end %lu\n", hostID, localStartByte,
-                                                  localEndByte);
+    printf("[%lu] Byte start %lu byte end %lu, num bytes %lu\n", hostID, 
+                   localStartByte, localEndByte, localEndByte - localStartByte);
 
     // load edges into a vector
     uint64_t localNumEdges = 0;
