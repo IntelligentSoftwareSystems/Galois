@@ -246,10 +246,94 @@ findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
   return uniqueChunks;
 }
 
-/**
- * Attempts even balance. TODO get better description + split into a bunch
- * of helper functions
- */
+void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
+             const std::vector<uint32_t>& localEdges,
+             const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode,
+             std::vector<uint64_t>& chunkCounts) {
+  std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
+  for (auto chunkID : uniqueChunks) {
+    // default-initialize necessary GAccumulators
+    chunkToAccumulator[chunkID];
+  }
+
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  printf("[%lu] Chunk accumulators created\n", hostID);
+
+  uint64_t localNumEdges = localEdges.size() / 2;
+  // determine which chunk edges go to
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src = localEdges[edgeIndex * 2];
+      uint32_t chunkNum = findHostID(src, chunkToNode);
+      GALOIS_ASSERT(chunkNum != (uint32_t)-1);
+      chunkToAccumulator[chunkNum] += 1;
+    },
+    galois::loopname("ChunkInspection"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  printf("[%lu] Chunk accumulators done accumulating\n", hostID);
+
+  // update chunk count
+  for (auto chunkID : uniqueChunks) {
+    chunkCounts[chunkID] = chunkToAccumulator[chunkID].reduce();
+  }
+}
+
+void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  printf("[%lu] Sending edge chunk counts\n", hostID);
+  // send off my chunk count vector to others so all hosts can have the
+  // same count of edges in a chunk
+  for (unsigned h = 0; h < totalNumHosts; h++) {
+    if (h == hostID) continue;
+    galois::runtime::SendBuffer b;
+    galois::runtime::gSerialize(b, chunkCounts);
+    net.sendTagged(h, galois::runtime::evilPhase, b);
+  }
+
+  // receive chunk counts
+  std::vector<uint64_t> recvChunkCounts;
+
+  printf("[%lu] Receiving edge chunk counts\n", hostID);
+  for (unsigned h = 0; h < totalNumHosts; h++) {
+    if (h == hostID) continue;
+    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
+
+    do {
+      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+    } while (!rBuffer);
+
+    galois::runtime::gDeserialize(rBuffer->second, recvChunkCounts);
+
+    for (unsigned i = 0; i < chunkCounts.size(); i++) {
+      chunkCounts[i] += recvChunkCounts[i];
+    }
+  }
+  galois::runtime::evilPhase++;
+}
+
+std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
+                const std::set<uint64_t>& uniqueChunks,
+                const std::vector<uint32_t>& localEdges,
+                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
+  std::vector<uint64_t> chunkCounts;
+  chunkCounts.assign(numNodeChunks, 0);
+
+  accumulateLocalEdgesToChunks(uniqueChunks, localEdges, chunkToNode, 
+                               chunkCounts);
+  sendAndReceiveEdgeChunkCounts(chunkCounts);
+
+  return chunkCounts;
+}
+
+
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
@@ -277,80 +361,17 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     );
   }
 
-  uint64_t localNumEdges = localEdges.size() / 2;
-
   printf("[%lu] Determining edge to chunk counts\n", hostID);
   std::set<uint64_t> uniqueNodes = findUniqueSourceNodes(localEdges);
   std::set<uint64_t> uniqueChunks = findUniqueChunks(uniqueNodes, chunkToNode);
-
-  std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
-  for (auto chunkID : uniqueChunks) {
-    // default initialize necessary gaccumulators
-    chunkToAccumulator[chunkID];
-  }
-
-  printf("[%lu] Chunk accumulators created\n", hostID);
-
-  // determine which chunk edges go to
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t chunkNum = findHostID(src, chunkToNode);
-      GALOIS_ASSERT(chunkNum != (uint32_t)-1);
-      chunkToAccumulator[chunkNum] += 1;
-    },
-    galois::loopname("ChunkInspection"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
-
-  printf("[%lu] Chunk accumulators done accumulating\n", hostID);
-
-  std::vector<uint64_t> chunkCounts;
-  chunkCounts.assign(numNodeChunks, 0);
-  for (auto chunkID : uniqueChunks) {
-    chunkCounts[chunkID] = chunkToAccumulator[chunkID].reduce();
-  }
-
-  printf("[%lu] Sending edge chunk counts\n", hostID);
-  // send off my chunk count vector to others so all hosts can have the
-  // same count of edges in a chunk
-  for (unsigned h = 0; h < totalNumHosts; h++) {
-    if (h == hostID) continue;
-    galois::runtime::SendBuffer b;
-    galois::runtime::gSerialize(b, chunkCounts);
-    net.sendTagged(h, galois::runtime::evilPhase, b);
-  }
-
-  // receive chunk counts
-  std::vector<uint64_t> recvChunkCounts;
-
-  printf("[%lu] Receiving edge chunk counts\n", hostID);
-  for (unsigned h = 0; h < totalNumHosts; h++) {
-    if (h == hostID) continue;
-    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
-
-    do {
-      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-    } while (!rBuffer);
-
-    galois::runtime::gDeserialize(rBuffer->second, recvChunkCounts);
-
-    for (unsigned i = 0; i < numNodeChunks; i++) {
-      chunkCounts[i] += recvChunkCounts[i];
-    }
-  }
-  galois::runtime::evilPhase++;
-  freeVector(recvChunkCounts);
-
+  std::vector<uint64_t> chunkCounts = 
+       getChunkEdgeCounts(numNodeChunks, uniqueChunks, localEdges, chunkToNode);
+  printf("[%lu] Edge to chunk counts determined\n", hostID);
 
   // prefix sum on the chunks
   for (unsigned i = 1; i < numNodeChunks; i++) {
     chunkCounts[i] += chunkCounts[i - 1];
   }
-
 
   printf("[%lu] Determining host mappings using chunk prefix sum\n", hostID);
   std::vector<std::pair<uint64_t, uint64_t>> finalMapping;

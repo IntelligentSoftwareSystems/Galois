@@ -117,7 +117,7 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
  * edges are laid out in (src, dest) order in the vector.
  *
  * @param localEdges vector of edges to find unique sources of: needs to have
- * (src, dest) layout
+ * (src, dest) layout (i.e. i even: vector[i] is source, i+1 is dest
  * @returns Set of global IDs of unique sources found in the provided edge
  * vector
  */
@@ -137,6 +137,43 @@ findUniqueSourceNodes(const std::vector<uint32_t>& localEdges);
 std::set<uint64_t> 
 findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
                  const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
+
+/**
+ * Get the edge counts for chunks of edges that we have locally.
+ *
+ * @param uniqueChunks unique chunks that this host has in its loaded edge list
+ * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
+ * @param chunkToNode specifies which chunks have which nodes
+ * @param chunkCounts (input/output) a 0-initialized vector that will be 
+ * edited to have our local chunk edge counts
+ */
+void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
+             const std::vector<uint32_t>& localEdges,
+             const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode,
+             std::vector<uint64_t>& chunkCounts);
+
+/**
+ * Synchronize chunk edge counts across all hosts, i.e. send and receive
+ * local chunk counts and update them.
+ *
+ * @param chunkCounts local edge chunk counts to be updated to a global chunk
+ * edge count across all hosts
+ */
+void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts);
+
+/**
+ * Get the number of edges that each node chunk has.
+ *
+ * @param numNodeChunks total number of chunks
+ * @param uniqueChunks unique chunks that this host has in its loaded edge list
+ * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
+ * @param chunkToNode specifies which chunks have which nodes
+ * @returns A vector specifying the number of edges each chunk has
+ */
+std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
+                const std::set<uint64_t>& uniqueChunks,
+                const std::vector<uint32_t>& localEdges,
+                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
 
 /**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
