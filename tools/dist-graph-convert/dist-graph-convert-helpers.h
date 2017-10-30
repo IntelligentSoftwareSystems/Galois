@@ -92,7 +92,6 @@ std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
  */
 uint64_t accumulateValue(uint64_t value);
 
-
 /**
  * Find an index into the provided prefix sum that gets the desired "weight"
  * (weight comes from the units of the prefix sum).
@@ -112,11 +111,41 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
 std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
                                   const std::vector<uint64_t>& prefixSum);
 
+
 /**
- * TODO
+ * Finds the unique source nodes of a set of edges in memory. Assumes
+ * edges are laid out in (src, dest) order in the vector.
+ *
+ * @param localEdges vector of edges to find unique sources of: needs to have
+ * (src, dest) layout
+ * @returns Set of global IDs of unique sources found in the provided edge
+ * vector
+ */
+std::set<uint64_t>
+findUniqueSourceNodes(const std::vector<uint32_t>& localEdges);
+
+/**
+ * Given a chunk to node mapping and a set of unique nodes, find the unique 
+ * chunks corresponding to the unique nodes provided.
+ *
+ * @param uniqueNodes set of unique nodes
+ * @param chunkToNode a mapping of a chunk to the range of nodes that the chunk
+ * has
+ * @returns a set of chunk ids corresponding to the nodes passed in (i.e. chunks
+ * those nodes are included in)
+ */
+std::set<uint64_t> 
+findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
+                 const std::vector<std::pair<uint64_t, uint64_t>> chunkToNode);
+
+/**
+ * Attempts to evenly assign nodes to hosts such that each host roughly gets
+ * an even number of edges. 
+ *
+ * TODO params
  */
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
-    std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
+    const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
 );
 

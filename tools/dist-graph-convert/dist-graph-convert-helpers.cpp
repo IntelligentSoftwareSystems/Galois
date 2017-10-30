@@ -176,13 +176,64 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
   return std::pair<uint64_t, uint64_t>(lower, upper);
 }
 
+std::set<uint64_t> 
+findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  printf("[%lu] Finding unique nodes\n", hostID);
+  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
+
+  uint64_t localNumEdges = localEdges.size() / 2;
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      std::set<uint64_t>& localSet = *threadUniqueNodes.getLocal();
+      // src node
+      localSet.insert(localEdges[edgeIndex * 2]);
+    },
+    galois::loopname("FindUniqueNodes"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  std::set<uint64_t> uniqueNodes;
+
+  for (unsigned i = 0; i < threadUniqueNodes.size(); i++) {
+    auto& tSet = *threadUniqueNodes.getRemote(i);
+    for (auto nodeID : tSet) {
+      uniqueNodes.insert(nodeID);
+    }
+  }
+
+  printf("[%lu] Unique nodes found\n", hostID);
+
+  return uniqueNodes;
+}
+
+std::set<uint64_t> 
+findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
+                 const std::vector<std::pair<uint64_t, uint64_t>> chunkToNode) {
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  // TODO parallelize
+  printf("[%lu] Finding unique chunks\n", hostID);
+  std::set<uint64_t> uniqueChunks;
+  for (auto nodeID : uniqueNodes) {
+    uint32_t chunkNum = findHostID(nodeID, chunkToNode);
+    uniqueChunks.insert(chunkNum);
+  }
+  printf("[%lu] Have %lu unique chunk(s)\n", hostID, uniqueChunks.size());
+
+  return uniqueChunks;
+}
 
 /**
  * Attempts even balance. TODO get better description + split into a bunch
  * of helper functions
  */
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
-    std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
+    const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
 ) {
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -211,41 +262,8 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   uint64_t localNumEdges = localEdges.size() / 2;
 
   printf("[%lu] Determining edge to chunk counts\n", hostID);
-
-  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
-
-  printf("[%lu] Finding unique chunks I own\n", hostID);
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      std::set<uint64_t>& localSet = *threadUniqueNodes.getLocal();
-      // src node
-      localSet.insert(localEdges[edgeIndex * 2]);
-    },
-    galois::loopname("FindUniqueNodes"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
-
-  std::set<uint64_t> uniqueNodes;
-
-  for (unsigned i = 0; i < threadUniqueNodes.size(); i++) {
-    auto& tSet = *threadUniqueNodes.getRemote(i);
-    for (auto nodeID : tSet) {
-      uniqueNodes.insert(nodeID);
-    }
-  }
-  printf("[%lu] Unique nodes found\n", hostID);
-
-  std::set<uint64_t> uniqueChunks;
-
-  for (auto nodeID : uniqueNodes) {
-    uint32_t chunkNum = findHostID(nodeID, chunkToNode);
-    uniqueChunks.insert(chunkNum);
-  }
-
-  printf("[%lu] Have %lu unique chunk(s)\n", hostID, uniqueChunks.size());
+  std::set<uint64_t> uniqueNodes = findUniqueSourceNodes(localEdges);
+  std::set<uint64_t> uniqueChunks = findUniqueChunks(uniqueNodes, chunkToNode);
 
   std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
   for (auto chunkID : uniqueChunks) {
