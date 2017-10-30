@@ -127,7 +127,11 @@ void convert(C& c, Conversion) {
                    "\n");
   }
 
+  galois::StatTimer convertTimer("Convert Time", "convert"); 
+
+  convertTimer.start();
   c.template convert<EdgeTy>(inputFilename, outputFilename);
+  convertTimer.stop();
 
   if (net.ID == 0) {
     galois::gPrint("Done with convert\n");
