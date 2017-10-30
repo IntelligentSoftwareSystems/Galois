@@ -356,6 +356,35 @@ std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
   return chunkCounts;
 }
 
+std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
+      const std::vector<uint64_t>& chunkCountsPrefixSum,
+      const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
+  std::vector<std::pair<uint64_t, uint64_t>> finalMapping;
+
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  uint64_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
+  for (uint64_t h = 0; h < totalNumHosts; h++) {
+    uint64_t lowerChunk;
+    uint64_t upperChunk;
+
+    // get the lower/upper chunk assigned to host h
+    std::tie(lowerChunk, upperChunk) = binSearchDivision(h, totalNumHosts, 
+                                                         chunkCountsPrefixSum);
+    
+    uint64_t lowerNode = chunkToNode[lowerChunk].first;
+    uint64_t upperNode = chunkToNode[upperChunk].first;
+
+    if (hostID == 0) {
+      printf("Host %lu gets nodes %lu to %lu\n", h, lowerNode, upperNode);
+    }
+
+    finalMapping.emplace_back(std::pair<uint64_t, uint64_t>(lowerNode, 
+                                                            upperNode));
+  }
+
+  return finalMapping;
+}
+
 
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
@@ -391,37 +420,21 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
        getChunkEdgeCounts(numNodeChunks, uniqueChunks, localEdges, chunkToNode);
   printf("[%lu] Edge to chunk counts determined\n", hostID);
 
-  // prefix sum on the chunks
+  // prefix sum on the chunks (reuse array to save memory)
   for (unsigned i = 1; i < numNodeChunks; i++) {
     chunkCounts[i] += chunkCounts[i - 1];
   }
 
-  printf("[%lu] Determining host mappings using chunk prefix sum\n", hostID);
-  std::vector<std::pair<uint64_t, uint64_t>> finalMapping;
 
-  // to make access to chunkToNode's last element correct with regard to the
-  // upperChunk access (without this would access out of bounds)
+  // to make access to chunkToNode's last element correct with regard to later
+  // access (without this access to chunkToNode[chunkSize] is out of bounds)
   chunkToNode.emplace_back(std::pair<uint64_t, uint64_t>(totalNodeCount, 
                                                          totalNodeCount));
-  for (uint64_t h = 0; h < totalNumHosts; h++) {
-    uint64_t lowerChunk;
-    uint64_t upperChunk;
 
-    // get the lower/upper chunk assigned to host h
-    std::tie(lowerChunk, upperChunk) = binSearchDivision(h, totalNumHosts, 
-                                                         chunkCounts);
-    
-    uint64_t lowerNode = chunkToNode[lowerChunk].first;
-    uint64_t upperNode = chunkToNode[upperChunk].first;
+  std::vector<std::pair<uint64_t, uint64_t>> finalMapping = 
+      getChunkToHostMapping(chunkCounts, chunkToNode);
 
-    if (hostID == 0) {
-      printf("Host %lu gets nodes %lu to %lu\n", h, lowerNode, upperNode);
-    }
-
-    finalMapping.emplace_back(std::pair<uint64_t, uint64_t>(lowerNode, 
-                                                            upperNode));
-  }
-
+  // TODO 
   return finalMapping;
 }
 

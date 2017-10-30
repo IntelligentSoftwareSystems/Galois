@@ -190,8 +190,6 @@ struct Edgelist2Gr : public Conversion {
     uint64_t localNodeEnd = hostToNodes[hostID].second;
     uint64_t localNumNodes = localNodeEnd - localNodeBegin;
 
-    printf("[%lu] Nodes %lu to %lu\n", hostID, localNodeBegin, localNodeEnd);
-
     sendEdgeCounts(hostToNodes, localNumEdges, localEdges);
     std::atomic<uint64_t> edgesToReceive;
     edgesToReceive.store(receiveEdgeCounts());
@@ -215,7 +213,7 @@ struct Edgelist2Gr : public Conversion {
       totalAssignedEdges += localSrcToDest[i].size();
     }
 
-    printf("[%lu] I will write %lu edges\n", hostID, totalAssignedEdges);
+    printf("[%lu] Will write %lu edges\n", hostID, totalAssignedEdges);
 
     // calculate global edge offset using edge counts from other hosts
     std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
@@ -225,16 +223,14 @@ struct Edgelist2Gr : public Conversion {
       globalEdgeOffset += edgesPerHost[h];
       totalEdgeCount2 += edgesPerHost[h];
     }
-    printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
+    //printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
 
-    // finish off getting total edge count
+    // finish off getting total edge count (note this is more of a sanity check
+    // since we got total edge count near the beginning already)
     for (unsigned h = hostID; h < totalNumHosts; h++) {
       totalEdgeCount2 += edgesPerHost[h];
     }
-    printf("[%lu] Total number of edges is %lu\n", hostID, totalEdgeCount2);
-
     GALOIS_ASSERT(totalEdgeCount == totalEdgeCount2);
-
     freeVector(edgesPerHost);
 
     printf("[%lu] Beginning write to file\n", hostID);
@@ -247,29 +243,33 @@ struct Edgelist2Gr : public Conversion {
     }
 
     if (localNumNodes > 0) {
-    // prepare edge prefix sum for file writing
-    std::vector<uint64_t> edgePrefixSum(localNumNodes);
-    edgePrefixSum[0] = localSrcToDest[0].size();
-    for (unsigned i = 1; i < localNumNodes; i++) {
-      edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
+      // prepare edge prefix sum for file writing
+      std::vector<uint64_t> edgePrefixSum(localNumNodes);
+      edgePrefixSum[0] = localSrcToDest[0].size();
+      for (unsigned i = 1; i < localNumNodes; i++) {
+        edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
+      }
+
+      // account for edge offset
+      for (unsigned i = 0; i < localNumNodes; i++) {
+        edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
+      }
+
+      // begin file writing 
+      uint64_t headerSize = sizeof(uint64_t) * 4;
+      uint64_t nodeIndexOffset = headerSize + 
+                                 (localNodeBegin * sizeof(uint64_t));
+      printf("[%lu] Write node index data\n", hostID);
+      writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
+      freeVector(edgePrefixSum);
+
+      uint64_t edgeDestOffset = headerSize + 
+                                (totalNumNodes * sizeof(uint64_t)) +
+                                globalEdgeOffset * sizeof(uint32_t);
+      printf("[%lu] Write edge dest data\n", hostID);
+      writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
     }
 
-    for (unsigned i = 0; i < localNumNodes; i++) {
-      edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
-    }
-
-
-    // begin file writing 
-    uint64_t headerSize = sizeof(uint64_t) * 4;
-    uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
-    writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
-    freeVector(edgePrefixSum);
-
-    uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
-                              globalEdgeOffset * sizeof(uint32_t);
-    writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
-
-    }
     MPICheck(MPI_File_close(&newGR));
     printf("[%lu] Write to file done\n", hostID);
 

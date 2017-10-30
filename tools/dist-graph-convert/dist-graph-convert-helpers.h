@@ -175,6 +175,21 @@ std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
                 const std::vector<uint32_t>& localEdges,
                 const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
 
+
+/**
+ * Given a chunk edge count prefix sum and the chunk to node mapping, assign
+ * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even 
+ * number of edges and return the node mapping.
+ *
+ * @param chunkCountsPrefixSum prefix sum of edges in chunks
+ * @param chunkToNode mapping of chunk to nodes the chunk has
+ * @returns a host to node mapping where each host very roughly has a balanced
+ * number of edges
+ */
+std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
+      const std::vector<uint64_t>& chunkCountsPrefixSum,
+      const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
+
 /**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
  * an even number of edges. 
