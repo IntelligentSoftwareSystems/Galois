@@ -60,15 +60,15 @@ std::vector<std::pair<uint64_t, uint64_t>>
   getHostToNodeMapping(uint64_t numHosts, uint64_t totalNumNodes);
 
 /**
- * Get the assigned host of some node given its global id.
+ * Get the assigned owner of some ID given a mapping from ID to owner.
  *
- * @param gID global ID of a node
- * @param hostToNodes Vector containing information about which host has which
+ * @param gID ID to find owner of
+ * @param ownerMapping Vector containing information about which host has which
  * nodes
- * @returns Host that requested node resides on or -1 if it couldn't be found
+ * @returns Owner of requested ID on or -1 if it couldn't be found
  */
-uint32_t findHostID(const uint64_t gID, 
-                 const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes);
+uint32_t findOwner(const uint64_t gID, 
+                 const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping);
 
 /**
  * Returns the file size of an ifstream.

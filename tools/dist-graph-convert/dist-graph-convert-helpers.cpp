@@ -47,11 +47,12 @@ std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
 }
 
 // TODO THIS IS WAY TOO SLOW; FIND BETTER WAY
-uint32_t findHostID(const uint64_t gID, 
-            const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes) {
-  for (uint64_t host = 0; host < hostToNodes.size(); host++) {
-    if (gID >= hostToNodes[host].first && gID < hostToNodes[host].second) {
-      return host;
+// TODO change this to binary search
+uint32_t findOwner(const uint64_t gID, 
+            const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping) {
+  for (uint64_t o = 0; o < ownerMapping.size(); o++) {
+    if (gID >= ownerMapping[o].first && gID < ownerMapping[o].second) {
+      return o;
     }
   }
   return -1;
@@ -224,7 +225,7 @@ findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
     galois::iterate(uniqueNodes.cbegin(), uniqueNodes.cend()),
     [&] (auto uniqueNode) {
       std::set<uint64_t>& localSet = *threadUniqueChunks.getLocal();
-      localSet.insert(findHostID(uniqueNode, chunkToNode));
+      localSet.insert(findOwner(uniqueNode, chunkToNode));
     },
     galois::loopname("FindUniqueChunks"),
     galois::no_stats(),
@@ -265,7 +266,7 @@ void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
       uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t chunkNum = findHostID(src, chunkToNode);
+      uint32_t chunkNum = findOwner(src, chunkToNode);
       GALOIS_ASSERT(chunkNum != (uint32_t)-1);
       chunkToAccumulator[chunkNum] += 1;
     },
@@ -420,7 +421,7 @@ void sendEdgeCounts(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
       uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t edgeOwner = findHostID(src, hostToNodes);
+      uint32_t edgeOwner = findOwner(src, hostToNodes);
       numEdgesPerHost[edgeOwner] += 1;
     },
     galois::loopname("EdgeInspection"),
@@ -507,7 +508,7 @@ void sendAssignedEdges(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
       uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t edgeOwner = findHostID(src, hostToNodes);
+      uint32_t edgeOwner = findOwner(src, hostToNodes);
       uint32_t dst = localEdges[(edgeIndex * 2) + 1];
       uint32_t localID = src - hostToNodes[edgeOwner].first;
 
@@ -608,7 +609,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
             uint64_t src;
             galois::runtime::gDeserialize(receiveBuffer, src, recvVector);
             edgesToReceive -= recvVector.size();
-            GALOIS_ASSERT(findHostID(src, hostToNodes) == hostID);
+            GALOIS_ASSERT(findOwner(src, hostToNodes) == hostID);
             uint32_t localID = src - hostToNodes[hostID].first;
 
             nodeLocks[localID].lock();
