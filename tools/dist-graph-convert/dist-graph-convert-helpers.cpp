@@ -192,7 +192,9 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
   std::vector<std::pair<uint64_t, uint64_t>> chunkToNode;
 
-  printf("num chunks is %lu\n", numNodeChunks);
+  if (hostID == 0) {
+    printf("Num chunks is %lu\n", numNodeChunks);
+  }
 
   for (unsigned i = 0; i < numNodeChunks; i++) {
     chunkToNode.emplace_back(
@@ -203,15 +205,16 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 
   uint64_t localNumEdges = localEdges.size() / 2;
 
+  printf("[%lu] Determining edge to chunk counts\n", hostID);
+
   // determine which node chunk my edges go to
-  std::vector<galois::GAccumulator<uint64_t>> myNodeChunkCounts(numNodeChunks);
+  std::vector<std::atomic<uint64_t>> myNodeChunkCounts(numNodeChunks);
 
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
       uint32_t src = localEdges[edgeIndex * 2];
       uint32_t chunkNum = findHostID(src, chunkToNode);
-      //printf("chunk num %u\n", chunkNum);
       GALOIS_ASSERT(chunkNum != (uint32_t)-1);
       myNodeChunkCounts[chunkNum] += 1;
     },
@@ -223,9 +226,10 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 
   std::vector<uint64_t> chunkCounts(numNodeChunks);
   for (unsigned i = 0; i < numNodeChunks; i++) {
-    chunkCounts[i] = myNodeChunkCounts[i].reduce();
+    chunkCounts[i] = myNodeChunkCounts[i];
   }
 
+  printf("[%lu] Sending edge chunk counts\n", hostID);
   // send off my chunk count vector to others so all hosts can have the
   // same count of edges in a chunk
   for (unsigned h = 0; h < totalNumHosts; h++) {
@@ -238,6 +242,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   // receive chunk counts
   std::vector<uint64_t> recvChunkCounts;
 
+  printf("[%lu] Receiving edge chunk counts\n", hostID);
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID) continue;
     decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
@@ -261,6 +266,8 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     chunkCounts[i] += chunkCounts[i - 1];
   }
 
+
+  printf("[%lu] Determining host mappings using chunk prefix sum\n", hostID);
   std::vector<std::pair<uint64_t, uint64_t>> finalMapping;
 
   // to make access to chunkToNode's last element correct with regard to the

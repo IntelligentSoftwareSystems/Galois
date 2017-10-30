@@ -179,14 +179,8 @@ struct Edgelist2Gr : public Conversion {
       printf("Total num edges %lu\n", totalEdgeCount);
     }
 
-    // TODO get better host to node mapping that is more even
-
-    // split up nodes among hosts
-    //std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
-    //    getHostToNodeMapping(totalNumHosts, totalNumNodes);
-
     std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
-    getEvenNodeToHostMapping(localEdges, totalNumNodes, totalEdgeCount);
+        getEvenNodeToHostMapping(localEdges, totalNumNodes, totalEdgeCount);
 
     uint64_t localNodeBegin = hostToNodes[hostID].first;
     uint64_t localNodeEnd = hostToNodes[hostID].second;
@@ -217,7 +211,7 @@ struct Edgelist2Gr : public Conversion {
       totalAssignedEdges += localSrcToDest[i].size();
     }
 
-    printf("[%lu] I have %lu edges\n", hostID, totalAssignedEdges);
+    printf("[%lu] I will write %lu edges\n", hostID, totalAssignedEdges);
 
     // calculate global edge offset using edge counts from other hosts
     std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
