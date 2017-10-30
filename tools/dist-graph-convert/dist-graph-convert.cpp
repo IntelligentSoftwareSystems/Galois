@@ -205,6 +205,7 @@ struct Edgelist2Gr : public Conversion {
     freeVector(localEdges);
     receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
                          nodeLocks);
+    freeVector(hostToNodes);
     freeVector(nodeLocks);
 
     // TODO can refactor to function
