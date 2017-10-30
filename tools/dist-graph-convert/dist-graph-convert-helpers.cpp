@@ -190,6 +190,11 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   uint64_t totalNumHosts = net.Num;
 
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
+  // TODO better heuristics: basically we don't want to run out of memory...
+  while (numNodeChunks > 10000000) {
+    numNodeChunks /= 2;
+  }
+
   std::vector<std::pair<uint64_t, uint64_t>> chunkToNode;
 
   if (hostID == 0) {
@@ -207,16 +212,57 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 
   printf("[%lu] Determining edge to chunk counts\n", hostID);
 
-  // determine which node chunk my edges go to
-  std::vector<std::atomic<uint64_t>> myNodeChunkCounts(numNodeChunks);
+  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
 
+  printf("[%lu] Finding unique chunks I own\n", hostID);
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      std::set<uint64_t>& localSet = *threadUniqueNodes.getLocal();
+      // src node
+      localSet.insert(localEdges[edgeIndex * 2]);
+    },
+    galois::loopname("FindUniqueNodes"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  std::set<uint64_t> uniqueNodes;
+
+  for (unsigned i = 0; i < threadUniqueNodes.size(); i++) {
+    auto& tSet = *threadUniqueNodes.getRemote(i);
+    for (auto nodeID : tSet) {
+      uniqueNodes.insert(nodeID);
+    }
+  }
+  printf("[%lu] Unique nodes found\n", hostID);
+
+  std::set<uint64_t> uniqueChunks;
+
+  for (auto nodeID : uniqueNodes) {
+    uint32_t chunkNum = findHostID(nodeID, chunkToNode);
+    uniqueChunks.insert(chunkNum);
+  }
+
+  printf("[%lu] Have %lu unique chunk(s)\n", hostID, uniqueChunks.size());
+
+  std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
+  for (auto chunkID : uniqueChunks) {
+    // default initialize necessary gaccumulators
+    chunkToAccumulator[chunkID];
+  }
+
+  printf("[%lu] Chunk accumulators created\n", hostID);
+
+  // determine which chunk edges go to
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
       uint32_t src = localEdges[edgeIndex * 2];
       uint32_t chunkNum = findHostID(src, chunkToNode);
       GALOIS_ASSERT(chunkNum != (uint32_t)-1);
-      myNodeChunkCounts[chunkNum] += 1;
+      chunkToAccumulator[chunkNum] += 1;
     },
     galois::loopname("ChunkInspection"),
     galois::no_stats(),
@@ -224,9 +270,12 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     galois::timeit()
   );
 
-  std::vector<uint64_t> chunkCounts(numNodeChunks);
-  for (unsigned i = 0; i < numNodeChunks; i++) {
-    chunkCounts[i] = myNodeChunkCounts[i];
+  printf("[%lu] Chunk accumulators done accumulating\n", hostID);
+
+  std::vector<uint64_t> chunkCounts;
+  chunkCounts.assign(numNodeChunks, 0);
+  for (auto chunkID : uniqueChunks) {
+    chunkCounts[chunkID] = chunkToAccumulator[chunkID].reduce();
   }
 
   printf("[%lu] Sending edge chunk counts\n", hostID);
