@@ -214,7 +214,7 @@ findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
 
 std::set<uint64_t> 
 findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
-                 const std::vector<std::pair<uint64_t, uint64_t>> chunkToNode) {
+                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
   printf("[%lu] Finding unique chunks\n", hostID);
