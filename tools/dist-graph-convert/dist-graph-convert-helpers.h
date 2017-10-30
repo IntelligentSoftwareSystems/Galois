@@ -31,6 +31,7 @@
 #include "galois/Galois.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Network.h"
+#include "galois/DistAccumulator.h"
 
 /**
  * Wrapper for MPI calls that return an error code. Make sure it is success
@@ -82,6 +83,42 @@ uint64_t getFileSize(std::ifstream& openFile);
  */
 std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
                                                  uint64_t fileSize);
+
+/**
+ * Accumulates some value from all hosts + return it.
+ *
+ * @param value value to accumulate across hosts
+ * @return Accumulated value (add all values from all hosts up)
+ */
+uint64_t accumulateValue(uint64_t value);
+
+
+/**
+ * Find an index into the provided prefix sum that gets the desired "weight"
+ * (weight comes from the units of the prefix sum).
+ * 
+ * TODO params
+ */
+uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
+                            const std::vector<uint64_t>& prefixSum);
+
+/**
+ * Given a prefix sum, a partition ID, and the total number of partitions, 
+ * find a good contiguous division using the prefix sum such that 
+ * partitions get roughly an even amount of units (based on prefix sum).
+ *
+ * TODO params
+ */
+std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
+                                  const std::vector<uint64_t>& prefixSum);
+
+/**
+ * TODO
+ */
+std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
+    std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
+    uint64_t totalEdgeCount
+);
 
 /**
  * Determine/send to each host how many edges they should expect to receive

@@ -27,7 +27,6 @@
 #include <mutex>
 
 #include "galois/DistGalois.h"
-#include "galois/DistAccumulator.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "dist-graph-convert-helpers.h"
@@ -175,9 +174,19 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT(localNumEdges == (localEdges.size() / 2));
     printf("[%lu] Local num edges %lu\n", hostID, localNumEdges);
 
+    uint64_t totalEdgeCount = accumulateValue(localNumEdges);
+    if (hostID == 0) {
+      printf("Total num edges %lu\n", totalEdgeCount);
+    }
+
+    // TODO get better host to node mapping that is more even
+
     // split up nodes among hosts
+    //std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
+    //    getHostToNodeMapping(totalNumHosts, totalNumNodes);
+
     std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
-        getHostToNodeMapping(totalNumHosts, totalNumNodes);
+    getEvenNodeToHostMapping(localEdges, totalNumNodes, totalEdgeCount);
 
     uint64_t localNodeBegin = hostToNodes[hostID].first;
     uint64_t localNodeEnd = hostToNodes[hostID].second;
@@ -208,23 +217,38 @@ struct Edgelist2Gr : public Conversion {
       totalAssignedEdges += localSrcToDest[i].size();
     }
 
+    printf("[%lu] I have %lu edges\n", hostID, totalAssignedEdges);
+
     // calculate global edge offset using edge counts from other hosts
     std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
     uint64_t globalEdgeOffset = 0;
-    uint64_t totalEdgeCount = 0;
+    uint64_t totalEdgeCount2 = 0;
     for (unsigned h = 0; h < hostID; h++) {
       globalEdgeOffset += edgesPerHost[h];
-      totalEdgeCount += edgesPerHost[h];
+      totalEdgeCount2 += edgesPerHost[h];
     }
     printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
 
     // finish off getting total edge count
     for (unsigned h = hostID; h < totalNumHosts; h++) {
-      totalEdgeCount += edgesPerHost[h];
+      totalEdgeCount2 += edgesPerHost[h];
     }
-    printf("[%lu] Total number of edges is %lu\n", hostID, totalEdgeCount);
+    printf("[%lu] Total number of edges is %lu\n", hostID, totalEdgeCount2);
+
+    GALOIS_ASSERT(totalEdgeCount == totalEdgeCount2);
+
     freeVector(edgesPerHost);
 
+    printf("[%lu] Beginning write to file\n", hostID);
+    MPI_File newGR;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
+             MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
+
+    if (hostID == 0) {
+      writeGrHeader(newGR, 1, 0, totalNumNodes, totalEdgeCount2);
+    }
+
+    if (localNumNodes > 0) {
     // prepare edge prefix sum for file writing
     std::vector<uint64_t> edgePrefixSum(localNumNodes);
     edgePrefixSum[0] = localSrcToDest[0].size();
@@ -236,15 +260,8 @@ struct Edgelist2Gr : public Conversion {
       edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
     }
 
+
     // begin file writing 
-    MPI_File newGR;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
-             MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
-
-    if (hostID == 0) {
-      writeGrHeader(newGR, 1, 0, totalNumNodes, totalEdgeCount);
-    }
-
     uint64_t headerSize = sizeof(uint64_t) * 4;
     uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
     writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
@@ -254,7 +271,9 @@ struct Edgelist2Gr : public Conversion {
                               globalEdgeOffset * sizeof(uint32_t);
     writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
 
-    MPI_File_close(&newGR);
+    }
+    MPICheck(MPI_File_close(&newGR));
+    printf("[%lu] Write to file done\n", hostID);
 
     galois::runtime::getHostBarrier().wait();
   }

@@ -128,6 +128,167 @@ std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
   return std::pair<uint64_t, uint64_t>(finalStart, finalEnd);
 }
 
+uint64_t accumulateValue(uint64_t localEdgeCount) {
+  galois::DGAccumulator<uint64_t> accumulator;
+  accumulator.reset();
+  accumulator += localEdgeCount;
+  return accumulator.reduce();
+}
+
+uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
+                            const std::vector<uint64_t>& prefixSum) {
+  while (lb < ub) {
+    uint64_t mid = lb + (ub - lb) / 2;
+    uint64_t numUnits;
+
+    if (mid != 0) {
+      numUnits = prefixSum[mid - 1];
+    } else {
+      numUnits = 0;
+    }
+
+    if (numUnits <= targetWeight) {
+      lb = mid + 1;
+    } else {
+      ub = mid;
+    }
+  }
+
+  return lb;
+}
+
+std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
+                                  const std::vector<uint64_t>& prefixSum) {
+  uint64_t totalWeight = prefixSum.back();
+  uint64_t weightPerPartition = (totalWeight + totalID - 1) / totalID;
+  uint64_t numThingsToSplit = prefixSum.size();
+
+  uint64_t lower;
+  if (id != 0) {
+    lower = findIndexPrefixSum(id * weightPerPartition, 0, numThingsToSplit,
+                               prefixSum);
+  } else {
+    lower = 0;
+  }
+  uint64_t upper = findIndexPrefixSum((id + 1) * weightPerPartition, 
+                                      lower, numThingsToSplit, prefixSum);
+  
+  return std::pair<uint64_t, uint64_t>(lower, upper);
+}
+
+
+/**
+ * Attempts even balance. TODO get better description + split into a bunch
+ * of helper functions
+ */
+std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
+    std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
+    uint64_t totalEdgeCount
+) {
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
+  std::vector<std::pair<uint64_t, uint64_t>> chunkToNode;
+
+  printf("num chunks is %lu\n", numNodeChunks);
+
+  for (unsigned i = 0; i < numNodeChunks; i++) {
+    chunkToNode.emplace_back(
+      galois::block_range((uint64_t)0, (uint64_t)totalNodeCount, i, 
+                          numNodeChunks)
+    );
+  }
+
+  uint64_t localNumEdges = localEdges.size() / 2;
+
+  // determine which node chunk my edges go to
+  std::vector<galois::GAccumulator<uint64_t>> myNodeChunkCounts(numNodeChunks);
+
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src = localEdges[edgeIndex * 2];
+      uint32_t chunkNum = findHostID(src, chunkToNode);
+      //printf("chunk num %u\n", chunkNum);
+      GALOIS_ASSERT(chunkNum != (uint32_t)-1);
+      myNodeChunkCounts[chunkNum] += 1;
+    },
+    galois::loopname("ChunkInspection"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  std::vector<uint64_t> chunkCounts(numNodeChunks);
+  for (unsigned i = 0; i < numNodeChunks; i++) {
+    chunkCounts[i] = myNodeChunkCounts[i].reduce();
+  }
+
+  // send off my chunk count vector to others so all hosts can have the
+  // same count of edges in a chunk
+  for (unsigned h = 0; h < totalNumHosts; h++) {
+    if (h == hostID) continue;
+    galois::runtime::SendBuffer b;
+    galois::runtime::gSerialize(b, chunkCounts);
+    net.sendTagged(h, galois::runtime::evilPhase, b);
+  }
+
+  // receive chunk counts
+  std::vector<uint64_t> recvChunkCounts;
+
+  for (unsigned h = 0; h < totalNumHosts; h++) {
+    if (h == hostID) continue;
+    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) rBuffer;
+
+    do {
+      rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+    } while (!rBuffer);
+
+    galois::runtime::gDeserialize(rBuffer->second, recvChunkCounts);
+
+    for (unsigned i = 0; i < numNodeChunks; i++) {
+      chunkCounts[i] += recvChunkCounts[i];
+    }
+  }
+  galois::runtime::evilPhase++;
+  freeVector(recvChunkCounts);
+
+
+  // prefix sum on the chunks
+  for (unsigned i = 1; i < numNodeChunks; i++) {
+    chunkCounts[i] += chunkCounts[i - 1];
+  }
+
+  std::vector<std::pair<uint64_t, uint64_t>> finalMapping;
+
+  // to make access to chunkToNode's last element correct with regard to the
+  // upperChunk access (without this would access out of bounds)
+  chunkToNode.emplace_back(std::pair<uint64_t, uint64_t>(totalNodeCount, 
+                                                         totalNodeCount));
+  for (uint64_t h = 0; h < totalNumHosts; h++) {
+    uint64_t lowerChunk;
+    uint64_t upperChunk;
+
+    // get the lower/upper chunk assigned to host h
+    std::tie(lowerChunk, upperChunk) = binSearchDivision(h, totalNumHosts, 
+                                                         chunkCounts);
+    
+    uint64_t lowerNode = chunkToNode[lowerChunk].first;
+    uint64_t upperNode = chunkToNode[upperChunk].first;
+
+    if (hostID == 0) {
+      printf("Host %lu gets nodes %lu to %lu\n", h, lowerNode, upperNode);
+    }
+
+    finalMapping.emplace_back(std::pair<uint64_t, uint64_t>(lowerNode, 
+                                                            upperNode));
+  }
+
+  return finalMapping;
+}
+
 void sendEdgeCounts(
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
     uint64_t localNumEdges, const std::vector<uint32_t>& localEdges
@@ -157,8 +318,6 @@ void sendEdgeCounts(
 
   printf("[%lu] Sending edge counts\n", hostID);
 
-  // tell hosts how many edges they should expect
-  std::vector<uint64_t> edgeVectorToSend;
   for (unsigned h = 0; h < totalNumHosts; h++) {
     if (h == hostID) continue;
     galois::runtime::SendBuffer b;
