@@ -57,7 +57,7 @@ void freeVector(VectorTy& toFree) {
  * TODO documentation
  */
 std::vector<std::pair<uint64_t, uint64_t>> 
-  getHostToNodeMapping(const uint64_t numHosts, const uint64_t totalNumNodes);
+  getHostToNodeMapping(uint64_t numHosts, uint64_t totalNumNodes);
 
 /**
  * Get the assigned host of some node given its global id.
@@ -68,7 +68,7 @@ std::vector<std::pair<uint64_t, uint64_t>>
  * @returns Host that requested node resides on or -1 if it couldn't be found
  */
 uint32_t findHostID(const uint64_t gID, 
-                  const std::vector<std::pair<uint64_t, uint64_t>> hostToNodes);
+                 const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes);
 
 /**
  * Returns the file size of an ifstream.

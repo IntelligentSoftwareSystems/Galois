@@ -31,7 +31,7 @@ void MPICheck(int errcode) {
 }
 
 std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
-    const uint64_t numHosts, const uint64_t totalNumNodes
+    uint64_t numHosts, uint64_t totalNumNodes
 ) {
   GALOIS_ASSERT((totalNumNodes != 0), "host2node mapping needs numNodes");
 
@@ -46,8 +46,9 @@ std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
   return hostToNodes;
 }
 
+// TODO THIS IS WAY TOO SLOW; FIND BETTER WAY
 uint32_t findHostID(const uint64_t gID, 
-            const std::vector<std::pair<uint64_t, uint64_t>> hostToNodes) {
+            const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes) {
   for (uint64_t host = 0; host < hostToNodes.size(); host++) {
     if (gID >= hostToNodes[host].first && gID < hostToNodes[host].second) {
       return host;
@@ -216,13 +217,30 @@ findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
                  const std::vector<std::pair<uint64_t, uint64_t>> chunkToNode) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
-  // TODO parallelize
   printf("[%lu] Finding unique chunks\n", hostID);
+  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueChunks;
+
+  galois::do_all(
+    galois::iterate(uniqueNodes.cbegin(), uniqueNodes.cend()),
+    [&] (auto uniqueNode) {
+      std::set<uint64_t>& localSet = *threadUniqueChunks.getLocal();
+      localSet.insert(findHostID(uniqueNode, chunkToNode));
+    },
+    galois::loopname("FindUniqueChunks"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
   std::set<uint64_t> uniqueChunks;
-  for (auto nodeID : uniqueNodes) {
-    uint32_t chunkNum = findHostID(nodeID, chunkToNode);
-    uniqueChunks.insert(chunkNum);
+
+  for (unsigned i = 0; i < threadUniqueChunks.size(); i++) {
+    auto& tSet = *threadUniqueChunks.getRemote(i);
+    for (auto chunkID : tSet) {
+      uniqueChunks.insert(chunkID);
+    }
   }
+
   printf("[%lu] Have %lu unique chunk(s)\n", hostID, uniqueChunks.size());
 
   return uniqueChunks;
