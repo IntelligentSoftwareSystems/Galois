@@ -46,16 +46,38 @@ std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
   return hostToNodes;
 }
 
-// TODO THIS IS WAY TOO SLOW; FIND BETTER WAY
-// TODO change this to binary search
 uint32_t findOwner(const uint64_t gID, 
             const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping) {
-  for (uint64_t o = 0; o < ownerMapping.size(); o++) {
-    if (gID >= ownerMapping[o].first && gID < ownerMapping[o].second) {
-      return o;
+  uint32_t lb = 0;
+  uint32_t ub = ownerMapping.size();
+
+  while (lb < ub) {
+    uint64_t mid = lb + (ub - lb) / 2;
+    auto& currentPair = ownerMapping[mid];
+
+    if (gID >= currentPair.first && gID < currentPair.second) {
+      return mid;
+    } else if (gID < currentPair.first) {
+      // MOVE DOWN
+      ub = mid;
+    } else if (gID >= currentPair.second) { // gid >= currentPair.second
+      // MOVE UP
+      lb = mid + 1;
+    } else { // die; we should fall into one of the above cases
+      GALOIS_DIE("Issue in findOwner in dist-graph-convert helpers.");
     }
   }
+
+  // it should find something above...
   return -1;
+
+  // old linear search
+  //for (uint64_t o = 0; o < ownerMapping.size(); o++) {
+  //  if (gID >= ownerMapping[o].first && gID < ownerMapping[o].second) {
+  //    return o;
+  //  }
+  //}
+  //return -1;
 }
 
 uint64_t getFileSize(std::ifstream& openFile) {
