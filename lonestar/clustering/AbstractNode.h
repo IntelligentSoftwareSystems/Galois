@@ -32,6 +32,9 @@
 #include <limits>
 #include <stdlib.h>
 
+template <typename T>
+using GVector = galois::gstl::Vector<T>;
+
 class AbstractNode {
 public:
   static int globalNumReps;
@@ -42,7 +45,7 @@ protected:
   Point3 myLoc;
   Point3 intensity; // Use r,g,b as x,y,z
   int startTime, endTime;
-  galois::gstl::Vector<double> timeVector;
+  GVector<double> timeVector;
 
 public:
   AbstractNode(double x, double y, double z) : myLoc(x, y, z), intensity(0) {

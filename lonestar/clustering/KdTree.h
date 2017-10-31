@@ -48,7 +48,7 @@ private:
   }
 
 public:
-  static KdTree* createTree(galois::gstl::Vector<NodeWrapper*>& inPoints) {
+  static KdTree* createTree(GVector<NodeWrapper*>& inPoints) {
     KdTree* factory = new KdTree();
     KdTree* root    = (KdTree*)KdTree::subDivide(inPoints, 0, inPoints.size(),
                                               NULL, *factory);
@@ -60,8 +60,7 @@ public:
     return new KdTree(inSplitType, inSplitValue);
   }
 
-  static void getAll(KdCell& tree,
-                     galois::gstl::Vector<NodeWrapper*>& allLeaves) {
+  static void getAll(KdCell& tree, GVector<NodeWrapper*>& allLeaves) {
     tree.getAll(allLeaves);
   }
 

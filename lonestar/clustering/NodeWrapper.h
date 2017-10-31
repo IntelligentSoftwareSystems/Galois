@@ -44,7 +44,7 @@ private:
   Point3 location;
   Point3 coneDirection;
   const int descendents;
-  galois::gstl::Vector<ClusterNode*> coneClusters;
+  GVector<ClusterNode*> coneClusters;
   const bool cleanLight;
   NodeWrapper *_l, *_r;
 
@@ -63,8 +63,7 @@ public:
   }
 
   NodeWrapper(NodeWrapper& pLeft, NodeWrapper& pRight,
-              galois::gstl::Vector<double>* coordArr,
-              galois::gstl::Vector<ClusterNode*>& tempClusterArr)
+              GVector<double>* coordArr, GVector<ClusterNode*>& tempClusterArr)
       : light(*(new ClusterNode())), location(0), coneDirection(0),
         descendents(pLeft.descendents + pRight.descendents), cleanLight(true) {
     NodeWrapper *l = &pLeft, *r = &pRight;
