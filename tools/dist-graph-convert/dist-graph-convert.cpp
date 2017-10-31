@@ -54,7 +54,7 @@ enum EdgeType {
 static cll::opt<std::string> inputFilename(cll::Positional, 
     cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional,
-    cll::desc("<output file>"), cll::Required);
+    cll::desc("<output file>"), cll::init(std::string()));
 static cll::opt<EdgeType> edgeType("edgeType", 
     cll::desc("Input/Output edge type:"),
     cll::values(
@@ -78,7 +78,8 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
     cll::values(
       clEnumVal(edgelistb2gr, "Convert edge list binary to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
-      clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr"),
+      clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr "
+                         "(in-place"),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -86,6 +87,10 @@ static cll::opt<unsigned> totalNumNodes("numNodes",
                                         cll::init(0));
 static cll::opt<unsigned> threadsToUse("t", cll::desc("Threads to use"),
                                        cll::init(1));
+static cll::opt<bool> editInPlace("inPlace", 
+                                  cll::desc("Flag specifying conversion is in "
+                                            "place"),
+                                  cll::init(false));
 
 
 // Base structures to inherit from: name specifies what the converter can do
@@ -125,16 +130,10 @@ template<typename EdgeTy, typename C>
 void convert(C& c, Conversion) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
-  if (net.ID == 0) {
-    galois::gPrint("Input: ", inputFilename, "; Output: ", outputFilename, 
-                   "\n");
-  }
-
   galois::StatTimer convertTimer("Convert Time", "convert"); 
 
   convertTimer.start();
   c.template convert<EdgeTy>(inputFilename, outputFilename);
-  //c.convert<EdgeTy>(inputFilename, outputFilename);
   convertTimer.stop();
 
   if (net.ID == 0) {
@@ -147,6 +146,7 @@ struct Edgelist2Gr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
+    GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs a output file");
 
     if (!std::is_void<EdgeTy>::value) {
       GALOIS_DIE("Currently not implemented for non-void\n");
@@ -286,9 +286,12 @@ struct Edgelist2Gr : public Conversion {
   }
 };
 
+// TODO refactor
 struct Gr2WGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(outputFile.empty(), "gr2wgr doesn't take an output file");
+    GALOIS_ASSERT(editInPlace, "You must use -inPlace with gr2wgr");
 
     MPI_File unweightedGr;
     MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
@@ -358,7 +361,6 @@ struct Gr2WGr : public Conversion {
       byteOffsetToEdgeData += itemsWritten * sizeof(uint32_t);
     }
 
-
     uint64_t edgeSize = 4;
 
     // if host 0 update header with edge size
@@ -368,10 +370,6 @@ struct Gr2WGr : public Conversion {
     }
 
     MPICheck(MPI_File_close(&unweightedGr));
-
-    // each host sets seed different based on host num
-    // host 0 adds padding if necessary
-    // each host writes its own portion of edge data
   }
 };
 
