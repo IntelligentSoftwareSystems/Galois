@@ -114,8 +114,8 @@ private:
           MPI_File_read_at(graphFile, 
                            readPosition + (nodesLoaded * sizeof(uint64_t)), 
                            ((char*)this->outIndexBuffer) + 
-                            (threadNodeStart - nodeStart + nodesLoaded) * 
-                            sizeof(uint64_t), 
+                            ((threadNodeStart - nodeStart + nodesLoaded) * 
+                            sizeof(uint64_t)), 
                            toLoad, MPI_UINT64_T, &mpiStatus); 
     
           int itemsRead; 
@@ -183,8 +183,8 @@ private:
     
           MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
                            ((char*)this->edgeDestBuffer) + 
-                            (threadEdgeStart - edgeStart + edgesLoaded) * 
-                            sizeof(uint32_t), 
+                            ((threadEdgeStart - edgeStart + edgesLoaded) * 
+                            sizeof(uint32_t)), 
                            toLoad, MPI_UINT32_T, &mpiStatus); 
           int itemsRead; 
           MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
@@ -269,8 +269,8 @@ private:
 
           MPI_File_read_at(graphFile, readPosition + bytesLoaded, 
                            ((char*)this->edgeDataBuffer) + 
-                            bytesLoaded +
-                            (threadEdgeStart - edgeStart) * sizeof(EdgeDataType),
+                           bytesLoaded +
+                           ((threadEdgeStart - edgeStart) * sizeof(EdgeDataType)),
                            toLoad, MPI_BYTE, &mpiStatus); 
 
           int bytesRead; 
