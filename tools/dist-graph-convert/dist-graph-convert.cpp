@@ -36,6 +36,7 @@ namespace cll = llvm::cl;
 // TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {
   edgelist2gr,
+  gr2wgr,
   edgelistb2gr // TODO
 };
 
@@ -76,6 +77,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
     cll::values(
       clEnumVal(edgelistb2gr, "Convert edge list binary to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
+      clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr"),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -131,6 +133,7 @@ void convert(C& c, Conversion) {
 
   convertTimer.start();
   c.template convert<EdgeTy>(inputFilename, outputFilename);
+  //c.convert<EdgeTy>(inputFilename, outputFilename);
   convertTimer.stop();
 
   if (net.ID == 0) {
@@ -139,14 +142,17 @@ void convert(C& c, Conversion) {
 }
 
 struct Edgelist2Gr : public Conversion {
-  // WARNING
-  // WILL NOT WORK IF THE EDGE LIST HAS WEIGHTS
+  // WARNING: WILL NOT WORK IF THE EDGE LIST HAS WEIGHTS
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
+
+    if (!std::is_void<EdgeTy>::value) {
+      GALOIS_DIE("Currently not implemented for non-void\n");
+    }
+
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
-    uint64_t totalNumHosts = net.Num;
 
     std::ifstream edgeListFile(inputFile.c_str());
     uint64_t fileSize = getFileSize(edgeListFile);
@@ -158,9 +164,8 @@ struct Edgelist2Gr : public Conversion {
     uint64_t localEndByte;
     std::tie(localStartByte, localEndByte) = determineByteRange(edgeListFile,
                                                                 fileSize);
-
-    printf("[%lu] Byte start %lu byte end %lu, num bytes %lu\n", hostID, 
-                   localStartByte, localEndByte, localEndByte - localStartByte);
+    //printf("[%lu] Byte start %lu byte end %lu, num bytes %lu\n", hostID, 
+    //               localStartByte, localEndByte, localEndByte - localStartByte);
 
     // load edges into a vector
     uint64_t localNumEdges = 0;
@@ -170,13 +175,15 @@ struct Edgelist2Gr : public Conversion {
       uint32_t src;
       uint32_t dst;
       edgeListFile >> src >> dst;
+      GALOIS_ASSERT(src < totalNumNodes, "src ", src, " and ", totalNumNodes);
+      GALOIS_ASSERT(dst < totalNumNodes, "dst ", dst, " and ", totalNumNodes);
       localEdges.emplace_back(src);
       localEdges.emplace_back(dst);
       localNumEdges++;
     }
     edgeListFile.close();
     GALOIS_ASSERT(localNumEdges == (localEdges.size() / 2));
-    printf("[%lu] Local num edges %lu\n", hostID, localNumEdges);
+    printf("[%lu] Local num edges from file %lu\n", hostID, localNumEdges);
 
     uint64_t totalEdgeCount = accumulateValue(localNumEdges);
     if (hostID == 0) {
@@ -224,8 +231,8 @@ struct Edgelist2Gr : public Conversion {
       globalEdgeOffset += edgesPerHost[h];
       totalEdgeCount2 += edgesPerHost[h];
     }
-    //printf("[%lu] Edge offset %lu\n", hostID, globalEdgeOffset);
 
+    uint64_t totalNumHosts = net.Num;
     // finish off getting total edge count (note this is more of a sanity check
     // since we got total edge count near the beginning already)
     for (unsigned h = hostID; h < totalNumHosts; h++) {
@@ -234,6 +241,7 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT(totalEdgeCount == totalEdgeCount2);
     freeVector(edgesPerHost);
 
+    // TODO I can refactor this out completely
     printf("[%lu] Beginning write to file\n", hostID);
     MPI_File newGR;
     MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
@@ -269,12 +277,42 @@ struct Edgelist2Gr : public Conversion {
                                 globalEdgeOffset * sizeof(uint32_t);
       printf("[%lu] Write edge dest data\n", hostID);
       writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
+      printf("[%lu] Write to file done\n", hostID);
     }
 
     MPICheck(MPI_File_close(&newGR));
-    printf("[%lu] Write to file done\n", hostID);
-
     galois::runtime::getHostBarrier().wait();
+  }
+};
+
+struct Gr2WGr : public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint64_t hostID = net.ID;
+
+    MPI_File unweightedGr;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
+                           MPI_MODE_RDONLY, MPI_INFO_NULL, &unweightedGr));
+    uint64_t grHeader[4];
+
+    // read gr header for num edges, assert that it had no edge data
+    MPICheck(MPI_File_read_at(unweightedGr, 0, grHeader, 4, MPI_UINT64_T, 
+                              MPI_STATUS_IGNORE));
+    
+    if (hostID == 0) {
+      printf("version %lu\n", grHeader[0]);
+      printf("edge size %lu\n", grHeader[1]);
+      printf("num nodes %lu\n", grHeader[2]);
+      printf("num edges %lu\n", grHeader[3]);
+    }
+
+    MPICheck(MPI_File_close(&unweightedGr));
+
+    // split edges evenly between hosts
+    // each host sets seed different based on host num
+    // host 0 adds padding if necessary
+    // each host writes its own portion of edge data
   }
 };
 
@@ -288,6 +326,8 @@ int main(int argc, char** argv) {
     //  convert<EdgelistB2Gr>(); break;
     case edgelist2gr: 
       convert<Edgelist2Gr>(); break;
+    case gr2wgr: 
+      convert<Gr2WGr>(); break;
     default: abort();
   }
   return 0;
