@@ -695,6 +695,21 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges) {
   return edgesPerHost;
 }
 
+std::vector<uint32_t> 
+flattenVectors(std::vector<std::vector<uint32_t>>& vectorOfVectors) {
+  std::vector<uint32_t> finalVector;
+  uint64_t vectorsToFlatten = vectorOfVectors.size();
+
+  for (unsigned i = 0; i < vectorsToFlatten; i++) {
+    auto& curVector = vectorOfVectors[i];
+    finalVector.insert(finalVector.end(), curVector.begin(), curVector.end());
+    // free the memory up
+    freeVector(vectorOfVectors[i]);
+  }
+
+  return finalVector;
+}
+
 void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
                    uint64_t totalNumNodes, uint64_t totalEdgeCount) {
   // I won't check status here because there should be no reason why 
@@ -727,10 +742,12 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
   }
 }
 
+// vector of vectors version
 void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
                        uint64_t edgeDestOffset,
                        std::vector<std::vector<uint32_t>>& localSrcToDest) {
   MPI_Status writeStatus;
+
   for (unsigned i = 0; i < localNumNodes; i++) {
     std::vector<uint32_t> currentDests = localSrcToDest[i];
     uint64_t numToWrite = currentDests.size();
@@ -749,6 +766,28 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
     }
   }
 }
+
+// 1 vector version (MUCH FASTER, USE WHEN POSSIBLE)
+void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
+                       uint64_t edgeDestOffset,
+                       std::vector<uint32_t>& destVector) {
+  MPI_Status writeStatus;
+  uint64_t numToWrite = destVector.size();
+  uint64_t totalWritten = 0;
+
+  while (numToWrite != 0) {
+    MPICheck(MPI_File_write_at(gr, edgeDestOffset, 
+                              ((uint32_t*)destVector.data()) + totalWritten,
+                              numToWrite, MPI_UINT32_T, &writeStatus));
+
+    int itemsWritten;
+    MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    numToWrite -= itemsWritten;
+    totalWritten += itemsWritten;
+    edgeDestOffset += sizeof(uint32_t) * itemsWritten;
+  }
+}
+
 
 void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
                        uint64_t edgeDataOffset,

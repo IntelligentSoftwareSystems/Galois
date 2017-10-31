@@ -281,7 +281,9 @@ struct Edgelist2Gr : public Conversion {
                                 (totalNumNodes * sizeof(uint64_t)) +
                                 globalEdgeOffset * sizeof(uint32_t);
       printf("[%lu] Write edge dest data\n", hostID);
-      writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, localSrcToDest);                               
+      std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
+      freeVector(localSrcToDest);
+      writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, destVector);                               
       printf("[%lu] Write to file done\n", hostID);
     }
 

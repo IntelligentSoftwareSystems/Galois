@@ -290,6 +290,19 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
  */
 std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
 
+
+/**
+ * Given a vector of vectors, "flatten" it by merging them into 1 vector
+ * in the order they appear the in the vector.
+ *
+ * @param vectorOfVectors vector of vectors to flatten. FUNCTION WILL ERASE
+ * ALL DATA IN THE VECTOR.
+ * @returns a flattened vector from vectorOfVectors
+ */
+std::vector<uint32_t> 
+flattenVectors(std::vector<std::vector<uint32_t>>& vectorOfVectors);
+
+
 /**
  * Writes a binary galois graph's header information.
  *
@@ -330,6 +343,18 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
                        uint64_t edgeDestOffset,
                        std::vector<std::vector<uint32_t>>& localSrcToDest);
 
+/**
+ * Writes the edge destination data of a galois binary graph.
+ * @param gr File to write to
+ * @param localNumNodes number of source nodes that this host was 
+ * assigned to write
+ * @param edgeDestOffset offset into file specifying where to start writing
+ * @param destVector Vector of edge destinations IN THE ORDER THAT THEY SHOULD
+ * BE WRITTEN (i.e. in correct order corresponding to node order this host has)
+ */
+void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
+                       uint64_t edgeDestOffset,
+                       std::vector<uint32_t>& destVector);
 /**
  * Writes the edge data data of a galois binary graph.
  *
@@ -376,4 +401,7 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
  * @returns pair specifying the range that this host is responsible for
  */
 std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit);
+
+
 #endif
+
