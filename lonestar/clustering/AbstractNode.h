@@ -26,11 +26,11 @@
 #define ABSTRACTNODE_H_
 
 #include "Point3.h"
+#include "galois/gstl.h"
 #include <assert.h>
 #include <iostream>
 #include <limits>
 #include <stdlib.h>
-#include <vector>
 
 class AbstractNode {
 public:
@@ -42,7 +42,7 @@ protected:
   Point3 myLoc;
   Point3 intensity; // Use r,g,b as x,y,z
   int startTime, endTime;
-  std::vector<double> timeVector;
+  galois::gstl::Vector<double> timeVector;
 
 public:
   AbstractNode(double x, double y, double z) : myLoc(x, y, z), intensity(0) {

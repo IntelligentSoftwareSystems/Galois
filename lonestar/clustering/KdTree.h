@@ -31,7 +31,6 @@
 #include "Point3.h"
 #include "PotentialCluster.h"
 #include <limits>
-#include <vector>
 
 class KdTree : public KdCell {
 private:
@@ -49,7 +48,7 @@ private:
   }
 
 public:
-  static KdTree* createTree(std::vector<NodeWrapper*>& inPoints) {
+  static KdTree* createTree(galois::gstl::Vector<NodeWrapper*>& inPoints) {
     KdTree* factory = new KdTree();
     KdTree* root    = (KdTree*)KdTree::subDivide(inPoints, 0, inPoints.size(),
                                               NULL, *factory);
@@ -61,7 +60,8 @@ public:
     return new KdTree(inSplitType, inSplitValue);
   }
 
-  static void getAll(KdCell& tree, std::vector<NodeWrapper*>& allLeaves) {
+  static void getAll(KdCell& tree,
+                     galois::gstl::Vector<NodeWrapper*>& allLeaves) {
     tree.getAll(allLeaves);
   }
 

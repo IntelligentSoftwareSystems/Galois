@@ -26,11 +26,11 @@
 #define KDCELL_H_
 #include "NodeWrapper.h"
 #include "Point3.h"
+#include "galois/gstl.h"
 #include <algorithm>
 #include <assert.h>
 #include <iostream>
 #include <limits>
-#include <vector>
 
 class KdCell {
 public:
@@ -48,7 +48,7 @@ protected:
   const double splitValue;
   KdCell* leftChild;
   KdCell* rightChild;
-  std::vector<NodeWrapper*> pointList;
+  galois::gstl::Vector<NodeWrapper*> pointList;
 
 public:
   KdCell()
@@ -112,8 +112,8 @@ public:
     delete root;
   }
 
-  static KdCell* subDivide(std::vector<NodeWrapper*>& list, int offset,
-                           const int size, std::vector<double>* arr,
+  static KdCell* subDivide(galois::gstl::Vector<NodeWrapper*>& list, int offset,
+                           const int size, galois::gstl::Vector<double>* arr,
                            KdCell& factory) {
     KdCell* toReturn;
     if (size <= KdCell::MAX_POINTS_IN_CELL) {
@@ -137,7 +137,7 @@ public:
     } else {
       bool shouldClean = false;
       if (arr == NULL) {
-        arr         = new std::vector<double>(size);
+        arr         = new galois::gstl::Vector<double>(size);
         shouldClean = true;
       }
       Point3 min(std::numeric_limits<float>::max());
@@ -203,9 +203,9 @@ public:
 
   bool notifyContentsRebuilt(bool inChange) { return inChange; }
 
-  static double computeSplitValue(std::vector<NodeWrapper*>& list, int offset,
-                                  int size, int pSplitType,
-                                  std::vector<double>* arr) {
+  static double computeSplitValue(galois::gstl::Vector<NodeWrapper*>& list,
+                                  int offset, int size, int pSplitType,
+                                  galois::gstl::Vector<double>* arr) {
     for (int i = 0; i < size; i++) {
       (*arr)[i] = findSplitComponent(*(list[offset + i]), pSplitType);
     }
@@ -224,7 +224,8 @@ public:
     return 0.0;
   }
 
-  static double findMedianGapSplit(std::vector<double>* arr, int size) {
+  static double findMedianGapSplit(galois::gstl::Vector<double>* arr,
+                                   int size) {
     sort(arr->begin(), arr->begin() + size);
     int start = ((size - 1) >> 1) - ((size + 7) >> 3);
     int end   = (size >> 1) + ((size + 7) >> 3);
@@ -253,7 +254,7 @@ public:
     return splitValue;
   }
 
-  static int splitList(std::vector<NodeWrapper*>& list, int startIndex,
+  static int splitList(galois::gstl::Vector<NodeWrapper*>& list, int startIndex,
                        int size, double pSplitValue, const int pSplitType) {
     int lo = startIndex;
     int hi = startIndex + size - 1;
@@ -308,7 +309,7 @@ public:
     }
   }
 
-  void getAll(std::vector<NodeWrapper*>& allLeaves) {
+  void getAll(galois::gstl::Vector<NodeWrapper*>& allLeaves) {
     if (this->splitType == KdCell::LEAF) {
       for (int i = 0; i < KdCell::MAX_POINTS_IN_CELL; i++) {
         if (pointList[i] != NULL)
@@ -403,7 +404,8 @@ public:
         if (parent == NULL) {
           assert(false && "Cannot split root node, in addNode");
         } else {
-          std::vector<NodeWrapper*> newList(KdCell::MAX_POINTS_IN_CELL + 1);
+          galois::gstl::Vector<NodeWrapper*> newList(
+              KdCell::MAX_POINTS_IN_CELL + 1);
           for (int i = 0; i < MAX_POINTS_IN_CELL; i++) {
             for (int j = 0; j < MAX_POINTS_IN_CELL; j++) {
               if (i != j) {
@@ -450,7 +452,8 @@ private:
     return retVal;
   }
 
-  void computeBoundingBoxFromPoints(std::vector<NodeWrapper*>& list, int size) {
+  void computeBoundingBoxFromPoints(galois::gstl::Vector<NodeWrapper*>& list,
+                                    int size) {
     Point3 newMin(std::numeric_limits<double>::max());
     Point3 newMax(-std::numeric_limits<double>::max());
     for (int i = 0; i < size; i++) {

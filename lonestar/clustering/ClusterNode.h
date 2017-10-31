@@ -27,14 +27,14 @@
 
 #include "LeafNode.h"
 #include "NodeWrapper.h"
+#include "galois/gstl.h"
 #include <assert.h>
-#include <vector>
 
 class ClusterNode : public AbstractNode {
 private:
   AbstractNode* leftChild;
   AbstractNode* rightChild;
-  std::vector<LeafNode*> reps;
+  galois::gstl::Vector<LeafNode*> reps;
   Point3 boxRadius;
   Point3 coneDirection;
   double coneCos;
@@ -125,7 +125,7 @@ public:
     }
   }
 
-  static void chooseRepsNoTime(std::vector<LeafNode*>& repArr,
+  static void chooseRepsNoTime(galois::gstl::Vector<LeafNode*>& repArr,
                                AbstractNode& parent,
                                std::vector<double>* ranVec, LeafNode& left,
                                LeafNode& right) {
@@ -140,7 +140,7 @@ public:
     repArr[repArr.size() - 1] = (nextTest < leftInten) ? &left : &right;
   }
 
-  static void chooseRepsNoTime(std::vector<LeafNode*>& repArr,
+  static void chooseRepsNoTime(galois::gstl::Vector<LeafNode*>& repArr,
                                AbstractNode& parent,
                                std::vector<double>* ranVec, ClusterNode& left,
                                LeafNode& right) {
@@ -156,7 +156,7 @@ public:
         (nextTest < leftInten) ? (left.reps[repArr.size() - 1]) : &right;
   }
 
-  static void chooseRepsNoTime(std::vector<LeafNode*>& repArr,
+  static void chooseRepsNoTime(galois::gstl::Vector<LeafNode*>& repArr,
                                AbstractNode& parent,
                                std::vector<double>* ranVec, ClusterNode& left,
                                ClusterNode& right) {
@@ -181,16 +181,18 @@ public:
 
   float getConeCos() { return coneCos; }
 
-  void findConeDirsRecursive(std::vector<double>* coordArr,
-                             std::vector<ClusterNode*>& tempClusterArr) {
+  void
+  findConeDirsRecursive(galois::gstl::Vector<double>* coordArr,
+                        galois::gstl::Vector<ClusterNode*>& tempClusterArr) {
     // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
     findConeDirsRecursive(*leftChild, coordArr, 0, tempClusterArr, 3);
     findConeDirsRecursive(*rightChild, coordArr, 0, tempClusterArr, 3);
   }
 
   static int findConeDirsRecursive(AbstractNode& node,
-                                   std::vector<double>* fArr, int numDirs,
-                                   std::vector<ClusterNode*>& cArr,
+                                   galois::gstl::Vector<double>* fArr,
+                                   int numDirs,
+                                   galois::gstl::Vector<ClusterNode*>& cArr,
                                    int recurseDepth) {
     if (!node.isLeaf()) {
       ClusterNode& clus = (ClusterNode&)node;
@@ -223,8 +225,8 @@ public:
     return numDirs;
   }
 
-  static int addConeDir(std::vector<double>* fArr, int numDirs, double x,
-                        double y, double z) {
+  static int addConeDir(galois::gstl::Vector<double>* fArr, int numDirs,
+                        double x, double y, double z) {
     // only add direction if it does not match any existing directions
     for (int i = 0; i < 3 * numDirs; i++) {
       if (((*fArr)[i] == x) && ((*fArr)[i + 1] == y) && ((*fArr)[i + 2] == z)) {

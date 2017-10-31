@@ -31,25 +31,21 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include <vector>
 #include <map>
 #include <string>
 #include <sstream>
 #include <limits>
-#include <iostream>
 #include <fstream>
 #include <set>
-#include<iostream>
-#include<vector>
-#include<limits>
-#include<set>
-#include<map>
-#include<stdlib.h>
+#include <iostream>
+#include <limits>
+#include <set>
+#include <stdlib.h>
 
 #include "LeafNode.h"
 #include "NodeWrapper.h"
 #include "KdTree.h"
-#include"ClusterNode.h"
+#include "ClusterNode.h"
 #include <stdlib.h>
 #include <sys/time.h>
 // clang-format on
@@ -72,11 +68,11 @@ static cll::opt<bool> parallel("parallel",
 using namespace std;
 
 void loopBody(NodeWrapper* cluster, KdTree* kdTree,
-              std::vector<NodeWrapper*>* wl,
-              std::vector<ClusterNode*>* clusterArr,
-              std::vector<double>* floatArr);
-///////////////////////////////////////////
-void getRandomPoints(vector<LeafNode*>& lights, int numPoints) {
+              galois::gstl::Vector<NodeWrapper*>* wl,
+              galois::gstl::Vector<ClusterNode*>* clusterArr,
+              galois::gstl::Vector<double>* floatArr);
+
+void getRandomPoints(galois::gstl::Vector<LeafNode*>& lights, int numPoints) {
   double dirX = 0;
   double dirY = 0;
   double dirZ = 1;
@@ -84,25 +80,24 @@ void getRandomPoints(vector<LeafNode*>& lights, int numPoints) {
   AbstractNode::setGlobalNumReps();
   // generating random lights
   for (int i = 0; i < numPoints; i++) {
-    double x = ((double)rand()) / (std::numeric_limits<int>::max());
-    double y = ((double)rand()) / (std::numeric_limits<int>::max());
-    double z = ((double)rand()) / (std::numeric_limits<int>::max());
+    double x = ((double)rand()) / (numeric_limits<int>::max());
+    double y = ((double)rand()) / (numeric_limits<int>::max());
+    double z = ((double)rand()) / (numeric_limits<int>::max());
 
     LeafNode* l = new LeafNode(x, y, z, dirX, dirY, dirZ);
 #if DEBUG_CONSOLE
-    cout << "Created " << *l << std::endl;
+    cout << "Created " << *l << endl;
 #endif
     lights[i] = l;
   }
   return;
 }
 
-////////////////////////////////////////////////////////////
 int findMatch(KdTree* tree, NodeWrapper* nodeA,
               galois::InsertBag<NodeWrapper*>*& newNodes,
               galois::InsertBag<NodeWrapper*>& allocs,
-              vector<double>* coordinatesArray,
-              vector<ClusterNode*>& clusterArray) {
+              galois::gstl::Vector<double>* coordinatesArray,
+              galois::gstl::Vector<ClusterNode*>& clusterArray) {
   int addCounter = 0;
   if (tree->contains(*nodeA)) {
     NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
@@ -137,14 +132,15 @@ int findMatch(KdTree* tree, NodeWrapper* nodeA,
   return addCounter;
 }
 
-void clusterGalois(vector<LeafNode*>& lights) {
+void clusterGalois(galois::gstl::Vector<LeafNode*>& lights) {
   int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
   cout << "Temp size is " << tempSize << " coord. arr size should be "
        << tempSize * 3 << endl;
-  vector<double>* coordinatesArray = new vector<double>(tempSize * 3);
-  vector<ClusterNode*> clusterArray(tempSize);
+  galois::gstl::Vector<double>* coordinatesArray =
+      new galois::gstl::Vector<double>(tempSize * 3);
+  galois::gstl::Vector<ClusterNode*> clusterArray(tempSize);
 
-  vector<NodeWrapper*> initialWorklist(lights.size());
+  galois::gstl::Vector<NodeWrapper*> initialWorklist(lights.size());
   for (unsigned int i = 0; i < lights.size(); i++) {
     NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
     initialWorklist[i] = nw;
@@ -157,7 +153,7 @@ void clusterGalois(vector<LeafNode*>& lights) {
        << endl;
 #endif
 
-  vector<NodeWrapper*> workList(0);
+  galois::gstl::Vector<NodeWrapper*> workList(0);
   KdTree::getAll(*tree, workList);
   size_t size = 0;
 
@@ -252,16 +248,14 @@ void clusterGalois(vector<LeafNode*>& lights) {
   return;
 }
 
-/*********************************************************************************************/
-///////////////////////////////////////////
-
-void clusterSerial(vector<LeafNode*>& lights) {
+void clusterSerial(galois::gstl::Vector<LeafNode*>& lights) {
   int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
   cout << "Temp size is " << tempSize << " coord. arr size should be "
        << tempSize * 3 << endl;
-  vector<double>* coordinatesArray = new vector<double>(tempSize * 3);
-  vector<NodeWrapper*> initialWorklist(lights.size());
-  vector<ClusterNode*> clusterArray(tempSize);
+  galois::gstl::Vector<double>* coordinatesArray =
+      new galois::gstl::Vector<double>(tempSize * 3);
+  galois::gstl::Vector<NodeWrapper*> initialWorklist(lights.size());
+  galois::gstl::Vector<ClusterNode*> clusterArray(tempSize);
   for (unsigned int i = 0; i < lights.size(); i++) {
     NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
     initialWorklist[i] = nw;
@@ -272,15 +266,15 @@ void clusterSerial(vector<LeafNode*>& lights) {
   cout << "================================================================"
        << endl;
   //#endif
-  ////////////////////////////////////
-  vector<NodeWrapper*> workListOld(0);
+
+  galois::gstl::Vector<NodeWrapper*> workListOld(0);
   KdTree::getAll(*tree, workListOld);
-  vector<NodeWrapper*> workList(0);
+  galois::gstl::Vector<NodeWrapper*> workList(0);
   for (unsigned int i = 0; i < workListOld.size(); i++) {
     workList.push_back(workListOld[i]);
   }
-  vector<NodeWrapper*> newNodes;
-  vector<NodeWrapper*> allocs;
+  galois::gstl::Vector<NodeWrapper*> newNodes;
+  galois::gstl::Vector<NodeWrapper*> allocs;
   while (true) {
     while (workList.size() > 1) {
       cout << "===================Worklist size :: " << workList.size()
@@ -309,8 +303,8 @@ void clusterSerial(vector<LeafNode*>& lights) {
       }
     }
     workList.clear();
-    for (vector<NodeWrapper*>::iterator it    = newNodes.begin(),
-                                        itEnd = newNodes.end();
+    for (galois::gstl::Vector<NodeWrapper*>::iterator it    = newNodes.begin(),
+                                                      itEnd = newNodes.end();
          it != itEnd; it++)
       workList.push_back(*it);
     cout << "Newly added" << newNodes.size() << endl;
@@ -342,14 +336,14 @@ void clusterSerial(vector<LeafNode*>& lights) {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  std::cout << "Starting Clustering app...[" << numPoints << "]" << std::endl;
+  cout << "Starting Clustering app...[" << numPoints << "]" << endl;
   // Initializing...
 
-  vector<LeafNode*>* lights = new vector<LeafNode*>(numPoints);
+  galois::gstl::Vector<LeafNode*>* lights =
+      new galois::gstl::Vector<LeafNode*>(numPoints);
   getRandomPoints(*lights, numPoints);
 
-  std::cout << "Running the " << (parallel ? "parallel" : "serial")
-            << " version\n ";
+  cout << "Running the " << (parallel ? "parallel" : "serial") << " version\n ";
   if (!parallel) {
     clusterSerial(*lights);
   } else {
@@ -360,12 +354,11 @@ int main(int argc, char** argv) {
   for (int i = 0; i < numPoints; i++) {
     LeafNode* l = lights->at(i);
 #if DEBUG_CONSOLE
-    std::cout << "deleted :: " << *l << std::endl;
+    cout << "deleted :: " << *l << endl;
 #endif
     delete l;
   }
-  std::cout << "Ending Clustering app...[" << lights->size() << "]"
-            << std::endl;
+  cout << "Ending Clustering app...[" << lights->size() << "]" << endl;
   delete lights;
   return 0;
 }
