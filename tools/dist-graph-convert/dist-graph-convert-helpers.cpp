@@ -70,14 +70,6 @@ uint32_t findOwner(const uint64_t gID,
 
   // it should find something above...
   return -1;
-
-  // old linear search
-  //for (uint64_t o = 0; o < ownerMapping.size(); o++) {
-  //  if (gID >= ownerMapping[o].first && gID < ownerMapping[o].second) {
-  //    return o;
-  //  }
-  //}
-  //return -1;
 }
 
 uint64_t getFileSize(std::ifstream& openFile) {
@@ -395,7 +387,8 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   uint64_t totalNumHosts = net.Num;
 
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
-  // TODO better heuristics: basically we don't want to run out of memory...
+  // TODO better heuristics: basically we don't want to run out of memory,
+  // so keep number of chunks from growing too large
   while (numNodeChunks > 10000000) {
     numNodeChunks /= 2;
   }
@@ -425,7 +418,6 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     chunkCounts[i] += chunkCounts[i - 1];
   }
 
-
   // to make access to chunkToNode's last element correct with regard to later
   // access (without this access to chunkToNode[chunkSize] is out of bounds)
   chunkToNode.emplace_back(std::pair<uint64_t, uint64_t>(totalNodeCount, 
@@ -434,13 +426,12 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   std::vector<std::pair<uint64_t, uint64_t>> finalMapping = 
       getChunkToHostMapping(chunkCounts, chunkToNode);
 
-  // TODO 
   return finalMapping;
 }
 
 void sendEdgeCounts(
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-    uint64_t localNumEdges, const std::vector<uint32_t>& localEdges
+    const std::vector<uint32_t>& localEdges
 ) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;
@@ -449,8 +440,8 @@ void sendEdgeCounts(
   printf("[%lu] Determinining edge counts\n", hostID);
 
   std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
-  //std::vector<uint64_t> numEdgesPerHost(totalNumHosts);
 
+  uint64_t localNumEdges = localEdges.size() / 2;
   // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
@@ -507,7 +498,7 @@ uint64_t receiveEdgeCounts() {
 // TODO make implementation smaller/cleaner i.e. refactor
 void sendAssignedEdges(
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-    uint64_t localNumEdges, const std::vector<uint32_t>& localEdges,
+    const std::vector<uint32_t>& localEdges,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
     std::vector<std::mutex>& nodeLocks)
 {
@@ -538,7 +529,8 @@ void sendAssignedEdges(
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
-  // pass 1: determine to which host each edge will go
+  uint64_t localNumEdges = localEdges.size() / 2;
+  // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {

@@ -130,8 +130,12 @@ template<typename EdgeTy, typename C>
 void convert(C& c, Conversion) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
-  galois::StatTimer convertTimer("Convert Time", "convert"); 
+  if (net.ID == 0) {
+    printf("Input: %s; Output: %s\n", inputFilename.c_str(), 
+                                      outputFilename.c_str());
+  }
 
+  galois::StatTimer convertTimer("Convert Time", "convert"); 
   convertTimer.start();
   c.template convert<EdgeTy>(inputFilename, outputFilename);
   convertTimer.stop();
@@ -184,7 +188,7 @@ struct Edgelist2Gr : public Conversion {
     }
     edgeListFile.close();
     GALOIS_ASSERT(localNumEdges == (localEdges.size() / 2));
-    printf("[%lu] Local num edges from file %lu\n", hostID, localNumEdges);
+    printf("[%lu] Local num edges from file is %lu\n", hostID, localNumEdges);
 
     uint64_t totalEdgeCount = accumulateValue(localNumEdges);
     if (hostID == 0) {
@@ -198,7 +202,7 @@ struct Edgelist2Gr : public Conversion {
     uint64_t localNodeEnd = hostToNodes[hostID].second;
     uint64_t localNumNodes = localNodeEnd - localNodeBegin;
 
-    sendEdgeCounts(hostToNodes, localNumEdges, localEdges);
+    sendEdgeCounts(hostToNodes, localEdges);
     std::atomic<uint64_t> edgesToReceive;
     edgesToReceive.store(receiveEdgeCounts());
 
@@ -208,8 +212,7 @@ struct Edgelist2Gr : public Conversion {
     std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
     std::vector<std::mutex> nodeLocks(localNumNodes);
 
-    sendAssignedEdges(hostToNodes, localNumEdges, localEdges, localSrcToDest,
-                      nodeLocks);
+    sendAssignedEdges(hostToNodes, localEdges, localSrcToDest, nodeLocks);
     freeVector(localEdges);
     receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
                          nodeLocks);
@@ -298,10 +301,9 @@ struct Gr2WGr : public Conversion {
                            MPI_MODE_RDWR, MPI_INFO_NULL, &unweightedGr));
     uint64_t grHeader[4];
 
-    // read gr header for num edges, assert that it had no edge data
+    // read gr header for num edges
     MPICheck(MPI_File_read_at(unweightedGr, 0, grHeader, 4, MPI_UINT64_T, 
                               MPI_STATUS_IGNORE));
-    // make sure certain header fields are what we expect
     GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
 
     // split edges evenly between hosts
@@ -319,7 +321,6 @@ struct Gr2WGr : public Conversion {
     printf("[%lu] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
                                                        localEdgeEnd);
     
-
     uint64_t byteOffsetToEdgeData = (4 * sizeof(uint64_t)) + // header
                                     (grHeader[2] * sizeof(uint64_t)) + // nodes
                                     (totalNumEdges * sizeof(uint32_t)); // edges

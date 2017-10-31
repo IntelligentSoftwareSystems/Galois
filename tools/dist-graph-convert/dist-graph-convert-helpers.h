@@ -54,7 +54,13 @@ void freeVector(VectorTy& toFree) {
 }
 
 /**
- * TODO documentation
+ * Gets a mapping of host to nodes of all hosts in the system. Divides
+ * nodes evenly among hosts.
+ *
+ * @param numHosts total number of hosts
+ * @param totalNumNodes total number of nodes
+ * @returns A vector of pairs representing node -> host assignments. Evenly 
+ * distributed nodes to hosts.
  */
 std::vector<std::pair<uint64_t, uint64_t>> 
   getHostToNodeMapping(uint64_t numHosts, uint64_t totalNumNodes);
@@ -79,7 +85,11 @@ uint32_t findOwner(const uint64_t gID,
 uint64_t getFileSize(std::ifstream& openFile);
 
 /**
- * TODO
+ * Determine the byte range that a host should read from a file.
+ *
+ * @param edgeListFile edge list file to read
+ * @param fileSize total size of the file
+ * @returns pair that represents the begin/end of this host's byte range to read
  */
 std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
                                                  uint64_t fileSize);
@@ -96,7 +106,11 @@ uint64_t accumulateValue(uint64_t value);
  * Find an index into the provided prefix sum that gets the desired "weight"
  * (weight comes from the units of the prefix sum).
  * 
- * TODO params
+ * @param targetWeight desired weight that you want the index returned to have
+ * @param lb Lower bound of search
+ * @param ub Upper bound of search
+ * @param prefixSum Prefix sum where the weights/returned index are derived
+ * from
  */
 uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
                             const std::vector<uint64_t>& prefixSum);
@@ -106,7 +120,12 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
  * find a good contiguous division using the prefix sum such that 
  * partitions get roughly an even amount of units (based on prefix sum).
  *
- * TODO params
+ * @param id partition ID
+ * @param totalID total number of partitions
+ * @param prefixSum prefix sum of things that you want to divide among
+ * partitions
+ * @returns Pair representing the begin/end of the elements that partition
+ * "id" is assigned based on the prefix sum
  */
 std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
                                   const std::vector<uint64_t>& prefixSum);
@@ -194,7 +213,11 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
  * an even number of edges. 
  *
- * TODO params
+ * @param localEdges in-memory buffer of edges this host has loaded
+ * @param totalNodeCount total number of nodes in the entire graph
+ * @param totalEdgeCount total number of edges in the entire graph
+ * @returns a mapping of host to nodes where each host gets an attempted
+ * roughly even amount of edges
  */
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
@@ -205,33 +228,52 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
  * Determine/send to each host how many edges they should expect to receive
  * from the caller (i.e. this host).
  *
- * TODO params
+ * @param hostToNodes mapping of a host to the nodes it is assigned
+ * @param localEdges in-memory buffer of edges this host has loaded
  */
 void sendEdgeCounts(
   const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-  uint64_t localNumEdges, const std::vector<uint32_t>& localEdges
+  const std::vector<uint32_t>& localEdges
 ); 
 
 /**
  * Receive the messages from other hosts that tell this host how many edges
  * it should expect to receive. Should be called after sendEdgesCounts.
  *
- * TODO params
+ * @returns the number of edges that the caller host should expect to receive
+ * in total from all other hosts
  */
 uint64_t receiveEdgeCounts();
 
 /**
- * TODO
+ * Loop through all local edges and send them to the host they are assigned to.
+ *
+ * @param hostToNodes mapping of a host to the nodes it is assigned
+ * @param localEdges in-memory buffer of edges this host has loaded
+ * @param localSrcToDest local mapping of LOCAL sources to destinations (we
+ * may have some edges that do not need sending; they are saved here)
+ * @param nodeLocks Vector of mutexes (one for each local node) that are used
+ * when writing to the local mapping of sources to destinations since vectors
+ * are not thread safe
  */
 void sendAssignedEdges( 
   const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-  uint64_t localNumEdges, const std::vector<uint32_t>& localEdges,
+  const std::vector<uint32_t>& localEdges,
   std::vector<std::vector<uint32_t>>& localSrcToDest,
   std::vector<std::mutex>& nodeLocks
 );
 
 /**
- * TODO
+ * Receive this host's assigned edges: should be called after sendAssignedEdges.
+ *
+ * @param edgesToReceive the number of edges we expect to receive; the function
+ * will not exit until all expected edges are received
+ * @param hostToNodes mapping of a host to the nodes it is assigned
+ * @param localSrcToDest local mapping of LOCAL sources to destinations (we
+ * may have some edges that do not need sending; they are saved here)
+ * @param nodeLocks Vector of mutexes (one for each local node) that are used
+ * when writing to the local mapping of sources to destinations since vectors
+ * are not thread safe
  */
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
@@ -241,25 +283,45 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
 /**
  * Send/receive other hosts number of assigned edges.
  *
- * TODO
+ * @param localAssignedEdges number of edges assigned to this host
+ * @returns a vector that has every hosts number of locally assigned edges
  */
 std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
 
 /**
- * TODO
+ * Writes a binary galois graph's header information.
+ *
+ * @param gr File to write to
+ * @param version Version of the galois binary graph file
+ * @param sizeOfEdge Size of edge data (0 if there is no edge data)
+ * @param totalNumNodes total number of nodes in the graph
+ * @param totalEdgeConnt total number of edges in the graph
  */
 void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
                    uint64_t totalNumNodes, uint64_t totalEdgeCount);
 
 /**
- * TODO
+ * Writes the node index data of a galois binary graph.
+ *
+ * @param gr File to write to
+ * @param nodesToWrite number of nodes to write
+ * @param nodeIndexOffset offset into file specifying where to start writing
+ * @param edgePrefixSum the node index data to write into the file (index data
+ * in graph tells you where to start looking for edges of some node, i.e.
+ * it's a prefix sum)
  */
 void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
                         uint64_t nodeIndexOffset, 
                         std::vector<uint64_t>& edgePrefixSum);
 
 /**
- * TODO
+ * Writes the edge destination data of a galois binary graph.
+ * @param gr File to write to
+ * @param localNumNodes number of source nodes that this host was 
+ * assigned to write
+ * @param edgeDestOffset offset into file specifying where to start writing
+ * @param localSrcToDest Vector of vectors: the vector at index i specifies
+ * the destinations for local src node i
  */
 void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
                        uint64_t edgeDestOffset,
