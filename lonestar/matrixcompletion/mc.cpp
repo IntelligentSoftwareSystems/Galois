@@ -310,41 +310,38 @@ void sgd_node_movie_pri (Graph& g, unsigned int numMovieNodes, unsigned int numU
 }
 
 //Simple by-edge grouped by movie (only one edge per movie on the WL at any time)
-struct sgd_edge_movie {
-  Graph& g;
-  double step_size;
-  sgd_edge_movie(Graph& g, double ss) :g(g), step_size(ss) {}
+void sgd_edge_movie (Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
+  galois::InsertBag<GNode> Movies;
 
-  template<typename Context>
-  void operator()(GNode node, Context& cnx) {
-    auto ii = g.edge_begin (node, galois::MethodFlag::UNPROTECTED), ee = g.edge_end (node, galois::MethodFlag::UNPROTECTED);
-    if (ii == ee) return;
-    auto& nd = g.getData(node);
-    std::advance(ii, nd.edge_offset);
-    auto& no = g.getData(g.getEdgeDst(ii));
-    doGradientUpdate(nd, no, g.getEdgeData(ii), step_size);
-    ++nd.edge_offset;
-    ++ii;
-    if (ii == ee) { nd.edge_offset = 0; return; }
-    else { cnx.push(node); }
-  }
+  galois::do_all(galois::iterate(g),
+      [&] (GNode n) {
+        if (g.edge_begin(n) != g.edge_end(n))
+          Movies.push_back(n);
+      });
 
-  static void go(Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
-    std::deque<GNode> Movies;
-    for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
-      if (g.edge_begin(*ii) != g.edge_end(*ii))
-        Movies.push_back(*ii);
-    for (int i = 0; i < 20; ++i) {
-      if (verifyPerIter)
-        verify(g);
-      double step_size = lf->step_size(i);
-      std::cout << "Step Size: " << step_size << "\n";
-      if (i != 0)
-        std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(galois::iterate(Movies), sgd_edge_movie(g, step_size), galois::wl<galois::worklists::dChunkedLIFO<8>>());
-    }
+  for (int i = 0; i < 20; ++i) {
+    if (verifyPerIter)
+      verify(g);
+    double step_size = lf->step_size(i);
+    std::cout << "Step Size: " << step_size << "\n";
+    // if (i != 0)
+    //   std::random_shuffle(Movies.begin(), Movies.end());
+    galois::for_each(galois::iterate(Movies),
+        [&] (GNode node, auto& ctx) {
+          auto ii = g.edge_begin(node, galois::MethodFlag::UNPROTECTED), ee = g.edge_end(node, galois::MethodFlag::UNPROTECTED);
+          if (ii == ee) return;
+          auto& nd = g.getData(node);
+          std::advance(ii, nd.edge_offset);
+          auto& no = g.getData(g.getEdgeDst(ii));
+          doGradientUpdate(nd, no, g.getEdgeData(ii), step_size);
+          ++nd.edge_offset;
+          ++ii;
+          if (ii == ee) { nd.edge_offset = 0; return; }
+          else { ctx.push(node); }
+        },
+        galois::wl<galois::worklists::dChunkedLIFO<8>>());
   }
-};
+}
 
 struct sgd_block
 {
@@ -1323,7 +1320,7 @@ int main(int argc, char** argv) {
     sgd_node_movie_pri(g, numMovieNodes, numUserNodes, lf.get());
     break;
   case Algo::edgeMovie:
-    sgd_edge_movie::go(g, numMovieNodes, numUserNodes, lf.get());
+    sgd_edge_movie(g, numMovieNodes, numUserNodes, lf.get());
     break;
   case Algo::block:
     runBlockSlices<sgd_block>(g, lf.get());
