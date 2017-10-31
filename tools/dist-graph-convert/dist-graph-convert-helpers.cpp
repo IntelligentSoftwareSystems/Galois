@@ -720,13 +720,16 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
                         uint64_t nodeIndexOffset, 
                         std::vector<uint64_t>& edgePrefixSum) {
   MPI_Status writeStatus;
+  uint64_t totalWritten = 0;
   while (nodesToWrite != 0) {
-    MPICheck(MPI_File_write_at(gr, nodeIndexOffset, edgePrefixSum.data(),
+    MPICheck(MPI_File_write_at(gr, nodeIndexOffset, 
+                               ((uint64_t*)edgePrefixSum.data()) + totalWritten,
                                nodesToWrite, MPI_UINT64_T, &writeStatus));
     
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
     nodesToWrite -= itemsWritten;
+    totalWritten += itemsWritten;
     nodeIndexOffset += itemsWritten * sizeof(uint64_t);
   }
 }
@@ -735,18 +738,20 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
                        uint64_t edgeDestOffset,
                        std::vector<std::vector<uint32_t>>& localSrcToDest) {
   MPI_Status writeStatus;
-
   for (unsigned i = 0; i < localNumNodes; i++) {
     std::vector<uint32_t> currentDests = localSrcToDest[i];
     uint64_t numToWrite = currentDests.size();
+    uint64_t totalWritten = 0;
 
     while (numToWrite != 0) {
-      MPICheck(MPI_File_write_at(gr, edgeDestOffset, currentDests.data(),
-                                 numToWrite, MPI_UINT32_T, &writeStatus));
+      MPICheck(MPI_File_write_at(gr, edgeDestOffset, 
+                                ((uint32_t*)currentDests.data()) + totalWritten,
+                                numToWrite, MPI_UINT32_T, &writeStatus));
 
       int itemsWritten;
       MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
       numToWrite -= itemsWritten;
+      totalWritten += itemsWritten;
       edgeDestOffset += sizeof(uint32_t) * itemsWritten;
     }
   }
