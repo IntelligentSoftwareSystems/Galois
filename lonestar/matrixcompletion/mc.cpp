@@ -76,7 +76,7 @@ static cll::opt<bool> verifyPerIter ("verifyPerIter", cll::desc ("compute RMS ev
 
 static cll::opt<int> shiftFactor("shiftRating", cll::desc("Shift ratings down by"), cll::init(0));
 
-static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(
                                        clEnumVal(nodeMovie, "Node by Movies"),
                                        clEnumVal(edgeMovie, "Edge by Movies"),
@@ -89,7 +89,7 @@ static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
                                        clEnumValEnd), 
                            cll::init(blockAndSliceBoth));
 
-static cll::opt<Learn> learn(cll::desc("Choose a learning function:"),
+static cll::opt<Learn> learn("lf", cll::desc("Choose a learning function:"),
                              cll::values(
                                          clEnumVal(Intel, "Intel"),
                                          clEnumVal(Purdue, "Perdue"),
@@ -277,41 +277,37 @@ void sgd_node_movie (Graph& g, unsigned int numMovieNodes, unsigned int numUserN
 }
 
 //priority by-movie node-based
-struct sgd_node_movie_pri {
-  Graph& g;
-  double step_size;
-  sgd_node_movie_pri(Graph& g, double ss) :g(g), step_size(ss) {}
+void sgd_node_movie_pri (Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
+  galois::InsertBag<GNode> Movies;
 
-  template<typename Context>
-  void operator()(GNode node, Context& cnx) {
-    for (auto ii = g.edge_begin (node), ee = g.edge_end (node);
-         ii != ee; ++ii) {
-      double e1 = doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), step_size);
-      double e2 = g.getEdgeData(ii) - calcPrediction(g.getData(node), g.getData(g.getEdgeDst(ii)));
-      if (std::abs(e1 - e2) > 20) {
-        std::cerr << "A" << std::abs(e1 - e2);
-        cnx.push(g.getEdgeDst(ii));
-      }
-    }
-  }
+  galois::do_all(galois::iterate(g),
+      [&] (GNode n) {
+        if (std::distance(g.edge_begin(n), g.edge_end(n)) > 100) {
+          Movies.push_back(n);
+        }
+      });
 
-  static void go(Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
-    std::deque<GNode> Movies;
-    for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
-      if (std::distance(g.edge_begin(*ii), g.edge_end(*ii)) > 100)
-        Movies.push_back(*ii);
-    for (int i = 0; i < 10; ++i) {
-      if (verifyPerIter)
-        verify(g);
-      double step_size = lf->step_size(i);
-      std::cout << "Step Size: " << step_size << "\n";
-      // if (i != 0)
-      //   std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(galois::iterate(Movies), sgd_node_movie_pri(g, step_size),
-                       galois::wl<galois::worklists::dChunkedFIFO<8>>());
-    }
+  for (int i = 0; i < 10; ++i) {
+    if (verifyPerIter)
+      verify(g);
+    double step_size = lf->step_size(i);
+    std::cout << "Step Size: " << step_size << "\n";
+    // if (i != 0)
+    //   std::random_shuffle(Movies.begin(), Movies.end());
+    galois::for_each(galois::iterate(Movies),
+        [&] (GNode node, auto& ctx) {
+          for (auto e: g.edges(node)) {
+            double e1 = doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(e)), g.getEdgeData(e), step_size);
+            double e2 = g.getEdgeData(e) - calcPrediction(g.getData(node), g.getData(g.getEdgeDst(e)));
+            if (std::abs(e1 - e2) > 20) {
+              std::cerr << "A" << std::abs(e1 - e2);
+              ctx.push(g.getEdgeDst(e));
+            }
+          }
+        },
+        galois::wl<galois::worklists::dChunkedFIFO<8>>());
   }
-};
+}
 
 //Simple by-edge grouped by movie (only one edge per movie on the WL at any time)
 struct sgd_edge_movie {
@@ -1324,7 +1320,7 @@ int main(int argc, char** argv) {
     sgd_node_movie(g, numMovieNodes, numUserNodes, lf.get());
     break;
   case Algo::nodeMoviePri:
-    sgd_node_movie_pri::go(g, numMovieNodes, numUserNodes, lf.get());
+    sgd_node_movie_pri(g, numMovieNodes, numUserNodes, lf.get());
     break;
   case Algo::edgeMovie:
     sgd_edge_movie::go(g, numMovieNodes, numUserNodes, lf.get());
