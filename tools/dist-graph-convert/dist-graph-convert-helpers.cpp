@@ -748,3 +748,61 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
     }
   }
 }
+
+void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
+                       uint64_t edgeDataOffset,
+                       const std::vector<uint32_t>& edgeDataToWrite) {
+  MPI_Status writeStatus;
+  uint64_t numToWrite = localNumEdges;
+  uint64_t numWritten = 0;
+
+  while (numToWrite != 0) {
+    MPICheck(MPI_File_write_at(gr, edgeDataOffset, 
+                             ((uint32_t*)edgeDataToWrite.data()) + numWritten,
+                             numToWrite, MPI_UINT32_T, &writeStatus));
+    int itemsWritten;
+    MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    numToWrite -= itemsWritten;
+    numWritten += itemsWritten;
+    edgeDataOffset += itemsWritten * sizeof(uint32_t);
+  }
+}
+
+std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed, 
+                                            uint64_t lower, uint64_t upper) {
+  std::minstd_rand0 rGenerator;
+  rGenerator.seed(seed);
+  std::uniform_int_distribution<uint32_t> rDist(lower, upper);
+
+  std::vector<uint32_t> randomNumbers;
+  randomNumbers.reserve(count);
+  for (unsigned i = 0; i < count; i++) {
+    randomNumbers.emplace_back(rDist(rGenerator));
+  }
+
+  return randomNumbers;
+}
+
+uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes, 
+                                  uint64_t totalNumEdges, 
+                                  uint64_t localEdgeBegin) {
+  uint64_t byteOffsetToEdgeData = (4 * sizeof(uint64_t)) + // header
+                                  (totalNumNodes * sizeof(uint64_t)) + // nodes
+                                  (totalNumEdges * sizeof(uint32_t)); // edges
+  // version 1: determine if padding is necessary at end of file +
+  // add it (64 byte alignment since edges are 32 bytes in version 1)
+  if (totalNumEdges % 2) {
+    byteOffsetToEdgeData += sizeof(uint32_t);
+  }
+  byteOffsetToEdgeData += localEdgeBegin * sizeof(uint32_t);
+
+  return byteOffsetToEdgeData;
+}
+
+std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit) {
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  return galois::block_range((uint64_t)0, numToSplit, hostID, totalNumHosts);
+}

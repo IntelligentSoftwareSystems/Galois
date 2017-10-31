@@ -25,7 +25,9 @@
 #ifndef _GALOIS_DIST_CONVERT_HELP_
 #define _GALOIS_DIST_CONVERT_HELP_
 
+#include <mutex>
 #include <fstream>
+#include <random>
 #include <mpi.h>
 
 #include "galois/Galois.h"
@@ -316,6 +318,7 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
 
 /**
  * Writes the edge destination data of a galois binary graph.
+ *
  * @param gr File to write to
  * @param localNumNodes number of source nodes that this host was 
  * assigned to write
@@ -326,4 +329,51 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
 void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
                        uint64_t edgeDestOffset,
                        std::vector<std::vector<uint32_t>>& localSrcToDest);
+
+/**
+ * Writes the edge data data of a galois binary graph.
+ *
+ * @param gr File to write to
+ * @param localNumEdges number of edges to write edge data for
+ * @param edgeDataOffset offset into file specifying where to start writing
+ * @param edgeDataToWrite vector of localNumEdges elements corresponding to
+ * edge data that needs to be written
+ */
+void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
+                       uint64_t edgeDataOffset,
+                       const std::vector<uint32_t>& edgeDataToWrite);
+
+/**
+ * Generates a vector of random uint32_ts.
+ *
+ * @param count number of numbers to generate
+ * @param seed seed to start generating with
+ * @param lower lower bound of numbers to generate, inclusive
+ * @param upper upper bound of number to generate, inclusive
+ * @returns Vector of random uint32_t numbers
+ */
+std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed, 
+                                            uint64_t lower, uint64_t upper);
+
+/**
+ * Gets the offset into the location of the edge data of some edge in a galois
+ * binary graph file.
+ *
+ * @param totalNumNodes total number of nodes in graph
+ * @param totalNumEdges total number of edges in graph
+ * @param localEdgeBegin the edge to get the offset to
+ * @returns offset into location of edge data of localEdgeBegin
+ */
+uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes, 
+                                  uint64_t totalNumEdges, 
+                                  uint64_t localEdgeBegin);
+
+/**
+ * Given some number, get the chunk of that number that this host is responsible
+ * for.
+ *
+ * @param numToSplit the number to chunk among hosts
+ * @returns pair specifying the range that this host is responsible for
+ */
+std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit);
 #endif

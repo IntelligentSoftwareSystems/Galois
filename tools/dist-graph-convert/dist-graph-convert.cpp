@@ -24,8 +24,6 @@
  */
 
 #include <utility>
-#include <random>
-#include <mutex>
 
 #include "galois/DistGalois.h"
 #include "llvm/Support/CommandLine.h"
@@ -145,6 +143,9 @@ void convert(C& c, Conversion) {
   }
 }
 
+/**
+ * Converts an edge list to a Galois binary graph.
+ */
 struct Edgelist2Gr : public Conversion {
   // WARNING: WILL NOT WORK IF THE EDGE LIST HAS WEIGHTS
   template<typename EdgeTy>
@@ -289,7 +290,9 @@ struct Edgelist2Gr : public Conversion {
   }
 };
 
-// TODO refactor
+/**
+ * Adds random weights to a Galois binary graph.
+ */
 struct Gr2WGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
@@ -300,72 +303,32 @@ struct Gr2WGr : public Conversion {
     MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
                            MPI_MODE_RDWR, MPI_INFO_NULL, &unweightedGr));
     uint64_t grHeader[4];
-
-    // read gr header for num edges
+    // read gr header for metadata
     MPICheck(MPI_File_read_at(unweightedGr, 0, grHeader, 4, MPI_UINT64_T, 
                               MPI_STATUS_IGNORE));
     GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
 
-    // split edges evenly between hosts
     uint64_t totalNumEdges = grHeader[3];
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    uint64_t hostID = net.ID;
-    uint64_t totalNumHosts = net.Num;
-
     uint64_t localEdgeBegin;
     uint64_t localEdgeEnd;
-    std::tie(localEdgeBegin, localEdgeEnd) = 
-        galois::block_range((uint64_t)0, totalNumEdges, hostID, totalNumHosts);
+    std::tie(localEdgeBegin, localEdgeEnd) = getLocalAssignment(totalNumEdges);
     
+    uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
     printf("[%lu] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
                                                        localEdgeEnd);
     
-    uint64_t byteOffsetToEdgeData = (4 * sizeof(uint64_t)) + // header
-                                    (grHeader[2] * sizeof(uint64_t)) + // nodes
-                                    (totalNumEdges * sizeof(uint32_t)); // edges
-    
-    // version 1: determine if padding is necessary at end of file +
-    // add it (64 byte alignment since edges are 32 bytes in version 1)
-    if (totalNumEdges % 2) {
-      byteOffsetToEdgeData += sizeof(uint32_t);
-    }
-
-    // each host writes its own (random) edge data
-    std::minstd_rand0 rGenerator;
-    rGenerator.seed(hostID);
-    std::uniform_int_distribution<uint32_t> rDist(1, 100);
-
     uint64_t numLocalEdges = localEdgeEnd - localEdgeBegin;
-    std::vector<uint32_t> edgeDataToWrite;
-    edgeDataToWrite.reserve(numLocalEdges);
-
-    // create local vector of edge data to write
-    for (unsigned i = 0; i < numLocalEdges; i++) {
-      edgeDataToWrite.emplace_back(rDist(rGenerator));
-    }
-
-    byteOffsetToEdgeData += localEdgeBegin * sizeof(uint32_t);
-
-    MPI_Status writeStatus;
-    uint64_t numToWrite = numLocalEdges;
-    uint64_t numWritten = 0;
-
-    while (numToWrite != 0) {
-      MPICheck(MPI_File_write_at(unweightedGr, byteOffsetToEdgeData, 
-                               ((uint32_t*)edgeDataToWrite.data()) + numWritten,
-                               numToWrite, MPI_UINT32_T, &writeStatus));
-      int itemsWritten;
-      MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
-      numToWrite -= itemsWritten;
-      numWritten += itemsWritten;
-      byteOffsetToEdgeData += itemsWritten * sizeof(uint32_t);
-    }
-
-    uint64_t edgeSize = 4;
+    std::vector<uint32_t> edgeDataToWrite = generateRandomNumbers(numLocalEdges,
+                                            hostID, 1, 100);
+    GALOIS_ASSERT(edgeDataToWrite.size() == numLocalEdges);
+    uint64_t byteOffsetToEdgeData = getOffsetToLocalEdgeData(grHeader[2], 
+                                      totalNumEdges, localEdgeBegin);
+    writeEdgeDataData(unweightedGr, numLocalEdges, byteOffsetToEdgeData, 
+                      edgeDataToWrite);
 
     // if host 0 update header with edge size
     if (hostID == 0) {
+      uint64_t edgeSize = 4;
       MPICheck(MPI_File_write_at(unweightedGr, sizeof(uint64_t), 
                                  &edgeSize, 1, MPI_UINT64_T, MPI_STATUS_IGNORE));
     }
