@@ -314,7 +314,7 @@ void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
  */
 void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
                         uint64_t nodeIndexOffset, 
-                        std::vector<uint64_t>& edgePrefixSum);
+                        const std::vector<uint64_t>& edgePrefixSum);
 
 /**
  * Writes the edge destination data of a galois binary graph.

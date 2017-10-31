@@ -367,7 +367,8 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
     uint64_t upperNode = chunkToNode[upperChunk].first;
 
     if (hostID == 0) {
-      printf("Host %lu gets nodes %lu to %lu\n", h, lowerNode, upperNode);
+      printf("Host %lu gets nodes %lu to %lu (count %lu)\n", h, 
+              lowerNode, upperNode, upperNode - lowerNode);
     }
 
     finalMapping.emplace_back(std::pair<uint64_t, uint64_t>(lowerNode, 
@@ -710,7 +711,7 @@ void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
 
 void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
                         uint64_t nodeIndexOffset, 
-                        std::vector<uint64_t>& edgePrefixSum) {
+                        const std::vector<uint64_t>& edgePrefixSum) {
   MPI_Status writeStatus;
   uint64_t totalWritten = 0;
   while (nodesToWrite != 0) {
