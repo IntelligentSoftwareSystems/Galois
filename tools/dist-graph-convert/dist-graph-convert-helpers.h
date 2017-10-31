@@ -34,6 +34,7 @@
 #include "galois/gstl.h"
 #include "galois/runtime/Network.h"
 #include "galois/DistAccumulator.h"
+#include "galois/graphs/OfflineGraph.h"
 
 /**
  * Wrapper for MPI calls that return an error code. Make sure it is success
@@ -225,6 +226,15 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
 );
+
+/**
+ * Using OfflineGraph to read the binary gr, divide nodes among hosts such
+ * that each hosts gets roughly an even amount of edges to read.
+ *
+ * @param inputGr file name of the input Galois binary graph
+ * @returns pair that specifies what nodes this host is responsble for reading
+ */
+std::pair<uint64_t, uint64_t> getNodesToReadFromGr(const std::string& inputGr);
 
 /**
  * Determine/send to each host how many edges they should expect to receive

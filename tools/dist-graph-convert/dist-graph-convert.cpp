@@ -36,16 +36,12 @@ namespace cll = llvm::cl;
 enum ConvertMode {
   edgelist2gr,
   gr2wgr,
+  gr2tgr,
   edgelistb2gr // TODO
 };
 
 enum EdgeType {
-  float32_,
-  float64_,
-  int32_,
-  int64_,
   uint32_,
-  uint64_,
   void_
 };
 
@@ -56,18 +52,8 @@ static cll::opt<std::string> outputFilename(cll::Positional,
 static cll::opt<EdgeType> edgeType("edgeType", 
     cll::desc("Input/Output edge type:"),
     cll::values(
-      clEnumValN(EdgeType::float32_, "float32", 
-                 "32 bit floating point edge values"),
-      clEnumValN(EdgeType::float64_, "float64", 
-                 "64 bit floating point edge values"),
-      clEnumValN(EdgeType::int32_, "int32", 
-                 "32 bit int edge values"),
-      clEnumValN(EdgeType::int64_, "int64", 
-                 "64 bit int edge values"),
       clEnumValN(EdgeType::uint32_, "uint32", 
                  "32 bit unsigned int edge values"),
-      clEnumValN(EdgeType::uint64_, "uint64", 
-                 "64 bit unsigned int edge values"),
       clEnumValN(EdgeType::void_, "void", 
                  "no edge values"),
       clEnumValEnd), 
@@ -77,7 +63,8 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(edgelistb2gr, "Convert edge list binary to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
       clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr "
-                         "(in-place"),
+                         "(in-place)"),
+      clEnumVal(gr2tgr, "Convert (weighted) binary gr to transpose binary gr "),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -109,12 +96,7 @@ void convert() {
   C c;
 
   switch (edgeType) {
-    case EdgeType::float32_: convert<float>(c, c); break;
-    case EdgeType::float64_: convert<double>(c, c); break;
-    case EdgeType::int32_: convert<int32_t>(c, c); break;
-    case EdgeType::int64_: convert<int64_t>(c, c); break;
     case EdgeType::uint32_: convert<uint32_t>(c, c); break;
-    case EdgeType::uint64_: convert<uint64_t>(c, c); break;
     case EdgeType::void_: convert<void>(c, c); break;
     default: abort();
   };
@@ -132,6 +114,8 @@ void convert(C& c, Conversion) {
     printf("Input: %s; Output: %s\n", inputFilename.c_str(), 
                                       outputFilename.c_str());
   }
+
+  galois::runtime::getHostBarrier().wait();
 
   galois::StatTimer convertTimer("Convert Time", "convert"); 
   convertTimer.start();
@@ -151,7 +135,7 @@ struct Edgelist2Gr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
-    GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs a output file");
+    GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs an output file");
 
     if (!std::is_void<EdgeTy>::value) {
       GALOIS_DIE("Currently not implemented for non-void\n");
@@ -293,6 +277,27 @@ struct Edgelist2Gr : public Conversion {
 };
 
 /**
+ * Transpose a WEIGHTED Galois binary graph.
+ * 
+ * TODO make it work for non weighted graphs too
+ */
+struct Gr2TGr : public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+    uint32_t totalNumHosts = net.Num;
+
+    // get "read" assignment of nodes
+    std::pair<uint64_t, uint64_t> nodesToRead = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+                                                    nodesToRead.second);
+  }
+};
+
+
+/**
  * Adds random weights to a Galois binary graph.
  */
 struct Gr2WGr : public Conversion {
@@ -351,6 +356,8 @@ int main(int argc, char** argv) {
       convert<Edgelist2Gr>(); break;
     case gr2wgr: 
       convert<Gr2WGr>(); break;
+    case gr2tgr: 
+      convert<Gr2TGr>(); break;
     default: abort();
   }
   return 0;
