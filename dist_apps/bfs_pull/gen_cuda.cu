@@ -221,7 +221,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -229,7 +229,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint
 void InitializeGraph_all_cuda(const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, local_infinity, local_src_node, ctx);
+  InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
 void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
@@ -245,7 +245,7 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct
   HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), _rv);
+  BFS <<<blocks, __tb_BFS>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->numNodesWithEdges, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -255,6 +255,6 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct
 void BFS_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  BFS_cuda(0, ctx->nowned, __retval, ctx);
+  BFS_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
 }

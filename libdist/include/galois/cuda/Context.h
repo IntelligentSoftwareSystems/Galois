@@ -11,7 +11,9 @@ struct CUDA_Context_Shared {
 struct CUDA_Context_Common {
   int device;
   int id;
-  unsigned int nowned; // number of nodes with edges
+  unsigned int numOwned; // Number of nodes owned (masters) by this host
+  unsigned int beginMaster; // local id of the beginning of master nodes
+  unsigned int numNodesWithEdges; // Number of nodes (masters + mirrors) that have outgoing edges 
   CSRGraphTy hg;
   CSRGraphTy gg;
   struct CUDA_Context_Shared master;
@@ -48,7 +50,9 @@ bool init_CUDA_context_common(struct CUDA_Context_Common *ctx, int device) {
 
 void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, unsigned num_hosts) {
   CSRGraphTy &graph = ctx->hg;
-  ctx->nowned = g.nowned;
+  ctx->numOwned = g.numOwned;
+  ctx->beginMaster = g.beginMaster;
+  ctx->numNodesWithEdges = g.numNodesWithEdges;
   assert(ctx->id == g.id);
   graph.nnodes = g.nnodes;
   graph.nedges = g.nedges;

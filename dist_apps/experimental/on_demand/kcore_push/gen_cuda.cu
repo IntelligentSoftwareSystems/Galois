@@ -448,7 +448,7 @@ void InitializeGraph2_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   // FP: "4 -> 5;
   InitializeGraph2 <<<blocks, __tb_InitializeGraph2>>>(ctx->gg, 
   ctx->current_degree.is_updated.gpu_rd_ptr(),
-  ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr());
+  ctx->numNodesWithEdges, __begin, __end, ctx->current_degree.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -456,7 +456,7 @@ void InitializeGraph2_cuda(unsigned int  __begin, unsigned int  __end, struct CU
 void InitializeGraph2_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph2_cuda(0, ctx->nowned, ctx);
+  InitializeGraph2_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
@@ -469,7 +469,7 @@ void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CU
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   InitializeGraph1 <<<blocks, threads>>>(ctx->gg, 
-    ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
+    ctx->numNodesWithEdges, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
     ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
@@ -478,7 +478,7 @@ void InitializeGraph1_cuda(unsigned int  __begin, unsigned int  __end, struct CU
 void InitializeGraph1_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph1_cuda(0, ctx->nowned, ctx);
+  InitializeGraph1_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
@@ -491,7 +491,7 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   KCoreStep2 <<<blocks, threads>>>(ctx->gg, 
-    ctx->nowned, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
+    ctx->numNodesWithEdges, __begin, __end, ctx->current_degree.data.gpu_wr_ptr(), 
     ctx->trim.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
@@ -500,7 +500,7 @@ void KCoreStep2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
 void KCoreStep2_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  KCoreStep2_cuda(0, ctx->nowned, ctx);
+  KCoreStep2_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, uint32_t local_k_core_num, struct CUDA_Context * ctx)
@@ -517,7 +517,7 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval,
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, 
-  ctx->nowned, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+  ctx->numNodesWithEdges, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -527,6 +527,6 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval,
 void KCoreStep1_all_cuda(int & __retval, uint32_t local_k_core_num, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  KCoreStep1_cuda(0, ctx->nowned, __retval, local_k_core_num, ctx);
+  KCoreStep1_cuda(0, ctx->numNodesWithEdges, __retval, local_k_core_num, ctx);
   // FP: "2 -> 3;
 }

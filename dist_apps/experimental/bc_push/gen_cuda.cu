@@ -1283,7 +1283,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1291,7 +1291,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
 void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, ctx);
+  InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void InitializeIteration_cuda(unsigned int  __begin, unsigned int  __end, const unsigned int & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context * ctx)
@@ -1303,7 +1303,7 @@ void InitializeIteration_cuda(unsigned int  __begin, unsigned int  __end, const 
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeIteration <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr());
+  InitializeIteration <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1311,7 +1311,7 @@ void InitializeIteration_cuda(unsigned int  __begin, unsigned int  __end, const 
 void InitializeIteration_all_cuda(const unsigned int & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeIteration_cuda(0, ctx->nowned, local_infinity, local_current_src_node, ctx);
+  InitializeIteration_cuda(0, ctx->numNodesWithEdges, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
 void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
@@ -1325,7 +1325,7 @@ void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct 
   // FP: "4 -> 5;
   FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, 
     ctx->current_length.is_updated.gpu_rd_ptr(), 
-    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr());
+    ctx->numNodesWithEdges, __begin, __end, ctx->current_length.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1333,7 +1333,7 @@ void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct 
 void FirstIterationSSSP_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  FirstIterationSSSP_cuda(0, ctx->nowned, ctx);
+  FirstIterationSSSP_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
@@ -1351,7 +1351,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   _rv.rv = retval.gpu_wr_ptr();
   SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, 
     ctx->current_length.is_updated.gpu_rd_ptr(), 
-    ctx->nowned, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), _rv);
+    ctx->numNodesWithEdges, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1361,7 +1361,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
 void SSSP_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->nowned, __retval, ctx);
+  SSSP_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
 }
 void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, struct CUDA_Context * ctx)
@@ -1376,7 +1376,7 @@ void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t
   PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, 
     ctx->num_predecessors.is_updated.gpu_rd_ptr(),
     ctx->num_successors.is_updated.gpu_rd_ptr(),
-    ctx->nowned, __begin, __end, local_infinity, 
+    ctx->numNodesWithEdges, __begin, __end, local_infinity, 
     ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
@@ -1385,7 +1385,7 @@ void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t
 void PredAndSucc_all_cuda(const uint32_t & local_infinity, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  PredAndSucc_cuda(0, ctx->nowned, local_infinity, ctx);
+  PredAndSucc_cuda(0, ctx->numNodesWithEdges, local_infinity, ctx);
   // FP: "2 -> 3;
 }
 void NumShortestPathsChanges_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
@@ -1400,7 +1400,7 @@ void NumShortestPathsChanges_cuda(unsigned int  __begin, unsigned int  __end, st
   NumShortestPathsChanges <<<blocks, threads>>>(ctx->gg, 
     ctx->propogation_flag.is_updated.gpu_rd_ptr(),
     ctx->num_shortest_paths.is_updated.gpu_rd_ptr(),
-    ctx->nowned, __begin, __end, ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+    ctx->numNodesWithEdges, __begin, __end, ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1408,7 +1408,7 @@ void NumShortestPathsChanges_cuda(unsigned int  __begin, unsigned int  __end, st
 void NumShortestPathsChanges_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  NumShortestPathsChanges_cuda(0, ctx->nowned, ctx);
+  NumShortestPathsChanges_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, const uint32_t & local_infinity, struct CUDA_Context * ctx)
@@ -1427,7 +1427,7 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, int & __r
   NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, 
     ctx->to_add.is_updated.gpu_wr_ptr(),
     ctx->trim.is_updated.gpu_wr_ptr(),
-    ctx->nowned, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+    ctx->numNodesWithEdges, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1437,7 +1437,7 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, int & __r
 void NumShortestPaths_all_cuda(int & __retval, const uint32_t & local_infinity, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  NumShortestPaths_cuda(0, ctx->nowned, __retval, local_infinity, ctx);
+  NumShortestPaths_cuda(0, ctx->numNodesWithEdges, __retval, local_infinity, ctx);
   // FP: "2 -> 3;
 }
 void DependencyPropChanges_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, struct CUDA_Context * ctx)
@@ -1452,7 +1452,7 @@ void DependencyPropChanges_cuda(unsigned int  __begin, unsigned int  __end, cons
   DependencyPropChanges <<<blocks, threads>>>(ctx->gg, 
     ctx->dependency.is_updated.gpu_wr_ptr(),
     ctx->propogation_flag.is_updated.gpu_wr_ptr(),
-    ctx->nowned, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+    ctx->numNodesWithEdges, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1460,7 +1460,7 @@ void DependencyPropChanges_cuda(unsigned int  __begin, unsigned int  __end, cons
 void DependencyPropChanges_all_cuda(const uint32_t & local_infinity, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  DependencyPropChanges_cuda(0, ctx->nowned, local_infinity, ctx);
+  DependencyPropChanges_cuda(0, ctx->numNodesWithEdges, local_infinity, ctx);
   // FP: "2 -> 3;
 }
 void DependencyPropogation_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, const unsigned int & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context * ctx)
@@ -1479,7 +1479,7 @@ void DependencyPropogation_cuda(unsigned int  __begin, unsigned int  __end, int 
   DependencyPropogation <<<blocks, __tb_DependencyPropogation>>>(ctx->gg, 
     ctx->to_add_float.is_updated.gpu_wr_ptr(),
     ctx->trim.is_updated.gpu_wr_ptr(),
-    ctx->nowned, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
+    ctx->numNodesWithEdges, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propogation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1489,7 +1489,7 @@ void DependencyPropogation_cuda(unsigned int  __begin, unsigned int  __end, int 
 void DependencyPropogation_all_cuda(int & __retval, const unsigned int & local_infinity, const uint64_t & local_current_src_node, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  DependencyPropogation_cuda(0, ctx->nowned, __retval, local_infinity, local_current_src_node, ctx);
+  DependencyPropogation_cuda(0, ctx->numNodesWithEdges, __retval, local_infinity, local_current_src_node, ctx);
   // FP: "2 -> 3;
 }
 void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
@@ -1501,7 +1501,7 @@ void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * c
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  BC <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr());
+  BC <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->betweeness_centrality.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1509,6 +1509,6 @@ void BC_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * c
 void BC_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  BC_cuda(0, ctx->nowned, ctx);
+  BC_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }

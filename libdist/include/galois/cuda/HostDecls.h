@@ -45,7 +45,9 @@ typedef unsigned int edge_data_type;
 struct MarshalGraph {
   size_t nnodes;  
   size_t nedges;
-  unsigned int nowned;
+  unsigned int numOwned; // Number of nodes owned (masters) by this host
+  unsigned int beginMaster; // local id of the beginning of master nodes
+  unsigned int numNodesWithEdges; // Number of nodes (masters + mirrors) that have outgoing edges 
   int id;
   index_type *row_start;
   index_type *edge_dst;

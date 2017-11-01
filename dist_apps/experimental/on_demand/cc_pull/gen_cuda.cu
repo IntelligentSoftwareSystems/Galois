@@ -222,7 +222,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->comp_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -230,7 +230,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
 void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, ctx);
+  InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
@@ -246,7 +246,7 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), _rv);
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -256,6 +256,6 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
 void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  ConnectedComp_cuda(0, ctx->nowned, __retval, ctx);
+  ConnectedComp_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
 }

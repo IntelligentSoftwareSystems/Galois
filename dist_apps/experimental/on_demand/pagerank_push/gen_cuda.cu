@@ -316,7 +316,7 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -324,7 +324,7 @@ void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Con
 void ResetGraph_all_cuda(struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  ResetGraph_cuda(0, ctx->nowned, ctx);
+  ResetGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
@@ -336,7 +336,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nout.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, __tb_InitializeGraph>>>(ctx->gg, ctx->nout.is_updated.gpu_rd_ptr(), ctx->numNodesWithEdges, __begin, __end, local_alpha, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -344,7 +344,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const floa
 void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  InitializeGraph_cuda(0, ctx->nowned, local_alpha, ctx);
+  InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_alpha, ctx);
   // FP: "2 -> 3;
 }
 void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
@@ -356,7 +356,7 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, const float
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PageRank_delta <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
+  PageRank_delta <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, local_alpha, local_tolerance, ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -364,7 +364,7 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, const float
 void PageRank_delta_all_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  PageRank_delta_cuda(0, ctx->nowned, local_alpha, local_tolerance, ctx);
+  PageRank_delta_cuda(0, ctx->numNodesWithEdges, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
 void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
@@ -380,7 +380,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, s
   HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), _rv);
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), _rv);
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -390,6 +390,6 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, s
 void PageRank_all_cuda(int & __retval, struct CUDA_Context * ctx)
 {
   // FP: "1 -> 2;
-  PageRank_cuda(0, ctx->nowned, __retval, ctx);
+  PageRank_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
 }

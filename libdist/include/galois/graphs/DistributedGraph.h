@@ -3158,8 +3158,10 @@ public:
   void getMarshalGraph(MarshalGraph& m) {
     m.nnodes = size();
     m.nedges = sizeEdges();
-    m.nowned = numNodesWithEdges;
-    assert(m.nowned > 0);
+    assert(numOwned > 0);
+    m.numOwned = numOwned;
+    m.beginMaster = beginMaster;
+    m.numNodesWithEdges = numNodesWithEdges;
     m.id = id;
     m.row_start = (index_type*) calloc(m.nnodes + 1, sizeof(index_type));
     m.edge_dst = (index_type*) calloc(m.nedges, sizeof(index_type));
@@ -3187,7 +3189,7 @@ public:
          n != graph.end() && *n != m.nnodes; 
          n++, node_counter++) {
       m.row_start[node_counter] = edge_counter;
-      if (*n < m.nowned) {
+      if (*n < numNodesWithEdges) {
         for (auto e = edge_begin(*n); e != edge_end(*n); e++) {
            if (getEdgeDst(e) < m.nnodes) {
               setMarshalEdge<std::is_void<EdgeTy>::value>(m, edge_counter, e);
