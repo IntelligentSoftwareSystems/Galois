@@ -27,7 +27,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "7 -> 8;
 }
-__global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, Sum ret_val)
+__global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -120,7 +120,7 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
             if (old_dist > new_dist)
             {
               is_updated->set(src);
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
             }
           }
         }
@@ -164,7 +164,7 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
               if (old_dist > new_dist)
               {
                 is_updated->set(src);
-                ret_val.do_return( 1);
+                ret_val.reduce( 1);
               }
             }
           }
@@ -199,7 +199,7 @@ __global__ void SSSP(CSRGraph graph, DynamicBitset *is_updated, unsigned int __n
             if (old_dist > new_dist)
             {
               is_updated->set(src);
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
             }
           }
         }
@@ -242,7 +242,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, ctx->dist_current.is_updated.gpu_rd_ptr(), ctx->nowned, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), _rv);

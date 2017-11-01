@@ -293,7 +293,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph,
 }
 __global__ void SSSP(CSRGraph graph, 
   DynamicBitset* is_updated_current_length,
-  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, Sum ret_val)
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -395,7 +395,7 @@ __global__ void SSSP(CSRGraph graph,
           if (old > new_dist)
           {
             is_updated_current_length->set(dst);
-            ret_val.do_return( 1);
+            ret_val.reduce( 1);
             //continue;
           }
         }
@@ -438,7 +438,7 @@ __global__ void SSSP(CSRGraph graph,
             if (old > new_dist)
             {
               is_updated_current_length->set(dst);
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
               //continue;
             }
           }
@@ -472,7 +472,7 @@ __global__ void SSSP(CSRGraph graph,
           if (old > new_dist)
           {
             is_updated_current_length->set(dst);
-            ret_val.do_return( 1);
+            ret_val.reduce( 1);
             //continue;
           }
         }
@@ -758,7 +758,7 @@ __global__ void NumShortestPathsChanges(CSRGraph graph,
 }
 __global__ void NumShortestPaths(CSRGraph graph, 
   DynamicBitset* is_updated_to_add, DynamicBitset* is_updated_trim,
-  unsigned int __nowned, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propogation_flag, uint32_t * p_to_add, uint32_t * p_trim, Sum ret_val)
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propogation_flag, uint32_t * p_to_add, uint32_t * p_trim, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -874,7 +874,7 @@ __global__ void NumShortestPaths(CSRGraph graph,
             is_updated_to_add->set(dst);
             is_updated_trim->set(dst);
 
-            ret_val.do_return( 1);
+            ret_val.reduce( 1);
             //continue;
           }
         }
@@ -922,7 +922,7 @@ __global__ void NumShortestPaths(CSRGraph graph,
               is_updated_to_add->set(dst);
               is_updated_trim->set(dst);
 
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
               //continue;
             }
           }
@@ -961,7 +961,7 @@ __global__ void NumShortestPaths(CSRGraph graph,
             is_updated_to_add->set(dst);
             is_updated_trim->set(dst);
 
-            ret_val.do_return( 1);
+            ret_val.reduce( 1);
             //continue;
           }
         }
@@ -1029,7 +1029,7 @@ __global__ void DependencyPropChanges(CSRGraph graph,
 }
 __global__ void DependencyPropogation(CSRGraph graph, 
   DynamicBitset* is_updated_to_add_float, DynamicBitset* is_updated_trim,
-  unsigned int __nowned, unsigned int __begin, unsigned int __end, const uint64_t local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propogation_flag, float * p_to_add_float, uint32_t * p_trim, Sum ret_val)
+  unsigned int __nowned, unsigned int __begin, unsigned int __end, const uint64_t local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propogation_flag, float * p_to_add_float, uint32_t * p_trim, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -1151,7 +1151,7 @@ __global__ void DependencyPropogation(CSRGraph graph,
               is_updated_to_add_float->set(src);
               is_updated_trim->set(src);
 
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
               //continue;
             }
           }
@@ -1200,7 +1200,7 @@ __global__ void DependencyPropogation(CSRGraph graph,
                 is_updated_to_add_float->set(src);
                 is_updated_trim->set(src);
 
-                ret_val.do_return( 1);
+                ret_val.reduce( 1);
                 //continue;
               }
             }
@@ -1240,7 +1240,7 @@ __global__ void DependencyPropogation(CSRGraph graph,
               is_updated_to_add_float->set(src);
               is_updated_trim->set(src);
 
-              ret_val.do_return( 1);
+              ret_val.reduce( 1);
               //continue;
             }
           }
@@ -1346,7 +1346,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struc
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, 
@@ -1421,7 +1421,7 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, int & __r
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, 
@@ -1473,7 +1473,7 @@ void DependencyPropogation_cuda(unsigned int  __begin, unsigned int  __end, int 
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   DependencyPropogation <<<blocks, __tb_DependencyPropogation>>>(ctx->gg, 

@@ -240,7 +240,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
   }
   // FP: "101 -> 102;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old, Sum ret_val)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -279,7 +279,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
       if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
-        ret_val.do_return( 1);
+        ret_val.reduce( 1);
       }
       else
       {
@@ -512,7 +512,7 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retv
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _rv);

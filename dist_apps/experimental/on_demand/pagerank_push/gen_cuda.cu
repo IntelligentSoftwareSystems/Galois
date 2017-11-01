@@ -90,7 +90,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
   }
   // FP: "8 -> 9;
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_residual, float * p_delta, Sum ret_val)
+__global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, float * p_residual, float * p_delta, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -133,7 +133,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __nowned, unsigned int __b
       {
         delta = p_delta[src];
         p_delta[src] = 0;
-        ret_val.do_return( 1);
+        ret_val.reduce( 1);
       }
       else
       {
@@ -377,7 +377,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, s
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->nowned, __begin, __end, ctx->residual.data.gpu_wr_ptr(), ctx->delta.data.gpu_wr_ptr(), _rv);

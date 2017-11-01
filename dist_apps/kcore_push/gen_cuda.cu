@@ -261,7 +261,7 @@ __global__ void KCoreStep2(CSRGraph graph,
   // FP: "10 -> 11;
 }
 __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
-    unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, Sum ret_val)
+    unsigned int __nowned, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -298,7 +298,7 @@ __global__ void KCoreStep1(CSRGraph graph, DynamicBitset* is_updated,
         if (p_current_degree[src] < local_k_core_num)
         {
           p_flag[src] = false;
-          ret_val.do_return( 1);
+          ret_val.reduce( 1);
           //continue;
         }
         else
@@ -506,7 +506,7 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, int & __retval,
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, 

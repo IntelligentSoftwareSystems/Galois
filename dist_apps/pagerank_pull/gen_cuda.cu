@@ -214,7 +214,7 @@ __global__ void InitializeGraph(CSRGraph graph, DynamicBitset *nout_is_updated, 
   }
   // FP: "91 -> 92;
 }
-__global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value, Sum ret_val)
+__global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value, HGAccumulator<int> ret_val)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -237,7 +237,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __nowned, unsigned i
         if (p_nout[src] > 0)
         {
           p_delta[src] = p_residual[src]*(1-local_alpha)/p_nout[src];
-          ret_val.do_return( 1);
+          ret_val.reduce( 1);
         }
         p_residual[src] = 0;
       }
@@ -502,7 +502,7 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, int & __ret
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
   Shared<int> retval = Shared<int>(1);
-  Sum _rv;
+  HGAccumulator<int> _rv;
   *(retval.cpu_wr_ptr()) = 0;
   _rv.rv = retval.gpu_wr_ptr();
   PageRank_delta <<<blocks, threads>>>(ctx->gg, ctx->nowned, __begin, __end, local_alpha, local_tolerance, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _rv);
