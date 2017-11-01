@@ -11,7 +11,7 @@ struct CUDA_Context_Shared {
 struct CUDA_Context_Common {
   int device;
   int id;
-  unsigned int nowned;
+  unsigned int nowned; // number of nodes with edges
   CSRGraphTy hg;
   CSRGraphTy gg;
   struct CUDA_Context_Shared master;
@@ -89,7 +89,7 @@ void load_graph_CUDA_common(struct CUDA_Context_Common *ctx, MarshalGraph &g, un
   ctx->is_updated.alloc(1);
   ctx->is_updated.cpu_wr_ptr()->alloc(max_shared_size);
   graph.copy_to_gpu(ctx->gg);
-  printf("[%u] load_graph_GPU: %u owned nodes of total %u resident, %lu edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
+  //printf("[%u] load_graph_GPU: %u owned nodes of total %u resident, %lu edges\n", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);
 }
 
 size_t mem_usage_CUDA_common(MarshalGraph &g, unsigned num_hosts) {

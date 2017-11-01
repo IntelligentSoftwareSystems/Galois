@@ -3158,7 +3158,7 @@ public:
   void getMarshalGraph(MarshalGraph& m) {
     m.nnodes = size();
     m.nedges = sizeEdges();
-    m.nowned = numOwned;
+    m.nowned = numNodesWithEdges;
     assert(m.nowned > 0);
     m.id = id;
     m.row_start = (index_type*) calloc(m.nnodes + 1, sizeof(index_type));
