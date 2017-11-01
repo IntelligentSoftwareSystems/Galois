@@ -20,6 +20,7 @@ void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 
+void SSSPSanityCheck_cuda(unsigned int & sum, unsigned int & max, const uint32_t & local_infinity, struct CUDA_Context *ctx);
 void SSSP_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
 void SSSP_all_cuda(int & __retval, struct CUDA_Context *ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context *ctx);

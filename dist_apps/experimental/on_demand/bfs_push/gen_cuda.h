@@ -47,6 +47,7 @@ void batch_set_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 void batch_add_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_old_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 
+void BFSSanityCheck_cuda(unsigned int & sum, unsigned int & max, const uint32_t & local_infinity, struct CUDA_Context *ctx);
 void BFS_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);
 void BFS_all_cuda(int & __retval, struct CUDA_Context *ctx);
 void FirstItr_BFS_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);

@@ -264,37 +264,41 @@ struct SSSPSanityCheck {
   galois::DGAccumulator<uint32_t>& DGAccumulator_max;
   galois::GReduceMax<uint32_t>& current_max;
 
-  SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph,
-                  galois::DGAccumulator<uint64_t>& dgas,
-                  galois::DGAccumulator<uint32_t>& dgam,
-                  galois::GReduceMax<uint32_t>& m) : 
-    local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
-    DGAccumulator_max(dgam), current_max(m) {}
+  SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph, 
+                 galois::DGAccumulator<uint64_t>& dgas,
+                 galois::DGAccumulator<uint32_t>& dgam,
+                 galois::GReduceMax<uint32_t>& m) 
+    : local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
+      DGAccumulator_max(dgam), current_max(m) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam, 
+                 galois::DGAccumulator<uint32_t>& dgam,
                  galois::GReduceMax<uint32_t>& m) {
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      // TODO currently no GPU support for sanity check operator
-      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.\n");
-    }
-  #endif
     dgas.reset();
     dgam.reset();
-    m.reset();
 
-    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
-                   SSSPSanityCheck(infinity, &_graph, dgas, dgam, m), 
-                   galois::loopname("SSSPSanityCheck"),
-                   galois::no_stats());
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      uint32_t sum, max;
+      SSSPSanityCheck_cuda(sum, max, infinity, cuda_ctx);
+      dgas += sum;
+      dgam = max;
+    }
+    else
+  #endif
+    {
+      m.reset();
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
+                     SSSPSanityCheck(infinity, &_graph, dgas, dgam, m),
+                     galois::loopname("SSSPSanityCheck"),
+                     galois::no_stats());
+      dgam = m.reduce();
+    }
 
     uint64_t num_visited = dgas.reduce();
-    dgam = m.reduce();
     uint32_t max_distance = dgam.reduce_max();
 
-    // Only node 0 will print the info
+    // Only host 0 will print the info
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       printf("Number of nodes visited is %lu\n", num_visited);
       printf("Max distance is %u\n", max_distance);
@@ -304,13 +308,11 @@ struct SSSPSanityCheck {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src)) && 
-        src_data.dist_current < local_infinity) {
+    if (src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
       current_max.update(src_data.dist_current);
     }
   }
-
 };
 
 /******************************************************************************/

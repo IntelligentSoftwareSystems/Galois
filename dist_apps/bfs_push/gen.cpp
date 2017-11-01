@@ -280,24 +280,28 @@ struct BFSSanityCheck {
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
                  galois::DGAccumulator<uint32_t>& dgam,
                  galois::GReduceMax<uint32_t>& m) {
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      // TODO currently no GPU support for sanity check operator
-      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.\n");
-    }
-  #endif
     dgas.reset();
     dgam.reset();
-    m.reset();
 
-    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
-                   BFSSanityCheck(infinity, &_graph, dgas, dgam, m), 
-                   galois::loopname("BFSSanityCheck"),
-                   galois::no_stats());
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      uint32_t sum, max;
+      BFSSanityCheck_cuda(sum, max, infinity, cuda_ctx);
+      dgas += sum;
+      dgam = max;
+    }
+    else
+  #endif
+    {
+      m.reset();
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
+                     BFSSanityCheck(infinity, &_graph, dgas, dgam, m),
+                     galois::loopname("BFSSanityCheck"),
+                     galois::no_stats());
+      dgam = m.reduce();
+    }
 
     uint64_t num_visited = dgas.reduce();
-    dgam = m.reduce();
     uint32_t max_distance = dgam.reduce_max();
 
     // Only host 0 will print the info
@@ -310,8 +314,7 @@ struct BFSSanityCheck {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src)) && 
-        src_data.dist_current < local_infinity) {
+    if (src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
       current_max.update(src_data.dist_current);
     }

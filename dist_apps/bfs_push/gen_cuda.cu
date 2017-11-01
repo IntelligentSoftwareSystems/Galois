@@ -463,6 +463,24 @@ __global__ void BFS(CSRGraph graph, DynamicBitset *is_updated, unsigned int __no
   }
   ret_val.thread_exit<_br>(_ts);
 }
+__global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<unsigned int> sum, HGReduceMax<unsigned int> max)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  sum.thread_entry();
+  max.thread_entry();
+  for (index_type src = __begin + tid; src < __end; src += nthreads)
+  {
+    if (p_dist_current[src] < local_infinity) {
+      sum.reduce(1);
+      max.reduce(p_dist_current[src]);
+    }
+  }
+  sum.thread_exit<_br>(_ts);
+  max.thread_exit<_br>(_ts);
+}
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context * ctx)
 {
   dim3 blocks;
@@ -528,4 +546,22 @@ void BFS_all_cuda(int & __retval, struct CUDA_Context * ctx)
   // FP: "1 -> 2;
   BFS_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
+}
+void BFSSanityCheck_cuda(unsigned int & sum, unsigned int & max, const uint32_t & local_infinity, struct CUDA_Context * ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  kernel_sizing(blocks, threads);
+  Shared<unsigned int> sumval = Shared<unsigned int>(1);
+  HGAccumulator<unsigned int> _sum;
+  *(sumval.cpu_wr_ptr()) = 0;
+  _sum.rv = sumval.gpu_wr_ptr();
+  Shared<unsigned int> maxval = Shared<unsigned int>(1);
+  HGReduceMax<unsigned int> _max;
+  *(maxval.cpu_wr_ptr()) = 0;
+  _max.rv = maxval.gpu_wr_ptr();
+  BFSSanityCheck <<<blocks, __tb_BFS>>>(ctx->gg, ctx->beginMaster, ctx->beginMaster+ctx->numOwned, local_infinity, ctx->dist_current.data.gpu_rd_ptr(), _sum, _max);
+  check_cuda_kernel;
+  sum = *(sumval.cpu_rd_ptr());
+  max = *(maxval.cpu_rd_ptr());
 }
