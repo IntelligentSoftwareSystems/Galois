@@ -188,7 +188,8 @@ struct Edgelist2Gr : public Conversion {
     std::vector<std::vector<uint32_t>> localSrcToData;
     std::vector<std::mutex> nodeLocks(localNumNodes);
 
-    sendAssignedEdges(hostToNodes, localEdges, localSrcToDest, nodeLocks);
+    sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
+                              localSrcToData, nodeLocks);
     freeVector(localEdges);
     receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
                          nodeLocks);

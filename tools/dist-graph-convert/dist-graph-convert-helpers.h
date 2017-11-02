@@ -519,16 +519,267 @@ uint64_t receiveEdgeCounts();
  * @param localEdges in-memory buffer of edges this host has loaded
  * @param localSrcToDest local mapping of LOCAL sources to destinations (we
  * may have some edges that do not need sending; they are saved here)
+ * @param localSrcToData Vector of vectors: the vector at index i specifies
+ * the data of edges owned by local node i
  * @param nodeLocks Vector of mutexes (one for each local node) that are used
  * when writing to the local mapping of sources to destinations since vectors
  * are not thread safe
  */
-void sendAssignedEdges( 
-  const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-  const std::vector<uint32_t>& localEdges,
-  std::vector<std::vector<uint32_t>>& localSrcToDest,
-  std::vector<std::mutex>& nodeLocks
-);
+// TODO make implementation smaller/cleaner i.e. refactor
+template<typename EdgeDataTy,
+     typename std::enable_if<std::is_void<EdgeDataTy>::value>::type* = nullptr>
+void sendAssignedEdges(
+    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<uint32_t>& localEdges,
+    std::vector<std::vector<uint32_t>>& localSrcToDest,
+    std::vector<std::vector<uint32_t>>& localSrcToData,
+    std::vector<std::mutex>& nodeLocks)
+{
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  printf("[%lu] Going to send assigned edges\n", hostID);
+
+  using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
+  galois::substrate::PerThreadStorage<EdgeVectorTy> 
+      dstVectors(totalNumHosts);
+  
+  using SendBufferVectorTy = std::vector<galois::runtime::SendBuffer>;
+  galois::substrate::PerThreadStorage<SendBufferVectorTy> 
+      sendBuffers(totalNumHosts);
+  galois::substrate::PerThreadStorage<std::vector<uint64_t>> 
+      lastSourceSentStorage(totalNumHosts);
+
+  // initialize last source sent
+  galois::on_each(
+    [&] (unsigned tid, unsigned nthreads) {
+      for (unsigned h = 0; h < totalNumHosts; h++) {
+        (*(lastSourceSentStorage.getLocal()))[h] = 0;
+      }
+    },
+    galois::no_stats()
+  );
+
+  printf("[%lu] Passing through edges and assigning\n", hostID);
+
+  uint64_t localNumEdges = getNumEdges(localEdges);
+  // determine to which host each edge will go
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src = localEdges[edgeIndex * 2];
+      uint32_t edgeOwner = findOwner(src, hostToNodes);
+      uint32_t dst = localEdges[(edgeIndex * 2) + 1];
+      uint32_t localID = src - hostToNodes[edgeOwner].first;
+
+      if (edgeOwner != hostID) {
+        // send off to correct host
+        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[edgeOwner];
+        auto& dstVector = (*(dstVectors.getLocal()))[edgeOwner];
+        auto& lastSourceSent = 
+            (*(lastSourceSentStorage.getLocal()))[edgeOwner];
+
+        if (lastSourceSent == localID) {
+          dstVector.emplace_back(dst);
+        } else {
+          // serialize vector if anything exists in it + send buffer if
+          // reached some limit
+          if (dstVector.size() > 0) {
+            uint64_t globalSourceID = lastSourceSent + 
+                                      hostToNodes[edgeOwner].first;
+            galois::runtime::gSerialize(hostSendBuffer, globalSourceID, 
+                                        dstVector);
+            dstVector.clear();
+            if (hostSendBuffer.size() > 1400) {
+              net.sendTagged(edgeOwner, galois::runtime::evilPhase, 
+                             hostSendBuffer);
+              hostSendBuffer.getVec().clear();
+            }
+          }
+
+          dstVector.emplace_back(dst);
+          lastSourceSent = localID;
+        }
+      } else {
+        // save to edge dest array
+        nodeLocks[localID].lock();
+        localSrcToDest[localID].emplace_back(dst);
+        nodeLocks[localID].unlock();
+      }
+    },
+    galois::loopname("Pass2"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  printf("[%lu] Buffer cleanup\n", hostID);
+
+  // cleanup: each thread serialize + send out remaining stuff
+  galois::on_each(
+    [&] (unsigned tid, unsigned nthreads) {
+      for (unsigned h = 0; h < totalNumHosts; h++) {
+        if (h == hostID) continue;
+        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[h];
+        auto& dstVector = (*(dstVectors.getLocal()))[h];
+        uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
+
+        if (dstVector.size() > 0) {
+          uint64_t globalSourceID = lastSourceSent + 
+                                    hostToNodes[h].first;
+          galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
+                                      dstVector);
+          dstVector.clear();
+        }
+
+        if (hostSendBuffer.size() > 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
+          hostSendBuffer.getVec().clear();
+        }
+      }
+    },
+    galois::loopname("Pass2Cleanup"),
+    galois::timeit(),
+    galois::no_stats()
+  );
+}
+
+// Non-void variant of the above; uint32_t only
+template<typename EdgeDataTy,
+     typename std::enable_if<!std::is_void<EdgeDataTy>::value>::type* = nullptr>
+void sendAssignedEdges(
+    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<uint32_t>& localEdges,
+    std::vector<std::vector<uint32_t>>& localSrcToDest,
+    std::vector<std::vector<uint32_t>>& localSrcToData,
+    std::vector<std::mutex>& nodeLocks)
+{
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  printf("[%lu] Going to send assigned edges\n", hostID);
+
+  // initialize localsrctodata
+  GALOIS_ASSERT(localSrcToData.empty());
+  using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
+  EdgeVectorTy tmp = EdgeVectorTy(localSrcToDest.size());
+  localSrcToData.swap(tmp);
+
+  galois::substrate::PerThreadStorage<EdgeVectorTy> 
+      dstVectors(totalNumHosts);
+  // currently only uint32_t support for edge data
+  galois::substrate::PerThreadStorage<EdgeVectorTy> 
+      dataVectors(totalNumHosts);
+ 
+  using SendBufferVectorTy = std::vector<galois::runtime::SendBuffer>;
+  galois::substrate::PerThreadStorage<SendBufferVectorTy> 
+      sendBuffers(totalNumHosts);
+  galois::substrate::PerThreadStorage<std::vector<uint64_t>> 
+      lastSourceSentStorage(totalNumHosts);
+
+  // initialize last source sent
+  galois::on_each(
+    [&] (unsigned tid, unsigned nthreads) {
+      for (unsigned h = 0; h < totalNumHosts; h++) {
+        (*(lastSourceSentStorage.getLocal()))[h] = 0;
+      }
+    },
+    galois::no_stats()
+  );
+
+  printf("[%lu] Passing through edges and assigning\n", hostID);
+
+  uint64_t localNumEdges = getNumEdges(localEdges);
+  // determine to which host each edge will go
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src = localEdges[edgeIndex * 3];
+      uint32_t edgeOwner = findOwner(src, hostToNodes);
+      uint32_t dst = localEdges[(edgeIndex * 3) + 1];
+      uint32_t localID = src - hostToNodes[edgeOwner].first;
+      uint32_t edgeData = localEdges[(edgeIndex * 3) + 2];
+
+      if (edgeOwner != hostID) {
+        // send off to correct host
+        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[edgeOwner];
+        auto& dstVector = (*(dstVectors.getLocal()))[edgeOwner];
+        auto& dataVector = (*(dataVectors.getLocal()))[edgeOwner];
+        auto& lastSourceSent = 
+            (*(lastSourceSentStorage.getLocal()))[edgeOwner];
+
+        if (lastSourceSent == localID) {
+          dstVector.emplace_back(dst);
+          dataVector.emplace_back(edgeData);
+        } else {
+          // serialize vector if anything exists in it + send buffer if
+          // reached some limit
+          if (dstVector.size() > 0) {
+            uint64_t globalSourceID = lastSourceSent + 
+                                      hostToNodes[edgeOwner].first;
+            galois::runtime::gSerialize(hostSendBuffer, globalSourceID, 
+                                        dstVector, dataVector);
+            dstVector.clear();
+            dataVector.clear();
+            if (hostSendBuffer.size() > 1400) {
+              net.sendTagged(edgeOwner, galois::runtime::evilPhase, 
+                             hostSendBuffer);
+              hostSendBuffer.getVec().clear();
+            }
+          }
+
+          dstVector.emplace_back(dst);
+          dataVector.emplace_back(edgeData);
+          lastSourceSent = localID;
+        }
+      } else {
+        // save to edge dest array
+        nodeLocks[localID].lock();
+        localSrcToDest[localID].emplace_back(dst);
+        nodeLocks[localID].unlock();
+      }
+    },
+    galois::loopname("Pass2"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  printf("[%lu] Buffer cleanup\n", hostID);
+
+  // cleanup: each thread serialize + send out remaining stuff
+  galois::on_each(
+    [&] (unsigned tid, unsigned nthreads) {
+      for (unsigned h = 0; h < totalNumHosts; h++) {
+        if (h == hostID) continue;
+        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[h];
+        auto& dstVector = (*(dstVectors.getLocal()))[h];
+        auto& dataVector = (*(dataVectors.getLocal()))[h];
+        uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
+
+        if (dstVector.size() > 0) {
+          uint64_t globalSourceID = lastSourceSent + 
+                                    hostToNodes[h].first;
+          galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
+                                      dstVector, dataVector);
+          dstVector.clear();
+          dataVector.clear();
+        }
+
+        if (hostSendBuffer.size() > 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
+          hostSendBuffer.getVec().clear();
+        }
+      }
+    },
+    galois::loopname("Pass2Cleanup"),
+    galois::timeit(),
+    galois::no_stats()
+  );
+}
+
 
 /**
  * Receive this host's assigned edges: should be called after sendAssignedEdges.
