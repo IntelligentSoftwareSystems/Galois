@@ -185,6 +185,7 @@ struct Edgelist2Gr : public Conversion {
 
     // FIXME ONLY V1 SUPPORT
     std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
+    std::vector<std::vector<uint32_t>> localSrcToData;
     std::vector<std::mutex> nodeLocks(localNumNodes);
 
     sendAssignedEdges(hostToNodes, localEdges, localSrcToDest, nodeLocks);
@@ -220,48 +221,9 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT(totalEdgeCount == totalEdgeCount2);
     freeVector(edgesPerHost);
 
-    // TODO I can refactor this out completely
-    printf("[%lu] Beginning write to file\n", hostID);
-    MPI_File newGR;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
-             MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
+    writeToGr(outputFile, totalNumNodes, totalEdgeCount2, localNumNodes, 
+              localNodeBegin, globalEdgeOffset, localSrcToDest, localSrcToData);
 
-    if (hostID == 0) {
-      writeGrHeader(newGR, 1, 0, totalNumNodes, totalEdgeCount2);
-    }
-
-    if (localNumNodes > 0) {
-      // prepare edge prefix sum for file writing
-      std::vector<uint64_t> edgePrefixSum(localNumNodes);
-      edgePrefixSum[0] = localSrcToDest[0].size();
-      for (unsigned i = 1; i < localNumNodes; i++) {
-        edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
-      }
-
-      // account for edge offset
-      for (unsigned i = 0; i < localNumNodes; i++) {
-        edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
-      }
-
-      // begin file writing 
-      uint64_t headerSize = sizeof(uint64_t) * 4;
-      uint64_t nodeIndexOffset = headerSize + 
-                                 (localNodeBegin * sizeof(uint64_t));
-      printf("[%lu] Write node index data\n", hostID);
-      writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
-      freeVector(edgePrefixSum);
-
-      uint64_t edgeDestOffset = headerSize + 
-                                (totalNumNodes * sizeof(uint64_t)) +
-                                globalEdgeOffset * sizeof(uint32_t);
-      printf("[%lu] Write edge dest data\n", hostID);
-      std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
-      freeVector(localSrcToDest);
-      writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, destVector);                               
-      printf("[%lu] Write to file done\n", hostID);
-    }
-
-    MPICheck(MPI_File_close(&newGR));
     galois::runtime::getHostBarrier().wait();
   }
 };

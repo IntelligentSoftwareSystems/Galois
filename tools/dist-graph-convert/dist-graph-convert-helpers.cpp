@@ -651,6 +651,67 @@ void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
   }
 }
 
+void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
+               uint64_t totalNumEdges, uint64_t localNumNodes, 
+               uint64_t localNodeBegin, uint64_t globalEdgeOffset,
+               std::vector<std::vector<uint32_t>>& localSrcToDest,
+               std::vector<std::vector<uint32_t>>& localSrcToData) {
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  printf("[%lu] Beginning write to file\n", hostID);
+  MPI_File newGR;
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
+           MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &newGR));
+
+  if (hostID == 0) {
+    if (localSrcToData.empty()) {
+      writeGrHeader(newGR, 1, 0, totalNumNodes, totalNumEdges);
+    } else {
+      // edge data size hard set to 4 (uint32_t)
+      writeGrHeader(newGR, 1, 4, totalNumNodes, totalNumEdges);
+    }
+  }
+
+  if (localNumNodes > 0) {
+    // prepare edge prefix sum for file writing
+    std::vector<uint64_t> edgePrefixSum(localNumNodes);
+    edgePrefixSum[0] = localSrcToDest[0].size();
+    for (unsigned i = 1; i < localNumNodes; i++) {
+      edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
+    }
+
+    // account for edge offset
+    for (unsigned i = 0; i < localNumNodes; i++) {
+      edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
+    }
+
+    // begin file writing 
+    uint64_t headerSize = sizeof(uint64_t) * 4;
+    uint64_t nodeIndexOffset = headerSize + 
+                               (localNodeBegin * sizeof(uint64_t));
+    printf("[%lu] Write node index data\n", hostID);
+    writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
+    freeVector(edgePrefixSum);
+
+    uint64_t edgeDestOffset = headerSize + 
+                              (totalNumNodes * sizeof(uint64_t)) +
+                              globalEdgeOffset * sizeof(uint32_t);
+    printf("[%lu] Write edge dest data\n", hostID);
+    std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
+    freeVector(localSrcToDest);
+    writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, destVector);
+
+    // edge data writing if necessary
+    if (!localSrcToDest.empty()) {
+      // TODO/FIXME implement this
+    }
+
+    printf("[%lu] Write to file done\n", hostID);
+  }
+
+  MPICheck(MPI_File_close(&newGR));
+}
+
 std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed, 
                                             uint64_t lower, uint64_t upper) {
   std::minstd_rand0 rGenerator;

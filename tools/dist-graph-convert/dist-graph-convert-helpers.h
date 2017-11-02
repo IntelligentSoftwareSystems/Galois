@@ -567,7 +567,6 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
 std::vector<uint32_t> 
 flattenVectors(std::vector<std::vector<uint32_t>>& vectorOfVectors);
 
-
 /**
  * Writes a binary galois graph's header information.
  *
@@ -611,8 +610,8 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
 /**
  * Writes the edge destination data of a galois binary graph.
  * @param gr File to write to
- * @param localNumNodes number of source nodes that this host was 
- * assigned to write
+ * @param localNumNodes number of source nodes that this host was assigned to 
+ * write
  * @param edgeDestOffset offset into file specifying where to start writing
  * @param destVector Vector of edge destinations IN THE ORDER THAT THEY SHOULD
  * BE WRITTEN (i.e. in correct order corresponding to node order this host has)
@@ -632,6 +631,28 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
 void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
                        uint64_t edgeDataOffset,
                        const std::vector<uint32_t>& edgeDataToWrite);
+
+/**
+ * Write graph data out to a V1 Galois binary graph file.
+ *
+ * @param outputFile name of file to write to
+ * @param totalNumNodes total number of nodes in the graph
+ * @param totalNumEdges total number of edges in graph
+ * @param localNumNodes number of source nodes that this host was assigned to
+ * write
+ * @param localNodeBegin global id of first node this host was assigned
+ * @param globalEdgeOffset number of edges to skip to get to the first edge
+ * this host is responsible for
+ * @param localSrcToDest Vector of vectors: the vector at index i specifies
+ * the destinations of edges owned by local node i
+ * @param localSrcToData Vector of vectors: the vector at index i specifies
+ * the data of edges owned by local node i
+ */
+void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
+               uint64_t totalNumEdges, uint64_t localNumNodes, 
+               uint64_t localNodeBegin, uint64_t globalEdgeOffset,
+               std::vector<std::vector<uint32_t>>& localSrcToDest,
+               std::vector<std::vector<uint32_t>>& localSrcToData);
 
 /**
  * Generates a vector of random uint32_ts.
