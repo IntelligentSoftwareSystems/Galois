@@ -458,6 +458,14 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
 
 /**
+ * TODO
+ */
+std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
+    const std::string& inputFile, Uint64Pair nodesToRead, 
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
+);
+
+/**
  * Determine/send to each host how many edges they should expect to receive
  * from the caller (i.e. this host).
  *

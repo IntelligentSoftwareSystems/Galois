@@ -306,11 +306,48 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
   return DoubleUint64Pair(nodePair, edgePair);
 }
 
-// TODO
-//std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead) {
-//  galois::graphs::MPIGraph<uint32_t> mpiGraph;
-//  mpiGraph.loadPartialGraph
-//}
+std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
+    const std::string& inputFile, Uint64Pair nodesToRead, 
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
+) {
+  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+                            edgesToRead.first, edgesToRead.second, 
+                            totalNumNodes, totalNumEdges);
+
+  std::vector<uint32_t> edgeData((edgesToRead.second - edgesToRead.first) * 3);
+
+  if (edgeData.size() > 0) {
+    galois::do_all(
+      galois::iterate(nodesToRead.first, nodesToRead.second),
+      [&] (uint32_t gID) {
+        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+
+        // offset into which we should start writing data in edgeData
+        uint64_t edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
+        
+        // loop through all edges, save data
+        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+          uint32_t edgeSource = mpiGraph.edgeDestination(i);
+          uint32_t edgeWeight = mpiGraph.edgeData(i);
+
+          // note that src is saved as dest and dest is aved as source 
+          // (transpose)
+          edgeData[edgeDataOffset] = edgeSource;
+          edgeData[edgeDataOffset + 1] = gID;
+          edgeData[edgeDataOffset + 2] = edgeWeight;
+          edgeDataOffset += 3;
+        }
+      },
+      galois::loopname("LoadTransposeEdgesMPIGraph"),
+      galois::timeit(),
+      galois::no_stats()
+    );
+  }
+  
+  return edgeData;
+}
 
 uint64_t receiveEdgeCounts() {
   auto& net = galois::runtime::getSystemNetworkInterface();

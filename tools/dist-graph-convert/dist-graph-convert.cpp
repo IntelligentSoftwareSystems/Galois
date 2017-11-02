@@ -137,10 +137,6 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
     GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs an output file");
 
-    //if (!std::is_void<EdgeTy>::value) {
-    //  GALOIS_DIE("Currently not implemented for non-void\n");
-    //}
-
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
 
@@ -238,15 +234,29 @@ struct Gr2TGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
+    if (std::is_void<EdgeTy>::value) {
+      GALOIS_DIE("gr2tgr currently not implemented for void\n");
+    }
+
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
-    uint32_t totalNumHosts = net.Num;
 
+    // read gr header for metadata
+    MPI_File gr;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
+                           MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
+    uint64_t grHeader[4];
+    MPICheck(MPI_File_read_at(gr, 0, grHeader, 4, MPI_UINT64_T, 
+                              MPI_STATUS_IGNORE));
+    MPICheck(MPI_File_close(&gr));
+    GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
+    GALOIS_ASSERT(grHeader[1] != 0, "gr2tgr assumes edges weights exist in gr");
+    uint64_t totalNumNodes = grHeader[2];
+    uint64_t totalNumEdges = grHeader[3];
+
+    // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     std::pair<uint64_t, uint64_t> nodesToRead;
     std::pair<uint64_t, uint64_t> edgesToRead;
-
-    // TODO
-    // get "read" assignment of nodes
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
     printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
                                                     nodesToRead.second);
@@ -255,12 +265,74 @@ struct Gr2TGr : public Conversion {
 
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to do it TRANSPOSED
-    //std::vector<uint32_t> localEdges = 
-    //    loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead);
-
-    // TODO
+    std::vector<uint32_t> localEdges =
+        loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead, edgesToRead,
+                                        totalNumNodes, totalNumEdges);
+    
     // at this point you can do the same thing as edgelist2gr and it will work
     // fine
+
+    // sanity check
+    uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
+    GALOIS_ASSERT(totalEdgeCount == totalNumEdges, 
+                  "edges from metadata doesn't match edges in memory");
+
+    std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
+        getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, 
+                                         totalEdgeCount);
+    uint64_t localNodeBegin = hostToNodes[hostID].first;
+    uint64_t localNodeEnd = hostToNodes[hostID].second;
+    uint64_t localNumNodes = localNodeEnd - localNodeBegin;
+
+    sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
+    std::atomic<uint64_t> edgesToReceive;
+    edgesToReceive.store(receiveEdgeCounts());
+
+    printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
+
+    // FIXME ONLY V1 SUPPORT
+    std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
+    std::vector<std::vector<uint32_t>> localSrcToData;
+    std::vector<std::mutex> nodeLocks(localNumNodes);
+
+    sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
+                              localSrcToData, nodeLocks);
+    freeVector(localEdges);
+    receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
+                         localSrcToData, nodeLocks);
+    freeVector(hostToNodes);
+    freeVector(nodeLocks);
+
+    // TODO can refactor to function
+    uint64_t totalAssignedEdges = 0;
+    for (unsigned i = 0; i < localNumNodes; i++) {
+      totalAssignedEdges += localSrcToDest[i].size();
+    }
+
+    printf("[%u] Will write %lu edges\n", hostID, totalAssignedEdges);
+
+    // calculate global edge offset using edge counts from other hosts
+    std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
+    uint64_t globalEdgeOffset = 0;
+    uint64_t totalEdgeCount2 = 0;
+    for (unsigned h = 0; h < hostID; h++) {
+      globalEdgeOffset += edgesPerHost[h];
+      totalEdgeCount2 += edgesPerHost[h];
+    }
+
+    uint64_t totalNumHosts = net.Num;
+    // finish off getting total edge count (note this is more of a sanity check
+    // since we got total edge count near the beginning already)
+    for (unsigned h = hostID; h < totalNumHosts; h++) {
+      totalEdgeCount2 += edgesPerHost[h];
+    }
+    GALOIS_ASSERT(totalEdgeCount == totalEdgeCount2);
+    freeVector(edgesPerHost);
+
+    writeToGr(outputFile, totalNumNodes, totalEdgeCount2, localNumNodes, 
+              localNodeBegin, globalEdgeOffset, localSrcToDest, localSrcToData);
+
+    galois::runtime::getHostBarrier().wait();
   }
 };
 
@@ -289,7 +361,7 @@ struct Gr2WGr : public Conversion {
     std::tie(localEdgeBegin, localEdgeEnd) = getLocalAssignment(totalNumEdges);
     
     uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-    printf("[%lu] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
+    printf("[%u] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
                                                        localEdgeEnd);
     
     uint64_t numLocalEdges = localEdgeEnd - localEdgeBegin;
