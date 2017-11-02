@@ -170,7 +170,8 @@ struct Edgelist2Gr : public Conversion {
     }
 
     std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
-        getEvenNodeToHostMapping(localEdges, totalNumNodes, totalEdgeCount);
+        getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, 
+                                         totalEdgeCount);
 
     uint64_t localNodeBegin = hostToNodes[hostID].first;
     uint64_t localNodeEnd = hostToNodes[hostID].second;

@@ -61,7 +61,7 @@ void freeVector(VectorTy& toFree) {
  * Given a vector representing edges, get the number of edges the vector
  * represents.
  *
- *
+ * @tparam EdgeDataTy type of edge data to read
  * @param edgeVector vector with edges laid out in src, dest, and optionally
  * data order (i.e. 3 elements)
  * @returns the number of edges represented by the vector
@@ -81,6 +81,7 @@ size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
  * Given an open ifstream of an edgelist and a range to read, 
  * read the edges into memory.
  *
+ * @tparam EdgeDataTy type of edge data to read
  * @param edgeListFile open ifstream of an edge list
  * @param localStartByte First byte to read
  * @param localEndByte Last byte to read (non-inclusive)
@@ -216,13 +217,51 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
  * Finds the unique source nodes of a set of edges in memory. Assumes
  * edges are laid out in (src, dest) order in the vector.
  *
+ * @tparam EdgeDataTy type of edge data to read
  * @param localEdges vector of edges to find unique sources of: needs to have
  * (src, dest) layout (i.e. i even: vector[i] is source, i+1 is dest
  * @returns Set of global IDs of unique sources found in the provided edge
  * vector
  */
-std::set<uint64_t>
-findUniqueSourceNodes(const std::vector<uint32_t>& localEdges);
+template<typename EdgeDataTy>
+std::set<uint64_t> 
+findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  printf("[%lu] Finding unique nodes\n", hostID);
+  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
+
+  uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      std::set<uint64_t>& localSet = *threadUniqueNodes.getLocal();
+      // src node
+      if (std::is_void<EdgeDataTy>::value) {
+        localSet.insert(localEdges[edgeIndex * 2]);
+      } else {
+        localSet.insert(localEdges[edgeIndex * 3]);
+      }
+    },
+    galois::loopname("FindUniqueNodes"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  std::set<uint64_t> uniqueNodes;
+
+  for (unsigned i = 0; i < threadUniqueNodes.size(); i++) {
+    auto& tSet = *threadUniqueNodes.getRemote(i);
+    for (auto nodeID : tSet) {
+      uniqueNodes.insert(nodeID);
+    }
+  }
+
+  printf("[%lu] Unique nodes found\n", hostID);
+
+  return uniqueNodes;
+}
 
 /**
  * Given a chunk to node mapping and a set of unique nodes, find the unique 
@@ -241,16 +280,55 @@ findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
 /**
  * Get the edge counts for chunks of edges that we have locally.
  *
+ * @tparam EdgeDataTy type of edge data to read
  * @param uniqueChunks unique chunks that this host has in its loaded edge list
  * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
  * @param chunkToNode specifies which chunks have which nodes
  * @param chunkCounts (input/output) a 0-initialized vector that will be 
  * edited to have our local chunk edge counts
  */
+template<typename EdgeDataTy>
 void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
              const std::vector<uint32_t>& localEdges,
              const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode,
-             std::vector<uint64_t>& chunkCounts);
+             std::vector<uint64_t>& chunkCounts) {
+  std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
+  for (auto chunkID : uniqueChunks) {
+    // default-initialize necessary GAccumulators
+    chunkToAccumulator[chunkID];
+  }
+
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  printf("[%lu] Chunk accumulators created\n", hostID);
+
+  uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
+  // determine which chunk edges go to
+  galois::do_all(
+    galois::iterate((uint64_t)0, localNumEdges),
+    [&] (uint64_t edgeIndex) {
+      uint32_t src;
+      if (std::is_void<EdgeDataTy>::value) {
+        src = localEdges[edgeIndex * 2];
+      } else {
+        src = localEdges[edgeIndex * 3];
+      }
+      uint32_t chunkNum = findOwner(src, chunkToNode);
+      GALOIS_ASSERT(chunkNum != (uint32_t)-1);
+      chunkToAccumulator[chunkNum] += 1;
+    },
+    galois::loopname("ChunkInspection"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  printf("[%lu] Chunk accumulators done accumulating\n", hostID);
+
+  // update chunk count
+  for (auto chunkID : uniqueChunks) {
+    chunkCounts[chunkID] = chunkToAccumulator[chunkID].reduce();
+  }
+}
 
 /**
  * Synchronize chunk edge counts across all hosts, i.e. send and receive
@@ -264,16 +342,26 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts);
 /**
  * Get the number of edges that each node chunk has.
  *
+ * @tparam EdgeDataTy type of edge data to read
  * @param numNodeChunks total number of chunks
  * @param uniqueChunks unique chunks that this host has in its loaded edge list
  * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
  * @param chunkToNode specifies which chunks have which nodes
  * @returns A vector specifying the number of edges each chunk has
  */
+template<typename EdgeDataTy>
 std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
                 const std::set<uint64_t>& uniqueChunks,
                 const std::vector<uint32_t>& localEdges,
-                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
+                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
+  std::vector<uint64_t> chunkCounts;
+  chunkCounts.assign(numNodeChunks, 0);
+  accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunks, localEdges, 
+                                           chunkToNode, chunkCounts);
+  sendAndReceiveEdgeChunkCounts(chunkCounts);
+
+  return chunkCounts;
+}
 
 
 /**
@@ -294,16 +382,65 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
  * an even number of edges. 
  *
+ * @tparam EdgeDataTy type of edge data to read
  * @param localEdges in-memory buffer of edges this host has loaded
  * @param totalNodeCount total number of nodes in the entire graph
  * @param totalEdgeCount total number of edges in the entire graph
  * @returns a mapping of host to nodes where each host gets an attempted
  * roughly even amount of edges
  */
+template<typename EdgeDataTy>
 std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
-);
+) {
+  auto& net = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID = net.ID;
+  uint64_t totalNumHosts = net.Num;
+
+  uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
+  // TODO better heuristics: basically we don't want to run out of memory,
+  // so keep number of chunks from growing too large
+  while (numNodeChunks > 10000000) {
+    numNodeChunks /= 2;
+  }
+
+  std::vector<std::pair<uint64_t, uint64_t>> chunkToNode;
+
+  if (hostID == 0) {
+    printf("Num chunks is %lu\n", numNodeChunks);
+  }
+
+  for (unsigned i = 0; i < numNodeChunks; i++) {
+    chunkToNode.emplace_back(
+      galois::block_range((uint64_t)0, (uint64_t)totalNodeCount, i, 
+                          numNodeChunks)
+    );
+  }
+
+  printf("[%lu] Determining edge to chunk counts\n", hostID);
+  std::set<uint64_t> uniqueNodes = findUniqueSourceNodes<EdgeDataTy>(localEdges);
+  std::set<uint64_t> uniqueChunks = findUniqueChunks(uniqueNodes, chunkToNode);
+  std::vector<uint64_t> chunkCounts = 
+       getChunkEdgeCounts<EdgeDataTy>(numNodeChunks, uniqueChunks, localEdges, 
+                                      chunkToNode);
+  printf("[%lu] Edge to chunk counts determined\n", hostID);
+
+  // prefix sum on the chunks (reuse array to save memory)
+  for (unsigned i = 1; i < numNodeChunks; i++) {
+    chunkCounts[i] += chunkCounts[i - 1];
+  }
+
+  // to make access to chunkToNode's last element correct with regard to later
+  // access (without this access to chunkToNode[chunkSize] is out of bounds)
+  chunkToNode.emplace_back(std::pair<uint64_t, uint64_t>(totalNodeCount, 
+                                                         totalNodeCount));
+
+  std::vector<std::pair<uint64_t, uint64_t>> finalMapping = 
+      getChunkToHostMapping(chunkCounts, chunkToNode);
+
+  return finalMapping;
+}
 
 /**
  * Using OfflineGraph to read the binary gr, divide nodes among hosts such
