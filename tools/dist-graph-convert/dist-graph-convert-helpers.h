@@ -66,7 +66,7 @@ void freeVector(VectorTy& toFree) {
  * data order (i.e. 3 elements)
  * @returns the number of edges represented by the vector
  */
-template<typename EdgeDataTy = void>
+template<typename EdgeDataTy>
 size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
   size_t numEdges;
   if (std::is_void<EdgeDataTy>::value) {
@@ -565,7 +565,7 @@ void sendAssignedEdges(
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
-  uint64_t localNumEdges = getNumEdges(localEdges);
+  uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
@@ -668,6 +668,7 @@ void sendAssignedEdges(
   using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
   EdgeVectorTy tmp = EdgeVectorTy(localSrcToDest.size());
   localSrcToData.swap(tmp);
+  GALOIS_ASSERT(localSrcToData.size() == localSrcToDest.size());
 
   galois::substrate::PerThreadStorage<EdgeVectorTy> 
       dstVectors(totalNumHosts);
@@ -693,7 +694,8 @@ void sendAssignedEdges(
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
-  uint64_t localNumEdges = getNumEdges(localEdges);
+
+  uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
@@ -740,6 +742,7 @@ void sendAssignedEdges(
         // save to edge dest array
         nodeLocks[localID].lock();
         localSrcToDest[localID].emplace_back(dst);
+        localSrcToData[localID].emplace_back(edgeData);
         nodeLocks[localID].unlock();
       }
     },
