@@ -35,6 +35,7 @@
 #include "galois/runtime/Network.h"
 #include "galois/DistAccumulator.h"
 #include "galois/graphs/OfflineGraph.h"
+#include "galois/graphs/MPIGraph.h"
 
 /**
  * Wrapper for MPI calls that return an error code. Make sure it is success
@@ -54,6 +55,63 @@ template <typename VectorTy>
 void freeVector(VectorTy& toFree) {
   VectorTy dummyVector;
   toFree.swap(dummyVector);
+}
+
+/**
+ * Given an open ifstream of an edgelist and a range to read, 
+ * read the edges into memory.
+ *
+ * @param edgeListFile open ifstream of an edge list
+ * @param localStartByte First byte to read
+ * @param localEndByte Last byte to read (non-inclusive)
+ * @param totalNumNodes Total number of nodes in the graph: used for correctness
+ * checking of src/dest ids
+ * @returns Vector representing the read in edges: every 2-3 elements represents
+ * src, dest, and edge data (if the latter exists)
+ */
+template<typename EdgeDataTy> 
+std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
+                                            uint64_t localStartByte,
+                                            uint64_t localEndByte,
+                                            uint64_t totalNumNodes) {
+  // load edges into a vector
+  uint64_t localNumEdges = 0;
+  std::vector<uint32_t> localEdges; // v1 support only + only uint32_t data
+
+  // read lines until last byte
+  edgeListFile.seekg(localStartByte);
+  while ((uint64_t)(edgeListFile.tellg() + 1) != localEndByte) {
+    uint32_t src;
+    uint32_t dst;
+    edgeListFile >> src >> dst;
+    GALOIS_ASSERT(src < totalNumNodes, "src ", src, " and ", totalNumNodes);
+    GALOIS_ASSERT(dst < totalNumNodes, "dst ", dst, " and ", totalNumNodes);
+    localEdges.emplace_back(src);
+    localEdges.emplace_back(dst);
+
+    // get edge data: IT ONLY SUPPORTS uint32_t AT THE MOMENT
+    // TODO function template specializations necessary to read other graph
+    // data types
+    if (!std::is_void<EdgeDataTy>::value) {
+      uint32_t edgeData;
+      edgeListFile >> edgeData;
+      localEdges.emplace_back(edgeData);
+    }
+
+    localNumEdges++;
+  }
+
+  if (std::is_void<EdgeDataTy>::value) {
+    GALOIS_ASSERT(localNumEdges == (localEdges.size() / 2));
+  } else {
+    GALOIS_ASSERT(localNumEdges == (localEdges.size() / 3));
+  }
+
+  printf("[%u] Local num edges from file is %lu\n", 
+         galois::runtime::getSystemNetworkInterface().ID, 
+         localNumEdges);
+
+  return localEdges;
 }
 
 /**
@@ -77,7 +135,7 @@ std::vector<std::pair<uint64_t, uint64_t>>
  * @returns Owner of requested ID on or -1 if it couldn't be found
  */
 uint32_t findOwner(const uint64_t gID, 
-                 const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping);
+                const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping);
 
 /**
  * Returns the file size of an ifstream.

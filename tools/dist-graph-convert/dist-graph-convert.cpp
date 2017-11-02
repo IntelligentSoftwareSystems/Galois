@@ -158,24 +158,12 @@ struct Edgelist2Gr : public Conversion {
     //               localStartByte, localEndByte, localEndByte - localStartByte);
 
     // load edges into a vector
-    uint64_t localNumEdges = 0;
-    edgeListFile.seekg(localStartByte);
-    std::vector<uint32_t> localEdges; // v1 support only
-    while ((uint64_t)(edgeListFile.tellg() + 1) != localEndByte) {
-      uint32_t src;
-      uint32_t dst;
-      edgeListFile >> src >> dst;
-      GALOIS_ASSERT(src < totalNumNodes, "src ", src, " and ", totalNumNodes);
-      GALOIS_ASSERT(dst < totalNumNodes, "dst ", dst, " and ", totalNumNodes);
-      localEdges.emplace_back(src);
-      localEdges.emplace_back(dst);
-      localNumEdges++;
-    }
+    std::vector<uint32_t> localEdges = loadEdgesFromEdgeList<EdgeTy>(
+                                           edgeListFile, localStartByte,
+                                           localEndByte, totalNumNodes);
     edgeListFile.close();
-    GALOIS_ASSERT(localNumEdges == (localEdges.size() / 2));
-    printf("[%lu] Local num edges from file is %lu\n", hostID, localNumEdges);
 
-    uint64_t totalEdgeCount = accumulateValue(localNumEdges);
+    uint64_t totalEdgeCount = accumulateValue(localEdges.size() / 2);
     if (hostID == 0) {
       printf("Total num edges %lu\n", totalEdgeCount);
     }
@@ -285,14 +273,26 @@ struct Gr2TGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    uint32_t hostID = net.ID;
-    uint32_t totalNumHosts = net.Num;
+    //auto& net = galois::runtime::getSystemNetworkInterface();
+    //uint32_t hostID = net.ID;
+    //uint32_t totalNumHosts = net.Num;
 
+    //std::pair<uint64_t, uint64_t> nodesToRead;
+    //std::pair<uint64_t, uint64_t> edgesToRead;
+
+    // TODO
     // get "read" assignment of nodes
-    std::pair<uint64_t, uint64_t> nodesToRead = getNodesToReadFromGr(inputFile);
-    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-                                                    nodesToRead.second);
+    //uint64_t nodesToRead = getNodesToReadFromGr(inputFile);
+    //printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+    //                                                nodesToRead.second);
+    // read edges of assigned nodes using MPI_Graph, load into the same format
+    // used by edgelist2gr; catch is to do it TRANSPOSED
+    //std::vector<uint32_t> localEdges = 
+    //    loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead);
+
+    // TODO
+    // at this point you can do the same thing as edgelist2gr and it will work
+    // fine
   }
 };
 
