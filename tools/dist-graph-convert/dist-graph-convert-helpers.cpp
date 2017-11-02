@@ -310,43 +310,6 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
 //  //mpiGraph.loadPartialGraph
 //}
 
-void sendEdgeCounts(
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
-    const std::vector<uint32_t>& localEdges
-) {
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  uint64_t hostID = net.ID;
-  uint64_t totalNumHosts = net.Num;
-
-  printf("[%lu] Determinining edge counts\n", hostID);
-
-  std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
-
-  uint64_t localNumEdges = getNumEdges(localEdges);
-  // determine to which host each edge will go
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t edgeOwner = findOwner(src, hostToNodes);
-      numEdgesPerHost[edgeOwner] += 1;
-    },
-    galois::loopname("EdgeInspection"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
-
-  printf("[%lu] Sending edge counts\n", hostID);
-
-  for (unsigned h = 0; h < totalNumHosts; h++) {
-    if (h == hostID) continue;
-    galois::runtime::SendBuffer b;
-    galois::runtime::gSerialize(b, numEdgesPerHost[h].reduce());
-    net.sendTagged(h, galois::runtime::evilPhase, b);
-  }
-}
-
 uint64_t receiveEdgeCounts() {
   auto& net = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;

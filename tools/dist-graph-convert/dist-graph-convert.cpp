@@ -177,7 +177,7 @@ struct Edgelist2Gr : public Conversion {
     uint64_t localNodeEnd = hostToNodes[hostID].second;
     uint64_t localNumNodes = localNodeEnd - localNodeBegin;
 
-    sendEdgeCounts(hostToNodes, localEdges);
+    sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
     std::atomic<uint64_t> edgesToReceive;
     edgesToReceive.store(receiveEdgeCounts());
 
