@@ -494,12 +494,11 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
 }
 
 // vector of vectors version
-void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
-                       uint64_t edgeDestOffset,
+void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
                        std::vector<std::vector<uint32_t>>& localSrcToDest) {
   MPI_Status writeStatus;
 
-  for (unsigned i = 0; i < localNumNodes; i++) {
+  for (unsigned i = 0; i < localSrcToDest.size(); i++) {
     std::vector<uint32_t> currentDests = localSrcToDest[i];
     uint64_t numToWrite = currentDests.size();
     uint64_t totalWritten = 0;
@@ -519,8 +518,7 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
 }
 
 // 1 vector version (MUCH FASTER, USE WHEN POSSIBLE)
-void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes, 
-                       uint64_t edgeDestOffset,
+void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset, 
                        std::vector<uint32_t>& destVector) {
   MPI_Status writeStatus;
   uint64_t numToWrite = destVector.size();
@@ -539,12 +537,10 @@ void writeEdgeDestData(MPI_File& gr, uint64_t localNumNodes,
   }
 }
 
-
-void writeEdgeDataData(MPI_File& gr, uint64_t localNumEdges,
-                       uint64_t edgeDataOffset,
+void writeEdgeDataData(MPI_File& gr, uint64_t edgeDataOffset,
                        const std::vector<uint32_t>& edgeDataToWrite) {
   MPI_Status writeStatus;
-  uint64_t numToWrite = localNumEdges;
+  uint64_t numToWrite = edgeDataToWrite.size();
   uint64_t numWritten = 0;
 
   while (numToWrite != 0) {
@@ -607,11 +603,16 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
     printf("[%lu] Write edge dest data\n", hostID);
     std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
     freeVector(localSrcToDest);
-    writeEdgeDestData(newGR, localNumNodes, edgeDestOffset, destVector);
+    writeEdgeDestData(newGR, edgeDestOffset, destVector);
 
     // edge data writing if necessary
-    if (!localSrcToDest.empty()) {
-      // TODO/FIXME implement this
+    if (!localSrcToData.empty()) {
+      uint64_t edgeDataOffset = getOffsetToLocalEdgeData(totalNumNodes, 
+                                                         totalNumEdges,
+                                                         globalEdgeOffset);
+      std::vector<uint32_t> dataVector = flattenVectors(localSrcToData);
+      freeVector(localSrcToData);
+      writeEdgeDataData(newGR, edgeDataOffset, dataVector);
     }
 
     printf("[%lu] Write to file done\n", hostID);

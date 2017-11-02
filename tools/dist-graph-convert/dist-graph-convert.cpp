@@ -137,9 +137,9 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
     GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs an output file");
 
-    if (!std::is_void<EdgeTy>::value) {
-      GALOIS_DIE("Currently not implemented for non-void\n");
-    }
+    //if (!std::is_void<EdgeTy>::value) {
+    //  GALOIS_DIE("Currently not implemented for non-void\n");
+    //}
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
@@ -295,8 +295,7 @@ struct Gr2WGr : public Conversion {
     GALOIS_ASSERT(edgeDataToWrite.size() == numLocalEdges);
     uint64_t byteOffsetToEdgeData = getOffsetToLocalEdgeData(grHeader[2], 
                                       totalNumEdges, localEdgeBegin);
-    writeEdgeDataData(unweightedGr, numLocalEdges, byteOffsetToEdgeData, 
-                      edgeDataToWrite);
+    writeEdgeDataData(unweightedGr, byteOffsetToEdgeData, edgeDataToWrite);
 
     // if host 0 update header with edge size
     if (hostID == 0) {
