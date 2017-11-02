@@ -18,7 +18,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Distributed graph converter helper signatures/definitions.
+ * Distributed graph converter helper signatures/definitions (and 
+ * implementations for templated functions).
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -458,7 +459,17 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
 
 /**
- * TODO
+ * Load a Galois binary graph into an MPIGraph and load assigned nodes/edges
+ * into memory such that srcs become dests and dests become srcs (i.e.
+ * transpose graph).
+ *
+ * @param inputFile path to input Galois binary graph
+ * @param nodesToRead a pair that has the range of nodes that should be read
+ * @param edgesToRead a pair that has the range of edges that should be read
+ * @param totalNumNodes Total number of nodes in the graph
+ * @param totalNumEdges Total number of edges in the graph
+ * @returns a vector with transposed edges corresponding to the nodes/edges
+ * pass into the function
  */
 std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
@@ -953,6 +964,74 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
  */
 std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit);
 
+/**
+ * assign
+ */
+
+/**
+ * Given a set of disjoint edges, assign edges to hosts. Then, each host writes
+ * the edges to the specified output file in the Galois binary graph format.
+ */
+template<typename EdgeTy>
+void assignAndWriteEdges(std::vector<uint32_t>& localEdges, 
+                         uint64_t totalNumNodes, uint64_t totalNumEdges,
+                         const std::string& outputFile) {
+  uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
+    getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, totalNumEdges);
+
+  uint64_t localNodeBegin = hostToNodes[hostID].first;
+  uint64_t localNumNodes = hostToNodes[hostID].second - localNodeBegin;
+
+  sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
+  std::atomic<uint64_t> edgesToReceive;
+  edgesToReceive.store(receiveEdgeCounts());
+
+  printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
+
+  // FIXME ONLY V1 SUPPORT
+  std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
+  std::vector<std::vector<uint32_t>> localSrcToData;
+  std::vector<std::mutex> nodeLocks(localNumNodes);
+
+  sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
+                            localSrcToData, nodeLocks);
+  freeVector(localEdges);
+  receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
+                       localSrcToData, nodeLocks);
+  freeVector(hostToNodes);
+  freeVector(nodeLocks);
+
+  // TODO can refactor to function
+  uint64_t totalAssignedEdges = 0;
+  for (unsigned i = 0; i < localNumNodes; i++) {
+    totalAssignedEdges += localSrcToDest[i].size();
+  }
+
+  printf("[%u] Will write %lu edges\n", hostID, totalAssignedEdges);
+
+  // calculate global edge offset using edge counts from other hosts
+  std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
+  uint64_t globalEdgeOffset = 0;
+  uint64_t totalEdgeCount = 0;
+  for (unsigned h = 0; h < hostID; h++) {
+    globalEdgeOffset += edgesPerHost[h];
+    totalEdgeCount += edgesPerHost[h];
+  }
+
+  uint64_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
+  // finish off getting total edge count (note this is more of a sanity check
+  // since we got total edge count near the beginning already)
+  for (unsigned h = hostID; h < totalNumHosts; h++) {
+    totalEdgeCount += edgesPerHost[h];
+  }
+  GALOIS_ASSERT(totalNumEdges == totalEdgeCount);
+  freeVector(edgesPerHost);
+
+  writeToGr(outputFile, totalNumNodes, totalEdgeCount, localNumNodes, 
+            localNodeBegin, globalEdgeOffset, localSrcToDest, localSrcToData);
+}
 
 #endif
 
