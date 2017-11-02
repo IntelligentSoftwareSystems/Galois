@@ -80,3 +80,4 @@ void KCoreStep1_cuda(unsigned int __begin, unsigned int __end, int & __retval, u
 void KCoreStep1_all_cuda(int & __retval, uint32_t local_k_core_num, struct CUDA_Context *ctx);
 void KCoreStep2_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context *ctx);
 void KCoreStep2_all_cuda(struct CUDA_Context *ctx);
+void KCoreSanityCheck_cuda(unsigned int & sum, struct CUDA_Context *ctx);

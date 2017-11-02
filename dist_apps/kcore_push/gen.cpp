@@ -308,42 +308,36 @@ struct KCoreStep1 {
 /******************************************************************************/
 
 /* Gets the total number of nodes that are still alive */
-struct GetAliveDead {
+struct KCoreSanityCheck {
   Graph* graph;
   galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
-  galois::DGAccumulator<uint64_t>& DGAccumulator_accum2;
 
-  GetAliveDead(Graph* _graph, 
-               galois::DGAccumulator<uint64_t>& _DGAccumulator_accum,
-               galois::DGAccumulator<uint64_t>& _DGAccumulator_accum2) : 
-      graph(_graph), DGAccumulator_accum(_DGAccumulator_accum),
-      DGAccumulator_accum2(_DGAccumulator_accum2) {}
+  KCoreSanityCheck(Graph* _graph, 
+               galois::DGAccumulator<uint64_t>& _DGAccumulator_accum) : 
+      graph(_graph), DGAccumulator_accum(_DGAccumulator_accum) {}
 
   void static go(Graph& _graph,
-    galois::DGAccumulator<uint64_t>& dga1,
-    galois::DGAccumulator<uint64_t>& dga2) {
+    galois::DGAccumulator<uint64_t>& dga) {
+    dga.reset();
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // TODO currently no GPU support for sanity check operator
-      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.\n");
+      uint32_t sum;
+      KCoreSanityCheck_cuda(sum, cuda_ctx);
+      dga += sum;
     }
+    else
   #endif
-    dga1.reset();
-    dga2.reset();
-
-    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()), 
-                   GetAliveDead(&_graph, dga1, dga2), 
-                   galois::loopname("GetAliveDead"),
+    galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()), 
+                   KCoreSanityCheck(&_graph, dga), 
+                   galois::loopname("KCoreSanityCheck"),
                    galois::no_stats());
 
-    uint32_t num_alive = dga1.reduce();
-    uint32_t num_dead = dga2.reduce();
+    uint64_t num_nodes = dga.reduce();
 
     // Only node 0 will print data
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      printf("Number of nodes alive is %u, dead is %u\n", num_alive,
-             num_dead);
+      galois::gPrint("Number of nodes in the ", k_core_num, "-core is ", num_nodes, "\n");
     }
   }
 
@@ -351,12 +345,8 @@ struct GetAliveDead {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src))) {
-      if (src_data.flag) {
-        DGAccumulator_accum += 1;
-      } else {
-        DGAccumulator_accum2 += 1;
-      }
+    if (src_data.flag) {
+      DGAccumulator_accum += 1;
     }
   }
 };
@@ -401,8 +391,7 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-  galois::DGAccumulator<uint64_t> dga1;
-  galois::DGAccumulator<uint64_t> dga2;
+  galois::DGAccumulator<uint64_t> dga;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] KCoreStep1::go run ", run, " called\n");
@@ -414,7 +403,7 @@ int main(int argc, char** argv) {
     StatTimer_main.stop();
 
     // sanity check
-    GetAliveDead::go(*h_graph, dga1, dga2);
+    KCoreSanityCheck::go(*h_graph, dga);
 
     // re-init graph for next run
     if ((run + 1) != numRuns) {
