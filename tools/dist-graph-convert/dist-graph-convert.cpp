@@ -192,7 +192,7 @@ struct Edgelist2Gr : public Conversion {
                               localSrcToData, nodeLocks);
     freeVector(localEdges);
     receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
-                         nodeLocks);
+                         localSrcToData, nodeLocks);
     freeVector(hostToNodes);
     freeVector(nodeLocks);
 

@@ -526,6 +526,8 @@ uint64_t receiveEdgeCounts();
  * are not thread safe
  */
 // TODO make implementation smaller/cleaner i.e. refactor
+// TODO merge with the non void version below because the code duplication
+// here is ugly and messy
 template<typename EdgeDataTy,
      typename std::enable_if<std::is_void<EdgeDataTy>::value>::type* = nullptr>
 void sendAssignedEdges(
@@ -789,6 +791,9 @@ void sendAssignedEdges(
  * @param hostToNodes mapping of a host to the nodes it is assigned
  * @param localSrcToDest local mapping of LOCAL sources to destinations (we
  * may have some edges that do not need sending; they are saved here)
+ * @param localSrcToData Vector of vectors: the vector at index i specifies
+ * the data of edges owned by local node i; NOTE THAT THIS VECTOR BEING EMPTY
+ * OR NON EMPTY DETERMINES IF THE FUNCTION EXPECTS TO RECEIVE EDGE DATA
  * @param nodeLocks Vector of mutexes (one for each local node) that are used
  * when writing to the local mapping of sources to destinations since vectors
  * are not thread safe
@@ -796,6 +801,7 @@ void sendAssignedEdges(
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
+    std::vector<std::vector<uint32_t>>& localSrcToData,
     std::vector<std::mutex>& nodeLocks);
 
 /**

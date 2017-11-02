@@ -342,6 +342,7 @@ uint64_t receiveEdgeCounts() {
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
     const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
+    std::vector<std::vector<uint32_t>>& localSrcToData,
     std::vector<std::mutex>& nodeLocks)
 {
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -353,23 +354,46 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
   galois::on_each(
     [&] (unsigned tid, unsigned nthreads) {
       std::vector<uint32_t> recvVector;
+      std::vector<uint32_t> recvDataVector;
+
       while (edgesToReceive) {
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) 
             rBuffer;
         rBuffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         
+        // the buffer will have edge data as well if localsrctodata is nonempty
+        // (it will be nonempty if initialized to non-empty by the send 
+        // function, and the send function only initializes it if it is going
+        // to send edge data
         if (rBuffer) {
           auto& receiveBuffer = rBuffer->second;
           while (receiveBuffer.r_size() > 0) {
             uint64_t src;
-            galois::runtime::gDeserialize(receiveBuffer, src, recvVector);
+            if (localSrcToData.empty()) {
+              // receive only dest data
+              galois::runtime::gDeserialize(receiveBuffer, src, recvVector);
+            } else {
+              // receive edge data as well
+              galois::runtime::gDeserialize(receiveBuffer, src, recvVector, 
+                                            recvDataVector);
+            }
+
             edgesToReceive -= recvVector.size();
             GALOIS_ASSERT(findOwner(src, hostToNodes) == hostID);
             uint32_t localID = src - hostToNodes[hostID].first;
 
             nodeLocks[localID].lock();
-            for (unsigned i = 0; i < recvVector.size(); i++) {
-              localSrcToDest[localID].emplace_back(recvVector[i]);
+            if (localSrcToData.empty()) {
+              // deal with only destinations
+              for (unsigned i = 0; i < recvVector.size(); i++) {
+                localSrcToDest[localID].emplace_back(recvVector[i]);
+              }
+            } else {
+              // deal with destinations and data
+              for (unsigned i = 0; i < recvVector.size(); i++) {
+                localSrcToDest[localID].emplace_back(recvVector[i]);
+                localSrcToData[localID].emplace_back(recvDataVector[i]);
+              }
             }
             nodeLocks[localID].unlock();
           }
