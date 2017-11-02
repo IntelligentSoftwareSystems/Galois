@@ -238,20 +238,23 @@ struct Gr2TGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
-    //auto& net = galois::runtime::getSystemNetworkInterface();
-    //uint32_t hostID = net.ID;
-    //uint32_t totalNumHosts = net.Num;
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+    uint32_t totalNumHosts = net.Num;
 
-    //std::pair<uint64_t, uint64_t> nodesToRead;
-    //std::pair<uint64_t, uint64_t> edgesToRead;
+    std::pair<uint64_t, uint64_t> nodesToRead;
+    std::pair<uint64_t, uint64_t> edgesToRead;
 
     // TODO
     // get "read" assignment of nodes
-    //uint64_t nodesToRead = getNodesToReadFromGr(inputFile);
-    //printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
-    //                                                nodesToRead.second);
+    std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+                                                    nodesToRead.second);
+    printf("[%u] Reads edges %lu to %lu\n", hostID, edgesToRead.first,
+                                                    edgesToRead.second);
+
     // read edges of assigned nodes using MPI_Graph, load into the same format
-    // used by edgelist2gr; catch is to do it TRANSPOSED
+    // used by edgelist2gr; key is to do it TRANSPOSED
     //std::vector<uint32_t> localEdges = 
     //    loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead);
 

@@ -293,21 +293,23 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
   return finalMapping;
 }
 
-///std::pair<uint64_t, uint64_t> getNodesToReadFromGr(const std::string& inputGr) {
-///  uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-///  uint32_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
-///
-///  galois::graphs::OfflineGraph offlineGr(inputGr);
-///  auto nodeAndEdgeRange = offlineGr.divideByNode(0, 1, hostID, totalNumHosts);
-///  auto& nodeRange = nodeAndEdgeRange.first;
-///  auto& edgeRange = nodeAndEdgeRange.second;
-///  return std::pair<uint64_t, uint64_t>(*nodeRange.first, *nodeRange.second);
-///}
+DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
+  uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  uint32_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
 
-//// TODO
+  galois::graphs::OfflineGraph offlineGr(inputGr);
+  auto nodeAndEdgeRange = offlineGr.divideByNode(0, 1, hostID, totalNumHosts);
+  auto& nodeRange = nodeAndEdgeRange.first;
+  auto& edgeRange = nodeAndEdgeRange.second;
+  Uint64Pair nodePair(*nodeRange.first, *nodeRange.second);
+  Uint64Pair edgePair(*edgeRange.first, *edgeRange.second);
+  return DoubleUint64Pair(nodePair, edgePair);
+}
+
+// TODO
 //std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead) {
 //  galois::graphs::MPIGraph<uint32_t> mpiGraph;
-//  //mpiGraph.loadPartialGraph
+//  mpiGraph.loadPartialGraph
 //}
 
 uint64_t receiveEdgeCounts() {
