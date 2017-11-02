@@ -131,7 +131,7 @@ void convert(C& c, Conversion) {
  * Converts an edge list to a Galois binary graph.
  */
 struct Edgelist2Gr : public Conversion {
-  // WARNING: WILL NOT WORK IF THE EDGE LIST HAS WEIGHTS
+
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
@@ -166,20 +166,17 @@ struct Edgelist2Gr : public Conversion {
                                 outputFile);
     galois::runtime::getHostBarrier().wait();
   }
+
 };
 
 /**
- * Transpose a WEIGHTED Galois binary graph.
- * 
- * TODO make it work for non weighted graphs too
+ * Transpose a Galois binary graph.
  */
 struct Gr2TGr : public Conversion {
+
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
-    if (std::is_void<EdgeTy>::value) {
-      GALOIS_DIE("gr2tgr currently not implemented for void\n");
-    }
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
 
@@ -209,8 +206,9 @@ struct Gr2TGr : public Conversion {
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to do it TRANSPOSED
     std::vector<uint32_t> localEdges =
-        loadTransposedEdgesFromMPIGraph(inputFile, nodesToRead, edgesToRead,
-                                        totalNumNodes, totalNumEdges);
+        loadTransposedEdgesFromMPIGraph<EdgeTy>(inputFile, nodesToRead, 
+                                                edgesToRead, totalNumNodes, 
+                                                totalNumEdges);
     
     // sanity check
     uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
@@ -221,6 +219,7 @@ struct Gr2TGr : public Conversion {
 
     galois::runtime::getHostBarrier().wait();
   }
+
 };
 
 
