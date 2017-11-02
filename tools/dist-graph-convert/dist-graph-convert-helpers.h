@@ -58,6 +58,26 @@ void freeVector(VectorTy& toFree) {
 }
 
 /**
+ * Given a vector representing edges, get the number of edges the vector
+ * represents.
+ *
+ *
+ * @param edgeVector vector with edges laid out in src, dest, and optionally
+ * data order (i.e. 3 elements)
+ * @returns the number of edges represented by the vector
+ */
+template<typename EdgeDataTy = void>
+size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
+  size_t numEdges;
+  if (std::is_void<EdgeDataTy>::value) {
+    numEdges = edgeVector.size() / 2;
+  } else {
+    numEdges = edgeVector.size() / 3;
+  } 
+  return numEdges;
+}
+
+/**
  * Given an open ifstream of an edgelist and a range to read, 
  * read the edges into memory.
  *

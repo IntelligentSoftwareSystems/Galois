@@ -163,7 +163,8 @@ struct Edgelist2Gr : public Conversion {
                                            localEndByte, totalNumNodes);
     edgeListFile.close();
 
-    uint64_t totalEdgeCount = accumulateValue(localEdges.size() / 2);
+    uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
+
     if (hostID == 0) {
       printf("Total num edges %lu\n", totalEdgeCount);
     }

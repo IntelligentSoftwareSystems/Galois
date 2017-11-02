@@ -199,7 +199,7 @@ findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
   printf("[%lu] Finding unique nodes\n", hostID);
   galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
 
-  uint64_t localNumEdges = localEdges.size() / 2;
+  uint64_t localNumEdges = getNumEdges(localEdges);
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
@@ -274,7 +274,7 @@ void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
   printf("[%lu] Chunk accumulators created\n", hostID);
 
-  uint64_t localNumEdges = localEdges.size() / 2;
+  uint64_t localNumEdges = getNumEdges(localEdges);
   // determine which chunk edges go to
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
@@ -459,7 +459,7 @@ void sendEdgeCounts(
 
   std::vector<galois::GAccumulator<uint64_t>> numEdgesPerHost(totalNumHosts);
 
-  uint64_t localNumEdges = localEdges.size() / 2;
+  uint64_t localNumEdges = getNumEdges(localEdges);
   // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
@@ -547,7 +547,7 @@ void sendAssignedEdges(
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
-  uint64_t localNumEdges = localEdges.size() / 2;
+  uint64_t localNumEdges = getNumEdges(localEdges);
   // determine to which host each edge will go
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
