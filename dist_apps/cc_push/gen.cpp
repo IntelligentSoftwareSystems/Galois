@@ -51,9 +51,6 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
-static cll::opt<unsigned long long> src_node("srcNodeId", 
-                                             cll::desc("ID of the source node"), 
-                                             cll::init(0));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -244,57 +241,46 @@ struct ConnectedComp {
 /* Sanity check operators */
 /******************************************************************************/
 
-/* Get/print the number of members in source node component */
-struct SourceComponentSize {
-  const unsigned long long src_comp;
+/* Get/print the number of components */
+struct ConnectedCompSanityCheck {
   Graph* graph;
 
   galois::DGAccumulator<uint64_t>& DGAccumulator_accum;
 
-  SourceComponentSize(const uint64_t _src_comp, Graph* _graph, 
+  ConnectedCompSanityCheck(Graph* _graph, 
                       galois::DGAccumulator<uint64_t>& _dga) : 
-    src_comp(_src_comp), graph(_graph), DGAccumulator_accum(_dga) {}
+    graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dga) {
+    dga.reset();
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // TODO currently no GPU support for sanity check operator
-      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.\n");
+      uint32_t sum;
+      ConnectedCompSanityCheck_cuda(sum, cuda_ctx);
+      dga += sum;
     }
+    else
   #endif
-
-    dga.reset();
-
-    if (_graph.isOwned(src_node)) {
-      dga += _graph.getData(_graph.getLID(src_node)).comp_current;
-    }
-
-    uint64_t src_comp = dga.reduce();
-
-    dga.reset();
-
-    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), _graph.allNodesRange().end()),
-                   SourceComponentSize(src_comp, &_graph, dga), 
-                   galois::loopname("SourceComponentSize"),
+    galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
+                   ConnectedCompSanityCheck(&_graph, dga), 
+                   galois::loopname("ConnectedCompSanityCheck"),
                    galois::no_stats());
 
-    uint64_t num_in_component = dga.reduce();
+    uint64_t num_components = dga.reduce();
 
     // Only node 0 will print the number visited
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      printf("Number of nodes in node %lu's component is %lu\n", (uint64_t)src_node, 
-             num_in_component);
+      printf("Number of components is %lu\n", num_components);
     }
   }
 
-  /* Check if an owned node's component is the same as src's.
+  /* Check if a node's component is the same as its ID.
    * if yes, then increment an accumulator */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src)) && 
-        src_data.comp_current == src_comp) {
+    if (src_data.comp_current == graph->getGID(src)) {
       DGAccumulator_accum += 1;
     }
   }
@@ -352,7 +338,7 @@ int main(int argc, char** argv) {
       ConnectedComp::go(*hg, DGAccumulator_accum);
     StatTimer_main.stop();
 
-    SourceComponentSize::go(*hg, DGAccumulator_accum64);
+    ConnectedCompSanityCheck::go(*hg, DGAccumulator_accum64);
 
     if ((run + 1) != numRuns) {
       #ifdef __GALOIS_HET_CUDA__

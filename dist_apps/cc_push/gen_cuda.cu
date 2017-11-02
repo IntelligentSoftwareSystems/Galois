@@ -463,6 +463,21 @@ __global__ void ConnectedComp(CSRGraph graph, DynamicBitset *is_updated, unsigne
   }
   ret_val.thread_exit<_br>(_ts);
 }
+__global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, HGAccumulator<unsigned int> sum)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts;
+  sum.thread_entry();
+  for (index_type src = __begin + tid; src < __end; src += nthreads)
+  {
+    if (p_comp_current[src] == graph.node_data[src]) {
+      sum.reduce(1);
+    }
+  }
+  sum.thread_exit<_br>(_ts);
+}
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
 {
   dim3 blocks;
@@ -528,4 +543,17 @@ void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
   // FP: "1 -> 2;
   ConnectedComp_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
   // FP: "2 -> 3;
+}
+void ConnectedCompSanityCheck_cuda(unsigned int & sum, struct CUDA_Context * ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  kernel_sizing(blocks, threads);
+  Shared<unsigned int> sumval = Shared<unsigned int>(1);
+  HGAccumulator<unsigned int> _sum;
+  *(sumval.cpu_wr_ptr()) = 0;
+  _sum.rv = sumval.gpu_wr_ptr();
+  ConnectedCompSanityCheck <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->beginMaster, ctx->beginMaster+ctx->numOwned, ctx->comp_current.data.gpu_rd_ptr(), _sum);
+  check_cuda_kernel;
+  sum = *(sumval.cpu_rd_ptr());
 }
