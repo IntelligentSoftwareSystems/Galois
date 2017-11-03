@@ -30,7 +30,7 @@ void MPICheck(int errcode) {
   }
 }
 
-Uint64Pair readV1GrHeader(const std::string& grFile) {
+Uint64Pair readV1GrHeader(const std::string& grFile, bool isVoid) {
   MPI_File gr;
   MPICheck(MPI_File_open(MPI_COMM_WORLD, grFile.c_str(), 
                          MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
@@ -39,6 +39,11 @@ Uint64Pair readV1GrHeader(const std::string& grFile) {
                             MPI_STATUS_IGNORE));
   MPICheck(MPI_File_close(&gr));
   GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1");
+
+  if (!isVoid) {
+    GALOIS_ASSERT(grHeader[1] != 0, "gr should have weights "
+                                    "(specified in header)");
+  }
 
   return Uint64Pair(grHeader[2], grHeader[3]);
 }

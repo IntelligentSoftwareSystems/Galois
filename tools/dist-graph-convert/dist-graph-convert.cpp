@@ -181,7 +181,9 @@ struct Gr2TGr : public Conversion {
 
     uint64_t totalNumNodes;
     uint64_t totalNumEdges;
-    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
+    std::tie(totalNumNodes, totalNumEdges) = 
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
+
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
@@ -225,7 +227,9 @@ struct Gr2SGr : public Conversion {
 
     uint64_t totalNumNodes;
     uint64_t totalNumEdges;
-    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
+    std::tie(totalNumNodes, totalNumEdges) = 
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
+
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
@@ -265,7 +269,9 @@ struct Gr2WGr : public Conversion {
 
     uint64_t totalNumNodes;
     uint64_t totalNumEdges;
-    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
+    std::tie(totalNumNodes, totalNumEdges) = 
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
+
 
     uint64_t localEdgeBegin;
     uint64_t localEdgeEnd;
@@ -317,7 +323,8 @@ struct Gr2CGr : public Conversion {
 
     uint64_t totalNumNodes;
     uint64_t totalNumEdges;
-    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
+    std::tie(totalNumNodes, totalNumEdges) = 
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;

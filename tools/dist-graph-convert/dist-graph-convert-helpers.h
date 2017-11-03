@@ -56,10 +56,12 @@ void MPICheck(int errcode);
  * nodes and edges.
  *
  * @param grFile file name of gr
+ * @param isVoid true if edge data shouldn't exist in the graph, 
+ * false otherwise; used for a safety check
  * @returns a pair with the number of nodes and number of edges in the gr file
  * in that order
  */
-Uint64Pair readV1GrHeader(const std::string& grFile);
+Uint64Pair readV1GrHeader(const std::string& grFile, bool isVoid);
 
 /**
  * "Free" memory used by a vector by swapping it out with an empty one.
