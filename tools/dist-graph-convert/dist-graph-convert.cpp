@@ -178,18 +178,10 @@ struct Gr2TGr : public Conversion {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
-    // TODO can probably refactor this entire thing
-    // read gr header for metadata
-    MPI_File gr;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
-                           MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
-    uint64_t grHeader[4];
-    MPICheck(MPI_File_read_at(gr, 0, grHeader, 4, MPI_UINT64_T, 
-                              MPI_STATUS_IGNORE));
-    MPICheck(MPI_File_close(&gr));
-    GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
-    uint64_t totalNumNodes = grHeader[2];
-    uint64_t totalNumEdges = grHeader[3];
+
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
@@ -230,18 +222,10 @@ struct Gr2SGr : public Conversion {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2sgr needs an output file");
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
-    // TODO can probably refactor this entire thing
-    // read gr header for metadata
-    MPI_File gr;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
-                           MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
-    uint64_t grHeader[4];
-    MPICheck(MPI_File_read_at(gr, 0, grHeader, 4, MPI_UINT64_T, 
-                              MPI_STATUS_IGNORE));
-    MPICheck(MPI_File_close(&gr));
-    GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
-    uint64_t totalNumNodes = grHeader[2];
-    uint64_t totalNumEdges = grHeader[3];
+
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
@@ -278,40 +262,39 @@ struct Gr2WGr : public Conversion {
     GALOIS_ASSERT(outputFile.empty(), "gr2wgr doesn't take an output file");
     GALOIS_ASSERT(editInPlace, "You must use -inPlace with gr2wgr");
 
-    MPI_File unweightedGr;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
-                           MPI_MODE_RDWR, MPI_INFO_NULL, &unweightedGr));
-    uint64_t grHeader[4];
-    // read gr header for metadata
-    MPICheck(MPI_File_read_at(unweightedGr, 0, grHeader, 4, MPI_UINT64_T, 
-                              MPI_STATUS_IGNORE));
-    GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
 
-    uint64_t totalNumEdges = grHeader[3];
     uint64_t localEdgeBegin;
     uint64_t localEdgeEnd;
     std::tie(localEdgeBegin, localEdgeEnd) = getLocalAssignment(totalNumEdges);
     
     uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
     printf("[%u] Responsible for edges %lu to %lu\n", hostID, localEdgeBegin,
-                                                       localEdgeEnd);
+                                                              localEdgeEnd);
     
+    // get edge data to write (random numbers) and get location to start
+    // write
     uint64_t numLocalEdges = localEdgeEnd - localEdgeBegin;
     std::vector<uint32_t> edgeDataToWrite = generateRandomNumbers(numLocalEdges,
                                             hostID, 1, 100);
     GALOIS_ASSERT(edgeDataToWrite.size() == numLocalEdges);
-    uint64_t byteOffsetToEdgeData = getOffsetToLocalEdgeData(grHeader[2], 
+    uint64_t byteOffsetToEdgeData = getOffsetToLocalEdgeData(totalNumNodes,
                                       totalNumEdges, localEdgeBegin);
-    writeEdgeDataData(unweightedGr, byteOffsetToEdgeData, edgeDataToWrite);
 
+    // do edge data writing
+    MPI_File grInPlace;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
+                           MPI_MODE_RDWR, MPI_INFO_NULL, &grInPlace));
+    writeEdgeDataData(grInPlace, byteOffsetToEdgeData, edgeDataToWrite);
     // if host 0 update header with edge size
     if (hostID == 0) {
       uint64_t edgeSize = 4;
-      MPICheck(MPI_File_write_at(unweightedGr, sizeof(uint64_t), 
+      MPICheck(MPI_File_write_at(grInPlace, sizeof(uint64_t), 
                                 &edgeSize, 1, MPI_UINT64_T, MPI_STATUS_IGNORE));
     }
-
-    MPICheck(MPI_File_close(&unweightedGr));
+    MPICheck(MPI_File_close(&grInPlace));
   }
 };
 

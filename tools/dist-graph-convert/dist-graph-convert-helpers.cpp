@@ -30,6 +30,19 @@ void MPICheck(int errcode) {
   }
 }
 
+Uint64Pair readV1GrHeader(const std::string& grFile) {
+  MPI_File gr;
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, grFile.c_str(), 
+                         MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
+  uint64_t grHeader[4];
+  MPICheck(MPI_File_read_at(gr, 0, grHeader, 4, MPI_UINT64_T, 
+                            MPI_STATUS_IGNORE));
+  MPICheck(MPI_File_close(&gr));
+  GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1");
+
+  return Uint64Pair(grHeader[2], grHeader[3]);
+}
+
 std::vector<Uint64Pair> getHostToNodeMapping(
     uint64_t numHosts, uint64_t totalNumNodes
 ) {
@@ -595,6 +608,7 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
       uint64_t edgeDataOffset = getOffsetToLocalEdgeData(totalNumNodes, 
                                                          totalNumEdges,
                                                          globalEdgeOffset);
+      printf("[%lu] Write edge data data\n", hostID);
       std::vector<uint32_t> dataVector = flattenVectors(localSrcToData);
       freeVector(localSrcToData);
       writeEdgeDataData(newGR, edgeDataOffset, dataVector);

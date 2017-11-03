@@ -52,6 +52,16 @@ using DoubleUint64Pair = std::pair<Uint64Pair, Uint64Pair>;
 void MPICheck(int errcode);
 
 /**
+ * Reads a gr header from a v1 gr binary file and return number of
+ * nodes and edges.
+ *
+ * @param grFile file name of gr
+ * @returns a pair with the number of nodes and number of edges in the gr file
+ * in that order
+ */
+Uint64Pair readV1GrHeader(const std::string& grFile);
+
+/**
  * "Free" memory used by a vector by swapping it out with an empty one.
  *
  * @tparam VectorTy type of vector 
