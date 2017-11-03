@@ -13,6 +13,7 @@
 
 #pragma once
 #include "cub/cub.cuh"
+#include "atomic_float.h"
 
 template<typename Type>
 class HGReducible {
