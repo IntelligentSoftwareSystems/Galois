@@ -192,8 +192,8 @@ struct Gr2TGr : public Conversion {
     uint64_t totalNumEdges = grHeader[3];
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
-    std::pair<uint64_t, uint64_t> nodesToRead;
-    std::pair<uint64_t, uint64_t> edgesToRead;
+    Uint64Pair nodesToRead;
+    Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
     printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
                                                     nodesToRead.second);
@@ -244,8 +244,8 @@ struct Gr2SGr : public Conversion {
     uint64_t totalNumEdges = grHeader[3];
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
-    std::pair<uint64_t, uint64_t> nodesToRead;
-    std::pair<uint64_t, uint64_t> edgesToRead;
+    Uint64Pair nodesToRead;
+    Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
     printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
                                                     nodesToRead.second);

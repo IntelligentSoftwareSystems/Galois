@@ -150,8 +150,8 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
  * @returns A vector of pairs representing node -> host assignments. Evenly 
  * distributed nodes to hosts.
  */
-std::vector<std::pair<uint64_t, uint64_t>> 
-  getHostToNodeMapping(uint64_t numHosts, uint64_t totalNumNodes);
+std::vector<Uint64Pair> getHostToNodeMapping(uint64_t numHosts, 
+                                             uint64_t totalNumNodes);
 
 /**
  * Get the assigned owner of some ID given a mapping from ID to owner.
@@ -162,7 +162,7 @@ std::vector<std::pair<uint64_t, uint64_t>>
  * @returns Owner of requested ID on or -1 if it couldn't be found
  */
 uint32_t findOwner(const uint64_t gID, 
-                const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping);
+                   const std::vector<Uint64Pair>& ownerMapping);
 
 /**
  * Returns the file size of an ifstream.
@@ -179,8 +179,7 @@ uint64_t getFileSize(std::ifstream& openFile);
  * @param fileSize total size of the file
  * @returns pair that represents the begin/end of this host's byte range to read
  */
-std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
-                                                 uint64_t fileSize);
+Uint64Pair determineByteRange(std::ifstream& edgeListFile, uint64_t fileSize);
 
 /**
  * Accumulates some value from all hosts + return it.
@@ -215,8 +214,8 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
  * @returns Pair representing the begin/end of the elements that partition
  * "id" is assigned based on the prefix sum
  */
-std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
-                                  const std::vector<uint64_t>& prefixSum);
+Uint64Pair binSearchDivision(uint64_t id, uint64_t totalID, 
+                             const std::vector<uint64_t>& prefixSum);
 
 
 /**
@@ -287,7 +286,7 @@ template<typename EdgeDataTy>
 void accumulateLocalEdgesToChunks(
              galois::DynamicBitSet& uniqueChunkBitset,
              const std::vector<uint32_t>& localEdges,
-             const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode,
+             const std::vector<Uint64Pair>& chunkToNode,
              std::vector<uint64_t>& chunkCounts) {
   std::map<uint64_t, std::atomic<uint64_t>> chunkToAccumulator;
 
@@ -338,10 +337,6 @@ void accumulateLocalEdgesToChunks(
     galois::steal<false>(),
     galois::timeit()
   );
-
-  //for (auto chunkID : uniqueChunks) {
-  //  chunkCounts[chunkID] = chunkToAccumulator[chunkID].load();
-  //}
 }
 
 /**
@@ -389,9 +384,9 @@ std::vector<uint64_t> getChunkEdgeCounts(
  * @returns a host to node mapping where each host very roughly has a balanced
  * number of edges
  */
-std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
+std::vector<Uint64Pair> getChunkToHostMapping(
       const std::vector<uint64_t>& chunkCountsPrefixSum,
-      const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
+      const std::vector<Uint64Pair>& chunkToNode);
 
 /**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
@@ -405,7 +400,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
  * roughly even amount of edges
  */
 template<typename EdgeDataTy>
-std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
+std::vector<Uint64Pair> getEvenNodeToHostMapping(
     const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
     uint64_t totalEdgeCount
 ) {
@@ -420,7 +415,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
     numNodeChunks /= 2;
   }
 
-  std::vector<std::pair<uint64_t, uint64_t>> chunkToNode;
+  std::vector<Uint64Pair> chunkToNode;
 
   if (hostID == 0) {
     printf("Num chunks is %lu\n", numNodeChunks);
@@ -454,10 +449,9 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
 
   // to make access to chunkToNode's last element correct with regard to later
   // access (without this access to chunkToNode[chunkSize] is out of bounds)
-  chunkToNode.emplace_back(std::pair<uint64_t, uint64_t>(totalNodeCount, 
-                                                         totalNodeCount));
+  chunkToNode.emplace_back(Uint64Pair(totalNodeCount, totalNodeCount));
 
-  std::vector<std::pair<uint64_t, uint64_t>> finalMapping = 
+  std::vector<Uint64Pair> finalMapping = 
       getChunkToHostMapping(chunkCounts, chunkToNode);
 
   return finalMapping;
@@ -636,7 +630,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
  */
 template<typename EdgeDataTy>
 void sendEdgeCounts(
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<Uint64Pair>& hostToNodes,
     const std::vector<uint32_t>& localEdges
 ) {
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -706,7 +700,7 @@ uint64_t receiveEdgeCounts();
 template<typename EdgeDataTy,
      typename std::enable_if<std::is_void<EdgeDataTy>::value>::type* = nullptr>
 void sendAssignedEdges(
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<Uint64Pair>& hostToNodes,
     const std::vector<uint32_t>& localEdges,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
     std::vector<std::vector<uint32_t>>& localSrcToData,
@@ -826,7 +820,7 @@ void sendAssignedEdges(
 template<typename EdgeDataTy,
      typename std::enable_if<!std::is_void<EdgeDataTy>::value>::type* = nullptr>
 void sendAssignedEdges(
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<Uint64Pair>& hostToNodes,
     const std::vector<uint32_t>& localEdges,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
     std::vector<std::vector<uint32_t>>& localSrcToData,
@@ -976,7 +970,7 @@ void sendAssignedEdges(
  * are not thread safe
  */
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<Uint64Pair>& hostToNodes,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
     std::vector<std::vector<uint32_t>>& localSrcToData,
     std::vector<std::mutex>& nodeLocks);
@@ -1112,7 +1106,7 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
  * @param numToSplit the number to chunk among hosts
  * @returns pair specifying the range that this host is responsible for
  */
-std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit);
+Uint64Pair getLocalAssignment(uint64_t numToSplit);
 
 /**
  * Given a set of disjoint edges, assign edges to hosts. Then, each host writes
@@ -1126,7 +1120,7 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
                          const std::string& outputFile) {
   uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
-  std::vector<std::pair<uint64_t, uint64_t>> hostToNodes = 
+  std::vector<Uint64Pair> hostToNodes = 
     getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, totalNumEdges);
 
   uint64_t localNodeBegin = hostToNodes[hostID].first;
@@ -1181,4 +1175,3 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
             localNodeBegin, globalEdgeOffset, localSrcToDest, localSrcToData);
 }
 #endif
-

@@ -30,12 +30,12 @@ void MPICheck(int errcode) {
   }
 }
 
-std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
+std::vector<Uint64Pair> getHostToNodeMapping(
     uint64_t numHosts, uint64_t totalNumNodes
 ) {
   GALOIS_ASSERT((totalNumNodes != 0), "host2node mapping needs numNodes");
 
-  std::vector<std::pair<uint64_t, uint64_t>> hostToNodes;
+  std::vector<Uint64Pair> hostToNodes;
 
   for (unsigned i = 0; i < numHosts; i++) {
     hostToNodes.emplace_back(
@@ -47,7 +47,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
 }
 
 uint32_t findOwner(const uint64_t gID, 
-               const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping) {
+               const std::vector<Uint64Pair>& ownerMapping) {
   uint32_t lb = 0;
   uint32_t ub = ownerMapping.size();
 
@@ -77,8 +77,7 @@ uint64_t getFileSize(std::ifstream& openFile) {
   return openFile.tellg();
 }
 
-std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
-                                                 uint64_t fileSize) {
+Uint64Pair determineByteRange(std::ifstream& edgeListFile, uint64_t fileSize) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;
   uint64_t totalNumHosts = net.Num;
@@ -141,7 +140,7 @@ std::pair<uint64_t, uint64_t> determineByteRange(std::ifstream& edgeListFile,
     finalEnd = edgeListFile.tellg();
   }
 
-  return std::pair<uint64_t, uint64_t>(finalStart, finalEnd);
+  return Uint64Pair(finalStart, finalEnd);
 }
 
 uint64_t accumulateValue(uint64_t localEdgeCount) {
@@ -173,8 +172,8 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
   return lb;
 }
 
-std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID, 
-                                  const std::vector<uint64_t>& prefixSum) {
+Uint64Pair binSearchDivision(uint64_t id, uint64_t totalID, 
+                             const std::vector<uint64_t>& prefixSum) {
   uint64_t totalWeight = prefixSum.back();
   uint64_t weightPerPartition = (totalWeight + totalID - 1) / totalID;
   uint64_t numThingsToSplit = prefixSum.size();
@@ -189,7 +188,7 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
   uint64_t upper = findIndexPrefixSum((id + 1) * weightPerPartition, 
                                       lower, numThingsToSplit, prefixSum);
   
-  return std::pair<uint64_t, uint64_t>(lower, upper);
+  return Uint64Pair(lower, upper);
 }
 
 
@@ -254,10 +253,10 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
   galois::runtime::evilPhase++;
 }
 
-std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
+std::vector<Uint64Pair> getChunkToHostMapping(
       const std::vector<uint64_t>& chunkCountsPrefixSum,
-      const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
-  std::vector<std::pair<uint64_t, uint64_t>> finalMapping;
+      const std::vector<Uint64Pair>& chunkToNode) {
+  std::vector<Uint64Pair> finalMapping;
 
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
   uint64_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
@@ -277,8 +276,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getChunkToHostMapping(
               lowerNode, upperNode, upperNode - lowerNode);
     }
 
-    finalMapping.emplace_back(std::pair<uint64_t, uint64_t>(lowerNode, 
-                                                            upperNode));
+    finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
   }
 
   return finalMapping;
@@ -327,7 +325,7 @@ uint64_t receiveEdgeCounts() {
 }
 
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
-    const std::vector<std::pair<uint64_t, uint64_t>>& hostToNodes,
+    const std::vector<Uint64Pair>& hostToNodes,
     std::vector<std::vector<uint32_t>>& localSrcToDest,
     std::vector<std::vector<uint32_t>>& localSrcToData,
     std::vector<std::mutex>& nodeLocks)
@@ -639,7 +637,7 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
   return byteOffsetToEdgeData;
 }
 
-std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit) {
+Uint64Pair getLocalAssignment(uint64_t numToSplit) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;
   uint64_t totalNumHosts = net.Num;
