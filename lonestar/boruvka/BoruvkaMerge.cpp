@@ -61,7 +61,15 @@ typedef Graph::GraphNode GNode;
 
 using Counter = galois::GAccumulator<size_t>;
 
+#define BORUVKA_DEBUG
+
 ///////////////////////////////////////////////////////////////////////////////////////
+
+std::ostream& operator << (std::ostream& out, std::tuple<NodeDataType, NodeDataType, EdgeDataType>& etpl) {
+  out << "(" << std::get<0>(etpl) << ", " << std::get<1>(etpl) << ", " << std::get<2>(etpl) << ")";
+  return out;
+}
+
 EdgeDataType runBodyParallel(Graph& graph) {
 
   auto indexer = [&] (const GNode& n) {
@@ -69,6 +77,7 @@ EdgeDataType runBodyParallel(Graph& graph) {
                           , graph.edge_begin(n, galois::MethodFlag::UNPROTECTED));
 
   };
+
 
   using namespace galois::worklists;
   typedef dChunkedFIFO<64> dChunk;
@@ -88,18 +97,20 @@ EdgeDataType runBodyParallel(Graph& graph) {
         graph.getData(src, galois::MethodFlag::WRITE);
         GNode minNeighbor = 0;
 #ifdef BORUVKA_DEBUG
-        std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
+        std::cout << "Processing " << graph.getData(src) << std::endl;
 #endif
         EdgeDataType minEdgeWeight = std::numeric_limits<EdgeDataType>::max();
         //Acquire locks on neighborhood.
-        for (auto dst : graph.edges(src, galois::MethodFlag::WRITE)) {
-          graph.getData(graph.getEdgeDst(dst));
+        for (auto dit : graph.edges(src, galois::MethodFlag::WRITE)) {
+          graph.getData(graph.getEdgeDst(dit));
         }
         //Find minimum neighbor
         for (auto e_it : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
           EdgeDataType w = graph.getEdgeData(e_it, galois::MethodFlag::UNPROTECTED);
           assert(w>=0);
-          if (w < minEdgeWeight) {
+          auto dst = graph.getEdgeDst(e_it);
+
+          if (dst != src && w < minEdgeWeight) {
             minNeighbor = graph.getEdgeDst(e_it);
             minEdgeWeight = w;
           }
@@ -110,7 +121,11 @@ EdgeDataType runBodyParallel(Graph& graph) {
           return;
         }
 #ifdef BORUVKA_DEBUG
-        std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
+        auto tpl = std::make_tuple( 
+            graph.getData(src, galois::MethodFlag::UNPROTECTED),
+            graph.getData(minNeighbor, galois::MethodFlag::UNPROTECTED),
+            minEdgeWeight);
+        std::cout << " Boruvka edge added: " << tpl << std::endl;
 #endif
         //Acquire locks on neighborhood of min neighbor.
         for (auto e_it : graph.edges(minNeighbor, galois::MethodFlag::WRITE)) {
@@ -125,10 +140,10 @@ EdgeDataType runBodyParallel(Graph& graph) {
 
         DstEdgeSet toAdd;
 
-        for (auto mdst : graph.edges(minNeighbor, galois::MethodFlag::UNPROTECTED)) {
+        for (auto dit : graph.edges(minNeighbor, galois::MethodFlag::UNPROTECTED)) {
 
-          GNode dstNode = graph.getEdgeDst(mdst);
-          int edgeWeight = graph.getEdgeData(mdst,galois::MethodFlag::UNPROTECTED);
+          GNode dstNode = graph.getEdgeDst(dit);
+          int edgeWeight = graph.getEdgeData(dit,galois::MethodFlag::UNPROTECTED);
 
           if (dstNode != src) { //Do not add the edge being contracted
 
@@ -233,6 +248,11 @@ EdgeDataType runKruskal(Graph& graph) {
          uf.uf_union(src,dst);
          mst_sum += e.wt;
          mst_size++;
+
+#ifdef BORUVKA_DEBUG
+         auto tpl = std::make_tuple(e.src, e.dst, e.wt);
+         std::cout << "Kruskal Edge added: " << tpl << std::endl;
+#endif
 
       }
 
