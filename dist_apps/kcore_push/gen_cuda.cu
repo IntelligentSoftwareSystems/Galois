@@ -434,7 +434,7 @@ __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned 
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
-  typedef cub::BlockReduce<int, TB_SIZE> _br;
+  typedef cub::BlockReduce<unsigned int, TB_SIZE> _br;
   __shared__ _br::TempStorage _ts;
   sum.thread_entry();
   for (index_type src = __begin + tid; src < __end; src += nthreads)

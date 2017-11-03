@@ -466,8 +466,8 @@ __global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned in
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
-  typedef cub::BlockReduce<int, TB_SIZE> _br;
-  __shared__ _br::TempStorage _ts;
+  typedef cub::BlockReduce<unsigned int, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts1, _ts2;
   sum.thread_entry();
   max.thread_entry();
   for (index_type src = __begin + tid; src < __end; src += nthreads)
@@ -477,8 +477,8 @@ __global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned in
       max.reduce(p_dist_current[src]);
     }
   }
-  sum.thread_exit<_br>(_ts);
-  max.thread_exit<_br>(_ts);
+  sum.thread_exit<_br>(_ts1);
+  max.thread_exit<_br>(_ts2);
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, uint64_t local_src_node, struct CUDA_Context * ctx)
 {
