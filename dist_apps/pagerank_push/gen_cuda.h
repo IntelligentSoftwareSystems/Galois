@@ -54,6 +54,7 @@ void batch_set_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsig
 void batch_add_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_value_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode);
 
+void PageRankSanityCheck_cuda(float & _max_value, float & _min_value, float & _sum_value, float & _sum_residual, unsigned int & num_residual_over_tolerance, float & _max_residual, float & _min_residual, const float & tolerance, struct CUDA_Context *cuda_ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const float & local_alpha, struct CUDA_Context *ctx);
 void InitializeGraph_all_cuda(const float & local_alpha, struct CUDA_Context *ctx);
 void PageRank_cuda(unsigned int __begin, unsigned int __end, int & __retval, struct CUDA_Context *ctx);

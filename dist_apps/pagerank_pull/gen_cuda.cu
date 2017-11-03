@@ -452,6 +452,41 @@ __global__ void PageRank(CSRGraph graph, DynamicBitset *is_updated, unsigned int
   }
   // FP: "100 -> 101;
 }
+__global__ void PageRankSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const float tolerance, float * p_residual, float * p_value, HGReduceMax<float> max_value, HGReduceMin<float> min_value, HGAccumulator<float> sum_value, HGAccumulator<float> sum_residual, HGAccumulator<unsigned int> num_residual_over_tolerance, HGReduceMax<float> max_residual, HGReduceMin<float> min_residual)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+  typedef cub::BlockReduce<unsigned int, TB_SIZE> _ubr;
+  __shared__ _ubr::TempStorage _uts;
+  typedef cub::BlockReduce<float, TB_SIZE> _br;
+  __shared__ _br::TempStorage _ts1, _ts2, _ts3, _ts4, _ts5, _ts6;
+  max_value.thread_entry();
+  min_value.thread_entry();
+  sum_value.thread_entry();
+  sum_residual.thread_entry();
+  num_residual_over_tolerance.thread_entry();
+  max_residual.thread_entry();
+  min_residual.thread_entry();
+  for (index_type src = __begin + tid; src < __end; src += nthreads)
+  {
+    max_value.reduce(p_value[src]);
+    min_value.reduce(p_value[src]);
+    sum_value.reduce(p_value[src]);
+    sum_residual.reduce(p_residual[src]);
+    max_residual.reduce(p_residual[src]);
+    min_residual.reduce(p_residual[src]);
+    if (p_residual[src] > tolerance) {
+      num_residual_over_tolerance.reduce(1);
+    }
+  }
+  max_value.thread_exit<_br>(_ts1);
+  min_value.thread_exit<_br>(_ts2);
+  sum_value.thread_exit<_br>(_ts3);
+  sum_residual.thread_exit<_br>(_ts4);
+  num_residual_over_tolerance.thread_exit<_ubr>(_uts);
+  max_residual.thread_exit<_br>(_ts5);
+  min_residual.thread_exit<_br>(_ts6);
+}
 void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context * ctx)
 {
   dim3 blocks;
@@ -537,4 +572,47 @@ void PageRank_all_cuda(struct CUDA_Context * ctx)
   // FP: "1 -> 2;
   PageRank_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
+}
+void PageRankSanityCheck_cuda(float & max_value, float & min_value, float & sum_value, float & sum_residual, unsigned int & num_residual_over_tolerance, float & max_residual, float & min_residual, const float & tolerance, struct CUDA_Context *ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  kernel_sizing(blocks, threads);
+  Shared<float> max_valueval = Shared<float>(1);
+  HGReduceMax<float> _max_value;
+  *(max_valueval.cpu_wr_ptr()) = 0;
+  _max_value.rv = max_valueval.gpu_wr_ptr();
+  Shared<float> min_valueval = Shared<float>(1);
+  HGReduceMin<float> _min_value;
+  *(min_valueval.cpu_wr_ptr()) = 1073741823;
+  _min_value.rv = min_valueval.gpu_wr_ptr();
+  Shared<float> sum_valueval = Shared<float>(1);
+  HGAccumulator<float> _sum_value;
+  *(sum_valueval.cpu_wr_ptr()) = 0;
+  _sum_value.rv = sum_valueval.gpu_wr_ptr();
+  Shared<float> sum_residualval = Shared<float>(1);
+  HGAccumulator<float> _sum_residual;
+  *(sum_residualval.cpu_wr_ptr()) = 0;
+  _sum_residual.rv = sum_residualval.gpu_wr_ptr();
+  Shared<unsigned int> num_residual_over_toleranceval = Shared<unsigned int>(1);
+  HGAccumulator<unsigned int> _num_residual_over_tolerance;
+  *(num_residual_over_toleranceval.cpu_wr_ptr()) = 0;
+  _num_residual_over_tolerance.rv = num_residual_over_toleranceval.gpu_wr_ptr();
+  Shared<float> max_residualval = Shared<float>(1);
+  HGReduceMax<float> _max_residual;
+  *(max_residualval.cpu_wr_ptr()) = 0;
+  _max_residual.rv = max_residualval.gpu_wr_ptr();
+  Shared<float> min_residualval = Shared<float>(1);
+  HGReduceMin<float> _min_residual;
+  *(min_residualval.cpu_wr_ptr()) = 1073741823;
+  _min_residual.rv = min_residualval.gpu_wr_ptr();
+  PageRankSanityCheck <<<blocks, __tb_PageRank>>>(ctx->gg, ctx->beginMaster, ctx->beginMaster+ctx->numOwned, tolerance, ctx->residual.data.gpu_rd_ptr(), ctx->value.data.gpu_rd_ptr(), _max_value, _min_value, _sum_value, _sum_residual, _num_residual_over_tolerance, _max_residual, _min_residual);
+  check_cuda_kernel;
+  max_value = *(max_valueval.cpu_rd_ptr());
+  min_value = *(min_valueval.cpu_rd_ptr());
+  sum_value = *(sum_valueval.cpu_rd_ptr());
+  sum_residual = *(sum_residualval.cpu_rd_ptr());
+  num_residual_over_tolerance = *(num_residual_over_toleranceval.cpu_rd_ptr());
+  max_residual = *(max_residualval.cpu_rd_ptr());
+  min_residual = *(min_residualval.cpu_rd_ptr());
 }

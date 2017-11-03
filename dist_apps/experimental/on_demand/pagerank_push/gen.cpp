@@ -427,11 +427,6 @@ struct PageRankSanity {
   cll::opt<float>& local_tolerance;
   Graph* graph;
 
-  static float current_max;
-  static float current_min;
-  static float current_max_residual;
-  static float current_min_residual;
-
   galois::DGAccumulator<float>& DGAccumulator_max;
   galois::DGAccumulator<float>& DGAccumulator_min;
   galois::DGAccumulator<float>& DGAccumulator_sum;
@@ -440,6 +435,11 @@ struct PageRankSanity {
   galois::DGAccumulator<float>& DGAccumulator_max_residual;
   galois::DGAccumulator<float>& DGAccumulator_min_residual;
 
+  galois::GReduceMax<float>& max_value;
+  galois::GReduceMin<float>& min_value;
+  galois::GReduceMax<float>& max_residual;
+  galois::GReduceMin<float>& min_residual;
+
   PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph,
       galois::DGAccumulator<float>& _DGAccumulator_max,
       galois::DGAccumulator<float>& _DGAccumulator_min,
@@ -447,7 +447,11 @@ struct PageRankSanity {
       galois::DGAccumulator<float>& _DGAccumulator_sum_residual,
       galois::DGAccumulator<uint64_t>& _DGAccumulator_residual_over_tolerance,
       galois::DGAccumulator<float>& _DGAccumulator_max_residual,
-      galois::DGAccumulator<float>& _DGAccumulator_min_residual
+      galois::DGAccumulator<float>& _DGAccumulator_min_residual,
+      galois::GReduceMax<float>& _max_value,
+      galois::GReduceMin<float>& _min_value,
+      galois::GReduceMax<float>& _max_residual,
+      galois::GReduceMin<float>& _min_residual
   ) : 
     local_tolerance(_local_tolerance), graph(_graph),
     DGAccumulator_max(_DGAccumulator_max),
@@ -456,7 +460,11 @@ struct PageRankSanity {
     DGAccumulator_sum_residual(_DGAccumulator_sum_residual),
     DGAccumulator_residual_over_tolerance(_DGAccumulator_residual_over_tolerance),
     DGAccumulator_max_residual(_DGAccumulator_max_residual),
-    DGAccumulator_min_residual(_DGAccumulator_min_residual) {}
+    DGAccumulator_min_residual(_DGAccumulator_min_residual),
+    max_value(_max_value),
+    min_value(_min_value),
+    max_residual(_max_residual),
+    min_residual(_min_residual) {}
 
   void static go(Graph& _graph,
     galois::DGAccumulator<float>& DGA_max,
@@ -465,15 +473,12 @@ struct PageRankSanity {
     galois::DGAccumulator<float>& DGA_sum_residual,
     galois::DGAccumulator<uint64_t>& DGA_residual_over_tolerance,
     galois::DGAccumulator<float>& DGA_max_residual,
-    galois::DGAccumulator<float>& DGA_min_residual
+    galois::DGAccumulator<float>& DGA_min_residual,
+    galois::GReduceMax<float>& max_value,
+    galois::GReduceMin<float>& min_value,
+    galois::GReduceMax<float>& max_residual,
+    galois::GReduceMin<float>& min_residual
   ) {
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      // TODO currently no GPU support for sanity check operator
-      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-                      "wrong results.\n");
-    }
-  #endif
     DGA_max.reset();
     DGA_min.reset();
     DGA_sum.reset();
@@ -482,42 +487,72 @@ struct PageRankSanity {
     DGA_max_residual.reset();
     DGA_min_residual.reset();
 
-    galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
-                   PageRankSanity(
-                     tolerance, 
-                     &_graph,
-                     DGA_max,
-                     DGA_min,
-                     DGA_sum,
-                     DGA_sum_residual,
-                     DGA_residual_over_tolerance,
-                     DGA_max_residual,
-                     DGA_min_residual
-                   ), 
-                   galois::loopname("PageRankSanity"));
-
-    DGA_max = current_max;
-    DGA_min = current_min;
-    DGA_max_residual = current_max_residual;
-    DGA_min_residual = current_min_residual;
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      float _max_value;
+      float _min_value;
+      float _sum_value;
+      float _sum_residual;
+      uint32_t num_residual_over_tolerance;
+      float _max_residual;
+      float _min_residual;
+      PageRankSanityCheck_cuda(_max_value, _min_value, _sum_value, _sum_residual, num_residual_over_tolerance, _max_residual, _min_residual, tolerance, cuda_ctx);
+      DGA_max = _max_value;
+      DGA_min = _min_value;
+      DGA_sum += _sum_value;
+      DGA_sum_residual += _sum_residual;
+      DGA_residual_over_tolerance += num_residual_over_tolerance;
+      DGA_max_residual = _max_residual;
+      DGA_min_residual = _min_residual;
+    }
+    else
+  #endif
+    {
+      max_value.reset();
+      min_value.reset();
+      max_residual.reset();
+      min_residual.reset();
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()), 
+                     PageRankSanity(
+                       tolerance, 
+                       &_graph,
+                       DGA_max,
+                       DGA_min,
+                       DGA_sum,
+                       DGA_sum_residual,
+                       DGA_residual_over_tolerance,
+                       DGA_max_residual,
+                       DGA_min_residual,
+                       max_value,
+                       min_value,
+                       max_residual,
+                       min_residual
+                     ), 
+                     galois::loopname("PageRankSanity"),
+                     galois::no_stats());
+      DGA_max = max_value.reduce();
+      DGA_min = min_value.reduce();
+      DGA_max_residual = max_residual.reduce();
+      DGA_min_residual = min_residual.reduce();
+    }
 
     float max_rank = DGA_max.reduce_max();
     float min_rank = DGA_min.reduce_min();
     float rank_sum = DGA_sum.reduce();
     float residual_sum = DGA_sum_residual.reduce();
     uint64_t over_tolerance = DGA_residual_over_tolerance.reduce();
-    float max_residual = DGA_max_residual.reduce_max();
-    float min_residual = DGA_min_residual.reduce_min();
+    float max_res = DGA_max_residual.reduce_max();
+    float min_res = DGA_min_residual.reduce_min();
 
     // Only node 0 will print data
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      printf("Max rank is %f\n", max_rank);
-      printf("Min rank is %f\n", min_rank);
-      printf("Rank sum is %f\n", rank_sum);
-      printf("Residual sum is %f\n", residual_sum);
-      printf("# nodes with residual over tolerance is %lu\n", over_tolerance);
-      printf("Max residual is %f\n", max_residual);
-      printf("Min residual is %f\n", min_residual);
+      galois::gPrint("Max rank is ", max_rank, "\n");
+      galois::gPrint("Min rank is ", min_rank, "\n");
+      galois::gPrint("Rank sum is ", rank_sum, "\n");
+      galois::gPrint("Residual sum is ", residual_sum, "\n");
+      galois::gPrint("# nodes with residual over ", tolerance, " (tolerance) is ", over_tolerance, "\n");
+      galois::gPrint("Max residual is ", max_res, "\n");
+      galois::gPrint("Min residual is ", min_res, "\n");
     }
   }
   
@@ -526,36 +561,19 @@ struct PageRankSanity {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
 
-    if (graph->isOwned(graph->getGID(src))) {
-      if (current_max < sdata.value) {
-        current_max = sdata.value;
-      }
+    max_value.update(sdata.value);
+    min_value.update(sdata.value);
+    max_residual.update(sdata.residual);
+    min_residual.update(sdata.residual);
 
-      if (current_min > sdata.value) {
-        current_min = sdata.value;
-      }
+    DGAccumulator_sum += sdata.value;
+    DGAccumulator_sum_residual += sdata.residual;
 
-      if (current_max_residual < sdata.residual) {
-        current_max_residual = sdata.residual;
-      }
-
-      if (current_min_residual > sdata.residual) {
-        current_min_residual = sdata.residual;
-      }
-
-      if (sdata.residual > local_tolerance) {
-        DGAccumulator_residual_over_tolerance += 1;
-      }
-
-      DGAccumulator_sum += sdata.value;
-      DGAccumulator_sum_residual += sdata.residual;
+    if (sdata.residual > local_tolerance) {
+      DGAccumulator_residual_over_tolerance += 1;
     }
   }
 };
-float PageRankSanity::current_max = 0;
-float PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
-float PageRankSanity::current_max_residual = 0;
-float PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
 
 /******************************************************************************/
 /* Main */
@@ -664,6 +682,10 @@ int main(int argc, char** argv) {
     galois::DGAccumulator<uint64_t> DGA_residual_over_tolerance;
     galois::DGAccumulator<float> DGA_max_residual;
     galois::DGAccumulator<float> DGA_min_residual;
+    galois::GReduceMax<float> max_value;
+    galois::GReduceMin<float> min_value;
+    galois::GReduceMax<float> max_residual;
+    galois::GReduceMin<float> min_residual;
 
     for (auto run = 0; run < numRuns; ++run) {
       std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
@@ -675,21 +697,10 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       // sanity check
-      PageRankSanity::current_max = 0;
-      PageRankSanity::current_min = std::numeric_limits<float>::max() / 4;
-
-      PageRankSanity::current_max_residual = 0;
-      PageRankSanity::current_min_residual = std::numeric_limits<float>::max() / 4;
-
       PageRankSanity::go(
-        *hg,
-        DGA_max,
-        DGA_min,
-        DGA_sum,
-        DGA_sum_residual,
-        DGA_residual_over_tolerance,
-        DGA_max_residual,
-        DGA_min_residual
+        *hg, DGA_max, DGA_min, DGA_sum, DGA_sum_residual,
+        DGA_residual_over_tolerance, DGA_max_residual, DGA_min_residual,
+        max_value, min_value, max_residual, min_residual
       );
 
       if((run + 1) != numRuns){
