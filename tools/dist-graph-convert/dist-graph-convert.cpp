@@ -32,12 +32,11 @@
 
 namespace cll = llvm::cl;
 
-// TODO: move these enums to a common location for all graph convert tools
 enum ConvertMode {
   edgelist2gr,
   gr2wgr,
   gr2tgr,
-  edgelistb2gr // TODO
+  gr2sgr,
 };
 
 enum EdgeType {
@@ -60,11 +59,11 @@ static cll::opt<EdgeType> edgeType("edgeType",
     cll::init(EdgeType::void_));
 static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
     cll::values(
-      clEnumVal(edgelistb2gr, "Convert edge list binary to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
       clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr "
                          "(in-place)"),
-      clEnumVal(gr2tgr, "Convert (weighted) binary gr to transpose binary gr "),
+      clEnumVal(gr2tgr, "Convert binary gr to transpose binary gr "),
+      clEnumVal(gr2sgr, "Convert binary gr to symmetric binary gr "),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -179,7 +178,7 @@ struct Gr2TGr : public Conversion {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2tgr needs an output file");
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
-
+    // TODO can probably refactor this entire thing
     // read gr header for metadata
     MPI_File gr;
     MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
@@ -189,7 +188,6 @@ struct Gr2TGr : public Conversion {
                               MPI_STATUS_IGNORE));
     MPICheck(MPI_File_close(&gr));
     GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
-    GALOIS_ASSERT(grHeader[1] != 0, "gr2tgr assumes edges weights exist in gr");
     uint64_t totalNumNodes = grHeader[2];
     uint64_t totalNumEdges = grHeader[3];
 
@@ -209,7 +207,6 @@ struct Gr2TGr : public Conversion {
         loadTransposedEdgesFromMPIGraph<EdgeTy>(inputFile, nodesToRead, 
                                                 edgesToRead, totalNumNodes, 
                                                 totalNumEdges);
-    
     // sanity check
     uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
     GALOIS_ASSERT(totalEdgeCount == totalNumEdges, 
@@ -220,6 +217,55 @@ struct Gr2TGr : public Conversion {
     galois::runtime::getHostBarrier().wait();
   }
 
+};
+
+/**
+ * Makes a Galois binary graph symmetric (i.e. add a directed edge in the
+ * opposite direction for every directed edge)
+ */
+struct Gr2SGr : public Conversion {
+
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(!(outputFile.empty()), "gr2sgr needs an output file");
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+    // TODO can probably refactor this entire thing
+    // read gr header for metadata
+    MPI_File gr;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, inputFile.c_str(), 
+                           MPI_MODE_RDONLY, MPI_INFO_NULL, &gr));
+    uint64_t grHeader[4];
+    MPICheck(MPI_File_read_at(gr, 0, grHeader, 4, MPI_UINT64_T, 
+                              MPI_STATUS_IGNORE));
+    MPICheck(MPI_File_close(&gr));
+    GALOIS_ASSERT(grHeader[0] == 1, "gr file must be version 1 for convert");
+    uint64_t totalNumNodes = grHeader[2];
+    uint64_t totalNumEdges = grHeader[3];
+
+    // get "read" assignment of nodes (i.e. nodes this host is responsible for)
+    std::pair<uint64_t, uint64_t> nodesToRead;
+    std::pair<uint64_t, uint64_t> edgesToRead;
+    std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+                                                    nodesToRead.second);
+    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID, 
+           edgesToRead.first, edgesToRead.second, 
+           edgesToRead.second - edgesToRead.first);
+
+    // read edges of assigned nodes using MPI_Graph, load into the same format
+    // used by edgelist2gr; key is to load one edge as 2 edges (i.e. symmetric)
+    std::vector<uint32_t> localEdges =
+        loadSymmetricEdgesFromMPIGraph<EdgeTy>(inputFile, nodesToRead, 
+                                               edgesToRead, totalNumNodes, 
+                                               totalNumEdges);
+    // sanity check
+    uint64_t doubleEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
+    GALOIS_ASSERT(doubleEdgeCount == 2 * totalNumEdges, 
+                  "data needs to have twice as many edges as original graph");
+    assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, doubleEdgeCount, 
+                                outputFile);
+  }
 };
 
 
@@ -262,7 +308,7 @@ struct Gr2WGr : public Conversion {
     if (hostID == 0) {
       uint64_t edgeSize = 4;
       MPICheck(MPI_File_write_at(unweightedGr, sizeof(uint64_t), 
-                                 &edgeSize, 1, MPI_UINT64_T, MPI_STATUS_IGNORE));
+                                &edgeSize, 1, MPI_UINT64_T, MPI_STATUS_IGNORE));
     }
 
     MPICheck(MPI_File_close(&unweightedGr));
@@ -275,14 +321,14 @@ int main(int argc, char** argv) {
   galois::setActiveThreads(threadsToUse);
 
   switch (convertMode) {
-    //case edgelistb2gr: 
-    //  convert<EdgelistB2Gr>(); break;
     case edgelist2gr: 
       convert<Edgelist2Gr>(); break;
     case gr2wgr: 
       convert<Gr2WGr>(); break;
     case gr2tgr: 
       convert<Gr2TGr>(); break;
+    case gr2sgr: 
+      convert<Gr2SGr>(); break;
     default: abort();
   }
   return 0;

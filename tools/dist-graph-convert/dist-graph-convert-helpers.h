@@ -32,6 +32,7 @@
 #include <mpi.h>
 
 #include "galois/Galois.h"
+#include "galois/DynamicBitset.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Network.h"
 #include "galois/DistAccumulator.h"
@@ -225,27 +226,26 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
  * @tparam EdgeDataTy type of edge data to read
  * @param localEdges vector of edges to find unique sources of: needs to have
  * (src, dest) layout (i.e. i even: vector[i] is source, i+1 is dest
- * @returns Set of global IDs of unique sources found in the provided edge
- * vector
+ * @param uniqueNodeBitset bitset marking which unique nodes are present
+ * on this host; should be pre-initialized before being passed into this
+ * function
  */
 template<typename EdgeDataTy>
-std::set<uint64_t> 
-findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
+void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
+                           galois::DynamicBitSet& uniqueNodeBitset) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-
   printf("[%lu] Finding unique nodes\n", hostID);
-  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueNodes;
+  uniqueNodeBitset.reset();
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   galois::do_all(
     galois::iterate((uint64_t)0, localNumEdges),
     [&] (uint64_t edgeIndex) {
-      std::set<uint64_t>& localSet = *threadUniqueNodes.getLocal();
       // src node
       if (std::is_void<EdgeDataTy>::value) {
-        localSet.insert(localEdges[edgeIndex * 2]);
+        uniqueNodeBitset.set(localEdges[edgeIndex * 2]);
       } else {
-        localSet.insert(localEdges[edgeIndex * 3]);
+        uniqueNodeBitset.set(localEdges[edgeIndex * 3]);
       }
     },
     galois::loopname("FindUniqueNodes"),
@@ -254,57 +254,55 @@ findUniqueSourceNodes(const std::vector<uint32_t>& localEdges) {
     galois::timeit()
   );
 
-  std::set<uint64_t> uniqueNodes;
-
-  for (unsigned i = 0; i < threadUniqueNodes.size(); i++) {
-    auto& tSet = *threadUniqueNodes.getRemote(i);
-    for (auto nodeID : tSet) {
-      uniqueNodes.insert(nodeID);
-    }
-  }
-
   printf("[%lu] Unique nodes found\n", hostID);
-
-  return uniqueNodes;
 }
 
 /**
  * Given a chunk to node mapping and a set of unique nodes, find the unique 
  * chunks corresponding to the unique nodes provided.
  *
- * @param uniqueNodes set of unique nodes
+ * @param uniqueNodeBitset Bitset specifying which source nodes exist on the
+ * edges this host has read
  * @param chunkToNode a mapping of a chunk to the range of nodes that the chunk
  * has
  * @returns a set of chunk ids corresponding to the nodes passed in (i.e. chunks
  * those nodes are included in)
  */
-std::set<uint64_t> 
-findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
-                 const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode);
+void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
+                      const std::vector<Uint64Pair>& chunkToNode,
+                      galois::DynamicBitSet& uniqueChunkBitset);
 
 /**
  * Get the edge counts for chunks of edges that we have locally.
  *
  * @tparam EdgeDataTy type of edge data to read
- * @param uniqueChunks unique chunks that this host has in its loaded edge list
+ * @param uniqueChunkBitset Bitset specifying which chunks are present on
+ * this host; will be unusable at the end of the function (memory free)
  * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
  * @param chunkToNode specifies which chunks have which nodes
  * @param chunkCounts (input/output) a 0-initialized vector that will be 
  * edited to have our local chunk edge counts
  */
 template<typename EdgeDataTy>
-void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
+void accumulateLocalEdgesToChunks(
+             galois::DynamicBitSet& uniqueChunkBitset,
              const std::vector<uint32_t>& localEdges,
              const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode,
              std::vector<uint64_t>& chunkCounts) {
-  std::map<uint64_t, galois::GAccumulator<uint64_t>> chunkToAccumulator;
-  for (auto chunkID : uniqueChunks) {
-    // default-initialize necessary GAccumulators
-    chunkToAccumulator[chunkID];
+  std::map<uint64_t, std::atomic<uint64_t>> chunkToAccumulator;
+
+  // default-initialize necessary chunk atomics
+  for (size_t i = 0; i < uniqueChunkBitset.size(); i++) {
+    if (uniqueChunkBitset.test(i)) {
+      chunkToAccumulator[i];
+    }
   }
 
+  freeVector(uniqueChunkBitset.get_vec());
+
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  printf("[%lu] Chunk accumulators created\n", hostID);
+  printf("[%lu] Chunk accumulators created: %lu of them\n", hostID, 
+         chunkToAccumulator.size());
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine which chunk edges go to
@@ -330,9 +328,20 @@ void accumulateLocalEdgesToChunks(const std::set<uint64_t>& uniqueChunks,
   printf("[%lu] Chunk accumulators done accumulating\n", hostID);
 
   // update chunk count
-  for (auto chunkID : uniqueChunks) {
-    chunkCounts[chunkID] = chunkToAccumulator[chunkID].reduce();
-  }
+  galois::do_all(
+    galois::iterate(chunkToAccumulator.cbegin(), chunkToAccumulator.cend()),
+    [&] (auto& chunkAndCount) {
+      chunkCounts[chunkAndCount.first] += chunkAndCount.second.load();
+    },
+    galois::loopname("ChunkCountUpdate"),
+    galois::no_stats(),
+    galois::steal<false>(),
+    galois::timeit()
+  );
+
+  //for (auto chunkID : uniqueChunks) {
+  //  chunkCounts[chunkID] = chunkToAccumulator[chunkID].load();
+  //}
 }
 
 /**
@@ -348,20 +357,21 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts);
  * Get the number of edges that each node chunk has.
  *
  * @tparam EdgeDataTy type of edge data to read
- * @param numNodeChunks total number of chunks
- * @param uniqueChunks unique chunks that this host has in its loaded edge list
+ * @param uniqueChunkBitset bitset specifying which chunks are present on this
+ * host
  * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
  * @param chunkToNode specifies which chunks have which nodes
  * @returns A vector specifying the number of edges each chunk has
  */
 template<typename EdgeDataTy>
-std::vector<uint64_t> getChunkEdgeCounts(uint64_t numNodeChunks,
-                const std::set<uint64_t>& uniqueChunks,
+std::vector<uint64_t> getChunkEdgeCounts(
+                galois::DynamicBitSet& uniqueChunkBitset,
                 const std::vector<uint32_t>& localEdges,
-                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
+                const std::vector<Uint64Pair>& chunkToNode) {
   std::vector<uint64_t> chunkCounts;
-  chunkCounts.assign(numNodeChunks, 0);
-  accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunks, localEdges, 
+  chunkCounts.assign(uniqueChunkBitset.size(), 0);
+  printf("Chunk counts initialized\n");
+  accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunkBitset, localEdges, 
                                            chunkToNode, chunkCounts);
   sendAndReceiveEdgeChunkCounts(chunkCounts);
 
@@ -406,7 +416,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
   // TODO better heuristics: basically we don't want to run out of memory,
   // so keep number of chunks from growing too large
-  while (numNodeChunks > 10000000) {
+  while (numNodeChunks > 5000000) {
     numNodeChunks /= 2;
   }
 
@@ -424,11 +434,17 @@ std::vector<std::pair<uint64_t, uint64_t>> getEvenNodeToHostMapping(
   }
 
   printf("[%lu] Determining edge to chunk counts\n", hostID);
-  std::set<uint64_t> uniqueNodes = findUniqueSourceNodes<EdgeDataTy>(localEdges);
-  std::set<uint64_t> uniqueChunks = findUniqueChunks(uniqueNodes, chunkToNode);
+
+  galois::DynamicBitSet uniqueNodeBitset;
+  uniqueNodeBitset.resize(totalNodeCount);
+  findUniqueSourceNodes<EdgeDataTy>(localEdges, uniqueNodeBitset);
+
+  galois::DynamicBitSet uniqueChunkBitset;
+  uniqueChunkBitset.resize(numNodeChunks);
+  findUniqueChunks(uniqueNodeBitset, chunkToNode, uniqueChunkBitset);
+
   std::vector<uint64_t> chunkCounts = 
-       getChunkEdgeCounts<EdgeDataTy>(numNodeChunks, uniqueChunks, localEdges, 
-                                      chunkToNode);
+     getChunkEdgeCounts<EdgeDataTy>(uniqueChunkBitset, localEdges, chunkToNode);
   printf("[%lu] Edge to chunk counts determined\n", hostID);
 
   // prefix sum on the chunks (reuse array to save memory)
@@ -529,6 +545,86 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
   
   return edgeData;
 }
+
+/**
+ * Load a Galois binary graph into an MPIGraph and load assigned nodes/edges
+ * into memory such that each edge is loaded twice (extra in reverse direction).
+ *
+ * @tparam EdgeDataTy type of edge data to read
+ * @param inputFile path to input Galois binary graph
+ * @param nodesToRead a pair that has the range of nodes that should be read
+ * @param edgesToRead a pair that has the range of edges that should be read
+ * @param totalNumNodes Total number of nodes in the graph
+ * @param totalNumEdges Total number of edges in the graph
+ * @returns a vector with edges corresponding to the nodes/edges
+ * passed into the function; 1 edge in original becomes 2
+ */
+template<typename EdgeDataTy>
+std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
+    const std::string& inputFile, Uint64Pair nodesToRead, 
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
+) {
+  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+                            edgesToRead.first, edgesToRead.second, 
+                            totalNumNodes, totalNumEdges);
+
+  std::vector<uint32_t> edgeData;
+
+  // void = 2 elements per edge; non-void = 3 elements per edge
+  if (std::is_void<EdgeDataTy>::value) {
+    edgeData.resize(((edgesToRead.second - edgesToRead.first) * 2) * 2);
+  } else {
+    edgeData.resize(((edgesToRead.second - edgesToRead.first) * 3) * 2);
+  }
+
+  if (edgeData.size() > 0) {
+    galois::do_all(
+      galois::iterate(nodesToRead.first, nodesToRead.second),
+      [&] (uint32_t gID) {
+        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+
+        // offset into which we should start writing data in edgeData
+        uint64_t edgeDataOffset; 
+        if (std::is_void<EdgeDataTy>::value) {
+          edgeDataOffset = (edgeBegin - edgesToRead.first) * 4;
+        } else {
+          edgeDataOffset = (edgeBegin - edgesToRead.first) * 6;
+        }
+
+        // loop through all edges, create 2 edges for every edge
+        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+          uint32_t edgeDest = mpiGraph.edgeDestination(i);
+          edgeData[edgeDataOffset] = gID;
+          edgeData[edgeDataOffset + 1] = edgeDest;
+
+          if (std::is_void<EdgeDataTy>::value) {
+            edgeData[edgeDataOffset + 2] = edgeDest;
+            edgeData[edgeDataOffset + 3] = gID;
+            edgeDataOffset += 4;
+          } else {
+            uint32_t edgeWeight = mpiGraph.edgeData(i);
+
+            edgeData[edgeDataOffset + 2] = edgeWeight;
+
+            edgeData[edgeDataOffset + 3] = edgeDest;
+            edgeData[edgeDataOffset + 4] = gID;
+            edgeData[edgeDataOffset + 5] = edgeWeight;
+
+            edgeDataOffset += 6;
+          }
+        }
+      },
+      galois::loopname("LoadSymmetricEdgesMPIGraph"),
+      galois::timeit(),
+      galois::no_stats()
+    );
+  }
+  
+  return edgeData;
+}
+
 
 /**
  * Determine/send to each host how many edges they should expect to receive
@@ -1019,12 +1115,10 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
 std::pair<uint64_t, uint64_t> getLocalAssignment(uint64_t numToSplit);
 
 /**
- * assign
- */
-
-/**
  * Given a set of disjoint edges, assign edges to hosts. Then, each host writes
  * the edges to the specified output file in the Galois binary graph format.
+ *
+ * @TODO
  */
 template<typename EdgeTy>
 void assignAndWriteEdges(std::vector<uint32_t>& localEdges, 

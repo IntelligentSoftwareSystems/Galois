@@ -47,7 +47,7 @@ std::vector<std::pair<uint64_t, uint64_t>> getHostToNodeMapping(
 }
 
 uint32_t findOwner(const uint64_t gID, 
-            const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping) {
+               const std::vector<std::pair<uint64_t, uint64_t>>& ownerMapping) {
   uint32_t lb = 0;
   uint32_t ub = ownerMapping.size();
 
@@ -193,19 +193,19 @@ std::pair<uint64_t, uint64_t> binSearchDivision(uint64_t id, uint64_t totalID,
 }
 
 
-std::set<uint64_t> 
-findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
-                const std::vector<std::pair<uint64_t, uint64_t>>& chunkToNode) {
+void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
+                      const std::vector<Uint64Pair>& chunkToNode,
+                      galois::DynamicBitSet& uniqueChunkBitset) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-
   printf("[%lu] Finding unique chunks\n", hostID);
-  galois::substrate::PerThreadStorage<std::set<uint64_t>> threadUniqueChunks;
+  uniqueChunkBitset.reset();
 
   galois::do_all(
-    galois::iterate(uniqueNodes.cbegin(), uniqueNodes.cend()),
-    [&] (auto uniqueNode) {
-      std::set<uint64_t>& localSet = *threadUniqueChunks.getLocal();
-      localSet.insert(findOwner(uniqueNode, chunkToNode));
+    galois::iterate((size_t)0, uniqueNodeBitset.size()),
+    [&] (auto nodeIndex) {
+      if (uniqueNodeBitset.test(nodeIndex)) {
+        uniqueChunkBitset.set(findOwner(nodeIndex, chunkToNode));
+      }
     },
     galois::loopname("FindUniqueChunks"),
     galois::no_stats(),
@@ -213,18 +213,9 @@ findUniqueChunks(const std::set<uint64_t>& uniqueNodes,
     galois::timeit()
   );
 
-  std::set<uint64_t> uniqueChunks;
+  freeVector(uniqueNodeBitset.get_vec());
 
-  for (unsigned i = 0; i < threadUniqueChunks.size(); i++) {
-    auto& tSet = *threadUniqueChunks.getRemote(i);
-    for (auto chunkID : tSet) {
-      uniqueChunks.insert(chunkID);
-    }
-  }
-
-  printf("[%lu] Have %lu unique chunk(s)\n", hostID, uniqueChunks.size());
-
-  return uniqueChunks;
+  printf("[%lu] Unique chunks found\n", hostID);
 }
 
 void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts) {
