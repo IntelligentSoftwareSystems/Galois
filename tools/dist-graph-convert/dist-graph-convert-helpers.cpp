@@ -308,6 +308,65 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
   return DoubleUint64Pair(nodePair, edgePair);
 }
 
+std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
+    const std::string& inputFile, Uint64Pair nodesToRead, 
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
+) {
+  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+                            edgesToRead.first, edgesToRead.second, 
+                            totalNumNodes, totalNumEdges);
+  size_t numNodesToRead = nodesToRead.second - nodesToRead.first;
+  std::vector<std::set<uint32_t>> nonDupSets(numNodesToRead);
+
+  // insert edge destinations of each node into a set (i.e. no duplicates)
+  galois::do_all(
+    galois::iterate(nodesToRead.first, nodesToRead.second),
+    [&] (uint32_t gID) {
+      size_t vectorIndex = gID - nodesToRead.first;
+
+      uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
+      uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+
+      for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+        uint32_t edgeDest = mpiGraph.edgeDestination(i);
+        if (edgeDest != gID) {
+          nonDupSets[vectorIndex].insert(edgeDest);
+        }
+      }
+    },
+    galois::loopname("FindCleanEdges"),
+    galois::timeit(),
+    galois::no_stats()
+  );
+
+  // get total num edges remaining
+  uint64_t edgesRemaining = 0;
+  for (unsigned i = 0; i < numNodesToRead; i++) {
+    edgesRemaining += nonDupSets[i].size();
+  }
+
+  std::vector<uint32_t> edgeData(edgesRemaining * 2);
+
+  uint64_t counter = 0;
+
+  // (serially) create the edge vector; TODO it's possible to parallelize
+  // this loop using a prefix sum of edges....; worth doing?
+  for (unsigned i = 0; i < numNodesToRead; i++) {
+    std::set<uint32_t> currentSet = nonDupSets[i];
+    uint32_t currentGID = i + nodesToRead.first;
+
+    for (auto dest : currentSet) {
+      edgeData[counter * 2] = currentGID; // src
+      edgeData[counter * 2 + 1] = dest;
+      counter++;
+    }
+  }
+
+  return edgeData;
+}
+
+
 uint64_t receiveEdgeCounts() {
   auto& net = galois::runtime::getSystemNetworkInterface();
   uint64_t hostID = net.ID;

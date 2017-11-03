@@ -249,6 +249,7 @@ struct Gr2SGr : public Conversion {
                   "data needs to have twice as many edges as original graph");
     assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, doubleEdgeCount, 
                                 outputFile);
+    galois::runtime::getHostBarrier().wait();
   }
 };
 
@@ -311,7 +312,38 @@ struct Gr2CGr : public Conversion {
                   "Edge type must be void to clean graph");
     GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
 
-    // TODO
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) = readV1GrHeader(inputFile);
+
+    // get "read" assignment of nodes (i.e. nodes this host is responsible for)
+    Uint64Pair nodesToRead;
+    Uint64Pair edgesToRead;
+    std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+                                                    nodesToRead.second);
+    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID, 
+           edgesToRead.first, edgesToRead.second, 
+           edgesToRead.second - edgesToRead.first);
+
+    std::vector<uint32_t> localEdges = loadCleanEdgesFromMPIGraph(inputFile, 
+                                           nodesToRead, edgesToRead, 
+                                           totalNumNodes, totalNumEdges);
+    uint64_t cleanEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
+    GALOIS_ASSERT(cleanEdgeCount < totalNumEdges, 
+                  "clean should not increase edge count");
+
+    if (hostID == 0) {
+      galois::gPrint("From ", totalNumEdges, " edges to ", cleanEdgeCount, 
+                     "edges\n");
+    }
+
+    assignAndWriteEdges<EdgeTy>(localEdges, totalNumNodes, cleanEdgeCount, 
+                                outputFile);
+    galois::runtime::getHostBarrier().wait();
   }
 };
 
