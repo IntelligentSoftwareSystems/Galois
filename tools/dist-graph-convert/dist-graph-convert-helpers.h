@@ -375,7 +375,6 @@ std::vector<uint64_t> getChunkEdgeCounts(
                 const std::vector<Uint64Pair>& chunkToNode) {
   std::vector<uint64_t> chunkCounts;
   chunkCounts.assign(uniqueChunkBitset.size(), 0);
-  printf("Chunk counts initialized\n");
   accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunkBitset, localEdges, 
                                            chunkToNode, chunkCounts);
   sendAndReceiveEdgeChunkCounts(chunkCounts);
@@ -421,7 +420,7 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
   // TODO better heuristics: basically we don't want to run out of memory,
   // so keep number of chunks from growing too large
-  while (numNodeChunks > 5000000) {
+  while (numNodeChunks > 10000000) {
     numNodeChunks /= 2;
   }
 
