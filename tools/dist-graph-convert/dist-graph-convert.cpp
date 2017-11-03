@@ -37,6 +37,7 @@ enum ConvertMode {
   gr2wgr,
   gr2tgr,
   gr2sgr,
+  gr2cgr
 };
 
 enum EdgeType {
@@ -62,8 +63,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
       clEnumVal(gr2wgr, "Convert unweighted binary gr to weighted binary gr "
                          "(in-place)"),
-      clEnumVal(gr2tgr, "Convert binary gr to transpose binary gr "),
-      clEnumVal(gr2sgr, "Convert binary gr to symmetric binary gr "),
+      clEnumVal(gr2tgr, "Convert binary gr to transpose binary gr"),
+      clEnumVal(gr2sgr, "Convert binary gr to symmetric binary gr"),
+      clEnumVal(gr2cgr, "Convert binary gr to binary gr without self-loops "
+                        "or multi-edges; edge data will be ignored"),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -77,10 +80,7 @@ static cll::opt<bool> editInPlace("inPlace",
                                   cll::init(false));
 
 
-// Base structures to inherit from: name specifies what the converter can do
 struct Conversion { };
-struct HasOnlyVoidSpecialization { };
-struct HasNoVoidSpecialization { };
 
 ////////////////////////////////////////////////////////////////////////////////
 // BEGIN CONVERT CODE/STRUCTS
@@ -315,6 +315,23 @@ struct Gr2WGr : public Conversion {
   }
 };
 
+/**
+ * Cleans graph (no multi-edges, no self-loops).
+ *
+ * ONLY WORKS ON GRAPHS WITH NO EDGE DATA. (If it does have edge data, it will
+ * be ignored.)
+ */
+struct Gr2CGr : public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(std::is_void<EdgeTy>::value, 
+                  "Edge type must be void to clean graph");
+    GALOIS_ASSERT(!(outputFile.empty()), "gr2cgr needs an output file");
+
+    // TODO
+  }
+};
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   llvm::cl::ParseCommandLineOptions(argc, argv);
@@ -329,6 +346,8 @@ int main(int argc, char** argv) {
       convert<Gr2TGr>(); break;
     case gr2sgr: 
       convert<Gr2SGr>(); break;
+    case gr2cgr: 
+      convert<Gr2CGr>(); break;
     default: abort();
   }
   return 0;
