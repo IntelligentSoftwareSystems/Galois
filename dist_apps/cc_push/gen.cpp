@@ -271,7 +271,7 @@ struct ConnectedCompSanityCheck {
 
     // Only node 0 will print the number visited
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      printf("Number of components is %lu\n", num_components);
+      galois::gPrint("Number of components is ", num_components, "\n");
     }
   }
 

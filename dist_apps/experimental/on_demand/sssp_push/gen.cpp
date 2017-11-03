@@ -428,8 +428,8 @@ struct SSSPSanityCheck {
 
     // Only host 0 will print the info
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      printf("Number of nodes visited is %lu\n", num_visited);
-      printf("Max distance is %u\n", max_distance);
+      galois::gPrint("Number of nodes visited from source ", src_node, " is ", num_visited, "\n");
+      galois::gPrint("Max distance from source ", src_node, " is ", max_distance, "\n");
     }
   }
 
