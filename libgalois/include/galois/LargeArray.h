@@ -39,6 +39,16 @@
 
 #include <utility>
 
+/*
+ * Headers for boost serialization
+ */
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/serialization/split_member.hpp>
+#include <boost/serialization/binary_object.hpp>
+#include <boost/serialization/array.hpp>
+#include <boost/serialization/serialization.hpp>
+
 namespace galois {
 
 namespace runtime {
@@ -56,6 +66,8 @@ class LargeArray {
   substrate::LAptr m_realdata;
   T* m_data;
   size_t m_size;
+
+
 
 public:
   typedef T raw_value_type;
@@ -100,6 +112,37 @@ protected:
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
+
+private:
+  /*
+   * To support boost serialization
+   */
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void save(Archive &ar, const unsigned int version) const {
+
+    std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
+    ar << m_size;
+    ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    /*
+     * Cas use make_array too as shown below
+     */
+    //ar << boost::serialization::make_array<T>(m_data, m_size);
+  }
+  template <typename Archive>
+  void load(Archive &ar, const unsigned int version) {
+    ar >> m_size;
+
+    std::cerr << "load m_size : " << m_size << " Threads : " <<runtime::activeThreads << "\n";
+
+    //TODO: For now, always use allocateInterleaved
+    //Allocates and sets m_data pointer
+    allocateInterleaved(m_size);
+    ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    //ar >> boost::serialization::make_array<T>(m_data, m_size);
+  }
+  //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
+  BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
   /**
@@ -245,6 +288,18 @@ public:
 //! Void specialization
 template<>
 class LargeArray<void> {
+
+private:
+  /*
+   * To support boost serialization
+   * Can use single function serialize instead of save and load, since both save
+   * and load have identical code.
+   */
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void serialize(Archive &ar, const unsigned int version) const {
+  }
+
 public:
   LargeArray(void* d, size_t s) { }
   LargeArray() = default;

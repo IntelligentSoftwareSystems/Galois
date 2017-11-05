@@ -38,6 +38,7 @@
 #include <iostream>
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <fstream>
 
 #include "galois/gstl.h"
 #include "galois/Galois.h"
@@ -62,6 +63,18 @@
 #include "galois/runtime/BareMPI.h"
 
 #include "llvm/Support/CommandLine.h"
+
+/*
+ * Headers for boost serialization
+ */
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/serialization/split_member.hpp>
+#include <boost/serialization/binary_object.hpp>
+#include <boost/serialization/serialization.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/unordered_map.hpp>
+
 
 namespace cll = llvm::cl;
 
@@ -136,6 +149,8 @@ protected:
   // Master nodes on each host.
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
+  uint32_t numNodes; // Number of local nodes (master + mirrors) on this host
+
   uint64_t last_nodeID_withEdges_bipartite; // used only for bipartite graphs
 
   // memoization optimization
@@ -190,6 +205,9 @@ public:
   virtual unsigned getHostID(uint64_t) const = 0;
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{
+  }
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0){};
 
   // Requirement: For all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
@@ -857,8 +875,13 @@ protected:
    * partition.
    * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
    */
+  template<typename VectorTy>
+  //inline void determine_thread_ranges(uint32_t total_nodes,
+                               //std::vector<uint64_t> edge_prefix_sum) {
+
   inline void determine_thread_ranges(uint32_t total_nodes,
-                               std::vector<uint64_t> edge_prefix_sum) {
+                               VectorTy& edge_prefix_sum) {
+
     graph.determineThreadRangesByNode(edge_prefix_sum);
   }
 
@@ -3308,6 +3331,111 @@ public:
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
                        "_" + std::to_string(num_iteration));
   }
+
+  /*
+   * Write the local LC_CSR graph to the file on a disk.
+   *
+   * @param takes file name to write local graph to.
+   *
+   * @returns: void
+   */
+  void save_local_graph_to_file(std::string localGraphFileName = "local_graph"){
+    using namespace boost::archive;
+    std::string fileName = localGraphFileName + "_" + std::to_string(id);
+
+    std::ofstream outputStream(fileName, std::ios::binary);
+    if(!outputStream.is_open()){
+      std::cerr << "ERROR: Could not open " << fileName << " to save local graph!!!\n";
+    }
+
+    boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
+
+    //graph topology
+    ar << graph;
+    ar << numGlobalNodes;
+    ar << numGlobalEdges;
+
+    //bool
+    ar << transposed;
+
+
+    //Proxy information
+    //TODO: Find better way to serialize vector of vectors in boost serialization
+    for(uint32_t i = 0; i < numHosts; ++i){
+      ar << masterNodes[i];
+      ar << mirrorNodes[i];
+    }
+
+    ar << numOwned;
+    ar << numNodes;
+    ar << beginMaster;
+    ar << numNodesWithEdges;
+    ar << gid2host;
+
+    //Serialize partitioning scheme specific data structures.
+    boostSerializeLocalGraph(ar);
+
+
+    outputStream.close();
+  }
+
+  /*
+   * Read the local LC_CSR graph from the file on a disk.
+   *
+   * @param takes file name to read local graph from.
+   *
+   * @returns: void
+   */
+  void read_local_graph_from_file(std::string localGraphFileName = "local_graph"){
+    using namespace boost::archive;
+    std::string fileName = localGraphFileName + "_" + std::to_string(id);
+
+    std::ifstream inputStream(fileName, std::ios::binary);
+    if(!inputStream.is_open()){
+      std::cerr << "ERROR: Could not open " << fileName << " to read local graph!!!\n";
+    }
+
+    galois::gPrint("[", id, "] inside read_local_graph_from_file \n");
+
+    boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
+
+    //Graph topology
+    ar >> graph;
+    ar >> numGlobalNodes;
+    ar >> numGlobalEdges;
+
+    //bool
+    ar >> transposed;
+
+    //Proxy information
+    //TODO: Find better way to Deserialize vector of vectors in boost serialization
+    for(uint32_t i = 0; i < numHosts; ++i){
+      ar >> masterNodes[i];
+      ar >> mirrorNodes[i];
+    }
+
+    ar >>  numOwned;
+    ar >>  numNodes;
+    ar >>  beginMaster;
+    ar >>  numNodesWithEdges;
+    ar >>  gid2host;
+
+
+    //Serialize partitioning scheme specific data structures.
+    boostDeSerializeLocalGraph(ar);
+
+    determine_thread_ranges(numNodes, graph.getEdgeInDataArray());
+    // find ranges for master + nodes with edges
+    determine_thread_ranges_master();
+    determine_thread_ranges_with_edges();
+    initialize_specific_ranges();
+
+    // Exchange information among hosts
+    send_info_to_host();
+
+    inputStream.close();
+  }
+
 
 };
 template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>

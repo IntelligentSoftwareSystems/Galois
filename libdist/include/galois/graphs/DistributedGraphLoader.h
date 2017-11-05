@@ -72,6 +72,9 @@ extern cll::opt<std::string> partFolder;
 extern cll::opt<PARTITIONING_SCHEME> partitionScheme;
 extern cll::opt<unsigned int> VCutThreshold;
 extern cll::opt<std::string> vertexIDMapFileName;
+extern cll::opt<bool> readFromFile;
+extern cll::opt<std::string> localGraphFileName;
+extern cll::opt<bool> saveLocalGraph;
 
 /*******************************************************************************
  * Graph-loading functions
@@ -180,17 +183,17 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
   // 1 host = no concept of cut; just load from edgeCut, no transpose
   if (net.Num == 1) {
     return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                             scaleFactor, false);
+                             scaleFactor, false, readFromFile, localGraphFileName);
   }
 
   switch(partitionScheme) {
     case OEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                               scaleFactor, false);
+                               scaleFactor, false, readFromFile, localGraphFileName);
     case IEC:
       if (inputFileTranspose.size()) {
         return new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, 
-                                 net.Num, scaleFactor, true);
+                                 net.Num, scaleFactor, true, readFromFile, localGraphFileName);
       } else {
         GALOIS_DIE("Error: attempting incoming edge cut without transpose "
                    "graph");

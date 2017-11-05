@@ -76,3 +76,17 @@ cll::opt<unsigned int> VCutThreshold("VCutThreshold",
 cll::opt<std::string> vertexIDMapFileName("vertexIDMapFileName",
                                        cll::desc("<file containing the vertexID to hosts mapping for the custom edge cut.>"), 
                                        cll::init(""));
+
+cll::opt<bool> readFromFile("readFromFile",
+                              cll::desc("Set this flag if graph is to be constructed from file (file must be created by Abelian CSR)"),
+                              cll::init(false));
+
+cll::opt<std::string> localGraphFileName("localGraphFileName",
+                              cll::desc("Name of the local file to construct local graph (file must be created by Abelian CSR)"),
+                              cll::init("local_graph"));
+
+cll::opt<bool> saveLocalGraph("saveLocalGraph",
+                                             cll::desc("Set to save the local CSR graph"), 
+                                             cll::init(false));
+
+

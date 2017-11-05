@@ -104,13 +104,18 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned>& scalefactor, 
-                   bool transpose = false) : 
+                   bool transpose = false, bool readFromFile = false, std::string localGraphFileName = "local_graph") : 
                     base_hGraph(host, _numHosts) {
       galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", 
                                                   GRNAME);
       Tgraph_construct.start();
       galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
                                                        GRNAME);
+      if(readFromFile){
+        galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+        base_hGraph::read_local_graph_from_file(localGraphFileName);
+        return;
+      }
       uint32_t _numNodes;
       uint64_t _numEdges;
 
@@ -230,7 +235,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
+      base_hGraph::numNodes = numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
 
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);
@@ -434,5 +439,42 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       }
     }
   }
+
+
+  /*
+   * This function serializes the local data structures using boost binary archive.
+   */
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
+
+    //unsigned ints
+    ar << numNodes;
+    ar << globalOffset;
+
+    //maps and vectors
+    ar << ghostMap;
+    ar << GlobalToLocalGhostMap;
+
+    //pairs
+    ar << hostNodes;
+
+  }
+
+  /*
+   * This function DeSerializes the local data structures using boost binary archive.
+   */
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
+
+    //unsigned ints
+    ar >> numNodes;
+    ar >> globalOffset;
+
+    //maps and vectors
+    ar >> ghostMap;
+    ar >> GlobalToLocalGhostMap;
+
+    //pairs
+    ar >> hostNodes;
+  }
+
 };
 #endif

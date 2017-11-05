@@ -42,6 +42,16 @@
 
 #include <type_traits>
 
+/*
+ * Headers for boost serialization
+ */
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+#include <boost/serialization/split_member.hpp>
+#include <boost/serialization/binary_object.hpp>
+#include <boost/serialization/serialization.hpp>
+
+
 namespace galois {
 namespace graphs {
 /**
@@ -197,6 +207,48 @@ class LC_CSR_Graph :
   GraphNode getNode(size_t n) {
     return n;
   }
+
+ private:
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void save(Archive &ar, const unsigned int version) const {
+    ar << numNodes;
+    ar << numEdges;
+
+    //Large Arrays
+    ar << edgeIndData;
+    ar << edgeDst;
+    ar << edgeData;
+  }
+
+  template <typename Archive>
+  void load(Archive &ar, const unsigned int version) {
+    ar >> numNodes;
+    ar >> numEdges;
+
+    //Large Arrays
+    ar >> edgeIndData;
+    ar >> edgeDst;
+    ar >> edgeData;
+
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes);
+      this->outOfLineAllocateLocal(numNodes);
+    } else{
+      nodeData.allocateInterleaved(numNodes);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+
+    //Construct nodeData largeArray
+    for (size_t n = 0; n < numNodes; ++n) {
+      nodeData.constructAt(n);
+    }
+
+  }
+  //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
+  BOOST_SERIALIZATION_SPLIT_MEMBER()
+
+
 
  public:
   LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
@@ -488,6 +540,16 @@ class LC_CSR_Graph :
   std::vector<uint32_t>& getThreadRangesVector() {
     return threadRanges;
   }
+
+  /**
+   * Returns the reference to the edgeIndData LargeArray
+   *
+   * @returns reference to LargeArray edgeIndData
+   */
+  EdgeIndData& getEdgeInDataArray() {
+    return edgeIndData;
+  }
+
 
   /**
    * Helper function used by determineThreadRanges that consists of the main
