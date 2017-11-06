@@ -37,6 +37,7 @@
 #include "galois/runtime/Mem.h"
 #include "galois/substrate/NumaMem.h"
 
+#include <iostream> // TODO remove this once cerr is removed
 #include <utility>
 
 /*
@@ -121,6 +122,7 @@ private:
   template <typename Archive>
   void save(Archive &ar, const unsigned int version) const {
 
+    // TODO DON'T USE CERR
     std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
     ar << m_size;
     ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
@@ -133,6 +135,7 @@ private:
   void load(Archive &ar, const unsigned int version) {
     ar >> m_size;
 
+    // TODO DON'T USE CERR
     std::cerr << "load m_size : " << m_size << " Threads : " <<runtime::activeThreads << "\n";
 
     //TODO: For now, always use allocateInterleaved
