@@ -43,7 +43,7 @@ target_include_directories(galois_shmem PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(galois_shmem gllvm)
+target_link_libraries(galois_shmem gllvm ${Boost_SERIALIZATION_LIBRARY_RELEASE})
 
 if (CMAKE_HAVE_PTHREAD_H)
    add_definitions(-DGALOIS_HAVE_PTHREAD)

@@ -295,7 +295,7 @@ set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
-find_package(Boost 1.38.0 REQUIRED)
+find_package(Boost 1.38.0 REQUIRED COMPONENTS serialization)
 include_directories(${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_NO_AUTO_PTR)
 
