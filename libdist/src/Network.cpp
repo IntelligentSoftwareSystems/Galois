@@ -46,8 +46,11 @@ galois::runtime::NetworkIO::~NetworkIO() {}
  */
 void NetworkInterface::initializeMPI() {
   int supportProvided;
-  int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_MULTIPLE, 
-                                    &supportProvided);
+#ifdef GALOIS_USE_LWCI
+  int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, &supportProvided);
+#else
+  int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_MULTIPLE, &supportProvided);
+#endif
   if (initSuccess != MPI_SUCCESS) {
     MPI_Abort(MPI_COMM_WORLD, initSuccess);
   }
