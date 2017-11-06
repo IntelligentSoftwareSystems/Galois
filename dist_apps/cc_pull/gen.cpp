@@ -52,7 +52,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("srcNodeId", 
+static cll::opt<uint32_t> src_node("srcNodeId", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -61,7 +61,7 @@ static cll::opt<unsigned long long> src_node("srcNodeId",
 /******************************************************************************/
 
 struct NodeData {
-  unsigned long long comp_current;
+  uint32_t comp_current;
 };
 
 galois::DynamicBitSet bitset_comp_current;
@@ -168,8 +168,8 @@ struct ConnectedComp {
     for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned long long new_comp = dnode.comp_current;
-      unsigned long long old_comp = galois::min(snode.comp_current, new_comp);
+      uint32_t new_comp = dnode.comp_current;
+      uint32_t old_comp = galois::min(snode.comp_current, new_comp);
       if (old_comp > new_comp){
         bitset_comp_current.set(src);
         DGAccumulator_accum += 1;

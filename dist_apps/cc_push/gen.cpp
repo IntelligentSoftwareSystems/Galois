@@ -57,7 +57,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 /******************************************************************************/
 
 struct NodeData {
-  std::atomic<unsigned long long> comp_current;
+  std::atomic<uint32_t> comp_current;
   uint32_t comp_old;
 };
 
@@ -152,8 +152,8 @@ struct FirstItr_ConnectedComp{
     for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned long long new_dist = snode.comp_current;
-      unsigned long long old_dist = galois::atomicMin(dnode.comp_current, new_dist);
+      uint32_t new_dist = snode.comp_current;
+      uint32_t old_dist = galois::atomicMin(dnode.comp_current, new_dist);
       if (old_dist > new_dist) bitset_comp_current.set(dst);
     }
   }
@@ -227,8 +227,8 @@ struct ConnectedComp {
       for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        unsigned long long new_dist = snode.comp_current;
-        unsigned long long old_dist = galois::atomicMin(dnode.comp_current, new_dist);
+        uint32_t new_dist = snode.comp_current;
+        uint32_t old_dist = galois::atomicMin(dnode.comp_current, new_dist);
         if (old_dist > new_dist) bitset_comp_current.set(dst);
       }
 
