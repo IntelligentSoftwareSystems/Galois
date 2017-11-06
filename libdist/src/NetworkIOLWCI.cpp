@@ -28,7 +28,6 @@
 #include "galois/substrate/SimpleLock.h"
 
 #include "lc.h"
-#include "ult/helper.h"
 
 #include <iostream>
 #include <list>
@@ -39,7 +38,6 @@
 #endif
 
 class NetworkIOLWCI;
-NetworkIOLWCI* __ctx;
 lch* mv;
 
 struct mpiMessage {
@@ -53,6 +51,13 @@ struct mpiMessage {
   mpiMessage(uint32_t r, uint32_t t, std::vector<uint8_t> &b) :
     rank(r), tag(t), buf(std::move(b))  {};
 };
+
+void* alloc_cb(void* ctx, size_t size)
+{
+  mpiMessage* msg = (mpiMessage*) ctx;
+  msg->buf.resize(size);
+  return &(msg->buf[0]);
+}
 
 /**
  * LWCI implementation of network IO.
@@ -70,8 +75,7 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
    * Initializes LWCI's communication layer.
    */
   std::pair<int, int> initMPI() {
-    lc_open((size_t) 128 * 1024 * 1024, &mv);
-    __ctx = this;
+    lc_open(&mv, 1);
     return std::make_pair(getID(), getNum());
   }
 
@@ -108,7 +112,7 @@ public:
     memUsageTracker.incrementMemUsage(m.data.size());
     inflight.emplace_back(m.host, m.tag, m.data);
     auto& f = inflight.back();
-    while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, &f.ctx)) {
+    while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, 0, &f.ctx)) {
       progress();
     }
   }
@@ -116,11 +120,10 @@ public:
   void probe() {
     recv.emplace_back();
     auto& m = recv.back();
-    int size;
-    if (lc_recv_queue(mv, &size, (int*) &m.rank, (int*) &m.tag, &m.ctx)) {
-      m.buf.resize(size);
+    size_t size; lc_qtag tag;
+    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, &m.ctx)) {
+      m.tag = tag;
       memUsageTracker.incrementMemUsage(size);
-      lc_recv_queue_post(mv, m.buf.data(), &m.ctx);
     } else {
       recv.pop_back();
     }
