@@ -51,30 +51,22 @@ class DGAccumulator {
   }
 #else
   inline void reduce_mpi() {
-    switch(typeid(Ty)) {
-      case typeid(int32):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(int64):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(uint32):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(uint64):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(float):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(double):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      case typeid(long double):
-        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        break;
-      default:
-        static_assert(true, "Type of DGAccumulator not supported for MPI reduction");
+    if (typeid(Ty) == typeid(int32_t)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(int64_t)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(uint32_t)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(uint64_t)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(float)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(double)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    } else if (typeid(Ty) == typeid(long double)) {
+      MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    } else {
+      static_assert(true, "Type of DGAccumulator not supported for MPI reduction");
     }
   }
 #endif
