@@ -33,12 +33,8 @@
 #include <limits>
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
-#include "galois/runtime/BareMPI.h"
 #include "galois/AtomicHelpers.h"
-
-#ifdef __GALOIS_HET_OPENCL__
-#include "galois/opencl/CL_Header.h"
-#endif
+#include "galois/runtime/LWCI.h"
 
 namespace galois {
 
@@ -48,121 +44,58 @@ class DGAccumulator {
 
   galois::GAccumulator<Ty> mdata;
   Ty local_mdata, global_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-  cl_mem dev_data;
-#endif
 
-  void reduce_net() {
-    global_mdata = local_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-    Ty tmp;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    galois::atomicAdd(mdata, tmp);
-#endif
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (net.ID + h) % net.Num;
-      galois::runtime::SendBuffer b;
-      gSerialize(b, local_mdata);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
+#ifdef GALOIS_USE_LWCI
+  inline void reduce_lwci() {
+    lc_alreduce(&local_mdata, &global_mdata, 1, &ompi_op_sum<Ty>, mv);
+  }
+#else
+  inline void reduce_mpi() {
+    switch(typeid(Ty)) {
+      case typeid(int32):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(int64):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(uint32):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(uint64):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(float):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(double):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      case typeid(long double):
+        MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        break;
+      default:
+        static_assert(true, "Type of DGAccumulator not supported for MPI reduction");
     }
-    net.flush();
-
-    unsigned num_Hosts_recvd = 1;
-    while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      Ty x_mdata;
-      gDeserialize(p->second, x_mdata);
-      global_mdata += x_mdata;
-      ++num_Hosts_recvd;
-    }
-    ++galois::runtime::evilPhase;
-  }
-
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-  void reduce_mpi(const int32_t& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::INT, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const int64_t& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::LONG, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const uint32_t& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const uint64_t& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const float& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::FLOAT, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const double& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  }
-
-  void reduce_mpi(const long double& l_mdata) {
-    MPI_Allreduce(&l_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   }
 #endif
 
 public:
   // Default constructor
-  DGAccumulator() {
-#ifdef __GALOIS_HET_OPENCL__
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err;
-    dev_data= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(Ty) , nullptr, &err);
-    galois::opencl::CHECK_CL_ERROR(err, "Error allocating DGAccumulator!\n");
-    Ty val = 0;
-    cl_command_queue queue = ctx->get_default_device()->command_queue();
-    err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::opencl::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
-#endif
-  }
+  DGAccumulator() {}
+
   DGAccumulator& operator+=(const Ty& rhs) {
     mdata += rhs;
     return *this;
   }
-  /************************************************************
-   *
-   ************************************************************/
 
   void operator=(const Ty rhs) {
     mdata.reset();
     mdata += rhs;
-#ifdef __GALOIS_HET_OPENCL__
-    int err;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_command_queue queue = ctx->get_default_device()->command_queue();
-    Ty val = mdata.load();
-    err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::opencl::CHECK_CL_ERROR(err, "Error Writing DGAccumulator!\n");
-#endif
   }
-
-  /************************************************************
-   *
-   ************************************************************/
 
   void set(const Ty rhs) {
     mdata.reset();
     mdata += rhs;
-#ifdef __GALOIS_HET_OPENCL__
-    int err;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_command_queue queue = ctx->get_default_device()->command_queue();
-    err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &mdata.load(), 0, NULL, NULL);
-    galois::opencl::CHECK_CL_ERROR(err, "Error writing DGAccumulator!\n");
-#endif
   }
 
   Ty read_local() {
@@ -172,6 +105,13 @@ public:
 
   Ty read() {
     return global_mdata;
+  }
+
+  Ty reset() {
+    Ty retval = global_mdata;
+    mdata.reset();
+    local_mdata = global_mdata = 0;
+    return retval;
   }
 
   /************************************************************
@@ -188,20 +128,10 @@ public:
 
     if (local_mdata == 0) local_mdata = mdata.reduce();
 
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-    switch (bare_mpi) {
-      case noBareMPI:
-#endif
-        reduce_net();
-#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
-        break;
-      case nonBlockingBareMPI:
-      case oneSidedBareMPI:
-        reduce_mpi(local_mdata);
-        break;
-      default:
-        GALOIS_DIE("Unsupported bare MPI");
-    }
+#ifdef GALOIS_USE_LWCI 
+    reduce_lwci();
+#else
+    reduce_mpi();
 #endif
 
     reduceTimer.stop();
@@ -215,18 +145,10 @@ public:
    ************************************************************/
 
   /* Max reduction across DGAccumulators */
+  // TODO: FIX THIS - should be a separate reduction type, not within Accumulator
   Ty reduce_max() {
     if (local_mdata == 0) local_mdata = mdata.reduce();
     global_mdata = local_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-    Ty tmp;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    // TODO change to atomic max?
-    galois::atomicAdd(mdata, tmp);
-#endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
       galois::runtime::SendBuffer b;
@@ -257,18 +179,10 @@ public:
    ************************************************************/
 
   /* Min reduction across DGAccumulators */
+  // TODO: FIX THIS - should be a separate reduction type, not within Accumulator
   Ty reduce_min() {
     if (local_mdata == 0) local_mdata = mdata.reduce();
     global_mdata = local_mdata;
-#ifdef __GALOIS_HET_OPENCL__
-    Ty tmp;
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_int err = clEnqueueReadBuffer(ctx->get_default_device()->command_queue(), dev_data, CL_TRUE, 0, sizeof(Ty), &tmp, 0, NULL, NULL);
-//    fprintf(stderr, "READ-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, tmp);
-    galois::opencl::CHECK_CL_ERROR(err, "Error reading DGAccumulator!\n");
-    // TODO change to atomic min?
-    galois::atomicAdd(mdata, tmp);
-#endif
     for (unsigned h = 1; h < net.Num; ++h) {
       unsigned x = (net.ID + h) % net.Num;
       galois::runtime::SendBuffer b;
@@ -292,35 +206,6 @@ public:
 
     // returns min from all accumulators
     return global_mdata;
-  }
-
-  /************************************************************
-   *
-   ************************************************************/
-
-#ifdef __GALOIS_HET_OPENCL__
-  const cl_mem &device_ptr(){
-    reset();
-    return dev_data;
-  }
-#endif
-  /************************************************************
-   *
-   ************************************************************/
-  Ty reset() {
-    Ty retval = global_mdata;
-    mdata.reset();
-    local_mdata = global_mdata = 0;
-#ifdef __GALOIS_HET_OPENCL__
-    int err;
-    Ty val = mdata.load();
-    galois::opencl::CLContext * ctx = galois::opencl::getCLContext();
-    cl_command_queue queue = ctx->get_default_device()->command_queue();
-    err = clEnqueueWriteBuffer(queue, dev_data, CL_TRUE, 0, sizeof(Ty), &val, 0, NULL, NULL);
-    galois::opencl::CHECK_CL_ERROR(err, "Error writing (reset) DGAccumulator!\n");
-//    fprintf(stderr, "RESET-DGA[%d, %d]\n", galois::runtime::NetworkInterface::ID, val);
-#endif
-    return retval;
   }
 };
 }

@@ -27,7 +27,7 @@
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
 
-#include "lc.h"
+#include "galois/runtime/LWCI.h"
 
 #include <iostream>
 #include <list>
