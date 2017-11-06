@@ -607,7 +607,6 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
         }
       },
       galois::loopname("LoadSymmetricEdgesMPIGraph"));
-    );
   }
   
   return edgeData;

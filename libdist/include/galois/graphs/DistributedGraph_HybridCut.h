@@ -247,7 +247,6 @@ public:
         base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
       },
       galois::loopname("EdgeLoading"));
-    );
 
     base_hGraph::printStatistics();
 
