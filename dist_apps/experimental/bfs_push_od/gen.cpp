@@ -169,9 +169,7 @@ struct InitializeGraph {
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>(),
-      galois::timeit()
-    );
+      galois::steal<true>());
 
     }
   }
@@ -217,8 +215,7 @@ struct FirstItr_BFS{
     // one node, doesn't matter which do_all you use, so regular one suffices
     galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
                 FirstItr_BFS{&_graph}, 
-                galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-                galois::timeit());
+                galois::loopname(_graph.get_run_identifier("BFS").c_str()));
     }
 
     Flags_dist_current::set_write_dst();
@@ -283,8 +280,7 @@ struct BFS {
         nodesWithEdges,
         BFS(&_graph, dga),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-        galois::steal<true>(),
-        galois::timeit()
+        galois::steal<true>());
       );
     }
 

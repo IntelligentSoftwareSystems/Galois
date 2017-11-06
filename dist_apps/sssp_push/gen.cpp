@@ -105,10 +105,7 @@ struct InitializeGraph {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{src_node, infinity, &_graph}, 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -147,10 +144,7 @@ struct FirstItr_SSSP {
     galois::do_all(
       galois::iterate(__begin, __end),
       FirstItr_SSSP{&_graph}, 
-      galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -210,10 +204,7 @@ struct SSSP {
           galois::iterate(nodesWithEdges),
           SSSP{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-          galois::steal<true>(),
-          galois::timeit(),
-          galois::no_stats()
-        );
+          galois::steal<true>());
       }
 
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
@@ -290,8 +281,7 @@ struct SSSPSanityCheck {
       m.reset();
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
                      SSSPSanityCheck(infinity, &_graph, dgas, dgam, m),
-                     galois::loopname("SSSPSanityCheck"),
-                     galois::no_stats());
+                     galois::loopname("SSSPSanityCheck"));
       dgam = m.reduce();
     }
 

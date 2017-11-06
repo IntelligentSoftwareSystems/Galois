@@ -245,15 +245,15 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
       abort(); // Never executed
       output.densify();
       // typedef dChunkedFIFO<256*4> WL;
-      galois::do_all(galois::iterate(graph), internal::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), galois::chunk_size<256>(), galois::no_stats());
+      galois::do_all(galois::iterate(graph), internal::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), galois::chunk_size<256>());
     } else {
       // typedef dChunkedFIFO<256> WL;
-      galois::do_all(galois::iterate(graph), internal::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), galois::chunk_size<256>(), galois::no_stats());
+      galois::do_all(galois::iterate(graph), internal::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), galois::chunk_size<256>());
     }
   } else {
     //std::cout << "(S) Count " << count << "\n"; // XXX
     // typedef dChunkedFIFO<64> WL;
-    galois::do_all(galois::iterate(input), internal::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), galois::chunk_size<256>(), galois::no_stats());
+    galois::do_all(galois::iterate(input), internal::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), galois::chunk_size<256>());
   }
 }
 

@@ -198,7 +198,7 @@ private:
               galois::runtime::pagePoolFree(h2);
           }
           hpair.second = 0;
-        }, std::make_tuple(galois::no_stats()));
+        }, std::make_tuple());
   }
 
 public:

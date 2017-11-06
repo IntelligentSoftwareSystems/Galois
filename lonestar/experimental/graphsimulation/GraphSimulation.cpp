@@ -86,8 +86,7 @@ void initializeQueryGraph(Graph& g) {
         auto& data = g.getData(n);
         data.matched = false;
         data.label = data.id;
-      },
-      galois::no_stats());
+      });
 }
 
 template<typename Graph>
@@ -102,8 +101,7 @@ void initializeDataGraph(Graph& g, uint32_t labelCount) {
         auto& data = g.getData(n);
         data.matched = false;
         data.label = data.id % labelCount; // TODO: change to random
-      },
-      galois::no_stats());
+      });
 }
 
 template<typename QG, typename DG, typename W>
@@ -124,8 +122,7 @@ void matchLabel(QG& qG, DG& dG, W& w) {
           }
         }
       },
-      galois::loopname("MatchLabel"),
-      galois::timeit());
+      galois::loopname("MatchLabel"));
 }
 
 template<typename QG>
@@ -240,8 +237,7 @@ void runGraphSimulation() {
             next->push_back(dn);
           }
         },
-        galois::loopname("CheckChildrenLink"),
-        galois::timeit());
+        galois::loopname("CheckChildrenLink"));
 
     sizeCur = std::distance(cur->begin(), cur->end());
     sizeNext = std::distance(next->begin(), next->end());

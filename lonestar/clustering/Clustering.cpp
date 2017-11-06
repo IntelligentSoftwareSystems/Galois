@@ -197,7 +197,7 @@ void clusterGalois(GVector<LeafNode*>& lights) {
             }
           }
         },
-        galois::wl<WL>(), galois::timeit(), galois::loopname("Main"));
+        galois::wl<WL>(), galois::loopname("Main"));
 
     size += addedNodes.reduce();
 

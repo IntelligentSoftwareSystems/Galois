@@ -62,9 +62,9 @@ class DoAllStealingExec {
     HALF, FULL
   };
 
-  static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsTuple>::value;
-  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTuple>::value;
-  static constexpr bool USE_TERM = false;
+  constexpr static const bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsTuple>::value;
+  constexpr static const bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsTuple>::value;
+  constexpr static const bool USE_TERM = false;
 
   struct ThreadContext {
 
@@ -481,7 +481,7 @@ public:
     :
       range (_range),
       func (_func),
-      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
+      loopname (galois::internal::getLoopName(argsTuple)),
       chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
       term(substrate::getSystemTermination(activeThreads)),
       totalTime(loopname, "Total"),
@@ -608,10 +608,10 @@ template <> struct ChooseDoAllImpl<false> {
 
     runtime::on_each_gen([&] (const unsigned tid, const unsigned numT) {
 
-        static constexpr bool NEEDS_STATS = !exists_by_supertype<no_stats_tag, ArgsT>::value;
-        static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsT>::value;
+        static constexpr bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsT>::value;
+        static constexpr bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsT>::value;
 
-        const char* const loopname = get_by_supertype<loopname_tag> (argsTuple).value;
+        const char* const loopname = galois::internal::getLoopName(argsTuple);
 
         PerThreadTimer<MORE_STATS> totalTime(loopname, "Total");
         PerThreadTimer<MORE_STATS> initTime(loopname, "Init");
@@ -643,7 +643,7 @@ template <> struct ChooseDoAllImpl<false> {
           galois::runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 
-    }, std::make_tuple(no_stats(), loopname("DoAll-no-steal")));
+    }, std::make_tuple(loopname("DoAll-no-steal")));
   }
 
 };
@@ -661,17 +661,17 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   auto argsT = std::tuple_cat (argsTuple,
       get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, steal_tag{}),
-        std::make_tuple (loopname {}, chunk_size<> {}, steal<>{} )));
+        std::make_tuple (chunk_size_tag {}, steal_tag{}),
+        std::make_tuple (chunk_size<> {}, steal<>{} )));
 
   using ArgsT = decltype(argsT);
 
-  constexpr bool TIME_IT = exists_by_supertype<timeit_tag, ArgsT>::value;
-  CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(argsT).value);
+  constexpr bool TIME_IT = exists_by_supertype<loopname_tag, ArgsT>::value;
+  CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(argsT));
 
   timer.start();
 
-  static constexpr bool STEAL = get_type_by_supertype<steal_tag, ArgsT>::type::value;
+  constexpr bool STEAL = get_type_by_supertype<steal_tag, ArgsT>::type::value;
 
   internal::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
 

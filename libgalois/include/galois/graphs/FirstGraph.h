@@ -982,8 +982,7 @@ public:
       galois::do_all(galois::iterate(0ul, aux.size()),
           [&] (size_t index) {
             aux.constructAt(index);
-          },
-	  galois::no_stats());
+          });
     }
   }
 

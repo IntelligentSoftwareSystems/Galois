@@ -388,12 +388,10 @@ public:
 
     assert (range.begin () != range.end ());
 
-    galois::runtime::do_all_gen (range,
+    galois::do_all (range,
         [this] (const T& x) {
         pending.get ().push (x);
-        },
-        std::make_tuple (
-          galois::no_stats()));
+        });
 
     assert (!pending.empty_all ());
 

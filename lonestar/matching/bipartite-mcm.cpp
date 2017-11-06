@@ -742,8 +742,7 @@ struct MatchingMF {
             }
           }
         }, 
-        galois::wl<galois::worklists::dChunkedFIFO<32> >(),
-        galois::no_stats());
+        galois::wl<galois::worklists::dChunkedFIFO<32> >());
     T.stop();
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {

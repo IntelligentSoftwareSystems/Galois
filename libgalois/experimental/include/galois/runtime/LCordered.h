@@ -541,7 +541,6 @@ public:
         range,
 				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt)
         std::make_tuple(
-          galois::timeit(),
           galois::loopname("create_initial_contexts")));
     t_create.stop ();
 
@@ -549,7 +548,6 @@ public:
     galois::runtime::do_all_gen(makeLocalRange(initCtxt),
 				 FindInitSources (sourceTest, initSrc, nInitSrc),
          std::make_tuple(
-           galois::timeit(),
            galois::loopname("find_initial_sources")));
     //       "find_initial_sources");
     t_find.stop ();
@@ -581,7 +579,6 @@ public:
           perThUserCtx,
           niter),
         galois::loopname("apply_operator"),
-        galois::timeit(),
         galois::wl<SrcWL_ty>());
     t_for.stop ();
 

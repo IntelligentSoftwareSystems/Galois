@@ -146,7 +146,7 @@ struct ComputeRequiredTime {
 static void computeRequiredTime(Graph& g, GNode dummySink) {
   galois::InsertBag<GNode> work;
   work.push_back(dummySink);
-  galois::for_each(galois::iterate(work), ComputeRequiredTime{g}, galois::loopname("ComputeRequiredTime"), galois::timeit());
+  galois::for_each(galois::iterate(work), ComputeRequiredTime{g}, galois::loopname("ComputeRequiredTime"));
 }
 
 struct ComputeArrivalTimeAndPower {
@@ -334,7 +334,7 @@ static void computeArrivalTimeAndPower(Graph& g, GNode dummySrc) {
   galois::do_all(galois::iterate(g), SetForwardPrecondition{g}, galois::steal<true>());
   galois::InsertBag<GNode> work;
   work.push_back(dummySrc);
-  galois::for_each(galois::iterate(work), ComputeArrivalTimeAndPower{g}, galois::loopname("ComputeArrivalTimeAndPower"), galois::timeit());
+  galois::for_each(galois::iterate(work), ComputeArrivalTimeAndPower{g}, galois::loopname("ComputeArrivalTimeAndPower"));
 }
 
 void doStaticTimingAnalysis(CircuitGraph& graph) {

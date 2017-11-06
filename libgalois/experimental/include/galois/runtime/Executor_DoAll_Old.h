@@ -204,12 +204,7 @@ void do_all_gen_old(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) 
         std::make_tuple(loopname_tag{}, steal_tag{}),
         std::make_tuple(loopname{}, steal<>{})));
 
-  constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
-  CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);
-
-  timer.start();
   do_all_old_impl( r, fn, dtpl);
-  timer.stop();
 }
 
 

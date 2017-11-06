@@ -141,10 +141,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
-      galois::loopname("InitializeGraph"), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("InitializeGraph"));
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -182,11 +179,7 @@ struct InitializeIteration {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
-      galois::loopname("InitializeIteration"), 
-      //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("InitializeIteration"));
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -242,10 +235,7 @@ struct SSSP {
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       #if __OPT_VERSION__ == 5
       Flags_current_length.set_write_src();
@@ -320,10 +310,7 @@ struct PredAndSucc {
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
 
     #if __OPT_VERSION__ == 5
     Flags_num_predecessors.set_write_src();
@@ -400,10 +387,7 @@ struct NSPTrim {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       NSPTrim{&_graph}, 
-      galois::loopname("NSPTrim"), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("NSPTrim"));
   }
 
   void operator()(GNode src) const {
@@ -432,10 +416,7 @@ struct NSPAdd {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       NSPAdd{&_graph}, 
-      galois::loopname("NSPAdd"), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("NSPAdd"));
   }
 
   void operator()(GNode src) const {
@@ -474,7 +455,6 @@ struct NumShortestPathsChanges {
       allNodes.begin(), allNodes.end(), 
       NumShortestPathsChanges{infinity, &_graph}, 
       galois::loopname("NumShortestPathsChanges"), 
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -537,7 +517,6 @@ struct NumShortestPaths {
         NumShortestPaths(infinity, &_graph, dga), 
         galois::loopname("NumShortestPaths"),
         galois::steal<true>(),
-        galois::timeit(),
         galois::no_stats()
       );
 
@@ -649,7 +628,6 @@ struct FlagPrep {
       allNodes.begin(), allNodes.end(), 
       FlagPrep{infinity, &_graph}, 
       galois::loopname("FlagPrep"), 
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -685,7 +663,6 @@ struct DPTrim {
       allNodes.begin(), allNodes.end(), 
       DPTrim{&_graph}, 
       galois::loopname("DPTrim"), 
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -717,7 +694,6 @@ struct DPAdd {
       allNodes.begin(), allNodes.end(), 
       DPAdd{&_graph}, 
       galois::loopname("DPAdd"), 
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -757,7 +733,6 @@ struct DependencyPropChanges {
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
       galois::loopname("DependencyPropChanges"),
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -813,7 +788,6 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
         galois::steal<true>(),
-        galois::timeit(),
         galois::no_stats()
       );
 
@@ -1002,11 +976,7 @@ struct BC {
         nodesWithEdges.begin(), 
         nodesWithEdges.end(), 
         BC(&_graph), 
-        galois::loopname("BC"),
-        //galois::loopname(_graph.get_run_identifier("BC").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("BC"));
     }
   }
 

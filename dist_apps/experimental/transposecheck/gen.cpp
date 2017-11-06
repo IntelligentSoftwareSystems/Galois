@@ -106,9 +106,7 @@ int main(int argc, char** argv) {
           }
         }
       }
-    },
-    galois::no_stats()
-  );
+    });
 
   return 0;
 }

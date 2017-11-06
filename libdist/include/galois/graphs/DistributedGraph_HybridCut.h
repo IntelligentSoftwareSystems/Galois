@@ -246,9 +246,7 @@ public:
       [&] (auto n) {
         base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
       },
-      galois::loopname("EdgeLoading"),
-      galois::timeit(),
-      galois::no_stats()
+      galois::loopname("EdgeLoading"));
     );
 
     base_hGraph::printStatistics();
@@ -326,9 +324,7 @@ private:
     galois::on_each(
       [&](unsigned tid, unsigned nthreads) {
         receiveAssignedEdges(graph, edgesToReceive);
-      },
-      galois::no_stats()
-    );
+      });
 
     ++galois::runtime::evilPhase;
 
@@ -519,10 +515,7 @@ private:
           }
         }
       },
-      galois::loopname("EdgeInspection"),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("EdgeInspection"));
 
     edgeInspectionTimer.stop();
     galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ",
@@ -671,10 +664,7 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
-      galois::loopname("EdgeLoading"),
-      galois::no_stats(),
-      galois::timeit()
-    );
+      galois::loopname("EdgeLoading"));
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
@@ -800,10 +790,7 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
-      galois::loopname("EdgeLoading"),
-      galois::no_stats(),
-      galois::timeit()
-    );
+      galois::loopname("EdgeLoading"));
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {

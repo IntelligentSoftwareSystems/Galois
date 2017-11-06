@@ -97,8 +97,7 @@ struct ResetGraph {
       allNodes.begin(),
       allNodes.end(),
       ResetGraph{ &_graph },
-      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
-      galois::timeit()
+      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str())
     );
   }
 
@@ -134,8 +133,7 @@ struct InitializeGraph {
         nodesWithEdges.begin(),
         nodesWithEdges.end(),
         InitializeGraph{alpha, &_graph},
-        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        galois::timeit()
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str())
       );
     }
   }
@@ -175,9 +173,7 @@ struct PageRank {
           nodesWithEdges,
           PageRank{ alpha, tolerance, &_graph, dga },
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          galois::steal<true>(),
-          galois::timeit()
-        );
+          galois::steal<true>());
       }
 
       galois::runtime::reportStat("(NULL)", 

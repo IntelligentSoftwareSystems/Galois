@@ -165,10 +165,7 @@ struct ResetGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       ResetGraph{ alpha, &_graph },
-      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -207,10 +204,7 @@ struct InitializeGraph {
       nodesWithEdges,
       InitializeGraph{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
 
     #if __OPT_VERSION__ == 5
     Flags_nout.set_write_dst();
@@ -282,10 +276,7 @@ struct PageRank_delta {
       allNodes.begin(), allNodes.end(),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
 
   }
 
@@ -337,10 +328,7 @@ struct PageRank {
         nodesWithEdges,
         PageRank{ &_graph },
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       #if __OPT_VERSION__ == 5
       Flags_residual.set_write_src();

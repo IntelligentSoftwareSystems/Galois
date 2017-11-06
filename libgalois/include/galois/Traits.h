@@ -180,12 +180,32 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
   loopname(const char* p = "ANON_LOOP"): trait_has_value<const char*>(p) { }
 };
 
+namespace internal {
+
+
+  template <typename Tup>
+  std::enable_if_t<
+      galois::exists_by_supertype<loopname_tag, Tup>::value, 
+      const char*> 
+  getLoopName(const Tup& t) {
+    return galois::get_by_supertype<loopname_tag>(t).value;
+  }
+
+  template <typename Tup>
+  std::enable_if_t<
+      !galois::exists_by_supertype<loopname_tag, Tup>::value, 
+      const char*> 
+  getLoopName(const Tup& t) {
+    return "ANON_LOOP";
+  }
+}
+
 /**
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
  * argument to {@link do_all()} loops.
  */
 struct steal_tag {};
-template<bool V = true>
+template<bool V = false> // steal disabled by default
 struct steal: public trait_has_svalue<bool, V>, steal_tag {};
 
 /**
@@ -202,12 +222,6 @@ template<typename T, typename... Args>
 s_wl<T, Args...> wl(Args&&... args) {
   return s_wl<T, Args...>(std::forward<Args>(args)...);
 }
-
-/**
- * Presence of timeit option will automatically time the do_all or for_each loop 
- * */
-struct timeit_tag {};
-struct timeit: public trait_has_type<bool>, timeit_tag {};
 
 //
 /**
@@ -230,13 +244,8 @@ struct per_iter_alloc_tag {};
 struct per_iter_alloc: public trait_has_type<bool>, per_iter_alloc_tag {};
 
 /**
- * Indicates the operator doesn't need its execution stats recorded
- */
-struct no_stats_tag {};
-struct no_stats: public trait_has_type<bool>, no_stats_tag { };
-
-/**
  * Indicates the operator needs detailed stats
+ * Must provide loopname to enable this flag
  */
 struct more_stats_tag {};
 struct more_stats: public trait_has_type<bool>, more_stats_tag { };

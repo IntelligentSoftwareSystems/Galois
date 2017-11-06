@@ -224,11 +224,7 @@ void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
         uniqueChunkBitset.set(findOwner(nodeIndex, chunkToNode));
       }
     },
-    galois::loopname("FindUniqueChunks"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("FindUniqueChunks"));
 
   freeVector(uniqueNodeBitset.get_vec());
 
@@ -462,10 +458,7 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
         }
       }
     },
-    galois::loopname("EdgeReceiving"),
-    galois::timeit(),
-    galois::no_stats()
-  );
+    galois::loopname("EdgeReceiving"));
   galois::runtime::evilPhase++; 
 
   printf("[%lu] Receive assigned edges finished\n", hostID);

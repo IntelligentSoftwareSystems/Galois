@@ -165,10 +165,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::timeit(),
-        galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -221,10 +218,7 @@ struct SSSP {
             nodesToWork.begin(), nodesToWork.end(),
             SSSP(&_graph, dga, dist_wl),
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-            galois::steal<true>(),
-            galois::timeit(),
-        galois::no_stats()
-            );
+            galois::steal<true>());
 
         galois::runtime::reportStat("(NULL)", 
             "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 

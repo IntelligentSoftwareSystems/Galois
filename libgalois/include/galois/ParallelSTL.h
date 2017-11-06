@@ -89,7 +89,6 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   for_each(galois::iterate(make_no_deref_iterator(first), make_no_deref_iterator(last)), helper,
       galois::no_conflicts(),
       galois::no_pushes(),
-      galois::no_stats(),
       galois::parallel_break(),
       galois::wl<WL>());
   for (unsigned i = 0; i < accum.size(); ++i) {
@@ -258,7 +257,6 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   for_each(galois::iterate( { std::make_pair(first, last) } )
       , sort_helper<Compare>(comp)
       , galois::no_conflicts()
-      , galois::no_stats()
       , galois::wl<WL>());
 }
 
@@ -300,8 +298,8 @@ std::enable_if_t<!std::is_scalar<internal::Val_ty<I> >::value> destroy (I first,
   do_all(iterate(first, last),
     [=] (T& i) {
       (&i)->~T();
-    },
-    no_stats());
+    });
+    
 }
 
 template<class I>

@@ -127,10 +127,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
-      galois::loopname("InitializeGraph"), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("InitializeGraph"));
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -168,11 +165,7 @@ struct InitializeIteration {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
-      galois::loopname("InitializeIteration"), 
-      //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("InitializeIteration"));
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -224,10 +217,7 @@ struct SSSP {
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       iterations++;
 
@@ -271,10 +261,7 @@ struct PredAndSucc {
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
   }
 
   void operator()(GNode src) const {
@@ -313,10 +300,7 @@ struct NumShortestPathsChanges {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       NumShortestPathsChanges{infinity, &_graph}, 
-      galois::loopname("NumShortestPathsChanges"), 
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("NumShortestPathsChanges"));
   }
 
   void operator()(GNode src) const {
@@ -371,10 +355,7 @@ struct NumShortestPaths {
         nodesWithEdges,
         NumShortestPaths(infinity, &_graph, dga), 
         galois::loopname("NumShortestPaths"),
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       // this deals with flag; in compiler version it should deal with trim/
       // to_add as well...
@@ -431,10 +412,7 @@ struct DependencyPropChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
-      galois::loopname("DependencyPropChanges"),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("DependencyPropChanges"));
   }
 
   void operator()(GNode src) const {
@@ -480,10 +458,7 @@ struct DependencyPropogation {
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       // flag changing (has to be done between BSP rounds so values
       // are propogated more than once)
@@ -628,11 +603,7 @@ struct BC {
         allNodes.begin(), 
         allNodes.end(), 
         BC(&_graph), 
-        galois::loopname("BC"),
-        //galois::loopname(_graph.get_run_identifier("BC").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("BC"));
     }
   }
 

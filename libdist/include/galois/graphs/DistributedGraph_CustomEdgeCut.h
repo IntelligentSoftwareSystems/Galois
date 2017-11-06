@@ -307,10 +307,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::loopname("EdgeLoading"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeLoading"));
 
       loadEdges(base_hGraph::graph, mpiGraph, numEdges_distribute);
 
@@ -373,9 +370,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       galois::on_each(
         [&](unsigned tid, unsigned nthreads) {
           receive_edges(graph, edgesToReceive);
-        },
-        galois::no_stats()
-      );
+        });
 
       ++galois::runtime::evilPhase;
 
@@ -440,10 +435,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             hasIncomingEdge[h].set(gdst);
           }
         },
-        galois::loopname("EdgeInspection"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeInspection"));
 
       // time should have been started outside of this loop
       edgeInspectionTimer.stop();
@@ -616,10 +608,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                 mirror_mapping_to_hosts[this->G2L(src) - numOwned] = h;
               }
           },
-          galois::loopname("MirrorToHostAssignment"),
-          galois::timeit(),
-          galois::no_stats()
-        );
+          galois::loopname("MirrorToHostAssignment"));
       }
       galois::gPrint("[", base_hGraph::id, "] End: assignedNodes receive\n");
       ++galois::runtime::evilPhase;
@@ -734,10 +723,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               }
             }
           },
-          galois::loopname("EdgeLoading"),
-          galois::no_stats(),
-          galois::timeit()
-        );
+          galois::loopname("EdgeLoading"));
 
         // flush buffers
         for (unsigned threadNum = 0; 
@@ -831,10 +817,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               }
             }
           },
-          galois::loopname("EdgeLoading"),
-          galois::no_stats(),
-          galois::timeit()
-        );
+          galois::loopname("EdgeLoading"));
 
         // flush buffers
         for (unsigned threadNum = 0; 

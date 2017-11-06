@@ -206,8 +206,7 @@ struct SynchronousAlgo {
             next->push(Edge(src, &ddata, 0));
             break;
           }
-        },
-        galois::no_stats());
+        });
         
 
     while (!cur->empty()) {
@@ -219,7 +218,6 @@ struct SynchronousAlgo {
               emptyMerges += 1;
 
           },
-          galois::timeit(),
           galois::loopname("Merge"));
           
 
@@ -244,7 +242,6 @@ struct SynchronousAlgo {
               }
             }
           },
-          galois::timeit(),
           galois::loopname("Find"));
 
 
@@ -690,8 +687,7 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   galois::do_all(galois::iterate(map), 
       [&] (const ComponentSizePair& x) {
         maxComp.update(x);
-      },
-      galois::no_stats());
+      });
 
   ComponentSizePair largest = maxComp.reduce();
 

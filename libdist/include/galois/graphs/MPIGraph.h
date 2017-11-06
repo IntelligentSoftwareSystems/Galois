@@ -126,9 +126,7 @@ private:
         }
 
         assert(threadNumNodesToLoad == 0);
-      },
-      galois::no_stats()
-    );
+      }); 
 
     nodeOffset = nodeStart;
   }
@@ -194,9 +192,7 @@ private:
         }
 
         assert(threadNumEdgesToLoad == 0);
-      },
-      galois::no_stats()
-    );
+      });
 
     edgeOffset = edgeStart;
   }
@@ -281,9 +277,7 @@ private:
         }
 
         assert(numBytesToLoad == 0);
-      },
-      galois::no_stats()
-    );
+      });
   }
 
   /**

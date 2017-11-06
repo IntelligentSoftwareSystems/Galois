@@ -177,10 +177,7 @@ struct InitializeGraph2 {
       nodesWithEdges,
       InitializeGraph2{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
 
     #if __OPT_VERSION__ == 5
     Flags_current_degree.set_write_dst();
@@ -243,10 +240,7 @@ struct InitializeGraph1 {
      galois::do_all(
         allNodes.begin(), allNodes.end(),
         InitializeGraph1{ &_graph },
-        galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()));
 
     // degree calculation
     InitializeGraph2::go(_graph);
@@ -306,10 +300,7 @@ struct KCoreStep2 {
        allNodes.begin(), allNodes.end(),
        #endif
        KCoreStep2{ &_graph },
-       galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-       galois::timeit(),
-       galois::no_stats()
-     );
+       galois::loopname(_graph.get_run_identifier("KCore").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -377,10 +368,7 @@ struct KCoreStep1 {
         nodesWithEdges,
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       #if __OPT_VERSION__ == 5
       Flags_trim.set_write_dst();

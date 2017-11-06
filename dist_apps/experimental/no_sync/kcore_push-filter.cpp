@@ -99,9 +99,7 @@ struct InitializeGraph2 {
       nodesWithEdges,
       InitializeGraph2{ &_graph },
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-      galois::steal<true>(),
-      galois::timeit()
-    );
+      galois::steal<true>());
   }
 
   /* Calculate degree of nodes by checking how many nodes have it as a dest and
@@ -133,8 +131,7 @@ struct InitializeGraph1 {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       InitializeGraph1{ &_graph },
-      galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()),
-      galois::timeit()
+      galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str())
     );
 
     // degree calculation
@@ -173,9 +170,7 @@ struct KCoreStep1 {
         allNodes,
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::loopname(_graph.get_run_identifier("KCoreStep1").c_str()),
-        galois::steal<true>(),
-        galois::timeit()
-      );
+        galois::steal<true>());
 
       iterations++;
     } while ((iterations < maxIterations) && dga.reduce());

@@ -243,8 +243,7 @@ bool checkAcyclic (void) {
         Node& data = graph.getData(n);
         if (data.component() == &data)
           roots += 1;
-      },
-      galois::no_stats());
+      });
       
   unsigned numRoots = roots.reduce();
   unsigned numEdges = std::distance(mst.begin(), mst.end());

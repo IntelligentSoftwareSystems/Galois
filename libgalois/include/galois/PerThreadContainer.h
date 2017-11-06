@@ -446,8 +446,7 @@ public:
         [this] (const unsigned tid, const unsigned numT) {
           get ().clear ();
         },
-        std::make_tuple(
-          galois::no_stats()));
+        std::make_tuple());
   }
 
   bool empty_all() const {
@@ -468,9 +467,7 @@ public:
           (my.*pushFn) (v);
           // (get ().*pushFn)(v);
         },
-        std::make_tuple(
-          galois::no_stats(),
-          galois::steal<false>()));
+        std::make_tuple());
   }
 };
 

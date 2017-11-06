@@ -255,10 +255,10 @@ struct ParallelAlgo {
         std::swap(current, next);
         galois::do_all(galois::iterate(*current)
             , Merge(this)
-            , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Merge"));
+            galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Merge"));
         galois::do_all(galois::iterate(*current)
             , Find(this)
-            , galois::timeit(), galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Find"));
+            galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Find"));
         current->clear();
 
         if (next->empty())
@@ -317,8 +317,7 @@ struct ParallelAlgo {
             const auto& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
             if (data.isRep())
               roots += 1;
-          },
-          galois::no_stats());
+          });
 
 
       unsigned numRoots = roots.reduce();
@@ -354,8 +353,7 @@ struct ParallelAlgo {
             return;
           std::advance(ii, dist - 1);
           heavy.update(graph.getEdgeData(ii));
-        },
-        galois::no_stats());
+        });
 
     return heavy.reduce();
   }

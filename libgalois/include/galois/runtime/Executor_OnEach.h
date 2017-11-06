@@ -47,12 +47,19 @@ namespace galois {
 namespace runtime {
 
 namespace internal {
+
 template <typename FunctionTy, typename ArgsTy>
-inline void on_each_exec(FunctionTy& fn, const ArgsTy& argsTuple) {
+inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
 
-  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
+  static_assert(!exists_by_supertype<char*, ArgsTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const *, ArgsTy>::value, "old loopname");
 
-  const char* const loopname = get_by_supertype<loopname_tag>(argsTuple).value;
+  static constexpr bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsTy>::value;
+
+  const char* const loopname = galois::internal::getLoopName(argsTuple);
+
+  CondStatTimer<NEEDS_STATS> timer(loopname);
 
   PerThreadTimer<MORE_STATS> execTime(loopname, "Execute");
 
@@ -68,26 +75,8 @@ inline void on_each_exec(FunctionTy& fn, const ArgsTy& argsTuple) {
 
   };
 
-  substrate::getThreadPool().run(numT, runFun);
-}
-
-template<typename FunctionTy, typename TupleTy>
-inline void on_each_impl(FunctionTy& fn, const TupleTy& tpl) {
-  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
-
-  auto dtpl = std::tuple_cat(tpl,
-      get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}),
-        std::make_tuple(loopname{})));
-
-  constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(dtpl)>::value;
-  CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(dtpl).value);
-
   timer.start();
-
-  on_each_exec(fn, dtpl);
-
+  substrate::getThreadPool().run(numT, runFun);
   timer.stop();
 }
 

@@ -19,7 +19,7 @@ int main() {
 
   galois::for_each(galois::iterate(v), &function_pointer, galois::loopname("func-pointer"));
   galois::for_each(galois::iterate(v), function_object(), galois::loopname("with function object and options"));
-  galois::do_all(galois::iterate(v), [&b](int x) { b.push(x); }, galois::no_stats());
+  galois::do_all(galois::iterate(v), [&b](int x) { b.push(x); });
   galois::for_each(galois::iterate(b), function_object());
   
   // Works without context as well

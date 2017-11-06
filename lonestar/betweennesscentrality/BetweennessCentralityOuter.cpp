@@ -205,8 +205,7 @@ private:
           this->initArray(perThreadDelta.getLocal());
           this->initArray(perThreadSucc.getLocal());
           
-        },
-        galois::no_stats());
+        });
   }
 
   void DeleteLocal(void) {
@@ -217,8 +216,7 @@ private:
           this->deleteArray(perThreadD.getLocal());
           this->deleteArray(perThreadDelta.getLocal());
           this->deleteArray(perThreadSucc.getLocal());
-        },
-        galois::no_stats());
+        });
   }
 
 };

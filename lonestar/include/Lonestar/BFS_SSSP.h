@@ -77,15 +77,15 @@ bool verify(Graph& graph, GNode source) {
       [&notVisited, &graph] (GNode n) { 
         if (graph.getData(n) >= DIST_INFINITY) 
         ++notVisited; 
-        },
-        galois::no_stats());
+        });
+
   if (notVisited)
     std::cerr << notVisited << " unvisited nodes; this is an error if the graph is strongly connected\n";
 
   std::atomic<bool> not_c;
   galois::do_all(galois::iterate(graph), 
-      not_consistent<useOne>(graph, not_c),
-      galois::no_stats());
+      not_consistent<useOne>(graph, not_c));
+
   if (not_c) {
     std::cerr << "node found with incorrect distance\n";
     return false;
@@ -93,8 +93,8 @@ bool verify(Graph& graph, GNode source) {
 
   galois::GReduceMax<Dist> m;
   galois::do_all(galois::iterate(graph), 
-      max_dist(graph, m),
-      galois::no_stats());
+      max_dist(graph, m));
+
   std::cout << "max dist: " << m.reduce() << "\n";
   
   return true;

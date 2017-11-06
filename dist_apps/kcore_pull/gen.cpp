@@ -107,10 +107,7 @@ struct DegreeCounting {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       DegreeCounting{ &_graph },
-      galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()));
 
     _graph.sync<writeSource, readAny, Reduce_add_current_degree, 
       Broadcast_current_degree, Bitset_current_degree>("DegreeCounting");
@@ -161,10 +158,7 @@ struct InitializeGraph {
      galois::do_all(
         galois::iterate(allNodes.begin(), allNodes.end()),
         InitializeGraph{ &_graph },
-        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
     // degree calculation
     DegreeCounting::go(_graph);
@@ -201,10 +195,7 @@ struct LiveUpdate {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       LiveUpdate{ k_core_num, &_graph, dga },
-      galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()));
 
     // no sync necessary as all nodes should have updated
   }
@@ -263,10 +254,7 @@ struct KCore {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         KCore{ &_graph },
-        galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim, 
                   Bitset_trim>("KCore");
@@ -331,8 +319,7 @@ struct KCoreSanityCheck {
   #endif
     galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()), 
                    KCoreSanityCheck(&_graph, dga), 
-                   galois::loopname("KCoreSanityCheck"),
-                   galois::no_stats());
+                   galois::loopname("KCoreSanityCheck"));
 
     uint64_t num_nodes = dga.reduce();
 

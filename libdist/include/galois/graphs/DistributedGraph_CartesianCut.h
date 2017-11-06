@@ -344,10 +344,7 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::loopname("EdgeLoading"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeLoading"));
 
     } 
 
@@ -441,10 +438,7 @@ public:
             numOutgoingEdges[d][h][src - rowOffset]++;
           }
         },
-        galois::loopname("EdgeInspection"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeInspection"));
     }
 
     inspectionTimer.stop();
@@ -702,10 +696,7 @@ public:
             assert(cur == (*graph.edge_end(lsrc)));
           }
         },
-        galois::loopname("EdgeLoading"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeLoading"));
 
       for (unsigned t = 0; t < sb.size(); ++t) {
         auto& sbr = *sb.getRemote(t);
@@ -785,10 +776,7 @@ public:
             assert(cur == (*graph.edge_end(lsrc)));
           }
         },
-        galois::loopname("EdgeLoading"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeLoading"));
 
       for (unsigned t = 0; t < sb.size(); ++t) {
         auto& sbr = *sb.getRemote(t);

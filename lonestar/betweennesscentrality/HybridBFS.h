@@ -161,8 +161,7 @@ struct HybridBFS {
         galois::do_all(galois::iterate(bags[cur]), 
             [&] (const GNode& n) {
               asyncBag.push(WorkItem(n, newDist));
-            },
-            galois::no_stats());
+            });
 
         bfsPushAsync(graph, asyncBag);
         break;

@@ -185,8 +185,7 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph), 
       [&graph](typename Graph::GraphNode n) {
         graph.getData(n).init();
-      }, 
-      galois::no_stats());
+      });
 
   initResidual(graph);
   typedef galois::worklists::dChunkedFIFO<256> WL;

@@ -299,7 +299,6 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   if(!onlyOneNode)
     static_go += "\ngalois::steal<true>(),";
 
-  static_go += "\ngalois::timeit()";
   static_go += SS_write_set.str() + ");\n}\n";
   functor += static_go;
 

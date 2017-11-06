@@ -1289,8 +1289,7 @@ struct ChromaticExecutor {
           push (n);
         },
         std::make_tuple(
-        galois::loopname("fill_initial"),
-        galois::steal<false>()));
+        galois::loopname("fill_initial")));
 
     unsigned rounds = 0;
     // process until done

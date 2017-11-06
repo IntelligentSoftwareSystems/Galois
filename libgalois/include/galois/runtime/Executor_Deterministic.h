@@ -466,7 +466,7 @@ struct OptionsCommon {
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
-  static const bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
+  static const bool needsStats = !exists_by_supertype<loopname_tag, ArgsTy>::value;
   static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
   static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
@@ -1300,12 +1300,13 @@ class Executor:
   typedef worklists::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
 
   // Truly thread-local
-  struct ThreadLocalData: private boost::noncopyable {
+  using LoopStat = LoopStatistics<OptionsTy::needsStats>;
+  struct ThreadLocalData: public LoopStat {
+
     typename OptionsTy::function1_type fn1;
     typename OptionsTy::function2_type fn2;
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
-    LoopStatistics<OptionsTy::needsStats> stat;
 
     WL* wlcur;
     WL* wlnext;
@@ -1313,7 +1314,8 @@ class Executor:
     size_t outerRounds;
     bool hasNewWork;
     ThreadLocalData(const OptionsTy& o, const char* loopname):
-      fn1(o.fn1), fn2(o.fn2), stat(loopname), rounds(0), outerRounds(0) { }
+      LoopStat(loopname),
+      fn1(o.fn1), fn2(o.fn2), rounds(0), outerRounds(0) { }
   };
 
   OptionsTy options;
@@ -1475,7 +1477,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     ctx->startIteration();
     ctx->setFirstPass();
-    tld.stat.inc_iterations();
+    tld.inc_iterations();
     tld.facing.setFirstPass();
     setThreadContext(ctx);
 
@@ -1579,7 +1581,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     } else {
       this->reuseItem(ctx->item);
       tld.wlnext->push(ctx->item);
-      tld.stat.inc_conflicts();
+      tld.inc_conflicts();
       retval = true;
       ctx->cancelIteration();
     }

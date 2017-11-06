@@ -127,9 +127,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
-      galois::loopname("InitializeGraph"), 
-      galois::timeit()
-    );
+      galois::loopname("InitializeGraph"));
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -167,9 +165,7 @@ struct InitializeIteration {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
-      galois::loopname("InitializeIteration"), 
-      galois::timeit()
-    );
+      galois::loopname("InitializeIteration"));
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -225,9 +221,7 @@ struct FirstIterationSSSP {
       boost::make_counting_iterator(__begin), 
       boost::make_counting_iterator(__end), 
       FirstIterationSSSP(&_graph),
-      galois::loopname("FirstIterationSSSP"),
-      galois::timeit()
-    );
+      galois::loopname("FirstIterationSSSP"));
   }
 
   /* Does SSSP, push/filter based (actually it does BFS...) */
@@ -272,9 +266,7 @@ struct SSSP {
         nodesWithEdges,
         SSSP(&_graph, dga), 
         galois::loopname("SSSP"), 
-        galois::steal<true>(),
-        galois::timeit()
-      );
+        galois::steal<true>());
 
       iterations++;
 
@@ -324,9 +316,7 @@ struct PredAndSucc {
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
       galois::loopname("PredAndSucc"),
-      galois::steal<true>(),
-      galois::timeit()
-    );
+      galois::steal<true>());
     }
   }
 
@@ -369,9 +359,7 @@ struct NumShortestPathsChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(), 
       NumShortestPathsChanges{&_graph}, 
-      galois::loopname("NumShortestPathsChanges"), 
-      galois::timeit()
-    );
+      galois::loopname("NumShortestPathsChanges"));
   }
 
   void operator()(GNode src) const {
@@ -425,9 +413,7 @@ struct NumShortestPaths {
           NumShortestPaths(infinity, &_graph, dga), 
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          galois::steal<true>(),
-          galois::timeit()
-        );
+          galois::steal<true>());
       }
 
       // do predecessor decrementing using trim + dependency changes with
@@ -506,10 +492,7 @@ struct DependencyPropChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
-      galois::loopname("DependencyPropChanges"),
-      //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
-      galois::timeit()
-    );
+      galois::loopname("DependencyPropChanges"));
   }
 
   void operator()(GNode src) const {
@@ -579,9 +562,7 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        galois::steal<true>(),
-        galois::timeit()
-      );
+        galois::steal<true>());
     }
                     
 
@@ -734,10 +715,7 @@ struct BC {
         nodesWithEdges.begin(), 
         nodesWithEdges.end(), 
         BC(&_graph), 
-        galois::loopname("BC"),
-        //galois::loopname(_graph.get_run_identifier("BC").c_str()),
-        galois::timeit()
-      );
+        galois::loopname("BC"));
     }
   }
 

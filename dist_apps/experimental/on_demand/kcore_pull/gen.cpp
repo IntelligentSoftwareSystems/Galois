@@ -178,10 +178,7 @@ struct DegreeCounting {
       nodesWithEdges,
       DegreeCounting{ &_graph },
       galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
-      galois::steal<true>(),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::steal<true>());
 
     #if __OPT_VERSION__ == 5
     Flags_current_degree.set_write_src();
@@ -242,10 +239,7 @@ struct InitializeGraph {
      galois::do_all(
         allNodes.begin(), allNodes.end(),
         InitializeGraph{ &_graph },
-        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
     // degree calculation
     DegreeCounting::go(_graph);
@@ -292,10 +286,7 @@ struct DegreeUpdate {
      galois::do_all(
        allNodes.begin(), allNodes.end(),
        DegreeUpdate{ &_graph },
-       galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()),
-       galois::timeit(),
-       galois::no_stats()
-     );
+       galois::loopname(_graph.get_run_identifier("DegreeUpdate").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -336,10 +327,7 @@ struct LiveUpdate {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       LiveUpdate{ k_core_num, &_graph, dga },
-      galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("LiveUpdate").c_str()));
 
     // TODO hand optimized can merge trim decrement into this operator.....
 
@@ -411,10 +399,7 @@ struct KCore {
         nodesWithEdges,
         KCore{ &_graph },
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::steal<true>(),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::steal<true>());
 
       #if __OPT_VERSION__ == 5
       Flags_trim.set_write_src();

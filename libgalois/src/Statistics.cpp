@@ -118,7 +118,7 @@ void galois::runtime::reportPageAlloc(const char* category) {
       [category] (const unsigned tid, const unsigned numT) {
         reportStat_Tsum("(NULL)", category, numPagePoolAllocForThread(tid)); 
       }
-      , std::make_tuple(galois::no_stats()));
+      , std::make_tuple());
 }
 
 void galois::runtime::reportNumaAlloc(const char* category) {

@@ -322,14 +322,14 @@ class SyncEngine {
 
   template<bool IsFirst,typename Container1, typename Container2>
   void executeStep(Container1& cur, Container2& next) {
-    galois::do_all(galois::iterate(cur), Initialize<IsFirst>(this), galois::no_stats());
+    galois::do_all(galois::iterate(cur), Initialize<IsFirst>(this));
     
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
-      galois::do_all(galois::iterate(cur), Gather(this), galois::no_stats());
+      galois::do_all(galois::iterate(cur), Gather(this));
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-      galois::do_all(galois::iterate(cur), Scatter<Container2>(this, next), galois::no_stats());
+      galois::do_all(galois::iterate(cur), Scatter<Container2>(this, next));
     }
   }
 

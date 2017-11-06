@@ -61,7 +61,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
   galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    galois::do_all(galois::iterate(V.begin(), V.begin()+num), emp(), galois::steal<>(), galois::no_stats());
+    galois::do_all(galois::iterate(V.begin(), V.begin()+num), emp());
   t.stop();
   return t.get();
 }
@@ -75,7 +75,6 @@ unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned t
   t.start();
   for (unsigned x = 0; x < iter; ++x)
     galois::for_each(galois::iterate(V.begin(), V.begin() + num), emp()
-        , galois::no_stats()
         , galois::no_pushes()
         , galois::no_conflicts()
         , galois::wl<galois::worklists::StableIterator<>>());

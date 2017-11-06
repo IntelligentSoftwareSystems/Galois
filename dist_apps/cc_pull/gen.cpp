@@ -99,10 +99,7 @@ struct InitializeGraph {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{&_graph}, 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -141,10 +138,7 @@ struct ConnectedComp {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         ConnectedComp(&_graph, dga),
-        galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()));
 
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current, 
                   Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
@@ -205,8 +199,7 @@ struct ConnectedCompSanityCheck {
   #endif
     galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
                    ConnectedCompSanityCheck(&_graph, dga), 
-                   galois::loopname("ConnectedCompSanityCheck"),
-                   galois::no_stats());
+                   galois::loopname("ConnectedCompSanityCheck"));
 
     uint64_t num_components = dga.reduce();
 

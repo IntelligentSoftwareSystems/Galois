@@ -667,10 +667,7 @@ protected:
                      [&](uint32_t n) {
                        masterNodes[h][n] = G2L(masterNodes[h][n]);
                      },
-                     galois::loopname(get_run_identifier("MASTER_NODES").c_str()),
-                     galois::timeit(),
-                     galois::steal<false>(),
-                     galois::no_stats());
+                     galois::loopname(get_run_identifier("MASTER_NODES").c_str()));
     }
 
     for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
@@ -678,10 +675,7 @@ protected:
                      [&](uint32_t n) {
                        mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
                      },
-                     galois::loopname(get_run_identifier("MIRROR_NODES").c_str()),
-                     galois::timeit(),
-                     galois::steal<false>(),
-                     galois::no_stats());
+                     galois::loopname(get_run_identifier("MIRROR_NODES").c_str()));
     }
 
     Tcomm_setup.stop();
@@ -1208,10 +1202,7 @@ private:
                          bitset_comm.set(n);
                        }
                      },
-                     galois::loopname(get_run_identifier(doall_str).c_str()),
-                     galois::timeit(),
-                     galois::steal<false>(),
-                     galois::no_stats());
+                     galois::loopname(get_run_identifier(doall_str).c_str()));
 
       // get the number of set bits and the offsets into the comm bitset
       get_offsets_from_bitset<syncType>(loopName, bitset_comm, offsets,
@@ -1275,10 +1266,7 @@ private:
                        size_t lid = indices[offset];
                        val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid);
                      },
-                     galois::loopname(get_run_identifier(doall_str).c_str()),
-                     galois::timeit(),
-                     galois::steal<false>(),
-                     galois::no_stats());
+                     galois::loopname(get_run_identifier(doall_str).c_str()));
     } else {
       for (unsigned n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1315,10 +1303,7 @@ private:
             size_t lid = indices[offset];
             gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
           }, 
-          galois::loopname(get_run_identifier(doall_str).c_str()),
-          galois::steal<false>(),
-          galois::timeit(),
-          galois::no_stats());
+          galois::loopname(get_run_identifier(doall_str).c_str()));
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1435,10 +1420,7 @@ private:
             size_t lid = indices[offset];
             set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
           }, 
-          galois::loopname(get_run_identifier(doall_str).c_str()),
-          galois::steal<false>(),
-          galois::timeit(),
-          galois::no_stats());
+          galois::loopname(get_run_identifier(doall_str).c_str()));
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1508,10 +1490,7 @@ private:
         [&](unsigned int n) {
           offsets[n] = static_cast<uint32_t>(getGID(offsets[n]));
         }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::timeit(),
-        galois::steal<false>(),
-        galois::no_stats());
+        galois::loopname(get_run_identifier(doall_str).c_str()));
   }
   
   /**
@@ -1528,10 +1507,7 @@ private:
         [&](unsigned int n) {
           offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
         }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::steal<false>(),
-        galois::timeit(),
-        galois::no_stats());
+        galois::loopname(get_run_identifier(doall_str).c_str()));
   }
   
   /**
@@ -2723,8 +2699,7 @@ private:
                          FnTy::reduce(lid, getData(lid), val_vec[n]);
                          #endif
                        },
-                       galois::loopname(get_run_identifier(doall_str).c_str()),
-                       galois::no_stats());
+                       galois::loopname(get_run_identifier(doall_str).c_str()));
       }
     }
 
@@ -2788,8 +2763,7 @@ private:
                 #endif
                 val_vec[n] = val;
               }, 
-              galois::loopname(get_run_identifier(doall_str).c_str()),
-              galois::no_stats());
+              galois::loopname(get_run_identifier(doall_str).c_str()));
         }
       }
 
@@ -2807,8 +2781,7 @@ private:
              auto val = FnTy::extract(n, getData(n));
              checkpoint_val_vec[n] = val;
             }, 
-            galois::loopname(get_run_identifier(doall_str).c_str()), 
-            galois::no_stats());
+            galois::loopname(get_run_identifier(doall_str).c_str()));
 
         gSerialize(b, checkpoint_val_vec);
         checkpoint_bytes += (b.size() - send_bytes);
@@ -2872,8 +2845,7 @@ public:
           auto val = FnTy::extract(n, getData(n));
           val_vec[n] = val;
         }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::no_stats());
+        galois::loopname(get_run_identifier(doall_str).c_str()));
 
     galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, 
         val_vec.size() * sizeof(typename FnTy::ValTy));
@@ -2968,8 +2940,7 @@ public:
       [&](uint32_t n) {
         FnTy::setVal(n, getData(n), val_vec[n]);
       }, 
-      galois::loopname(get_run_identifier(doall_str).c_str()), 
-      galois::no_stats());
+      galois::loopname(get_run_identifier(doall_str).c_str()));
   }
 
  /*************************************************
@@ -3012,8 +2983,7 @@ public:
           auto val = FnTy::extract(n, getData(n));
           val_vec[n] = val;
         }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::no_stats());
+        galois::loopname(get_run_identifier(doall_str).c_str()));
 
     galois::runtime::SendBuffer b;
     gSerialize(b, val_vec);
@@ -3072,8 +3042,7 @@ public:
         [&](uint32_t n) {
           FnTy::setVal(n, getData(n), val_vec[n]);
         }, 
-        galois::loopname(get_run_identifier(doall_str).c_str()), 
-        galois::no_stats());
+        galois::loopname(get_run_identifier(doall_str).c_str()));
   }
 
 private:

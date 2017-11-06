@@ -259,11 +259,7 @@ void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
         uniqueNodeBitset.set(localEdges[edgeIndex * 3]);
       }
     },
-    galois::loopname("FindUniqueNodes"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("FindUniqueNodes"));
 
   printf("[%lu] Unique nodes found\n", hostID);
 }
@@ -330,11 +326,7 @@ void accumulateLocalEdgesToChunks(
       GALOIS_ASSERT(chunkNum != (uint32_t)-1);
       chunkToAccumulator[chunkNum] += 1;
     },
-    galois::loopname("ChunkInspection"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("ChunkInspection"));
 
   printf("[%lu] Chunk accumulators done accumulating\n", hostID);
 
@@ -344,11 +336,7 @@ void accumulateLocalEdgesToChunks(
     [&] (auto& chunkAndCount) {
       chunkCounts[chunkAndCount.first] += chunkAndCount.second.load();
     },
-    galois::loopname("ChunkCountUpdate"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("ChunkCountUpdate"));
 }
 
 /**
@@ -542,10 +530,7 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
           }
         }
       },
-      galois::loopname("LoadTransposeEdgesMPIGraph"),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("LoadTransposeEdgesMPIGraph"));
   }
   
   return edgeData;
@@ -621,9 +606,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
           }
         }
       },
-      galois::loopname("LoadSymmetricEdgesMPIGraph"),
-      galois::timeit(),
-      galois::no_stats()
+      galois::loopname("LoadSymmetricEdgesMPIGraph"));
     );
   }
   
@@ -688,11 +671,7 @@ void sendEdgeCounts(
       uint32_t edgeOwner = findOwner(src, hostToNodes);
       numEdgesPerHost[edgeOwner] += 1;
     },
-    galois::loopname("EdgeInspection"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("EdgeInspection"));
 
   printf("[%lu] Sending edge counts\n", hostID);
 
@@ -760,9 +739,7 @@ void sendAssignedEdges(
       for (unsigned h = 0; h < totalNumHosts; h++) {
         (*(lastSourceSentStorage.getLocal()))[h] = 0;
       }
-    },
-    galois::no_stats()
-  );
+    });
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
@@ -811,11 +788,7 @@ void sendAssignedEdges(
         nodeLocks[localID].unlock();
       }
     },
-    galois::loopname("Pass2"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("Pass2"));
 
   printf("[%lu] Buffer cleanup\n", hostID);
 
@@ -842,10 +815,7 @@ void sendAssignedEdges(
         }
       }
     },
-    galois::loopname("Pass2Cleanup"),
-    galois::timeit(),
-    galois::no_stats()
-  );
+    galois::loopname("Pass2Cleanup"));
 }
 
 // Non-void variant of the above; uint32_t only
@@ -889,9 +859,7 @@ void sendAssignedEdges(
       for (unsigned h = 0; h < totalNumHosts; h++) {
         (*(lastSourceSentStorage.getLocal()))[h] = 0;
       }
-    },
-    galois::no_stats()
-  );
+    });
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
@@ -947,11 +915,7 @@ void sendAssignedEdges(
         nodeLocks[localID].unlock();
       }
     },
-    galois::loopname("Pass2"),
-    galois::no_stats(),
-    galois::steal<false>(),
-    galois::timeit()
-  );
+    galois::loopname("Pass2"));
 
   printf("[%lu] Buffer cleanup\n", hostID);
 
@@ -980,10 +944,7 @@ void sendAssignedEdges(
         }
       }
     },
-    galois::loopname("Pass2Cleanup"),
-    galois::timeit(),
-    galois::no_stats()
-  );
+    galois::loopname("Pass2Cleanup"));
 }
 
 /**

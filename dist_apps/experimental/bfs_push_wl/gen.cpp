@@ -168,10 +168,7 @@ struct InitializeGraph {
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>(),
-      galois::timeit(),
-        galois::no_stats()
-    );
+      galois::steal<true>());
 
     }
   }
@@ -227,10 +224,7 @@ struct BFS {
             nodesToWork.begin(), nodesToWork.end(),
             BFS(&_graph, dga, dist_wl),
             galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-            galois::steal<true>(),
-            galois::timeit(),
-        galois::no_stats()
-            );
+            galois::steal<true>());
 
         galois::runtime::reportStat("(NULL)", 
             _graph.get_run_identifier("NUM_WORK_ITEMS_"), 

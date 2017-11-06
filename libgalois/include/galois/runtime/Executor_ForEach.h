@@ -46,6 +46,7 @@
 #include "galois/runtime/Context.h"
 #include "galois/runtime/ForEachTraits.h"
 #include "galois/runtime/Range.h"
+#include "galois/runtime/LoopStatistics.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
@@ -160,40 +161,39 @@ public:
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
-//TODO: implement more_stats instead of does_not_need_stats which show aborts/pushes etc.
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
-  static constexpr bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
+  static constexpr bool needsStats = exists_by_supertype<loopname_tag, ArgsTy>::value;
   static constexpr bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
   static constexpr bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
   static constexpr bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
   static constexpr bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
-  static constexpr bool MORE_STATS = exists_by_supertype<more_stats_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS = needsStats && exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type;
 
-  struct ThreadLocalData {
-    FunctionTy function;
+  struct ThreadLocalBasics {
+
     UserContextAccess<value_type> facing;
+    FunctionTy function;
     SimpleRuntimeContext ctx;
-    unsigned long stat_conflicts;
-    unsigned long stat_iterations;
-    unsigned long stat_pushes;
-    const char* loopname;
-    ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : function(fn), stat_conflicts(0), stat_iterations(0), stat_pushes(0),
-        loopname(ln)
+
+    explicit ThreadLocalBasics(const FunctionTy& fn): 
+      facing(), 
+      function(fn),
+      ctx() 
     {}
-    ~ThreadLocalData() {
-      if (needsStats) {
-        reportStat_Tsum(loopname, "Conflicts", stat_conflicts);
-        reportStat_Tsum(loopname, "Commits", stat_iterations - stat_conflicts);
-        reportStat_Tsum(loopname, "Pushes", stat_pushes);
-        reportStat_Tsum(loopname, "Iterations", stat_iterations);
-      }
-    }
+  };
+
+  using LoopStat = LoopStatistics<needsStats>;
+
+  struct ThreadLocalData: public ThreadLocalBasics, public LoopStat {
+
+    ThreadLocalData(const FunctionTy& fn, const char* ln)
+      : ThreadLocalBasics(fn), LoopStat(ln)
+    {}
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -218,7 +218,7 @@ protected:
       auto& pb = tld.facing.getPushBuffer();
       auto n = pb.size();
       if (n) {
-	tld.stat_pushes += n;
+        tld.inc_pushes(n);
         wl.push(pb.begin(), pb.end());
         pb.clear();
       }
@@ -235,7 +235,7 @@ protected:
   void abortIteration(const Item& item, ThreadLocalData& tld) {
     assert(needsAborts);
     tld.ctx.cancelIteration();
-    ++tld.stat_conflicts;
+    tld.inc_conflicts();
     aborted.push(item);
     //clear push buffer
     if (needsPush)
@@ -248,26 +248,31 @@ protected:
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
     if (needsAborts)
       tld.ctx.startIteration();
-    ++tld.stat_iterations;
+
+    tld.inc_iterations();
     tld.function(val, tld.facing.data());
     commitIteration(tld);
   }
 
-  void runQueueSimple(ThreadLocalData& tld) {
+  bool runQueueSimple(ThreadLocalData& tld) {
     galois::optional<value_type> p;
+    bool didWork = false;
     while ((p = wl.pop())) {
       doProcess(*p, tld);
+      didWork = true;
     }
+    return didWork;
   }
 
-  template<int limit, typename WL>
-  void runQueue(ThreadLocalData& tld, WL& lwl) {
+  template<unsigned int limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl) {
     galois::optional<typename WL::value_type> p;
-    int num = 0;
+    unsigned int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
-      while ((!limit || num++ < limit) && (p = lwl.pop())) {
-	doProcess(aborted.value(*p), tld);
+      while ((!limit || num < limit) && (p = lwl.pop())) {
+        doProcess(aborted.value(*p), tld);
+        ++num;
       }
     } else {
       clearReleasable();
@@ -276,18 +281,21 @@ protected:
     }
 #else
     try {
-      while ((!limit || num++ < limit) && (p = lwl.pop())) {
-	doProcess(aborted.value(*p), tld);
+      while ((!limit || num < limit) && (p = lwl.pop())) {
+        doProcess(aborted.value(*p), tld);
+        ++num;
       }
     } catch (ConflictFlag const& flag) {
       abortIteration(*p, tld);
     }
 #endif
+
+    return (num > 0);
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void handleAborts(ThreadLocalData& tld) {
-    runQueue<0>(tld, *aborted.getQueue());
+  bool handleAborts(ThreadLocalData& tld) {
+    return runQueue<0>(tld, *aborted.getQueue());
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -317,22 +325,24 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachExecutor::fastPushBack, this, std::placeholders::_1));
 
-    unsigned long old_iterations = 0;
     while (true) {
       do {
+        bool didWork = false;
+
         // Run some iterations
         if (couldAbort || needsBreak) {
           constexpr int __NUM = (needsBreak || isLeader) ? 64 : 0;
-          runQueue<__NUM>(tld, wl);
+          bool b = runQueue<__NUM>(tld, wl);
+          didWork = b || didWork;
           // Check for abort
-          if (couldAbort)
-            handleAborts(tld);
+          if (couldAbort) {
+            b = handleAborts(tld);
+            didWork = b || didWork;
+          }
         } else { // No try/catch
-          runQueueSimple(tld);
+          bool b = runQueueSimple(tld);
+          didWork = b || didWork;
         }
-
-        bool didWork = old_iterations != tld.stat_iterations;
-        old_iterations = tld.stat_iterations;
 
         // Update node color and prop token
         term.localTermination(didWork);
@@ -365,7 +375,7 @@ protected:
     barrier(getBarrier(activeThreads)),
     wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
-    loopname(get_by_supertype<loopname_tag>(args).value),
+    loopname(galois::internal::getLoopName(args)),
     broke(false),
     initTime(loopname, "Init"),
     execTime(loopname, "Execute")
@@ -544,16 +554,15 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
   static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
   if (forceNew) {
-    // TODO: not needed any more? Remove once sure
     auto ftpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
 
     auto xtpl = std::tuple_cat(ftpl,
           get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>())));
+            std::make_tuple(wl_tag {}),
+            std::make_tuple(wl<defaultWL>())));
 
-    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
-    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
+    constexpr bool TIME_IT = exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
+    CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(xtpl));
 
     timer.start();
 
@@ -562,6 +571,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     timer.stop();
 
   } else {
+    // TODO: not needed any more? Remove once sure
     auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
     auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
     auto ttpl = get_default_trait_values(tpl, tags, values);
@@ -570,11 +580,11 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
     auto xtpl = std::tuple_cat(ftpl,
           get_default_trait_values(tpl,
-            std::make_tuple(loopname_tag {}, wl_tag {}),
-            std::make_tuple(loopname {}, wl<defaultWL>())));
+            std::make_tuple(wl_tag {}),
+            std::make_tuple(wl<defaultWL>())));
 
-    constexpr bool TIME_IT = exists_by_supertype<timeit_tag, decltype(xtpl)>::value;
-    CondStatTimer<TIME_IT> timer(get_by_supertype<loopname_tag>(xtpl).value);
+    constexpr bool TIME_IT = exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
+    CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(xtpl));
 
     timer.start();
 

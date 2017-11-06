@@ -393,7 +393,7 @@ void divide(const Iter& b, const Iter& e) {
 
 void layoutPoints(PointList& points) {
   divide(points.begin(), points.end() - 3);
-  galois::do_all(galois::iterate(points.begin(), points.end() - 3), insPt(), galois::no_stats());
+  galois::do_all(galois::iterate(points.begin(), points.end() - 3), insPt());
 //! [Insert elements into InsertBag]
   Point* p1 = &basePoints.push(*(points.end() - 1));
   Point* p2 = &basePoints.push(*(points.end() - 2));

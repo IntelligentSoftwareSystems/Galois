@@ -100,10 +100,7 @@ struct ResetGraph {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph{ &_graph },
-      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -148,10 +145,7 @@ struct InitializeGraph {
      galois::do_all(
         galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         InitializeGraph{alpha, &_graph},
-        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
 
     _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
@@ -196,10 +190,7 @@ struct PageRank_delta {
       galois::do_all(
         galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         PageRank_delta{ alpha, tolerance, &_graph },
-        galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
     }
   }
 
@@ -248,10 +239,7 @@ struct PageRank {
         galois::do_all(
           galois::iterate(nodesWithEdges),
           PageRank{ &_graph, dga },
-          galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          galois::timeit(),
-          galois::no_stats()
-        );
+          galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
       }
 
       _graph.sync<writeDestination, readSource, Reduce_add_residual, 
@@ -400,8 +388,8 @@ struct PageRankSanity {
                        max_residual,
                        min_residual
                      ), 
-                     galois::loopname("PageRankSanity"),
-                     galois::no_stats());
+                     galois::loopname("PageRankSanity"));
+
       DGA_max = max_value.reduce();
       DGA_min = min_value.reduce();
       DGA_max_residual = max_residual.reduce();

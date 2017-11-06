@@ -110,8 +110,7 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph), 
       [&graph] (GNode n) { 
         graph.getData(n) = DIST_INFINITY; 
-      }, 
-      galois::no_stats());
+      });
 
   graph.getData(source) = 0;
   galois::StatTimer Tmain;

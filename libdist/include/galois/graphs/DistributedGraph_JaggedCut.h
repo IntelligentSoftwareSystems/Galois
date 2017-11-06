@@ -283,10 +283,7 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::loopname("EdgeLoading"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("EdgeLoading"));
 
     }
 
@@ -343,10 +340,7 @@ private:
           ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
         }
       },
-      galois::loopname("CalculateIndegree"),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("CalculateIndegree"));
 
     timer.stop();
     galois::gPrint("[", base_hGraph::id, "] In-degree calculation time: ", timer.get_usec()/1000000.0f,
@@ -469,10 +463,7 @@ private:
           numOutgoingEdges[h][src - rowOffset]++;
         }
       },
-      galois::loopname("EdgeInspection"),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname("EdgeInspection"));
 
     timer.stop();
     galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
@@ -588,10 +579,8 @@ private:
             }
           }
         },
-        galois::loopname("CreateDstNode"),
-        galois::timeit(),
-        galois::no_stats()
-      );
+        galois::loopname("CreateDstNode"));
+
       for (uint64_t dst = range.first; dst < range.second; ++dst) {
         if (createNode.test(dst - range.first)) {
           localToGlobalVector.push_back(dst);
@@ -627,9 +616,7 @@ private:
     galois::on_each(
       [&](unsigned tid, unsigned nthreads) {
         receiveEdges(graph, edgesToReceive);
-      },
-      galois::no_stats()
-    );
+      });
 
     ++galois::runtime::evilPhase;
 
@@ -711,11 +698,7 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
-      galois::loopname("EdgeLoading"),
-      galois::no_stats(),
-      galois::timeit()
-    );
-
+      galois::loopname("EdgeLoading"));
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
       auto& sbr = *sb.getRemote(t);
@@ -795,10 +778,7 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
-      galois::loopname("EdgeLoading"),
-      galois::no_stats(),
-      galois::timeit()
-    );
+      galois::loopname("EdgeLoading"));
 
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {

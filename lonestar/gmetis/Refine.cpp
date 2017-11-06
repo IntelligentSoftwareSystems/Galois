@@ -349,7 +349,7 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
           degreeInAccum[clust] += degreet;
 
         },
-        galois::loopname("compute dists"), galois::timeit());
+        galois::loopname("compute dists"));
 
 
     for (int i=0; i<nbParti; i++)
@@ -387,7 +387,7 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
           g.getData(n, galois::MethodFlag::UNPROTECTED).setPart(partition);
 
         },
-        galois::loopname("make moves"), galois::timeit());
+        galois::loopname("make moves"));
   }
   /*  std::cout<<ratiocut(nbParti, degreeIn, card)<< '\n';
   for (int i=0; i<nbParti; i++)

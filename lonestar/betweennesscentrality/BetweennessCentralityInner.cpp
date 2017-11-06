@@ -124,7 +124,6 @@ struct AsyncAlgo {
           data.dependencies = -std::numeric_limits<float>::max();
           data.dist = std::numeric_limits<int>::max();
         },
-        galois::timeit(),
         galois::loopname("Initialize"));
 
   }
@@ -162,7 +161,6 @@ struct AsyncAlgo {
           }
         },
         galois::no_conflicts(),
-        galois::timeit(),
         galois::wl<OBIM>(indexer),
         galois::loopname("BFS"));
 
@@ -204,7 +202,6 @@ struct AsyncAlgo {
         },
         galois::no_conflicts(),
         galois::no_pushes(),
-        galois::timeit(),
         galois::wl<OBIM>(indexer),
         galois::loopname("CountPaths"));
 
@@ -245,7 +242,6 @@ struct AsyncAlgo {
         },
         galois::no_conflicts(),
         galois::no_pushes(),
-        galois::timeit(),
         galois::wl<OBIM>(indexer),
         galois::loopname("ComputeDep"));
 
@@ -303,7 +299,6 @@ struct LeveledAlgo {
           data.dependencies = 0.0; //std::numeric_limits<float>::lowest();
           data.dist = std::numeric_limits<int>::max();
         },
-        galois::timeit(),
         galois::loopname("Initialize"));
   }
 
@@ -373,7 +368,6 @@ struct LeveledAlgo {
           sdata.numPaths = sdata.numPaths + np;
 
         },
-        galois::timeit(),
         galois::loopname("CountPaths"));
   }
 

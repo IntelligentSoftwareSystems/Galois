@@ -167,10 +167,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::timeit(),
-      galois::no_stats()
-    );
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -213,10 +210,7 @@ struct FirstItr_SSSP {
     // one node, doesn't matter which do_all you use, so regular one suffices
     galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
                 FirstItr_SSSP{&_graph}, 
-                galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-                galois::timeit(),
-                galois::no_stats()
-                );
+                galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
     }
 
     #if __OPT_VERSION__ == 5
@@ -310,10 +304,7 @@ struct SSSP {
           nodesWithEdges,
           SSSP{ &_graph, dga },
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-          galois::steal<true>(),
-          galois::timeit(),
-          galois::no_stats()
-        );
+          galois::steal<true>());
       }
 
       #if __OPT_VERSION__ == 5
@@ -418,8 +409,7 @@ struct SSSPSanityCheck {
       m.reset();
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
                      SSSPSanityCheck(infinity, &_graph, dgas, dgam, m),
-                     galois::loopname("SSSPSanityCheck"),
-                     galois::no_stats());
+                     galois::loopname("SSSPSanityCheck"));
       dgam = m.reduce();
     }
 

@@ -468,8 +468,7 @@ void makeGraph(const std::string& triangleFilename) {
   galois::do_all(galois::iterate(permuted), 
       [&](N x) {
         permuted.sortEdges<void>(x, IdLess<N,void>()); 
-      }, 
-      galois::no_stats());
+      });
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
   permuted.toFile(triangleFilename);
