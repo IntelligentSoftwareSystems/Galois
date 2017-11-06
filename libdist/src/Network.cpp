@@ -55,7 +55,11 @@ void NetworkInterface::initializeMPI() {
     MPI_Abort(MPI_COMM_WORLD, initSuccess);
   }
 
+#ifdef GALOIS_USE_LWCI
+  if (supportProvided < MPI_THREAD_FUNNELED) {
+#else
   if (supportProvided < MPI_THREAD_MULTIPLE) {
+#endif
     GALOIS_DIE("Thread multiple (MPI) not supported.");
   }
 }
