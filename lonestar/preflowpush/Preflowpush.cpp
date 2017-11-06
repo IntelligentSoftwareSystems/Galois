@@ -635,8 +635,8 @@ struct PreflowPush {
           increment += BETA;
         }
 
-        if (self->app.global_relabel_interval > 0 &&
-            self->counter.reduce() >= self->app.global_relabel_interval) {
+        if (app.global_relabel_interval > 0 &&
+            counter.reduce() >= app.global_relabel_interval) {
 
           app.should_global_relabel = true;
           ctx.breakLoop();

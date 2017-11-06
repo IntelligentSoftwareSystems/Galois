@@ -643,7 +643,7 @@ template <> struct ChooseDoAllImpl<false> {
           galois::runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 
-    }, std::make_tuple(loopname("DoAll-no-steal")));
+    }, std::make_tuple());
   }
 
 };

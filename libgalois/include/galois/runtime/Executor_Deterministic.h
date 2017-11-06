@@ -1345,7 +1345,7 @@ public:
     NewWorkManager<OptionsTy>(o),
     options(o),
     barrier(getBarrier(activeThreads)),
-    loopname(get_by_supertype<loopname_tag>(o.args).value)
+    loopname(galois::internal::getLoopName(o.args))
   {
     static_assert(!OptionsTy::needsBreak || OptionsTy::hasBreak,
         "need to use break function to break loop");

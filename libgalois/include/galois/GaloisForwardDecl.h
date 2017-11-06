@@ -21,8 +21,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-#include "galois/UserContext.h"
-
 namespace galois {
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>

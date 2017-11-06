@@ -33,6 +33,7 @@
 #define GALOIS_LARGEARRAY_H
 
 #include "galois/ParallelSTL.h"
+#include "galois/Galois.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
 #include "galois/substrate/NumaMem.h"
