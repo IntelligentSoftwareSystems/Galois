@@ -348,7 +348,6 @@ struct PageRankSanity {
     DGA_max_residual.reset();
     DGA_min_residual.reset();
 
-<<<<<<< HEAD
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       float _max_value;
