@@ -238,7 +238,7 @@ struct SSSP {
         SSSP(&_graph, dga), 
         galois::no_stats(),
         galois::loopname("SSSP"), 
-        galois::steal<true>());
+        galois::steal());
 
       #if __OPT_VERSION__ == 5
       Flags_current_length.set_write_src();
@@ -314,7 +314,7 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       galois::no_stats(),
       galois::loopname("PredAndSucc"),
-      galois::steal<true>());
+      galois::steal());
 
     #if __OPT_VERSION__ == 5
     Flags_num_predecessors.set_write_src();
@@ -524,7 +524,7 @@ struct NumShortestPaths {
         NumShortestPaths(infinity, &_graph, dga), 
         galois::no_stats(),
         galois::loopname("NumShortestPaths"),
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats()
       );
 
@@ -800,7 +800,7 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::no_stats(),
         galois::loopname("DependencyPropogation"),
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats()
       );
 

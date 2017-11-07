@@ -296,7 +296,7 @@ struct PageRank_delta {
         PageRank_delta{ alpha, tolerance, &_graph },
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-        galois::steal<true>());
+        galois::steal());
     }
 
     // src write
@@ -350,7 +350,7 @@ struct PageRank {
           PageRank{ &_graph, dga },
           galois::no_stats(),
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          galois::steal<true>());
+          galois::steal());
       }
 
       #if __OPT_VERSION__ == 5

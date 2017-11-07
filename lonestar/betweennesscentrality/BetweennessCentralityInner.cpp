@@ -343,7 +343,7 @@ struct LeveledAlgo {
             //     sdata.numPaths += ddata.numPaths;
             // }
           },
-          galois::loopname("BFS"), galois::steal<true>());
+          galois::loopname("BFS"), galois::steal());
       //galois::do_all(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
@@ -388,7 +388,7 @@ struct LeveledAlgo {
                 sdata.dependencies += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
             }
           },
-          galois::loopname("ComputeDep"), galois::steal<true>());
+          galois::loopname("ComputeDep"), galois::steal());
     Tdep.stop();
   }
 

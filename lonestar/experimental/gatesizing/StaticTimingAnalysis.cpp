@@ -331,7 +331,7 @@ struct SetForwardPrecondition {
 };
 
 static void computeArrivalTimeAndPower(Graph& g, GNode dummySrc) {
-  galois::do_all(galois::iterate(g), SetForwardPrecondition{g}, galois::steal<true>());
+  galois::do_all(galois::iterate(g), SetForwardPrecondition{g}, galois::steal());
   galois::InsertBag<GNode> work;
   work.push_back(dummySrc);
   galois::for_each(galois::iterate(work), ComputeArrivalTimeAndPower{g}, galois::loopname("ComputeArrivalTimeAndPower"));

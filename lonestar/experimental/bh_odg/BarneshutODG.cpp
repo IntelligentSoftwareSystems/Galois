@@ -200,7 +200,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 
     t_bbox.start ();
     galois::do_all(beg, end,
-        ReduceBoxes (bbox), galois::steal<true>());
+        ReduceBoxes (bbox), galois::steal());
     t_bbox.stop ();
 
     BoundingBox box(bbox.reduce ());

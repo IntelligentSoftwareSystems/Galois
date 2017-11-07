@@ -178,7 +178,7 @@ struct InitializeGraph2 {
       InitializeGraph2{ &_graph },
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()),
-      galois::steal<true>());
+      galois::steal());
 
     #if __OPT_VERSION__ == 5
     Flags_current_degree.set_write_dst();
@@ -372,7 +372,7 @@ struct KCoreStep1 {
         KCoreStep1{ k_core_num, &_graph, dga },
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::steal<true>());
+        galois::steal());
 
       #if __OPT_VERSION__ == 5
       Flags_trim.set_write_dst();

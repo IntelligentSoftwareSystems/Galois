@@ -455,7 +455,7 @@ class LC_CSR_Graph :
         this->sortEdgesByDst(N, mflag);
       },
       galois::no_stats(),
-      galois::steal<true>());
+      galois::steal());
   }
 
   typedef std::pair<iterator, iterator> NodeRange;

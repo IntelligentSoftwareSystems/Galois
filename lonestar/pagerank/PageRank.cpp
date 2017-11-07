@@ -149,7 +149,7 @@ void initResidual(Graph& graph) {
                          }
                        },
                        galois::loopname("init-res-0"),
-                       galois::steal<true>());
+                       galois::steal());
   // scale residual
   galois::do_all(galois::iterate(graph),
                        [&graph](const typename Graph::GraphNode& src) {
@@ -157,7 +157,7 @@ void initResidual(Graph& graph) {
                          data.residual = data.residual * alpha * (1.0 - alpha);
                        },
                        galois::loopname("init-res-1"),
-                       galois::steal<true>());
+                       galois::steal());
 }
 
 int main(int argc, char** argv) {

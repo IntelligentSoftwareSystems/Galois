@@ -59,7 +59,7 @@ namespace runtime {
 template<typename FunctionTy, typename RangeTy, typename ArgsTy>
 class DoAllExecutor {
 
-  static const bool STEAL = get_type_by_supertype<steal_tag, ArgsTy>::type::value;
+  static const bool STEAL = exists_by_supertype<steal_tag, ArgsTy>::value;
 
   typedef typename RangeTy::local_iterator iterator;
   FunctionTy F;
@@ -232,8 +232,8 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, steal_tag{}),
-        std::make_tuple(loopname{}, steal<>{})));
+        std::make_tuple(loopname_tag{}),
+        std::make_tuple(loopname{})));
 
   do_all_impl( r, fn, dtpl);
 }
@@ -246,8 +246,8 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
 
   auto dtpl = std::tuple_cat(tpl,
       get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}, steal_tag{}),
-        std::make_tuple(loopname{}, steal<>{})));
+        std::make_tuple(loopname_tag{}),
+        std::make_tuple(loopname{})));
 
 #if 0
   std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
@@ -261,7 +261,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, GTimerTy& statTimer, con
   do_all_impl(
       r, fn,
       get_by_supertype<loopname_tag>(dtpl).getValue(),
-      get_by_supertype<steal_tag>(dtpl).getValue());
+      exists_by_supertype<steal_tag, decltype(dtpl)>::value);
   statTimer.stop();
   }
 }

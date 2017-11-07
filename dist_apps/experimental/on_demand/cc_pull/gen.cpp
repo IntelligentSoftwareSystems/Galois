@@ -163,7 +163,7 @@ struct InitializeGraph {
       InitializeGraph{&_graph}, 
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>());
+      galois::steal());
     }
   }
 
@@ -212,7 +212,7 @@ struct ConnectedComp {
         ConnectedComp(&_graph, dga),
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
-        galois::steal<true>());
+        galois::steal());
 
       #if __OPT_VERSION__ == 5
       Flags_comp_current.set_write_src();

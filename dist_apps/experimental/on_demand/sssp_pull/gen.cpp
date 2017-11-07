@@ -217,7 +217,7 @@ struct SSSP {
           SSSP{ &_graph, dga },
           galois::no_stats(),
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
-          galois::steal<true>());
+          galois::steal());
       }
 
       #if __OPT_VERSION__ == 5

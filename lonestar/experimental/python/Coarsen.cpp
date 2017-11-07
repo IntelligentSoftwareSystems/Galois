@@ -66,7 +66,7 @@ struct LocateCoarsenEdges {
   EdgeMap collect() {
     galois::GReducible<EdgeMap, Updater> E;
     pg = &E;
-    galois::do_all(fg, *this, galois::steal<true>());
+    galois::do_all(fg, *this, galois::steal());
     return E.reduce(Reducer());
   }
 };

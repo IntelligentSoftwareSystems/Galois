@@ -170,7 +170,7 @@ struct InitializeGraph {
       InitializeGraph(src_node, infinity, &_graph),
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>());
+      galois::steal());
     }
 
   }
@@ -220,7 +220,7 @@ struct BFS {
         BFS(&_graph, dga),
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
-        galois::steal<true>());
+        galois::steal());
       }
 
       #if __OPT_VERSION__ == 5

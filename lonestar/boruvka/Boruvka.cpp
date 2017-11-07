@@ -246,7 +246,7 @@ struct ParallelAlgo {
     init();
 
     galois::do_all(galois::iterate(graph), Initialize(this)
-        , galois::chunk_size<16>(), galois::steal<true>() , galois::loopname("Initialize"));
+        , galois::chunk_size<16>(), galois::steal() , galois::loopname("Initialize"));
 
     while (true) {
       while (true) {
@@ -255,10 +255,10 @@ struct ParallelAlgo {
         std::swap(current, next);
         galois::do_all(galois::iterate(*current)
             , Merge(this)
-            , galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Merge"));
+            , galois::steal(), galois::chunk_size<16>(), galois::loopname("Merge"));
         galois::do_all(galois::iterate(*current)
             , Find(this)
-            , galois::steal<true>(), galois::chunk_size<16>(), galois::loopname("Find"));
+            , galois::steal(), galois::chunk_size<16>(), galois::loopname("Find"));
         current->clear();
 
         if (next->empty())

@@ -205,7 +205,7 @@ struct InitializeGraph {
       InitializeGraph{ &_graph },
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
-      galois::steal<true>());
+      galois::steal());
 
     Flags_nout::set_write_dst();
 
@@ -268,7 +268,7 @@ struct PageRank_delta {
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-      galois::steal<true>());
+      galois::steal());
 
     Flags_residual::set_write_src();
     Flags_residual::set_write_dst();
@@ -323,7 +323,7 @@ struct PageRank {
         PageRank{ &_graph },
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-        galois::steal<true>());
+        galois::steal());
 
       Flags_residual::set_write_src();
 

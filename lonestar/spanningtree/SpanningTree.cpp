@@ -142,7 +142,7 @@ struct AsyncAlgo {
             }
           }
         },
-        galois::loopname("Merge"), galois::steal<true>());
+        galois::loopname("Merge"), galois::steal());
 
     galois::do_all(galois::iterate(graph), 
         Normalize(), 

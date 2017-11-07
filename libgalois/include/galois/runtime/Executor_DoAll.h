@@ -661,8 +661,8 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   auto argsT = std::tuple_cat (argsTuple,
       get_default_trait_values (argsTuple,
-        std::make_tuple (chunk_size_tag {}, steal_tag{}),
-        std::make_tuple (chunk_size<> {}, steal<>{} )));
+        std::make_tuple (chunk_size_tag {}),
+        std::make_tuple (chunk_size<> {})));
 
   using ArgsT = decltype(argsT);
 
@@ -671,7 +671,7 @@ void do_all_gen (const R& range, const F& func, const ArgsTuple& argsTuple) {
 
   timer.start();
 
-  constexpr bool STEAL = get_type_by_supertype<steal_tag, ArgsT>::type::value;
+  constexpr bool STEAL = exists_by_supertype<steal_tag, ArgsT>::value;
 
   internal::ChooseDoAllImpl<STEAL>::call(range, func, argsT);
 

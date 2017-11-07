@@ -162,7 +162,7 @@ struct VF2Algo {
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
+      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal());
       return isSomeNodeEmpty.reduce();
     }
   };
@@ -491,7 +491,7 @@ struct UllmannAlgo {
     // return true if at least one node has an empty set of candidates
     static bool go(DGraph& gD, QGraph& gQ) {
       galois::GReduceLogicalOR isSomeNodeEmpty;
-      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal<true>());
+      galois::do_all(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), galois::loopname("filter"), galois::steal());
       return isSomeNodeEmpty.reduce();
     }
   };

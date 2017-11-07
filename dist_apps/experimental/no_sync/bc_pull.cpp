@@ -220,7 +220,7 @@ struct SSSP {
         SSSP(&_graph, dga), 
         galois::no_stats(),
         galois::loopname("SSSP"), 
-        galois::steal<true>());
+        galois::steal());
 
       iterations++;
 
@@ -265,7 +265,7 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       galois::no_stats(),
       galois::loopname("PredAndSucc"),
-      galois::steal<true>());
+      galois::steal());
   }
 
   void operator()(GNode src) const {
@@ -361,7 +361,7 @@ struct NumShortestPaths {
         NumShortestPaths(infinity, &_graph, dga), 
         galois::no_stats(),
         galois::loopname("NumShortestPaths"),
-        galois::steal<true>());
+        galois::steal());
 
       // this deals with flag; in compiler version it should deal with trim/
       // to_add as well...
@@ -466,7 +466,7 @@ struct DependencyPropogation {
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
         galois::no_stats(),
         galois::loopname("DependencyPropogation"),
-        galois::steal<true>());
+        galois::steal());
 
       // flag changing (has to be done between BSP rounds so values
       // are propogated more than once)

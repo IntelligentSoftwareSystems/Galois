@@ -185,8 +185,7 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
  * argument to {@link do_all()} loops.
  */
 struct steal_tag {};
-template<bool V = false> // steal disabled by default
-struct steal: public trait_has_svalue<bool, V>, steal_tag {};
+struct steal: public trait_has_type<bool>, steal_tag {};
 
 /**
  * Indicates worklist to use. Optional argument to {@link for_each()} loops.

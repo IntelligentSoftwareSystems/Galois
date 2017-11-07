@@ -296,7 +296,7 @@ struct BuildTreeLockFree {
       
     galois::do_all (beg, end, 
         BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
-        galois::steal<true>());
+        galois::steal());
 
     return root;
   }

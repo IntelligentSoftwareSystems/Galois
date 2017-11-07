@@ -782,7 +782,7 @@ public:
   }
 
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this), [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, galois::steal<true>());
+    galois::do_all(galois::iterate(*this), [=] (GraphNode N) {this->sortEdgesByDst(N, mflag);}, galois::steal());
   }
 
   //// General Things ////

@@ -57,7 +57,7 @@ static void initialize(Graph *g) {
         data.II.vInt1 = DIST_INFINITY;
         data.II.vInt2 = DIST_INFINITY;
       },
-    galois::steal<true>()
+    galois::steal()
     );
 }
 
@@ -90,7 +90,7 @@ static NodeSet collectOutward(Graph *g, int hop) {
           w.push_back(n);
         }
       },
-    galois::steal<true>()
+    galois::steal()
     );
 
   return w;
@@ -112,7 +112,7 @@ static NodeSet collectBetween(Graph *g, int hop) {
           w.push_back(n);
         }
       },
-    galois::steal<true>()
+    galois::steal()
     );
 
   return w;

@@ -270,7 +270,7 @@ struct SSSP {
         SSSP(&_graph, dga), 
         galois::no_stats(),
         galois::loopname("SSSP"), 
-        galois::steal<true>());
+        galois::steal());
 
       iterations++;
 
@@ -321,7 +321,7 @@ struct PredAndSucc {
       PredAndSucc(infinity, &_graph), 
       galois::no_stats(),
       galois::loopname("PredAndSucc"),
-      galois::steal<true>());
+      galois::steal());
     }
   }
 
@@ -420,7 +420,7 @@ struct NumShortestPaths {
           galois::no_stats(),
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          galois::steal<true>());
+          galois::steal());
       }
 
       // do predecessor decrementing using trim + dependency changes with
@@ -571,7 +571,7 @@ struct DependencyPropogation {
         galois::no_stats(),
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        galois::steal<true>());
+        galois::steal());
     }
                     
 

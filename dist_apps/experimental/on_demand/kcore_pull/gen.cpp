@@ -179,7 +179,7 @@ struct DegreeCounting {
       DegreeCounting{ &_graph },
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()),
-      galois::steal<true>());
+      galois::steal());
 
     #if __OPT_VERSION__ == 5
     Flags_current_degree.set_write_src();
@@ -404,7 +404,7 @@ struct KCore {
         KCore{ &_graph },
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("KCore").c_str()),
-        galois::steal<true>());
+        galois::steal());
 
       #if __OPT_VERSION__ == 5
       Flags_trim.set_write_src();

@@ -67,7 +67,7 @@ void initResidual(Graph& graph) {
         sum += 1.0/nout(graph,dst, galois::MethodFlag::UNPROTECTED);  
       }
       data.residual = sum * alpha * (1.0-alpha);
-    }, galois::steal<true>());
+    }, galois::steal());
 }
 
 template<typename Graph, typename PriFn>
@@ -83,7 +83,7 @@ void initResidual(Graph& graph, galois::InsertBag<std::pair<typename Graph::Grap
       }
       data.residual = sum * alpha * (1.0-alpha);
       b.push(std::make_pair(src, pri(graph, src)));
-    }, galois::steal<true>());
+    }, galois::steal());
 }
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {

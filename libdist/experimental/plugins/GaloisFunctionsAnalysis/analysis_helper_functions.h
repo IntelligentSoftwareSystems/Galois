@@ -297,7 +297,7 @@ string makeFunctorFirstIter(string orig_functor_name, Ty_firstEntry entry, vecto
   static_go += "FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}, ";
   static_go += "galois::loopname(_graph.get_run_identifier(\"" + orig_functor_name + "\").c_str()),";
   if(!onlyOneNode)
-    static_go += "\ngalois::steal<true>(),";
+    static_go += "\ngalois::steal(),";
 
   static_go += SS_write_set.str() + ");\n}\n";
   functor += static_go;

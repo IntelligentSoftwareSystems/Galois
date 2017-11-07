@@ -78,7 +78,7 @@ void initialize(Graph& g) {
         g.getEdgeData(e) = removed;
       }
     },
-    galois::steal<true>()
+    galois::steal()
   );
 }
 
@@ -154,7 +154,7 @@ std::pair<size_t, size_t> countValidNodesAndEdges(Graph& g) {
       }
       numNodes += numN;
     },
-    galois::steal<true>()
+    galois::steal()
   );
 
   return std::make_pair(numNodes.reduce(), numEdges.reduce());
@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
         }
       }
     },
-    galois::steal<true>()
+    galois::steal()
   );
 
   // pick out the following:
@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
          shouldBeValid.push_back(e);
        }
     },
-    galois::steal<true>()
+    galois::steal()
   );
 
   auto numShouldBeInvalid = std::distance(shouldBeInvalid.begin(), shouldBeInvalid.end());

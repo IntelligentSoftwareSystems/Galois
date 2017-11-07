@@ -237,7 +237,7 @@ struct SGD_doPartialGradientUpdate {
         nodesWithEdges,
         SGD_doPartialGradientUpdate( &_graph, _step_size ),
         Galois::loopname(_graph.get_run_identifier("SGD").c_str()),
-        Galois::steal<true>());
+        Galois::steal());
     // sync all latent vectors
     //_graph.sync<writeAny, readAny, Reduce_pair_wise_avg_array_residual_latent_vector,
                 //Broadcast_residual_latent_vector>("SGD");
@@ -316,7 +316,7 @@ struct SGD_mergeResidual {
           allNodes,
           SGD_mergeResidual { &_graph },
           Galois::loopname(_graph.get_run_identifier("SGD_merge").c_str()),
-          Galois::steal<true>());
+          Galois::steal());
           
   }
 
@@ -376,7 +376,7 @@ struct SGD {
         nodesWithEdges,
         SGD ( &_graph, step_size, dga),
         Galois::loopname(_graph.get_run_identifier("SGD").c_str()),
-        Galois::steal<true>());
+        Galois::steal());
 
       ++iteration;
 
@@ -434,7 +434,7 @@ struct SGD2 {
           nodesWithEdges,
           SGD2( &_graph, step_size, dga),
           Galois::loopname(_graph.get_run_identifier("SGD").c_str()),
-          Galois::steal<true>());
+          Galois::steal());
     // sync all latent vectors
     //_graph.sync<writeAny, readAny, Reduce_pair_wise_avg_array_residual_latent_vector,
                 //Broadcast_residual_latent_vector>("SGD");

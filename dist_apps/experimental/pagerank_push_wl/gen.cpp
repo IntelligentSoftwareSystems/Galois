@@ -254,7 +254,7 @@ struct PageRank_delta {
         nodesWithEdges.begin(), nodesWithEdges.end(),
         PageRank_delta{ alpha, tolerance, &_graph },
         galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
-        galois::steal<true>());
+        galois::steal());
     }
   }
 
@@ -312,7 +312,7 @@ struct PageRank {
           nodesToWork.begin(), nodesToWork.end(),
           PageRank{ &_graph, dga, dist_wl},
           galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
-          galois::steal<true>());
+          galois::steal());
 
         galois::runtime::reportStat("(NULL)", 
             _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
