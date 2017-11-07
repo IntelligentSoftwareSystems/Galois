@@ -68,6 +68,8 @@ int main(int argc, char** argv) {
   Graph* flipped = new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, net.Num,
                                      dummyScale, false);
 
+  galois::gPrint("Graphs loaded: beginning transpose checking of all edges.\n");
+
   galois::do_all(
     galois::iterate(regular->masterNodesRange()),
     [&] (auto node) {
@@ -100,9 +102,9 @@ int main(int argc, char** argv) {
           }
 
           if (!found) {
-            printf("%lu to %lu not found\n", regular->getGID(node), 
-                                             regular->getGID(edgeDst));
-            GALOIS_DIE("edge not found");
+            printf("Edge %lu to %lu with same weight not found\n", 
+                   regular->getGID(node), regular->getGID(edgeDst));
+            GALOIS_DIE("An edge was not found");
           }
         }
       }
