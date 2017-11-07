@@ -107,7 +107,7 @@ struct DegreeCounting {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       DegreeCounting{ &_graph },
-      galois::steal<true>(), 
+      galois::steal(), 
       galois::no_stats(), 
       galois::loopname(_graph.get_run_identifier("DegreeCounting").c_str()));
 
@@ -259,7 +259,7 @@ struct KCore {
         galois::iterate(nodesWithEdges),
         KCore{ &_graph },
         galois::no_stats(), 
-        galois::steal<true>(),
+        galois::steal(),
         galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim, 

@@ -129,7 +129,7 @@ struct FirstItr_ConnectedComp{
       galois::do_all(
         galois::iterate(nodesWithEdges),
         FirstItr_ConnectedComp{ &_graph },
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()));
     }
@@ -194,7 +194,7 @@ struct ConnectedComp {
         galois::iterate(nodesWithEdges),
         ConnectedComp(&_graph, dga),
         galois::no_stats(),
-        galois::steal<true>(),
+        galois::steal(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()));
       }
 

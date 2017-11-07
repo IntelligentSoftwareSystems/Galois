@@ -143,7 +143,7 @@ struct InitializeGraph {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       InitializeGraph{ &_graph },
-      galois::steal<true>(), 
+      galois::steal(), 
       galois::no_stats(), 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
@@ -246,7 +246,7 @@ struct PageRank {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         PageRank{ &_graph },
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats(), 
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 

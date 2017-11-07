@@ -205,7 +205,8 @@ struct SSSP {
         galois::do_all(
           galois::iterate(nodesWithEdges),
           SSSP{ &_graph, dga },
-          galois::no_stats(), galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
+          galois::no_stats(), 
+          galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           galois::steal());
       }
 

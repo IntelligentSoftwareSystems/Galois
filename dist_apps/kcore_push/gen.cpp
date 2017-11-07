@@ -105,6 +105,7 @@ struct InitializeGraph2 {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       InitializeGraph2{ &_graph },
+      galois::steal(),
       galois::no_stats(), 
       galois::loopname(_graph.get_run_identifier("InitializeGraph2").c_str()));
 
@@ -247,7 +248,7 @@ struct KCoreStep1 {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         KCoreStep1{ k_core_num, &_graph, dga },
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats(), 
         galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 

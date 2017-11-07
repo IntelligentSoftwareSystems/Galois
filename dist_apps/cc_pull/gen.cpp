@@ -139,7 +139,7 @@ struct ConnectedComp {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         ConnectedComp(&_graph, dga),
-        galois::steal<true>(),
+        galois::steal(),
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()));
 
