@@ -1,11 +1,11 @@
-/** BFS -*- C++ -*-
+/** Transpose check -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,11 +19,10 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
+ * 
+ * Necessary but not sufficient test to check matching weights for regular +
+ * transpose graph.
  *
- * Compute BFS push on distributed Galois.
- *
- * @author Gurbinder Gill <gurbinder533@gmail.com>
- * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
@@ -39,7 +38,7 @@
 #include "galois/runtime/Tracer.h"
 
 struct NodeData {
-  uint32_t blah;
+  char blah;
 };
 
 typedef hGraph<NodeData, unsigned> Graph;
@@ -62,6 +61,7 @@ int main(int argc, char** argv) {
   std::vector<unsigned> dummyScale;
 
   masters_distribution = BALANCED_MASTERS;
+  partitionScheme = OEC;
 
   Graph* regular = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
                                      dummyScale, false);
@@ -77,8 +77,8 @@ int main(int argc, char** argv) {
 
         auto globalNodeID = regular->getGID(edgeDst);
 
+        // if the transpose owns the node, then 
         if (flipped->isOwned(globalNodeID)) {
-          //printf("%lu owned by transpose\n", flipped->getGID(edgeDst));
           bool found = false;
           auto flippedNodeID = flipped->getLID(globalNodeID);
 
@@ -86,7 +86,7 @@ int main(int argc, char** argv) {
           for (auto flipEdge : flipped->edges(flippedNodeID)) {
             auto flipEdgeDst = flipped->getEdgeDst(flipEdge);
 
-            // hit this node
+            // see if it matches the original source node
             if (flipped->getGID(flipEdgeDst) == regular->getGID(node)) {
               // check edge data to see if matches
               auto flipEdgeData = flipped->getEdgeData(flipEdge);
