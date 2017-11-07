@@ -213,6 +213,7 @@ struct BFS {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         BFS(&_graph, dga),
+        galois::steal<true>(),
         galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()));
     }

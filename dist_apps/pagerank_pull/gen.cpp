@@ -104,7 +104,8 @@ struct ResetGraph {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph{ alpha, &_graph },
-      galois::no_stats(), galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -142,7 +143,9 @@ struct InitializeGraph {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       InitializeGraph{ &_graph },
-      galois::no_stats(), galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
+      galois::steal<true>(), 
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph");
@@ -193,7 +196,8 @@ struct PageRank_delta {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
-      galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -242,7 +246,9 @@ struct PageRank {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         PageRank{ &_graph },
-        galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
+        galois::steal<true>(),
+        galois::no_stats(), 
+        galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
@@ -373,7 +379,8 @@ struct PageRankSanity {
       min_value.reset();
       max_residual.reset();
       min_residual.reset();
-      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()), 
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
+                                     _graph.masterNodesRange().end()), 
                      PageRankSanity(
                        tolerance, 
                        &_graph,
