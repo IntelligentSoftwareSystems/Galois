@@ -936,7 +936,7 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
-    { Galois::addArray(node.fieldname, y); return true;}\
+    { galois::addArray(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
@@ -949,7 +949,7 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 \
   static void reset (uint32_t node_id, struct NodeData &node) {\
-    { Galois::resetVec(node.fieldname); }\
+    { galois::resetVec(node.fieldname); }\
   }\
 }
 

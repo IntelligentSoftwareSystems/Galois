@@ -3,7 +3,7 @@
 
 #include <array>
 #include <type_traits>
-#include "Galois/Runtime/Extra_dist_traits.h"
+#include "galois/runtime/Extra_dist_traits.h"
 
 namespace galois {
 
@@ -13,7 +13,7 @@ namespace galois {
     public:
 
       // only typedef if T is trivially copyable to use mem copy in serialize/deserialize.
-      typedef typename std::enable_if<Galois::Runtime::is_memory_copyable<T>::value, int>::type tt_is_copyable;
+      typedef typename std::enable_if<galois::runtime::is_memory_copyable<T>::value, int>::type tt_is_copyable;
   };
 }
 #endif
