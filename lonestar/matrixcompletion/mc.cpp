@@ -272,7 +272,8 @@ void sgd_node_movie (Graph& g, unsigned int numMovieNodes, unsigned int numUserN
             doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), step_size);
           }
         },
-        galois::wl<galois::worklists::dChunkedFIFO<8>>());
+        galois::wl<galois::worklists::dChunkedFIFO<8>>(),
+        galois::loopname("sgd_node_movie"));
   }
 }
 
@@ -305,7 +306,8 @@ void sgd_node_movie_pri (Graph& g, unsigned int numMovieNodes, unsigned int numU
             }
           }
         },
-        galois::wl<galois::worklists::dChunkedFIFO<8>>());
+        galois::wl<galois::worklists::dChunkedFIFO<8>>(),
+        galois::loopname("sgd_node_movie_pri"));
   }
 }
 
@@ -339,7 +341,8 @@ void sgd_edge_movie (Graph& g, unsigned int numMovieNodes, unsigned int numUserN
           if (ii == ee) { nd.edge_offset = 0; return; }
           else { ctx.push(node); }
         },
-        galois::wl<galois::worklists::dChunkedLIFO<8>>());
+        galois::wl<galois::worklists::dChunkedLIFO<8>>(),
+        galois::loopname("sgd_edge_movie"));
   }
 }
 
