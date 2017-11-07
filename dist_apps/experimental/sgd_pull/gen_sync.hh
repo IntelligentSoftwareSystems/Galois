@@ -1,11 +1,11 @@
-#include "Galois/Runtime/SyncStructures.h"
-#include "Galois/AtomicWrapper.h"
-#include "Galois/ArrayWrapper.h"
+#include "galois/runtime/SyncStructures.h"
+#include "galois/AtomicWrapper.h"
+#include "galois/ArrayWrapper.h"
 
 #define LATENT_VECTOR_SIZE 20
 
-typedef Galois::CopyableArray<double, LATENT_VECTOR_SIZE> ArrTy;
-typedef Galois::CopyableArray<Galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> ArrAtomicTy;
+typedef galois::CopyableArray<double, LATENT_VECTOR_SIZE> ArrTy;
+typedef galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> ArrAtomicTy;
 //GALOIS_SYNC_STRUCTURE_REDUCE_SET(updates, unsigned int);
 //GALOIS_SYNC_STRUCTURE_REDUCE_SET(edge_offset, unsigned int);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(residual_latent_vector, ArrAtomicTy);
