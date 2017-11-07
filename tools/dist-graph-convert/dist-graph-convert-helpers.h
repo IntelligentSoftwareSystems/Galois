@@ -530,6 +530,7 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
           }
         }
       },
+      galois::steal<true>(),
       galois::loopname("LoadTransposeEdgesMPIGraph"));
   }
   
@@ -606,6 +607,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
           }
         }
       },
+      galois::steal<true>(),
       galois::loopname("LoadSymmetricEdgesMPIGraph"));
   }
   
