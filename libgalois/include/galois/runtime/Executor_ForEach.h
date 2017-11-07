@@ -164,12 +164,12 @@ public:
 template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
-  static constexpr bool needsStats = exists_by_supertype<loopname_tag, ArgsTy>::value;
+  static constexpr bool needStats = galois::internal::NeedStats<ArgsTy>::value;
   static constexpr bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
   static constexpr bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
   static constexpr bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
   static constexpr bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
-  static constexpr bool MORE_STATS = needsStats && exists_by_supertype<more_stats_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS = needStats && exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type;
@@ -187,7 +187,7 @@ protected:
     {}
   };
 
-  using LoopStat = LoopStatistics<needsStats>;
+  using LoopStat = LoopStatistics<needStats>;
 
   struct ThreadLocalData: public ThreadLocalBasics, public LoopStat {
 

@@ -167,6 +167,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::steal<true>());
 
@@ -223,6 +224,7 @@ struct BFS {
         galois::do_all(
             nodesToWork.begin(), nodesToWork.end(),
             BFS(&_graph, dga, dist_wl),
+            galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("BFS").c_str()),
             galois::steal<true>());
 
@@ -298,6 +300,7 @@ struct BFSSanityCheck {
 
     galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
+                   galois::no_stats(),
                    galois::loopname("BFSSanityCheck"));
 
     uint64_t num_visited = dgas.reduce();

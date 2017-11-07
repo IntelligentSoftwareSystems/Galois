@@ -162,7 +162,7 @@ struct ResetGraph {
       allNodes.begin(),
       allNodes.end(),
       ResetGraph{ &_graph },
-      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
+      galois::no_stats(), galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -208,7 +208,7 @@ struct InitializeGraph {
         nodesWithEdges.begin(),
         nodesWithEdges.end(),
         InitializeGraph{alpha, &_graph},
-        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
+        galois::no_stats(), galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
 
     _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
@@ -253,7 +253,7 @@ struct PageRank_delta {
       galois::do_all(
         nodesWithEdges.begin(), nodesWithEdges.end(),
         PageRank_delta{ alpha, tolerance, &_graph },
-        galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
+        galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
         galois::steal<true>());
     }
   }
@@ -311,7 +311,7 @@ struct PageRank {
         galois::do_all(
           nodesToWork.begin(), nodesToWork.end(),
           PageRank{ &_graph, dga, dist_wl},
-          galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
+          galois::no_stats(), galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
           galois::steal<true>());
 
         galois::runtime::reportStat("(NULL)", 
@@ -426,7 +426,7 @@ struct PageRankSanity {
                      DGA_max_residual,
                      DGA_min_residual
                    ), 
-                   galois::loopname("PageRankSanity"));
+                   galois::no_stats(), galois::loopname("PageRankSanity"));
 
     DGA_max = current_max;
     DGA_min = current_min;

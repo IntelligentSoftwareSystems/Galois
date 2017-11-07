@@ -454,6 +454,7 @@ class LC_CSR_Graph :
     galois::do_all(galois::iterate(*this), [=] (GraphNode N) {
         this->sortEdgesByDst(N, mflag);
       },
+      galois::no_stats(),
       galois::steal<true>());
   }
 
@@ -815,6 +816,7 @@ class LC_CSR_Graph :
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    },
+                   galois::no_stats(),
                    galois::loopname("CONSTRUCT_NODES"));
 #endif
   }
@@ -855,6 +857,7 @@ class LC_CSR_Graph :
                      edgeIndData_old[n] = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    },
+                   galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
 
     // get destination of edge, copy to array, and
@@ -865,6 +868,7 @@ class LC_CSR_Graph :
                      // counting incoming edges in the original graph
                      __sync_add_and_fetch(&(edgeIndData_temp[dst]), 1);
                    },
+                   galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_INC"));
 
     // TODO is it worth doing parallel prefix sum?
@@ -893,6 +897,7 @@ class LC_CSR_Graph :
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
                    },
+                   galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
 
     // edgeIndData_temp[i] will now hold number of edges that all nodes
@@ -902,6 +907,7 @@ class LC_CSR_Graph :
       galois::do_all(galois::iterate(1ul, numNodes), [&](uint32_t n) {
                        edgeIndData_temp[n] = edgeIndData[n-1];
                      },
+                     galois::no_stats(),
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
     }
 
@@ -929,6 +935,7 @@ class LC_CSR_Graph :
                        e++;
                      }
                    },
+                   galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEDST"));
 
     // reallocate edgeData
@@ -943,6 +950,7 @@ class LC_CSR_Graph :
                      [&](uint32_t e){
                        edgeDataCopy(edgeData, edgeData_new, e, e);
                      },
+                     galois::no_stats(),
                      galois::loopname("TRANSPOSE_EDGEDATA_SET"));
     }
 

@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
       }
       prefixSumOfEdges[n - nodeBegin] = edgeOffset - ee;
     },
-    galois::loopname("EdgeInspection"));
+    galois::no_stats(), galois::loopname("EdgeInspection"));
 
   timer.stop();
 

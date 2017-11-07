@@ -168,6 +168,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes,
       InitializeGraph{src_node, infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::steal<true>());
 
@@ -215,6 +216,7 @@ struct FirstItr_BFS{
     // one node, doesn't matter which do_all you use, so regular one suffices
     galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
                 FirstItr_BFS{&_graph}, 
+                galois::no_stats(),
                 galois::loopname(_graph.get_run_identifier("BFS").c_str()));
     }
 
@@ -279,6 +281,7 @@ struct BFS {
       galois::do_all(
         nodesWithEdges,
         BFS(&_graph, dga),
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
         galois::steal<true>());
       );
@@ -357,6 +360,7 @@ struct BFSSanityCheck {
 
     galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    BFSSanityCheck(infinity, &_graph, dgas, dgam), 
+                   galois::no_stats(),
                    galois::loopname("BFSSanityCheck"));
 
     uint64_t num_visited = dgas.reduce();

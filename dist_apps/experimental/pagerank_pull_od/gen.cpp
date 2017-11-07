@@ -164,6 +164,7 @@ struct ResetGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       ResetGraph{ alpha, &_graph },
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
@@ -202,6 +203,7 @@ struct InitializeGraph {
     galois::do_all(
       nodesWithEdges,
       InitializeGraph{ &_graph },
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::steal<true>());
 
@@ -264,6 +266,7 @@ struct PageRank_delta {
     galois::do_all(
       allNodes,
       PageRank_delta{ alpha, tolerance, &_graph, dga },
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()),
       galois::steal<true>());
 
@@ -318,6 +321,7 @@ struct PageRank {
       galois::do_all(
         nodesWithEdges,
         PageRank{ &_graph },
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()),
         galois::steal<true>());
 
@@ -431,6 +435,7 @@ struct PageRankSanity {
                      DGA_max_residual,
                      DGA_min_residual
                    ), 
+                   galois::no_stats(),
                    galois::loopname("PageRankSanity"));
 
     DGA_max = current_max;

@@ -283,6 +283,7 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
     }
@@ -340,6 +341,7 @@ private:
           ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
         }
       },
+      galois::no_stats(),
       galois::loopname("CalculateIndegree"));
 
     timer.stop();
@@ -463,6 +465,7 @@ private:
           numOutgoingEdges[h][src - rowOffset]++;
         }
       },
+      galois::no_stats(),
       galois::loopname("EdgeInspection"));
 
     timer.stop();
@@ -579,6 +582,7 @@ private:
             }
           }
         },
+        galois::no_stats(),
         galois::loopname("CreateDstNode"));
 
       for (uint64_t dst = range.first; dst < range.second; ++dst) {
@@ -698,6 +702,7 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
@@ -778,6 +783,7 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
     // flush all buffers

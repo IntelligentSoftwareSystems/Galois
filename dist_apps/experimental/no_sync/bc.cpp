@@ -127,6 +127,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
+      galois::no_stats(),
       galois::loopname("InitializeGraph"));
   }
 
@@ -165,6 +166,7 @@ struct InitializeIteration {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
+      galois::no_stats(),
       galois::loopname("InitializeIteration"));
   }
 
@@ -221,6 +223,7 @@ struct FirstIterationSSSP {
       boost::make_counting_iterator(__begin), 
       boost::make_counting_iterator(__end), 
       FirstIterationSSSP(&_graph),
+      galois::no_stats(),
       galois::loopname("FirstIterationSSSP"));
   }
 
@@ -265,6 +268,7 @@ struct SSSP {
       galois::do_all(
         nodesWithEdges,
         SSSP(&_graph, dga), 
+        galois::no_stats(),
         galois::loopname("SSSP"), 
         galois::steal<true>());
 
@@ -315,6 +319,7 @@ struct PredAndSucc {
     galois::do_all(
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
+      galois::no_stats(),
       galois::loopname("PredAndSucc"),
       galois::steal<true>());
     }
@@ -359,6 +364,7 @@ struct NumShortestPathsChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(), 
       NumShortestPathsChanges{&_graph}, 
+      galois::no_stats(),
       galois::loopname("NumShortestPathsChanges"));
   }
 
@@ -411,6 +417,7 @@ struct NumShortestPaths {
         galois::do_all(
           nodesWithEdges,
           NumShortestPaths(infinity, &_graph, dga), 
+          galois::no_stats(),
           galois::loopname("NumShortestPaths"),
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
           galois::steal<true>());
@@ -492,6 +499,7 @@ struct DependencyPropChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("DependencyPropChanges"));
   }
 
@@ -560,6 +568,7 @@ struct DependencyPropogation {
       galois::do_all(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
+        galois::no_stats(),
         galois::loopname("DependencyPropogation"),
         //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
         galois::steal<true>());
@@ -715,6 +724,7 @@ struct BC {
         nodesWithEdges.begin(), 
         nodesWithEdges.end(), 
         BC(&_graph), 
+        galois::no_stats(),
         galois::loopname("BC"));
     }
   }

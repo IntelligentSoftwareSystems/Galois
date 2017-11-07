@@ -127,6 +127,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeGraph{&_graph}, 
+      galois::no_stats(),
       galois::loopname("InitializeGraph"));
   }
 
@@ -165,6 +166,7 @@ struct InitializeIteration {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       InitializeIteration{infinity, current_src_node, &_graph},
+      galois::no_stats(),
       galois::loopname("InitializeIteration"));
   }
 
@@ -216,6 +218,7 @@ struct SSSP {
       galois::do_all(
         nodesWithEdges,
         SSSP(&_graph, dga), 
+        galois::no_stats(),
         galois::loopname("SSSP"), 
         galois::steal<true>());
 
@@ -260,6 +263,7 @@ struct PredAndSucc {
     galois::do_all(
       nodesWithEdges,
       PredAndSucc(infinity, &_graph), 
+      galois::no_stats(),
       galois::loopname("PredAndSucc"),
       galois::steal<true>());
   }
@@ -300,6 +304,7 @@ struct NumShortestPathsChanges {
     galois::do_all(
       allNodes.begin(), allNodes.end(), 
       NumShortestPathsChanges{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("NumShortestPathsChanges"));
   }
 
@@ -354,6 +359,7 @@ struct NumShortestPaths {
       galois::do_all(
         nodesWithEdges,
         NumShortestPaths(infinity, &_graph, dga), 
+        galois::no_stats(),
         galois::loopname("NumShortestPaths"),
         galois::steal<true>());
 
@@ -412,6 +418,7 @@ struct DependencyPropChanges {
     galois::do_all(
       nodesWithEdges.begin(), nodesWithEdges.end(),
       DependencyPropChanges{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("DependencyPropChanges"));
   }
 
@@ -457,6 +464,7 @@ struct DependencyPropogation {
       galois::do_all(
         nodesWithEdges,
         DependencyPropogation(infinity, current_src_node, &_graph, dga), 
+        galois::no_stats(),
         galois::loopname("DependencyPropogation"),
         galois::steal<true>());
 
@@ -603,6 +611,7 @@ struct BC {
         allNodes.begin(), 
         allNodes.end(), 
         BC(&_graph), 
+        galois::no_stats(),
         galois::loopname("BC"));
     }
   }

@@ -62,8 +62,8 @@ class DoAllStealingExec {
     HALF, FULL
   };
 
-  constexpr static const bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsTuple>::value;
-  constexpr static const bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsTuple>::value;
+  constexpr static const bool NEED_STATS = galois::internal::NeedStats<ArgsTuple>::value;
+  constexpr static const bool MORE_STATS = NEED_STATS && exists_by_supertype<more_stats_tag, ArgsTuple>::value;
   constexpr static const bool USE_TERM = false;
 
   struct ThreadContext {
@@ -114,7 +114,7 @@ class DoAllStealingExec {
         didwork = true;
 
         for (; beg != end; ++beg) {
-          if (NEEDS_STATS) { ++num_iter; }
+          if (NEED_STATS) { ++num_iter; }
           func (*beg);
         }
       }
@@ -575,7 +575,7 @@ public:
     totalTime.stop ();
     assert (!ctx.hasWork ());
 
-    if (NEEDS_STATS) {
+    if (NEED_STATS) {
       galois::runtime::reportStat_Tsum(loopname, "Iterations", ctx.num_iter);
     }
   }
@@ -608,8 +608,8 @@ template <> struct ChooseDoAllImpl<false> {
 
     runtime::on_each_gen([&] (const unsigned tid, const unsigned numT) {
 
-        static constexpr bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsT>::value;
-        static constexpr bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsT>::value;
+        static constexpr bool NEED_STATS = galois::internal::NeedStats<ArgsT>::value;
+        static constexpr bool MORE_STATS = NEED_STATS && exists_by_supertype<more_stats_tag, ArgsT>::value;
 
         const char* const loopname = galois::internal::getLoopName(argsTuple);
 
@@ -631,7 +631,7 @@ template <> struct ChooseDoAllImpl<false> {
 
         while (begin != end) {
           func(*begin++);
-          if (NEEDS_STATS) {
+          if (NEED_STATS) {
             ++iter;
           }
         }
@@ -639,7 +639,7 @@ template <> struct ChooseDoAllImpl<false> {
 
         totalTime.stop();
 
-        if (NEEDS_STATS) {
+        if (NEED_STATS) {
           galois::runtime::reportStat_Tsum(loopname, "Iterations", iter);
         }
 

@@ -193,6 +193,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           }
           prefixSumOfEdges[n - nodeBegin] = std::distance(edgeOffset, ee);
         },
+        galois::no_stats(),
         galois::loopname("EdgeInspection"));
 
       timer.stop();
@@ -258,6 +259,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
       base_hGraph::printStatistics();
@@ -355,6 +357,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
     timer.stop();
@@ -388,6 +391,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
 

@@ -180,26 +180,6 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
   loopname(const char* p = "ANON_LOOP"): trait_has_value<const char*>(p) { }
 };
 
-namespace internal {
-
-
-  template <typename Tup>
-  std::enable_if_t<
-      galois::exists_by_supertype<loopname_tag, Tup>::value, 
-      const char*> 
-  getLoopName(const Tup& t) {
-    return galois::get_by_supertype<loopname_tag>(t).value;
-  }
-
-  template <typename Tup>
-  std::enable_if_t<
-      !galois::exists_by_supertype<loopname_tag, Tup>::value, 
-      const char*> 
-  getLoopName(const Tup& t) {
-    return "ANON_LOOP";
-  }
-}
-
 /**
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
  * argument to {@link do_all()} loops.
@@ -242,6 +222,12 @@ struct no_pushes: public trait_has_type<bool>, no_pushes_tag {};
  */
 struct per_iter_alloc_tag {};
 struct per_iter_alloc: public trait_has_type<bool>, per_iter_alloc_tag {};
+
+/**
+ * Indicates the operator doesn't need its execution stats recorded
+ */
+struct no_stats_tag {};
+struct no_stats: public trait_has_type<bool>, no_stats_tag { };
 
 /**
  * Indicates the operator needs detailed stats
@@ -384,6 +370,32 @@ struct chunk_size:
 };
 
 typedef worklists::dChunkedFIFO<chunk_size<>::value> defaultWL;
+
+namespace internal {
+
+  template <typename Tup>
+  struct NeedStats {
+    constexpr static const bool value = !exists_by_supertype<no_stats_tag, Tup>::value
+                                        && exists_by_supertype<loopname_tag, Tup>::value;
+                                        
+  };
+
+  template <typename Tup>
+  std::enable_if_t<
+      galois::exists_by_supertype<loopname_tag, Tup>::value, 
+      const char*> 
+  getLoopName(const Tup& t) {
+    return galois::get_by_supertype<loopname_tag>(t).value;
+  }
+
+  template <typename Tup>
+  std::enable_if_t<
+      !galois::exists_by_supertype<loopname_tag, Tup>::value, 
+      const char*> 
+  getLoopName(const Tup& t) {
+    return "ANON_LOOP";
+  }
+}
 
 } // close namespace galois
 

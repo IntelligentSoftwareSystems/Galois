@@ -466,7 +466,7 @@ struct OptionsCommon {
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
-  static const bool needsStats = !exists_by_supertype<loopname_tag, ArgsTy>::value;
+  static const bool needStats = galois::internal::NeedStats<ArgsTy>::value;
   static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
   static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
@@ -1300,7 +1300,7 @@ class Executor:
   typedef worklists::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
 
   // Truly thread-local
-  using LoopStat = LoopStatistics<OptionsTy::needsStats>;
+  using LoopStat = LoopStatistics<OptionsTy::needStats>;
   struct ThreadLocalData: public LoopStat {
 
     typename OptionsTy::function1_type fn1;
@@ -1453,7 +1453,7 @@ void Executor<OptionsTy>::go() {
   this->destroyDAGManager();
   this->clearNewWork();
 
-  if (OptionsTy::needsStats) {
+  if (OptionsTy::needStats) {
     if (substrate::ThreadPool::getTID() == 0) {
       reportStat_Single(loopname, "RoundsExecuted", tld.rounds);
       reportStat_Single(loopname, "OuterRoundsExecuted", tld.outerRounds);

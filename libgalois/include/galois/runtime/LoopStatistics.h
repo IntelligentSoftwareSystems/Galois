@@ -46,6 +46,7 @@ public:
 
   ~LoopStatistics() {
     reportStat_Tsum(loopname, "Iterations", m_iterations);
+    reportStat_Tsum(loopname, "Commits", (m_iterations - m_conflicts));
     reportStat_Tsum(loopname, "Pushes", m_pushes);
     reportStat_Tsum(loopname, "Conflicts", m_conflicts);
   }

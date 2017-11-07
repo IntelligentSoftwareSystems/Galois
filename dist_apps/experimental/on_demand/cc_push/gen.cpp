@@ -160,6 +160,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes,
       InitializeGraph{&_graph}, 
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::steal<true>());
     }
@@ -201,6 +202,7 @@ struct FirstItr_ConnectedComp{
       galois::do_all(
         nodesWithEdges,
         FirstItr_ConnectedComp{ &_graph },
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
         galois::steal<true>());
     }
@@ -295,6 +297,7 @@ struct ConnectedComp {
       galois::do_all(
         nodesWithEdges,
         ConnectedComp(&_graph, dga),
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("ConnectedComp").c_str()),
         galois::steal<true>());
       }

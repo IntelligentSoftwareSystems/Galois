@@ -246,6 +246,7 @@ public:
       [&] (auto n) {
         base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
     base_hGraph::printStatistics();
@@ -514,6 +515,7 @@ private:
           }
         }
       },
+      galois::no_stats(),
       galois::loopname("EdgeInspection"));
 
     edgeInspectionTimer.stop();
@@ -663,6 +665,7 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
     // flush buffers
@@ -789,6 +792,7 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
+      galois::no_stats(),
       galois::loopname("EdgeLoading"));
 
     // flush buffers

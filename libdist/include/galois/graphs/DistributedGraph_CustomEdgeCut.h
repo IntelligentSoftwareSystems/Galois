@@ -307,6 +307,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
       loadEdges(base_hGraph::graph, mpiGraph, numEdges_distribute);
@@ -435,6 +436,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
             hasIncomingEdge[h].set(gdst);
           }
         },
+        galois::no_stats(),
         galois::loopname("EdgeInspection"));
 
       // time should have been started outside of this loop
@@ -608,6 +610,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                 mirror_mapping_to_hosts[this->G2L(src) - numOwned] = h;
               }
           },
+          galois::no_stats(),
           galois::loopname("MirrorToHostAssignment"));
       }
       galois::gPrint("[", base_hGraph::id, "] End: assignedNodes receive\n");
@@ -723,6 +726,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               }
             }
           },
+          galois::no_stats(),
           galois::loopname("EdgeLoading"));
 
         // flush buffers
@@ -817,6 +821,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
               }
             }
           },
+          galois::no_stats(),
           galois::loopname("EdgeLoading"));
 
         // flush buffers

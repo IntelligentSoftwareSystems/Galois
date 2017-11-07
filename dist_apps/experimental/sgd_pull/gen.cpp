@@ -199,7 +199,7 @@ struct InitializeGraph {
     } else if (personality == CPU)
     #endif
     galois::do_all(allNodes.begin(), allNodes.end(), 
-                   InitializeGraph {&_graph}, galois::loopname("Init"));
+                   InitializeGraph {&_graph}, galois::no_stats(), galois::loopname("Init"));
 
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts

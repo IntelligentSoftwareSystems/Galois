@@ -168,6 +168,7 @@ struct InitializeGraph {
     galois::do_all_local(
       allNodes,
       InitializeGraph(src_node, infinity, &_graph),
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()),
       galois::steal<true>());
     }
@@ -217,6 +218,7 @@ struct BFS {
       galois::do_all_local(
         nodesWithEdges,
         BFS(&_graph, dga),
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()),
         galois::steal<true>());
       }
@@ -317,6 +319,7 @@ struct BFSSanityCheck {
       m.reset();
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
                      BFSSanityCheck(infinity, &_graph, dgas, dgam, m),
+                     galois::no_stats(),
                      galois::loopname("BFSSanityCheck"));
       dgam = m.reduce();
     }

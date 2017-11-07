@@ -147,6 +147,7 @@ struct InitializeGraph {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{&_graph}, 
+      galois::no_stats(),
       galois::loopname("InitializeGraph"));
   }
 
@@ -203,6 +204,7 @@ struct InitializeIteration {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeIteration{infinity, current_src_node, &_graph},
+      galois::no_stats(),
       galois::loopname("InitializeIteration"));
   }
 
@@ -268,6 +270,7 @@ struct SSSP {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         SSSP(&_graph, dga), 
+        galois::no_stats(),
         galois::loopname("SSSP"));
       }
 
@@ -354,6 +357,7 @@ struct PredAndSucc {
     galois::do_all(
       galois::iterate(nodesWithEdges),
       PredAndSucc(infinity, &_graph), 
+      galois::no_stats(),
       galois::loopname("PredAndSucc"),
       galois::no_stats()
     );
@@ -428,6 +432,7 @@ struct NumShortestPathsChanges {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       NumShortestPathsChanges{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("NumShortestPathsChanges"), 
       galois::no_stats()
     );
@@ -511,6 +516,7 @@ struct NumShortestPaths {
         galois::do_all(
           galois::iterate(nodesWithEdges),
           NumShortestPaths(infinity, &_graph, dga), 
+          galois::no_stats(),
           galois::loopname("NumShortestPaths"),
           galois::no_stats()
         );
@@ -583,6 +589,7 @@ struct FlagPrep {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       FlagPrep{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("FlagPrep"), 
       galois::no_stats()
     );
@@ -633,6 +640,7 @@ struct DependencyPropChanges {
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       DependencyPropChanges{infinity, &_graph}, 
+      galois::no_stats(),
       galois::loopname("DependencyPropChanges"),
       galois::no_stats()
     );
@@ -711,6 +719,7 @@ struct DependencyPropagation {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         DependencyPropagation(infinity, current_src_node, &_graph, dga), 
+        galois::no_stats(),
         galois::loopname("DependencyPropagation"),
         galois::no_stats()
       );
@@ -873,6 +882,7 @@ struct BC {
       galois::do_all(
         galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
         BC(&_graph), 
+        galois::no_stats(),
         galois::loopname("BC"));
     }
   }
@@ -938,6 +948,7 @@ struct Sanity {
                      DGA_min,
                      DGA_sum
                    ), 
+                   galois::no_stats(),
                    galois::loopname("Sanity"));
 
     DGA_max = current_max;

@@ -344,6 +344,7 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
     } 
@@ -438,6 +439,7 @@ public:
             numOutgoingEdges[d][h][src - rowOffset]++;
           }
         },
+        galois::no_stats(),
         galois::loopname("EdgeInspection"));
     }
 
@@ -696,6 +698,7 @@ public:
             assert(cur == (*graph.edge_end(lsrc)));
           }
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
       for (unsigned t = 0; t < sb.size(); ++t) {
@@ -776,6 +779,7 @@ public:
             assert(cur == (*graph.edge_end(lsrc)));
           }
         },
+        galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
       for (unsigned t = 0; t < sb.size(); ++t) {

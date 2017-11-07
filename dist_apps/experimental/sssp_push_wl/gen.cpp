@@ -165,7 +165,7 @@ struct InitializeGraph {
     galois::do_all(
       allNodes.begin(), allNodes.end(),
       InitializeGraph{src_node, infinity, &_graph}, 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
+      galois::no_stats(), galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
 
@@ -217,7 +217,7 @@ struct SSSP {
         galois::do_all(
             nodesToWork.begin(), nodesToWork.end(),
             SSSP(&_graph, dga, dist_wl),
-            galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
+            galois::no_stats(), galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
             galois::steal<true>());
 
         galois::runtime::reportStat("(NULL)", 
@@ -292,7 +292,7 @@ struct SSSPSanityCheck {
 
     galois::do_all(_graph.allNodesRange().begin(), _graph.allNodesRange().end(), 
                    SSSPSanityCheck(infinity, &_graph, dgas, dgam), 
-                   galois::loopname("SSSPSanityCheck"));
+                   galois::no_stats(), galois::loopname("SSSPSanityCheck"));
 
     uint64_t num_visited = dgas.reduce();
 
