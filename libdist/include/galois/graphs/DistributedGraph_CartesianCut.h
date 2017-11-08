@@ -618,10 +618,9 @@ public:
 
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_hGraph::numOwned + dummyOutgoingNodes;
-    loadEdgesFromFile(graph, g, mpiGraph);
+    loadEdgesFromFile(graph, g, mpiGraph, numNodesWithEdges);
     galois::on_each([&](unsigned tid, unsigned nthreads){
-      std::vector<uint64_t> gdst_vec;
-      receiveEdges(graph, gdst_vec, numNodesWithEdges);
+      receiveEdges(graph, numNodesWithEdges);
     });
     ++galois::runtime::evilPhase;
 
@@ -642,7 +641,8 @@ public:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
+                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph,
+                         std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     //XXX h_offset not correct
@@ -707,6 +707,10 @@ public:
           if (this->isLocal(n)) {
             assert(cur == (*graph.edge_end(lsrc)));
           }
+
+          // TODO don't have to receive every iteration
+          auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
         galois::no_stats(),
         galois::loopname("EdgeLoading"));
@@ -731,7 +735,8 @@ public:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
+                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph,
+                         std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     for(unsigned d = 0; d < DecomposeFactor; ++d){
@@ -788,6 +793,10 @@ public:
           if (this->isLocal(n)) {
             assert(cur == (*graph.edge_end(lsrc)));
           }
+
+          // TODO don't have to receive every iteration
+          auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
         galois::no_stats(),
         galois::loopname("EdgeLoading"));
@@ -806,31 +815,46 @@ public:
     net.flush();
   }
 
+  // used below
+  template<typename T>
+  #if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
+  using optional_t = std::experimental::optional<T>;
+  #else
+  using optional_t = boost::optional<T>;
+  #endif
   template<typename GraphTy>
-  void receiveEdges(GraphTy& graph, std::vector<uint64_t>& gdst_vec,
-      std::atomic<uint32_t>& numNodesWithEdges) {
+  void processReceivedEdgeBuffer(
+    optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
+    GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges
+  ) {
+    if (buffer) {
+      auto& rb = buffer->second;
+
+      while (rb.r_size() > 0) {
+        uint64_t n;
+        std::vector<uint64_t> gdst_vec;
+        galois::runtime::gDeserialize(rb, n);
+        galois::runtime::gDeserialize(rb, gdst_vec);
+        assert(isLocal(n));
+        uint32_t lsrc = G2L(n);
+        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+        uint64_t cur_end = *graph.edge_end(lsrc);
+        assert((cur_end - cur) == gdst_vec.size());
+        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
+        ++numNodesWithEdges;
+      }
+    }
+  }
+
+  template<typename GraphTy>
+  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // receive edges for all mirror nodes
     while (numNodesWithEdges < base_hGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-
-      if (p) {
-        auto& rb = p->second;
-        while (rb.r_size() > 0) {
-          uint64_t n;
-          galois::runtime::gDeserialize(rb, n);
-          galois::runtime::gDeserialize(rb, gdst_vec);
-          assert(isLocal(n));
-          uint32_t lsrc = G2L(n);
-          uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-          uint64_t cur_end = *graph.edge_end(lsrc);
-          assert((cur_end - cur) == gdst_vec.size());
-          deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
-          ++numNodesWithEdges;
-        }
-      }
+      processReceivedEdgeBuffer(p, graph, numNodesWithEdges);
     }
   }
 
