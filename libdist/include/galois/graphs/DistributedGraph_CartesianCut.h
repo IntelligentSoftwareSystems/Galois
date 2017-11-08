@@ -277,13 +277,23 @@ public:
   hGraph_cartesianCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
-              bool transpose = false) : base_hGraph(host, _numHosts) {
+              bool transpose = false,
+              bool readFromFile = false,
+              std::string localGraphFileName = "local_graph") : base_hGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
     }
 
     galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
     Tgraph_construct.start();
+
+    if(readFromFile){
+      galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+      base_hGraph::read_local_graph_from_file(localGraphFileName);
+      Tgraph_construct.stop();
+      return;
+    }
+
 
     // only used to determine node splits among hosts; abandonded later
     // for the FileGraph which mmaps appropriate regions of memory
@@ -942,5 +952,36 @@ public:
       }
     }
   }
+
+  /*
+   * This function serializes the local data structures using boost binary archive.
+   */
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
+
+    //unsigned ints
+    ar << numNodes;
+    ar << numRowHosts;
+    ar << numColumnHosts;
+
+    //maps and vectors
+    ar << localToGlobalVector;
+    ar << globalToLocalMap;
+  }
+
+  /*
+   * This function DeSerializes the local data structures using boost binary archive.
+   */
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
+
+    //unsigned ints
+    ar >> numNodes;
+    ar >> numRowHosts;
+    ar >> numColumnHosts;
+
+    //maps and vectors
+    ar >> localToGlobalVector;
+    ar >> globalToLocalMap;
+  }
+
 };
 #endif

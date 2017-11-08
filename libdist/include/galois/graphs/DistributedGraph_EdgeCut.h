@@ -104,7 +104,9 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
                    unsigned host, 
                    unsigned _numHosts, 
                    std::vector<unsigned>& scalefactor, 
-                   bool transpose = false, bool readFromFile = false, std::string localGraphFileName = "local_graph") : 
+                   bool transpose = false, 
+                   bool readFromFile = false,
+                   std::string localGraphFileName = "local_graph") : 
                     base_hGraph(host, _numHosts) {
       galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", 
                                                   GRNAME);
@@ -114,6 +116,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       if(readFromFile){
         galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
         base_hGraph::read_local_graph_from_file(localGraphFileName);
+        Tgraph_construct.stop();
         return;
       }
       uint32_t _numNodes;
@@ -233,7 +236,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
         }
       }
 
-      base_hGraph::numNodes = numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
+      numNodes =_numNodes = base_hGraph::numOwned + ghostMap.size();
 
       assert((uint64_t)base_hGraph::numOwned + (uint64_t)ghostMap.size() == 
              (uint64_t)numNodes);

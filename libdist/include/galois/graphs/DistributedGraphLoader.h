@@ -114,17 +114,19 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
     case OEC:
     case IEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                               scaleFactor, false);
+                               scaleFactor, false, readFromFile, localGraphFileName);
     case HOVC:
     case HIVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scaleFactor, false, VCutThreshold);
+                                 scaleFactor, false, VCutThreshold, false,
+                                 readFromFile, localGraphFileName);
     case BOARD2D_VCUT:
       return new Graph_checkerboardCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scaleFactor, false);
+                                    scaleFactor, false ,
+                                 readFromFile, localGraphFileName );
     case JAGGED_CYCLIC_VCUT:
       return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
@@ -201,11 +203,13 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
       }
     case HOVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scaleFactor, false, VCutThreshold);
+                                 scaleFactor, false, VCutThreshold, false, 
+                                 readFromFile, localGraphFileName);
     case HIVC:
       if (inputFileTranspose.size()) {
         return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, 
-                                   net.Num, scaleFactor, true, VCutThreshold);
+                                   net.Num, scaleFactor, true, VCutThreshold, false, 
+                                   readFromFile, localGraphFileName);
       } else {
         GALOIS_DIE("Error: attempting incoming hybrid cut without transpose "
                    "graph");
@@ -216,7 +220,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
                                     scaleFactor, false);
     case CART_VCUT:
       return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
-                                    scaleFactor, false);
+                                    scaleFactor, false,
+                                   readFromFile, localGraphFileName);
     case JAGGED_CYCLIC_VCUT:
       return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num, 
                                     scaleFactor, false);
@@ -276,14 +281,14 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
   if (net.Num == 1) {
     if (inputFileTranspose.size()) {
       return new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, net.Num, 
-                               scaleFactor, false);
+                               scaleFactor, false, readFromFile, localGraphFileName);
     } else {
       fprintf(stderr, "WARNING: Loading transpose graph through in-memory "
                       "transpose to iterate over in-edges: pass in transpose "
                       "graph with -graphTranspose to avoid unnecessary "
                       "overhead.\n");
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                               scaleFactor, true);
+                               scaleFactor, true, readFromFile, localGraphFileName);
     }
   }
 
@@ -291,11 +296,11 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
   switch(partitionScheme) {
     case OEC:
       return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
-                               scaleFactor, true);
+                               scaleFactor, true, readFromFile, localGraphFileName);
     case IEC:
       if (inputFileTranspose.size()) {
         return new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, net.Num, 
-                                 scaleFactor, false);
+                                 scaleFactor, false, readFromFile, localGraphFileName);
       } else {
         GALOIS_DIE("Error: attempting incoming edge cut without transpose "
                    "graph");
@@ -303,11 +308,13 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
       }
     case HOVC:
       return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
-                                 scaleFactor, true, VCutThreshold);
+                                 scaleFactor, true, VCutThreshold, false, 
+                                 readFromFile, localGraphFileName);
     case HIVC:
       if (inputFileTranspose.size()) {
         return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, 
-                                   net.Num, scaleFactor, false, VCutThreshold);
+                                   net.Num, scaleFactor, false, VCutThreshold, false, 
+                                   readFromFile, localGraphFileName);
       } else {
         GALOIS_DIE("Error: (hivc) iterate over in-edges without transpose graph");
         break;
@@ -325,7 +332,8 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
     case CART_VCUT:
       if (inputFileTranspose.size()) {
         return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, 
-                                      net.Num, scaleFactor, false);
+                                      net.Num, scaleFactor, false, 
+                                   readFromFile, localGraphFileName);
       } else {
         GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
         break;

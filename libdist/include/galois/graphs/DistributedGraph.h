@@ -149,8 +149,6 @@ protected:
   // Master nodes on each host.
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
-  uint32_t numNodes; // Number of local nodes (master + mirrors) on this host
-
   uint64_t last_nodeID_withEdges_bipartite; // used only for bipartite graphs
 
   // memoization optimization
@@ -3351,7 +3349,6 @@ public:
     }
 
     ar << numOwned;
-    ar << numNodes;
     ar << beginMaster;
     ar << numNodesWithEdges;
     ar << gid2host;
@@ -3399,7 +3396,6 @@ public:
     }
 
     ar >>  numOwned;
-    ar >>  numNodes;
     ar >>  beginMaster;
     ar >>  numNodesWithEdges;
     ar >>  gid2host;
@@ -3408,7 +3404,7 @@ public:
     //Serialize partitioning scheme specific data structures.
     boostDeSerializeLocalGraph(ar);
 
-    determine_thread_ranges(numNodes, graph.getEdgeInDataArray());
+    determine_thread_ranges(numNodesWithEdges, graph.getEdgeInDataArray());
     // find ranges for master + nodes with edges
     determine_thread_ranges_master();
     determine_thread_ranges_with_edges();

@@ -153,7 +153,9 @@ public:
              std::vector<unsigned>& scalefactor, 
              bool transpose = false, 
              uint32_t VCutThreshold = 100, 
-             bool bipartite = false) : base_hGraph(host, _numHosts) {
+             bool bipartite = false, 
+             bool readFromFile = false, 
+             std::string localGraphFileName = "local_graph") : base_hGraph(host, _numHosts) {
     // TODO split constructor into more parts? quite long at the moment
     if (!scalefactor.empty()) {
       if (base_hGraph::id == 0) {
@@ -166,9 +168,17 @@ public:
     galois::StatTimer Tgraph_construct(
       "TIME_GRAPH_CONSTRUCT", GRNAME);
     galois::StatTimer Tgraph_construct_comm(
-      "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
+        "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
 
     Tgraph_construct.start();
+
+    if(readFromFile){
+      galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+      base_hGraph::read_local_graph_from_file(localGraphFileName);
+      Tgraph_construct.stop();
+      return;
+    }
+
 
     galois::graphs::OfflineGraph g(filename);
     isBipartite = bipartite;
@@ -959,6 +969,33 @@ public:
    */
   bool is_vertex_cut() const {
     return true;
+  }
+
+
+  /*
+   * This function serializes the local data structures using boost binary archive.
+   */
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
+
+    //unsigned ints
+    ar << numNodes;
+
+    //maps and vectors
+    ar << localToGlobalVector;
+    ar << globalToLocalMap;
+  }
+
+  /*
+   * This function DeSerializes the local data structures using boost binary archive.
+   */
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
+
+    //unsigned ints
+    ar >> numNodes;
+
+    //maps and vectors
+    ar >> localToGlobalVector;
+    ar >> globalToLocalMap;
   }
 
 };
