@@ -50,7 +50,6 @@ enum Algo {
   nodeiterator,
   edgeiterator,
   hybrid,
-  eigentriangle
 };
 
 namespace cll = llvm::cl;
@@ -60,7 +59,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator (default)"),
       clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid node iterator and matrix multiply algorithm"),
-      clEnumValN(Algo::eigentriangle, "eigentriangle", "Approximate eigen triangle algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
 typedef galois::graphs::LC_Linear_Graph<uint32_t,void>
@@ -428,10 +426,6 @@ struct EdgeIteratorAlgo {
   }
 };
 
-struct EigenTriangleAlgo {
-  void operator()() { abort(); }
-};
-
 template<typename Algo>
 void run() {
   Algo algo;
@@ -528,9 +522,6 @@ int main(int argc, char** argv) {
       // TODO: add preAlloc calls
     case hybrid: 
       run<HybridAlgo>(); 
-      break;
-    case eigentriangle: 
-      run<EigenTriangleAlgo>(); 
       break;
 #endif
     default: 
