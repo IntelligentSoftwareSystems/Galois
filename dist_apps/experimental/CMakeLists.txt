@@ -46,3 +46,4 @@ distAppNoGPU(graph_reader)
 
 distAppNoGPU(transposecheck)
 distAppNoGPU(weightcheck)
+distAppNoGPU(samenesscheck)

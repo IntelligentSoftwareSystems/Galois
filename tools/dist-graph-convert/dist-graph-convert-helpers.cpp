@@ -336,7 +336,7 @@ std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
         }
       }
     },
-    galois::steal<true>(),
+    galois::steal(),
     galois::loopname("FindCleanEdges"));
 
   // get total num edges remaining
