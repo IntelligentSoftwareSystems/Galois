@@ -32,6 +32,7 @@
 #include <thread>
 #include <mutex>
 #include <iostream>
+#include <limits>
 
 using namespace galois::runtime;
 using namespace galois::substrate;
@@ -274,6 +275,12 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         if (m.tag != tag) {
           break;
         } else {
+          // do not let it go over the integer limit because MPI_Isend cannot
+          // deal with it
+          if ((m.data.size() + sizeof(uint32_t) + len) > 
+              std::numeric_limits<int>::max()) {
+            break;
+          }
           len += m.data.size();
           num += sizeof(uint32_t);
         }
