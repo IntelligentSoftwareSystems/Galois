@@ -117,10 +117,10 @@ double calcPrediction (const NodeData& movie_data, const NodeData& user_data) {
   pred = std::min(MAXVAL, pred);
   pred = std::max(MINVAL, pred);
 
-  //#ifndef NDEBUG
+  #ifndef NDEBUG
   if (p != pred)
     std::cerr << "clamped " << p << " to " << pred << "\n";
-  //#endif
+  #endif
 
   return pred;
 }
