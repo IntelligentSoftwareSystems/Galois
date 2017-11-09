@@ -119,6 +119,7 @@ size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
  * @param localEndByte Last byte to read (non-inclusive)
  * @param totalNumNodes Total number of nodes in the graph: used for correctness
  * checking of src/dest ids
+ * @param startAtOne true if the edge list node ids start at 1
  * @returns Vector representing the read in edges: every 2-3 elements represents
  * src, dest, and edge data (if the latter exists)
  */
@@ -126,7 +127,8 @@ template<typename EdgeDataTy>
 std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
                                             uint64_t localStartByte,
                                             uint64_t localEndByte,
-                                            uint64_t totalNumNodes) {
+                                            uint64_t totalNumNodes,
+                                            bool startAtOne=false) {
   // load edges into a vector
   uint64_t localNumEdges = 0;
   std::vector<uint32_t> localEdges; // v1 support only + only uint32_t data
@@ -137,6 +139,10 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
     uint32_t src;
     uint32_t dst;
     edgeListFile >> src >> dst;
+    if (startAtOne) {
+      src--;
+      dst--;
+    }
     GALOIS_ASSERT(src < totalNumNodes, "src ", src, " and ", totalNumNodes);
     GALOIS_ASSERT(dst < totalNumNodes, "dst ", dst, " and ", totalNumNodes);
     localEdges.emplace_back(src);

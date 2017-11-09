@@ -85,6 +85,9 @@ static cll::opt<bool> editInPlace("inPlace",
 static cll::opt<std::string> nodeMapBinary("nodeMapBinary", 
                                cll::desc("Binary file of numbers mapping nodes"),
                                cll::init(std::string()));
+static cll::opt<bool> startAtOne("startAtOne", 
+                               cll::desc("Set this if edgelist nodeid start at 1"),
+                               cll::init(false));
 
 struct Conversion { };
 
@@ -160,7 +163,8 @@ struct Edgelist2Gr : public Conversion {
     // load edges into a vector
     std::vector<uint32_t> localEdges = loadEdgesFromEdgeList<EdgeTy>(
                                            edgeListFile, localStartByte,
-                                           localEndByte, totalNumNodes);
+                                           localEndByte, totalNumNodes,
+                                           startAtOne);
     edgeListFile.close();
 
     uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
