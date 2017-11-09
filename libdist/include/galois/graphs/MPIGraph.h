@@ -40,6 +40,7 @@
 #include <galois/gstl.h>
 #include <galois/Threads.h>
 #include <galois/Reduction.h>
+#include <galois/runtime/Network.h>
 #include <mpi.h>
 
 #include <boost/iterator/counting_iterator.hpp>
@@ -388,9 +389,14 @@ public:
 
     unsigned int numActiveThreads = galois::getActiveThreads();
 
-    if (numActiveThreads > 4) {
-      galois::setActiveThreads(4);
+    uint32_t numHosts = galois::runtime::getSystemNetworkInterface().Num;
+    uint32_t newThreadNum = std::min(numActiveThreads, (unsigned int)4);
+    uint32_t totalAccessThreads = numHosts * newThreadNum;
+    while (totalAccessThreads > 300 && newThreadNum > 1) {
+      newThreadNum--;
+      totalAccessThreads = numHosts * newThreadNum;
     }
+    galois::setActiveThreads(newThreadNum);
 
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
