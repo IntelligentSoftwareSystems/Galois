@@ -486,8 +486,7 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  // TODo change this
-  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
@@ -557,7 +556,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
   // TODO change this
-  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);

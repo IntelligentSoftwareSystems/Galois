@@ -313,7 +313,7 @@ std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::MPIGraph<uint32_t> mpiGraph;
+  galois::graphs::MPIGraph<void> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
