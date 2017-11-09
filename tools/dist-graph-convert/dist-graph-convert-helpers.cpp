@@ -24,6 +24,37 @@
  */
 #include "dist-graph-convert-helpers.h"
 
+std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
+                                            uint64_t nodeOffset, 
+                                            uint64_t numToRead) {
+  MPI_File mb;
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, nodeMapBinary.c_str(), 
+           MPI_MODE_RDONLY, MPI_INFO_NULL, &mb));
+
+  uint64_t readPosition = nodeOffset * sizeof(uint32_t);
+  uint64_t numRead = 0;
+  MPI_Status readStatus;
+  std::vector<uint32_t> node2NewNode(numToRead);
+
+  while (numToRead > 0) {
+    // File_read can only go up to the max int
+    uint64_t toLoad = std::min(numToRead, 
+                               (uint64_t)std::numeric_limits<int>::max()); 
+    MPI_File_read_at(mb, readPosition, 
+                  ((char*)(node2NewNode.data())) + (numRead * sizeof(uint32_t)),
+                  toLoad, MPI_UINT32_T, &readStatus); 
+
+    int nodesRead; 
+    MPI_Get_count(&readStatus, MPI_UINT32_T, &nodesRead);
+    numToRead -= nodesRead;
+    numRead += nodesRead;
+    readPosition += nodesRead * sizeof(uint32_t);
+  }
+  MPICheck(MPI_File_close(&mb));
+
+  return node2NewNode;
+}
+
 void MPICheck(int errcode) {
   if (errcode != MPI_SUCCESS) {
     MPI_Abort(MPI_COMM_WORLD, errcode);
@@ -713,3 +744,5 @@ Uint64Pair getLocalAssignment(uint64_t numToSplit) {
 
   return galois::block_range((uint64_t)0, numToSplit, hostID, totalNumHosts);
 }
+
+

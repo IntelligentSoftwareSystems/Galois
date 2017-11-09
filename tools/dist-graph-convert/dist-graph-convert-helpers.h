@@ -42,6 +42,20 @@
 // useful typedefs that shorten long declarations
 using Uint64Pair = std::pair<uint64_t, uint64_t>;
 using DoubleUint64Pair = std::pair<Uint64Pair, Uint64Pair>;
+using VoVUint32 = std::vector<std::vector<uint32_t>>;
+using PairVoVUint32 = std::pair<VoVUint32, VoVUint32>;
+
+/**
+ * Given a binary node mapping, read a specified region into memory.
+ *
+ * @param nodeMapBinary name of the binary file with node mappings
+ * @param nodeOffset node offset to begin reading at
+ * @param numToRead the number of node mappings (i.e. nodes) to read
+ * @returns Vector with the read in node mappings
+ */
+std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
+                                            uint64_t nodeOffset, 
+                                            uint64_t numToRead);
 
 /**
  * Wrapper for MPI calls that return an error code. Make sure it is success
@@ -649,33 +663,9 @@ std::vector<uint32_t> loadMappedSourceEdgesFromMPIGraph(
     edgeData.resize((edgesToRead.second - edgesToRead.first) * 3);
   }
 
-  printf("asdf\n");
-  // load map data TODO refactor
-  MPI_File mb;
-  MPICheck(MPI_File_open(MPI_COMM_WORLD, mappedBinary.c_str(), 
-           MPI_MODE_RDONLY, MPI_INFO_NULL, &mb));
-  uint64_t numToRead = nodesToRead.second - nodesToRead.first;
-  uint64_t numRead = 0;
-  uint64_t readPosition = nodesToRead.first * sizeof(uint32_t);
-  uint32_t node2NewNode[numToRead]; // this variable is all that we need
-  MPI_Status mpiStatus;
-
-  while (numToRead > 0) {
-    // File_read can only go up to the max int
-    uint64_t toLoad = std::min(numToRead, 
-                               (uint64_t)std::numeric_limits<int>::max()); 
-    MPI_File_read_at(mb, readPosition, 
-                     ((char*)node2NewNode) + (numRead * sizeof(uint32_t)),
-                     toLoad, MPI_UINT32_T, &mpiStatus); 
-
-    int nodesRead; 
-    MPI_Get_count(&mpiStatus, MPI_UINT32_T, &nodesRead);
-    numToRead -= nodesRead;
-    numRead += nodesRead;
-    readPosition += nodesRead * sizeof(uint32_t);
-    printf("read %d\n", nodesRead);
-  }
-  MPICheck(MPI_File_close(&mb));
+  std::vector<uint32_t> node2NewNode = 
+      readRandomNodeMapping(mappedBinary, nodesToRead.first, 
+                            nodesToRead.second - nodesToRead.first);
 
   if (edgeData.size() > 0) {
     galois::do_all(
@@ -1184,11 +1174,56 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
  */
 Uint64Pair getLocalAssignment(uint64_t numToSplit);
 
+
 /**
- * Given a set of disjoint edges, assign edges to hosts. Then, each host writes
- * the edges to the specified output file in the Galois binary graph format.
+ * Given a host to node assignment, send the edges we have to the appropriate
+ * place + receieve edges sent by other hosts.
  *
- * @TODO
+ * @param hostToNodes Vector specifying assignment of nodes to hosts
+ * @param localEdges array that represents edges on this host (to keep or to
+ * send)
+ * @returns 2 structures: one is a vector of vectors where the vector at
+ * index i has destination ids for local node i and another vector of vectors
+ * similar to the former except with edge weights (if EdgeTy is non-void)
+ */
+template<typename EdgeTy>
+PairVoVUint32 sendAndReceiveAssignedEdges(
+    const std::vector<Uint64Pair>& hostToNodes, 
+    std::vector<uint32_t>& localEdges
+) {
+  uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  uint64_t localNumNodes = hostToNodes[hostID].second - 
+                           hostToNodes[hostID].first;
+
+  sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
+  std::atomic<uint64_t> edgesToReceive;
+  edgesToReceive.store(receiveEdgeCounts());
+
+  printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
+
+  // FIXME ONLY V1 SUPPORT
+  VoVUint32 localSrcToDest(localNumNodes);
+  VoVUint32 localSrcToData;
+  std::vector<std::mutex> nodeLocks(localNumNodes);
+
+  sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
+                            localSrcToData, nodeLocks);
+  freeVector(localEdges);
+  receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
+                       localSrcToData, nodeLocks);
+  return PairVoVUint32(localSrcToDest, localSrcToData);
+}
+
+
+/**
+ * Given a set of disjoint edges, assign/send edges to hosts. Then, each host 
+ * writes the edges to the specified output file in the Galois binary graph 
+ * format.
+ *
+ * @param localEdges Array of edges this host has
+ * @param totalNumNodes total number of nodes in entire graph
+ * @param totalNumEdges total number of edges in entire graph
+ * @param outputFile file to write new graph to
  */
 template<typename EdgeTy>
 void assignAndWriteEdges(std::vector<uint32_t>& localEdges, 
@@ -1199,29 +1234,15 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
   std::vector<Uint64Pair> hostToNodes = 
     getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, totalNumEdges);
 
+  PairVoVUint32 receivedEdgeInfo =
+      sendAndReceiveAssignedEdges<EdgeTy>(hostToNodes, localEdges);
+  VoVUint32 localSrcToDest = receivedEdgeInfo.first;
+  VoVUint32 localSrcToData = receivedEdgeInfo.second;
+
   uint64_t localNodeBegin = hostToNodes[hostID].first;
   uint64_t localNumNodes = hostToNodes[hostID].second - localNodeBegin;
-
-  sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
-  std::atomic<uint64_t> edgesToReceive;
-  edgesToReceive.store(receiveEdgeCounts());
-
-  printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
-
-  // FIXME ONLY V1 SUPPORT
-  std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
-  std::vector<std::vector<uint32_t>> localSrcToData;
-  std::vector<std::mutex> nodeLocks(localNumNodes);
-
-  sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
-                            localSrcToData, nodeLocks);
-  freeVector(localEdges);
-  receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
-                       localSrcToData, nodeLocks);
   freeVector(hostToNodes);
-  freeVector(nodeLocks);
 
-  // TODO can refactor to function
   uint64_t totalAssignedEdges = 0;
   for (unsigned i = 0; i < localNumNodes; i++) {
     totalAssignedEdges += localSrcToDest[i].size();

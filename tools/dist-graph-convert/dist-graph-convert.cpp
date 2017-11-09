@@ -381,87 +381,50 @@ struct Gr2RGr : public Conversion {
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    // this will remap the source nodes and return a TRANSPOSE edge list
     std::vector<uint32_t> localEdges = loadMappedSourceEdgesFromMPIGraph<EdgeTy>(
         inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges,
         nodeMapBinary);
     
-    //for (unsigned i = 0; i < totalNumEdges * 2; i += 2) {
-    //  fprintf(stderr, "%u %u\n", localEdges[i], localEdges[i + 1]);
-    //}
-
     ////////////////////////////////////////////////////////////////////////////
     // phase 2: remap destinations
     ////////////////////////////////////////////////////////////////////////////
+
+    // make each host remap a relatively even number of destination nodes by
+    // assigning/sending (this is the point of the transpose edge list above)
     std::vector<Uint64Pair> hostToNodes = 
       getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, totalNumEdges);
   
+    PairVoVUint32 receivedEdgeInfo =
+        sendAndReceiveAssignedEdges<EdgeTy>(hostToNodes, localEdges);
+    VoVUint32 localSrcToDest = receivedEdgeInfo.first;
+    VoVUint32 localSrcToData = receivedEdgeInfo.second;
+
     uint64_t localNodeBegin = hostToNodes[hostID].first;
     uint64_t localNumNodes = hostToNodes[hostID].second - localNodeBegin;
-  
-    sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
-    std::atomic<uint64_t> edgesToReceive;
-    edgesToReceive.store(receiveEdgeCounts());
-  
-    printf("[%u] Need to receive %lu edges\n", hostID, edgesToReceive.load());
-  
-    std::vector<std::vector<uint32_t>> localSrcToDest(localNumNodes);
-    std::vector<std::vector<uint32_t>> localSrcToData;
-    std::vector<std::mutex> nodeLocks(localNumNodes);
-  
-    sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
-                              localSrcToData, nodeLocks);
-    freeVector(localEdges);
-    receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
-                         localSrcToData, nodeLocks);
     freeVector(hostToNodes);
-    freeVector(nodeLocks);
-  
-    uint64_t totalAssignedEdges = 0;
-    for (unsigned i = 0; i < localNumNodes; i++) {
-      totalAssignedEdges += localSrcToDest[i].size();
-    }
 
-    // load map data TODO refactor
-    MPI_File mb;
-    MPICheck(MPI_File_open(MPI_COMM_WORLD, nodeMapBinary.c_str(), 
-             MPI_MODE_RDONLY, MPI_INFO_NULL, &mb));
-    uint64_t numToRead = localNumNodes;
-    uint64_t numRead = 0;
-    uint64_t readPosition = localNodeBegin * sizeof(uint32_t);
-    uint32_t node2NewNode[numToRead]; // this variable is all that we need
-    MPI_Status mpiStatus;
-
-    while (numToRead > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numToRead, 
-                                 (uint64_t)std::numeric_limits<int>::max()); 
-      MPI_File_read_at(mb, readPosition, 
-                       ((char*)node2NewNode) + (numRead * sizeof(uint32_t)),
-                       toLoad, MPI_UINT32_T, &mpiStatus); 
-  
-      int nodesRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &nodesRead);
-      numToRead -= nodesRead;
-      numRead += nodesRead;
-      readPosition += nodesRead * sizeof(uint32_t);
-    }
-    MPICheck(MPI_File_close(&mb));
-
-    std::vector<uint32_t> localEdges2;
-
+    // At this point, this host has all edges of the destinations it has been
+    // assigned to remap
+    std::vector<uint32_t> node2NewNode = readRandomNodeMapping(nodeMapBinary,
+                                                               localNodeBegin,
+                                                               localNumNodes);
+    // TODO refactor
+    std::vector<uint32_t> remappedEdges;
     GALOIS_ASSERT(localNumNodes == localSrcToDest.size());
-
-    // serial instead of doall because memory might be an issue
+    // Go through the received edge lists and un-transpose them into a regular
+    // edge list while remapping the destination nodes
+    // (serial loop due to memory concerns)
     for (unsigned i = 0; i < localNumNodes; i++) {
       auto& curVector = localSrcToDest[i];
 
       uint32_t remappedGID = node2NewNode[i];
       for (unsigned j = 0; j < curVector.size(); j++) {
-        localEdges2.emplace_back(curVector[j]);
-        localEdges2.emplace_back(remappedGID);
+        remappedEdges.emplace_back(curVector[j]);
+        remappedEdges.emplace_back(remappedGID);
         
         if (localSrcToData.size()) {
-          localEdges2.emplace_back(localSrcToData[i][j]);
+          remappedEdges.emplace_back(localSrcToData[i][j]);
         }
       }
       freeVector(curVector);
@@ -472,15 +435,13 @@ struct Gr2RGr : public Conversion {
     freeVector(localSrcToDest);
     freeVector(localSrcToData);
 
-    //for (unsigned i = 0; i < totalNumEdges * 2; i += 2) {
-    //  fprintf(stderr, "%u %u\n", localEdges2[i], localEdges2[i + 1]);
-    //}
-
     ////////////////////////////////////////////////////////////////////////////
-    // phase 3: write edges to new file
+    // phase 3: write now randomized-node edges to new file
     ////////////////////////////////////////////////////////////////////////////
 
-    assignAndWriteEdges<EdgeTy>(localEdges2, totalNumNodes, totalNumEdges, 
+    // we have the randomized nodes in remappedEdges; execution proceeds
+    // like the other converters from this point on
+    assignAndWriteEdges<EdgeTy>(remappedEdges, totalNumNodes, totalNumEdges, 
                                 outputFile);
     galois::runtime::getHostBarrier().wait();
   }
