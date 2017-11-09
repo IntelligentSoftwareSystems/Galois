@@ -37,7 +37,8 @@ enum ConvertMode {
   gr2wgr,
   gr2tgr,
   gr2sgr,
-  gr2cgr
+  gr2cgr,
+  nodemap2binary
 };
 
 enum EdgeType {
@@ -67,6 +68,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2sgr, "Convert binary gr to symmetric binary gr"),
       clEnumVal(gr2cgr, "Convert binary gr to binary gr without self-loops "
                         "or multi-edges; edge data will be ignored"),
+      clEnumVal(nodemap2binary, "Convert node map into binary form"),
       clEnumValEnd
     ), cll::Required);
 static cll::opt<unsigned> totalNumNodes("numNodes", 
@@ -78,7 +80,9 @@ static cll::opt<bool> editInPlace("inPlace",
                                   cll::desc("Flag specifying conversion is in "
                                             "place"),
                                   cll::init(false));
-
+static cll::opt<std::string> nodeMapFile("nodeMapBinary", 
+                               cll::desc("Binary file of numbers mapping nodes"),
+                               cll::init(std::string()));
 
 struct Conversion { };
 
@@ -354,6 +358,65 @@ struct Gr2CGr : public Conversion {
   }
 };
 
+/**
+ * Take a line separated list of numbers and convert it into a binary format.
+ */
+struct Nodemap2Binary : public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    // input file = node map
+    GALOIS_ASSERT(!(outputFile.empty()), "nodemap2binary needs an output file");
+
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint64_t hostID = net.ID;
+
+    std::ifstream mapFile(inputFile.c_str());
+    uint64_t fileSize = getFileSize(mapFile);
+    if (hostID == 0) {
+      printf("File size is %lu\n", fileSize);
+    }
+    uint64_t localStartByte;
+    uint64_t localEndByte;
+    std::tie(localStartByte, localEndByte) = 
+        determineByteRange(mapFile, fileSize);
+    std::vector<uint32_t> nodesToWrite;
+    // read lines until last byte
+    mapFile.seekg(localStartByte);
+    while ((uint64_t)(mapFile.tellg() + 1) != localEndByte) {
+      uint32_t node;
+      mapFile >> node;
+      nodesToWrite.emplace_back(node);
+    }
+    mapFile.close();
+
+    printf("[%u] Read %lu numbers\n", 
+           galois::runtime::getSystemNetworkInterface().ID, 
+           nodesToWrite.size());
+
+    // determine where to start writing using prefix sum of read nodes
+    std::vector<uint64_t> nodesEachHostRead =
+        getEdgesPerHost(nodesToWrite.size());
+    for (unsigned i = 1; i < nodesEachHostRead.size(); i++) {
+      nodesEachHostRead[i] += nodesEachHostRead[i - 1];
+    }
+    uint64_t fileOffset; 
+    if (hostID != 0) {
+      fileOffset = nodesEachHostRead[hostID - 1];
+    } else {
+      fileOffset = 0;
+    }
+
+    // write using mpi
+    MPI_File binaryMap;
+    MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(), 
+             MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &binaryMap));
+    // resuse of functions (misleading name, but it will do what I need which
+    // is write a vector of uint32_ts)
+    writeEdgeDataData(binaryMap, fileOffset, nodesToWrite);
+    MPICheck(MPI_File_close(&binaryMap));
+  }
+};
+
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   llvm::cl::ParseCommandLineOptions(argc, argv);
@@ -370,6 +433,8 @@ int main(int argc, char** argv) {
       convert<Gr2SGr>(); break;
     case gr2cgr: 
       convert<Gr2CGr>(); break;
+    case nodemap2binary:
+      convert<Nodemap2Binary>(); break;
     default: abort();
   }
   return 0;

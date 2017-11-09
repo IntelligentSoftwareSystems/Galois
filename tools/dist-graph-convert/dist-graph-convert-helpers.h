@@ -614,9 +614,6 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
   return edgeData;
 }
 
-
-
-
 /**
  * Load a Galois binary graph such that multiedges and self loops are ignored.
  * Weights are completely ignored regardless if they exist or not.
@@ -633,8 +630,6 @@ std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 );
-
-
 
 /**
  * Determine/send to each host how many edges they should expect to receive
