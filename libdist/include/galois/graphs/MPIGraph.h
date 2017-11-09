@@ -497,6 +497,9 @@ public:
    * @param globalEdgeID the global edge id of the edge to get the data of
    * @returns the edge data of the requested edge id
    */
+  template<typename K = EdgeDataType, typename std::enable_if<
+    !std::is_void<K>::value>::type* = nullptr
+  >
   EdgeDataType edgeData(uint64_t globalEdgeID) {
     if (!graphLoaded) {
       GALOIS_DIE("MPI graph hasn't been loaded yet.");
@@ -517,6 +520,19 @@ public:
     uint64_t localEdgeID = globalEdgeID - edgeOffset;
     return edgeDataBuffer[localEdgeID];
   }
+
+
+  /**
+   * Version of above function when edge data type is void.
+   */
+  template<typename K = EdgeDataType, typename std::enable_if<
+    std::is_void<K>::value>::type* = nullptr
+  >
+  unsigned edgeData(uint64_t globalEdgeID) {
+    galois::gWarn("Getting edge data on MPI graph when it doesn't exist\n");
+    return 0;
+  }
+
 
   /**
    * Reset reading counters.
