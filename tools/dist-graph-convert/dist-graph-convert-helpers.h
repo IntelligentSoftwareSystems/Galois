@@ -486,6 +486,7 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
+  // TODo change this
   galois::graphs::MPIGraph<uint32_t> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
@@ -555,6 +556,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
+  // TODO change this
   galois::graphs::MPIGraph<uint32_t> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
@@ -630,6 +632,92 @@ std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 );
+
+template<typename EdgeDataTy>
+std::vector<uint32_t> loadMappedSourceEdgesFromMPIGraph(
+    const std::string& inputFile, Uint64Pair nodesToRead, 
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
+    const std::string& mappedBinary) {
+  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
+  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+                            edgesToRead.first, edgesToRead.second, 
+                            totalNumNodes, totalNumEdges);
+  std::vector<uint32_t> edgeData;
+  // void = 2 elements per edge; non-void = 3 elements per edge
+  if (std::is_void<EdgeDataTy>::value) {
+    edgeData.resize((edgesToRead.second - edgesToRead.first) * 2);
+  } else {
+    edgeData.resize((edgesToRead.second - edgesToRead.first) * 3);
+  }
+
+  printf("asdf\n");
+  // load map data TODO refactor
+  MPI_File mb;
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, mappedBinary.c_str(), 
+           MPI_MODE_RDONLY, MPI_INFO_NULL, &mb));
+  uint64_t numToRead = nodesToRead.second - nodesToRead.first;
+  uint64_t numRead = 0;
+  uint64_t readPosition = nodesToRead.first * sizeof(uint32_t);
+  uint32_t node2NewNode[numToRead]; // this variable is all that we need
+  MPI_Status mpiStatus;
+
+  while (numToRead > 0) {
+    // File_read can only go up to the max int
+    uint64_t toLoad = std::min(numToRead, 
+                               (uint64_t)std::numeric_limits<int>::max()); 
+    MPI_File_read_at(mb, readPosition, 
+                     ((char*)node2NewNode) + (numRead * sizeof(uint32_t)),
+                     toLoad, MPI_UINT32_T, &mpiStatus); 
+
+    int nodesRead; 
+    MPI_Get_count(&mpiStatus, MPI_UINT32_T, &nodesRead);
+    numToRead -= nodesRead;
+    numRead += nodesRead;
+    readPosition += nodesRead * sizeof(uint32_t);
+    printf("read %d\n", nodesRead);
+  }
+  MPICheck(MPI_File_close(&mb));
+
+  if (edgeData.size() > 0) {
+    galois::do_all(
+      galois::iterate(nodesToRead.first, nodesToRead.second),
+      [&] (uint32_t gID) {
+        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+
+        // offset into which we should start writing data in edgeData
+        uint64_t edgeDataOffset; 
+        if (std::is_void<EdgeDataTy>::value) {
+          edgeDataOffset = (edgeBegin - edgesToRead.first) * 2;
+        } else {
+          edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
+        }
+
+        uint32_t lID = gID - nodesToRead.first;
+        uint32_t mappedSource = node2NewNode[lID];
+
+        // loop through all edges
+        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+          uint32_t edgeSource = mpiGraph.edgeDestination(i);
+          // src is saved as dest and dest is saved as source (transpose)
+          edgeData[edgeDataOffset] = edgeSource;
+          edgeData[edgeDataOffset + 1] = mappedSource;
+
+          if (std::is_void<EdgeDataTy>::value) {
+            edgeDataOffset += 2;
+          } else {
+            edgeData[edgeDataOffset + 2] = mpiGraph.edgeData(i);
+            edgeDataOffset += 3;
+          }
+        }
+      },
+      galois::steal(),
+      galois::loopname("TODO")
+    );
+  }
+
+  return edgeData;
+}
 
 /**
  * Determine/send to each host how many edges they should expect to receive

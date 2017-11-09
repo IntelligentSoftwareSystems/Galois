@@ -38,6 +38,7 @@ enum ConvertMode {
   gr2tgr,
   gr2sgr,
   gr2cgr,
+  gr2rgr,
   nodemap2binary
 };
 
@@ -68,6 +69,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2sgr, "Convert binary gr to symmetric binary gr"),
       clEnumVal(gr2cgr, "Convert binary gr to binary gr without self-loops "
                         "or multi-edges; edge data will be ignored"),
+      clEnumVal(gr2rgr, "Convert binary gr to randomized binary gr"),
       clEnumVal(nodemap2binary, "Convert node map into binary form"),
       clEnumValEnd
     ), cll::Required);
@@ -80,7 +82,7 @@ static cll::opt<bool> editInPlace("inPlace",
                                   cll::desc("Flag specifying conversion is in "
                                             "place"),
                                   cll::init(false));
-static cll::opt<std::string> nodeMapFile("nodeMapBinary", 
+static cll::opt<std::string> nodeMapBinary("nodeMapBinary", 
                                cll::desc("Binary file of numbers mapping nodes"),
                                cll::init(std::string()));
 
@@ -358,6 +360,53 @@ struct Gr2CGr : public Conversion {
   }
 };
 
+struct Gr2RGr : public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(!(outputFile.empty()), "gr2rgr needs an output file");
+    GALOIS_ASSERT(!(nodeMapBinary.empty()), "gr2rgr needs binary mapping");
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) = 
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
+
+    ////////////////////////////////////////////////////////////////////////////
+    // phase 1: remap sources
+    ////////////////////////////////////////////////////////////////////////////
+
+    // get "read" assignment of nodes (i.e. nodes this host is responsible for)
+    Uint64Pair nodesToRead;
+    Uint64Pair edgesToRead;
+    std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+                                                    nodesToRead.second);
+    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID, 
+           edgesToRead.first, edgesToRead.second, 
+           edgesToRead.second - edgesToRead.first);
+    std::vector<uint32_t> localEdges = loadMappedSourceEdgesFromMPIGraph<EdgeTy>(
+        inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges,
+        nodeMapBinary);
+    
+    for (unsigned i = 0; i < totalNumEdges * 2; i += 2) {
+      fprintf(stderr, "%u %u\n", localEdges[i], localEdges[i + 1]);
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    // phase 2: remap destinations
+    ////////////////////////////////////////////////////////////////////////////
+
+    ////////////////////////////////////////////////////////////////////////////
+    // phase 3: write edges to new file
+    ////////////////////////////////////////////////////////////////////////////
+
+    // TODO
+  }
+};
+
+
 /**
  * Take a line separated list of numbers and convert it into a binary format.
  */
@@ -433,6 +482,8 @@ int main(int argc, char** argv) {
       convert<Gr2SGr>(); break;
     case gr2cgr: 
       convert<Gr2CGr>(); break;
+    case gr2rgr: 
+      convert<Gr2RGr>(); break;
     case nodemap2binary:
       convert<Nodemap2Binary>(); break;
     default: abort();
