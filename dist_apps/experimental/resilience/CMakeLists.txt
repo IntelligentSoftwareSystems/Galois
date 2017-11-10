@@ -29,3 +29,7 @@ endfunction()
 
 
 distApp(bfs_push)
+distApp(sssp_push)
+distApp(pagerank_pull)
+distApp(sgd_pull)
+distApp(kcore_push)
