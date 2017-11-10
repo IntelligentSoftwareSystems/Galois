@@ -3058,6 +3058,44 @@ public:
         galois::loopname(get_run_identifier(doall_str).c_str()));
   }
 
+  /****************************************************************
+   * Checkpoint the complete structure on the node
+   *
+   ***************************************************************/
+  void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint"){
+    galois::gPrint(id, " : Saving local checkpoint\n");
+    using namespace boost::archive;
+    std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
+
+    std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
+    if(!outputStream.is_open()){
+      std::cerr << "ERROR: Could not open " << checkpointFileName_local << " to save local graph!!!\n";
+    }
+
+    boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
+
+    graph.serializeNodeData(ar);
+
+    outputStream.close();
+  }
+
+  void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint"){
+    using namespace boost::archive;
+    std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
+
+    std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
+    if(!inputStream.is_open()){
+      std::cerr << "ERROR: Could not open " << checkpointFileName_local << " to save local graph!!!\n";
+    }
+
+    boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
+
+    graph.deSerializeNodeData(ar);
+
+    inputStream.close();
+  }
+
+
 private:
   template<typename FnTy>
   void recovery_help_landingPad(galois::runtime::RecvBuffer& buff) {
@@ -3404,6 +3442,11 @@ public:
     //Serialize partitioning scheme specific data structures.
     boostDeSerializeLocalGraph(ar);
 
+    graph.clearRanges();
+    masterRanges.clear();
+    withEdgeRanges.clear();
+    specificRanges.clear();
+
     determine_thread_ranges(numNodesWithEdges, graph.getEdgeInDataArray());
     // find ranges for master + nodes with edges
     determine_thread_ranges_master();
@@ -3411,7 +3454,7 @@ public:
     initialize_specific_ranges();
 
     // Exchange information among hosts
-    send_info_to_host();
+    //send_info_to_host();
 
     inputStream.close();
   }

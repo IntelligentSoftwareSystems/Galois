@@ -124,7 +124,7 @@ private:
   void save(Archive &ar, const unsigned int version) const {
 
     // TODO DON'T USE CERR
-    std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
+    //std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
     ar << m_size;
     ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
     /*
@@ -137,11 +137,13 @@ private:
     ar >> m_size;
 
     // TODO DON'T USE CERR
-    std::cerr << "load m_size : " << m_size << " Threads : " <<runtime::activeThreads << "\n";
+    //std::cerr << "load m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
 
     //TODO: For now, always use allocateInterleaved
     //Allocates and sets m_data pointer
-    allocateInterleaved(m_size);
+    if(!m_data)
+      allocateInterleaved(m_size);
+
     ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
     //ar >> boost::serialization::make_array<T>(m_data, m_size);
   }

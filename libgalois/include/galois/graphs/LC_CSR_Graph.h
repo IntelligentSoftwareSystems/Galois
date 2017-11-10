@@ -231,23 +231,35 @@ class LC_CSR_Graph :
     ar >> edgeDst;
     ar >> edgeData;
 
-    if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes);
-      this->outOfLineAllocateLocal(numNodes);
-    } else{
-      nodeData.allocateInterleaved(numNodes);
-      this->outOfLineAllocateInterleaved(numNodes);
-    }
+    if(!nodeData.data()){
+      if (UseNumaAlloc) {
+        nodeData.allocateLocal(numNodes);
+        this->outOfLineAllocateLocal(numNodes);
+      } else{
+        nodeData.allocateInterleaved(numNodes);
+        this->outOfLineAllocateInterleaved(numNodes);
+      }
 
-    //Construct nodeData largeArray
-    for (size_t n = 0; n < numNodes; ++n) {
-      nodeData.constructAt(n);
+      //Construct nodeData largeArray
+      for (size_t n = 0; n < numNodes; ++n) {
+        nodeData.constructAt(n);
+      }
     }
 
   }
   //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
   BOOST_SERIALIZATION_SPLIT_MEMBER()
 
+
+ public:
+
+  void serializeNodeData(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
+     ar << nodeData;
+  }
+
+  void deSerializeNodeData(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
+     ar >> nodeData;
+  }
 
 
  public:
