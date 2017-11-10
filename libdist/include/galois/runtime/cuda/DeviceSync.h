@@ -310,9 +310,9 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   //timer1.start();
   size_t v_size = shared->num_nodes[from_id];
   if (reset) {
-    batch_get_reset_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
+    batch_get_reset_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
   } else {
-    batch_get_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
+    batch_get_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
   }
 	check_cuda_kernel;
   //timer1.stop();
@@ -345,7 +345,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     //timer1.start();
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
     ctx->is_updated.cpu_rd_ptr()->reset();
-    batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].gpu_rd_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
+    batch_get_subset_bitset <<<blocks, threads>>>(shared->num_nodes[from_id], shared->nodes[from_id].device_ptr(), ctx->is_updated.gpu_rd_ptr(), field->is_updated.gpu_rd_ptr());
     check_cuda_kernel;
     //timer1.stop();
     //timer2.start();
@@ -357,15 +357,15 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   if ((*data_mode) == onlyData) {
     *v_size = shared->num_nodes[from_id];
     if (reset) {
-      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
+      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
     } else {
-      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
+      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
     }
   } else { // bitsetData || offsetsData
     if (reset) {
-      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
+      batch_get_reset_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].device_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), i);
     } else {
-      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
+      batch_get_subset<DataType> <<<blocks, threads>>>(*v_size, shared->nodes[from_id].device_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_rd_ptr());
     }
   }
 	check_cuda_kernel;
@@ -417,19 +417,19 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   //timer2.start();
   if (data_mode == onlyData) {
     if (op == setOp) {
-      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == addOp) {
-      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == minOp) {
-      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     }
   } else { // bitsetData || offsetsData
     if (op == setOp) {
-      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == addOp) {
-      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == minOp) {
-      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].gpu_rd_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     }
   }
 	check_cuda_kernel;

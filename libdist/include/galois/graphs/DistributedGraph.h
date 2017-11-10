@@ -3208,13 +3208,7 @@ public:
     m.id = id;
     m.row_start = (index_type*) calloc(m.nnodes + 1, sizeof(index_type));
     m.edge_dst = (index_type*) calloc(m.nedges, sizeof(index_type));
-
-    // initialize node_data with localID-to-globalID mapping
     m.node_data = (index_type *) calloc(m.nnodes, sizeof(node_data_type));
-
-    for (index_type i = 0; i < m.nnodes; ++i) {
-      m.node_data[i] = getGID(i);
-    }
 
     if (std::is_void<EdgeTy>::value) {
       m.edge_data = NULL;
@@ -3226,24 +3220,19 @@ public:
       m.edge_data = (edge_data_type *) calloc(m.nedges, sizeof(edge_data_type));
     }
 
-    // pinched from Rashid's LC_LinearArray_Graph.h
-    size_t edge_counter = 0, node_counter = 0;
-    for (auto n = graph.begin(); 
-         n != graph.end() && *n != m.nnodes; 
-         n++, node_counter++) {
-      m.row_start[node_counter] = edge_counter;
-      if (*n < numNodesWithEdges) {
-        for (auto e = edge_begin(*n); e != edge_end(*n); e++) {
-           if (getEdgeDst(e) < m.nnodes) {
-              setMarshalEdge<std::is_void<EdgeTy>::value>(m, edge_counter, e);
-              m.edge_dst[edge_counter++] = getEdgeDst(e);
-           }
-        }
-      }
-    }
-
-    m.row_start[node_counter] = edge_counter;
-    m.nedges = edge_counter;
+    galois::do_all(galois::iterate(graph),
+        [&](const typename GraphTy::GraphNode& nodeID) {
+          // initialize node_data with localID-to-globalID mapping
+          m.node_data[nodeID] = getGID(nodeID);
+          m.row_start[nodeID] = *edge_begin(nodeID);
+          for (auto e = edge_begin(nodeID); e != edge_end(nodeID); e++) {
+            auto edgeID = *e;
+            setMarshalEdge<std::is_void<EdgeTy>::value>(m, edgeID, e);
+            m.edge_dst[edgeID] = getEdgeDst(e);
+          }
+        },
+        galois::steal());
+    m.row_start[m.nnodes] = m.nedges;
 
     // copy memoization meta-data
     m.num_master_nodes = (unsigned int *)calloc(masterNodes.size(), 
