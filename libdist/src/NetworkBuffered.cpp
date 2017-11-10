@@ -347,7 +347,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       MPI_Abort(MPI_COMM_WORLD, rankSuccess);
     }
 
-    int sizeSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &hostSize);
+    int sizeSuccess = MPI_Comm_size(MPI_COMM_WORLD, &hostSize);
     if (sizeSuccess != MPI_SUCCESS) {
       MPI_Abort(MPI_COMM_WORLD, sizeSuccess);
     }
@@ -358,8 +358,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
     #endif
 
-    assert(ID == rank);
-    assert(Num == hostSize);
+    assert(ID == (unsigned)rank);
+    assert(Num == (unsigned)hostSize);
 
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
