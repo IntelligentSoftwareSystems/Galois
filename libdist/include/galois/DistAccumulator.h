@@ -47,7 +47,7 @@ class DGAccumulator {
 
 #ifdef GALOIS_USE_LWCI
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, 1, &ompi_op_sum<Ty>, mv);
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), &ompi_op_sum<Ty>, mv);
   }
 #else
   inline void reduce_mpi() {
