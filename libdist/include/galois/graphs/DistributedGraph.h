@@ -3206,6 +3206,7 @@ public:
     m.beginMaster = beginMaster;
     m.numNodesWithEdges = numNodesWithEdges;
     m.id = id;
+    m.numHosts = masterNodes.size();
     m.row_start = (index_type*) calloc(m.nnodes + 1, sizeof(index_type));
     m.edge_dst = (index_type*) calloc(m.nedges, sizeof(index_type));
     m.node_data = (index_type *) calloc(m.nnodes, sizeof(node_data_type));
