@@ -223,17 +223,13 @@ struct BFS {
 
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    
+
     do {
 
       /*
        * Checkpointing the all the node data
        */
-      if(enableFT && recoveryScheme == CP){
-        if(_num_iterations%checkpointInterval == 0){
-          _graph.checkpointSaveNodeData();
-        }
-      }
+      saveCheckpointToDisk(_num_iterations, _graph);
 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
@@ -261,40 +257,8 @@ struct BFS {
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       /**************************CRASH SITE : start *****************************************/
-
       if(enableFT && (_num_iterations == crashIteration)){
-
-        const auto& net = galois::runtime::getSystemNetworkInterface();
-        std::set<uint32_t> crashHostSet = getRandomHosts();
-
-        //Use resilience to recover
-        if(recoveryScheme == RS){
-          galois::gPrint(net.ID, " :  Using RS\n");
-          // Crashed hosts need to reconstruct local graphs
-          if(crashHostSet.find(net.ID) != crashHostSet.end()){
-            galois::gPrint(net.ID, " : CRASHED!!!\n");
-
-            //Reconstruct local graph
-            _graph.read_local_graph_from_file(localGraphFileName);
-            recovery::go(_graph);
-
-          } else {
-            recovery::go(_graph);
-          }
-        } else if (recoveryScheme == CP){
-            galois::gPrint(net.ID, " :  Using CP\n");
-            // Crashed hosts need to reconstruct local graphs
-            if(crashHostSet.find(net.ID) != crashHostSet.end()){
-              galois::gPrint(net.ID, " : CRASHED!!!\n");
-
-              //Reconstruct local graph
-              //Assumes that local graph file is present
-              _graph.read_local_graph_from_file(localGraphFileName);
-              _graph.checkpointApplyNodeData();
-            } else {
-              _graph.checkpointApplyNodeData();
-            }
-        }
+        crashSite<recovery>(_graph);
       }
       /**************************CRASH SITE : end *****************************************/
 

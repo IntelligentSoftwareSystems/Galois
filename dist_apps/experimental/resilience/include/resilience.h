@@ -80,3 +80,50 @@ std::set<uint32_t> getRandomHosts(){
 
   return std::set<uint32_t>(allHosts.begin(), allHosts.begin() + crashNumHosts);
 }
+
+/*
+ * Checkpointing the all the node data
+ */
+template<typename GraphTy>
+void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
+  if(enableFT && recoveryScheme == CP){
+    if(_num_iterations%checkpointInterval == 0){
+      _graph.checkpointSaveNodeData();
+    }
+  }
+}
+
+template<typename RecoveryTy, typename GraphTy>
+void crashSite(GraphTy& _graph){
+  const auto& net = galois::runtime::getSystemNetworkInterface();
+  std::set<uint32_t> crashHostSet = getRandomHosts();
+
+  //Use resilience to recover
+  if(recoveryScheme == RS){
+    galois::gPrint(net.ID, " :  Using RS\n");
+    // Crashed hosts need to reconstruct local graphs
+    if(crashHostSet.find(net.ID) != crashHostSet.end()){
+      galois::gPrint(net.ID, " : CRASHED!!!\n");
+
+      //Reconstruct local graph
+      _graph.read_local_graph_from_file(localGraphFileName);
+      RecoveryTy::go(_graph);
+
+    } else {
+      RecoveryTy::go(_graph);
+    }
+  } else if (recoveryScheme == CP){
+    galois::gPrint(net.ID, " :  Using CP\n");
+    // Crashed hosts need to reconstruct local graphs
+    if(crashHostSet.find(net.ID) != crashHostSet.end()){
+      galois::gPrint(net.ID, " : CRASHED!!!\n");
+
+      //Reconstruct local graph
+      //Assumes that local graph file is present
+      _graph.read_local_graph_from_file(localGraphFileName);
+      _graph.checkpointApplyNodeData();
+    } else {
+      _graph.checkpointApplyNodeData();
+    }
+  }
+}
