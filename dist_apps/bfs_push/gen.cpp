@@ -346,10 +346,6 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, void>();
   #endif
 
-  //Save local graph structure
-  if(saveLocalGraph)
-    (*hg).save_local_graph_to_file();
-
   // bitset comm setup
   bitset_dist_current.resize(hg->size());
 

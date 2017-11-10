@@ -151,8 +151,6 @@ struct recovery {
   }
 };
 
-
-
 struct FirstItr_BFS {
   Graph * graph;
 
@@ -189,7 +187,7 @@ struct FirstItr_BFS {
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                 Broadcast_dist_current, Bitset_dist_current>("BFS");
-    
+
     galois::runtime::reportStat_Tsum(regionname,
        _graph.get_run_identifier("NUM_WORK_ITEMS"), __end - __begin);
   }
@@ -290,6 +288,7 @@ struct BFS {
               galois::gPrint(net.ID, " : CRASHED!!!\n");
 
               //Reconstruct local graph
+              //Assumes that local graph file is present
               _graph.read_local_graph_from_file(localGraphFileName);
               _graph.checkpointApplyNodeData();
             } else {
@@ -424,10 +423,6 @@ int main(int argc, char** argv) {
   #else
   Graph* hg = distGraphInitialization<NodeData, void>();
   #endif
-
-  //Save local graph structure
-  if(saveLocalGraph)
-    (*hg).save_local_graph_to_file();
 
   // bitset comm setup
   bitset_dist_current.resize(hg->size());
