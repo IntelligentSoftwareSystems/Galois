@@ -565,9 +565,12 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
   MPI_Status writeStatus;
   uint64_t totalWritten = 0;
   while (nodesToWrite != 0) {
+    uint64_t toWrite = std::min(nodesToWrite,
+                                (uint64_t)std::numeric_limits<int>::max());
+
     MPICheck(MPI_File_write_at(gr, nodeIndexOffset, 
                                ((uint64_t*)edgePrefixSum.data()) + totalWritten,
-                               nodesToWrite, MPI_UINT64_T, &writeStatus));
+                               toWrite, MPI_UINT64_T, &writeStatus));
     
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
@@ -588,9 +591,12 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
     uint64_t totalWritten = 0;
 
     while (numToWrite != 0) {
+      uint64_t toWrite = std::min(numToWrite,
+                                  (uint64_t)std::numeric_limits<int>::max());
+
       MPICheck(MPI_File_write_at(gr, edgeDestOffset, 
                                 ((uint32_t*)currentDests.data()) + totalWritten,
-                                numToWrite, MPI_UINT32_T, &writeStatus));
+                                toWrite, MPI_UINT32_T, &writeStatus));
 
       int itemsWritten;
       MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
@@ -609,9 +615,12 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
   uint64_t totalWritten = 0;
 
   while (numToWrite != 0) {
+    uint64_t toWrite = std::min(numToWrite,
+                                (uint64_t)std::numeric_limits<int>::max());
+
     MPICheck(MPI_File_write_at(gr, edgeDestOffset, 
                               ((uint32_t*)destVector.data()) + totalWritten,
-                              numToWrite, MPI_UINT32_T, &writeStatus));
+                              toWrite, MPI_UINT32_T, &writeStatus));
 
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
@@ -628,9 +637,12 @@ void writeEdgeDataData(MPI_File& gr, uint64_t edgeDataOffset,
   uint64_t numWritten = 0;
 
   while (numToWrite != 0) {
+    uint64_t toWrite = std::min(numToWrite,
+                                (uint64_t)std::numeric_limits<int>::max());
+
     MPICheck(MPI_File_write_at(gr, edgeDataOffset, 
                              ((uint32_t*)edgeDataToWrite.data()) + numWritten,
-                             numToWrite, MPI_UINT32_T, &writeStatus));
+                             toWrite, MPI_UINT32_T, &writeStatus));
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
     numToWrite -= itemsWritten;
