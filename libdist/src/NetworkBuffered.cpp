@@ -330,11 +330,33 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   void workerThread() {
     #ifdef GALOIS_USE_LWCI
+    // Initialize LWCI before MPI
     std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker);
     if (ID == 0) fprintf(stderr, "**Using LWCI Communication layer**\n");
-    #else
+    #endif
+
+    initializeMPI();
+    int rank;
+    int hostSize;
+
+    int rankSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    if (rankSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, rankSuccess);
+    }
+
+    int sizeSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &hostSize);
+    if (sizeSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, sizeSuccess);
+    }
+
+    galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
+
+    #ifndef GALOIS_USE_LWCI
     std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
     #endif
+
+    assert(ID == rank);
+    assert(Num == hostSize);
 
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};

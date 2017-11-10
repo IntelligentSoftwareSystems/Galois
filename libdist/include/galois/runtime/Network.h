@@ -72,10 +72,9 @@ using optional_t = boost::optional<T>;
 #endif
 
 class NetworkInterface {
-private:
+protected:
   void initializeMPI();
 
-protected:
   MemUsageTracker memUsageTracker;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__

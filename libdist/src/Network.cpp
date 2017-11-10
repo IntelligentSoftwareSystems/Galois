@@ -57,24 +57,6 @@ void NetworkInterface::initializeMPI() {
 }
 
 NetworkInterface::NetworkInterface() {
-  initializeMPI();
-  int rank;
-  int hostSize;
-
-  int rankSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-  if (rankSuccess != MPI_SUCCESS) {
-    MPI_Abort(MPI_COMM_WORLD, rankSuccess);
-  }
-
-  int sizeSuccess = MPI_Comm_rank(MPI_COMM_WORLD, &hostSize);
-  if (sizeSuccess != MPI_SUCCESS) {
-    MPI_Abort(MPI_COMM_WORLD, sizeSuccess);
-  }
-
-  NetworkInterface::ID = rank;
-  NetworkInterface::Num = hostSize;
-
-  galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
 }
 
 NetworkInterface::~NetworkInterface() {
