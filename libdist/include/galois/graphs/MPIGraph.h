@@ -250,8 +250,7 @@ private:
           return;
         }
 
-        uint64_t numBytesToLoad = threadNumEdgesToLoad * sizeof(EdgeDataType);
-        uint64_t bytesLoaded = 0;
+        uint64_t edgesLoaded = 0;
         MPI_Status mpiStatus;
 
         // jump to first byte of edge data
@@ -259,22 +258,23 @@ private:
                                 (sizeof(EdgeDataType) * threadEdgeStart);
    
         // TODO factor this out
-        while (numBytesToLoad > 0) {
+        while (threadNumEdgesToLoad > 0) {
           // File_read can only go up to the max int
-          uint64_t toLoad = std::min(numBytesToLoad, 
+          uint64_t toLoad = std::min(threadNumEdgesToLoad, 
                                      (uint64_t)std::numeric_limits<int>::max());
 
-          MPI_File_read_at(graphFile, readPosition + bytesLoaded, 
-                           ((char*)this->edgeDataBuffer) + 
-                           bytesLoaded +
-                           ((threadEdgeStart - edgeStart) * sizeof(EdgeDataType)),
-                           toLoad, MPI_BYTE, &mpiStatus); 
+          // TODO it only supports EdgeDataType = uint32_t at the moment
+          // you will get undefined behavior otherwise....
+          MPI_File_read_at(graphFile, 
+            readPosition + (edgesLoaded * sizeof(EdgeDataType)),
+            ((char*)this->edgeDataBuffer) + 
+            ((threadEdgeStart - edgeStart + edgesLoaded) * sizeof(EdgeDataType)),
+            toLoad, MPI_UINT32_T, &mpiStatus); 
 
-          int bytesRead; 
-          MPI_Get_count(&mpiStatus, MPI_BYTE, &bytesRead);
-
-          numBytesToLoad -= bytesRead;
-          bytesLoaded += bytesRead;
+          int numRead; 
+          MPI_Get_count(&mpiStatus, MPI_UINT32_T, &numRead);
+          threadNumEdgesToLoad -= numRead;
+          edgesLoaded += numRead;
         }
 
         assert(numBytesToLoad == 0);
