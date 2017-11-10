@@ -164,8 +164,11 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       std::vector<uint8_t> vec(std::move(data.front().data));
 
       data.pop_front();
-      if (!data.empty())
+      if (!data.empty()) {
         dataPresent = data.front().tag;
+      } else {
+        dataPresent = ~0;
+      }
 
       return optional_t<RecvBuffer>(RecvBuffer(std::move(vec), 0));
       #endif

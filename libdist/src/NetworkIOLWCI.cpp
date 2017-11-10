@@ -113,7 +113,8 @@ public:
     inflight.emplace_back(m.host, m.tag, m.data);
     auto& f = inflight.back();
     while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, 0, &f.ctx)) {
-      progress();
+      probe();
+      lc_progress(mv);
     }
   }
 
