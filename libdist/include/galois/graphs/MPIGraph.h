@@ -277,7 +277,7 @@ private:
           edgesLoaded += numRead;
         }
 
-        assert(numBytesToLoad == 0);
+        assert(threadNumEdgesToLoad == 0);
       });
   }
 
