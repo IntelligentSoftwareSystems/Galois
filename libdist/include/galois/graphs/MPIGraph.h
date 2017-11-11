@@ -87,47 +87,31 @@ private:
       GALOIS_DIE("Failed to allocate memory for out index buffer.");
     }
 
-    // each thread reads in disjunct portion
-    galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
-        auto myWork = galois::block_range(nodeStart, nodeStart + numNodesToLoad,
-                                          tid, nthreads);
+    // position to start of contiguous chunk of nodes to read
+    uint64_t readPosition = (4 + nodeStart) * sizeof(uint64_t);
 
-        uint64_t threadNodeStart = myWork.first;
-        uint64_t threadNumNodesToLoad = myWork.second - threadNodeStart;
+    uint64_t nodesLoaded = 0;
+    MPI_Status mpiStatus;
 
-        if (threadNumNodesToLoad == 0) {
-          return;
-        }
+    // TODO factor this out
+    while (numNodesToLoad > 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numNodesToLoad, 
+                                 (uint64_t)std::numeric_limits<int>::max());
 
-        // position to start of contiguous chunk of nodes to read
-        uint64_t readPosition = (4 + threadNodeStart) * sizeof(uint64_t);
-    
-        uint64_t nodesLoaded = 0;
-        MPI_Status mpiStatus;
-    
-        // TODO factor this out
-        while (threadNumNodesToLoad > 0) {
-          // File_read can only go up to the max int
-          uint64_t toLoad = std::min(threadNumNodesToLoad, 
-                                     (uint64_t)std::numeric_limits<int>::max());
-    
-          MPI_File_read_at(graphFile, 
-                           readPosition + (nodesLoaded * sizeof(uint64_t)), 
-                           ((char*)this->outIndexBuffer) + 
-                            ((threadNodeStart - nodeStart + nodesLoaded) * 
-                            sizeof(uint64_t)), 
-                           toLoad, MPI_UINT64_T, &mpiStatus); 
-    
-          int itemsRead; 
-          MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
-    
-          threadNumNodesToLoad -= itemsRead;
-          nodesLoaded += itemsRead;
-        }
+      MPI_File_read_at(graphFile, 
+                       readPosition + (nodesLoaded * sizeof(uint64_t)), 
+                       ((char*)this->outIndexBuffer) + 
+                                 (nodesLoaded * sizeof(uint64_t)), 
+                       toLoad, MPI_UINT64_T, &mpiStatus); 
 
-        assert(threadNumNodesToLoad == 0);
-      }); 
+      int itemsRead; 
+      MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
+      numNodesToLoad -= itemsRead;
+      nodesLoaded += itemsRead;
+    }
+
+    assert(threadNumNodesToLoad == 0);
 
     nodeOffset = nodeStart;
   }
