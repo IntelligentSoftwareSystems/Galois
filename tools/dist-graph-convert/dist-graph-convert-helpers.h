@@ -128,7 +128,8 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
                                             uint64_t localStartByte,
                                             uint64_t localEndByte,
                                             uint64_t totalNumNodes,
-                                            bool startAtOne=false) {
+                                            bool startAtOne=false,
+                                            bool ignoreWeights=false) {
   // load edges into a vector
   uint64_t localNumEdges = 0;
   std::vector<uint32_t> localEdges; // v1 support only + only uint32_t data
@@ -148,10 +149,13 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
     localEdges.emplace_back(src);
     localEdges.emplace_back(dst);
 
-    // get edge data: IT ONLY SUPPORTS uint32_t AT THE MOMENT
+    // get (or ignore)edge data: IT ONLY SUPPORTS uint32_t AT THE MOMENT
     // TODO function template specializations necessary to read other graph
     // data types
-    if (!std::is_void<EdgeDataTy>::value) {
+    if (ignoreWeights) {
+      // skip edgeweights
+      edgeListFile >> src;
+    } else if (!std::is_void<EdgeDataTy>::value) {
       uint32_t edgeData;
       edgeListFile >> edgeData;
       localEdges.emplace_back(edgeData);

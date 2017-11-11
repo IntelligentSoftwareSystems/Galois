@@ -88,6 +88,9 @@ static cll::opt<std::string> nodeMapBinary("nodeMapBinary",
 static cll::opt<bool> startAtOne("startAtOne", 
                                cll::desc("Set this if edgelist nodeid start at 1"),
                                cll::init(false));
+static cll::opt<bool> ignoreWeights("ignoreWeights", 
+                               cll::desc("Set this to ignore edgelist weights"),
+                               cll::init(false));
 
 struct Conversion { };
 
@@ -146,6 +149,11 @@ struct Edgelist2Gr : public Conversion {
     GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs an output file");
     GALOIS_ASSERT((totalNumNodes <= 4294967296), "num nodes limit is 2^32");
 
+    if (ignoreWeights) {
+      GALOIS_ASSERT(std::is_void<EdgeTy>::value, 
+                    "ignoreWeights needs void edgetype");
+    }
+
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
 
@@ -165,7 +173,7 @@ struct Edgelist2Gr : public Conversion {
     std::vector<uint32_t> localEdges = loadEdgesFromEdgeList<EdgeTy>(
                                            edgeListFile, localStartByte,
                                            localEndByte, totalNumNodes,
-                                           startAtOne);
+                                           startAtOne, ignoreWeights);
     edgeListFile.close();
 
     uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
