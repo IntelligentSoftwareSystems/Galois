@@ -73,7 +73,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(nodemap2binary, "Convert node map into binary form"),
       clEnumValEnd
     ), cll::Required);
-static cll::opt<unsigned> totalNumNodes("numNodes", 
+static cll::opt<unsigned long long> totalNumNodes("numNodes", 
                                         cll::desc("Nodes in input graph"),
                                         cll::init(0));
 static cll::opt<unsigned> threadsToUse("t", cll::desc("Threads to use"),
@@ -144,6 +144,7 @@ struct Edgelist2Gr : public Conversion {
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT((totalNumNodes != 0), "edgelist2gr needs num nodes");
     GALOIS_ASSERT(!(outputFile.empty()), "edgelist2gr needs an output file");
+    GALOIS_ASSERT((totalNumNodes <= 4294967296), "num nodes limit is 2^32");
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint64_t hostID = net.ID;
