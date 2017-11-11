@@ -111,7 +111,7 @@ private:
       nodesLoaded += itemsRead;
     }
 
-    assert(threadNumNodesToLoad == 0);
+    assert(numNodesToLoad == 0);
 
     nodeOffset = nodeStart;
   }
