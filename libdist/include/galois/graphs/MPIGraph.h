@@ -332,23 +332,12 @@ public:
 
     MPI_File graphFile;
 
-    int fileSuccess = MPI_File_open(MPI_COMM_SELF, filename.c_str(), 
+    int fileSuccess = MPI_File_open(MPI_COMM_WORLD, filename.c_str(), 
                                     MPI_MODE_RDONLY, MPI_INFO_NULL, &graphFile);
     
     if (fileSuccess != MPI_SUCCESS) {
       MPI_Abort(MPI_COMM_WORLD, fileSuccess);
     }
-
-    unsigned int numActiveThreads = galois::getActiveThreads();
-
-    uint32_t numHosts = galois::runtime::getSystemNetworkInterface().Num;
-    uint32_t newThreadNum = std::min(numActiveThreads, (unsigned int)4);
-    uint32_t totalAccessThreads = numHosts * newThreadNum;
-    while (totalAccessThreads > 300 && newThreadNum > 1) {
-      newThreadNum--;
-      totalAccessThreads = numHosts * newThreadNum;
-    }
-    galois::setActiveThreads(newThreadNum);
 
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
@@ -361,9 +350,6 @@ public:
     // may or may not do something depending on EdgeDataType
     loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges, 
                                numGlobalNodes, numGlobalEdges);
-
-    galois::setActiveThreads(numActiveThreads);
-
     graphLoaded = true;
 
     int closeSuccess = MPI_File_close(&graphFile);
