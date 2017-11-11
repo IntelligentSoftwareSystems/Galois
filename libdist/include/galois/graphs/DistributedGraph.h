@@ -3065,6 +3065,8 @@ public:
   void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint"){
     galois::gPrint(id, " : Saving local checkpoint\n");
     using namespace boost::archive;
+    galois::StatTimer TimerSaveCheckPoint("TIMER_SAVE_CHECKPOINT", GRNAME);
+    TimerSaveCheckPoint.start();
     std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
 
     std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
@@ -3077,10 +3079,13 @@ public:
     graph.serializeNodeData(ar);
 
     outputStream.close();
+    TimerSaveCheckPoint.stop();
   }
 
   void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint"){
     using namespace boost::archive;
+    galois::StatTimer TimerApplyCheckPoint("TIMER_APPLY_CHECKPOINT", GRNAME);
+    TimerApplyCheckPoint.start();
     std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
 
     std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
@@ -3093,6 +3098,7 @@ public:
     graph.deSerializeNodeData(ar);
 
     inputStream.close();
+    TimerApplyCheckPoint.stop();
   }
 
 
@@ -3351,8 +3357,12 @@ public:
    */
   void save_local_graph_to_file(std::string localGraphFileName = "local_graph"){
     using namespace boost::archive;
+    galois::StatTimer dGraphTimerSaveLocalGraph("TIMER_HG_SAVE_LOCAL", GRNAME);
+    dGraphTimerSaveLocalGraph.start();
+
     std::string fileName = localGraphFileName + "_" + std::to_string(id);
 
+    galois::gPrint("[", id, "] inside save_local_graph_to_file \n");
     std::ofstream outputStream(fileName, std::ios::binary);
     if(!outputStream.is_open()){
       std::cerr << "ERROR: Could not open " << fileName << " to save local graph!!!\n";
@@ -3384,8 +3394,8 @@ public:
     //Serialize partitioning scheme specific data structures.
     boostSerializeLocalGraph(ar);
 
-
     outputStream.close();
+    dGraphTimerSaveLocalGraph.stop();
   }
 
   /*
@@ -3397,6 +3407,9 @@ public:
    */
   void read_local_graph_from_file(std::string localGraphFileName = "local_graph"){
     using namespace boost::archive;
+    galois::StatTimer dGraphTimerReadLocalGraph("TIMER_HG_READ_LOCAL", GRNAME);
+    dGraphTimerReadLocalGraph.start();
+
     std::string fileName = localGraphFileName + "_" + std::to_string(id);
 
     std::ifstream inputStream(fileName, std::ios::binary);
@@ -3447,6 +3460,7 @@ public:
     //send_info_to_host();
 
     inputStream.close();
+    dGraphTimerReadLocalGraph.stop();
   }
 
 

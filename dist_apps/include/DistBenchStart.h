@@ -153,7 +153,6 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
           std::vector<unsigned>& scaleFactor,
           struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
-  galois::StatTimer dGraphTimerSave("TIMER_HG_SAVE", "DistBench"); 
   dGraphTimer.start();
 
   hGraph<NodeData, EdgeData>* loadedGraph = nullptr;
@@ -168,10 +167,8 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
   dGraphTimer.stop();
 
   //Save local graph structure
-  dGraphTimerSave.start();
   if(saveLocalGraph)
     (*loadedGraph).save_local_graph_to_file();
-  dGraphTimerSave.stop();
 
   return loadedGraph;
 }
