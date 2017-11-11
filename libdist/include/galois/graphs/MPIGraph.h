@@ -206,47 +206,31 @@ private:
       baseReadPosition += sizeof(uint32_t);
     }
 
-    galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
-        auto myWork = galois::block_range(edgeStart, edgeStart + numEdgesToLoad,
-                                          tid, nthreads);
+    uint64_t edgesLoaded = 0;
+    MPI_Status mpiStatus;
+    // jump to first byte of edge data
+    uint64_t readPosition = baseReadPosition + 
+                            (sizeof(EdgeDataType) * edgeStart);
+    // TODO factor this out
+    while (numEdgesToLoad > 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numEdgesToLoad, 
+                                 (uint64_t)std::numeric_limits<int>::max());
 
-        uint64_t threadEdgeStart = myWork.first;
-        uint64_t threadNumEdgesToLoad = myWork.second - threadEdgeStart;
+      // TODO it only supports EdgeDataType = uint32_t at the moment
+      // you will get undefined behavior otherwise....
+      MPI_File_read_at(graphFile, 
+        readPosition + (edgesLoaded * sizeof(EdgeDataType)),
+        ((char*)this->edgeDataBuffer) + (edgesLoaded * sizeof(EdgeDataType)),
+        toLoad, MPI_UINT32_T, &mpiStatus); 
 
-        if (threadNumEdgesToLoad == 0) {
-          return;
-        }
+      int numRead; 
+      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &numRead);
+      numEdgesToLoad -= numRead;
+      edgesLoaded += numRead;
+    }
 
-        uint64_t edgesLoaded = 0;
-        MPI_Status mpiStatus;
-
-        // jump to first byte of edge data
-        uint64_t readPosition = baseReadPosition + 
-                                (sizeof(EdgeDataType) * threadEdgeStart);
-   
-        // TODO factor this out
-        while (threadNumEdgesToLoad > 0) {
-          // File_read can only go up to the max int
-          uint64_t toLoad = std::min(threadNumEdgesToLoad, 
-                                     (uint64_t)std::numeric_limits<int>::max());
-
-          // TODO it only supports EdgeDataType = uint32_t at the moment
-          // you will get undefined behavior otherwise....
-          MPI_File_read_at(graphFile, 
-            readPosition + (edgesLoaded * sizeof(EdgeDataType)),
-            ((char*)this->edgeDataBuffer) + 
-            ((threadEdgeStart - edgeStart + edgesLoaded) * sizeof(EdgeDataType)),
-            toLoad, MPI_UINT32_T, &mpiStatus); 
-
-          int numRead; 
-          MPI_Get_count(&mpiStatus, MPI_UINT32_T, &numRead);
-          threadNumEdgesToLoad -= numRead;
-          edgesLoaded += numRead;
-        }
-
-        assert(threadNumEdgesToLoad == 0);
-      });
+    assert(numEdgesToLoad == 0);
   }
 
   /**
