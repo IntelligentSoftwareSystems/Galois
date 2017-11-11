@@ -154,47 +154,31 @@ private:
       GALOIS_DIE("Failed to allocate memory for edge dest buffer.");
     }
 
-    // each thread reads in disjunct portion
-    galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
-        auto myWork = galois::block_range(edgeStart, edgeStart + numEdgesToLoad,
-                                          tid, nthreads);
+    // position to start of contiguous chunk of edges to read
+    uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
+                            (sizeof(uint32_t) * edgeStart);
 
-        uint64_t threadEdgeStart = myWork.first;
-        uint64_t threadNumEdgesToLoad = myWork.second - threadEdgeStart;
-
-        if (threadNumEdgesToLoad == 0) {
-          return;
-        }
-
-        // position to start of contiguous chunk of edges to read
-        uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
-                                (sizeof(uint32_t) * threadEdgeStart);
-
-        uint64_t edgesLoaded = 0;
-        MPI_Status mpiStatus;
+    uint64_t edgesLoaded = 0;
+    MPI_Status mpiStatus;
     
-        // TODO factor this out
-        while (threadNumEdgesToLoad > 0) {
-          // File_read can only go up to the max int
-          uint64_t toLoad = std::min(threadNumEdgesToLoad, 
-                                     (uint64_t)std::numeric_limits<int>::max());
+    // TODO factor this out
+    while (numEdgesToLoad > 0) {
+      // File_read can only go up to the max int
+      uint64_t toLoad = std::min(numEdgesToLoad, 
+                                 (uint64_t)std::numeric_limits<int>::max());
     
-          MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
-                           ((char*)this->edgeDestBuffer) + 
-                            ((threadEdgeStart - edgeStart + edgesLoaded) * 
-                            sizeof(uint32_t)), 
-                           toLoad, MPI_UINT32_T, &mpiStatus); 
-          int itemsRead; 
-          MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
-    
-          threadNumEdgesToLoad -= itemsRead;
-          edgesLoaded += itemsRead;
-        }
+      MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
+                       ((char*)this->edgeDestBuffer) + 
+                             (edgesLoaded * sizeof(uint32_t)), 
+                       toLoad, MPI_UINT32_T, &mpiStatus); 
+      int itemsRead; 
+      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
+      numEdgesToLoad -= itemsRead;
+      edgesLoaded += itemsRead;
+    }
 
-        assert(threadNumEdgesToLoad == 0);
-      });
-
+    assert(numEdgesToLoad == 0);
+    // save edge offset of this MPI graph for later use
     edgeOffset = edgeStart;
   }
 
