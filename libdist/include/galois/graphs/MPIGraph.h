@@ -202,7 +202,7 @@ private:
                                 (sizeof(uint32_t) * numGlobalEdges);
     
     // version 1 padding TODO make version agnostic
-    if (baseReadPosition % 2) {
+    if (numGlobalEdges % 2) {
       baseReadPosition += sizeof(uint32_t);
     }
 
