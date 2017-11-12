@@ -129,21 +129,9 @@ struct recovery {
 
   void static go(Graph& _graph) {
 
-    const auto& allNodes = _graph.allNodesRange();
-    galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      recovery{&_graph},
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
-
-    //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                //Broadcast_dist_current, Bitset_dist_current>("RECOVERY");
-  }
-
-  void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
-    snode.dist_old = snode.dist_current;
-
+    //Only sync is required
+    _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+                Broadcast_dist_current>("RECOVERY");
   }
 };
 
