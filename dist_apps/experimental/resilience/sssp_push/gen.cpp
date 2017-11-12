@@ -237,7 +237,7 @@ struct SSSP {
 
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery>(_graph);
+        crashSite<recovery, InitializeGraph>(_graph);
       }
       /**************************CRASH SITE : end *****************************************/
 
