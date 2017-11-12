@@ -40,27 +40,31 @@ enum RECOVERY_SCHEME {CP, RS};
 
 static cll::opt<bool> enableFT("enableFT",
                                             cll::desc("Enable fault tolerance: "
-                                                      "Default false"),
+                                                      " Default false"),
                                             cll::init(false));
 static cll::opt<RECOVERY_SCHEME> recoveryScheme("recoveryScheme",
-                                            cll::desc("Use CP for checkpointing"
-                                                      "and RS for resilience"
-                                                      "Default CP"),
+                                            cll::desc("Fault tolerance scheme."),
+                                             cll::values(
+                                             clEnumValN(CP, "cp", 
+                                                            "Checkpointing (default)"), 
+                                             clEnumValN(RS, "rs", 
+                                                          "Resilience"), 
+                                             clEnumValEnd),
                                             cll::init(CP));
 static cll::opt<unsigned int> checkpointInterval("checkpointInterval",
                                             cll::desc("Interval of taking checkpoints"
-                                                       "to disk. N means checkpoint graph"
-                                                       "data every Nth iteration: "
-                                                      "Default 1"),
+                                                       " to disk. N means checkpoint graph"
+                                                       " data every Nth iteration: "
+                                                      " Default 1"),
                                             cll::init(1));
 static cll::opt<unsigned int> crashIteration("crashIteration",
                                             cll::desc("iteration to crash: "
-                                                      "Default -1"),
+                                                      " Default -1"),
                                             cll::init(-1));
 
 static cll::opt<unsigned int> crashNumHosts("crashNumHosts",
                                             cll::desc("number of hosts to crash: "
-                                                      "Default -1"),
+                                                      " Default -1"),
                                             cll::init(-1));
 
 
