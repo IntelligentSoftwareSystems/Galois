@@ -112,9 +112,9 @@ public:
     memUsageTracker.incrementMemUsage(m.data.size());
     inflight.emplace_back(m.host, m.tag, m.data);
     auto& f = inflight.back();
+    f.ctx.type = LC_REQ_PEND;
     while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, 0, &f.ctx)) {
-      probe();
-      lc_progress(mv);
+      progress();
     }
   }
 
