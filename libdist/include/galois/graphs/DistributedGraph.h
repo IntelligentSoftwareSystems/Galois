@@ -1982,7 +1982,8 @@ private:
       syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second, 
                                                     loopName);
     }
-    ++galois::runtime::evilPhase;
+    if (galois::runtime::evilPhase < 255) ++galois::runtime::evilPhase;
+    else galois::runtime::evilPhase = 1;
   }
   
   /**
