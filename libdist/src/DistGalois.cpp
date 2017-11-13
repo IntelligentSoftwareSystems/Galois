@@ -29,6 +29,7 @@
  */
 
 #include "galois/DistGalois.h"
+#include "galois/Galois.h"
 #include "galois/runtime/Network.h"
 
 galois::DistMemSys::DistMemSys(void)
@@ -38,4 +39,5 @@ galois::DistMemSys::DistMemSys(void)
 galois::DistMemSys::~DistMemSys(void) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   net.reportMemUsage();
+  galois::reportPageAlloc("MemInfoPost");
 }
