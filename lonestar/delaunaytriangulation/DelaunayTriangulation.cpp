@@ -118,8 +118,7 @@ struct Process {
   }
 
   GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (Graph::edge_iterator ii = graph.edge_begin(start, galois::MethodFlag::WRITE),
-        ei = graph.edge_end(start, galois::MethodFlag::WRITE); ii != ei; ++ii) {
+    for (auto ii: graph.edges(start)) {
       GNode dst = graph.getEdgeDst(ii);
       Element& e = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       int count = 0;
@@ -211,9 +210,9 @@ class ReadPoints {
     minX = minY = std::numeric_limits<double>::max();
     maxX = maxY = std::numeric_limits<double>::min();
 
-    for (PointList::iterator ii = points.begin(), ei = points.end(); ii != ei; ++ii) {
-      double x = ii->t().x();
-      double y = ii->t().y();
+    for (auto& p: points) {
+      double x = p.t().x();
+      double y = p.t().y();
       if (x < minX)
         minX = x;
       else if (x > maxX)
@@ -426,18 +425,19 @@ static void writePoints(const std::string& filename, const PointList& points) {
   out.setf(std::ios::scientific, std::ios::floatfield);
   out.precision(10);
   long id = 0;
-  for (PointList::const_iterator it = points.begin(), end = points.end(); it != end; ++it) {
-    const Tuple& t = it->t();
+  for (const auto& p: points) {
+    const Tuple& t = p.t();
     out << id++ << " " << t.x() << " " << t.y() << " 0\n";
   }
 
   out.close();
 }
+
 static void writeMesh(const std::string& filename) {
   long numTriangles = 0;
   long numSegments = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    Element& e = graph.getData(*ii);
+  for (auto n: graph) {
+    Element& e = graph.getData(n);
     if (e.boundary()) {
       numSegments++;
     } else {
@@ -462,8 +462,8 @@ static void writeMesh(const std::string& filename) {
   // <num segments> <has boundary markers>
   pout << "0 2 0 0\n";
   pout << numSegments << " 1\n";
-  for (Graph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-    const Element& e = graph.getData(*ii);
+  for (auto n: graph) {
+    const Element& e = graph.getData(n);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>
       pout << sid++ << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";

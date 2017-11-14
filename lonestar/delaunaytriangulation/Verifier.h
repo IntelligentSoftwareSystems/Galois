@@ -70,8 +70,7 @@ class Verifier {
     bool operator()(const GNode& node) {
       Element& e1 = graph->getData(node);
 
-      for (Graph::edge_iterator jj = graph->edge_begin(node),
-          ej = graph->edge_end(node); jj != ej; ++jj) {
+      for (auto jj: graph->edges(node)) {
         const GNode& n = graph->getEdgeDst(jj);
         Element& e2 = graph->getData(n);
         if (e1.dim() == 3 && e2.dim() == 3) {
@@ -132,8 +131,7 @@ class Verifier {
         }
         found.insert(node);
         int i = 0;
-        for (Graph::edge_iterator ii = graph->edge_begin(node),
-            ei = graph->edge_end(node); ii != ei; ++ii) {
+        for (auto ii: graph->edges(node)) {
           GNode n = graph->getEdgeDst(ii);
           assert(i < 3);
           assert(graph->containsNode(n));

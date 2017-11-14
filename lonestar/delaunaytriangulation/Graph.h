@@ -130,9 +130,7 @@ struct Searcher: private boost::noncopyable {
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::edge_iterator ii = graph.edge_begin(cur, galois::MethodFlag::WRITE),
-            ee = graph.edge_end(cur, galois::MethodFlag::WRITE);
-            ii != ee; ++ii) {
+        for (auto ii: graph.edges(cur)) {
           GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, SomeGNode(cur)));
         }

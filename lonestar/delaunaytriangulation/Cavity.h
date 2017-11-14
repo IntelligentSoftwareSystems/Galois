@@ -56,18 +56,15 @@ class Cavity: private boost::noncopyable {
 
   //! Find triangles that border cavity but are not in the cavity
   void findOutside() {
-    for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.inside.begin(),
-        ei = searcher.inside.end(); ii != ei; ++ii) {
-
-      for (Graph::edge_iterator jj = graph.edge_begin(*ii, galois::MethodFlag::UNPROTECTED),
-          ej = graph.edge_end(*ii, galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+    for (auto ii: searcher.inside) {
+      for (auto jj: graph.edges(ii, galois::MethodFlag::UNPROTECTED)) {
         GNode n = graph.getEdgeDst(jj);
         // i.e., if (!e.boundary() && e.inCircle(point->t())) 
         if (std::find(searcher.matches.begin(), searcher.matches.end(), n)
             != searcher.matches.end())
           continue;
 
-        int index = graph.getEdgeData(graph.findEdge(n, *ii, galois::MethodFlag::UNPROTECTED));
+        int index = graph.getEdgeData(graph.findEdge(n, ii, galois::MethodFlag::UNPROTECTED));
         outside.push_back(std::make_pair(n, index));
 
         Element& e = graph.getData(n, galois::MethodFlag::UNPROTECTED);
@@ -84,10 +81,9 @@ class Cavity: private boost::noncopyable {
     GNodeVector newNodes(alloc);
 
     // Create new nodes
-    for (typename GNodeIntPairVector::iterator ii = outside.begin(),
-        ei = outside.end(); ii != ei; ++ii) {
-      const GNode& n = ii->first;
-      int& index = ii->second;
+    for (auto& ii: outside) {
+      const GNode& n = ii.first;
+      int& index = ii.second;
 
       Element& e = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
@@ -133,9 +129,8 @@ class Cavity: private boost::noncopyable {
   }
 
   void removeElements() {
-    for (typename Searcher<Alloc>::GNodeVector::iterator ii = searcher.matches.begin(),
-        ei = searcher.matches.end(); ii != ei; ++ii) {
-      graph.removeNode(*ii, galois::MethodFlag::UNPROTECTED);
+    for (auto ii: searcher.matches) {
+      graph.removeNode(ii, galois::MethodFlag::UNPROTECTED);
     }
   }
 
