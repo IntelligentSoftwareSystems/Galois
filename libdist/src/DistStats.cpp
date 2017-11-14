@@ -250,5 +250,9 @@ void DistStatManager::printStats(std::ostream& out) {
     strDistStats.print(out);
   }
   // all hosts must wait for host 0 to finish printing stats
+  //galois::gDebug("[", galois::runtime::getSystemNetworkInterface().ID, "] entering barrier\n");
   galois::runtime::getHostBarrier().wait();
+  //galois::gDebug("[", galois::runtime::getSystemNetworkInterface().ID, "] leaving barrier\n");
+  // delete/reset the system network interface
+  galois::runtime::resetSystemNetworkInterface();
 }

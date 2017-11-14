@@ -412,6 +412,10 @@ public:
   virtual ~NetworkInterfaceBuffered() {
     ready = 3;
     worker.join();
+    galois::gDebug("[", ID, "] deleting net\n");
+    delete netio.release();
+    galois::gDebug("[", ID, "] deleting mpi\n");
+    finalizeMPI();
   }
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;
@@ -516,19 +520,32 @@ public:
  * Create a buffered network interface, or return one if already
  * created.
  */
-NetworkInterface& galois::runtime::makeNetworkBuffered() {
+NetworkInterface* galois::runtime::makeOrClearNetworkBuffered(bool clear) {
   static std::atomic<NetworkInterfaceBuffered*> net;
   static substrate::SimpleLock m_mutex;
   
-  // create the interface if it doesn't yet exist in the static variable
-  auto* tmp = net.load();
-  if (tmp == nullptr) {
-    std::lock_guard<substrate::SimpleLock> lock(m_mutex);
-    tmp = net.load();
-    if (tmp == nullptr) {
-      tmp = new NetworkInterfaceBuffered();
-      net.store(tmp);
+  if (clear) {
+    auto* tmp = net.load();
+    if (tmp != nullptr) {
+      std::lock_guard<substrate::SimpleLock> lock(m_mutex);
+      tmp = net.load();
+      if (tmp != nullptr) {
+        delete tmp;
+        net.store(nullptr);
+      }
     }
+    return nullptr;
+  } else { // make
+    // create the interface if it doesn't yet exist in the static variable
+    auto* tmp = net.load();
+    if (tmp == nullptr) {
+      std::lock_guard<substrate::SimpleLock> lock(m_mutex);
+      tmp = net.load();
+      if (tmp == nullptr) {
+        tmp = new NetworkInterfaceBuffered();
+        net.store(tmp);
+      }
+    }
+    return tmp;
   }
-  return *tmp;
 }
