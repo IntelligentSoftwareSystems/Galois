@@ -3280,6 +3280,8 @@ public:
         m.mirror_nodes[h] = NULL;
       }
     }
+
+    graph.deallocate();
   }
 #endif
 

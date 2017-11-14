@@ -833,6 +833,20 @@ class LC_CSR_Graph :
 #endif
   }
 
+  void deallocate() {
+    nodeData.destroy();
+    nodeData.deallocate();
+
+    edgeIndData.deallocate();
+    edgeIndData.destroy();
+
+    edgeDst.deallocate();
+    edgeDst.destroy();
+
+    edgeData.deallocate();
+    edgeData.destroy();
+  }
+
   void constructEdge(uint64_t e, uint32_t dst,
                      const typename EdgeData::value_type& val) {
     edgeData.set(e, val);
@@ -895,12 +909,14 @@ class LC_CSR_Graph :
 
     // reallocate nodeData
     if (reallocate) {
+      nodeData.destroy();
       nodeData.deallocate();
       nodeData.allocateSpecified(numNodes, threadRanges);
     }
 
     // reallocate edgeIndData
     if (reallocate) {
+      edgeIndData.destroy();
       edgeIndData.deallocate();
       edgeIndData.allocateSpecified(numNodes, threadRanges);
     }
@@ -925,6 +941,7 @@ class LC_CSR_Graph :
 
     // reallocate edgeDst
     if (reallocate) {
+      edgeDst.destroy();
       edgeDst.deallocate();
       edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     }
@@ -952,6 +969,7 @@ class LC_CSR_Graph :
 
     // reallocate edgeData
     if (reallocate) {
+      edgeData.destroy();
       edgeData.deallocate();
       edgeData.allocateSpecified(numEdges, threadRangesEdge);
     }
