@@ -412,9 +412,7 @@ public:
   virtual ~NetworkInterfaceBuffered() {
     ready = 3;
     worker.join();
-    galois::gDebug("[", ID, "] deleting net\n");
     delete netio.release();
-    galois::gDebug("[", ID, "] deleting mpi\n");
     finalizeMPI();
   }
 
