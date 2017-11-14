@@ -77,9 +77,9 @@ int main(int argc, char** argv) {
     }
   }
 
-  galois::gPrint(curMaxNode, " ", curHighEdges, "\n");
+  galois::gPrint(regular->L2G(curMaxNode), " ", curHighEdges, "\n");
   //galois::gPrint("[", net.ID, "] Max degree node is ", curMaxNode, 
   //               " with degree ", curHighEdges, "\n");
 
-  return 0;
+  return 2;
 }
