@@ -37,6 +37,10 @@ cll::opt<unsigned> buffSize("sendBuffSize",
                        cll::init(4096));
 #endif
 
+cll::opt<bool> partitionAgnostic("partitionAgnostic",
+  cll::desc("Do not use partition-aware optimizations"),
+  cll::init(false));
+
 cll::opt<bool> useGidMetadata("useGidMetadata",
   cll::desc("Use Global IDs in indices metadata (only when -metadata=2)"),
   cll::init(false));

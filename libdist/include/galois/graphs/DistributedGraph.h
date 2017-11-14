@@ -82,6 +82,7 @@ enum MASTERS_DISTRIBUTION {
   BALANCED_MASTERS, BALANCED_EDGES_OF_MASTERS, BALANCED_MASTERS_AND_EDGES
 };
 
+extern cll::opt<bool> partitionAgnostic;
 extern cll::opt<bool> useGidMetadata;
 extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
 extern cll::opt<uint32_t> nodeWeightOfMaster;
@@ -2402,29 +2403,33 @@ public:
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
     Tsync.start();
 
-    if (writeLocation == writeSource) {
-      if (readLocation == readSource) {
-        sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (readLocation == readDestination) {
-        sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else { // readAny
-        sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      }
-    } else if (writeLocation == writeDestination) {
-      if (readLocation == readSource) {
-        sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (readLocation == readDestination) {
-        sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else { // readAny
-        sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      }
-    } else { // writeAny
-      if (readLocation == readSource) {
-        sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else if (readLocation == readDestination) {
-        sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-      } else { // readAny
-        sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+    if (partitionAgnostic) {
+      sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+    } else {
+      if (writeLocation == writeSource) {
+        if (readLocation == readSource) {
+          sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else if (readLocation == readDestination) {
+          sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // readAny
+          sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
+      } else if (writeLocation == writeDestination) {
+        if (readLocation == readSource) {
+          sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else if (readLocation == readDestination) {
+          sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // readAny
+          sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
+      } else { // writeAny
+        if (readLocation == readSource) {
+          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else if (readLocation == readDestination) {
+          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        } else { // readAny
+          sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+        }
       }
     }
 
