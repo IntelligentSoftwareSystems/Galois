@@ -56,7 +56,10 @@ void NetworkInterface::initializeMPI() {
   }
 }
 
-void NetworkInterface::finalizeMPI() {
+NetworkInterface::NetworkInterface() {
+}
+
+NetworkInterface::~NetworkInterface() {
   int finalizeSuccess = MPI_Finalize();
 
   if (finalizeSuccess != MPI_SUCCESS) {
@@ -65,10 +68,6 @@ void NetworkInterface::finalizeMPI() {
 
   galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
 }
-
-NetworkInterface::NetworkInterface() {}
-
-NetworkInterface::~NetworkInterface() {}
 
 void NetworkInterface::reportMemUsage() const {
   std::string str("COMMUNICATION_MEM_USAGE");
@@ -157,9 +156,5 @@ NetworkBackend::~NetworkBackend() {
 NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
 NetworkInterface& galois::runtime::getSystemNetworkInterface() {
-  return *makeOrClearNetworkBuffered(false);
-}
-
-void galois::runtime::resetSystemNetworkInterface() {
-  makeOrClearNetworkBuffered(true);
+  return makeNetworkBuffered();
 }

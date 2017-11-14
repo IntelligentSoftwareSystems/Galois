@@ -74,7 +74,6 @@ using optional_t = boost::optional<T>;
 class NetworkInterface {
 protected:
   void initializeMPI();
-  void finalizeMPI();
 
   MemUsageTracker memUsageTracker;
 
@@ -155,11 +154,10 @@ public:
 extern uint32_t evilPhase;
 
 NetworkInterface& getSystemNetworkInterface();
-void resetSystemNetworkInterface();
 uint32_t getHostID();
 
-NetworkInterface* makeOrClearNetworkBuffered(bool clear);
-//NetworkInterface* makeOrClearNetworkRouted(bool clear);
+NetworkInterface& makeNetworkBuffered();
+NetworkInterface& makeNetworkRouted();
 
 //! Host Barrier
 substrate::Barrier& getHostBarrier();
