@@ -81,5 +81,5 @@ int main(int argc, char** argv) {
   //galois::gPrint("[", net.ID, "] Max degree node is ", curMaxNode, 
   //               " with degree ", curHighEdges, "\n");
 
-  return 2;
+  return 0;
 }
