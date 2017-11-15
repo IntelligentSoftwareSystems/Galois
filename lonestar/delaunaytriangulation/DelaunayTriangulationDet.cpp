@@ -402,7 +402,7 @@ static void writePoints(const std::string& filename, const PointList& points) {
 
 //! All Point* refer to elements in this bag
 //! [Define InsertBag]
-galois::InsertBag<Point> basePoints;
+galois::InsertBag<Point>* basePoints;
 //! [Define InsertBag]
 size_t maxRounds;
 galois::InsertBag<Point*>* rounds;
@@ -461,7 +461,7 @@ struct GenerateRounds {
   void operator()(size_t index) const {
     const Point& p = points[index];
 
-    Point* ptr = &basePoints.push(p);
+    Point* ptr = &(basePoints->push(p));
     int r = 0;
     for (size_t i = 0; i < log2; ++i) {
       size_t mask = (1UL << (i + 1)) - 1;
@@ -485,7 +485,7 @@ static void generateRoundsOld(PointList& points, bool randomize) {
 
   PointList::iterator ii = points.begin(), ei = points.end();
   while (ii != ei) {
-    Point* ptr = &basePoints.push(*ii);
+    Point* ptr = &(basePoints->push(*ii));
     buf.push_back(ptr);
     ++ii;
     if (ii == ei || counter > next) {
@@ -545,9 +545,9 @@ static void generateRounds(PointList& points, bool addBoundary) {
   // Now, handle boundary points
   size_t last = points.size();
 //! [Insert elements into InsertBag]
-  Point* p1 = &basePoints.push(points[last-1]);
-  Point* p2 = &basePoints.push(points[last-2]);
-  Point* p3 = &basePoints.push(points[last-3]);
+  Point* p1 = &(basePoints->push(points[last-1]));
+  Point* p2 = &(basePoints->push(points[last-2]));
+  Point* p3 = &(basePoints->push(points[last-3]));
 //! [Insert elements into InsertBag]
 
   rounds[maxRounds].push(p1);
@@ -564,6 +564,7 @@ static void readInput(const std::string& filename, bool addBoundary) {
   std::cout << "configuration: " << points.size() << " points\n";
 
   graph = new Graph();
+  basePoints = new galois::InsertBag<Point>;
 
 #if 1
   galois::preAlloc(
@@ -685,6 +686,7 @@ int main(int argc, char** argv) {
     copyPointsFromRounds(points);
     writePoints(doWritePoints, points);
     delete graph;
+    delete basePoints;
     delete [] rounds;
     return 0;
   }
@@ -727,6 +729,7 @@ int main(int argc, char** argv) {
   }
 
   delete graph;
+  delete basePoints;
   delete [] rounds;
 
   return 0;
