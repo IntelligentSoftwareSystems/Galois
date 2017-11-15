@@ -60,11 +60,23 @@ static cll::opt<std::string> doWriteMesh("writemesh",
     cll::desc("Write the mesh out to files with basename"),
     cll::value_desc("basename"));
 
-static Graph graph;
-static galois::graphs::SpatialTree2d<Point*> tree;
+using Tree = typename galois::graphs::SpatialTree2d<Point*>;
+
+//! All Point* refer to elements in this bag
+using basePointBag = typename galois::InsertBag<Point>;
+
+//! [Define Insert Bag]
+using ptrPointBag = typename galois::InsertBag<Point*>;
 
 //! Our main functor
 struct Process {
+  Graph& graph;
+  Tree& tree;
+  ptrPointBag& ptrPoints;
+
+  Process(Graph& g, Tree& t, ptrPointBag& p)
+      : graph(g), tree(t), ptrPoints(p) { }
+
   typedef galois::PerIterAllocTy Alloc;
 
   struct ContainsTuple {
@@ -174,30 +186,36 @@ struct Process {
     return planarSearch(p, someNode, node);
   }
 
-  //! Parallel operator
-  GALOIS_ATTRIBUTE_NOINLINE
-  void operator()(Point* p, galois::UserContext<Point*>& ctx) {
-    p->get(galois::MethodFlag::WRITE);
-    assert(!p->inMesh());
+  void generateMesh() {
+    typedef galois::worklists::AltChunkedLIFO<32> CA;
+    galois::for_each(galois::iterate(ptrPoints),
+        [&, self=this] (Point* p, auto& ctx) {
+          p->get(galois::MethodFlag::WRITE);
+          assert(!p->inMesh());
 
-    GNode node;
-    if (!findContainingElement(p, node)) {
-      // Someone updated an element while we were searching, producing
-      // a semi-consistent state
-      // ctx.push(p);
-      // Current version is safe with locking so this shouldn't happen
-      GALOIS_DIE("unreachable");
-      return;
-    }
+          GNode node;
+          if (!self->findContainingElement(p, node)) {
+            // Someone updated an element while we were searching, producing
+            // a semi-consistent state
+            // ctx.push(p);
+            // Current version is safe with locking so this shouldn't happen
+            GALOIS_DIE("unreachable");
+            return;
+          }
   
-    assert(graph.getData(node).inTriangle(p->t()));
-    assert(graph.containsNode(node));
+          assert(self->graph.getData(node).inTriangle(p->t()));
+          assert(self->graph.containsNode(node));
 
-    Cavity<Alloc> cav(graph, ctx.getPerIterAlloc());
-    cav.init(node, p);
-    cav.build();
-    cav.update();
-    tree.insert(p->t().x(), p->t().y(), p);
+          Cavity<Alloc> cav(self->graph, ctx.getPerIterAlloc());
+          cav.init(node, p);
+          cav.build();
+          cav.update();
+          self->tree.insert(p->t().x(), p->t().y(), p);
+        },
+        galois::no_pushes(),
+        galois::per_iter_alloc(),
+        galois::loopname("Main"),
+        galois::wl<CA>());
   }
 };
 
@@ -283,9 +301,10 @@ class ReadPoints {
   }
 
   PointList& points;
+  Tree& tree;
 
 public:
-  ReadPoints(PointList& p): points(p) { }
+  ReadPoints(PointList& p, Tree& t): points(p), tree(t) { }
 
   void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
@@ -307,115 +326,115 @@ public:
   }
 };
 
-//! All Point* refer to elements in this bag
+struct ReadInput {
+  Graph& graph;
+  Tree& tree;
+  basePointBag& basePoints;
+  ptrPointBag& ptrPoints;
 
-galois::InsertBag<Point> basePoints;
-//! [Define Insert Bag]
+  ReadInput(Graph& g, Tree& t, basePointBag& b, ptrPointBag& p)
+      : graph(g), tree(t), basePoints(b), ptrPoints(p) { }
 
-galois::InsertBag<Point*> ptrPoints;
-
-static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
-  Element large_triangle(p1, p2, p3);
-  GNode large_node = graph.createNode(large_triangle);
-  graph.addNode(large_node);
+  void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
+    Element large_triangle(p1, p2, p3);
+    GNode large_node = graph.createNode(large_triangle);
+    graph.addNode(large_node);
   
-  p1->addElement(large_node);
-  p2->addElement(large_node);
-  p3->addElement(large_node);
+    p1->addElement(large_node);
+    p2->addElement(large_node);
+    p3->addElement(large_node);
 
-  tree.insert(p1->t().x(), p1->t().y(), p1);
+    tree.insert(p1->t().x(), p1->t().y(), p1);
 
-  Element border_ele1(p1, p2);
-  Element border_ele2(p2, p3);
-  Element border_ele3(p3, p1);
+    Element border_ele1(p1, p2);
+    Element border_ele2(p2, p3);
+    Element border_ele3(p3, p1);
     
-  GNode border_node1 = graph.createNode(border_ele1);
-  GNode border_node2 = graph.createNode(border_ele2);
-  GNode border_node3 = graph.createNode(border_ele3);
+    GNode border_node1 = graph.createNode(border_ele1);
+    GNode border_node2 = graph.createNode(border_ele2);
+    GNode border_node3 = graph.createNode(border_ele3);
 
-  graph.addNode(border_node1);
-  graph.addNode(border_node2);
-  graph.addNode(border_node3);
+    graph.addNode(border_node1);
+    graph.addNode(border_node2);
+    graph.addNode(border_node3);
 
-  graph.getEdgeData(graph.addEdge(large_node, border_node1)) = 0;
-  graph.getEdgeData(graph.addEdge(large_node, border_node2)) = 1;
-  graph.getEdgeData(graph.addEdge(large_node, border_node3)) = 2;
+    graph.getEdgeData(graph.addEdge(large_node, border_node1)) = 0;
+    graph.getEdgeData(graph.addEdge(large_node, border_node2)) = 1;
+    graph.getEdgeData(graph.addEdge(large_node, border_node3)) = 2;
 
-  graph.getEdgeData(graph.addEdge(border_node1, large_node)) = 0;
-  graph.getEdgeData(graph.addEdge(border_node2, large_node)) = 0;
-  graph.getEdgeData(graph.addEdge(border_node3, large_node)) = 0;
-}
+    graph.getEdgeData(graph.addEdge(border_node1, large_node)) = 0;
+    graph.getEdgeData(graph.addEdge(border_node2, large_node)) = 0;
+    graph.getEdgeData(graph.addEdge(border_node3, large_node)) = 0;
+  }
 
-struct insPt {
-  void operator()(Point& p) const {
-    Point* pr = &basePoints.push(p);
-    ptrPoints.push(pr);
+  struct centerXCmp {
+    template<typename T>
+    bool operator()(const T& lhs, const T& rhs) const {
+      return lhs.t().x() < rhs.t().x();
+    }
+  };
+
+  struct centerYCmp {
+    template<typename T>
+    bool operator()(const T& lhs, const T& rhs) const {
+      return lhs.t().y() < rhs.t().y();
+    }
+  };
+
+  struct centerYCmpInv {
+    template<typename T>
+    bool operator()(const T& lhs, const T& rhs) const {
+      return rhs.t().y() < lhs.t().y();
+    }
+  };
+
+  template<typename Iter>
+  void divide(const Iter& b, const Iter& e) {
+    if (std::distance(b,e) > 64) {
+      std::sort(b, e, centerXCmp());
+      Iter m = galois::split_range(b, e);
+      std::sort(b, m, centerYCmpInv());
+      std::sort(m, e, centerYCmp());
+      divide(b, galois::split_range(b, m));
+      divide(galois::split_range(b, m), m);
+      divide(m,galois::split_range(m, e));
+      divide(galois::split_range(m, e), e);
+    } else {
+      std::random_shuffle(b, e);
+    }
+  }
+
+  void layoutPoints(PointList& points) {
+    divide(points.begin(), points.end() - 3);
+    galois::do_all(galois::iterate(points.begin(), points.end() - 3),
+        [&] (Point& p) {
+          Point* pr = &basePoints.push(p);
+          ptrPoints.push(pr);
+        });
+    //! [Insert elements into InsertBag]
+    Point* p1 = &basePoints.push(*(points.end() - 1));
+    Point* p2 = &basePoints.push(*(points.end() - 2));
+    Point* p3 = &basePoints.push(*(points.end() - 3));
+    //! [Insert elements into InsertBag]
+    addBoundaryNodes(p1,p2,p3);
+  }
+
+  void operator()(const std::string& filename) {
+    PointList points;
+    ReadPoints(points, tree).from(filename);
+
+    std::cout << "configuration: " << points.size() << " points\n";
+
+    galois::preAlloc(2 * numThreads // some per-thread state
+        + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
+        * 32 // include graph node size
+                     / (galois::runtime::pagePoolSize()) // in pages
+        );
+    galois::reportPageAlloc("MeminfoPre");
+
+    layoutPoints(points);
   }
 };
-
-struct centerXCmp {
-  template<typename T>
-  bool operator()(const T& lhs, const T& rhs) const {
-    return lhs.t().x() < rhs.t().x();
-  }
-};
-
-struct centerYCmp {
-  template<typename T>
-  bool operator()(const T& lhs, const T& rhs) const {
-    return lhs.t().y() < rhs.t().y();
-  }
-};
-
-struct centerYCmpInv {
-  template<typename T>
-  bool operator()(const T& lhs, const T& rhs) const {
-    return rhs.t().y() < lhs.t().y();
-  }
-};
-
-template<typename Iter>
-void divide(const Iter& b, const Iter& e) {
-  if (std::distance(b,e) > 64) {
-    std::sort(b, e, centerXCmp());
-    Iter m = galois::split_range(b, e);
-    std::sort(b, m, centerYCmpInv());
-    std::sort(m, e, centerYCmp());
-    divide(b, galois::split_range(b, m));
-    divide(galois::split_range(b, m), m);
-    divide(m,galois::split_range(m, e));
-    divide(galois::split_range(m, e), e);
-  } else {
-    std::random_shuffle(b, e);
-  }
-}
-
-void layoutPoints(PointList& points) {
-  divide(points.begin(), points.end() - 3);
-  galois::do_all(galois::iterate(points.begin(), points.end() - 3), insPt());
-//! [Insert elements into InsertBag]
-  Point* p1 = &basePoints.push(*(points.end() - 1));
-  Point* p2 = &basePoints.push(*(points.end() - 2));
-  Point* p3 = &basePoints.push(*(points.end() - 3));
-//! [Insert elements into InsertBag]
-  addBoundaryNodes(p1,p2,p3);
-}
-
-static void readInput(const std::string& filename) {
-  PointList points;
-  ReadPoints(points).from(filename);
-
-  std::cout << "configuration: " << points.size() << " points\n";
-
-  galois::preAlloc(2 * numThreads // some per-thread state
-      + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
-      * 32 // include graph node size
-                   / (galois::runtime::pagePoolSize()) // in pages
-      );
-  galois::reportPageAlloc("MeminfoPre");
-
-  layoutPoints(points);
-}
 
 static void writePoints(const std::string& filename, const PointList& points) {
   std::ofstream out(filename.c_str());
@@ -433,7 +452,7 @@ static void writePoints(const std::string& filename, const PointList& points) {
   out.close();
 }
 
-static void writeMesh(const std::string& filename) {
+static void writeMesh(const std::string& filename, Graph& graph) {
   long numTriangles = 0;
   long numSegments = 0;
   for (auto n: graph) {
@@ -484,25 +503,20 @@ static void writeMesh(const std::string& filename) {
   pout.close();
 }
 
-static void generateMesh() {
-  typedef galois::worklists::AltChunkedLIFO<32> CA;
-  galois::for_each(galois::iterate(ptrPoints), 
-      Process(), 
-      galois::no_pushes(),
-      galois::per_iter_alloc(),
-      galois::loopname("Main"),
-      galois::wl<CA>());
-}
-
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  readInput(inputname);
+  Graph graph;
+  Tree tree;
+  basePointBag basePoints;
+  ptrPointBag ptrPoints;
+
+  ReadInput(graph, tree, basePoints, ptrPoints)(inputname);
 
   galois::StatTimer T;
   T.start();
-  generateMesh();
+  Process(graph, tree, ptrPoints).generateMesh();
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
@@ -519,11 +533,11 @@ int main(int argc, char** argv) {
   if (doWriteMesh.size()) {
     std::string base = doWriteMesh;
     std::cout << "Writing " << base << "\n";
-    writeMesh(base.c_str());
+    writeMesh(base.c_str(), graph);
 
     PointList points;
     // Reordering messes up connection between id and place in pointlist
-    ReadPoints(points).from(inputname);
+    ReadPoints(points, tree).from(inputname);
     writePoints(base.append(".node"), points);
   }
 
