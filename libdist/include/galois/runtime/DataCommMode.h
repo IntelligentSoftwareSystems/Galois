@@ -1,5 +1,5 @@
 #pragma once
-enum DataCommMode { noData, offsetsData, bitsetData, onlyData, dataSplitFirst, 
+enum DataCommMode { noData, bitsetData, offsetsData, onlyData, dataSplitFirst, 
                     dataSplit };
 
 extern DataCommMode enforce_data_mode;

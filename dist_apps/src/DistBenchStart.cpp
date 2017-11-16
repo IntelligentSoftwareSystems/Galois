@@ -53,6 +53,8 @@ cll::opt<int> numRuns("runs", cll::desc("Number of runs"),
 cll::opt<std::string> statFile("statFile", 
          cll::desc("output file to print stats to "), 
          cll::init(""));
+
+// TODO: move this to DistributedGraph.cpp and use enums
 cll::opt<unsigned int> enforce_metadata("metadata", 
           cll::desc("Enforce communication metadata: 0 - auto (default), "
                          "1 - bitset, 2 - indices, 3 - no metadata"), 

@@ -628,6 +628,7 @@ public:
       numHosts(numHosts) {
     if (useGidMetadata) {
       if (enforce_data_mode != offsetsData) {
+        galois::gPrint("Reseting useGidMetadata because metadata is not set appropriately\n");
         useGidMetadata = false;
       }
     }
@@ -661,6 +662,7 @@ protected:
 
     // convert the global ids stored in the master/mirror nodes arrays to local
     // ids
+    // TODO: use 32-bit distinct vectors for masters and mirrors from here on
     for (uint32_t h = 0; h < masterNodes.size(); ++h) {
       galois::do_all(galois::iterate(0ul, masterNodes[h].size()),
                      [&](uint32_t n) {
@@ -1487,13 +1489,14 @@ private:
    */
   template<SyncType syncType>
   void convert_lid_to_gid(const std::string &loopName, 
+                          const std::vector<size_t> &indices, 
                           std::vector<unsigned int> &offsets) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string doall_str(syncTypeStr + "_LID2GID_" + 
                           get_run_identifier(loopName));
     galois::do_all(galois::iterate(0ul, offsets.size()), 
         [&](unsigned int n) {
-          offsets[n] = static_cast<uint32_t>(getGID(offsets[n]));
+          offsets[n] = static_cast<uint32_t>(getGID(indices[offsets[n]]));
         }, 
         galois::no_stats(),
         galois::loopname(get_run_identifier(doall_str).c_str()));
@@ -1504,14 +1507,15 @@ private:
    */
   template<SyncType syncType>
   void convert_gid_to_lid(const std::string &loopName, 
-                          std::vector<unsigned int> &offsets) {
+                          const std::vector<unsigned int> &offsets,
+                          std::vector<size_t> &lids) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string doall_str(syncTypeStr + "_GID2LID_" + 
                           get_run_identifier(loopName));
 
     galois::do_all(galois::iterate(0ul, offsets.size()), 
         [&](unsigned int n) {
-          offsets[n] = static_cast<uint32_t>(getLID(offsets[n]));
+          lids[n] = getLID(offsets[n]);
         }, 
         galois::no_stats(),
         galois::loopname(get_run_identifier(doall_str).c_str()));
@@ -1635,7 +1639,7 @@ private:
         offsets.resize(bit_set_count);
 
         if (useGidMetadata) {
-          convert_lid_to_gid<syncType>(loopName, offsets);
+          convert_lid_to_gid<syncType>(loopName, indices, offsets);
         }
 
         val_vec.resize(bit_set_count);
@@ -1821,6 +1825,7 @@ private:
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
     static std::vector<unsigned int> offsets;
+    static std::vector<size_t> lids;
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
 
     uint32_t num = sharedNodes[from_id].size();
@@ -1841,7 +1846,8 @@ private:
             //offsets.resize(bit_set_count);
             galois::runtime::gDeserialize(buf, offsets);
             if (useGidMetadata) {
-              convert_gid_to_lid<syncType>(loopName, offsets);
+              lids.resize(offsets.size());
+              convert_gid_to_lid<syncType>(loopName, offsets, lids);
             }
           } else if (data_mode == bitsetData) {
             bit_set_comm.resize(num);
@@ -1878,9 +1884,15 @@ private:
                 sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                 bit_set_compute, buf_start);
           } else {
-            set_subset<SyncFnTy, syncType, false, true>(loopName, 
-                sharedNodes[from_id], bit_set_count, offsets, val_vec, 
-                bit_set_compute);
+            if (useGidMetadata) { // offsetsData
+              set_subset<SyncFnTy, syncType, true, true>(loopName, 
+                  lids, bit_set_count, offsets, val_vec, 
+                  bit_set_compute);
+            } else {
+              set_subset<SyncFnTy, syncType, false, true>(loopName, 
+                  sharedNodes[from_id], bit_set_count, offsets, val_vec, 
+                  bit_set_compute);
+            }
           }
           // TODO: reduce could update the bitset, so it needs to be copied 
           // back to the device
