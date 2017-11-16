@@ -12,6 +12,8 @@
 enum SharedType { sharedMaster, sharedMirror };
 enum UpdateOp { setOp, addOp, minOp };
 
+extern bool useGidMetadata; // TODO move this into DataCommMode
+
 void kernel_sizing(dim3 &blocks, dim3 &threads) {
 	threads.x = 256;
 	threads.y = threads.z = 1;
@@ -422,6 +424,14 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
       batch_add_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == minOp) {
       batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+    }
+  } else if (useGidMetadata) {
+    if (op == setOp) {
+      batch_set_subset<DataType> <<<blocks, threads>>>(v_size, ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+    } else if (op == addOp) {
+      batch_add_subset<DataType> <<<blocks, threads>>>(v_size, ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
+    } else if (op == minOp) {
+      batch_min_subset<DataType> <<<blocks, threads>>>(v_size, ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     }
   } else { // bitsetData || offsetsData
     if (op == setOp) {

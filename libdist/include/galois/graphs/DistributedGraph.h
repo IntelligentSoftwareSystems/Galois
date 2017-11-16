@@ -1880,16 +1880,14 @@ private:
             set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
                 sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                 bit_set_compute, buf_start);
-          } else {
-            if (useGidMetadata) { // offsetsData
-              set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(loopName, 
-                  offsets, bit_set_count, offsets, val_vec, 
-                  bit_set_compute);
-            } else {
-              set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, false, true>(loopName, 
-                  sharedNodes[from_id], bit_set_count, offsets, val_vec, 
-                  bit_set_compute);
-            }
+          } else if (useGidMetadata) { // offsetsData
+            set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(loopName, 
+                offsets, bit_set_count, offsets, val_vec, 
+                bit_set_compute);
+          } else { // bitsetData or offsetsData
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, false, true>(loopName, 
+                sharedNodes[from_id], bit_set_count, offsets, val_vec, 
+                bit_set_compute);
           }
           // TODO: reduce could update the bitset, so it needs to be copied 
           // back to the device
