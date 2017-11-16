@@ -1403,10 +1403,10 @@ private:
   /**
    * TODO
    */
-  template<typename FnTy, SyncType syncType, bool identity_offsets = false, 
+  template<typename VecTy, typename FnTy, SyncType syncType, bool identity_offsets = false, 
            bool parallelize = true>
   void set_subset(const std::string &loopName, 
-                  const std::vector<size_t> &indices, 
+                  const VecTy &indices, 
                   size_t size, 
                   const std::vector<unsigned int> &offsets, 
                   std::vector<typename FnTy::ValTy> &val_vec, 
@@ -1423,7 +1423,7 @@ private:
             if (identity_offsets) offset = n;
             else offset = offsets[n];
 
-            size_t lid = indices[offset];
+            auto lid = indices[offset];
             set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
           }, 
           galois::no_stats(),
@@ -1435,7 +1435,7 @@ private:
         if (identity_offsets) offset = n;
         else offset = offsets[n];
 
-        size_t lid = indices[offset];
+        auto lid = indices[offset];
         set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
       }
     }
@@ -1507,15 +1507,14 @@ private:
    */
   template<SyncType syncType>
   void convert_gid_to_lid(const std::string &loopName, 
-                          const std::vector<unsigned int> &offsets,
-                          std::vector<size_t> &lids) {
+                          std::vector<unsigned int> &offsets) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string doall_str(syncTypeStr + "_GID2LID_" + 
                           get_run_identifier(loopName));
 
     galois::do_all(galois::iterate(0ul, offsets.size()), 
         [&](unsigned int n) {
-          lids[n] = getLID(offsets[n]);
+          offsets[n] = getLID(offsets[n]);
         }, 
         galois::no_stats(),
         galois::loopname(get_run_identifier(doall_str).c_str()));
@@ -1825,7 +1824,6 @@ private:
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
     static std::vector<unsigned int> offsets;
-    static std::vector<size_t> lids;
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
 
     uint32_t num = sharedNodes[from_id].size();
@@ -1846,8 +1844,7 @@ private:
             //offsets.resize(bit_set_count);
             galois::runtime::gDeserialize(buf, offsets);
             if (useGidMetadata) {
-              lids.resize(offsets.size());
-              convert_gid_to_lid<syncType>(loopName, offsets, lids);
+              convert_gid_to_lid<syncType>(loopName, offsets);
             }
           } else if (data_mode == bitsetData) {
             bit_set_comm.resize(num);
@@ -1876,20 +1873,20 @@ private:
           }
 
           if (data_mode == onlyData) {
-            set_subset<SyncFnTy, syncType, true, true>(loopName, 
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
                 sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                 bit_set_compute);
           } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
-            set_subset<SyncFnTy, syncType, true, true>(loopName, 
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
                 sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                 bit_set_compute, buf_start);
           } else {
             if (useGidMetadata) { // offsetsData
-              set_subset<SyncFnTy, syncType, true, true>(loopName, 
-                  lids, bit_set_count, offsets, val_vec, 
+              set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(loopName, 
+                  offsets, bit_set_count, offsets, val_vec, 
                   bit_set_compute);
             } else {
-              set_subset<SyncFnTy, syncType, false, true>(loopName, 
+              set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, false, true>(loopName, 
                   sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                   bit_set_compute);
             }
