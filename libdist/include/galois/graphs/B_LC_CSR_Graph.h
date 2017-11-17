@@ -16,7 +16,7 @@ class B_LC_CSR_Graph :
      public LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
                   HasOutOfLineLockable, FileEdgeTy> {
   // typedef to make it easier to read
-  using BaseCSRGraph = LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
+  using BaseGraph = LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
                                  HasOutOfLineLockable, FileEdgeTy>;
 protected:
   // retypedefs of base class
@@ -48,12 +48,15 @@ public:
    * Creates the in edge data by reading from the out edge data.
    */
   void constructIncomingEdges() {
+    galois::StatTimer incomingEdgeConstructTimer("IncomingEdgeConstruct");
+    incomingEdgeConstructTimer.start();
+
     EdgeIndData dataBuffer;
-    dataBuffer.allocateInterleaved(this.numNodes);
+    dataBuffer.allocateInterleaved(BaseGraph::numNodes);
 
     // initialize the temp array
     galois::do_all(
-      galois::iterate(0ul, this.numNodes), 
+      galois::iterate(0ul, BaseGraph::numNodes), 
       [&](uint32_t n) {
         dataBuffer[n] = 0;
       }
@@ -61,9 +64,9 @@ public:
       
     // get destination of edge, copy to array, and
     galois::do_all(
-      galois::iterate(0ul, this.numEdges), 
+      galois::iterate(0ul, BaseGraph::numEdges), 
       [&](uint64_t e) {
-        auto dst = this.edgeDst[e];
+        auto dst = BaseGraph::edgeDst[e];
         // counting outgoing edges in the tranpose graph by
         // counting incoming edges in the original graph
         __sync_add_and_fetch(&(dataBuffer[dst]), 1);
@@ -71,7 +74,7 @@ public:
     );
 
     // prefix sum calculation of the edge index array
-    for (uint32_t n = 1; n < this.numNodes; ++n) {
+    for (uint32_t n = 1; n < BaseGraph::numNodes; ++n) {
       dataBuffer[n] += dataBuffer[n - 1];
     }
 
@@ -80,9 +83,9 @@ public:
     //determineThreadRangesByNode(dataBuffer);
 
     // copy over the new tranposed edge index data
-    inEdgeIndData.allocateInterleaved(this.numNodes);
+    inEdgeIndData.allocateInterleaved(BaseGraph::numNodes);
     galois::do_all(
-      galois::iterate(0ul, this.numNodes), 
+      galois::iterate(0ul, BaseGraph::numNodes), 
       [&](uint32_t n) {
         inEdgeIndData[n] = dataBuffer[n];
       }
@@ -90,10 +93,10 @@ public:
 
     // after this block dataBuffer[i] will now hold number of edges that all 
     // nodes before the ith node have
-    if (this.numNodes >= 1) {
+    if (BaseGraph::numNodes >= 1) {
       dataBuffer[0] = 0;
       galois::do_all(
-        galois::iterate(1ul, this.numNodes), 
+        galois::iterate(1ul, BaseGraph::numNodes), 
         [&](uint32_t n) {
           dataBuffer[n] = inEdgeIndData[n - 1];
         }
@@ -101,30 +104,32 @@ public:
     }
 
     // get edge dests and data
-    inEdgeDst.allocateInterleaved(this.numEdges);
-    inEdgeData.allocateInterleaved(this.numEdges);
+    inEdgeDst.allocateInterleaved(BaseGraph::numEdges);
+    inEdgeData.allocateInterleaved(BaseGraph::numEdges);
 
     galois::do_all(
-      galois::iterate(0ul, this.numNodes), 
+      galois::iterate(0ul, BaseGraph::numNodes), 
       [&](uint32_t src) {
         // e = start index into edge array for a particular node
-        uint64_t e = (src == 0) ? 0 : this.edgeIndData[src - 1];
+        uint64_t e = (src == 0) ? 0 : BaseGraph::edgeIndData[src - 1];
 
         // get all outgoing edges of a particular node in the non-transpose and
         // convert to incoming
-        while (e < this.edgeIndData[src]) {
+        while (e < BaseGraph::edgeIndData[src]) {
           // destination nodde
-          auto dst = this.edgeDst[e];
+          auto dst = BaseGraph::edgeDst[e];
           // location to save edge
           auto e_new = __sync_fetch_and_add(&(dataBuffer[dst]), 1);
           // save src as destination
           inEdgeDst[e_new] = src;
           // copy edge data to "new" array
-          edgeDataCopy(inEdgeData, this.edgeData, e_new, e);
+          BaseGraph::edgeDataCopy(inEdgeData, BaseGraph::edgeData, e_new, e);
           e++;
         }
       }
     );
+
+    incomingEdgeConstructTimer.stop();
   }
 
   /**
@@ -157,12 +162,12 @@ public:
    */
   edge_iterator in_edge_begin(GraphNode N, 
                               MethodFlag mflag = MethodFlag::WRITE) {
-    this.acquireNode(N, mflag);
+    BaseGraph::acquireNode(N, mflag);
     if (galois::runtime::shouldLock(mflag)) {
       for (edge_iterator ii = in_raw_begin(N), ee = in_raw_end(N); 
            ii != ee; 
            ++ii) {
-        this.acquireNode(inEdgeDst[*ii], mflag);
+        BaseGraph::acquireNode(inEdgeDst[*ii], mflag);
       }
     }
     return in_raw_begin(N);
@@ -176,7 +181,7 @@ public:
    * @returns Iterator to end of in edges of node N (i.e. first in edge of N+1)
    */
   edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    this.acquireNode(N, mflag);
+    BaseGraph::acquireNode(N, mflag);
     return in_raw_end(N);
   }
 
@@ -200,7 +205,6 @@ public:
    */
   edge_data_reference getInEdgeData(edge_iterator ni, 
       MethodFlag = MethodFlag::UNPROTECTED) const {
-    // galois::runtime::checkWrite(mflag, false);
     return inEdgeData[*ni];
   }
 };
