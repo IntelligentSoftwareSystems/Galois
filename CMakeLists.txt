@@ -257,7 +257,7 @@ endif()
 
 if(USE_VTUNE)
   message(STATUS "${VTune_ROOT}")
-  set(VTune_ROOT /opt/intel/vtune_amplifier_xe)
+  set(VTune_ROOT /opt/intel/vtune_amplifier)
   find_package(VTune)
   message(STATUS "${VTune_INCLUDE_DIRS}")
 
