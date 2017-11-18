@@ -173,44 +173,91 @@ struct IdLess {
  * Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
  * Thesis. Universitat Karlsruhe. 2007.
  */
-struct NodeIteratorAlgo {
-  Graph graph;
+void nodeIteratingAlgo(Graph& graph) {
 
-  void preAlloc() {
-    galois::preAlloc (numThreads);
-  }
+  galois::GAccumulator<size_t> numTriangles;
 
-  void operator()() { 
-    galois::GAccumulator<size_t> numTriangles;
+  galois::do_all(galois::iterate(graph), 
+      [&] (const GNode& n) {
+      // Partition neighbors
+      // [first, ea) [n] [bb, last)
+        Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
+        Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
-    galois::do_all(galois::iterate(graph), 
-        [&] (const GNode& n) {
-          // Partition neighbors
-          // [first, ea) [n] [bb, last)
-          Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
-          Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
-
-          for (; bb != last; ++bb) {
-            GNode B = graph.getEdgeDst(bb);
-            for (auto aa = first; aa != ea; ++aa) {
-              GNode A = graph.getEdgeDst(aa);
-              Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
-              Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
-              Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
-              if (it != ev && graph.getEdgeDst(it) == B) {
-                numTriangles += 1;
-              }
+        for (; bb != last; ++bb) {
+          GNode B = graph.getEdgeDst(bb);
+          for (auto aa = first; aa != ea; ++aa) {
+            GNode A = graph.getEdgeDst(aa);
+            Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
+            if (it != ev && graph.getEdgeDst(it) == B) {
+              numTriangles += 1;
             }
           }
         }
-        , galois::chunk_size<32>() // TODO: tune
-        , galois::loopname("NodeIteratorAlgo"));
+      }
+  , galois::chunk_size<32>() // TODO: tune
+    , galois::loopname("nodeIteratingAlgo"));
 
-    std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
-  }
-};
+  std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
+}
+
+/**
+ * Edge Iterator algorithm for counting triangles.
+ * <code>
+ * for ((a, b) in E) 
+ *   if (a < b)
+ *     for (v in intersect(neighbors(a), neighbors(b)))
+ *       if (a < v < b)
+ *         triangle += 1
+ * </code>
+ *
+ * Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
+ * Thesis. Universitat Karlsruhe. 2007.
+ */
+void edgeIteratingAlgo(Graph& graph) {
+
+  struct WorkItem {
+    GNode src;
+    GNode dst;
+    WorkItem(const GNode& a1, const GNode& a2): src(a1), dst(a2) { }
+  };
+
+  galois::InsertBag<WorkItem> items;
+  galois::GAccumulator<size_t> numTriangles;
+
+  galois::do_all(galois::iterate(graph),
+      [&] (GNode n) {
+        for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
+          GNode dst = graph.getEdgeDst(edge);
+          if (n < dst)
+            items.push(WorkItem(n, dst));
+        }
+      }
+      , galois::loopname("Initialize"));
+
+  galois::do_all(galois::iterate(items),
+      [&] (const WorkItem& w) {
+        // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
+        Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
+        Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
+
+        Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
+        Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
+        Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
+        Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
+
+        numTriangles += countEqual(graph, aa, ea, bb, eb);
+      },
+      galois::loopname("edgeIteratingAlgo"));
+
+  std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
+}
 
 #ifdef HAS_EIGEN
 /**
@@ -234,18 +281,16 @@ struct NodeIteratorAlgo {
 struct HybridAlgo {
   typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> Matrix;
 
+  Graph& graph;
   galois::GAccumulator<size_t> numTriangles;
   Matrix adjacency;
-  Graph graph;
 
   //! Since nodes are sorted by degree, we can classify nodes based on comparison with node id
   GNode limit;
   Graph::iterator limitIterator;
   int numHighNodes;
 
-  void preAlloc() {
-    // TODO: add preAlloc calls
-  }
+  explicit HybridAlgo(Graph& g): graph(g) {}
 
   //! Node iterator algorithm + populate 
   template<bool HasLimit>
@@ -304,8 +349,6 @@ struct HybridAlgo {
 
   void operator()() {
 
-    using WL = galois::worklists::dChunkedFIFO<32>; // tune
-
     if (getenv("GALOIS_DO_NOT_BIND_MAIN_THREAD") == 0) {
       std::cerr << "To enable full parallelization, set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD=1\n";
     }
@@ -351,83 +394,21 @@ struct HybridAlgo {
         numTriangles += high;
       }
       std::cout << "Processing low degree nodes\n";
-      galois::for_each(galois::iterate(graph)
+      galois::do_all(galois::iterate(graph)
           , ProcessLow<true>(this)
           , galois::loopname("HybridAlgo-1")
-          , galois::no_conflicts()
-          , galois::wl<WL>());
+          , galois::steal());
 
     } else {
-      galois::for_each(galois::iterate(graph)
+      galois::do_all(galois::iterate(graph)
           , ProcessLow<false>(this)
           , galois::loopname("HybridAlgo-2")
-          , galois::no_conflicts()
-          , galois::wl<WL>());
+          , galois::steal());
     }
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
 #endif
-
-/**
- * Edge Iterator algorithm for counting triangles.
- * <code>
- * for ((a, b) in E) 
- *   if (a < b)
- *     for (v in intersect(neighbors(a), neighbors(b)))
- *       if (a < v < b)
- *         triangle += 1
- * </code>
- *
- * Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
- * Thesis. Universitat Karlsruhe. 2007.
- */
-struct EdgeIteratorAlgo {
-  Graph graph;
-
-  struct WorkItem {
-    GNode src;
-    GNode dst;
-    WorkItem(const GNode& a1, const GNode& a2): src(a1), dst(a2) { }
-  };
-
-  void preAlloc() {
-    galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / galois::runtime::pagePoolSize());
-  }
-
-  void operator()() { 
-    galois::InsertBag<WorkItem> items;
-    galois::GAccumulator<size_t> numTriangles;
-
-    galois::do_all(galois::iterate(graph),
-        [&] (GNode n) {
-          for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-            GNode dst = graph.getEdgeDst(edge);
-            if (n < dst)
-              items.push(WorkItem(n, dst));
-          }
-        }
-        , galois::loopname("Initialize"));
-
-    galois::do_all(galois::iterate(items),
-        [&] (const WorkItem& w) {
-          // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
-          Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
-
-          Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
-          Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
-          Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
-          Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
-
-          numTriangles += countEqual(graph, aa, ea, bb, eb);
-        },
-        galois::loopname("EdgeIteratorAlgo"));
-    std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
-  }
-};
 
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
   typedef galois::graphs::FileGraph G;
@@ -484,52 +465,44 @@ void readGraph(Graph& graph) {
   }
 }
 
-template<typename Algo>
-void run() {
-  Algo algo;
-
-  galois::StatTimer Tinitial("InitializeTime");
-  Tinitial.start();
-  readGraph(algo.graph);
-  Tinitial.stop();
-
-  // XXX Test if preallocation matters
-  galois::reportPageAlloc("MeminfoPre");
-  // galois::preAlloc(numThreads + 8 * galois::runtime::MM::numPageAllocTotal());
-
-  algo.preAlloc();
-  galois::reportPageAlloc("MeminfoMid");
-
-  galois::StatTimer T;
-  T.start();
-  algo();
-  T.stop();
-
-  galois::reportPageAlloc("MeminfoPost");
-}
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
+  Graph graph;
+
+  galois::StatTimer Tinitial("GraphReadingTime");
+  Tinitial.start();
+  readGraph(graph);
+  Tinitial.stop();
+
+  galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / galois::runtime::pagePoolSize());
+  galois::reportPageAlloc("MeminfoPre");
+
+
+  galois::StatTimer T;
+  T.start();
   // case by case preAlloc to avoid allocating unnecessarily
   switch (algo) {
     case nodeiterator: 
-      run<NodeIteratorAlgo>(); 
+      nodeIteratingAlgo(graph);
       break;
 
     case edgeiterator: 
-      run<EdgeIteratorAlgo>(); 
+      edgeIteratingAlgo(graph);
       break;
 
 #ifdef HAS_EIGEN
     case hybrid: 
-      run<HybridAlgo>(); 
+      HybridAlgo(graph)();
       break;
 #endif
     default: 
       std::cerr << "Unknown algo: " << algo << "\n";
   }
+  T.stop();
 
+  galois::reportPageAlloc("MeminfoPost");
   return 0;
 }
