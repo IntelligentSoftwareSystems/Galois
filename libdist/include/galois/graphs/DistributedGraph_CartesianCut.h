@@ -29,13 +29,12 @@
 #include "galois/graphs/DistributedGraph.h"
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
-         bool moreColumnHosts = false, bool BSPNode = false, 
-         bool BSPEdge = false, unsigned DecomposeFactor = 1>
-class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+         bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
+class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
 
 public:
-  typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
+  typedef hGraph<NodeTy, EdgeTy> base_hGraph;
 
 private:
   unsigned numRowHosts;

@@ -100,28 +100,15 @@ enum ReadLocation { readSource, readDestination, readAny };
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
- * @tparam BSPNode specifies if node is a BSP node, e.g. it has an "old"
- * and a "new" that you can switch between for bulk-synchronous parallel
- * phases
- * @tparam BSPEdge specifies if edge is a BSP edge, e.g. it has an "old"
  * and a "new" that you can switch between for bulk-synchronous parallel
  * phases
  */
-template<typename NodeTy, typename EdgeTy, bool BSPNode = false,
-         bool BSPEdge = false>
+template<typename NodeTy, typename EdgeTy>
 class hGraph: public GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
-  typedef typename std::conditional<
-    BSPNode, std::pair<NodeTy, NodeTy>, NodeTy
-  >::type realNodeTy;
-  typedef typename std::conditional<
-    BSPEdge && !std::is_void<EdgeTy>::value, std::pair<EdgeTy, EdgeTy>,
-    EdgeTy
-  >::type realEdgeTy;
-
-  typedef typename galois::graphs::LC_CSR_Graph<realNodeTy, realEdgeTy, true>
+  typedef typename galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>
     GraphTy; // do not use locks, use default interleaved numa allocation
 
   bool round;
@@ -258,39 +245,13 @@ private:
   uint32_t num_run; //Keep track of number of runs.
   uint32_t num_iteration; //Keep track of number of iterations.
 
-  // Stats: for rough estimate of sendBytes.
-
   /**
    * Get the node data for a particular node in the graph.
-   *
-   * This function is called if we have BSP style nodes (i.e. return
-   * "new" or "old" depending on round number).
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be true.
    *
    * @param N node to get the data of
    * @param mflag access flag for node data
    * @returns A node data object
    */
-  template<bool en, typename std::enable_if<en>::type* = nullptr>
-  inline NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getData(N, mflag);
-    return round ? r.first : r.second;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   *
-   * This function is called if do NOT have BSP style nodes.
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be false.
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A node data object
-   */
-  template<bool en, typename std::enable_if<!en>::type* = nullptr>
   inline NodeTy& getDataImpl(typename GraphTy::GraphNode N,
                       galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
     auto& r = graph.getData(N, mflag);
@@ -300,34 +261,10 @@ private:
   /**
    * Get the node data for a particular node in the graph.
    *
-   * This function is called if you have BSP style edges.
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be true.
-   *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
    * @returns The edge data for the requested edge
    */
-  template<bool en, typename std::enable_if<en>::type* = nullptr>
-  inline typename GraphTy::edge_data_reference getEdgeDataImpl(
-      typename GraphTy::edge_iterator ni,
-      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getEdgeData(ni, mflag);
-    return round ? r.first : r.second;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   *
-   * This function is called if you do not have BSP style edges.
-   *
-   * @tparam en Specifies if this is a BSP node getData. Should be false.
-   *
-   * @param ni edge to get the data of
-   * @param mflag access flag for edge data
-   * @returns The edge data for the requested edge
-   */
-  template<bool en, typename std::enable_if<!en>::type* = nullptr>
   inline typename GraphTy::edge_data_reference getEdgeDataImpl(
       typename GraphTy::edge_iterator ni,
       galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
@@ -709,8 +646,7 @@ protected:
 
 public:
   /**
-   * Wrapper getData that calls into the get data that distinguishes between
-   * a BSP node and a non BSP node.
+   * Wrapper getData that calls into the get data. 
    *
    * @param N node to get the data of
    * @param mflag access flag for node data
@@ -718,13 +654,12 @@ public:
    */
   inline NodeTy& getData(GraphNode N, 
                   galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = getDataImpl<BSPNode>(N, mflag);
+    auto& r = getDataImpl(N, mflag);
     return r;
   }
 
   /**
-   * Wrapper getEdgeData that calls into the get edge data that distinguishes 
-   * between a BSP edge and a non BSP edge.
+   * Wrapper getEdgeData that calls into get edge data. 
    *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
@@ -732,7 +667,7 @@ public:
    */
   inline typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, 
                         galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    return getEdgeDataImpl<BSPEdge>(ni, mflag);
+    return getEdgeDataImpl(ni, mflag);
   }
 
   GraphNode getEdgeDst(edge_iterator ni) {
@@ -3480,6 +3415,6 @@ public:
 
 
 };
-template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>
-constexpr const char* const hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge>::GRNAME;
+template<typename NodeTy, typename EdgeTy>
+constexpr const char* const hGraph<NodeTy, EdgeTy>::GRNAME;
 #endif //_GALOIS_DIST_HGRAPH_H

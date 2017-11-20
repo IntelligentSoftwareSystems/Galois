@@ -29,13 +29,12 @@
 #include "galois/graphs/DistributedGraph.h"
 #include <sstream>
 
-template<typename NodeTy, typename EdgeTy, bool BSPNode = false, 
-         bool BSPEdge = false>
-class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+template<typename NodeTy, typename EdgeTy>
+class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_customEdgeCut";
 
   public:
-    typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
+    typedef hGraph<NodeTy, EdgeTy> base_hGraph;
     /** Utilities for reading partitioned graphs. **/
     struct NodeInfo {
       NodeInfo() :

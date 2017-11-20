@@ -27,11 +27,12 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, bool moreColumnHosts = false, uint32_t columnChunkSize = 256, bool BSPNode = false, bool BSPEdge = false>
-class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
+         bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
+class hGraph_jaggedCut : public hGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_jaggedCut";
 public:
-  typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
+  typedef hGraph<NodeTy, EdgeTy> base_hGraph;
 
 private:
   unsigned numRowHosts;

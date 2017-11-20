@@ -29,13 +29,12 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-template<typename NodeTy, typename EdgeTy, bool BSPNode = false, 
-         bool BSPEdge = false>
-class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+template<typename NodeTy, typename EdgeTy>
+class hGraph_vertexCut : public hGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
 
 public:
-  typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
+  typedef hGraph<NodeTy, EdgeTy> base_hGraph;
   /** Utilities for reading partitioned graphs. **/
   struct NodeInfo {
     NodeInfo() 

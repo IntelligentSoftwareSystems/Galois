@@ -28,15 +28,11 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-//template<typename NodeTy, typename EdgeTy, bool BSPNode = false, bool BSPEdge = false>
-//class hGraph;
-
-template<typename NodeTy, typename EdgeTy, bool isBipartite = false, 
-         bool BSPNode = false, bool BSPEdge = false>
-class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
+template<typename NodeTy, typename EdgeTy, bool isBipartite = false>
+class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_edgeCut";
   public:
-    typedef hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> base_hGraph;
+    typedef hGraph<NodeTy, EdgeTy> base_hGraph;
     // GID = ghostMap[LID - numOwned]
     std::vector<uint64_t> ghostMap;
     // LID = GlobalToLocalGhostMap[GID]
@@ -74,7 +70,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
           return i;
         }
         if(isBipartite){
-          if (gid >= globalOffset_bipartite && gid < globalOffset_bipartite + numOwned_withoutEdges)
+          if (gid >= globalOffset_bipartite && 
+              gid < globalOffset_bipartite + numOwned_withoutEdges)
         return i;
         }
       }
@@ -113,8 +110,10 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       Tgraph_construct.start();
       galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
                                                        GRNAME);
-      if(readFromFile){
-        galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+      if (readFromFile) {
+        galois::gPrint("[", base_hGraph::id, 
+                       "] Reading local graph from file : ", 
+                       localGraphFileName, "\n");
         base_hGraph::read_local_graph_from_file(localGraphFileName);
         Tgraph_construct.stop();
         return;
@@ -129,7 +128,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::numGlobalNodes = g.size();
       base_hGraph::numGlobalEdges = g.sizeEdges();
 
-      uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor, isBipartite);
+      uint64_t numNodes_to_divide = base_hGraph::computeMasters(g, scalefactor,
+                                                                isBipartite);
 
       // at this point gid2Host has pairs for how to split nodes among
       // hosts; pair has begin and end
@@ -298,6 +298,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, BSPNode, BSPEdge> {
       base_hGraph::determine_thread_ranges_master();
       base_hGraph::determine_thread_ranges_with_edges();
       base_hGraph::initialize_specific_ranges();
+
+      //base_hGraph::graph.constructIncomingEdges();
 
       Tgraph_construct.stop();
 

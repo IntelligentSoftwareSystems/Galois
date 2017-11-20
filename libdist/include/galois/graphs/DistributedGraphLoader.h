@@ -103,10 +103,10 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
   typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
   typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
   typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, 
-                                false, 2> Graph_cartesianCut_overDecomposeBy2;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, 
-                                false, 4> Graph_cartesianCut_overDecomposeBy4;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+                              Graph_cartesianCut_overDecomposeBy2;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+                              Graph_cartesianCut_overDecomposeBy4;
   typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
   
@@ -175,10 +175,10 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
         Graph_jaggedCut; // assumes push-style
   typedef hGraph_jaggedCut<NodeData, EdgeData, true> 
         Graph_jaggedBlockedCut; // assumes push-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, 
-                                false, 2> Graph_cartesianCut_overDecomposeBy2;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, false, 
-                                false, 4> Graph_cartesianCut_overDecomposeBy4;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+                              Graph_cartesianCut_overDecomposeBy2;
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+                              Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -270,10 +270,10 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
                            true> Graph_jaggedCut; // assumes pull-style
   typedef hGraph_jaggedCut<NodeData, EdgeData, true, 
                            true> Graph_jaggedBlockedCut; // assumes pull-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, 
-          false, 2> Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, false, 
-          false, 4> Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, 2> 
+                              Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
+  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, 4> 
+                              Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
   typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
 
