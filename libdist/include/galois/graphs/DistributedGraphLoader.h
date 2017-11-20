@@ -35,6 +35,9 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 
+// TODO/FIXME Refactoring a bunch of this code is likely very possible to
+// do without
+
 /*******************************************************************************
  * Supported partitioning schemes
  ******************************************************************************/
@@ -79,6 +82,105 @@ extern cll::opt<bool> saveLocalGraph;
 /*******************************************************************************
  * Graph-loading functions
  ******************************************************************************/
+/**
+ * Loads a graph file with the purpose of iterating over the out edges
+ * AND in edges of a graph.
+ *
+ * @tparam NodeData node data to store in graph
+ * @tparam EdgeData edge data to store in graph
+ *
+ * @param scaleFactor How to split nodes among hosts
+ * @returns a pointer to a newly allocated hGraph based on the command line
+ * loaded based on command line arguments
+ */
+template<typename NodeData, typename EdgeData>
+hGraph<NodeData, EdgeData, true>* constructTwoWayGraph(std::vector<unsigned>& 
+                                                           scaleFactor) {
+  // TODO template args for 2-way for everything that isn't edge cut
+  // TODO do it for edge cut too
+  typedef hGraph_edgeCut<NodeData, EdgeData, true> Graph_edgeCut;
+  //typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  //typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  //typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  //typedef hGraph_cartesianCut<NodeData, EdgeData, true> 
+  //      Graph_checkerboardCut; // assumes push-style
+  //typedef hGraph_jaggedCut<NodeData, EdgeData> 
+  //      Graph_jaggedCut; // assumes push-style
+  //typedef hGraph_jaggedCut<NodeData, EdgeData, true> 
+  //      Graph_jaggedBlockedCut; // assumes push-style
+  //typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  //                            Graph_cartesianCut_overDecomposeBy2;
+  //typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  //                            Graph_cartesianCut_overDecomposeBy4;
+
+  auto& net = galois::runtime::getSystemNetworkInterface();
+
+  // 1 host = no concept of cut; just load from edgeCut, no transpose
+  if (net.Num == 1) {
+    return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
+                             scaleFactor, false, readFromFile, localGraphFileName);
+  }
+
+  switch (partitionScheme) {
+    case OEC:
+      return new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num, 
+                               scaleFactor, false, readFromFile, localGraphFileName);
+    case IEC:
+      if (inputFileTranspose.size()) {
+        return new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, 
+                                 net.Num, scaleFactor, true, readFromFile, 
+                                 localGraphFileName);
+      } else {
+        GALOIS_DIE("Error: attempting incoming edge cut without transpose "
+                   "graph");
+        break;
+      }
+    //case HOVC:
+    //  return new Graph_vertexCut(inputFile, partFolder, net.ID, net.Num, 
+    //                             scaleFactor, false, VCutThreshold, false, 
+    //                             readFromFile, localGraphFileName);
+    //case HIVC:
+    //  if (inputFileTranspose.size()) {
+    //    return new Graph_vertexCut(inputFileTranspose, partFolder, net.ID, 
+    //                               net.Num, scaleFactor, true, VCutThreshold, false, 
+    //                               readFromFile, localGraphFileName);
+    //  } else {
+    //    GALOIS_DIE("Error: attempting incoming hybrid cut without transpose "
+    //               "graph");
+    //    break;
+    //  }
+    //case BOARD2D_VCUT:
+    //  return new Graph_checkerboardCut(inputFile, partFolder, net.ID, net.Num, 
+    //                                scaleFactor, false);
+    //case CART_VCUT:
+    //  return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num, 
+    //                                scaleFactor, false,
+    //                               readFromFile, localGraphFileName);
+    //case JAGGED_CYCLIC_VCUT:
+    //  return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num, 
+    //                                scaleFactor, false);
+    //case JAGGED_BLOCKED_VCUT:
+    //  return new Graph_jaggedBlockedCut(inputFile, partFolder, net.ID, net.Num, 
+    //                                scaleFactor, false);
+    //case OVER_DECOMPOSE_2_VCUT:
+    //  return new Graph_cartesianCut_overDecomposeBy2(inputFile, partFolder, 
+    //                                net.ID, net.Num, scaleFactor, false);
+    //case OVER_DECOMPOSE_4_VCUT:
+    //  return new Graph_cartesianCut_overDecomposeBy4(inputFile, partFolder, 
+    //                                net.ID, net.Num, scaleFactor, false);
+    //case CEC:
+    //  return new Graph_customEdgeCut(inputFile, partFolder, net.ID, net.Num, 
+    //                           scaleFactor, vertexIDMapFileName, false);
+    default:
+      GALOIS_DIE("Error: partition scheme specified is invalid");
+      return nullptr;
+  }
+}
+
+
+
+
+
 /**
  * Loads a symmetric graph file (i.e. directed graph with edges in both 
  * directions)

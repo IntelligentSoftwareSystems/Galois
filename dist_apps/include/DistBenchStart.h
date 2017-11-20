@@ -166,9 +166,8 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
 
   dGraphTimer.stop();
 
-  //Save local graph structure
-  if(saveLocalGraph)
-    (*loadedGraph).save_local_graph_to_file();
+  // Save local graph structure
+  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file();
 
   return loadedGraph;
 }
@@ -218,6 +217,46 @@ static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
 }
 
 /**
+ * Loads a 2-way graph into memory.
+ * Details/partitioning will be handled in the construct graph call.
+ *
+ * The user should NOT call this function.
+ *
+ * @tparam NodeData struct specifying what kind of data the node contains
+ * @tparam EdgeData type specifying the type of the edge data
+ *
+ * @param scaleFactor Vector that specifies how much of the graph each
+ * host should get
+ * @param cuda_ctx CUDA context of the currently running program; only matters
+ * if using GPU
+ *
+ * @returns Pointer to the loaded 2-way graph
+ */
+template <typename NodeData, typename EdgeData>
+static hGraph<NodeData, EdgeData, true>* 
+loadBDGraph(std::vector<unsigned>& scaleFactor,
+            struct CUDA_Context** cuda_ctx = nullptr) {
+  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
+  dGraphTimer.start();
+
+  hGraph<NodeData, EdgeData, true>* loadedGraph = nullptr;
+
+  // make sure that the symmetric graph flag was passed in
+  loadedGraph = constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
+  assert(loadedGraph != nullptr);
+
+  #ifdef __GALOIS_HET_CUDA__
+  // TODO marshal the incoming edges as well....... (for now we don't have
+  // support for it)
+  marshalGPUGraph(loadedGraph, cuda_ctx);
+  #endif
+
+  dGraphTimer.stop();
+
+  return loadedGraph;
+}
+
+/**
  * Loads a graph into memory, setting up heterogeneous execution if
  * necessary. Unlike the dGraph load functions above, this is meant
  * to be exposed to the user.
@@ -233,8 +272,8 @@ static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-hGraph<NodeData, EdgeData>* distGraphInitialization(
-      struct CUDA_Context** cuda_ctx = nullptr) {
+hGraph<NodeData, EdgeData>* 
+distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
   #ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
@@ -258,8 +297,8 @@ hGraph<NodeData, EdgeData>* distGraphInitialization(
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData>* symmetricDistGraphInitialization(
-      struct CUDA_Context** cuda_ctx = nullptr) {
+hGraph<NodeData, EdgeData>* 
+symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
 
   #ifdef __GALOIS_HET_CUDA__
@@ -267,6 +306,21 @@ hGraph<NodeData, EdgeData>* symmetricDistGraphInitialization(
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
   #else
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
+  #endif
+}
+
+/**
+ * TODO
+ */
+template <typename NodeData, typename EdgeData>
+hGraph<NodeData, EdgeData, true>* 
+twoWayDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
+  std::vector<unsigned> scaleFactor;
+  #ifdef __GALOIS_HET_CUDA__
+  internal::heteroSetup(scaleFactor);
+  return loadBDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
+  #else
+  return loadBDGraph<NodeData, EdgeData>(scaleFactor);
   #endif
 }
 
