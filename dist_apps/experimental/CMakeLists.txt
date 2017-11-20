@@ -27,6 +27,8 @@ function(distApp name)
 endfunction()
 
 
+distAppNoGPU(bfs_do)
+
 distApp(bfs_push_wl)
 distApp(sssp_push_wl)
 distApp(pagerank_push_wl)
