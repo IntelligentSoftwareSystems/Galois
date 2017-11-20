@@ -587,8 +587,9 @@ class LC_CSR_Graph :
     returnRanges[0] = beginNode;
     for (uint32_t i = 0; i < numThreads; i++) {
       // determine division for thread i
-      auto nodeEdgeSplits = divideByNode(0, 1, i, numThreads, numNodesInRange,
-                                         numEdgesInRange, beginNode, edgeOffset);
+      auto nodeEdgeSplits = divideByNode(nodeAlpha, 1, i, numThreads, 
+                                         numNodesInRange, numEdgesInRange, 
+                                         beginNode, edgeOffset);
 
       auto nodeSplits = nodeEdgeSplits.first;
 
