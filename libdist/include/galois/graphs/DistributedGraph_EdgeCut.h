@@ -28,11 +28,12 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
-template<typename NodeTy, typename EdgeTy, bool isBipartite = false>
-class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy> {
+template<typename NodeTy, typename EdgeTy, bool WithInEdges=false,
+         bool isBipartite=false>
+class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
   constexpr static const char* const GRNAME = "dGraph_edgeCut";
   public:
-    typedef hGraph<NodeTy, EdgeTy> base_hGraph;
+    typedef hGraph<NodeTy, EdgeTy, WithInEdges> base_hGraph;
     // GID = ghostMap[LID - numOwned]
     std::vector<uint64_t> ghostMap;
     // LID = GlobalToLocalGhostMap[GID]
@@ -299,7 +300,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy> {
       base_hGraph::determine_thread_ranges_with_edges();
       base_hGraph::initialize_specific_ranges();
 
-      //base_hGraph::graph.constructIncomingEdges();
+      base_hGraph::constructIncomingEdges();
 
       Tgraph_construct.stop();
 
@@ -424,7 +425,8 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy> {
     return false;
   }
 
-  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+  void reset_bitset(typename base_hGraph::SyncType syncType, 
+                    void (*bitset_reset_range)(size_t, size_t)) const {
     if (syncType == base_hGraph::syncBroadcast) { // reset masters
       if (base_hGraph::numOwned > 0) {
         bitset_reset_range(0, base_hGraph::numOwned - 1);

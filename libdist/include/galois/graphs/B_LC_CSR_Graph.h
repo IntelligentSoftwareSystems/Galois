@@ -139,7 +139,7 @@ public:
    * @returns Iterator to first in edge of node N
    */
   edge_iterator in_raw_begin(GraphNode N) const {
-    return edge_iterator((N == 0) ? 0 : inEdgeIndData[N-1]);
+    return edge_iterator((N == 0) ? 0 : inEdgeIndData[N - 1]);
   }
 
   /**

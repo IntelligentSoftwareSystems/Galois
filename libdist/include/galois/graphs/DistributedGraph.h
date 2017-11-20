@@ -43,6 +43,7 @@
 #include "galois/gstl.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LC_CSR_Graph.h"
+#include "galois/graphs/B_LC_CSR_Graph.h"
 #include "galois/graphs/MPIGraph.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/DistStats.h"
@@ -100,16 +101,18 @@ enum ReadLocation { readSource, readDestination, readAny };
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
- * and a "new" that you can switch between for bulk-synchronous parallel
- * phases
+ * @tparam WithInEdges controls whether or not it is possible to store in-edges
+ * in addition to outgoing edges in this graph
  */
-template<typename NodeTy, typename EdgeTy>
+// TODO change this (WithInEdges)
+template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
 class hGraph: public GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
-  typedef typename galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>
-    GraphTy; // do not use locks, use default interleaved numa allocation
+  using GraphTy = typename std::conditional<WithInEdges, 
+                    galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, true>,
+                    galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>>::type;
 
   bool round;
 
@@ -242,11 +245,12 @@ public:
                                                        size_t)) const = 0;
 
 private:
-  uint32_t num_run; //Keep track of number of runs.
-  uint32_t num_iteration; //Keep track of number of iterations.
+  uint32_t num_run; // Keep track of number of runs.
+  uint32_t num_iteration; // Keep track of number of iterations.
 
   /**
    * Get the node data for a particular node in the graph.
+   * TODO get rid of this
    *
    * @param N node to get the data of
    * @param mflag access flag for node data
@@ -260,6 +264,7 @@ private:
 
   /**
    * Get the node data for a particular node in the graph.
+   * TODO get rid of this
    *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
@@ -645,8 +650,31 @@ protected:
   }
 
 public:
+
+  /**
+   * Do an in-memory transpose while keeping the original graph intact.
+   *
+   * Only does something if WithInEdges is enabled.
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  void constructIncomingEdges() {
+    graph.constructIncomingEdges();
+  }
+
+  /**
+   * Do an in-memory transpose while keeping the original graph intact.
+   *
+   * Version that does nothing (i.e. WithInEdges is false).
+   */
+  template<bool T = WithInEdges, typename std::enable_if<!T>::type* = nullptr>
+  void constructIncomingEdges() {
+    // do nothing since the incoming edges template argument is false
+    return;
+  }
+
   /**
    * Wrapper getData that calls into the get data. 
+   * TODO get rid of wrapper
    *
    * @param N node to get the data of
    * @param mflag access flag for node data
@@ -660,6 +688,7 @@ public:
 
   /**
    * Wrapper getEdgeData that calls into get edge data. 
+   * TODO get rid of wrapper
    *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
@@ -670,8 +699,40 @@ public:
     return getEdgeDataImpl(ni, mflag);
   }
 
+  /**
+   * Directly gets in-edge data.
+   *
+   * @param ni in-edge to get the data of
+   * @param mflag access flag for edge data
+   * @returns The edge data for the requested in-edge
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline typename GraphTy::edge_data_reference getInEdgeData(
+      edge_iterator ni, 
+      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED
+  ) const {
+    return graph.getInEdgeData(ni, mflag);
+  }
+
+  /**
+   * Gets edge destination of edge ni.
+   *
+   * @param ni edge id to get destination of
+   * @returns Local ID of destination of edge ni
+   */
   GraphNode getEdgeDst(edge_iterator ni) {
     return graph.getEdgeDst(ni);
+  }
+
+  /**
+   * Gets edge destination of in-edge ni.
+   *
+   * @param ni in-edge id to get destination of
+   * @returns Local ID of destination of in-edge ni
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  GraphNode getInEdgeDst(edge_iterator ni) const {
+    return graph.getInEdgeDst(ni);
   }
 
   /**
@@ -696,6 +757,30 @@ public:
   }
 
   /**
+   * Gets the first in-edge of some node.
+   * 
+   * @param N node to get the edge of
+   * @returns iterator to first in-edge of N
+   */
+  //template<bool T = WithInEdges, typename std::enable_if<T == true>::type*>
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline edge_iterator in_edge_begin(GraphNode N) {
+    return graph.in_edge_begin(N, galois::MethodFlag::UNPROTECTED);
+  }
+
+  /**
+   * Gets the end in-edge boundary of some node.
+   * 
+   * @param N node to get the edge of
+   * @returns iterator to the end of the in-edges of node N, i.e. the first 
+   * in-edge of the next node (or an "end" iterator if there is no next node)
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline edge_iterator in_edge_end(GraphNode N) {
+    return graph.in_edge_end(N, galois::MethodFlag::UNPROTECTED);
+  }
+
+  /**
    * Returns an iterable object over the edges of a particular node in the
    * graph.
    *
@@ -705,6 +790,19 @@ public:
       edges(GraphNode N) {
     return galois::graphs::internal::make_no_deref_range(edge_begin(N), 
                                                          edge_end(N));
+  }
+
+  /**
+   * Returns an iterable object over the in-edges of a particular node in the
+   * graph.
+   *
+   * @param N node to get edges iterator over
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline galois::runtime::iterable<galois::NoDerefIterator<edge_iterator>> 
+      in_edges(GraphNode N) {
+    return galois::graphs::internal::make_no_deref_range(in_edge_begin(N), 
+                                                         in_edge_end(N));
   }
 
   /**
@@ -3412,9 +3510,8 @@ public:
     inputStream.close();
     dGraphTimerReadLocalGraph.stop();
   }
-
-
 };
-template<typename NodeTy, typename EdgeTy>
-constexpr const char* const hGraph<NodeTy, EdgeTy>::GRNAME;
+
+template<typename NodeTy, typename EdgeTy, bool WithInEdges>
+constexpr const char* const hGraph<NodeTy, EdgeTy, WithInEdges>::GRNAME;
 #endif //_GALOIS_DIST_HGRAPH_H
