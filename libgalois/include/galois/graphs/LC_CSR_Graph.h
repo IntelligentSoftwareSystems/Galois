@@ -580,7 +580,7 @@ class LC_CSR_Graph :
                                      std::vector<uint32_t>& returnRanges,
                                      uint32_t nodeAlpha) {
     uint32_t numNodesInRange = endNode - beginNode;
-    uint64_t numEdgesInRange = edge_begin(endNode) - edge_begin(beginNode);
+    uint64_t numEdgesInRange = edge_end(endNode - 1) - edge_begin(beginNode);
     uint32_t numThreads = galois::runtime::activeThreads;
     uint64_t edgeOffset = *edge_begin(beginNode);
 
@@ -608,8 +608,8 @@ class LC_CSR_Graph :
 
       galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i],
                      " to ", returnRanges[i+1], ", num edges is ",
-                     edge_begin(returnRanges[i + 1]) -
-                         edge_begin(returnRanges[i]));
+                     edge_end(returnRanges[i + 1] - 1) -
+                         raw_begin(returnRanges[i]));
     }
   }
 
