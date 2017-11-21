@@ -1,0 +1,12 @@
+How to run:
+
+Set the following environment variables:
+
+BMK_DIST_PATH to the dist_apps
+BMK_LOGS to wherever you want the logs to go
+
+Then run the following in THIS directory (same as README):
+
+python <path to bmk2/test2.py> run
+
+TODO explain the bmktest2.py file

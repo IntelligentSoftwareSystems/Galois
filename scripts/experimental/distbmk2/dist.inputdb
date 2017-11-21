@@ -1,0 +1,11 @@
+[bmktest2]
+version = 2
+basepath = /net/ohm/export/iss/dist-inputs
+
+[rmat25.gr]
+flags = 
+name = rmat25
+file = rmat25.gr
+transpose = transpose/rmat25.gr
+symmetric = symmetric/rmat25.sgr
+format = bin/galois
