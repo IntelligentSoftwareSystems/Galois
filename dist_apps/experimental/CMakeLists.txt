@@ -41,6 +41,8 @@ distAppNoGPU(bc_pull)
 
 distAppNoGPU(sgd_pull)
 
+distAppNoGPU(t_bc)
+
 distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)
 
