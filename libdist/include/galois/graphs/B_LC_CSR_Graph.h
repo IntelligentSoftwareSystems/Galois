@@ -18,6 +18,9 @@ class B_LC_CSR_Graph :
   // typedef to make it easier to read
   using BaseGraph = LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
                                  HasOutOfLineLockable, FileEdgeTy>;
+  using ThisGraph = B_LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
+                                   HasOutOfLineLockable, FileEdgeTy>;
+
 protected:
   // retypedefs of base class
   using EdgeData = LargeArray<EdgeTy>;
@@ -29,6 +32,39 @@ protected:
   // TODO don't use a separate array for in edge data; link back to original
   // edge data array
   EdgeData inEdgeData; 
+
+  /**
+   * Wrapper of this class to make a prefix sum accessible through []
+   */
+  struct PrefixSumWrapper {
+    ThisGraph* pointerToB_LC;
+
+    PrefixSumWrapper() {pointerToB_LC = nullptr;}
+
+    PrefixSumWrapper(ThisGraph* _thisGraph) 
+        : pointerToB_LC(_thisGraph) {}
+
+    /**
+     * Set the pointer to self.
+     */
+    void setSelfPointer(ThisGraph* thisGraph) {
+      pointerToB_LC = thisGraph;
+    }
+
+    uint64_t operator[](uint64_t n) {
+      return *(pointerToB_LC->in_edge_end(n));
+    }
+  };
+  // used to wrap this class to access prefix sum
+  PrefixSumWrapper sumWrapper;
+
+  // thread range vectors
+  std::vector<uint32_t> allNodesInThreadRange;
+  std::vector<uint32_t> masterNodesInThreadRange;
+
+  using NodeRangeType = 
+      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
+  std::vector<NodeRangeType> specificInRanges;
 
 public:
   using GraphNode = uint32_t;
@@ -43,6 +79,9 @@ public:
   // sparse = push
   // dense = pull
 
+  /*****************************************************************************
+   * Construction functions
+   ****************************************************************************/
   /**
    * Call only after the LC_CSR_Graph is fully constructed.
    * Creates the in edge data by reading from the out edge data.
@@ -129,8 +168,242 @@ public:
       }
     );
 
+    // set this for use when finding thread ranges later
+    sumWrapper.setSelfPointer(this);
+
     incomingEdgeConstructTimer.stop();
   }
+
+  /*****************************************************************************
+   * Thread Ranges Finding Functions
+   ****************************************************************************/
+
+  /**
+   * Returns 2 ranges (one for nodes, one for edges) for a particular division.
+   * The ranges specify the nodes/edges that a division is responsible for. The
+   * function attempts to split them evenly among threads given some kind of
+   * weighting. USES THE IN-EDGES. 
+   *
+   * @param nodeWeight weight to give to a node in division
+   * @param edgeWeight weight to give to an edge in division
+   * @param id Division number you want the ranges for
+   * @param total Total number of divisions
+   * @param nodesInRange Number of nodes in the range you want to divide
+   * up (specified by node offset)
+   * @param edgeInRange Number of edges in range you want to divide up
+   * (specified by node offset)
+   * @param nodeOffset Offset to the first node in the range you want
+   * to divide up
+   * @param edgeOffset Offset to the first edge in the range you want
+   * to divide up
+   */
+  auto divideByNodeInEdges(size_t nodeWeight, size_t edgeWeight, size_t id,
+                    size_t total, uint32_t nodesInRange, uint64_t edgesInRange,
+                    uint32_t nodeOffset, uint64_t edgeOffset) 
+                    -> typename BaseGraph::GraphRange {
+    std::vector<unsigned int> dummyScaleFactor;
+    return
+      galois::graphs::divideNodesBinarySearch<PrefixSumWrapper, uint32_t>(
+        nodesInRange, edgesInRange, nodeWeight, edgeWeight, id, total, 
+        sumWrapper, dummyScaleFactor, edgeOffset, nodeOffset);
+  }
+
+
+  /**
+   * Helper function used by determineThreadRanges that consists of the main
+   * loop over all threads and calls to divide by node to determine the
+   * division of nodes to threads. USES IN EDGES.
+   *
+   * Saves the ranges to an argument vector provided by the caller.
+   *
+   * @param beginNode Beginning of range
+   * @param endNode End of range, non-inclusive
+   * @param returnRanges Vector to store thread offsets for ranges in
+   * @param nodeAlpha The higher the number, the more weight nodes have in
+   * determining division of nodes (edges have weight 1).
+   */
+  void determineThreadRangesThreadLoopInEdges(uint32_t beginNode,
+                                          uint32_t endNode,
+                                          std::vector<uint32_t>& returnRanges,
+                                          uint32_t nodeAlpha) {
+    uint32_t numNodesInRange = endNode - beginNode;
+    uint64_t numEdgesInRange = in_raw_end(endNode - 1) -  
+                               in_raw_begin(beginNode);
+    uint32_t numThreads = galois::runtime::activeThreads;
+    uint64_t edgeOffset = *in_raw_begin(beginNode);
+
+    returnRanges[0] = beginNode;
+    for (uint32_t i = 0; i < numThreads; i++) {
+      // determine division for thread i
+      auto nodeEdgeSplits = divideByNodeInEdges(nodeAlpha, 1, i, numThreads, 
+                                                numNodesInRange,
+                                                numEdgesInRange, beginNode, 
+                                                edgeOffset);
+      auto nodeSplits = nodeEdgeSplits.first;
+
+      // i.e. if there are actually assigned nodes
+      if (nodeSplits.first != nodeSplits.second) {
+        if (i != 0) {
+          assert(returnRanges[i] == *(nodeSplits.first));
+        } else { // i == 0
+          assert(returnRanges[i] == beginNode);
+        }
+        returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
+      } else {
+        // thread assinged no nodes
+        returnRanges[i + 1] = returnRanges[i];
+      }
+
+      galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i],
+                     " to ", returnRanges[i + 1], ", num in-edges is ",
+                     in_raw_end(returnRanges[i + 1] - 1) - 
+                     in_raw_begin(returnRanges[i]));
+    }
+  }
+
+
+  /**
+   * Determines thread ranges for a given range of nodes and returns it as
+   * an offset vector in the passed in vector. (thread ranges = assigned
+   * nodes that a thread should work on). USES IN EDGES.
+   *
+   * Checks for corner cases, then calls the main loop function.
+   *
+   * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
+   * the graph is already constructed.
+   *
+   * @param beginNode Beginning of range
+   * @param endNode End of range, non-inclusive
+   * @param returnRanges Vector to store thread offsets for ranges in
+   * @param nodeAlpha The higher the number, the more weight nodes have in
+   * determining division of nodes (edges have weight 1).
+   */
+  void determineThreadRangesInEdges(uint32_t beginNode, uint32_t endNode,
+                             std::vector<uint32_t>& returnRanges,
+                             uint32_t nodeAlpha=0) {
+    uint32_t numThreads = galois::runtime::activeThreads;
+    uint32_t total_nodes = endNode - beginNode;
+
+    returnRanges.resize(numThreads + 1);
+
+    // check corner cases
+    // no nodes = assign nothing to all threads
+    if (beginNode == endNode) {
+      returnRanges[0] = beginNode;
+      for (uint32_t i = 0; i < numThreads; i++) {
+        returnRanges[i + 1] = beginNode;
+      }
+      return;
+    }
+
+    // single thread case; 1 thread gets all
+    if (numThreads == 1) {
+      returnRanges[0] = beginNode;
+      returnRanges[1] = endNode;
+      return;
+    // more threads than nodes
+    } else if (numThreads > total_nodes) {
+      uint32_t current_node = beginNode;
+      returnRanges[0] = current_node;
+      // 1 node for threads until out of threads
+      for (uint32_t i = 0; i < total_nodes; i++) {
+        returnRanges[i + 1] = ++current_node;
+      }
+      // deal with remainder threads; they get nothing
+      for (uint32_t i = total_nodes; i < numThreads; i++) {
+        returnRanges[i + 1] = total_nodes;
+      }
+      return;
+    }
+
+    // no corner cases: onto main loop over nodes that determines
+    // node ranges
+    determineThreadRangesThreadLoopInEdges(beginNode, endNode, returnRanges, 
+                                           nodeAlpha);
+    #ifndef NDEBUG
+    // sanity checks
+    assert(returnRanges[0] == beginNode &&
+           "return ranges begin not the begin node");
+    assert(returnRanges[numThreads] == endNode &&
+           "return ranges end not end node");
+
+    for (uint32_t i = 1; i < numThreads; i++) {
+      assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
+      assert(returnRanges[i] >= returnRanges[i-1]);
+    }
+    #endif
+  }
+
+  /*****************************************************************************
+   * Thread Ranges Saving Functions
+   ****************************************************************************/
+
+  /**
+   * Find thread ranges for all nodes considering in-edges. Save to vector
+   * in this instance of the class.
+   */
+  void findAllNodeThreadRangeIn() {
+    assert(allNodesInThreadRange.size() == 0);
+    determineThreadRangesInEdges(0, BaseGraph::numNodes, allNodesInThreadRange);
+  }
+
+  /**
+   * Find thread ranges for master nodes considering in-edges. Save to vector
+   * in this instance of the class.
+   *
+   * @param beginMaster first master node
+   * @param numOwned number of nodes owned by this graph
+   * @param numNodesWithEdges number of nodes with edges in this graph
+   */
+  void findMasterNodesThreadRangeIn(uint32_t beginMaster, uint32_t numOwned,
+                                    uint32_t numNodesWithEdges) {
+    assert(masterNodesInThreadRange.size() == 0);
+
+    // determine if work needs to be done
+    if (beginMaster == 0 && (beginMaster + numOwned) == BaseGraph::numNodes) {
+      masterNodesInThreadRange = allNodesInThreadRange;
+    } else {
+      determineThreadRangesInEdges(beginMaster, beginMaster + numOwned, 
+                                   masterNodesInThreadRange);
+    }
+  }
+
+  /**
+   * Construct 2 specific range objects using the 3 thread ranges vectors
+   * that should have been calculated before this function is called.
+   *
+   * @param beginMaster first master node
+   * @param numOwned number of nodes owned by this graph
+   * @param numNodesWithEdges number of nodes with edges in this graph
+   */
+  void finalizeThreadRangesIn(uint32_t beginMaster, uint32_t numOwned, 
+                              uint32_t numNodesWithEdges) {
+    assert(specificInRanges.size() == 0);
+    
+    // 0 is all nodes
+    specificInRanges.push_back(
+      galois::runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(BaseGraph::size()),
+        allNodesInThreadRange.data()
+      )
+    );
+
+    // 1 is master nodes
+    specificInRanges.push_back(
+      galois::runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(beginMaster),
+        boost::counting_iterator<size_t>(beginMaster + numOwned),
+        masterNodesInThreadRange.data()
+      )
+    );
+
+    assert(specificInRanges.size() == 2);
+  }
+
+  /*****************************************************************************
+   * Access functions
+   ****************************************************************************/
 
   /**
    * Grabs in edge beginning without lock/safety.
@@ -206,6 +479,34 @@ public:
   edge_data_reference getInEdgeData(edge_iterator ni, 
       MethodFlag = MethodFlag::UNPROTECTED) const {
     return inEdgeData[*ni];
+  }
+
+  /**
+   * Returns specific range based on in-edges, all nodes.
+   *
+   * @returns SpecificRange with all nodes, split by in-edges
+   */
+  const NodeRangeType& allNodesRangeIn() const {
+    return specificInRanges[0];
+  }
+
+  /**
+   * Returns specific range based on in-edges, master nodes.
+   *
+   * @returns SpecificRange with master nodes, split by in-edges
+   */
+  const NodeRangeType& masterNodesRangeIn() const {
+    return specificInRanges[1];
+  }
+
+  /**
+   * Returns specific range based on in-edges, master nodes + nodes with 
+   * in-edges (i.e. it's just all nodes anyways).
+   *
+   * @returns SpecificRange with all nodes, split by in-edges
+   */
+  const NodeRangeType& allNodesWithEdgesRangeIn() const {
+    return specificInRanges[0];
   }
 };
 
