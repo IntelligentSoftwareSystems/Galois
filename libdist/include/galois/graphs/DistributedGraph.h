@@ -159,10 +159,12 @@ private:
   std::vector<uint32_t> masterRanges;
   std::vector<uint32_t> withEdgeRanges;
 
+  using NodeRangeType = 
+      galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
+
   // vector of ranges that stores the 3 different range objects that a user is
   // able to access
-  std::vector<galois::runtime::SpecificRange<boost::counting_iterator<size_t>>>
-    specificRanges;
+  std::vector<NodeRangeType> specificRanges;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
@@ -247,35 +249,6 @@ public:
 private:
   uint32_t num_run; // Keep track of number of runs.
   uint32_t num_iteration; // Keep track of number of iterations.
-
-  /**
-   * Get the node data for a particular node in the graph.
-   * TODO get rid of this
-   *
-   * @param N node to get the data of
-   * @param mflag access flag for node data
-   * @returns A node data object
-   */
-  inline NodeTy& getDataImpl(typename GraphTy::GraphNode N,
-                      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getData(N, mflag);
-    return r;
-  }
-
-  /**
-   * Get the node data for a particular node in the graph.
-   * TODO get rid of this
-   *
-   * @param ni edge to get the data of
-   * @param mflag access flag for edge data
-   * @returns The edge data for the requested edge
-   */
-  inline typename GraphTy::edge_data_reference getEdgeDataImpl(
-      typename GraphTy::edge_iterator ni,
-      galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = graph.getEdgeData(ni, mflag);
-    return r;
-  }
 
   /**
    * Given an OfflineGraph, compute the masters for each node by
@@ -653,18 +626,23 @@ public:
 
   /**
    * Do an in-memory transpose while keeping the original graph intact.
+   * Find thread ranges as well.
    *
    * Only does something if WithInEdges is enabled.
    */
   template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
   void constructIncomingEdges() {
     graph.constructIncomingEdges();
+
+    graph.findAllNodeThreadRangeIn();
+    graph.findMasterNodesThreadRangeIn(beginMaster, numOwned, 
+                                       numNodesWithEdges);
+
+    graph.finalizeThreadRangesIn(beginMaster, numOwned, numNodesWithEdges);
   }
 
   /**
-   * Do an in-memory transpose while keeping the original graph intact.
-   *
-   * Version that does nothing (i.e. WithInEdges is false).
+   * Does nothing (i.e. WithInEdges is false).
    */
   template<bool T = WithInEdges, typename std::enable_if<!T>::type* = nullptr>
   void constructIncomingEdges() {
@@ -672,9 +650,9 @@ public:
     return;
   }
 
+
   /**
-   * Wrapper getData that calls into the get data. 
-   * TODO get rid of wrapper
+   * Get data of a node.
    *
    * @param N node to get the data of
    * @param mflag access flag for node data
@@ -682,13 +660,12 @@ public:
    */
   inline NodeTy& getData(GraphNode N, 
                   galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    auto& r = getDataImpl(N, mflag);
+    auto& r = graph.getData(N, mflag);
     return r;
   }
 
   /**
-   * Wrapper getEdgeData that calls into get edge data. 
-   * TODO get rid of wrapper
+   * Get the node data for a particular node in the graph.
    *
    * @param ni edge to get the data of
    * @param mflag access flag for edge data
@@ -696,7 +673,8 @@ public:
    */
   inline typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, 
                         galois::MethodFlag mflag = galois::MethodFlag::UNPROTECTED) {
-    return getEdgeDataImpl(ni, mflag);
+    auto& r = graph.getEdgeData(ni, mflag);
+    return r;
   }
 
   /**
@@ -846,8 +824,7 @@ public:
    *
    * @returns A range object that contains all the nodes in this graph
    */
-  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesRange() const {
+  inline const NodeRangeType& allNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[0];
   }
@@ -858,8 +835,7 @@ public:
    *
    * @returns A range object that contains the master nodes in this graph
    */
-  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  masterNodesRange() const {
+  inline const NodeRangeType& masterNodesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[1];
   }
@@ -871,10 +847,43 @@ public:
    * @returns A range object that contains the master nodes and the nodes
    * with outgoing edges in this graph
    */
-  inline const galois::runtime::SpecificRange<boost::counting_iterator<size_t>>&
-  allNodesWithEdgesRange() const {
+  inline const NodeRangeType& allNodesWithEdgesRange() const {
     assert(specificRanges.size() == 3);
     return specificRanges[2];
+  }
+
+  /**
+   * Returns a range object that encapsulates all nodes of the graph;
+   * specific range based on in-edge distribution.
+   *
+   * @returns A range object that contains all the nodes in this graph
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline const NodeRangeType& allNodesRangeIn() const {
+    return graph.allNodesRangeIn();
+  }
+
+  /**
+   * Returns a range object that encapsulates only master nodes in this
+   * graph; specific range based on in-edge distribution.
+   *
+   * @returns A range object that contains the master nodes in this graph
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline const NodeRangeType& masterNodesRangeIn() const {
+    return graph.masterNodesRangeIn();
+  }
+
+  /**
+   * Returns a range object that encapsulates master nodes and nodes
+   * with in-edges in this graph; specific range based on in-edge distribution.
+   *
+   * @returns A range object that contains the master nodes and the nodes
+   * with incoming edges in this graph (i.e. all nodes)
+   */
+  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline const NodeRangeType& allNodesWithEdgesRangeIn() const {
+    return graph.allNodesWithEdgesRangeIn();
   }
 
 protected:
@@ -970,6 +979,7 @@ protected:
   void initialize_specific_ranges() {
     assert(specificRanges.size() == 0);
 
+    // TODO/FIXME is this assertion safe? (i.e. what if a host gets no nodes?)
     // make sure the thread ranges have already been calculated
     // for the 3 ranges
     assert(graph.getThreadRangesVector().size() != 0);
