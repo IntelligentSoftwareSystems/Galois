@@ -40,8 +40,9 @@ class SharedMemApp(GraphBMKSharedMem):
 
             x = bmk2.RunSpec(self, bmkinput)
 
-            x.set_binary("", os.path.join(config.get_var("pathToApps"),
-                                          self.relativeAppPath))
+            x.set_binary("", os.path.expandvars(
+                               os.path.join(config.get_var("pathToApps"),
+                                          self.relativeAppPath)))
             x.set_arg("-t=%d" % numThreads)
 
             nameToAppend = bmkinput.name
@@ -58,9 +59,11 @@ class SharedMemApp(GraphBMKSharedMem):
                 x.set_arg(bmkinput.props.file)
 
             x.set_arg("-statFile=" +
-                      os.path.join(config.get_var("logOutputDirectory"),
-                                   self.getUniqueStatFile(numThreads, 
-                                                          nameToAppend)))
+                      os.path.expandvars(
+                        os.path.join(config.get_var("logOutputDirectory"),
+                                     self.getUniqueStatFile(numThreads, 
+                                     nameToAppend))
+                      ))
 
             listOfRunSpecs.append(x)
 
@@ -194,6 +197,7 @@ class SSSP(SharedMemApp):
         
         return specs
 
-BINARIES = [BFS(), SSSP(), DMR()]
+BINARIES = [BFS()]
+#BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
 #BINARIES = [BCInner(), BCOuter()]
