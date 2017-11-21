@@ -29,7 +29,7 @@ class SharedMemApp(GraphBMKSharedMem):
         shared memory benchmarks and returns them. They can be modified
         later according to the benchmark that you want to run.
         """
-        assert config != None
+        assert config != None # config should be passed through test2.py
         listOfRunSpecs = []
 
         for numThreads in range(self.startThread, self.endThread + 1, self.step):
@@ -194,6 +194,6 @@ class SSSP(SharedMemApp):
         
         return specs
 
-#BINARIES = [BFS(), SSSP(), DMR()]
+BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
-BINARIES = [BCInner(), BCOuter()]
+#BINARIES = [BCInner(), BCOuter()]

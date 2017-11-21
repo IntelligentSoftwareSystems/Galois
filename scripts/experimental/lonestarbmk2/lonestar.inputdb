@@ -1,6 +1,6 @@
 [bmktest2]
 version = 2
-basepath = /net/ohm/export/cdgc/inputs
+basepath = /net/ohm/export/iss/inputs
 
 [random/r4-2e26.gr]
 flags = 
