@@ -214,17 +214,22 @@ struct BFS {
       } else if (personality == CPU)
     #endif
     {
-      bool dopu = false;
       if (_num_iterations % 2) {
-        dopu = true;
+        galois::do_all(
+          galois::iterate(nodesWithEdges),
+          BFS(&_graph, dga, true),
+          galois::steal(),
+          galois::no_stats(),
+          galois::loopname(_graph.get_run_identifier("BFS").c_str()));
+      } else {
+        galois::do_all(
+          galois::iterate(_graph.allNodesWithEdgesRangeIn()),
+          BFS(&_graph, dga, true),
+          galois::steal(),
+          galois::no_stats(),
+          galois::loopname(_graph.get_run_identifier("BFS").c_str()));
       }
       
-      galois::do_all(
-        galois::iterate(nodesWithEdges),
-        BFS(&_graph, dga, dopu),
-        galois::steal(),
-        galois::no_stats(),
-        galois::loopname(_graph.get_run_identifier("BFS").c_str()));
     }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
