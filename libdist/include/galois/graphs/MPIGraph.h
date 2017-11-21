@@ -1,4 +1,4 @@
-/** MPI Graph -*- C++ -*-
+/** MPI Graph -*- C++ -*- // TODO rename
  * @file
  * @section License
  *
@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Graph that uses MPI read to load relavent portions of a graph into memory
+ * Graph that uses read to load all relavent portions of a graph into memory
  * for later reading.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
@@ -28,25 +28,22 @@
 
 // TODO version 2 Galois binary graph support; currently only suppports
 // version 1
-// TODO factor out the mpi read function used by the loading functions into
-// 1 helper function: they all function basically the same save for arguments
 
 #ifndef GALOIS_GRAPH_MPIGRAPH_H
 #define GALOIS_GRAPH_MPIGRAPH_H
 
-#include <limits>
 #include <galois/Galois.h>
 #include <galois/gIO.h>
 #include <galois/gstl.h>
 #include <galois/Threads.h>
 #include <galois/Reduction.h>
 #include <galois/runtime/Network.h>
-#include <mpi.h>
 
 #include <boost/iterator/counting_iterator.hpp>
 namespace galois {
 namespace graphs {
 
+// TODO rename: not MPI graph
 template <typename EdgeDataType>
 class MPIGraph {
 private:
@@ -75,7 +72,7 @@ private:
    * @param nodeStart the first node to load
    * @param numNodesToLoad number of nodes to load
    */
-  void loadOutIndex(MPI_File& graphFile, uint64_t nodeStart, 
+  void loadOutIndex(std::ifstream& graphFile, uint64_t nodeStart, 
                     uint64_t numNodesToLoad) {
     if (numNodesToLoad == 0) {
       return;
@@ -89,29 +86,20 @@ private:
 
     // position to start of contiguous chunk of nodes to read
     uint64_t readPosition = (4 + nodeStart) * sizeof(uint64_t);
+    graphFile.seekg(readPosition);
 
-    uint64_t nodesLoaded = 0;
-    MPI_Status mpiStatus;
+    uint64_t numBytesToLoad = numNodesToLoad * sizeof(uint64_t);
+    uint64_t bytesRead = 0;
 
-    // TODO factor this out
-    while (numNodesToLoad > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numNodesToLoad, 
-                                 (uint64_t)std::numeric_limits<int>::max());
-
-      MPI_File_read_at(graphFile, 
-                       readPosition + (nodesLoaded * sizeof(uint64_t)), 
-                       ((char*)this->outIndexBuffer) + 
-                                 (nodesLoaded * sizeof(uint64_t)), 
-                       toLoad, MPI_UINT64_T, &mpiStatus); 
-
-      int itemsRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT64_T, &itemsRead);
-      numNodesToLoad -= itemsRead;
-      nodesLoaded += itemsRead;
+    while (numBytesToLoad > 0) {
+      graphFile.read(((char*)this->outIndexBuffer) + bytesRead,
+                     numBytesToLoad);
+      size_t numRead = graphFile.gcount();
+      numBytesToLoad -= numRead;
+      bytesRead += numRead;
     }
 
-    assert(numNodesToLoad == 0);
+    assert(numBytesToLoad == 0);
 
     nodeOffset = nodeStart;
   }
@@ -125,7 +113,7 @@ private:
    * @param numGlobalNodes total number of nodes in the graph file; needed
    * to determine offset into the file
    */
-  void loadEdgeDest(MPI_File& graphFile, uint64_t edgeStart, 
+  void loadEdgeDest(std::ifstream& graphFile, uint64_t edgeStart, 
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes) {
     if (numEdgesToLoad == 0) {
       return;
@@ -141,27 +129,19 @@ private:
     // position to start of contiguous chunk of edges to read
     uint64_t readPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                             (sizeof(uint32_t) * edgeStart);
+    graphFile.seekg(readPosition);
 
-    uint64_t edgesLoaded = 0;
-    MPI_Status mpiStatus;
-    
-    // TODO factor this out
-    while (numEdgesToLoad > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numEdgesToLoad, 
-                                 (uint64_t)std::numeric_limits<int>::max());
-    
-      MPI_File_read_at(graphFile, readPosition + (edgesLoaded * sizeof(uint32_t)), 
-                       ((char*)this->edgeDestBuffer) + 
-                             (edgesLoaded * sizeof(uint32_t)), 
-                       toLoad, MPI_UINT32_T, &mpiStatus); 
-      int itemsRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &itemsRead);
-      numEdgesToLoad -= itemsRead;
-      edgesLoaded += itemsRead;
+    uint64_t numBytesToLoad = numEdgesToLoad * sizeof(uint32_t);
+    uint64_t bytesRead = 0;
+    while (numBytesToLoad > 0) {
+      graphFile.read(((char*)this->edgeDestBuffer) + bytesRead,
+                     numBytesToLoad);
+      size_t numRead = graphFile.gcount();
+      numBytesToLoad -= numRead;
+      bytesRead += numRead;
     }
 
-    assert(numEdgesToLoad == 0);
+    assert(numBytesToLoad == 0);
     // save edge offset of this MPI graph for later use
     edgeOffset = edgeStart;
   }
@@ -181,7 +161,7 @@ private:
   template<typename EdgeType, 
            typename std::enable_if<!std::is_void<EdgeType>::value>::type* = 
                                    nullptr>
-  void loadEdgeData(MPI_File& graphFile, uint64_t edgeStart, 
+  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
     galois::gDebug("Loading edge data with MPI read");
@@ -206,31 +186,22 @@ private:
       baseReadPosition += sizeof(uint32_t);
     }
 
-    uint64_t edgesLoaded = 0;
-    MPI_Status mpiStatus;
     // jump to first byte of edge data
     uint64_t readPosition = baseReadPosition + 
                             (sizeof(EdgeDataType) * edgeStart);
-    // TODO factor this out
-    while (numEdgesToLoad > 0) {
-      // File_read can only go up to the max int
-      uint64_t toLoad = std::min(numEdgesToLoad, 
-                                 (uint64_t)std::numeric_limits<int>::max());
+    graphFile.seekg(readPosition);
+    uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
+    uint64_t bytesRead = 0;
 
-      // TODO it only supports EdgeDataType = uint32_t at the moment
-      // you will get undefined behavior otherwise....
-      MPI_File_read_at(graphFile, 
-        readPosition + (edgesLoaded * sizeof(EdgeDataType)),
-        ((char*)this->edgeDataBuffer) + (edgesLoaded * sizeof(EdgeDataType)),
-        toLoad, MPI_UINT32_T, &mpiStatus); 
-
-      int numRead; 
-      MPI_Get_count(&mpiStatus, MPI_UINT32_T, &numRead);
-      numEdgesToLoad -= numRead;
-      edgesLoaded += numRead;
+    while (numBytesToLoad > 0) {
+      graphFile.read(((char*)this->edgeDataBuffer) + bytesRead,
+                     numBytesToLoad);
+      size_t numRead = graphFile.gcount();
+      numBytesToLoad -= numRead;
+      bytesRead += numRead;
     }
 
-    assert(numEdgesToLoad == 0);
+    assert(numBytesToLoad == 0);
   }
 
   /**
@@ -244,7 +215,7 @@ private:
   template<typename EdgeType, 
            typename std::enable_if<std::is_void<EdgeType>::value>::type* = 
                                    nullptr>
-  void loadEdgeData(MPI_File& graphFile, uint64_t edgeStart, 
+  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
     galois::gDebug("Not loading edge data with MPI read");
@@ -330,14 +301,7 @@ public:
       GALOIS_DIE("Cannot load an MPI graph more than once.");
     }
 
-    MPI_File graphFile;
-
-    int fileSuccess = MPI_File_open(MPI_COMM_WORLD, filename.c_str(), 
-                                    MPI_MODE_RDONLY, MPI_INFO_NULL, &graphFile);
-    
-    if (fileSuccess != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, fileSuccess);
-    }
+    std::ifstream graphFile(filename.c_str());
 
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
@@ -352,11 +316,7 @@ public:
                                numGlobalNodes, numGlobalEdges);
     graphLoaded = true;
 
-    int closeSuccess = MPI_File_close(&graphFile);
-
-    if (closeSuccess != MPI_SUCCESS) {
-      MPI_Abort(MPI_COMM_WORLD, closeSuccess);
-    }
+    graphFile.close();
   }
 
   using EdgeIterator = boost::counting_iterator<uint64_t>; 
