@@ -54,17 +54,15 @@ struct mpiMessage {
 
 void* alloc_cb(void* ctx, size_t size)
 {
+  lc_mem_fence();
   mpiMessage* msg = (mpiMessage*) ctx;
   msg->buf.resize(size);
   return msg->buf.data();
 }
 
-#undef  LC_SYNC_SIGNAL
-#define LC_SYNC_SIGNAL thread_signal
-
-static void thread_signal(void* sync) {
-  mpiMessage* msg = (mpiMessage*) sync;
-  assert(msg && "Should not happen\n");
+void thread_signal(void* signal) 
+{
+  mpiMessage* msg = (mpiMessage*) signal;
   delete msg;
 }
 
@@ -85,11 +83,12 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
    */
   std::pair<int, int> initMPI() {
     lc_open(&mv, 1);
-    lc_sync_init(NULL, NULL, thread_signal, NULL);
+    lc_sync_init(NULL, thread_signal);
     return std::make_pair(getID(), getNum());
   }
 
   std::list<mpiMessage> recv;
+  int save;
 
 public:
   NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM) 
@@ -97,6 +96,7 @@ public:
     auto p = initMPI();
     ID = p.first;
     NUM = p.second;
+    save = ID;
   }
 
   ~NetworkIOLWCI() {
@@ -105,13 +105,12 @@ public:
 
   virtual void enqueue(message m) {
     memUsageTracker.incrementMemUsage(m.data.size());
-    mpiMessage *f = new mpiMessage(m.host, m.tag, m.data);
-    f->ctx.type = LC_REQ_PEND;
-    while (!lc_send_queue(mv, f->buf.data(), f->buf.size(), m.host, m.tag, 0, &f->ctx)) {
+    mpiMessage* f = new mpiMessage(m.host, m.tag, m.data);
+    lc_info info = {LC_SYNC_WAKE, LC_SYNC_NULL, {0, (int16_t) m.tag}};
+    while (!lc_send_queue(mv, f->buf.data(), f->buf.size(), m.host, &info, &f->ctx)) {
       progress();
     }
     if (lc_post(&f->ctx, (void*) f)) {
-      assert(f->ctx.type == LC_REQ_DONE && "Something wrong\n");
       delete f;
     }
   }
@@ -120,7 +119,7 @@ public:
     recv.emplace_back();
     auto& m = recv.back();
     size_t size; lc_qtag tag;
-    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, &m.ctx)) {
+    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, LC_SYNC_NULL, &m.ctx)) {
       m.tag = tag;
       memUsageTracker.incrementMemUsage(size);
     } else {
@@ -144,6 +143,7 @@ public:
           recv.erase(it);
           return std::move(msg);
         }
+        lc_progress(mv);
       }
     }
     return message{~0U, 0, std::vector<uint8_t>()};
