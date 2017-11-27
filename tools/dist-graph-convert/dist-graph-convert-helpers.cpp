@@ -340,11 +340,11 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
   return DoubleUint64Pair(nodePair, edgePair);
 }
 
-std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
+std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::MPIGraph<void> mpiGraph;
+  galois::graphs::BufferedGraph<void> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);

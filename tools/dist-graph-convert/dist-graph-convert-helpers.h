@@ -37,7 +37,7 @@
 #include "galois/runtime/Network.h"
 #include "galois/DistAccumulator.h"
 #include "galois/graphs/OfflineGraph.h"
-#include "galois/graphs/MPIGraph.h"
+#include "galois/graphs/BufferedGraph.h"
 
 // useful typedefs that shorten long declarations
 using Uint64Pair = std::pair<uint64_t, uint64_t>;
@@ -492,7 +492,7 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
 DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
 
 /**
- * Load a Galois binary graph into an MPIGraph and load assigned nodes/edges
+ * Load a Galois binary graph into an BufferedGraph and load assigned nodes/edges
  * into memory such that srcs become dests and dests become srcs (i.e.
  * transpose graph).
  *
@@ -506,11 +506,11 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
  * pass into the function
  */
 template<typename EdgeDataTy>
-std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
+std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
+  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
@@ -555,14 +555,14 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
         }
       },
       galois::steal(),
-      galois::loopname("LoadTransposeEdgesMPIGraph"));
+      galois::loopname("LoadTransposeEdgesBufferedGraph"));
   }
   
   return edgeData;
 }
 
 /**
- * Load a Galois binary graph into an MPIGraph and load assigned nodes/edges
+ * Load a Galois binary graph into an BufferedGraph and load assigned nodes/edges
  * into memory such that each edge is loaded twice (extra in reverse direction).
  *
  * @tparam EdgeDataTy type of edge data to read
@@ -575,12 +575,12 @@ std::vector<uint32_t> loadTransposedEdgesFromMPIGraph(
  * passed into the function; 1 edge in original becomes 2
  */
 template<typename EdgeDataTy>
-std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
+std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
   // TODO change this
-  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
+  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
@@ -633,7 +633,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
         }
       },
       galois::steal(),
-      galois::loopname("LoadSymmetricEdgesMPIGraph"));
+      galois::loopname("LoadSymmetricEdgesBufferedGraph"));
   }
   
   return edgeData;
@@ -651,17 +651,17 @@ std::vector<uint32_t> loadSymmetricEdgesFromMPIGraph(
  * @returns a vector with edges corresponding to the nodes/edges
  * passed into the function; multi edges and self loops removed
  */
-std::vector<uint32_t> loadCleanEdgesFromMPIGraph(
+std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 );
 
 template<typename EdgeDataTy>
-std::vector<uint32_t> loadMappedSourceEdgesFromMPIGraph(
+std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
     const std::string& mappedBinary) {
-  galois::graphs::MPIGraph<EdgeDataTy> mpiGraph;
+  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
   mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);

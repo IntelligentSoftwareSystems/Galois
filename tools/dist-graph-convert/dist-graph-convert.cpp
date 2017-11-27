@@ -217,7 +217,7 @@ struct Gr2TGr : public Conversion {
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to do it TRANSPOSED
     std::vector<uint32_t> localEdges =
-        loadTransposedEdgesFromMPIGraph<EdgeTy>(inputFile, nodesToRead, 
+        loadTransposedEdgesFromBufferedGraph<EdgeTy>(inputFile, nodesToRead, 
                                                 edgesToRead, totalNumNodes, 
                                                 totalNumEdges);
     // sanity check
@@ -263,7 +263,7 @@ struct Gr2SGr : public Conversion {
     // read edges of assigned nodes using MPI_Graph, load into the same format
     // used by edgelist2gr; key is to load one edge as 2 edges (i.e. symmetric)
     std::vector<uint32_t> localEdges =
-        loadSymmetricEdgesFromMPIGraph<EdgeTy>(inputFile, nodesToRead, 
+        loadSymmetricEdgesFromBufferedGraph<EdgeTy>(inputFile, nodesToRead, 
                                                edgesToRead, totalNumNodes, 
                                                totalNumEdges);
     // sanity check
@@ -355,7 +355,7 @@ struct Gr2CGr : public Conversion {
            edgesToRead.first, edgesToRead.second, 
            edgesToRead.second - edgesToRead.first);
 
-    std::vector<uint32_t> localEdges = loadCleanEdgesFromMPIGraph(inputFile, 
+    std::vector<uint32_t> localEdges = loadCleanEdgesFromBufferedGraph(inputFile, 
                                            nodesToRead, edgesToRead, 
                                            totalNumNodes, totalNumEdges);
     uint64_t cleanEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
@@ -395,7 +395,7 @@ struct Gr2RGr : public Conversion {
     Uint64Pair edgesToRead;
     std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
     // this will remap the source nodes and return a TRANSPOSE edge list
-    std::vector<uint32_t> localEdges = loadMappedSourceEdgesFromMPIGraph<EdgeTy>(
+    std::vector<uint32_t> localEdges = loadMappedSourceEdgesFromBufferedGraph<EdgeTy>(
         inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges,
         nodeMapBinary);
     
@@ -524,6 +524,8 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   llvm::cl::ParseCommandLineOptions(argc, argv);
   galois::setActiveThreads(threadsToUse);
+
+  // TODO make sure MPI is initialized (this may use MPI write)
 
   switch (convertMode) {
     case edgelist2gr: 
