@@ -17,8 +17,8 @@ class DistApp(GraphBMKDistApp):
   step = 10
 
   # list of hosts to loop through
-  #testHosts = [1]
-  testHosts = [1, 2, 3]
+  testHosts = [1]
+  #testHosts = [1, 2, 3]
 
   # list of cuts to test
   # TODO use hybrid cuts?
@@ -69,8 +69,11 @@ class DistApp(GraphBMKDistApp):
                                       self.relativeAppPath)))
           x.set_arg("-t=%d" % numThreads)
 
+          # set transpose or symm graph flag
           if not (bmkinput.props.file).endswith(".sgr"):
             x.set_arg("-graphTranspose=%s" % bmkinput.props.transpose)
+          else:
+            x.set_arg("-symmetricGraph")
 
           nameToAppend = bmkinput.name
 
@@ -134,8 +137,81 @@ class BFSPull(DistApp):
       
     return specs
 
+class CCPush(DistApp):
+  relativeAppPath = "cc_push"
+  benchmark = "cc_push"
+  
+class CCPull(DistApp):
+  relativeAppPath = "cc_pull"
+  benchmark = "cc_pull"
+
+class KCorePush(DistApp):
+  relativeAppPath = "kcore_push"
+  benchmark = "kcore_push"
+
+  def get_run_spec(self, bmkinput, config):
+    """Adds kcore num"""
+    specs = self.get_default_run_specs(bmkinput, config)
+
+    for s in specs:
+      s.set_arg("-kcore=100")
+      
+    return specs
+
+class KCorePull(DistApp):
+  relativeAppPath = "kcore_pull"
+  benchmark = "kcore_pull"
+
+  def get_run_spec(self, bmkinput, config):
+    """Adds kcore num"""
+    specs = self.get_default_run_specs(bmkinput, config)
+
+    for s in specs:
+      s.set_arg("-kcore=100")
+      
+    return specs
+
+class PageRankPush(DistApp):
+  relativeAppPath = "pagerank_push"
+  benchmark = "pagerank_push"
+  # TODO max iterations?
+
+class PageRankPull(DistApp):
+  relativeAppPath = "pagerank_pull"
+  benchmark = "pagerank_pull"
+  # TODO max iterations?
+
+class SSSPPush(DistApp):
+  relativeAppPath = "sssp_push"
+  benchmark = "sssp_push"
+
+  def get_run_spec(self, bmkinput, config):
+    """Adds source of sssp"""
+    specs = self.get_default_run_specs(bmkinput, config)
+
+    for s in specs:
+      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      
+    return specs
+
+class SSSPPull(DistApp):
+  relativeAppPath = "sssp_pull"
+  benchmark = "sssp_pull"
+
+  def get_run_spec(self, bmkinput, config):
+    """Adds source of sssp"""
+    specs = self.get_default_run_specs(bmkinput, config)
+
+    for s in specs:
+      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      
+    return specs
+
+
 ################################################################################
 # Specification of binaries to run
 ################################################################################
 
-BINARIES = [BFSPush(), BFSPull()]
+#BINARIES = [BFSPush(), BFSPull()]
+BINARIES = [BFSPush(), BFSPull(), CCPush(), CCPull(), KCorePush(), KCorePull(),
+            PageRankPush(), PageRankPull(), SSSPPush(), SSSPPull()]

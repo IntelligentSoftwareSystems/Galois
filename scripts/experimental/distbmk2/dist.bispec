@@ -1,3 +1,11 @@
 #v1
-bfs_push rmat20
-bfs_pull rmat20
+bfs_push rmat24
+bfs_pull rmat24
+cc_push rmat24s
+cc_pull rmat24s
+kcore_push rmat24s
+kcore_pull rmat24s
+pagerank_push rmat24
+pagerank_pull rmat24
+sssp_push rmat24
+sssp_pull rmat24
