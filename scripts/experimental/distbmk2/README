@@ -3,7 +3,7 @@ How to run:
 Set the following environment variables:
 
 BMK_DIST_PATH to the dist_apps
-BMK_LOGS to wherever you want the logs to go
+BMK_DISTLOGS to wherever you want the logs to go
 BMK_MPIRUN_PATH to the mpirun binary
 
 Then run the following in THIS directory (same as README):
