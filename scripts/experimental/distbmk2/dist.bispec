@@ -1,24 +1,3 @@
 #v1
-bfs_push 
-#barneshut nothing
-#bfs r4-2e26
-##TODO needs graph
-#bc-inner nothing
-##TODO needs graph
-#bc-outer nothing
-##TODO needs graph
-#connectedcomponents nothing
-#dmr r5M
-#gmetis USA-road-d.USA
-#independentset r4-2e26
-## TODO add graph for matrix completion
-#matrixcompletion nothing
-#mcm nothing
-## TODO add graph for page rank
-#pagerank nothing
-#preflowpush r4-2e26
-#pta nothing
-#sssp r4-2e26
-## TODO get graphs for bc
-##bc-outer
-##bc-inner
+bfs_push rmat20
+bfs_pull rmat20
