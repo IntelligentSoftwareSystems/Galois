@@ -323,7 +323,7 @@ public:
 
     // file graph that is mmapped for much faster reading; will use this
     // when possible from now on in the code
-    std::vector<galois::graphs::MPIGraph<EdgeTy>> mpiGraph(DecomposeFactor);
+    std::vector<galois::graphs::BufferedGraph<EdgeTy>> mpiGraph(DecomposeFactor);
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       std::stringstream ss;
@@ -394,7 +394,7 @@ public:
   }
 
   void loadStatistics(galois::graphs::OfflineGraph& g, 
-      std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph,
+      std::vector<galois::graphs::BufferedGraph<EdgeTy>>& mpiGraph,
       std::vector<uint64_t>& prefixSumOfEdges,
       galois::Timer& inspectionTimer) {
 
@@ -600,7 +600,7 @@ public:
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
       galois::graphs::OfflineGraph& g,
-      std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph) {
+      std::vector<galois::graphs::BufferedGraph<EdgeTy>>& mpiGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -640,7 +640,7 @@ public:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph,
+                         std::vector<galois::graphs::BufferedGraph<EdgeTy>>& mpiGraph,
                          std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -734,7 +734,7 @@ public:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         std::vector<galois::graphs::MPIGraph<EdgeTy>>& mpiGraph,
+                         std::vector<galois::graphs::BufferedGraph<EdgeTy>>& mpiGraph,
                          std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 

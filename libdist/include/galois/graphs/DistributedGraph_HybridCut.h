@@ -222,7 +222,7 @@ public:
     galois::Timer edgeInspectionTimer;
     edgeInspectionTimer.start();
 
-    galois::graphs::MPIGraph<EdgeTy> mpiGraph;
+    galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
     mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
                               *edgeEnd, base_hGraph::numGlobalNodes,
                               base_hGraph::numGlobalEdges);
@@ -309,7 +309,7 @@ private:
    * threshold, the edges go to the host that contains the destination
    */
   template<typename GraphTy>
-  void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+  void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                  uint32_t VCutThreshold) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
@@ -468,7 +468,7 @@ private:
    */
   // Go over assigned nodes and determine where edges should go.
   std::vector<uint64_t> assignEdges(
-      galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+      galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
       uint64_t numEdges_distribute, 
       uint32_t VCutThreshold, 
       std::vector<std::vector<size_t>>& mirrorNodes,
@@ -568,7 +568,7 @@ private:
              !std::is_void<typename GraphTy::edge_data_type>::value
            >::type* = nullptr>
   void readAndSendEdges(GraphTy& graph, 
-                        galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                        galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                         uint32_t VCutThreshold,
                         std::atomic<uint64_t>& edgesToReceive) {
     typedef std::vector<std::vector<uint64_t>> DstVecType;
@@ -711,7 +711,7 @@ private:
              std::is_void<typename GraphTy::edge_data_type>::value
            >::type* = nullptr>
   void readAndSendEdges(GraphTy& graph, 
-                        galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                        galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                         uint32_t VCutThreshold,
                         std::atomic<uint64_t>& edgesToReceive) {
     auto& net = galois::runtime::getSystemNetworkInterface();

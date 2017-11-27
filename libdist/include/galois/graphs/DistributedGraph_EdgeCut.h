@@ -123,7 +123,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
       uint64_t _numEdges;
 
       // only used to determine node splits among hosts; abandonded later
-      // for the MPIGraph
+      // for the BufferedGraph
       galois::graphs::OfflineGraph g(filename);
 
       base_hGraph::numGlobalNodes = g.size();
@@ -171,7 +171,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
 
       galois::Timer timer;
       timer.start();
-      galois::graphs::MPIGraph<EdgeTy> mpiGraph;
+      galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
 
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
                                 *edgeEnd, base_hGraph::numGlobalNodes,
@@ -338,7 +338,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
   }
 
   template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     if (base_hGraph::id == 0) {
       galois::gPrint("Loading edge-data while creating edges\n");
     }
@@ -373,7 +373,7 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
   }
 
   template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+  void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     if (base_hGraph::id == 0) {
       galois::gPrint("Loading void edge-data while creating edges\n");
     }

@@ -44,7 +44,7 @@
 #include "galois/Galois.h"
 #include "galois/graphs/LC_CSR_Graph.h"
 #include "galois/graphs/B_LC_CSR_Graph.h"
-#include "galois/graphs/MPIGraph.h"
+#include "galois/graphs/BufferedGraph.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/GlobalObj.h"

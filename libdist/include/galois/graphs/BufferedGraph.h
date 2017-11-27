@@ -1,4 +1,4 @@
-/** MPI Graph -*- C++ -*- // TODO rename
+/** Buffered Graph -*- C++ -*- 
  * @file
  * @section License
  *
@@ -29,9 +29,8 @@
 // TODO version 2 Galois binary graph support; currently only suppports
 // version 1
 
-#ifndef GALOIS_GRAPH_MPIGRAPH_H
-#define GALOIS_GRAPH_MPIGRAPH_H
-
+#ifndef GALOIS_GRAPH_BUFGRAPH_H
+#define GALOIS_GRAPH_BUFGRAPH_H
 #include <galois/Galois.h>
 #include <galois/gIO.h>
 #include <galois/gstl.h>
@@ -43,9 +42,8 @@
 namespace galois {
 namespace graphs {
 
-// TODO rename: not MPI graph
 template <typename EdgeDataType>
-class MPIGraph {
+class BufferedGraph {
 private:
   // buffers that you load data into
   uint64_t* outIndexBuffer = nullptr;
@@ -68,7 +66,7 @@ private:
    * Load the out indices (i.e. where a particular node's edges begin in the
    * array of edges) from the file.
    *
-   * @param graphFile loaded MPI file for the graph
+   * @param graphFile loaded file for the graph
    * @param nodeStart the first node to load
    * @param numNodesToLoad number of nodes to load
    */
@@ -107,7 +105,7 @@ private:
   /**
    * Load the edge destination information from the file.
    *
-   * @param graphFile loaded MPI file for the graph
+   * @param graphFile loaded file for the graph
    * @param edgeStart the first edge to load
    * @param numEdgesToLoad number of edges to load
    * @param numGlobalNodes total number of nodes in the graph file; needed
@@ -142,7 +140,7 @@ private:
     }
 
     assert(numBytesToLoad == 0);
-    // save edge offset of this MPI graph for later use
+    // save edge offset of this graph for later use
     edgeOffset = edgeStart;
   }
 
@@ -164,7 +162,7 @@ private:
   void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
-    galois::gDebug("Loading edge data with MPI read");
+    galois::gDebug("Loading edge data");
 
     if (numEdgesToLoad == 0) {
       return;
@@ -218,7 +216,7 @@ private:
   void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
-    galois::gDebug("Not loading edge data with MPI read");
+    galois::gDebug("Not loading edge data");
     // do nothing (edge data is void, i.e. no edge data)
   }
 
@@ -257,31 +255,28 @@ public:
   /**
    * Class vars should be initialized by in-class initialization; all
    * left is to reset read counters.
-   *
-   * NOTE THAT IT IS ASSUMED THAT MPI HAS BEEN INITIALIZED ALREADY
-   * WHEN THIS CLASS IS CREATED.
    */
-  MPIGraph() {
+  BufferedGraph() {
     resetReadCounters();
   }
 
   /**
    * On destruction, free allocated buffers (if necessary).
    */
-  ~MPIGraph() noexcept {
+  ~BufferedGraph() noexcept {
     freeMemory();
   }
 
   // copy not allowed
-  MPIGraph(const MPIGraph&) = delete;
-  MPIGraph& operator=(const MPIGraph&) = delete;
+  BufferedGraph(const BufferedGraph&) = delete;
+  BufferedGraph& operator=(const BufferedGraph&) = delete;
   // move not allowed
-  MPIGraph(MPIGraph&&) = delete;
-  MPIGraph& operator=(MPIGraph&&) = delete;
+  BufferedGraph(BufferedGraph&&) = delete;
+  BufferedGraph& operator=(BufferedGraph&&) = delete;
 
   /**
    * Given a node/edge range to load, loads the specified portion of the graph 
-   * into memory buffers using MPI read.
+   * into memory buffers using read.
    *
    * @param filename name of graph to load; should be in Galois binary graph
    * format
@@ -298,7 +293,7 @@ public:
                         uint64_t edgeEnd, uint64_t numGlobalNodes,
                         uint64_t numGlobalEdges) {
     if (graphLoaded) {
-      GALOIS_DIE("Cannot load an MPI graph more than once.");
+      GALOIS_DIE("Cannot load an buffered graph more than once.");
     }
 
     std::ifstream graphFile(filename.c_str());
@@ -329,7 +324,7 @@ public:
    */
   EdgeIterator edgeBegin(uint64_t globalNodeID) {
     if (!graphLoaded) {
-      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+      GALOIS_DIE("Graph hasn't been loaded yet.");
     }
 
     if (numLocalNodes == 0) {
@@ -357,7 +352,7 @@ public:
    */
   EdgeIterator edgeEnd(uint64_t globalNodeID) {
     if (!graphLoaded) {
-      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+      GALOIS_DIE("Graph hasn't been loaded yet.");
     }
 
     if (numLocalNodes == 0) {
@@ -380,7 +375,7 @@ public:
    */
   uint64_t edgeDestination(uint64_t globalEdgeID) {
     if (!graphLoaded) {
-      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+      GALOIS_DIE("Graph hasn't been loaded yet.");
     }
 
     if (numLocalEdges == 0) {
@@ -406,7 +401,7 @@ public:
   >
   EdgeDataType edgeData(uint64_t globalEdgeID) {
     if (!graphLoaded) {
-      GALOIS_DIE("MPI graph hasn't been loaded yet.");
+      GALOIS_DIE("Graph hasn't been loaded yet.");
     }
     if (edgeDataBuffer == nullptr) {
       GALOIS_DIE("Trying to get edge data when graph has no edge data.");
@@ -433,7 +428,7 @@ public:
     std::is_void<K>::value>::type* = nullptr
   >
   unsigned edgeData(uint64_t globalEdgeID) {
-    galois::gWarn("Getting edge data on MPI graph when it doesn't exist\n");
+    galois::gWarn("Getting edge data on graph when it doesn't exist\n");
     return 0;
   }
 

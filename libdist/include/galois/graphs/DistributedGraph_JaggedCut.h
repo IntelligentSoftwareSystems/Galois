@@ -260,7 +260,7 @@ public:
     galois::Timer edgeInspectionTimer;
     edgeInspectionTimer.start();
 
-    galois::graphs::MPIGraph<EdgeTy> mpiGraph;
+    galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
     mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
                               *edgeEnd, base_hGraph::numGlobalNodes,
                               base_hGraph::numGlobalEdges);
@@ -322,7 +322,7 @@ public:
 private:
 
   void determineJaggedColumnMapping(galois::graphs::OfflineGraph& g,
-                                    galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+                                    galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     auto activeThreads = galois::runtime::activeThreads;
     galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
 
@@ -426,7 +426,7 @@ private:
   }
 
   void loadStatistics(galois::graphs::OfflineGraph& g,
-                      galois::graphs::MPIGraph<EdgeTy>& mpiGraph,
+                      galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                       std::vector<uint64_t>& prefixSumOfEdges) {
     base_hGraph::numOwned = base_hGraph::gid2host[base_hGraph::id].second - base_hGraph::gid2host[base_hGraph::id].first;
 
@@ -599,7 +599,7 @@ private:
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
                  galois::graphs::OfflineGraph& g,
-                 galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+                 galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     if (base_hGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -638,7 +638,7 @@ private:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+                         galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -726,7 +726,7 @@ private:
            >::type* = nullptr>
   void loadEdgesFromFile(GraphTy& graph, 
                          galois::graphs::OfflineGraph& g,
-                         galois::graphs::MPIGraph<EdgeTy>& mpiGraph) {
+                         galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
     auto& net = galois::runtime::getSystemNetworkInterface();
 

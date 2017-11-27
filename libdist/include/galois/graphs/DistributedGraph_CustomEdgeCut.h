@@ -262,7 +262,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       galois::Timer edgeInspectionTimer;
       edgeInspectionTimer.start();
 
-      galois::graphs::MPIGraph<EdgeTy> mpiGraph;
+      galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
                                 *edgeEnd, base_hGraph::numGlobalNodes,
       base_hGraph::numGlobalEdges);
@@ -346,7 +346,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
     }
 
     template<typename GraphTy>
-    void loadEdges(GraphTy& graph, galois::graphs::MPIGraph<EdgeTy>& mpiGraph,
+    void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                    uint64_t numEdges_distribute){
       if (base_hGraph::id == 0) {
         if (std::is_void<typename GraphTy::edge_data_type>::value) {
@@ -383,7 +383,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
     // TODO Function way too long; split into helper functions + calls
     // Just calculating the number of edges to send to other hosts
     void assign_edges_phase1(galois::graphs::OfflineGraph& g, 
-                             galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                             galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                              uint64_t numEdges_distribute, 
                              std::vector<int32_t>& vertexIDMap, 
                              std::vector<uint64_t>& prefixSumOfEdges, 
@@ -645,7 +645,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
                !std::is_void<typename GraphTy::edge_data_type>::value
              >::type* = nullptr>
       void assign_load_send_edges(GraphTy& graph, 
-                                  galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                                  galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
         using DstVecType = std::vector<std::vector<uint64_t>>;
         galois::substrate::PerThreadStorage<DstVecType> 
@@ -752,7 +752,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
                std::is_void<typename GraphTy::edge_data_type>::value
              >::type* = nullptr>
       void assign_load_send_edges(GraphTy& graph, 
-                                  galois::graphs::MPIGraph<EdgeTy>& mpiGraph, 
+                                  galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                                   uint64_t numEdges_distribute) {
         using DstVecType = std::vector<std::vector<uint64_t>>;
         galois::substrate::PerThreadStorage<DstVecType> 
