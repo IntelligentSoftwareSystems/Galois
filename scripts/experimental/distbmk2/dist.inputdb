@@ -2,10 +2,58 @@
 version = 2
 basepath = /net/ohm/export/iss/dist-inputs
 
+[rmat20.gr]
+flags = 
+name = rmat20
+file = rmat20.gr
+transpose = transpose/rmat20.gr
+format = bin/galois
+
+[rmat22.gr]
+flags = 
+name = rmat22
+file = rmat22.gr
+transpose = transpose/rmat22.gr
+format = bin/galois
+
+[rmat24.gr]
+flags = 
+name = rmat24
+file = rmat24.gr
+transpose = transpose/rmat24.gr
+format = bin/galois
+
 [rmat25.gr]
 flags = 
 name = rmat25
 file = rmat25.gr
 transpose = transpose/rmat25.gr
-symmetric = symmetric/rmat25.sgr
+format = bin/galois
+
+[rmat20.sgr]
+flags = 
+name = rmat20s
+file = symmetric/rmat20.sgr
+transpose = 
+format = bin/galois
+
+[rmat22.sgr]
+flags = 
+name = rmat22s
+file = symmetric/rmat22.sgr
+transpose = 
+format = bin/galois
+
+[rmat24.sgr]
+flags = 
+name = rmat24s
+file = symmetric/rmat24.sgr
+transpose = 
+format = bin/galois
+
+[rmat25.sgr]
+flags = 
+name = rmat25s
+file = symmetric/rmat25.sgr
+transpose = 
 format = bin/galois

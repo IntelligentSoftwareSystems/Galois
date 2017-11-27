@@ -1,3 +1,15 @@
 [bmktest2-props]
 version = 2
 paths = 
+
+[rmat20]
+source = 0
+
+[rmat22]
+source = 0
+
+[rmat24]
+source = 7601598
+
+[rmat25]
+source = 7601598
