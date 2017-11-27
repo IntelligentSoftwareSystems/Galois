@@ -6,28 +6,28 @@ basepath = /net/ohm/export/iss/dist-inputs
 flags = 
 name = rmat20
 file = rmat20.gr
-transpose = transpose/rmat20.gr
+transpose = /net/ohm/export/iss/dist-inputs/transpose/rmat20.tgr
 format = bin/galois
 
 [rmat22.gr]
 flags = 
 name = rmat22
 file = rmat22.gr
-transpose = transpose/rmat22.gr
+transpose = /net/ohm/export/iss/dist-inputs/transpose/rmat22.tgr
 format = bin/galois
 
 [rmat24.gr]
 flags = 
 name = rmat24
 file = rmat24.gr
-transpose = transpose/rmat24.gr
+transpose = /net/ohm/export/iss/dist-inputs/transpose/rmat24.tgr
 format = bin/galois
 
 [rmat25.gr]
 flags = 
 name = rmat25
 file = rmat25.gr
-transpose = transpose/rmat25.gr
+transpose = /net/ohm/export/iss/dist-inputs/transpose/rmat25.tgr
 format = bin/galois
 
 [rmat20.sgr]

@@ -14,13 +14,12 @@ class GraphBMKDistApp(bmk2.Binary):
     """Return the id of this benchmark."""
     return "%s" % (self.benchmark)
 
-  # TODO add hosts
-  def getUniqueStatFile(self, numThreads, numHosts, graphName):
+  def getUniqueStatFile(self, numThreads, numHosts, currentCut, graphName):
     """Get a statfile name given num threads + graph name being used."""
     timeNow = datetime.datetime.now().strftime(TIME_FMT).replace(" ", "_")
 
-    return ("%s_t=%d_n=%d_%s_%s.log" % (self.benchmark, numThreads, numHosts,
-                                        graphName, timeNow))
+    return ("%s_t=%d_n=%d_%s_%s_%s.log" % (self.benchmark, numThreads, numHosts,
+                                           graphName, currentCut, timeNow))
 
 class GraphBMKDistAppProps(bmk2.Properties):
   """Properties pertaining to a dist app."""
