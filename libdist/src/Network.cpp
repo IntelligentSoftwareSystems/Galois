@@ -60,6 +60,7 @@ NetworkInterface::NetworkInterface() {
 }
 
 NetworkInterface::~NetworkInterface() {
+  #ifndef GALOIS_USE_LWCI
   int finalizeSuccess = MPI_Finalize();
 
   if (finalizeSuccess != MPI_SUCCESS) {
@@ -67,6 +68,7 @@ NetworkInterface::~NetworkInterface() {
   }
 
   galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
+  #endif
 }
 
 void NetworkInterface::reportMemUsage() const {

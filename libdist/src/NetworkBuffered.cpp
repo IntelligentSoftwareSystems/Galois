@@ -336,8 +336,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     // Initialize LWCI before MPI
     std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker);
     if (ID == 0) fprintf(stderr, "**Using LWCI Communication layer**\n");
-    #endif
-
+    #else
     initializeMPI();
     int rank;
     int hostSize;
@@ -353,6 +352,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
+    #endif
 
     #ifndef GALOIS_USE_LWCI
     std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
