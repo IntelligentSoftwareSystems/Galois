@@ -26,7 +26,8 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#define __USE_BFS__
+
+#define NUM_SOURCES 1
 
 constexpr static const char* const REGION_NAME = "T_BC";
 
@@ -36,7 +37,6 @@ constexpr static const char* const REGION_NAME = "T_BC";
 
 #include <iostream>
 #include <limits>
-#include <random>
 
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
@@ -62,6 +62,9 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                 cll::desc("Number of sources to use for "
                                           "betweeness-centraility"),
                                 cll::init(0));
+static cll::opt<unsigned int> vIndex("index", 
+                                cll::desc("Index to print min distance of"),
+                                cll::init(0));
 
 /******************************************************************************/
 /* Graph structure declarations */
@@ -73,36 +76,21 @@ static uint64_t current_src_node = 0;
 // NOTE: types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
+  std::vector<uint32_t> oldMinDistances;
   std::vector<uint32_t> minDistances;
+
   std::vector<uint32_t> shortestPathNumbers;
-  //// SSSP vars
-  //std::atomic<uint32_t> current_length;
+  std::vector<char> readyStatus;
+  std::vector<uint32_t> sToSend;
+  std::vector<uint32_t> savedRoundNumbers;
 
-  //uint32_t old_length;
-
-  //// Betweeness centrality vars
-  //uint32_t num_shortest_paths;
-  //uint32_t num_successors;
-  //std::atomic<uint32_t> num_predecessors;
-  //std::atomic<uint32_t> trim;
-  //std::atomic<uint32_t> to_add;
-
-  //float to_add_float;
-  //float dependency;
-
-  //float betweeness_centrality;
-
-  //// used to determine if data has been propogated yet
-  //uint8_t propogation_flag;
+  std::vector<float> dependencyValues;
+  float bc;
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
-#ifndef __USE_BFS__
-typedef hGraph<NodeData, unsigned int, true> Graph;
-#else
 typedef hGraph<NodeData, void, true> Graph;
-#endif
 
 typedef typename Graph::GraphNode GNode;
 
@@ -124,7 +112,7 @@ galois::DynamicBitSet bitset_dependency;
 /* Functors for running the algorithm */
 /******************************************************************************/
 uint64_t offset;
-
+uint32_t roundNumber = 0;
 
 struct InitializeGraph {
   Graph *graph;
@@ -141,7 +129,6 @@ struct InitializeGraph {
       InitializeGraph{&_graph}, 
       galois::loopname("InitializeGraph"), 
       //galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()), 
-      galois::timeit(),
       galois::no_stats()
     );
   }
@@ -151,36 +138,31 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    // for now 5 sources per run
-    src_data.minDistances.resize(5);
-    src_data.shortestPathNumbers.resize(5);
+    src_data.oldMinDistances.resize(NUM_SOURCES);
+    src_data.minDistances.resize(NUM_SOURCES);
 
-    //src_data.betweeness_centrality = 0;
-    //src_data.num_shortest_paths = 0;
-    //src_data.num_successors = 0;
-    //src_data.num_predecessors = 0;
-    //src_data.trim = 0;
-    //src_data.to_add = 0;
-    //src_data.to_add_float = 0;
-    //src_data.dependency = 0;
-    //src_data.propogation_flag = false;
+    src_data.shortestPathNumbers.resize(NUM_SOURCES);
+    src_data.readyStatus.resize(NUM_SOURCES);
+    src_data.sToSend.resize(NUM_SOURCES);
+    src_data.savedRoundNumbers.resize(NUM_SOURCES);
+
+    src_data.dependencyValues.resize(NUM_SOURCES);
+
+    src_data.bc = 0.0;
   }
 };
 
-/* This is used to reset node data when switching to a different 5 source set */
+/* This is used to reset node data when switching to a different NUM_SOURCES source set */
 struct InitializeIteration {
   const uint32_t &local_infinity;
-  const uint64_t &local_current_src_node;
   Graph *graph;
 
   InitializeIteration(const uint32_t &_local_infinity,
                       const uint64_t &_local_current_src_node,
-                      Graph* _graph) : 
-                       local_infinity(_local_infinity),
-                       local_current_src_node(_local_current_src_node),
-                       graph(_graph){}
+                      Graph* _graph) 
+    : local_infinity(_local_infinity), graph(_graph) { }
 
-  /* Reset necessary graph metadata for next iteration of SSSP */
+  /* Reset necessary graph metadata */
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
 
@@ -193,193 +175,363 @@ struct InitializeIteration {
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
-   * (aside from betweeness centrality measure */
+   * (aside from betweeness centrality measure) */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    for (unsigned i = 0; i < 5; i++) {
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
       if ((offset + i) == graph->getGID(src)) {
         src_data.minDistances[i] = 0;
-        src_data.shortestPathNumber[i] = 1;
+        src_data.shortestPathNumbers[i] = 1;
       } else {
         src_data.minDistances[i] = local_infinity;
         src_data.shortestPathNumbers[i] = 0;
       }
+      src_data.readyStatus[i] = 1;
+      src_data.sToSend[i] = 0;
+      src_data.savedRoundNumbers[i] = local_infinity;
+      src_data.dependencyValues[i] = 0;
     }
 
-    //bool is_source = graph->getGID(src) == local_current_src_node;
-
-    //if (!is_source) {
-    //  src_data.current_length = local_infinity;
-    //  src_data.old_length = local_infinity;
-    //  src_data.num_shortest_paths = 0;
-    //  src_data.propogation_flag = false;
-    //} else {
-    //  src_data.current_length = 0;
-    //  src_data.old_length = 0; 
-    //  src_data.num_shortest_paths = 1;
-    //  src_data.propogation_flag = true;
+    src_data.oldMinDistances = src_data.minDistances;
+    //// old min distance setting
+    //for (unsigned i = 0; i < NUM_SOURCES; i++) {
+    //  src_data.oldMinDistances[i] = src_data.minDistances[i];
     //}
-    //src_data.num_predecessors = 0;
-    //src_data.num_successors = 0;
-    //src_data.dependency = 0;
-
-    //assert(src_data.trim.load() == 0);
-    //assert(src_data.to_add.load() == 0);
-    //assert(src_data.to_add_float == 0);
   }
 };
 
-/* Need a separate call for the first iteration as the condition check is 
- * different */
-struct FirstIterationSSSP {
+struct MidUpdate {
   Graph* graph;
-  FirstIterationSSSP(Graph* _graph) : graph(_graph){}
+  MidUpdate(Graph* _graph) : graph(_graph) { }
 
-  void static go(Graph& _graph){
-    unsigned int __begin, __end;
-    if (_graph.isLocal(current_src_node)) {
-      __begin = _graph.getLID(current_src_node);
-      __end = __begin + 1;
-    } else {
-      __begin = 0;
-      __end = 0;
-    }
-
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      galois::iterate(__begin, __end), 
-      FirstIterationSSSP(&_graph),
-      galois::loopname("SSSP"),
+      galois::iterate(allNodes.begin(), allNodes.end()), 
+      MidUpdate(&_graph),
+      galois::loopname("MidUpdate"),
       galois::no_stats()
     );
-
-    // Next op will read src, current length
-    _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
-                Broadcast_current_length, Bitset_current_length>(
-                "SSSP");
   }
 
-  /* Does SSSP, push/filter based */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    for (auto current_edge : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(current_edge);
 
-      if (src == dst) {
-        continue;
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      if (src_data.oldMinDistances[i] != src_data.minDistances[i]) {
+        src_data.shortestPathNumbers[i] = 0;
+        src_data.readyStatus[i] = 1;
       }
-
-      auto& dst_data = graph->getData(dst);
-
-      #ifndef __USE_BFS__
-      uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                              src_data.current_length + 1;
-      #else
-      // BFS 
-      uint32_t new_dist = 1 + src_data.current_length;
-      #endif
-
-      galois::atomicMin(dst_data.current_length, new_dist);
-
-      bitset_current_length.set(dst);
     }
   }
 };
 
-/* Sub struct for running SSSP (beyond 1st iteration) */
-struct SSSP {
+struct APSP2 {
+  Graph* graph;
+  APSP2(Graph* _graph) : graph(_graph) { }
+
+  void static go(Graph& _graph) {
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    galois::do_all(
+      galois::iterate(nodesWithEdges), 
+      APSP2(&_graph),
+      galois::loopname("APSP2"),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    for (auto outEdge : graph->edges(src)) {
+      GNode dst = graph->getEdgeDst(outEdge);
+      auto& dnode = graph->getData(dst);
+      // at this point minDist should be synchronized across all hosts
+      for (unsigned i = 0; i < NUM_SOURCES; i++) {
+        if (src_data.sToSend[i] != 0) {
+          if ((src_data.oldMinDistances[i] + 1) == dnode.minDistances[i]) {
+            dnode.shortestPathNumbers[i] += src_data.sToSend[i];
+          }
+        }
+      }
+    }
+  }
+};
+
+struct Swap {
+  Graph* graph;
+  Swap(Graph* _graph) : graph(_graph) { }
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()), 
+      Swap(&_graph),
+      galois::loopname("Swap"),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+    src_data.oldMinDistances = src_data.minDistances;
+  }
+};
+
+struct APSP {
+  const uint32_t local_infinity;
+  uint32_t& roundNum;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  SSSP(Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
-    graph(_graph), DGAccumulator_accum(dga) { }
+  APSP(const uint32_t _local_infinity, uint32_t& _roundNum, Graph* _graph, 
+       galois::DGAccumulator<uint32_t>& dga) 
+    : local_infinity(_local_infinity), roundNum(_roundNum), graph(_graph), 
+      DGAccumulator_accum(dga) { }
 
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
-    FirstIterationSSSP::go(_graph);
-
-    // starts at 1 since FirstSSSP takes care of the first one
-    uint32_t iterations = 1;
-    uint32_t accum_result;
-
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_iter(iterations);
       dga.reset();
-
-      {
+      galois::gPrint("Round ", roundNumber, "\n");
       galois::do_all(
-        galois::iterate(nodesWithEdges),
-        SSSP(&_graph, dga), 
-        galois::loopname("SSSP"), 
-        //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
-        galois::timeit(),
+        galois::iterate(nodesWithEdges), 
+        APSP(infinity, roundNumber, &_graph, dga),
+        galois::loopname("APSP"),
         galois::no_stats()
       );
-      }
 
-      iterations++;
+      // graph sync here
+      MidUpdate::go(_graph);
+      APSP2::go(_graph);
+      // graph sync here
+      Swap::go(_graph);
 
-      accum_result = dga.reduce();
-
-      if (accum_result) {
-        _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
-                    Broadcast_current_length, Bitset_current_length>("SSSP");
-      } else {
-        // write destination, read any, fails.....
-        // sync src and dst
-        if (_graph.is_vertex_cut()) { // TODO: only needed for cartesian cut
-          // no bitset used = sync all; at time of writing, vertex cut
-          // syncs cause the bit to be reset prematurely, so using the bitset
-          // will lead to incorrect results as it will not sync what is
-          // necessary
-          _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
-                       Broadcast_current_length, Bitset_current_length>("SSSP");
-          _graph.sync<writeDestination, readDestination, Reduce_min_current_length, 
-                       Broadcast_current_length>("SSSP");
-        } else {
-          _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
-                      Broadcast_current_length, 
-                      Bitset_current_length>("SSSP");
-        }
-      }
-    } while (accum_result);
+      roundNumber++;
+    } while (dga.reduce());
   }
 
-  /* Does SSSP, push/filter based */
+  struct DWrapper {
+    uint32_t dist;
+    uint32_t index;
+    
+    DWrapper(uint32_t _dist, uint32_t _index)
+      : dist(_dist), index(_index) { }
+
+    bool operator<(const DWrapper& b) const {
+      return dist < b.dist;
+    }
+  };
+
+  std::vector<DWrapper> 
+  wrapDistVector(const std::vector<uint32_t>& dVector) const {
+    std::vector<DWrapper> wrappedVector;
+    wrappedVector.reserve(NUM_SOURCES);
+
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      wrappedVector.emplace_back(DWrapper(dVector[i], i));
+    }
+    assert(dVector.size() == wrappedVector.size());
+
+    return wrappedVector;
+  }
+
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    if (src_data.old_length > src_data.current_length) {
-      src_data.old_length = src_data.current_length;
+    std::vector<DWrapper> toSort = wrapDistVector(src_data.oldMinDistances);
+    std::stable_sort(toSort.begin(), toSort.end());
 
-      for (auto current_edge : graph->edges(src)) {
-        GNode dst = graph->getEdgeDst(current_edge);
+    bool readyFound = false;
+    uint32_t indexToSend = NUM_SOURCES + 1;
 
-        if (src == dst) {
-          continue;
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      DWrapper& currentSource = toSort[i];
+      uint32_t currentIndex = currentSource.index;
+
+      // see if ready; use it if so
+      if (!readyFound) {
+        if (src_data.readyStatus[currentIndex]) {
+          indexToSend = currentIndex;
+          readyFound = true;
+        }
+      }
+
+      // determine if we need to send out the shortest path length in this round
+      if (i + currentSource.dist == roundNum) {
+        // save round num TODO
+        src_data.savedRoundNumbers[currentIndex] = roundNum;
+
+        // note that this index needs to have shortest path number sent out
+        // by saving it to another vector
+        src_data.sToSend[currentIndex] = 
+            src_data.shortestPathNumbers[currentIndex];
+      } else {
+        src_data.sToSend[currentIndex] = 0;
+      }
+    }
+
+    // there is something to send to other nodes this round
+    if (readyFound) {
+      uint32_t distValue = src_data.oldMinDistances[indexToSend];
+      uint32_t newValue = distValue + 1;
+
+      for (auto outEdge : graph->edges(src)) {
+        GNode dst = graph->getEdgeDst(outEdge);
+        auto& dnode = graph->getData(dst);
+        uint32_t oldValue = __sync_fetch_and_add(
+                              &(dnode.minDistances[indexToSend]), 0);
+        
+        while (oldValue > newValue) {
+          uint32_t newOld = __sync_val_compare_and_swap(
+                            &(dnode.minDistances[indexToSend]), oldValue,
+                            newValue);
+          
+          if (oldValue != newOld) {
+            oldValue = newOld;
+          } else {
+            break;
+          }
         }
 
-        auto& dst_data = graph->getData(dst);
+        if (oldValue > newValue) {
+          // TODO set bitset
+        }
+      }
+      DGAccumulator_accum += 1;
+      src_data.readyStatus[indexToSend] = 0;
+    }
 
-        #ifndef __USE_BFS__
-        uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                            src_data.current_length + 1;
-        #else
-        uint32_t new_dist = 1 + src_data.current_length;
-        #endif
+  }
+};
 
-        uint32_t old = galois::atomicMin(dst_data.current_length, new_dist);
+struct RoundUpdate {
+  Graph* graph;
+  const uint32_t roundNum;
+  const uint32_t local_infinity;
+  RoundUpdate(Graph* _graph, const uint32_t _roundNum, const uint32_t _li) 
+    : graph(_graph), roundNum(_roundNum), local_infinity(_li) { }
 
-        if (old > new_dist) {
-          bitset_current_length.set(dst);
-          DGAccumulator_accum += 1;
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()), 
+      RoundUpdate(&_graph, roundNumber, infinity),
+      galois::loopname("RoundUpdate"),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      if (src_data.minDistances[i] < local_infinity) {
+        src_data.savedRoundNumbers[i] = 
+            roundNum - src_data.savedRoundNumbers[i];
+        assert(src_data.savedRoundNumbers[i] <= roundNum);
+      }
+    }
+  }
+};
+
+
+struct BackProp {
+  Graph* graph;
+  const uint32_t roundNum;
+
+  BackProp(Graph* _graph, const uint32_t _roundNum)
+    : graph(_graph), roundNum(_roundNum) { }
+
+  void static go(Graph& _graph) {
+    const auto& allNodesWithEdgesIn = _graph.allNodesWithEdgesRangeIn();
+
+    uint32_t currentRound = 0;
+
+    while (currentRound <= roundNumber) {
+      galois::do_all(
+        galois::iterate(allNodesWithEdgesIn),
+        BackProp(&_graph, currentRound),
+        galois::loopname("BackProp"),
+        galois::no_stats()
+      );
+
+      currentRound++;
+    }
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    std::vector<uint32_t> toBackProp;
+
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      if (src_data.savedRoundNumbers[i] == roundNum) {
+        toBackProp.emplace_back(i);
+      }
+    }
+
+    // TODO optimize
+    //assert(toBackProp.size() == 1);
+
+    for (auto i : toBackProp) {
+      uint32_t myDistance = src_data.minDistances[i];
+
+      src_data.dependencyValues[i] = src_data.dependencyValues[i] * 
+                                     src_data.shortestPathNumbers[i];
+
+
+      //v -> w
+      //v -> k 
+      //v -> j
+
+      //w sends  (1 + dep w) / shortpath w
+
+      float toAdd = ((float)1 + src_data.dependencyValues[i]) / 
+                      src_data.shortestPathNumbers[i];
+
+      for (auto inEdge : graph->in_edges(src)) {
+        GNode dst = graph->getInEdgeDst(inEdge);
+        auto& dnode = graph->getData(dst);
+
+        // determine if this dnode is a predecessor
+        if (myDistance == (dnode.minDistances[i] + 1)) {
+          // TODO need to make this stuff atomic....
+          //__sync_add_and_fetch(&dnode.dependencyValues[i], toAdd);
+          dnode.dependencyValues[i] += toAdd;
         }
       }
     }
   }
 };
 
+struct BC {
+  Graph* graph;
+
+  BC(Graph* _graph) : graph(_graph) { }
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()), 
+      BC(&_graph),
+      galois::loopname("BC"),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      // todo exlucde source itself
+      src_data.bc += src_data.dependencyValues[i];
+    }
+  }
+};
 
 /******************************************************************************/
 /* Sanity check */
@@ -498,28 +650,6 @@ int main(int argc, char** argv) {
   Graph* hg = twoWayDistGraphInitialization<NodeData, void>();
   #endif
 
-  //// random num generate for sources
-  //std::minstd_rand0 r_generator;
-  //r_generator.seed(100);
-  //std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->globalSize() - 1);
-
-  //if (numberOfSources != 0) {
-  //  // uncomment this to have srcnodeid included as well
-  //  //random_sources.insert(startSource);
-
-  //  while (random_sources.size() < numberOfSources) {
-  //    random_sources.insert(r_dist(r_generator));
-  //  }
-  //}
-
-  //#ifndef NDEBUG
-  //int counter = 0;
-  //for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
-  //  printf("Source #%d: %lu\n", counter, *i);
-  //  counter++;
-  //}
-  //#endif
-
   //bitset_to_add.resize(h_graph->size());
   //bitset_to_add_float.resize(h_graph->size());
   //bitset_num_shortest_paths.resize(h_graph->size());
@@ -533,18 +663,22 @@ int main(int argc, char** argv) {
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
+
   StatTimer_graph_init.start();
-    InitializeGraph::go((*h_graph));
+  InitializeGraph::go(*hg);
   StatTimer_graph_init.stop();
+
   galois::runtime::getHostBarrier().wait();
 
   // shared DG accumulator among all steps
   galois::DGAccumulator<uint32_t> dga;
 
-  //// sanity dg accumulators
+  // sanity dg accumulators
   //galois::DGAccumulator<float> dga_max;
   //galois::DGAccumulator<float> dga_min;
   //galois::DGAccumulator<double> dga_sum;
+
+  offset = 0;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
@@ -552,7 +686,12 @@ int main(int argc, char** argv) {
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
-    //  BC::go(*h_graph, dga);
+    InitializeIteration::go(*hg);
+    APSP::go(*hg, dga);
+    roundNumber--; // terminating round; i.e. last round
+    RoundUpdate::go(*hg);
+    BackProp::go(*hg);
+    BC::go(*hg);
     StatTimer_main.stop();
 
     //Sanity::current_max = 0;
@@ -568,7 +707,9 @@ int main(int argc, char** argv) {
     // re-init graph for next run
     if ((run + 1) != numRuns) {
       galois::runtime::getHostBarrier().wait();
-      (*h_graph).set_num_run(run + 1);
+      (*hg).set_num_run(run + 1);
+      offset = 0;
+      roundNumber = 0;
 
       //bitset_to_add.reset();
       //bitset_to_add_float.reset();
@@ -580,7 +721,7 @@ int main(int argc, char** argv) {
       //bitset_propogation_flag.reset();
       //bitset_dependency.reset();
 
-      InitializeGraph::go((*h_graph));
+      InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
   }
@@ -588,33 +729,23 @@ int main(int argc, char** argv) {
   StatTimer_total.stop();
 
   //// Verify, i.e. print out graph data for examination
-  //if (verify) {
-  //  char *v_out = (char*)malloc(40);
-  //  #ifdef __GALOIS_HET_CUDA__
-  //  if (personality == CPU) { 
-  //  #endif
-  //    for (auto ii = (*h_graph).masterNodesRange().begin(); 
-  //              ii != (*h_graph).masterNodesRange().end(); 
-  //              ++ii) {
-  //      // outputs betweenness centrality
-  //      sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-  //              (*h_graph).getData(*ii).betweeness_centrality);
-  //      galois::runtime::printOutput(v_out);
-  //    }
-  //  #ifdef __GALOIS_HET_CUDA__
-  //  } else if (personality == GPU_CUDA) {
-  //    for (auto ii = (*h_graph).masterNodesRange().begin(); 
-  //              ii != (*h_graph).masterNodesRange().end(); 
-  //              ++ii) {
-  //      sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
-  //              get_node_betweeness_centrality_cuda(cuda_ctx, *ii));
-  //      galois::runtime::printOutput(v_out);
-  //      memset(v_out, '\0', 40);
-  //    }
-  //  }
-  //  #endif
-  //  free(v_out);
-  //}
+  if (verify) {
+    char *v_out = (char*)malloc(40);
+    for (auto ii = (*hg).masterNodesRange().begin(); 
+              ii != (*hg).masterNodesRange().end(); 
+              ++ii) {
+      //sprintf(v_out, "%lu %u\n", (*hg).getGID(*ii),
+      //        (*hg).getData(*ii).minDistances[vIndex]);
+      // outputs betweenness centrality
+      sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
+              (*hg).getData(*ii).bc);
+      //sprintf(v_out, "%lu %u\n", (*hg).getGID(*ii),
+      //        (*hg).getData(*ii).shortestPathNumbers[0]);
+
+      galois::runtime::printOutput(v_out);
+    }
+    free(v_out);
+  }
 
   return 0;
 }
