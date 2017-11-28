@@ -18,6 +18,7 @@ class SharedMemApp(GraphBMKSharedMem):
         def finput(x):
             if x.props.format == 'bin/galois': return True
             if x.props.format == 'mesh': return True
+            if x.props.format == 'mesh/nodes': return True
             if x.props.format == 'nothing': return True
 
             return False
@@ -108,6 +109,15 @@ class ConnectedComponents(SharedMemApp):
     relativeAppPath = "connectedcomponents/connectedcomponents"
     benchmark = "connectedcomponents"
 
+class DelaunayTriangulation(SharedMemApp):
+    relativeAppPath = "delaunaytriangulation/delaunaytriangulation"
+    benchmark = "delaunaytriangulation"
+
+# TODO segfaults
+class DelaunayTriangulationDet(SharedMemApp):
+    relativeAppPath = "delaunaytriangulation/delaunaytriangulation-det"
+    benchmark = "delaunaytriangulation-det"
+
 class DMR(SharedMemApp):
     relativeAppPath = "delaunayrefinement/delaunayrefinement"
     benchmark = "dmr"
@@ -150,13 +160,12 @@ class MCM(SharedMemApp):
         
         return specs
 
+# TODO specify tolerance?
 class PageRank(SharedMemApp):
     relativeAppPath = "pagerank/pagerank"
     benchmark = "pagerank"
 
-    # TODO specify tolerance?
-
-# TODO this is currently crashing
+# TODO crashes
 class PreflowPush(SharedMemApp):
     relativeAppPath = "preflowpush/preflowpush"
     benchmark = "preflowpush"
@@ -197,7 +206,9 @@ class SSSP(SharedMemApp):
         
         return specs
 
-BINARIES = [BFS()]
+#BINARIES = [PreflowPush()]
+#BINARIES = [DelaunayTriangulation()]
+BINARIES = [DelaunayTriangulationDet()]
 #BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
 #BINARIES = [BCInner(), BCOuter()]

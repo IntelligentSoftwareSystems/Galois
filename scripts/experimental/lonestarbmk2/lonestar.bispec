@@ -7,6 +7,8 @@ bc-inner nothing
 bc-outer nothing
 #TODO needs graph
 connectedcomponents nothing
+delaunaytriangulation r5Mn
+delaunaytriangulation-det r5Mn
 dmr r5M
 gmetis USA-road-d.USA
 independentset r4-2e26
@@ -18,6 +20,3 @@ pagerank nothing
 preflowpush r4-2e26
 pta nothing
 sssp r4-2e26
-# TODO get graphs for bc
-#bc-outer
-#bc-inner

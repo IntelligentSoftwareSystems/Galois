@@ -20,6 +20,12 @@ name = r5M
 file = meshes/r5M
 format = mesh
 
+[meshes/r5Mn]
+flags = 
+name = r5Mn
+file = meshes/r5M.node
+format = mesh/nodes
+
 [nothing]
 flags = 
 name = nothing
