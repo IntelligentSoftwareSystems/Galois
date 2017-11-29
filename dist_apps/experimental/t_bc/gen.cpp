@@ -49,7 +49,7 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned int> numSourcesPerRound("numRoundSources", 
                                 cll::desc("Number of sources to use for APSP"),
                                 cll::init(5));
-static cll::opt<unsigned int> totalNumSources("numOfSouces", 
+static cll::opt<unsigned int> totalNumSources("numOfSources", 
                                 cll::desc("Total number of sources to do BC"),
                                 cll::init(0));
 static cll::opt<unsigned int> vIndex("index", 
@@ -324,7 +324,8 @@ struct APSP {
     for (unsigned i = 0; i < numSourcesPerRound; i++) {
       wrappedVector.emplace_back(DWrapper(dVector[i], i));
     }
-    assert(dVector.size() == wrappedVector.size());
+
+    //assert(dVector.size() == wrappedVector.size());
 
     return wrappedVector;
   }
@@ -640,12 +641,18 @@ int main(int argc, char** argv) {
   // shared DG accumulator among all steps
   galois::DGAccumulator<uint32_t> dga;
 
+
   // sanity dg accumulators
   //galois::DGAccumulator<float> dga_max;
   //galois::DGAccumulator<float> dga_min;
   //galois::DGAccumulator<double> dga_sum;
 
   offset = 0;
+
+  if (totalNumSources == 0) {
+    galois::gDebug("Total num sources unspecified");
+    totalNumSources = hg->globalSize();
+  }
 
   galois::StatTimer sortTimer("SortTimer", REGION_NAME);
   for (auto run = 0; run < numRuns; ++run) {
@@ -655,13 +662,26 @@ int main(int argc, char** argv) {
 
     StatTimer_main.start();
 
-    // TODO loop over all sources
-    InitializeIteration::go(*hg);
-    APSP::go(*hg, dga, sortTimer);
-    roundNumber--; // terminating round; i.e. last round
-    RoundUpdate::go(*hg);
-    BackProp::go(*hg);
-    BC::go(*hg);
+    while (offset < totalNumSources) {
+      galois::gDebug("[", net.ID, "] Offset ", offset, " started");
+
+      // correct in case numsources overflows total num of sources
+      if (offset + numSourcesPerRound > totalNumSources) {
+        numSourcesPerRound = totalNumSources - offset;
+        galois::gDebug("Num sources for this final round will be ", 
+                       numSourcesPerRound);
+      }
+
+      InitializeIteration::go(*hg);
+      APSP::go(*hg, dga, sortTimer);
+      roundNumber--; // terminating round; i.e. last round
+      RoundUpdate::go(*hg);
+      BackProp::go(*hg);
+      BC::go(*hg);
+
+      offset += numSourcesPerRound;
+      roundNumber = 0;
+    }
 
     StatTimer_main.stop();
 
