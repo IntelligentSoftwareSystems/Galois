@@ -206,9 +206,13 @@ class SSSP(SharedMemApp):
         
         return specs
 
+class Triangles(SharedMemApp):
+    relativeAppPath = "triangles/triangles"
+    benchmark = "triangles"
+
 #BINARIES = [PreflowPush()]
 #BINARIES = [DelaunayTriangulation()]
-BINARIES = [DelaunayTriangulationDet()]
-#BINARIES = [BFS(), SSSP(), DMR()]
+#BINARIES = [DelaunayTriangulationDet()]
+BINARIES = [BFS(), SSSP(), DMR()]
 # specification of binaries to run
 #BINARIES = [BCInner(), BCOuter()]

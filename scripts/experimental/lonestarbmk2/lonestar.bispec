@@ -20,3 +20,5 @@ pagerank nothing
 preflowpush r4-2e26
 pta nothing
 sssp r4-2e26
+# TODO add graph for triangles
+triangles nothing
