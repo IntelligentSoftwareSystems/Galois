@@ -27,8 +27,6 @@
  */
 
 
-#define NUM_SOURCES 1
-
 constexpr static const char* const REGION_NAME = "T_BC";
 
 /******************************************************************************/
@@ -58,7 +56,7 @@ static cll::opt<unsigned int> startSource("srcNodeId",
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));
-static cll::opt<unsigned int> numberOfSources("numOfSources", 
+static cll::opt<unsigned int> NUM_SOURCES("numOfSources", 
                                 cll::desc("Number of sources to use for "
                                           "betweeness-centraility"),
                                 cll::init(0));
@@ -77,14 +75,19 @@ static uint64_t current_src_node = 0;
 // need to be changed for very large graphs
 struct NodeData {
   std::vector<uint32_t> oldMinDistances;
-  std::vector<uint32_t> minDistances;
+
+  //std::vector<uint32_t> minDistances;
+  std::atomic<uint32_t>* minDistances;
 
   std::vector<uint32_t> shortestPathNumbers;
   std::vector<char> readyStatus;
   std::vector<uint32_t> sToSend;
   std::vector<uint32_t> savedRoundNumbers;
 
-  std::vector<float> dependencyValues;
+  std::atomic<float>* dependencyValues;
+  //galois::LargeArray<std::atomic<float>> dependencyValues;
+
+  //std::vector<float> dependencyValues;
   float bc;
 };
 
@@ -113,6 +116,7 @@ galois::DynamicBitSet bitset_dependency;
 /******************************************************************************/
 uint64_t offset;
 uint32_t roundNumber = 0;
+uint32_t totalSortTime = 0;
 
 struct InitializeGraph {
   Graph *graph;
@@ -139,14 +143,20 @@ struct InitializeGraph {
     NodeData& src_data = graph->getData(src);
 
     src_data.oldMinDistances.resize(NUM_SOURCES);
-    src_data.minDistances.resize(NUM_SOURCES);
+
+    //src_data.minDistances.resize(NUM_SOURCES);
+
+    src_data.minDistances = 
+     (std::atomic<uint32_t>*)malloc(sizeof(std::atomic<uint32_t>) * NUM_SOURCES);
 
     src_data.shortestPathNumbers.resize(NUM_SOURCES);
     src_data.readyStatus.resize(NUM_SOURCES);
     src_data.sToSend.resize(NUM_SOURCES);
     src_data.savedRoundNumbers.resize(NUM_SOURCES);
+    src_data.dependencyValues = 
+     (std::atomic<float>*)malloc(sizeof(std::atomic<float>) * NUM_SOURCES);
 
-    src_data.dependencyValues.resize(NUM_SOURCES);
+    assert(src_data.dependencyValues != 0);
 
     src_data.bc = 0.0;
   }
@@ -190,14 +200,15 @@ struct InitializeIteration {
       src_data.readyStatus[i] = 1;
       src_data.sToSend[i] = 0;
       src_data.savedRoundNumbers[i] = local_infinity;
-      src_data.dependencyValues[i] = 0;
+      src_data.dependencyValues[i] = 0.0;
+      src_data.oldMinDistances[i] = src_data.minDistances[i];
     }
 
-    src_data.oldMinDistances = src_data.minDistances;
-    //// old min distance setting
+    // old min distance setting
     //for (unsigned i = 0; i < NUM_SOURCES; i++) {
     //  src_data.oldMinDistances[i] = src_data.minDistances[i];
     //}
+    //src_data.oldMinDistances = src_data.minDistances;
   }
 };
 
@@ -275,7 +286,11 @@ struct Swap {
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    src_data.oldMinDistances = src_data.minDistances;
+
+    for (unsigned i = 0; i < NUM_SOURCES; i++) {
+      src_data.oldMinDistances[i] = src_data.minDistances[i];
+    }
+    //src_data.oldMinDistances = src_data.minDistances;
   }
 };
 
@@ -284,21 +299,23 @@ struct APSP {
   uint32_t& roundNum;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
+  galois::StatTimer& t;
 
   APSP(const uint32_t _local_infinity, uint32_t& _roundNum, Graph* _graph, 
-       galois::DGAccumulator<uint32_t>& dga) 
+       galois::DGAccumulator<uint32_t>& dga, galois::StatTimer& _t) 
     : local_infinity(_local_infinity), roundNum(_roundNum), graph(_graph), 
-      DGAccumulator_accum(dga) { }
+      DGAccumulator_accum(dga), t(_t) { }
 
-  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga,
+                 galois::StatTimer& sortTimer) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
       dga.reset();
-      galois::gPrint("Round ", roundNumber, "\n");
+      //galois::gPrint("Round ", roundNumber, "\n");
       galois::do_all(
         galois::iterate(nodesWithEdges), 
-        APSP(infinity, roundNumber, &_graph, dga),
+        APSP(infinity, roundNumber, &_graph, dga, sortTimer),
         galois::loopname("APSP"),
         galois::no_stats()
       );
@@ -342,7 +359,11 @@ struct APSP {
     NodeData& src_data = graph->getData(src);
 
     std::vector<DWrapper> toSort = wrapDistVector(src_data.oldMinDistances);
+    t.start();
     std::stable_sort(toSort.begin(), toSort.end());
+    t.stop();
+
+    totalSortTime += t.get();
 
     bool readyFound = false;
     uint32_t indexToSend = NUM_SOURCES + 1;
@@ -361,7 +382,7 @@ struct APSP {
 
       // determine if we need to send out the shortest path length in this round
       if (i + currentSource.dist == roundNum) {
-        // save round num TODO
+        // save round num
         src_data.savedRoundNumbers[currentIndex] = roundNum;
 
         // note that this index needs to have shortest path number sent out
@@ -381,20 +402,9 @@ struct APSP {
       for (auto outEdge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(outEdge);
         auto& dnode = graph->getData(dst);
-        uint32_t oldValue = __sync_fetch_and_add(
-                              &(dnode.minDistances[indexToSend]), 0);
-        
-        while (oldValue > newValue) {
-          uint32_t newOld = __sync_val_compare_and_swap(
-                            &(dnode.minDistances[indexToSend]), oldValue,
-                            newValue);
-          
-          if (oldValue != newOld) {
-            oldValue = newOld;
-          } else {
-            break;
-          }
-        }
+
+        uint32_t oldValue = galois::atomicMin(dnode.minDistances[indexToSend],
+                                              newValue);
 
         if (oldValue > newValue) {
           // TODO set bitset
@@ -428,7 +438,7 @@ struct RoundUpdate {
     NodeData& src_data = graph->getData(src);
 
     for (unsigned i = 0; i < NUM_SOURCES; i++) {
-      if (src_data.minDistances[i] < local_infinity) {
+      if (src_data.oldMinDistances[i] < local_infinity) {
         src_data.savedRoundNumbers[i] = 
             roundNum - src_data.savedRoundNumbers[i];
         assert(src_data.savedRoundNumbers[i] <= roundNum);
@@ -473,22 +483,17 @@ struct BackProp {
       }
     }
 
-    // TODO optimize
+    // TODO why is this assertion failing?
     //assert(toBackProp.size() == 1);
 
     for (auto i : toBackProp) {
-      uint32_t myDistance = src_data.minDistances[i];
+      uint32_t myDistance = src_data.oldMinDistances[i];
 
+      // calculate final dependency value
       src_data.dependencyValues[i] = src_data.dependencyValues[i] * 
                                      src_data.shortestPathNumbers[i];
 
-
-      //v -> w
-      //v -> k 
-      //v -> j
-
-      //w sends  (1 + dep w) / shortpath w
-
+      // get the value to add to predecessors
       float toAdd = ((float)1 + src_data.dependencyValues[i]) / 
                       src_data.shortestPathNumbers[i];
 
@@ -497,10 +502,8 @@ struct BackProp {
         auto& dnode = graph->getData(dst);
 
         // determine if this dnode is a predecessor
-        if (myDistance == (dnode.minDistances[i] + 1)) {
-          // TODO need to make this stuff atomic....
-          //__sync_add_and_fetch(&dnode.dependencyValues[i], toAdd);
-          dnode.dependencyValues[i] += toAdd;
+        if (myDistance == (dnode.oldMinDistances[i] + 1)) {
+          galois::atomicAdd(dnode.dependencyValues[i], toAdd);
         }
       }
     }
@@ -527,8 +530,10 @@ struct BC {
     NodeData& src_data = graph->getData(src);
 
     for (unsigned i = 0; i < NUM_SOURCES; i++) {
-      // todo exlucde source itself
-      src_data.bc += src_data.dependencyValues[i];
+      // exclude sources themselves 
+      if (graph->getGID(src) != (i + offset)) {
+        src_data.bc += src_data.dependencyValues[i];
+      }
     }
   }
 };
@@ -653,11 +658,7 @@ int main(int argc, char** argv) {
   //bitset_to_add.resize(h_graph->size());
   //bitset_to_add_float.resize(h_graph->size());
   //bitset_num_shortest_paths.resize(h_graph->size());
-  //bitset_num_successors.resize(h_graph->size());
-  //bitset_num_predecessors.resize(h_graph->size());
   //bitset_trim.resize(h_graph->size());
-  //bitset_current_length.resize(h_graph->size());
-  //bitset_propogation_flag.resize(h_graph->size());
   //bitset_dependency.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
@@ -680,18 +681,21 @@ int main(int argc, char** argv) {
 
   offset = 0;
 
+  galois::StatTimer sortTimer("SortTimer");
   for (auto run = 0; run < numRuns; ++run) {
-    galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
+    galois::gPrint("[", net.ID, "] Run ", run, " started\n");
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
     StatTimer_main.start();
+
     InitializeIteration::go(*hg);
-    APSP::go(*hg, dga);
+    APSP::go(*hg, dga, sortTimer);
     roundNumber--; // terminating round; i.e. last round
     RoundUpdate::go(*hg);
     BackProp::go(*hg);
     BC::go(*hg);
+
     StatTimer_main.stop();
 
     //Sanity::current_max = 0;
@@ -728,7 +732,9 @@ int main(int argc, char** argv) {
 
   StatTimer_total.stop();
 
-  //// Verify, i.e. print out graph data for examination
+  //galois::gPrint("total sort time ", sortTimer.get(), "\n");
+
+  // Verify, i.e. print out graph data for examination
   if (verify) {
     char *v_out = (char*)malloc(40);
     for (auto ii = (*hg).masterNodesRange().begin(); 
