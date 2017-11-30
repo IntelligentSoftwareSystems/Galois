@@ -32,6 +32,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include "galois/runtime/Profile.h"
+
 #include <boost/iterator/transform_iterator.hpp>
 #ifdef HAS_EIGEN
 #include <Eigen/Dense>
@@ -239,22 +241,27 @@ void edgeIteratingAlgo(Graph& graph) {
       }
       , galois::loopname("Initialize"));
 
-  galois::do_all(galois::iterate(items),
-      [&] (const WorkItem& w) {
-        // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
-        Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
-        Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
-        Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
-        Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
 
-        Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
-        Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
-        Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
-        Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
+  galois::runtime::profileVtune(
+      [&] () {
+         galois::do_all(galois::iterate(items),
+             [&] (const WorkItem& w) {
+               // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
+               Graph::edge_iterator abegin = graph.edge_begin(w.src, galois::MethodFlag::UNPROTECTED);
+               Graph::edge_iterator aend = graph.edge_end(w.src, galois::MethodFlag::UNPROTECTED);
+               Graph::edge_iterator bbegin = graph.edge_begin(w.dst, galois::MethodFlag::UNPROTECTED);
+               Graph::edge_iterator bend = graph.edge_end(w.dst, galois::MethodFlag::UNPROTECTED);
 
-        numTriangles += countEqual(graph, aa, ea, bb, eb);
+               Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
+               Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));
+               Graph::edge_iterator bb = lowerBound(bbegin, bend, GreaterThanOrEqual<Graph>(graph, w.src));
+               Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
+
+               numTriangles += countEqual(graph, aa, ea, bb, eb);
+             },
+             galois::loopname("edgeIteratingAlgo"));
       },
-      galois::loopname("edgeIteratingAlgo"));
+      "edgeIteratorAlgo");
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
