@@ -106,6 +106,14 @@ class BFS(SharedMemApp):
     relativeAppPath = "bfs/bfs"
     benchmark = "bfs"
 
+class Boruvka(SharedMemApp):
+    relativeAppPath = "boruvka/boruvka"
+    benchmark = "boruvka"
+
+class BoruvkaMerge(SharedMemApp):
+    relativeAppPath = "boruvka/boruvka-merge"
+    benchmark = "boruvka-merge"
+
 class Clustering(SharedMemApp):
     relativeAppPath = "clustering/clustering"
     benchmark = "clustering"
@@ -202,6 +210,7 @@ class PreflowPush(SharedMemApp):
         
         return specs
 
+# TODO what are these constraints this app takes?
 class PointsToAnalysis(SharedMemApp):
     relativeAppPath = "pta/pta"
     benchmark = "pta"
@@ -284,4 +293,4 @@ class TrianglesEdge(SharedMemApp):
 BINARIES = [BFS(), SSSP(), DMR()]
 #BINARIES = [BCOuter()]
 #BINARIES = [TrianglesNode(), TrianglesEdge()]
-#BINARIES = [SurveyPropagation()]
+#BINARIES = [Boruvka(), BoruvkaMerge()]

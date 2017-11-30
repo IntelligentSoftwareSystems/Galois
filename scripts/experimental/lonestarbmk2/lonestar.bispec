@@ -4,6 +4,8 @@ bfs r4-2e26
 #TODO needs graph
 bc-inner nothing
 bc-outer rmat8-2e14
+boruvka USA-road-d.USA
+boruvka-merge USA-road-d.USA
 clustering nothing
 connectedcomponents twitter40-symmetric
 delaunaytriangulation r5Mn
