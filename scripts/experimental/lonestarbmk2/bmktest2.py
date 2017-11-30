@@ -232,6 +232,27 @@ class SSSP(SharedMemApp):
         
         return specs
 
+class SurveyPropagation(SharedMemApp):
+    relativeAppPath = "surveypropagation/surveypropagation"
+    benchmark = "surveypropagation"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds survey prop arguments to runs."""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("9") # random generator seed
+            s.set_arg("2000000") # number of vars
+            s.set_arg("6000000") # number of clauses
+            s.set_arg("4") # vars per clause
+
+            # below are args used by runs on galois website
+            #s.set_arg("1000000") # number of vars
+            #s.set_arg("3000000") # number of clauses
+            #s.set_arg("3") # vars per clause
+       
+        return specs
+
 class TrianglesNode(SharedMemApp):
     relativeAppPath = "triangles/triangles"
     benchmark = "triangles-node"
@@ -260,7 +281,7 @@ class TrianglesEdge(SharedMemApp):
 
 
 # specification of binaries to run
-#BINARIES = [BFS(), SSSP(), DMR()]
+BINARIES = [BFS(), SSSP(), DMR()]
 #BINARIES = [BCOuter()]
 #BINARIES = [TrianglesNode(), TrianglesEdge()]
-BINARIES = [SpanningTree()]
+#BINARIES = [SurveyPropagation()]

@@ -20,5 +20,6 @@ preflowpush r4-2e26
 pta nothing
 spanningtree r4-2e26
 sssp r4-2e26
+surveypropagation nothing
 triangles-node com-lj
 triangles-edge com-lj
