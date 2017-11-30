@@ -5,8 +5,7 @@ bfs r4-2e26
 bc-inner nothing
 bc-outer rmat8-2e14
 clustering nothing
-#TODO needs graph
-connectedcomponents nothing
+connectedcomponents twitter40-symmetric
 delaunaytriangulation r5Mn
 delaunaytriangulation-det r5Mn
 dmr r5M
