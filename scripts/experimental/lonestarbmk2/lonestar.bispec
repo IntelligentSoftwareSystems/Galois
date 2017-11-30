@@ -12,8 +12,7 @@ delaunaytriangulation-det r5Mn
 dmr r5M
 gmetis USA-road-d.USA
 independentset r4-2e26
-# TODO add graph for matrix completion
-matrixcompletion nothing
+matrixcompletion yahoo-music
 mcm nothing
 pagerank soc-livejournal
 preflowpush r4-2e26

@@ -50,6 +50,12 @@ name = com-lj
 file = stanford/communities/LiveJournal/com-lj.wgt32.sym.gr.triangles
 format = triangles
 
+[weighted/bipartite/yahoo]
+flags = 
+name = yahoo-music
+file = weighted/bipartite/yahoo.gr
+format = bin/galois
+
 [nothing]
 flags = 
 name = nothing
