@@ -106,6 +106,19 @@ class BFS(SharedMemApp):
     relativeAppPath = "bfs/bfs"
     benchmark = "bfs"
 
+class Clustering(SharedMemApp):
+    relativeAppPath = "clustering/clustering"
+    benchmark = "clustering"
+
+    def get_run_spec(self, bmkinput, config):
+        """Clustering command line setup"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-numPoints=10000") # num points to cluster
+        
+        return specs
+
 class ConnectedComponents(SharedMemApp):
     relativeAppPath = "connectedcomponents/connectedcomponents"
     benchmark = "connectedcomponents"
@@ -161,10 +174,18 @@ class MCM(SharedMemApp):
         
         return specs
 
-# TODO specify tolerance?
 class PageRank(SharedMemApp):
     relativeAppPath = "pagerank/pagerank"
     benchmark = "pagerank"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.000001") # pagerank tolerance
+        
+        return specs
 
 # TODO crashes
 class PreflowPush(SharedMemApp):
@@ -220,7 +241,6 @@ class TrianglesNode(SharedMemApp):
         
         return specs
 
-
 class TrianglesEdge(SharedMemApp):
     relativeAppPath = "triangles/triangles"
     benchmark = "triangles-edge"
@@ -236,6 +256,7 @@ class TrianglesEdge(SharedMemApp):
 
 
 # specification of binaries to run
-BINARIES = [BFS(), SSSP(), DMR()]
+#BINARIES = [BFS(), SSSP(), DMR()]
 #BINARIES = [BCOuter()]
 #BINARIES = [TrianglesNode(), TrianglesEdge()]
+BINARIES = [Clustering()]

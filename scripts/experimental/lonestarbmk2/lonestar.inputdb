@@ -32,6 +32,18 @@ name = r5Mn
 file = meshes/r5M.node
 format = mesh/nodes
 
+[twitter40]
+flags = 
+name = twitter40
+file = unweighted/twitter-WWW10-component.gr
+format = bin/galois
+
+[soc-livejournal]
+flags = 
+name = soc-livejournal
+file = unweighted/soc-LiveJournal1.gr
+format = bin/galois
+
 [com-lj]
 flags = 
 name = com-lj
