@@ -13,9 +13,9 @@ sub find_vtune() {
   my $vtune = `which amplxe-cl 2> /dev/null`;
   chomp $vtune;
   if (not -e $vtune) {
-    my @vtune_vers = ('2013', '2011');
+    my @vtune_vers = ('', '_2018');
     foreach my $ver (@vtune_vers) {
-      my $base = "/opt/intel/vtune_amplifier_xe_$ver/bin64/amplxe-cl";
+      my $base = "/opt/intel/vtune_amplifier$ver/bin64/amplxe-cl";
       if (-e $base) {
         return $vtune;
       }
@@ -123,7 +123,7 @@ my $startPaused = 1;
 my $help = 0;
 my $threads = 0;
 # my $analysisType = 'memory-access'; # causes vtune 2016 to hang
-my $analysisType = 'general_exploration';
+my $analysisType = 'general-exploration';
 my $reportType = 'hw-events';
 my $reportTimeout = 100000;
 GetOptions(
