@@ -215,6 +215,10 @@ class PointsToAnalysis(SharedMemApp):
         
         return specs
 
+class SpanningTree(SharedMemApp):
+    relativeAppPath = "spanningtree/spanningtree"  
+    benchmark = "spanningtree"
+
 class SSSP(SharedMemApp):
     relativeAppPath = "sssp/sssp"
     benchmark = "sssp"
@@ -259,4 +263,4 @@ class TrianglesEdge(SharedMemApp):
 #BINARIES = [BFS(), SSSP(), DMR()]
 #BINARIES = [BCOuter()]
 #BINARIES = [TrianglesNode(), TrianglesEdge()]
-BINARIES = [Clustering()]
+BINARIES = [SpanningTree()]
