@@ -151,12 +151,8 @@ int main(int argc, char** argv) {
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
-  if (detAlgo == nondet) {
-    galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / galois::runtime::pagePoolSize());
+  galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / galois::runtime::pagePoolSize());
 
-  } else {
-    galois::preAlloc(galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / galois::runtime::pagePoolSize());
-  }
   galois::reportPageAlloc("MeminfoPre2");
 
   galois::StatTimer T;
