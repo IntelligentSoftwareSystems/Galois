@@ -7,9 +7,9 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 80 
+    startThread = 0
     # thread to end at (inclusive)
-    endThread = 80
+    endThread = 40
     # step to use for looping through threads
     step = 10
 
@@ -19,6 +19,7 @@ class SharedMemApp(GraphBMKSharedMem):
             if x.props.format == 'bin/galois': return True
             if x.props.format == 'mesh': return True
             if x.props.format == 'mesh/nodes': return True
+            if x.props.format == 'triangles': return True
             if x.props.format == 'nothing': return True
 
             return False
@@ -206,13 +207,35 @@ class SSSP(SharedMemApp):
         
         return specs
 
-class Triangles(SharedMemApp):
+class TrianglesNode(SharedMemApp):
     relativeAppPath = "triangles/triangles"
-    benchmark = "triangles"
+    benchmark = "triangles-node"
 
-#BINARIES = [PreflowPush()]
-#BINARIES = [DelaunayTriangulation()]
-#BINARIES = [DelaunayTriangulationDet()]
-BINARIES = [BFS(), SSSP(), DMR()]
+    def get_run_spec(self, bmkinput, config):
+        """Specifies node version"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=nodeiterator")
+        
+        return specs
+
+
+class TrianglesEdge(SharedMemApp):
+    relativeAppPath = "triangles/triangles"
+    benchmark = "triangles-edge"
+
+    def get_run_spec(self, bmkinput, config):
+        """Specifies edge version"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=edgeiterator")
+        
+        return specs
+
+
 # specification of binaries to run
-#BINARIES = [BCInner(), BCOuter()]
+BINARIES = [BFS(), SSSP(), DMR()]
+#BINARIES = [BCOuter()]
+#BINARIES = [TrianglesNode(), TrianglesEdge()]

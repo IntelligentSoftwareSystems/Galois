@@ -2,6 +2,12 @@
 version = 2
 basepath = /net/ohm/export/iss/inputs
 
+[scalefree/rmat8-2e14.gr]
+flags = 
+name = rmat8-2e14
+file = scalefree/deprecated/rmat8-2e14.gr
+format = bin/galois
+
 [random/r4-2e26.gr]
 flags = 
 name = r4-2e26
@@ -25,6 +31,12 @@ flags =
 name = r5Mn
 file = meshes/r5M.node
 format = mesh/nodes
+
+[com-lj]
+flags = 
+name = com-lj
+file = stanford/communities/LiveJournal/com-lj.wgt32.sym.gr.triangles
+format = triangles
 
 [nothing]
 flags = 
