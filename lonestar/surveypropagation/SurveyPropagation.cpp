@@ -112,23 +112,18 @@ struct SPNode {
 typedef galois::graphs::FirstGraph<SPNode, SPEdge, false> Graph;
 typedef galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
-static Graph graph;
-
-static std::vector<GNode> literalsN;
-static std::vector<std::pair<GNode,int> > clauses;
-
-static galois::GAccumulator<unsigned int> nontrivial;
-
-static galois::GReduceMax<double> maxBias;
-static galois::GAccumulator<int> numBias;
-static galois::GAccumulator<double> sumBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
 //static const int tmax = 100;
 //static int tlimit = 0;
 
-void initialize_random_formula(int M, int N, int K) {
+void initialize_random_formula(Graph& graph,
+                               int M,
+                               int N,
+                               int K,
+                               std::vector<GNode>& literalsN,
+                               std::vector<std::pair<GNode,int>>& clauses) {
   //M clauses
   //N variables
   //K vars per clause
@@ -165,7 +160,7 @@ void initialize_random_formula(int M, int N, int K) {
   //std::random_shuffle(clauses.begin(), clauses.end());
 }
 
-void print_formula() {
+void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
   for (unsigned m = 0; m < clauses.size(); ++m) {
     if (m != 0)
       std::cout << " & ";
@@ -190,7 +185,7 @@ void print_formula() {
   std::cout << "\n";
 }
 
-void print_fixed() {
+void print_fixed(Graph& graph, std::vector<GNode>& literalsN) {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
     SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
@@ -200,7 +195,7 @@ void print_fixed() {
   std::cout << "\n";
 }
 
-int count_fixed() {
+int count_fixed(Graph& graph, std::vector<GNode>& literalsN) {
   int retval = 0;
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
@@ -211,7 +206,7 @@ int count_fixed() {
   return retval;
 }
 
-double eta_for_a_i(GNode a, GNode i) {
+double eta_for_a_i(Graph& graph, GNode a, GNode i) {
   double etaNew = 1.0;
   //for each j
   for (auto jii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
@@ -271,7 +266,13 @@ struct EGreater {
 };
 
 //return true if converged
-void SP_algorithm() {
+void SP_algorithm(Graph& graph,
+                  galois::GAccumulator<unsigned int>& nontrivial,
+                  galois::GReduceMax<double>& maxBias,
+                  galois::GAccumulator<int>& numBias,
+                  galois::GAccumulator<double>& sumBias,
+                  std::vector<GNode>& literalsN,
+                  std::vector<std::pair<GNode,int>>& clauses) {
   //0) at t = 0, for every edge a->i, randomly initialize the message sigma a->i(t=0) in [0,1]
   //1) for t = 1 to tmax:
   //1.1) sweep the set of edges in a random order, and update sequentially the warnings on all the edges of the graph, generating the values sigma a->i (t) using SP_update
@@ -282,6 +283,7 @@ void SP_algorithm() {
 
   using WL = galois::worklists::dChunkedFIFO<1024>;
 
+  galois::reportPageAlloc("MeminfoPre: SP_algorithm for_each");
   galois::for_each( galois::iterate(clauses), 
       [&] (const std::pair<GNode, int>& p, auto& ctx) {
 
@@ -304,7 +306,7 @@ void SP_algorithm() {
         //for each i
         for (auto iii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
           GNode i = graph.getEdgeDst(iii);
-          double e = eta_for_a_i(a, i);
+          double e = eta_for_a_i(graph, a, i);
           double olde = graph.getEdgeData(iii, galois::MethodFlag::UNPROTECTED).eta;
           graph.getEdgeData(iii).eta = e;
           //std::cout << olde << ',' << e << " ";
@@ -320,12 +322,14 @@ void SP_algorithm() {
       },
       galois::loopname("update_eta"), 
       galois::wl<WL>());
+  galois::reportPageAlloc("MeminfoPost: SP_algorithm for_each");
 
   maxBias.reset();
   numBias.reset();
   sumBias.reset();
   nontrivial.reset();
 
+  galois::reportPageAlloc("MeminfoPre: SP_algorithm do_all");
   // update_biases
   galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
@@ -373,9 +377,15 @@ void SP_algorithm() {
         sumBias += d;
       },
       galois::loopname("update_biases"));
+    galois::reportPageAlloc("MeminfoPost: SP_algorithm do_all");
 }
 
-void decimate() {
+void decimate(Graph& graph,
+              galois::GAccumulator<unsigned int>& nontrivial,
+              galois::GReduceMax<double>& maxBias,
+              galois::GAccumulator<int>& numBias,
+              galois::GAccumulator<double>& sumBias,
+              std::vector<GNode>& literalsN) {
   double m = maxBias.reduce();
   double n = nontrivial.reduce();
   int num = numBias.reduce();
@@ -385,6 +395,7 @@ void decimate() {
 
   const double limit = d;
 
+  galois::reportPageAlloc("MeminfoPre: decimate");
   // fix_variables
   galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
@@ -403,9 +414,17 @@ void decimate() {
 
       },
       galois::loopname("fix_variables"));
+  galois::reportPageAlloc("MeminfoPost: decimate");
 }
 
-bool survey_inspired_decimation() {
+bool survey_inspired_decimation(Graph& graph,
+                                galois::GAccumulator<unsigned int>& nontrivial,
+                                galois::GReduceMax<double>& maxBias,
+                                galois::GAccumulator<int>& numBias,
+                                galois::GAccumulator<double>& sumBias,
+                                std::vector<GNode>& literalsN,
+                                std::vector<std::pair<GNode,int>>& clauses
+                                ) {
   //0) Randomize initial conditions for the surveys
   //1) run SP
   //   if (SP does not converge, return SP UNCONVEREGED and stop
@@ -417,11 +436,12 @@ bool survey_inspired_decimation() {
   //   c) clean the graph
   //2.2) if all surveys are trivial(n = 0), output simplified subformula
   //4) if solved, output SAT, if no contradiction, continue at 1, if contridiction, stop
+  galois::preAlloc(numThreads + 100*(graph.size()) / galois::runtime::pagePoolSize());
   do {
-    SP_algorithm();
+    SP_algorithm(graph, nontrivial, maxBias, numBias, sumBias, literalsN, clauses);
     if (nontrivial.reduce()) {
       std::cout << "DECIMATED\n";
-      decimate();
+      decimate(graph, nontrivial, maxBias, numBias, sumBias, literalsN);
     } else {
       std::cout << "SIMPLIFIED\n";
       return false;
@@ -435,8 +455,17 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
   srand(seed);
-  initialize_random_formula(M,N,K);
-  //print_formula();
+  Graph graph;
+  galois::GAccumulator<unsigned int> nontrivial;
+  galois::GReduceMax<double> maxBias;
+  galois::GAccumulator<int> numBias;
+  galois::GAccumulator<double> sumBias;
+
+  std::vector<GNode> literalsN;
+  std::vector<std::pair<GNode,int>> clauses;
+
+  initialize_random_formula(graph,M,N,K,literalsN,clauses);
+  //print_formula(graph, clauses);
   //build_graph();
   //print_graph();
 
@@ -444,13 +473,13 @@ int main(int argc, char** argv) {
 
   galois::StatTimer T;
   T.start();
-  survey_inspired_decimation();
+  survey_inspired_decimation(graph, nontrivial, maxBias, numBias, sumBias, literalsN, clauses);
   T.stop();
 
-  //print_formula();
-  //print_fixed();
+  //print_formula(graph, clauses);
+  //print_fixed(graph, literalsN);
 
-  std::cout << "Fixed " << count_fixed() << " variables\n";
+  std::cout << "Fixed " << count_fixed(graph, literalsN) << " variables\n";
 
   return 0;
 }
