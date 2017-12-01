@@ -351,8 +351,6 @@ public:
   }
 
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
-    typedef typename EdgeInfo::value_type value_type;
-    typedef LargeArray<FileEdgeTy> FED;
     auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
