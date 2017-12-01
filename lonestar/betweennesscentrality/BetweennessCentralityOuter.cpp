@@ -18,7 +18,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Betweeness-centrality.
+ * Betweeness-centrality. "Outer" because parallelism is in the outer loop,
+ * i.e. each thread works on a single source.
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
