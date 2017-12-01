@@ -1,7 +1,7 @@
 #v1
 barneshut nothing
 bfs r4-2e26
-#TODO needs graph
+#TODO needs graph, though it only does 1 source
 bc-inner nothing
 bc-outer rmat8-2e14
 boruvka USA-road-d.USA

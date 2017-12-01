@@ -290,7 +290,8 @@ class TrianglesEdge(SharedMemApp):
 
 
 # specification of binaries to run
-BINARIES = [BFS(), SSSP(), DMR()]
-#BINARIES = [BCOuter()]
-#BINARIES = [TrianglesNode(), TrianglesEdge()]
-#BINARIES = [Boruvka(), BoruvkaMerge()]
+# apps present in Galois 2.2
+BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
+            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
+            SpanningTree(), SSSP(), SurveyPropagation()]
