@@ -21,7 +21,8 @@
  * @section Description
  *
  * Betweenness centrality. Implementation based on Ligra. Does BC with only
- * a single source.
+ * a single source. "Inner" because parallelism occurs within a source
+ * calculation rather than with sources themselves.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
@@ -369,9 +370,9 @@ struct LeveledAlgo {
                 newBag->push_back(dst);
               }
 
-              ddata.numPaths = ddata.numPaths + sdata.numPaths;
+              ddata.numPaths += sdata.numPaths;
             } else if (ddata.dist == sdata.dist + 1) {
-              ddata.numPaths = ddata.numPaths + sdata.numPaths;
+              ddata.numPaths += sdata.numPaths;
             }
           }
         },
@@ -492,7 +493,6 @@ void run() {
     for (typename Graph::iterator ii = graph.begin(), 
                                   ei = graph.end(); 
          ii != ei && count < MAX_COUNT; 
-         //ii != ei; 
          ++ii, ++count) {
       std::cout << count << " "
                 << std::setiosflags(std::ios::fixed) << std::setprecision(6) 
