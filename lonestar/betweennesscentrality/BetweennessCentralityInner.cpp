@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,25 +20,19 @@
  *
  * @section Description
  *
- * Betweenness centrality. Implementation based on Ligra
+ * Betweenness centrality. Implementation based on Ligra.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Timer.h"
-#include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
+
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "galois/graphs/GraphNodeBag.h"
+
 #include "HybridBFS.h"
 
-#include <atomic>
-#include <string>
-#include <deque>
-#include <iostream>
 #include <iomanip>
 
 static const char* name = "Betweenness Centrality";
@@ -51,21 +45,25 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
-static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"));
-static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
+static cll::opt<std::string> filename(cll::Positional, 
+                                 cll::desc("<input graph>"), cll::Required);
+static cll::opt<std::string> transposeGraphName("graphTranspose", 
+                                 cll::desc("Transpose of input graph"));
+static cll::opt<bool> symmetricGraph("symmetricGraph", 
+                          cll::desc("Input graph is symmetric"));
+static cll::opt<unsigned int> startNode("startNode", 
+                                  cll::desc("Node to start search from"), 
+                                  cll::init(0));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Async Algorithm"),
       clEnumValN(Algo::leveled, "leveled", "Leveled Algorithm"),
-      clEnumValEnd), cll::init(Algo::async));
+      clEnumValEnd), 
+    cll::init(Algo::async));
 
 template<typename Algo>
-void initialize(Algo& algo,
-    typename Algo::Graph& graph,
-    typename Algo::Graph::GraphNode& source) {
-
+void initialize(Algo& algo, typename Algo::Graph& graph, 
+                typename Algo::Graph::GraphNode& source) {
   algo.readGraph(graph);
   std::cout << "Read " << graph.size() << " nodes\n";
 
@@ -100,14 +98,16 @@ struct AsyncAlgo {
     float numPaths;
     float dependencies;
     int dist;
-    SNode() :numPaths(-std::numeric_limits<float>::max()), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
+    SNode() 
+      : numPaths(-std::numeric_limits<float>::max()), 
+        dependencies(-std::numeric_limits<float>::max()), 
+        dist(std::numeric_limits<int>::max()) { }
   };
 
   typedef galois::graphs::LC_CSR_Graph<SNode,void>
     ::with_no_lockable<true>::type 
     ::with_numa_alloc<true>::type InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
-//typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "async"; }
@@ -125,11 +125,9 @@ struct AsyncAlgo {
           data.dist = std::numeric_limits<int>::max();
         },
         galois::loopname("Initialize"));
-
   }
 
   void BFS(Graph& graph, GNode source) {
-
     using WorkItem =  std::pair<GNode, int>;
 
     auto indexer = [] (const WorkItem& val) { return val.second; };
@@ -137,7 +135,8 @@ struct AsyncAlgo {
     using OBIM = galois::worklists::OrderedByIntegerMetric<decltype(indexer)
       , galois::worklists::dChunkedFIFO<bfsChunkSize> >; 
 
-    galois::for_each( galois::iterate({ WorkItem(source, 0) }),
+    galois::for_each(
+        galois::iterate({ WorkItem(source, 0) }),
         [&] (const WorkItem& item, auto& ctx) {
           GNode n = item.first;
           int newDist = item.second;
@@ -163,11 +162,9 @@ struct AsyncAlgo {
         galois::no_conflicts(),
         galois::wl<OBIM>(indexer),
         galois::loopname("BFS"));
-
   }
 
   void CountPaths(Graph& graph) {
-
     auto indexer = [&] (const GNode& n) {
       return graph.getData(n, galois::MethodFlag::UNPROTECTED).dist;
     };
@@ -463,9 +460,10 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   galois::StatTimer T("TotalTime");
+
   T.start();
   switch (algo) {
-    case Algo::async: run<AsyncAlgo>();   break;
+    case Algo::async: run<AsyncAlgo>();     break;
     case Algo::leveled: run<LeveledAlgo>(); break;
   }
   T.stop();
