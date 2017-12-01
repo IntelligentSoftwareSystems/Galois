@@ -57,7 +57,6 @@ namespace cll = llvm::cl;
 extern cll::opt<int> numThreads;
 extern cll::opt<int> numRuns;
 extern cll::opt<std::string> statFile;
-extern cll::opt<unsigned int> enforce_metadata;
 extern cll::opt<bool> verify;
 
 #ifdef __GALOIS_HET_CUDA__

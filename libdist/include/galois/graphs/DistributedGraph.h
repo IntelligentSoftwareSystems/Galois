@@ -84,7 +84,7 @@ enum MASTERS_DISTRIBUTION {
 };
 
 extern cll::opt<bool> partitionAgnostic;
-extern cll::opt<bool> useGidMetadata;
+extern cll::opt<DataCommMode> enforce_metadata;
 extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
 extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
@@ -541,12 +541,7 @@ public:
   hGraph(unsigned host, unsigned numHosts) :
       GlobalObject(this), round(false), transposed(false), id(host),
       numHosts(numHosts) {
-    if (useGidMetadata) {
-      if (enforce_data_mode != offsetsData) {
-        galois::gPrint("Reseting useGidMetadata because metadata is not set appropriately\n");
-        useGidMetadata = false;
-      }
-    }
+    enforce_data_mode = enforce_metadata;
 
     masterNodes.resize(numHosts);
     mirrorNodes.resize(numHosts);
@@ -1657,7 +1652,7 @@ private:
           bit_set_count = indices.size();
           extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
             bit_set_count, offsets, val_vec);
-        } else if (data_mode != noData) { // bitsetData or offsetsData
+        } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
           extract_subset<SyncFnTy, syncType, false, true>(loopName, indices,
             bit_set_count, offsets, val_vec);
         }
@@ -1677,13 +1672,13 @@ private:
 
       if (data_mode == noData) {
         gSerialize(b, data_mode);
+      } else if (data_mode == gidsData) {
+        offsets.resize(bit_set_count);
+        convert_lid_to_gid<syncType>(loopName, indices, offsets);
+        val_vec.resize(bit_set_count);
+        gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
       } else if (data_mode == offsetsData) {
         offsets.resize(bit_set_count);
-
-        if (useGidMetadata) {
-          convert_lid_to_gid<syncType>(loopName, indices, offsets);
-        }
-
         val_vec.resize(bit_set_count);
         gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
       } else if (data_mode == bitsetData) {
@@ -1883,12 +1878,11 @@ private:
         if (data_mode != onlyData) {
           galois::runtime::gDeserialize(buf, bit_set_count);
 
-          if (data_mode == offsetsData) {
-            //offsets.resize(bit_set_count);
+          if (data_mode == gidsData) {
             galois::runtime::gDeserialize(buf, offsets);
-            if (useGidMetadata) {
-              convert_gid_to_lid<syncType>(loopName, offsets);
-            }
+            convert_gid_to_lid<syncType>(loopName, offsets);
+          } else if (data_mode == offsetsData) {
+            galois::runtime::gDeserialize(buf, offsets);
           } else if (data_mode == bitsetData) {
             bit_set_comm.resize(num);
             galois::runtime::gDeserialize(buf, bit_set_comm);
@@ -1923,7 +1917,7 @@ private:
             set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
                 sharedNodes[from_id], bit_set_count, offsets, val_vec, 
                 bit_set_compute, buf_start);
-          } else if (useGidMetadata) { // offsetsData
+          } else if (data_mode == gidsData) {
             set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(loopName, 
                 offsets, bit_set_count, offsets, val_vec, 
                 bit_set_compute);

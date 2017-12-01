@@ -12,8 +12,6 @@
 enum SharedType { sharedMaster, sharedMirror };
 enum UpdateOp { setOp, addOp, minOp };
 
-extern bool useGidMetadata; // TODO move this into DataCommMode
-
 void kernel_sizing(dim3 &blocks, dim3 &threads) {
 	threads.x = 256;
 	threads.y = threads.z = 1;
@@ -373,7 +371,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 	check_cuda_kernel;
   //timer3.stop();
   //timer4.start();
-  if ((*data_mode) == offsetsData) {
+  if (((*data_mode) == gidsData) || ((*data_mode) == offsetsData)) {
     ctx->offsets.copy_to_cpu(offsets_comm, *v_size);
   } else if ((*data_mode) == bitsetData) {
     ctx->is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_comm);
@@ -405,7 +403,7 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
   //ggc::Timer timer("timer"), timer1("timer1"), timer2("timer2");
   //timer.start();
   //timer1.start();
-  if (data_mode == offsetsData) {
+  if ((data_mode == gidsData) || (data_mode == offsetsData)) {
     ctx->offsets.copy_to_gpu(offsets_comm, v_size);
   } else if (data_mode == bitsetData) {
     ctx->is_updated.cpu_rd_ptr()->resize(shared->num_nodes[from_id]);
@@ -425,7 +423,7 @@ void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
     } else if (op == minOp) {
       batch_min_subset<DataType> <<<blocks, threads>>>(v_size, shared->nodes[from_id].device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     }
-  } else if (useGidMetadata) {
+  } else if (data_mode == gidsData) {
     if (op == setOp) {
       batch_set_subset<DataType> <<<blocks, threads>>>(v_size, ctx->offsets.device_ptr(), shared_data->device_ptr(), field->data.gpu_wr_ptr(), field->is_updated.gpu_wr_ptr());
     } else if (op == addOp) {

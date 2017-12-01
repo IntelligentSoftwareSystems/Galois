@@ -51,17 +51,11 @@ cll::opt<int> numThreads("t", cll::desc("Number of threads"),
 cll::opt<int> numRuns("runs", cll::desc("Number of runs"), 
                               cll::init(3));
 cll::opt<std::string> statFile("statFile", 
-         cll::desc("output file to print stats to "), 
-         cll::init(""));
-
-// TODO: move this to DistributedGraph.cpp and use enums
-cll::opt<unsigned int> enforce_metadata("metadata", 
-          cll::desc("Enforce communication metadata: 0 - auto (default), "
-                         "1 - bitset, 2 - indices, 3 - no metadata"), 
-          cll::init(0));
+                              cll::desc("output file to print stats to "), 
+                              cll::init(""));
 cll::opt<bool> verify("verify", 
-                     cll::desc("Verify results by outputting results to file"), 
-                     cll::init(false));
+                              cll::desc("Verify results by outputting results to file"), 
+                              cll::init(false));
 
 #ifdef __GALOIS_HET_CUDA__
 std::string personality_str(Personality p) {
@@ -105,8 +99,6 @@ cll::opt<std::string> personality_set("pset",
       cll::init("c"));
 #endif
 
-DataCommMode enforce_data_mode = noData;
-
 static void PrintVersion() {
   std::cout << "Galois Benchmark Suite v" << galois::getVersion() << " (" 
             << galois::getRevision() << ")\n";
@@ -122,9 +114,6 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = galois::setActiveThreads(numThreads); 
   galois::runtime::setStatFile(statFile);
-
-  assert(enforce_metadata <= 3);
-  enforce_data_mode = static_cast<DataCommMode>((unsigned int)enforce_metadata);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   
