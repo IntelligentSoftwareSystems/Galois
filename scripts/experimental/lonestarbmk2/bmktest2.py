@@ -88,7 +88,7 @@ class BarnesHut(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-n=50000")
+            s.set_arg("-n=500000")
             s.set_arg("-steps=1")
             s.set_arg("-seed=0")
         
