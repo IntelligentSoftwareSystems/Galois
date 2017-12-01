@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,13 +18,12 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * Betweeness-centrality.
+ *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
 
 #include "galois/Galois.h"
-#include "galois/Reduction.h"
-#include "galois/Timer.h"
-#include "galois/UserContext.h"
 #include "galois/graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -32,24 +31,32 @@
 
 #include <boost/iterator/filter_iterator.hpp>
 
-#include <algorithm>
-#include <iostream>
 #include <iomanip>
 #include <fstream>
-#include <sstream>
-#include <vector>
-#include <deque>
-#include <cstdlib>
 
 static const char* name = "Betweenness Centrality";
-static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
+static const char* desc = "Computes the betweenness centrality of all nodes in "
+                          "a graph";
 static const char* url  = "betweenness_centrality";
 
-static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::Required);
-static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
-static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
-static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
-static llvm::cl::opt<bool> printAll("printAll", llvm::cl::desc("Print betweenness values for all nodes"));
+static llvm::cl::opt<std::string> filename(llvm::cl::Positional, 
+                                           llvm::cl::desc("<input file>"), 
+                                           llvm::cl::Required);
+static llvm::cl::opt<int> iterLimit("limit", 
+                                    llvm::cl::desc("Limit number of iterations "
+                                                   "to value (0 is all nodes)"), 
+                                    llvm::cl::init(0));
+static llvm::cl::opt<unsigned int> startNode("startNode", 
+                                             llvm::cl::desc("Node to start "
+                                                            "search from"), 
+                                             llvm::cl::init(0));
+static llvm::cl::opt<bool> forceVerify("forceVerify", 
+                                       llvm::cl::desc("Abort if not verified; "
+                                                      "only makes sense for "
+                                                      "torus graphs"));
+static llvm::cl::opt<bool> printAll("printAll", 
+                                    llvm::cl::desc("Print betweenness values "
+                                                   "for all nodes"));
 
 typedef galois::graphs::LC_CSR_Graph<void, void>
   ::with_no_lockable<true>::type
@@ -57,7 +64,6 @@ typedef galois::graphs::LC_CSR_Graph<void, void>
 typedef Graph::GraphNode GNode;
 
 class BCouter {
-
   Graph* G;
   int NumNodes;
 
