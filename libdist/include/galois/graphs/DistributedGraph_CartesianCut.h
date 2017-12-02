@@ -976,6 +976,17 @@ public:
     }
   }
 
+  std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
+    std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
+    if(base_hGraph::beginMaster > 0)
+      mirrorRanges_vec.push_back(std::make_pair(0, base_hGraph::beginMaster));
+    auto endMaster = base_hGraph::beginMaster + base_hGraph::numOwned;
+    if (endMaster < numNodes) {
+      mirrorRanges_vec.push_back(std::make_pair(endMaster, numNodes));
+    }
+    return mirrorRanges_vec;
+  }
+
   /*
    * This function serializes the local data structures using boost binary archive.
    */

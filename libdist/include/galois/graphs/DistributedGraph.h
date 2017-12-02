@@ -196,9 +196,10 @@ public:
   virtual unsigned getHostID(uint64_t) const = 0;
   virtual bool isOwned(uint64_t) const = 0;
   virtual bool isLocal(uint64_t) const = 0;
-  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{
-  }
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{}
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0){};
+  virtual std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {}
+
 
   // Requirement: For all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
@@ -3513,6 +3514,25 @@ public:
 
     inputStream.close();
     dGraphTimerReadLocalGraph.stop();
+  }
+
+  template<typename FnTy>
+  void reset_mirrorField() {
+    auto mirrorRanges = getMirrorRanges();
+    for(auto r : mirrorRanges){
+        assert(r.first < r.second);
+        galois::do_all(galois::iterate(r.first, r.second),
+            [&](uint32_t lid) {
+              #ifdef __GALOIS_HET_OPENCL__
+              CLNodeDataWrapper d = clGraph.getDataW(lid);
+              FnTy::reset(lid, d);
+              #else
+              FnTy::reset(lid, getData(lid));
+              #endif
+            },
+            galois::no_stats(),
+            galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
+    }
   }
 };
 

@@ -439,6 +439,35 @@ class hGraph_edgeCut : public hGraph<NodeTy, EdgeTy, WithInEdges> {
     }
   }
 
+#if 0
+  /* Reset a field on a mirror nodes */
+  template<typename FnTy>
+  void reset_mirrorField() const {
+    if (base_hGraph::numOwned < numNodes) {
+        galois::do_all(galois::iterate(base_hGraph::numOwned, numNodes - 1),
+            [&](uint32_t n) {
+              uint32_t lid = base_hGraph::mirrorNodes[base_hGraph::id][n];
+              #ifdef __GALOIS_HET_OPENCL__
+              CLNodeDataWrapper d = clGraph.getDataW(lid);
+              FnTy::reset(lid, d);
+              #else
+              FnTy::reset(lid, base_hGraph::getData(lid));
+              #endif
+            },
+            galois::no_stats(),
+            galois::loopname(base_hGraph::get_run_identifier("RESET:MIRRORS").c_str()));
+        }
+  }
+#endif
+
+  std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
+    std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
+    if (base_hGraph::numOwned < numNodes) {
+      mirrorRanges_vec.push_back(std::make_pair(base_hGraph::numOwned, numNodes));
+    }
+    return mirrorRanges_vec;
+  }
+
 
   /*
    * This function serializes the local data structures using boost binary archive.
