@@ -149,3 +149,72 @@ void crashSite(GraphTy& _graph){
     }
   }
 }
+
+template<typename RecoveryTy, typename InitGraphCrashedTy, typename InitGraphHealthTy, typename GraphTy>
+void crashSite(GraphTy& _graph){
+  const auto& net = galois::runtime::getSystemNetworkInterface();
+  std::set<uint32_t> crashHostSet = getRandomHosts();
+
+  if(net.ID == 0){
+    galois::runtime::reportStat_Single("RECOVERY", "NUM_HOST_CRASHED", (crashHostSet.size()));
+  }
+
+  galois::StatTimer TimerRecoveryCrashed("TIMER_RECOVERY_CRASHED", "RECOVERY");
+  galois::StatTimer TimerRecoveryHealthy("TIMER_RECOVERY_HEALTHY", "RECOVERY");
+  //Use resilience to recover
+  if(recoveryScheme == RS){
+    galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+    galois::gPrint(net.ID, " :  Using RS\n");
+
+    // Crashed hosts need to reconstruct local graphs
+    if(crashHostSet.find(net.ID) != crashHostSet.end()){
+      TimerRecoveryCrashed.start();
+      galois::gPrint(net.ID, " : CRASHED!!!\n");
+
+      //Reconstruct local graph
+      _graph.read_local_graph_from_file(localGraphFileName);
+      InitGraphCrashedTy::go(_graph);
+      RecoveryTy::go(_graph);
+      TimerRecoveryCrashed.stop();
+
+    } else {
+      TimerRecoveryHealthy.start();
+      InitGraphHealthTy::go(_graph);
+      RecoveryTy::go(_graph);
+      TimerRecoveryHealthy.stop();
+    }
+  } else if (recoveryScheme == CP){
+    galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
+    galois::gPrint(net.ID, " :  Using CP\n");
+    // Crashed hosts need to reconstruct local graphs
+    if(crashHostSet.find(net.ID) != crashHostSet.end()){
+      TimerRecoveryCrashed.start();
+      galois::gPrint(net.ID, " : CRASHED!!!\n");
+
+      //Reconstruct local graph
+      //Assumes that local graph file is present
+      _graph.read_local_graph_from_file(localGraphFileName);
+      _graph.checkpointApplyNodeData();
+      TimerRecoveryCrashed.stop();
+    } else {
+      TimerRecoveryHealthy.start();
+      _graph.checkpointApplyNodeData();
+      TimerRecoveryHealthy.stop();
+    }
+  }
+}
+
+template<typename RecoveryAdjustTy, typename GraphTy>
+void crashSiteAdjust(GraphTy& _graph){
+  if (recoveryScheme == RS){
+    const auto& net = galois::runtime::getSystemNetworkInterface();
+    galois::StatTimer TimerRecoveryCrashedAdjust("TIMER_RECOVERY_CRASHED_ADJUST", "RECOVERY_ADJUST");
+
+    galois::gPrint(net.ID, " : RECOVERY_ADJUST!!!\n");
+    TimerRecoveryCrashedAdjust.start();
+    RecoveryAdjustTy::go(_graph);
+    TimerRecoveryCrashedAdjust.stop();
+  }
+}
+
+
