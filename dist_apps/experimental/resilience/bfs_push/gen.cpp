@@ -111,7 +111,7 @@ struct InitializeGraph {
     {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
-      InitializeGraph{src_node, infinity, &_graph}, 
+      InitializeGraph{src_node, infinity, &_graph},
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
@@ -119,39 +119,24 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : 
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 :
                                                                   local_infinity;
-    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : 
-                                                              local_infinity;
+    //TODO: Why is this required? Also, we don't need separate first iteration.
+    //sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 :
+                                                              //local_infinity;
+    sdata.dist_old = local_infinity;                                                              
   }
 };
 
 /* Recovery to be called by resilience based fault tolerance
+ * Null recovery operator
  */
 struct recovery {
   Graph * graph;
 
   recovery(Graph * _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {
-
-#if 0
-    const auto& allNodes = _graph.allNodesRange();
-    galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      recovery{&_graph},
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
-#endif
-
-    _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                Broadcast_dist_current>("RECOVERY");
-  }
-
-  void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
-
-  }
+  void static go(Graph& _graph) {}
 };
 
 struct FirstItr_BFS {
@@ -230,7 +215,9 @@ struct BFS {
     do {
 
       //Checkpointing the all the node data
-      saveCheckpointToDisk(_num_iterations, _graph);
+      if(enableFT && recoveryScheme == CP){
+        saveCheckpointToDisk(_num_iterations, _graph);
+      }
 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
@@ -260,6 +247,9 @@ struct BFS {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph>(_graph);
+
+        _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+                  Broadcast_dist_current>("RECOVERY");
       }
       /**************************CRASH SITE : end *****************************************/
 

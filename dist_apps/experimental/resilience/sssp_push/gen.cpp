@@ -116,7 +116,8 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    //sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
+    sdata.dist_old = local_infinity;
   }
 };
 
@@ -127,12 +128,7 @@ struct recovery {
 
   recovery(Graph * _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {
-
-    //Only sync is required
-    _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                Broadcast_dist_current>("RECOVERY");
-  }
+  void static go(Graph& _graph) {}
 };
 
 struct FirstItr_SSSP {
@@ -207,7 +203,9 @@ struct SSSP {
     do { 
 
       //Checkpointing the all the node data
-      saveCheckpointToDisk(_num_iterations, _graph);
+      if(enableFT && recoveryScheme == CP){
+        saveCheckpointToDisk(_num_iterations, _graph);
+      }
 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
@@ -238,6 +236,10 @@ struct SSSP {
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph>(_graph);
+
+        //Only sync is required
+        _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+          Broadcast_dist_current>("RECOVERY");
       }
       /**************************CRASH SITE : end *****************************************/
 

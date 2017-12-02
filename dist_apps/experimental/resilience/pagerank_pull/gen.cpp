@@ -166,6 +166,170 @@ struct InitializeGraph {
   }
 };
 
+/* (Re)initialize all fields to 0 except for value which needs to be 0.15
+ * on crashed hosts */
+struct ResetGraph_crashed {
+  const float& local_alpha;
+  Graph* graph;
+
+  ResetGraph_crashed(const float& _local_alpha, Graph* _graph) : 
+      local_alpha(_local_alpha), graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    //TODO: not correct for CUDA
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      ResetGraph_crashed{ alpha, &_graph },
+      galois::no_stats(),
+      galois::loopname(_graph.get_run_identifier("ResetGraph_crashed").c_str()));
+  }
+
+  void operator()(GNode src) const {
+    auto& sdata = graph->getData(src);
+    sdata.value = local_alpha;
+    sdata.nout = 0;
+    sdata.delta = 0;
+    sdata.residual = 0;
+  }
+};
+
+struct InitializeGraph_crashed {
+  Graph* graph;
+
+  InitializeGraph_crashed(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    // init graph
+    ResetGraph_crashed::go(_graph);
+
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    //TODO:: not correct for CUDA
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
+                           cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    // doing a local do all because we are looping over edges
+    galois::do_all(
+      galois::iterate(nodesWithEdges),
+      InitializeGraph_crashed{ &_graph },
+      galois::steal(), 
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
+
+    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+                Bitset_nout>("InitializeGraph_crashed");
+  }
+
+  // Calculate "outgoing" edges for destination nodes (note we are using
+  // the tranpose graph for pull algorithms)
+  void operator()(GNode src) const {
+    for (auto nbr : graph->edges(src)) {
+      GNode dst = graph->getEdgeDst(nbr);
+      auto& ddata = graph->getData(dst);
+      galois::atomicAdd(ddata.nout, (uint32_t)1);
+      bitset_nout.set(dst);
+    }
+  }
+};
+
+/* (Re)initialize only nout. Required only for recovery
+ * on healthy hosts */
+struct ResetGraph_healthy {
+  Graph* graph;
+
+  ResetGraph_healthy(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      ResetGraph_healthy{ &_graph },
+      galois::no_stats(),
+      galois::loopname(_graph.get_run_identifier("ResetGraph_healthy").c_str()));
+  }
+
+  void operator()(GNode src) const {
+    auto& sdata = graph->getData(src);
+    //Reset residual on healthy nodes.
+    sdata.residual = 0;
+    sdata.nout = 0;
+  }
+};
+
+
+struct InitializeGraph_healthy {
+  Graph* graph;
+
+  InitializeGraph_healthy(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    // Reset graph field on healthy nodes.
+    ResetGraph_healthy::go(_graph);
+
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
+                           cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    // doing a local do all because we are looping over edges
+    galois::do_all(
+      galois::iterate(nodesWithEdges),
+      InitializeGraph_healthy{ &_graph },
+      galois::steal(), 
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("InitializeGraph_healthy").c_str()));
+
+    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+                Bitset_nout>("InitializeGraph_healthy");
+  }
+
+  // Calculate "outgoing" edges for destination nodes (note we are using
+  // the tranpose graph for pull algorithms)
+  void operator()(GNode src) const {
+    for (auto nbr : graph->edges(src)) {
+      GNode dst = graph->getEdgeDst(nbr);
+      auto& ddata = graph->getData(dst);
+      galois::atomicAdd(ddata.nout, (uint32_t)1);
+      bitset_nout.set(dst);
+    }
+  }
+};
+
 /* Recovery to be called by resilience based fault tolerance
  */
 struct recovery {
@@ -175,20 +339,48 @@ struct recovery {
 
   void static go(Graph& _graph) {
 
-    const auto& allNodes = _graph.allNodesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    //const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
+      galois::iterate(nodesWithEdges),
+      //galois::iterate(allNodes.begin(), allNodes.end()),
       recovery{&_graph},
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
-
-    //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                //Broadcast_dist_current, Bitset_dist_current>("RECOVERY");
   }
 
   void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
+    NodeData& sdata = graph->getData(src);
+    if(sdata.nout > 0)
+      sdata.delta = sdata.value * (1 - alpha) / sdata.nout;
+  }
+};
 
+/* Recovery Adjust to be called by resilience based fault tolerance
+ */
+struct recoveryAdjust {
+  Graph * graph;
+
+  recoveryAdjust(Graph * _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    //const auto& allNodes = _graph.allNodesRange();
+    galois::do_all(
+      //galois::iterate(allNodes.begin(), allNodes.end()),
+      galois::iterate(nodesWithEdges),
+      recoveryAdjust{&_graph},
+      galois::no_stats(),
+      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
+
+      //TODO: Is this required??
+      //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY");
+  }
+
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+    sdata.residual -= (sdata.value - alpha);
   }
 };
 
@@ -211,7 +403,7 @@ struct PageRank_delta {
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" +
         (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -225,7 +417,7 @@ struct PageRank_delta {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
-      galois::no_stats(), 
+      galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
   }
 
@@ -244,7 +436,7 @@ struct PageRank_delta {
   }
 };
 
-// TODO: GPU code operator does not match CPU's operator (cpu accumulates sum 
+// TODO: GPU code operator does not match CPU's operator (cpu accumulates sum
 // and adds all at once, GPU adds each pulled value individually/atomically)
 struct PageRank {
   Graph* graph;
@@ -259,12 +451,22 @@ struct PageRank {
 
     do {
 
+       /**************************CRASH SITE : ADJUST : start *****************************************/
+      //if(enableFT && (_num_iterations == crashIteration + 1)){
+        //galois::gPrint("CALLING crashSiteAdjust\n");
+        //crashSiteAdjust<recoveryAdjust>(_graph);
+      //}
+      /**************************CRASH SITE : ADJUST : end *****************************************/
+
       //Checkpointing the all the node data
-      saveCheckpointToDisk(_num_iterations, _graph);
+      if(enableFT && recoveryScheme == CP){
+        saveCheckpointToDisk(_num_iterations, _graph);
+      }
 
       _graph.set_num_iter(_num_iterations);
       dga.reset();
       PageRank_delta::go(_graph, dga);
+      _graph.reset_mirrorField<Reduce_add_residual>();
 
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -280,7 +482,7 @@ struct PageRank {
         galois::iterate(nodesWithEdges),
         PageRank{ &_graph },
         galois::steal(),
-        galois::no_stats(), 
+        galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
@@ -288,7 +490,28 @@ struct PageRank {
 
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery>(_graph);
+        crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
+        const auto& net = galois::runtime::getSystemNetworkInterface();
+        galois::gPrint(net.ID, " : recovery DONE!!!\n");
+
+        _graph.reset_mirrorField<Reduce_add_residual>();
+        galois::do_all(
+            galois::iterate(nodesWithEdges),
+            PageRank{ &_graph },
+            galois::steal(),
+            galois::no_stats(),
+            galois::loopname(_graph.get_run_identifier("PageRank-afterCrash").c_str()));
+
+        //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
+          //Bitset_residual>("PageRank-afterCrash");
+
+        _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("PageRank-afterCrash");
+
+        crashSiteAdjust<recoveryAdjust>(_graph);
+
+        // Do all and sync
+        //_graph.reset_mirrorField<Reduce_add_residual>();
+        // Adjust delta
       }
       /**************************CRASH SITE : end *****************************************/
 
@@ -309,7 +532,6 @@ struct PageRank {
   // Pull deltas from neighbor nodes, then add to self-residual
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
-
 
     for (auto nbr : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(nbr);
