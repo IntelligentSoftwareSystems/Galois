@@ -40,13 +40,14 @@
 namespace cll = llvm::cl;
 
 const char* name = "Page Rank";
-const char* desc = "Computes page ranks a la Page and Brin";
-const char* url  = 0;
+const char* desc =
+    "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
+const char* url = 0;
 
 cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"),
                                cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
-                                 cll::init(0.01));
+                                 cll::init(0.000001));
 
 static const float alpha = 0.85;
 typedef double PRTy;
@@ -138,26 +139,24 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 void initResidual(Graph& graph) {
   // use residual for the partial, scaled initial residual
   galois::do_all(galois::iterate(graph),
-                       [&graph](const typename Graph::GraphNode& src) {
-                         // contribute residual
-                         auto nout = std::distance(graph.edge_begin(src),
-                                                   graph.edge_end(src));
-                         for (auto ii : graph.edges(src)) {
-                           auto dst    = graph.getEdgeDst(ii);
-                           auto& ddata = graph.getData(dst);
-                           atomicAdd(ddata.residual, 1.0 / nout);
-                         }
-                       },
-                       galois::loopname("init-res-0"),
-                       galois::steal());
+                 [&graph](const GNode& src) {
+                   // contribute residual
+                   auto nout = std::distance(graph.edge_begin(src),
+                                             graph.edge_end(src));
+                   for (auto ii : graph.edges(src)) {
+                     auto dst    = graph.getEdgeDst(ii);
+                     auto& ddata = graph.getData(dst);
+                     atomicAdd(ddata.residual, 1.0 / nout);
+                   }
+                 },
+                 galois::loopname("init-res-0"), galois::steal());
   // scale residual
   galois::do_all(galois::iterate(graph),
-                       [&graph](const typename Graph::GraphNode& src) {
-                         auto& data    = graph.getData(src);
-                         data.residual = data.residual * alpha * (1.0 - alpha);
-                       },
-                       galois::loopname("init-res-1"),
-                       galois::steal());
+                 [&graph](const GNode& src) {
+                   auto& data    = graph.getData(src);
+                   data.residual = data.residual * alpha * (1.0 - alpha);
+                 },
+                 galois::loopname("init-res-1"), galois::steal());
 }
 
 int main(int argc, char** argv) {
@@ -168,7 +167,6 @@ int main(int argc, char** argv) {
   T.start();
 
   Graph graph;
-
   galois::graphs::readGraph(graph, filename);
 
   std::cout << "Read " << std::distance(graph.begin(), graph.end())
@@ -179,13 +177,11 @@ int main(int argc, char** argv) {
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running Edge Async version\n";
-  std::cout << "tolerance: " << tolerance << "\n";
+  std::cout << "Running Edge Async push version, tolerance: " << tolerance
+            << "\n";
 
-  galois::do_all(galois::iterate(graph), 
-      [&graph](typename Graph::GraphNode n) {
-        graph.getData(n).init();
-      });
+  galois::do_all(galois::iterate(graph),
+                 [&graph](GNode n) { graph.getData(n).init(); });
 
   initResidual(graph);
   typedef galois::worklists::dChunkedFIFO<256> WL;
@@ -193,31 +189,32 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
   galois::for_each(galois::iterate(graph),
-      [&](GNode src, auto& ctx) {
-        LNode& sdata = graph.getData(src);
-        constexpr const galois::MethodFlag flag =
-            galois::MethodFlag::UNPROTECTED;
+                   [&](GNode src, auto& ctx) {
+                     LNode& sdata = graph.getData(src);
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
 
-        if (std::fabs(sdata.residual) > tolerance) {
-          PRTy oldResidual = sdata.residual.exchange(0.0);
-          sdata.value += oldResidual;
-          int src_nout = std::distance(graph.edge_begin(src, flag),
-                                       graph.edge_end(src, flag));
-          PRTy delta   = oldResidual * alpha / src_nout;
-          // for each out-going neighbors
-          for (auto jj : graph.edges(src, flag)) {
-            GNode dst    = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, flag);
-            auto old     = atomicAdd(ddata.residual, delta);
-            if (std::fabs(old) <= tolerance &&
-                std::fabs(old + delta) >= tolerance)
-              ctx.push(dst);
-          }
-        } else { // might need to reschedule self. But why?
-          // ctx.push(src);
-        }
-      },
-      galois::loopname("Main"), galois::no_conflicts(), galois::wl<WL>());
+                     if (std::fabs(sdata.residual) > tolerance) {
+                       PRTy oldResidual = sdata.residual.exchange(0.0);
+                       sdata.value += oldResidual;
+                       int src_nout = std::distance(graph.edge_begin(src, flag),
+                                                    graph.edge_end(src, flag));
+                       PRTy delta   = oldResidual * alpha / src_nout;
+                       // for each out-going neighbors
+                       for (auto jj : graph.edges(src, flag)) {
+                         GNode dst    = graph.getEdgeDst(jj);
+                         LNode& ddata = graph.getData(dst, flag);
+                         auto old     = atomicAdd(ddata.residual, delta);
+                         if (std::fabs(old) <= tolerance &&
+                             std::fabs(old + delta) >= tolerance)
+                           ctx.push(dst);
+                       }
+                     } else { // might need to reschedule self. But why?
+                       // ctx.push(src);
+                     }
+                   },
+                   galois::loopname("Main"), galois::no_conflicts(),
+                   galois::wl<WL>());
 
   Tmain.stop();
 
