@@ -1,7 +1,7 @@
 /* 
  * License:
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -14,27 +14,20 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Stochastic gradient descent for matrix factorization, implemented with Galois.
+ * Stochastic gradient descent for matrix factorization, implemented with 
+ * Galois.
  *
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
  */
 
-#include <iostream>
-#include <random>
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
 
-#include "galois/Reduction.h"
 #include "galois/Galois.h"
-#include "galois/Timer.h"
-
-#include "galois/graphs/Graph.h"
 #include "galois/graphs/LCGraph.h"
 
-#include "galois/substrate/PaddedLock.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include <cmath>
+#include <random>
 
 static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
@@ -78,15 +71,20 @@ static cll::opt<int> shiftFactor("shiftRating", cll::desc("Shift ratings down by
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(
-                                       clEnumVal(nodeMovie, "Node by Movies"),
-                                       clEnumVal(edgeMovie, "Edge by Movies"),
-                                       clEnumVal(nodeMoviePri, "Node delta error"),
-                                       clEnumVal(block, "Block by Users and Movies"),
-                                       clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
-                                       clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
-                                       clEnumVal(sliceMarch, "Marching Slices version"),
-                                       clEnumVal(sliceJump, "Jumping Slices version"),
-                                       clEnumValEnd), 
+                             clEnumVal(nodeMovie, "Node by Movies"),
+                             clEnumVal(edgeMovie, "Edge by Movies"),
+                             clEnumVal(nodeMoviePri, "Node delta error"),
+                             clEnumVal(block, "Block by Users and Movies"),
+                             clEnumVal(blockAndSliceUsers, 
+                                       "Block by Users and Movies, Slice by "
+                                       "Users"),
+                             clEnumVal(blockAndSliceBoth, 
+                                       "Block by Users and Movies, Slice by "
+                                       "Users and Movies (default)"),
+                             clEnumVal(sliceMarch, "Marching Slices version"),
+                             clEnumVal(sliceJump, "Jumping Slices version"),
+                             clEnumValEnd
+                           ), 
                            cll::init(blockAndSliceBoth));
 
 static cll::opt<Learn> learn("lf", cll::desc("Choose a learning function:"),
@@ -1225,7 +1223,7 @@ void runSliceJump(Graph& g, const LearnFN* lf)
   galois::runtime::reportStat_Single("Matrix Completion", "EdgesVisited", eVisited.reduce());
 }
 
-static double genRand () {
+static double genRand() {
   // generate a random double in (-1,1)
   return 2.0 * ((double)std::rand () / (double)RAND_MAX) - 1.0;
 }
