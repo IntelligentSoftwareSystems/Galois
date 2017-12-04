@@ -7,7 +7,7 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 0
+    startThread = 0 
     # thread to end at (inclusive)
     endThread = 40
     # step to use for looping through threads
@@ -94,9 +94,33 @@ class BarnesHut(SharedMemApp):
         
         return specs
 
-class BCInner(SharedMemApp):
+class BCInnerAsync(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
-    benchmark = "bc-inner"
+    benchmark = "bc-inner-async"
+
+    def get_run_spec(self, bmkinput, config):
+        """BC inner async command line setup"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-symmetricGraph") # say it is symmetric
+        
+        return specs
+
+class BCInnerLeveled(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
+    benchmark = "bc-inner-leveled"
+
+    def get_run_spec(self, bmkinput, config):
+        """BC inner async command line setup"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-symmetricGraph") # say it is symmetric
+            s.set_arg("-algo=leveled") # leveled algo
+        
+        return specs
+
 
 class BCOuter(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
@@ -291,7 +315,9 @@ class TrianglesEdge(SharedMemApp):
 
 # specification of binaries to run
 # apps present in Galois 2.2
-BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
-            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
-            SpanningTree(), SSSP(), SurveyPropagation()]
+#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
+#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+#            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
+#            SpanningTree(), SSSP(), SurveyPropagation()]
+#BINARIES = [MCM(), PageRank()]
+BINARIES = [BCInnerLeveled()]
