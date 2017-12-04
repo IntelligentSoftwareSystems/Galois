@@ -140,7 +140,7 @@ public:
 };
 
 template <typename F>
-void timeThis(F& f, const char* const name) {
+void timeThis(const F& f, const char* const name) {
   StatTimer t("Time", name);
 
   t.start();

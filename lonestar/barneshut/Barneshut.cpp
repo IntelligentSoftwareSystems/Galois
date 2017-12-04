@@ -27,6 +27,7 @@
 #include "galois/Bag.h"
 #include "galois/Reduction.h"
 #include "Lonestar/BoilerPlate.h"
+#include "galois/runtime/Profile.h"
 
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -497,7 +498,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
         [&boxes] (const Body* b) {
           boxes.update(b->pos);
         },
-        galois::loopname("reduceBoxes"), galois::steal());
+        galois::loopname("reduceBoxes"));
 
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
 
@@ -515,9 +516,11 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     T_build.stop();
 
     //update centers of mass in tree
-    unsigned size = computeCenterOfMass(&top);
-    //printTree(&top);
-    std::cout << "Tree Size: " << size << "\n";
+    galois::timeThis([&] (void) {
+        unsigned size = computeCenterOfMass(&top);
+        //printTree(&top);
+        std::cout << "Tree Size: " << size << "\n";
+        }, "summarize-Serial");
 
     ComputeForces cf(&top, box.diameter());
 
@@ -535,7 +538,9 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     T_compute.stop();
 
     if (!skipVerify) {
-      std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
+      galois::timeThis([&] (void) {
+        std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
+      }, "checkAllPairs");
     }
     //Done in compute forces
     galois::do_all(galois::iterate(pBodies), 
