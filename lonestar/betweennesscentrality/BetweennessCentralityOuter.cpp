@@ -138,7 +138,8 @@ public:
         }
 
         // Back-propogate the dependency values (delta) along the BFS DAG
-        while (!SQ.empty()) {
+        // ignore the source (hence SQ.size > 1 and not SQ.empty)
+        while (SQ.size() > 1) {
           int leaf = SQ.back();
           SQ.pop_back();
 
