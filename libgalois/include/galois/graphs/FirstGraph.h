@@ -938,7 +938,6 @@ public:
   }
 
   void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
     auto& map = aux.inNghs.get();
 
@@ -955,8 +954,6 @@ public:
   }
 
   void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
-
     if (!Directional || InOut) {
       auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
@@ -1007,7 +1004,6 @@ public:
 
   template<bool V = DirectedNotInOut>
   std::enable_if_t<!V> constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
@@ -1024,7 +1020,6 @@ public:
 
   template<bool V = DirectedNotInOut>
   std::enable_if_t<V> constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
@@ -1036,8 +1031,6 @@ public:
 
   template<bool V = DirectedNotInOut>
   std::enable_if_t<!V> constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
-    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
-
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
