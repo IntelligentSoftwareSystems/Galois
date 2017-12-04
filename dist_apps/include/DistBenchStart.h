@@ -166,7 +166,7 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file();
+  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
@@ -213,7 +213,7 @@ static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file();
+  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
