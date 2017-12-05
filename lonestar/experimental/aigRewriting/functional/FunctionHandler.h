@@ -8,11 +8,11 @@
  * @see InputNode, ChoiceNode.
  *
  * Modified by Vinicius Possani
- * Last modification in August 8, 2015.
+ * Last modification in July 28, 2017.
  */
 
-#ifndef FUNCTION_H_
-#define FUNCTION_H_
+#ifndef FUNCTIONAL_H_
+#define FUNCTIONAL_H_
 
 #include "../xxHash/xxhash.h"
 #include <cmath>
@@ -719,6 +719,6 @@ std::string supportToBin( unsigned int support ) {
 	return Functional::toBin( ptr , 1 );
 }
 
-} // namespace Functional
+} /* namespace Functional */
 
-#endif /* FUNCTION_H_ */
+#endif /* FUNCTIONAL_H_ */

@@ -21,16 +21,18 @@ private:
 	std::vector< std::tuple< int, int, bool > > latches;
 	std::vector< std::tuple< int, int, int > > ands;
 	std::vector<std::string> inputNames, latchNames, outputNames;
-
 	std::vector< aig::GNode > nodes;
+	std::vector< int > levelHistogram;
+
+	aig::Aig & aig;	
 	std::string designName;
 
-	unsigned char parseChar();
+	unsigned decode();
+	bool parseBool( std::string delimChar );
 	char parseByte();
+	unsigned char parseChar();
 	int parseInt( std::string delimChar );
 	std::string parseString( std::string delimChar );
-	bool parseBool( std::string delimChar );
-	unsigned decode();
 
 	void resize();
 
@@ -45,32 +47,37 @@ private:
 	void parseAigAnds();
 	void parseSymbolTable();
 
-	void createAig( aig::Aig & aig );
-	void createConstant( aig::Aig & aig );
-	void createInputs( aig::Aig & aig );
-	void createLatches( aig::Aig & aig );
-	void createOutputs( aig::Aig & aig );
-	void createAnds( aig::Aig & aig );
+	void createAig();
+	void createConstant();
+	void createInputs();
+	void createLatches();
+	void createOutputs();
+	void createAnds();
+	void connectAndsWithFanoutMap();
 
-	void connectLatches( aig::Aig & aig );
-	void connectOutputs( aig::Aig & aig );
-	void connectAnds( aig::Aig & aig );
+	void connectLatches();
+	void connectOutputs();
+	void connectAnds();
 
 public:
-	AigParser();
-	AigParser(std::string fileName);
+	
+	AigParser( aig::Aig & aig );
+	AigParser( std::string fileName, aig::Aig & aig );
 	virtual ~AigParser();
+	
 	void open(std::string fileName);
 	bool isOpen() const;
 	void close();
-	void parseAag( aig::Aig & aig );
-	void parseAig( aig::Aig & aig );
+	void parseAag();
+	void parseAig();
 
 	int getI();
 	int getL();
 	int getO();
 	int getA();
-	int getE( aig::Aig & aig );
+	int getE();
+
+	std::vector< int > & getLevelHistogram();
 };
 
 #endif /* AIGPARSER_H_ */

@@ -1,21 +1,30 @@
 #include "parsers/AigParser.h"
 #include "writers/AigWriter.h"
+
 #include "subjectgraph/aig/Aig.h"
-#include "algorithms/Rewriting.h"
+#include "algorithms/CutMananger.h"
+#include "algorithms/NPNMananger.h"
+#include "algorithms/RewriteMananger.h"
+#include "algorithms/PreCompGraphMananger.h"
+#include "algorithms/ReconvDrivenCut.h"
+
 #include "galois/Galois.h"
 #include "galois/Timer.h"
-#include <iostream>
 
-#define nOUTPUTS 10			// Number of outputs of the window (not used yet)
-#define nINPUTS 10			// Number of inputs of the window
-#define nFANOUT 5			// Maximum number of outgoing edges accepted to a node become and active node
-#define nLEVELS 6			// Number of level sweeped to build the TFO (Transitive Fanout) of the reference node
-#define CUT_SIZE_LIMIT 8		// Maximum size of reconvergence-driven cuts
+#include <chrono>
+#include <iostream>
+#include <sstream>
+
+using namespace std::chrono;
+
+void mergeAIGs();
 
 std::string getFileName( std::string path );
-double getMemUsage();
+
+void limitFanout( aig::Aig & aig, int limit );
 
 int main( int argc, char * argv[] ) {
+	galois::SharedMemSys G; // shared-memory system object initializes global variables for galois
 	
 	if ( argc < 5 ) {
 		std::cout << "<nThreads> <verbose (-vX, X={0,1,2,3})> <fileType (-aig or -aag)> <AigInputFile>" << std::endl;
@@ -45,17 +54,18 @@ int main( int argc, char * argv[] ) {
 	}
 
 	galois::Timer T;
+	T.start();	
 	aig::Aig aig;
 	std::string fileType( argv[3] );
 	std::string path( argv[4] );
-	AigParser aigParser( path );
-	T.start();	
+	AigParser aigParser( path, aig );
+
 	if ( fileType.compare( "-aig" ) == 0 ) {
-		aigParser.parseAig( aig );
+		aigParser.parseAig();
 	}
 	else {
 		if ( fileType.compare( "-aag" ) == 0 ) {
-			aigParser.parseAag( aig );
+			aigParser.parseAag();
 		}
 		else {
 			std::cout << " Unknow input file type!" << std::endl;
@@ -73,18 +83,9 @@ int main( int argc, char * argv[] ) {
 		std::cout << "|L|: " << aigParser.getL() << std::endl;
 		std::cout << "|O|: " << aigParser.getO() << std::endl;
 		std::cout << "|A|: " << aigParser.getA() << std::endl;
-		std::cout << "|E|: " << aigParser.getE( aig ) << " (outgoing edges)" << std::endl;
+		std::cout << "|E|: " << aigParser.getE() << " (outgoing edges)" << std::endl;
 		std::cout << "Parser run time: " << T.get() << " milliseconds" << std::endl << std::endl;
-		std::cout << "Using " << numThreads << " threads" << std::endl;
-		std::cout << "Windowing Constraints: " << std::endl;
-		std::cout << "\tnOUTPUTS: " << nOUTPUTS << std::endl;
-		std::cout << "\tnINPUTS: " << nINPUTS << std::endl;
-		std::cout << "\tnFANOUT: " << nFANOUT << std::endl;
-		std::cout << "\tnLEVELS: " << nLEVELS << std::endl;
-		std::cout << "\tCUT_SIZE_LIMIT: " << CUT_SIZE_LIMIT << std::endl;
 	}
-
-	aig.writeDot( fileName + ".dot", aig.toDot() );
 
 	if ( verbose == 3 ) {
 		std::cout << fileName << std::endl;
@@ -94,35 +95,311 @@ int main( int argc, char * argv[] ) {
 		std::cout << fileName << ";" << aigParser.getI() << ";" << aigParser.getO() << ";" << aigParser.getA() << ";";
 	}
 
-	T.start();
-	algorithm::Rewriting rewriting( aig );
-	rewriting.run( nOUTPUTS, nINPUTS, nLEVELS, nFANOUT, CUT_SIZE_LIMIT, verbose );
-	T.stop();
-	
-	if ( verbose <= 1 ) {
-		std::cout << T.get() << std::endl;
-	}
-	else {
-		if ( verbose == 2 ) {
-			std::cout << "Windowing run time: " << T.get() << " milliseconds" << std::endl;
-			std::cout << "Memory usage: " << getMemUsage() << " MB" << std::endl;
-		}
-	}
+	// FANOUT LIMIT
+	//limitFanout( aig, 30000 );
+
+
+
 /*
-	std::cout << "AAG " << std::endl;
-	AigWriter aagWriter( fileName + "_rewrited.aag" );
-	aagWriter.writeAag( aig );
+	// RECONVERGENCE DRIVE CUT
+	high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+	algorithm::ReconvDrivenCut rdcMan( aig );
+	rdcMan.run( 4 );
+
+	high_resolution_clock::time_point t2 = high_resolution_clock::now();
+	std::cout << numThreads << ";" << duration_cast<microseconds>( t2 - t1 ).count() << std::endl;
 */
-	std::cout << "Writing final AIG ..." << std::endl;
-	AigWriter aigWriter( fileName + "_rewrited.aig" );
+
+
+	// AIG REWRITING
+	high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+	std::vector< int > levelHistogram = aigParser.getLevelHistogram();
+/*	
+	int i = 0;
+	for( int value : levelHistogram ) {
+		std::cout << i++ << ": " << value << std::endl;
+	}
+*/
+
+	int K = 4, C = 500;
+	bool compTruth = true;
+	algorithm::CutMananger cutMan( aig, K, C, numThreads, compTruth );
+	//algorithm::runKCutOperator( cutMan );
+	//cutMan.printAllCuts();
+	//cutMan.printCutStatistics();
+	//cutMan.printRuntimes();
+
+	algorithm::NPNMananger npnMan;
+
+	algorithm::PreCompGraphMananger pcgMan( npnMan );
+	pcgMan.loadPreCompGraphFromArray();
+	pcgMan.processDecompositionGraphs();
+
+	int triesNGraphs = 500;
+	bool useZeros = true;
+	bool updateLevel = false;
+
+	if ( verbose >= 2 ) {
+		std::cout << "K: " << K << std::endl;
+		std::cout << "C: " << C << std::endl;
+		std::cout << "TriesNGraphs: " << triesNGraphs << std::endl;
+		std::cout << "CompTruth: " << ( compTruth ? "yes" : "no" ) << std::endl;
+		std::cout << "UseZeroCost: " << ( useZeros ? "yes" : "no" ) << std::endl;
+		std::cout << "UpdateLevel: " << ( updateLevel ? "yes" : "no" ) << std::endl;
+		std::cout << "nThreads: " << numThreads << std::endl;
+	}
+
+	algorithm::RewriteMananger rwtMan( aig, cutMan, npnMan, pcgMan, triesNGraphs, useZeros, updateLevel );
+	algorithm::runRewriteOperator( rwtMan, levelHistogram );
+	//cutMan.printAllCuts();
+	//cutMan.printCutStatistics();
+	//cutMan.printRuntimes();
+	
+
+	high_resolution_clock::time_point t2 = high_resolution_clock::now();
+	long double rewriteTime = duration_cast<microseconds>( t2 - t1 ).count();
+
+
+	if ( verbose == 0 ) {
+		std::cout << fileName << ";" << numThreads << ";" << aig.getNumAnds() << ";" << rewriteTime << std::endl;
+	}
+
+
+	if ( verbose >= 2 ) {
+		std::cout << "AND Nodes: " << aig.getNumAnds() << std::endl;
+		std::cout << "Runtime (us): " << rewriteTime << std::endl;
+		std::cout << "Writing final AIG file..." << std::endl;
+	}
+
+	AigWriter aigWriter( fileName + "_rewritten.aig" );
 	aigWriter.writeAig( aig );
 
-	aig.writeDot( fileName + "_rewrited.dot", aig.toDot() );
-
-	std::cout << "Done." << std::endl;
-
-	return 0;
+	//aig.writeDot( fileName + "_rewritten.dot", aig.toDot() );
 }
+
+
+/*
+int main( int argc, char * argv[] ) {
+
+	mergeAIGs();
+	
+	return 0;
+
+}
+*/
+
+void mergeAIGs() {
+
+	aig::Aig aig1;
+	std::string path1( "/workspace/vnpossani/benchmarks/mtm/mtm2320orig.aig");
+	AigParser aigParser1( path1, aig1 );
+	aigParser1.parseAig();
+
+	aig::Aig aig2;
+	std::string path2( "/workspace/vnpossani/benchmarks/mtm/sixteen.aig");
+	AigParser aigParser2( path2, aig2 );
+	aigParser2.parseAig();
+
+	aig::Graph & aigGraph1 = aig1.getGraph(); 
+	aig::Graph & aigGraph2 = aig2.getGraph(); 
+
+
+	std::cout << "Step 1" << std::endl;
+
+	// Redefine IDs for AIG2 to be beyond the range of IDs ofAIG1
+	std::stack< aig::GNode > stack;
+	aig2.computeTopologicalSortForAnds( stack );
+	int currentId = aig1.getNodes().size();
+
+	while ( !stack.empty() ) {
+		aig::GNode node = stack.top();
+		stack.pop();
+		aig::NodeData & nodeData = aigGraph2.getData( node, galois::MethodFlag::UNPROTECTED );
+		nodeData.id = currentId++;
+	}
+
+	for ( aig::GNode po : aig2.getOutputNodes() ) {
+		aig::NodeData & poData = aigGraph2.getData( po, galois::MethodFlag::UNPROTECTED );
+		poData.id = currentId++;
+	}
+	// End of IDs redefinition
+
+
+	std::cout << "Step 2" << std::endl;
+
+	// Redefine the size of resultant AIG
+	int newNumNodes = aig1.getNodes().size() + ( aig2.getNodes().size() - aig2.getInputNodes().size() - 1 );
+	int newNumPOs = aig1.getOutputNodes().size() + aig2.getOutputNodes().size();
+	aig1.getNodes().resize( newNumNodes );	
+
+	// Clone all ANDs and POs from AIG2 to AIG1
+	for ( aig::GNode node : aig2.getNodes() ) {
+
+		aig::NodeData & nodeData = aigGraph2.getData( node, galois::MethodFlag::UNPROTECTED );
+
+		if ( nodeData.type == aig::NodeType::AND ) {
+			aig::NodeData cloneNodeData = nodeData;
+			aig::GNode cloneNode = aigGraph1.createNode( cloneNodeData );
+			aigGraph1.addNode( cloneNode );
+			aig1.getNodes()[ cloneNodeData.id ] = cloneNode;
+
+			auto inEdge = aigGraph2.in_edge_begin( node );
+			aig::GNode lhsNode = aigGraph2.getEdgeDst( inEdge );
+			aig::NodeData & lhsNodeData = aigGraph2.getData( lhsNode, galois::MethodFlag::UNPROTECTED );
+			bool lhsPol = aigGraph2.getEdgeData( inEdge );
+			inEdge++;
+			aig::GNode rhsNode = aigGraph2.getEdgeDst( inEdge );
+			aig::NodeData & rhsNodeData = aigGraph2.getData( rhsNode, galois::MethodFlag::UNPROTECTED );
+			bool rhsPol = aigGraph2.getEdgeData( inEdge );
+
+        	aigGraph1.getEdgeData( aigGraph1.addMultiEdge( aig1.getNodes()[ lhsNodeData.id ], cloneNode, galois::MethodFlag::UNPROTECTED ) ) = lhsPol;
+        	aigGraph1.getEdgeData( aigGraph1.addMultiEdge( aig1.getNodes()[ rhsNodeData.id ], cloneNode, galois::MethodFlag::UNPROTECTED ) ) = rhsPol;
+		}
+
+		if ( nodeData.type == aig::NodeType::PO ) {
+			aig::NodeData cloneNodeData = nodeData;
+			aig::GNode cloneNode = aigGraph1.createNode( cloneNodeData );
+			aigGraph1.addNode( cloneNode );
+			aig1.getNodes()[ cloneNodeData.id ] = cloneNode;
+			aig1.getOutputNodes().push_back( cloneNode );
+
+			auto inEdge = aigGraph2.in_edge_begin( node );
+			aig::GNode lhsNode = aigGraph2.getEdgeDst( inEdge );
+			aig::NodeData & lhsNodeData = aigGraph2.getData( lhsNode, galois::MethodFlag::UNPROTECTED );
+			bool lhsPol = aigGraph2.getEdgeData( inEdge );
+
+        	aigGraph1.getEdgeData( aigGraph1.addMultiEdge( aig1.getNodes()[ lhsNodeData.id ], cloneNode, galois::MethodFlag::UNPROTECTED ) ) = lhsPol; 
+		}
+	}
+	// End of node cloning
+
+	std::cout << "Step 3" << std::endl;
+		
+	// Reset all AND IDs in the topological sort
+	aig1.resetAndIds();
+	
+	std::cout << "Step 4" << std::endl;
+
+	// Redefine IDs and names for all POs of AIG1
+	currentId = newNumNodes - newNumPOs;
+	for ( aig::GNode po : aig1.getOutputNodes() ) {
+		aig::NodeData & poData = aigGraph1.getData( po, galois::MethodFlag::WRITE );
+		poData.id = currentId++;
+		aig1.getNodes()[ poData.id ] = po;
+	}
+
+	aig1.getOutputNames().resize( newNumPOs );
+	for ( int i = 0; i < aig1.getOutputNames().size(); i++ ) {
+		std::stringstream name;
+		name << "o" << i;
+		aig1.getOutputNames()[i] = name.str();
+	}
+	// End of IDs redefinition for POs
+
+
+	std::cout << "Step 5" << std::endl;
+
+	AigWriter aigWriter( "mtm232016orig.aig" );
+	aigWriter.writeAig( aig1 );
+}
+
+
+void limitFanout( aig::Aig & aig, int limit ) {
+
+	aig::Graph & aigGraph = aig.getGraph();
+	int idCounter = aig.getNodes().size();
+	int size = aig.getInputNodes().size();
+
+	//for ( aig::GNode node : aigGraph ) {
+	for ( int i = 0; i < size; i++ ) {
+
+		aig::GNode node = aig.getInputNodes()[i];
+
+		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
+	
+		if ( nodeData.nFanout > limit ) {
+/*			
+			aig::GNode lhsNode;
+			aig::GNode rhsNode;
+			bool lhsPol;
+			bool rhsPol;
+
+			if ( nodeData.type == aig::NodeType::AND ) {
+				auto inEdgeIt = aigGraph.in_edge_begin( node );
+				lhsNode = aigGraph.getEdgeDst( inEdgeIt );
+				lhsPol = aigGraph.getEdgeData( inEdgeIt );
+				GinEdgeIt++;
+				rhsNode = aigGraph.getEdgeDst( inEdgeIt );
+				rhsPol = aigGraph.getEdgeData( inEdgeIt );
+			}
+*/
+			auto outEdgeIt = aigGraph.edge_begin( node );
+			auto outEdgeEnd = aigGraph.edge_end( node );
+			std::advance( outEdgeIt, limit );
+			
+			int counter = limit;
+			aig::GNode newNode = nullptr;
+			std::vector< aig::GNode > toRemoveEdges;
+
+			while ( outEdgeIt != outEdgeEnd ) {
+				
+				if ( counter == limit ) {
+					aig::NodeData newNodeData;
+					newNodeData.id = idCounter++;
+					newNodeData.type = nodeData.type;
+					newNodeData.level = nodeData.level;
+					newNodeData.nFanout = limit;
+					newNode = aigGraph.createNode( newNodeData );
+					aigGraph.addNode( newNode );
+					aig.getNodes().push_back( newNode );
+					counter = 0;
+
+					/*
+					if ( nodeData.type == aig::NodeType::AND ) {
+						aigGraph.getEdgeData( aigGraph.addMultiEdge( lhsNode, newNode, galois::MethodFlag::UNPROTECTED ) ) = lhsPol;
+            			aigGraph.getEdgeData( aigGraph.addMultiEdge( rhsNode, newNode, galois::MethodFlag::UNPROTECTED ) ) = rhsPol;
+					}
+					else {
+					*/
+						if ( nodeData.type == aig::NodeType::PI ) {
+							aig.getInputNodes().push_back( newNode );
+							std::stringstream name; 
+							name << aig.getInputNames()[ (nodeData.id-1) ] << "_" << newNodeData.id;
+							aig.getInputNames().push_back( name.str() );
+							//std::cout << "node " << nodeData.id << " expanding for " << newNodeData.id << " with name " << name << std::endl;
+						}
+					//}
+				}
+
+				aig::GNode dstNode = aigGraph.getEdgeDst( outEdgeIt );
+				toRemoveEdges.push_back( dstNode );
+				bool outEdgePol = aigGraph.getEdgeData( outEdgeIt, galois::MethodFlag::UNPROTECTED );	
+            	aigGraph.getEdgeData( aigGraph.addMultiEdge( newNode, dstNode, galois::MethodFlag::UNPROTECTED ) ) = outEdgePol;
+				counter++;
+				outEdgeIt++;
+			}
+
+			// The last newNode may have fanout smaller than limit
+			aig::NodeData & lastNodeData = aigGraph.getData( newNode, galois::MethodFlag::UNPROTECTED );
+			lastNodeData.nFanout = std::distance( aigGraph.edge_begin( newNode ), aigGraph.edge_end( newNode ) );
+
+			// Remove the fanout edges beyond limit in the original node
+			for ( aig::GNode fanoutNode : toRemoveEdges ) {	
+				auto edge = aigGraph.findEdge( node, fanoutNode );
+				aigGraph.removeEdge( node, edge );
+				
+				//int nFanin = std::distance( aigGraph.in_edge_begin( fanoutNode ), aigGraph.in_edge_end( fanoutNode ) );
+				//int nFanout = std::distance( aigGraph.edge_begin( node ), aigGraph.edge_end( node ) );
+				//assert( nFanin == 2 );
+				//assert( nFanout > 0 );
+			}
+			nodeData.nFanout = limit;
+		}	
+	}
+}
+
 
 std::string getFileName( std::string path ) {
 
@@ -132,32 +409,6 @@ std::string getFileName( std::string path ) {
 	return fileName;
 }
 
-double getMemUsage() {
-	using std::ios_base;
-	using std::ifstream;
-	using std::string;
-
-	double vm_usage = 0.0;
-
-	ifstream stat_stream("/proc/self/stat", ios_base::in);
-
-	string pid, comm, state, ppid, pgrp, session, tty_nr;
-	string tpgid, flags, minflt, cminflt, majflt, cmajflt;
-	string utime, stime, cutime, cstime, priority, nice;
-	string O, itrealvalue, starttime;
-
-	unsigned long vsize;
-
-	stat_stream >> pid >> comm >> state >> ppid >> pgrp >> session >> tty_nr
-			>> tpgid >> flags >> minflt >> cminflt >> majflt >> cmajflt >> utime
-			>> stime >> cutime >> cstime >> priority >> nice >> O >> itrealvalue
-			>> starttime >> vsize; // don't care about the rest
-
-	stat_stream.close();
-
-	vm_usage = (vsize / 1024.0) / 1024.0;
-	return vm_usage;
-}
 
 // ################### K-CUT ################### //
 // T.start();

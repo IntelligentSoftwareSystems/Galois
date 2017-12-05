@@ -1,2 +1,0 @@
-Galois::MethodFlag::UNPROTECTED
-Galois::MethodFlag::WRITE
