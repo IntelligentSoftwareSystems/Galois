@@ -40,22 +40,22 @@ static const char* desc = "Computes the betweenness centrality of all nodes in "
                           "a graph";
 static const char* url  = "betweenness_centrality";
 
-static llvm::cl::opt<std::string> filename(llvm::cl::Positional, 
-                                           llvm::cl::desc("<input file>"), 
+static llvm::cl::opt<std::string> filename(llvm::cl::Positional,
+                                           llvm::cl::desc("<input file>"),
                                            llvm::cl::Required);
-static llvm::cl::opt<int> iterLimit("limit", 
+static llvm::cl::opt<int> iterLimit("limit",
                                     llvm::cl::desc("Limit number of iterations "
-                                                   "to value (0 is all nodes)"), 
+                                                   "to value (0 is all nodes)"),
                                     llvm::cl::init(0));
-static llvm::cl::opt<unsigned int> startNode("startNode", 
+static llvm::cl::opt<unsigned int> startNode("startNode",
                                              llvm::cl::desc("Node to start "
-                                                            "search from"), 
+                                                            "search from"),
                                              llvm::cl::init(0));
-static llvm::cl::opt<bool> forceVerify("forceVerify", 
+static llvm::cl::opt<bool> forceVerify("forceVerify",
                                        llvm::cl::desc("Abort if not verified; "
                                                       "only makes sense for "
                                                       "torus graphs"));
-static llvm::cl::opt<bool> printAll("printAll", 
+static llvm::cl::opt<bool> printAll("printAll",
                                     llvm::cl::desc("Print betweenness values "
                                                    "for all nodes"));
 
@@ -81,7 +81,7 @@ public:
   BCOuter (Graph& g) : G(&g), NumNodes(g.size()) {
     InitializeLocal();
   }
-  
+
   /**
    * Constructor destroys thread local storage.
    */
@@ -102,7 +102,7 @@ public:
   void run(const Cont& v) {
     // Each thread works on an individual source node
     galois::do_all(
-      galois::iterate(v), 
+      galois::iterate(v),
       [&] (const GNode& curSource) {
         galois::gdeque<GNode> SQ;
 
@@ -147,15 +147,15 @@ public:
           double delta_leaf = delta[leaf];
           auto& succ_list = succ[leaf];
 
-          for (auto succ = succ_list.begin(), succ_end = succ_list.end(); 
-               succ != succ_end; 
+          for (auto succ = succ_list.begin(), succ_end = succ_list.end();
+               succ != succ_end;
                ++succ) {
             delta_leaf += (sigma_leaf / sigma[*succ]) * (1.0 + delta[*succ]);
           }
           delta[leaf] = delta_leaf;
         }
 
-        // save result of this source's BC, reset all local values for next 
+        // save result of this source's BC, reset all local values for next
         // source
         double* Vec = *CB.getLocal();
         for (int i = 0; i < NumNodes; ++i) {
@@ -172,8 +172,8 @@ public:
   }
 
   /**
-   * Verification for reference torus graph inputs. 
-   * All nodes should have the same betweenness value up to 
+   * Verification for reference torus graph inputs.
+   * All nodes should have the same betweenness value up to
    * some tolerance.
    */
   void verify() {
@@ -192,7 +192,7 @@ public:
       } else {
         // check if over some tolerance value
         if ((bc - sampleBC) > 0.0001) {
-          galois::gInfo("If torus graph, verification failed ", 
+          galois::gInfo("If torus graph, verification failed ",
                         (bc - sampleBC));
           if (forceVerify) abort();
           return;
@@ -209,7 +209,7 @@ public:
    * @param out stream to output to
    * @param precision precision of the floating points outputted by the function
    */
-  void printBCValues(size_t begin, size_t end, std::ostream& out, 
+  void printBCValues(size_t begin, size_t end, std::ostream& out,
                      int precision = 6) {
     for (; begin != end; ++begin) {
       double bc = (*CB.getRemote(0))[begin];
@@ -217,8 +217,8 @@ public:
       for (unsigned j = 1; j < galois::getActiveThreads(); ++j)
         bc += (*CB.getRemote(j))[begin];
 
-      out << begin << " " << std::setiosflags(std::ios::fixed) 
-          << std::setprecision(precision) << bc << "\n"; 
+      out << begin << " " << std::setiosflags(std::ios::fixed)
+          << std::setprecision(precision) << bc << "\n";
     }
   }
 
@@ -317,18 +317,17 @@ int main(int argc, char** argv) {
   galois::preAlloc(galois::getActiveThreads() * NumNodes / 1650);
   galois::reportPageAlloc("MeminfoMid");
 
-
   // preprocessing: find the nodes with out edges we will process and skip
   // over nodes with no out edges
 
   // find first node with out edges
-  boost::filter_iterator<HasOut, Graph::iterator> begin = 
+  boost::filter_iterator<HasOut, Graph::iterator> begin =
       boost::make_filter_iterator(HasOut(&g), g.begin(), g.end());
-  boost::filter_iterator<HasOut, Graph::iterator> end = 
+  boost::filter_iterator<HasOut, Graph::iterator> end =
       boost::make_filter_iterator(HasOut(&g), g.end(), g.end());
   // adjustedEnd = last node we will process based on how many iterations
   // (i.e. sources) we want to do
-  boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd = 
+  boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd =
     iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
   size_t iterations = std::distance(begin, adjustedEnd);
@@ -338,7 +337,7 @@ int main(int argc, char** argv) {
 
   galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
                  " Iterations: ",  iterations, "\n");
-  
+
   // execute algorithm
   galois::StatTimer T;
   T.start();
