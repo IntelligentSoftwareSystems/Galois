@@ -41,7 +41,8 @@ const char* desc =
     "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 const char* url = 0;
 
-cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"),
+cll::opt<std::string> filename(cll::Positional,
+                               cll::desc("<tranpose of input graph>"),
                                cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
                                  cll::init(0.000001));
@@ -49,12 +50,15 @@ cll::opt<unsigned int> maxIterations("maxIterations",
                                      cll::desc("Maximum iterations"),
                                      cll::init(10000000));
 
-static const float alpha = 0.85;
+static const float alpha = (1 - 0.85);
 typedef double PRTy;
 
 struct LNode {
-  PRTy value;
-  std::atomic<uint32_t> nout; // Store the outdegree in the transpose graph
+  PRTy oldValue;
+  PRTy newValue;
+  // Compute the outdegree in the original graph and save it to scale the
+  // pagerank contribution
+  std::atomic<uint32_t> nout;
 };
 
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
@@ -80,20 +84,26 @@ template <typename Graph>
 static void printTop(Graph& graph, int topn, const char* algo_name,
                      int numThreads) {
   typedef typename Graph::node_data_reference node_data_reference;
-  typedef TopPair<GNode> Pair;
-  typedef std::map<Pair, GNode> Top;
 
   // normalize the PageRank value so that the sum is equal to one
   float sum = 0;
+  std::ofstream out(std::string("out_" + std::to_string(numThreads)));
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    node_data_reference n = graph.getData(*ii);
+    out << *ii << " " << n.value << "\n";
+#if 0
     GNode src             = *ii;
     node_data_reference n = graph.getData(src);
     sum += n.value;
+#endif
   }
+  out.close();
 
+#if 0
   Top top;
 
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+
     GNode src             = *ii;
     node_data_reference n = graph.getData(src);
     float value           = n.value / sum; // normalized PR (divide PR by sum)
@@ -116,6 +126,7 @@ static void printTop(Graph& graph, int topn, const char* algo_name,
        ii != ei; ++ii, ++rank) {
     std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
+#endif
 }
 
 uint32_t atomicAdd(std::atomic<uint32_t>& v, uint32_t delta) {
@@ -126,21 +137,21 @@ uint32_t atomicAdd(std::atomic<uint32_t>& v, uint32_t delta) {
   return old;
 }
 
-/* Initialize all fields to 0 except for residual which is (1 - alpha) */
+/* Initialize all fields to 0 except for value which is (1 - alpha) */
 struct InitGraph {
   void run(Graph& graph) {
     galois::do_all(galois::iterate(graph),
                    [&](const GNode src) {
-                     auto& srcData = graph.getData(src);
-                     srcData.value = 1 - alpha;
-                     srcData.nout  = 0;
+                     auto& srcData    = graph.getData(src);
+                     srcData.oldValue = alpha;
+                     srcData.newValue = alpha;
+                     srcData.nout     = 0;
                    },
                    galois::no_stats(), galois::loopname("InitGraph"));
   }
 };
 
 struct ComputeInDegrees {
-
   void run(Graph& graph) {
     galois::do_all(galois::iterate(graph),
                    [&](const GNode src) {
@@ -158,7 +169,7 @@ struct ComputeInDegrees {
 struct PageRank {
 
   void run(Graph& graph) {
-    unsigned int iteration = 10000000;
+    unsigned int iteration = 0;
     galois::GReduceMax<float> max_delta;
 
     while (true) {
@@ -174,38 +185,43 @@ struct PageRank {
                          auto& ddata = graph.getData(dst);
 
                          if (ddata.nout > 0) {
-                           PRTy contrib = ddata.value * (alpha) / ddata.nout;
+                           PRTy contrib =
+                               ddata.oldValue * (1 - alpha) / ddata.nout;
                            sum += contrib;
                          }
                        }
-                       sdata.value += sum;
-                       if (sum > tolerance) {
-                         max_delta.update(sum);
+
+                       PRTy diff = sum - sdata.newValue;
+
+                       if (std::fabs(diff) > tolerance) {
+                         sdata.newValue += std::fabs(diff);
+                         max_delta.update(std::fabs(diff));
+                         galois::gPrint("diff : ", diff, "\n");
                        }
-#if 0
-                       if (std::fabs(sdata.residual) > tolerance) {
-                         sdata.value += sdata.residual;
-                         // for each out-going neighbors
-                         for (auto jj : graph.edges(src, flag)) {
-                           GNode dst    = graph.getEdgeDst(jj);
-                           LNode& ddata = graph.getData(dst);
-                           auto dstNumNeighbors =
-                               std::distance(graph.edge_begin(dst, flag),
-                                             graph.edge_end(dst, flag));
-                           PRTy delta =
-                               ddata.residual * alpha / dstNumNeighbors;
-                           sdata.residual += delta;
-                           max_delta.update(delta);
-                         }
-                       }
-#endif
                      },
                      galois::loopname("PageRank"), galois::no_conflicts());
+
+      galois::do_all(galois::iterate(graph),
+                     [&](const GNode& src) {
+                       LNode& sdata = graph.getData(src);
+                       constexpr const galois::MethodFlag flag =
+                           galois::MethodFlag::UNPROTECTED;
+                       sdata.oldValue = sdata.newValue;
+                     },
+                     galois::loopname("Swap-pagerank"), galois::no_conflicts());
       iteration += 1;
-      float delta = max_delta.reduce();
-      if (delta < tolerance || iteration >= maxIterations) {
+#if 0
+      if (iteration >= maxIterations) {
+        galois::gPrint("Iter : ", iteration, "\n");
         break;
       }
+#endif
+      float delta = max_delta.reduce();
+      if (delta < tolerance || iteration >= maxIterations) {
+        galois::gPrint("Iter : ", iteration, "\n");
+        break;
+      }
+      max_delta.reset();
     }
   }
 
