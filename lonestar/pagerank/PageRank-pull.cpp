@@ -54,16 +54,7 @@ typedef double PRTy;
 
 struct LNode {
   PRTy value;
-  PRTy residual;
-  // Initialize pagerank values
-  void init() {
-    value    = 1.0 - alpha;
-    residual = 0.0;
-  }
-  friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
-    os << "{PR " << n.value << ", residual " << n.residual << "}";
-    return os;
-  }
+  std::atomic<uint32_t> nout; // Store the outdegree in the transpose graph
 };
 
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
@@ -88,7 +79,6 @@ struct TopPair {
 template <typename Graph>
 static void printTop(Graph& graph, int topn, const char* algo_name,
                      int numThreads) {
-  typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
   typedef TopPair<GNode> Pair;
   typedef std::map<Pair, GNode> Top;
@@ -128,39 +118,49 @@ static void printTop(Graph& graph, int topn, const char* algo_name,
   }
 }
 
-void initResidual(Graph& graph) {
-  // use residual for the partial, scaled initial residual
-  galois::do_all(galois::iterate(graph),
-                 [&graph](const typename Graph::GraphNode& src) {
-                   auto& srcData = graph.getData(src);
-                   constexpr const galois::MethodFlag flag =
-                       galois::MethodFlag::UNPROTECTED;
-
-                   // Compute residual from neighbors
-                   for (auto ii : graph.edges(src, flag)) {
-                     auto dst             = graph.getEdgeDst(ii);
-                     auto dstNumNeighbors = std::distance(graph.edge_begin(dst),
-                                                          graph.edge_end(dst));
-                     srcData.residual += (1.0 / dstNumNeighbors);
-                   }
-                 },
-                 galois::loopname("init-res-0"), galois::steal());
-  // scale residual
-  galois::do_all(galois::iterate(graph),
-                 [&graph](const typename Graph::GraphNode& src) {
-                   auto& data    = graph.getData(src);
-                   data.residual = data.residual * alpha * (1.0 - alpha);
-                 },
-                 galois::loopname("init-res-1"), galois::steal());
+uint32_t atomicAdd(std::atomic<uint32_t>& v, uint32_t delta) {
+  uint32_t old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
 }
 
-struct PageRank {
-  Graph& m_graph;
-  PageRank(Graph& graph) : m_graph(graph) {}
+/* Initialize all fields to 0 except for residual which is (1 - alpha) */
+struct InitGraph {
+  void run(Graph& graph) {
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode src) {
+                     auto& srcData = graph.getData(src);
+                     srcData.value = 1 - alpha;
+                     srcData.nout  = 0;
+                   },
+                   galois::no_stats(), galois::loopname("InitGraph"));
+  }
+};
 
-  void operator()(Graph& graph) {
-    unsigned int iteration = 0;
+struct ComputeInDegrees {
+
+  void run(Graph& graph) {
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode src) {
+                     for (auto nbr : graph.edges(src)) {
+                       GNode dst   = graph.getEdgeDst(nbr);
+                       auto& ddata = graph.getData(dst);
+                       atomicAdd(ddata.nout, (uint32_t)1);
+                     }
+                   },
+                   galois::steal(), galois::no_stats(),
+                   galois::loopname("ComputeInDegrees"));
+  }
+};
+
+struct PageRank {
+
+  void run(Graph& graph) {
+    unsigned int iteration = 10000000;
     galois::GReduceMax<float> max_delta;
+
     while (true) {
       galois::do_all(galois::iterate(graph),
                      [&](const GNode& src) {
@@ -168,22 +168,39 @@ struct PageRank {
                        constexpr const galois::MethodFlag flag =
                            galois::MethodFlag::UNPROTECTED;
 
+                       PRTy sum = 0;
+                       for (auto nbr : graph.edges(src)) {
+                         GNode dst   = graph.getEdgeDst(nbr);
+                         auto& ddata = graph.getData(dst);
+
+                         if (ddata.nout > 0) {
+                           PRTy contrib = ddata.value * (alpha) / ddata.nout;
+                           sum += contrib;
+                         }
+                       }
+                       sdata.value += sum;
+                       if (sum > tolerance) {
+                         max_delta.update(sum);
+                       }
+#if 0
                        if (std::fabs(sdata.residual) > tolerance) {
                          sdata.value += sdata.residual;
                          // for each out-going neighbors
                          for (auto jj : graph.edges(src, flag)) {
-                           GNode dst            = graph.getEdgeDst(jj);
-                           LNode& ddata         = graph.getData(dst, flag);
-                           auto dstNumNeighbors = std::distance(
-                               graph.edge_begin(dst), graph.edge_end(dst));
+                           GNode dst    = graph.getEdgeDst(jj);
+                           LNode& ddata = graph.getData(dst);
+                           auto dstNumNeighbors =
+                               std::distance(graph.edge_begin(dst, flag),
+                                             graph.edge_end(dst, flag));
                            PRTy delta =
                                ddata.residual * alpha / dstNumNeighbors;
                            sdata.residual += delta;
                            max_delta.update(delta);
                          }
                        }
+#endif
                      },
-                     galois::loopname("Main"), galois::no_conflicts());
+                     galois::loopname("PageRank"), galois::no_conflicts());
       iteration += 1;
       float delta = max_delta.reduce();
       if (delta < tolerance || iteration >= maxIterations) {
@@ -191,6 +208,24 @@ struct PageRank {
       }
     }
   }
+
+  // void operator()(GNode src) const {
+  //   auto& sdata = graph->getData(src);
+
+  //   float sum = 0;
+  //   for (auto nbr : graph->edges(src)) {
+  //     GNode dst   = graph->getEdgeDst(nbr);
+  //     auto& ddata = graph->getData(dst);
+
+  //     if (ddata.nout > 0) {
+  //       unsigned contrib = ddata.value*(1 - alpha)/ddata.nout;
+  //       galois::add(sum, contrib);
+  //     }
+  //   }
+  //   if (sum > tolerance) {
+  //     sdata.value += sum;
+  //   }
+  // }
 };
 
 int main(int argc, char** argv) {
@@ -200,35 +235,39 @@ int main(int argc, char** argv) {
   galois::StatTimer T("OverheadTime");
   T.start();
 
-  Graph graph;
-  galois::graphs::readGraph(graph, filename);
+  Graph transposeGraph;
+  galois::graphs::readGraph(transposeGraph, filename);
 
-  std::cout << "Read " << std::distance(graph.begin(), graph.end())
+  std::cout << "Read "
+            << std::distance(transposeGraph.begin(), transposeGraph.end())
             << " Nodes\n";
 
-  galois::preAlloc(numThreads +
-                   (2 * graph.size() * sizeof(typename Graph::node_data_type)) /
-                       galois::runtime::pagePoolSize());
+  galois::preAlloc(numThreads + (2 * transposeGraph.size() *
+                                 sizeof(typename Graph::node_data_type)) /
+                                    galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   std::cout << "Running Edge Async push version, tolerance: " << tolerance
             << "\n";
 
-  galois::do_all(galois::iterate(graph), [&graph](typename Graph::GraphNode n) {
-    graph.getData(n).init();
-  });
-  std::cout << "After init" << std::endl;
-  initResidual(graph);
-  std::cout << "Done till this point\n" << std::endl;
+  galois::StatTimer outDegree;
+  outDegree.start();
+  InitGraph rg;
+  rg.run(transposeGraph);
+  ComputeInDegrees cdg;
+  cdg.run(transposeGraph);
+  outDegree.stop();
+
   galois::StatTimer Tmain;
   Tmain.start();
-  PageRank p(graph);
+  PageRank p;
+  p.run(transposeGraph);
   Tmain.stop();
 
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    printTop(graph, 10, "EdgeAsync", numThreads);
+    printTop(transposeGraph, 10, "EdgeAsync", numThreads);
   }
 
   T.stop();

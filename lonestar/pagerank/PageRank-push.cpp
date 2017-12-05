@@ -55,11 +55,12 @@ typedef double PRTy;
 struct LNode {
   PRTy value;
   std::atomic<PRTy> residual;
-  // Initialize pagerank values
+
   void init() {
     value    = 1.0 - alpha;
     residual = 0.0;
   }
+
   friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
     os << "{PR " << n.value << ", residual " << n.residual << "}";
     return os;
@@ -88,7 +89,6 @@ struct TopPair {
 template <typename Graph>
 static void printTop(Graph& graph, int topn, const char* algo_name,
                      int numThreads) {
-  typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
   typedef TopPair<GNode> Pair;
   typedef std::map<Pair, GNode> Top;
