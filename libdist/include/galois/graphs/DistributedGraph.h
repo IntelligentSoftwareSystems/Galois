@@ -3113,7 +3113,6 @@ public:
    *
    ***************************************************************/
   void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint"){
-    galois::gPrint(id, " : Saving local checkpoint\n");
     using namespace boost::archive;
     galois::StatTimer TimerSaveCheckPoint("TIMER_SAVE_CHECKPOINT", GRNAME);
     TimerSaveCheckPoint.start();
@@ -3121,8 +3120,9 @@ public:
 
     std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
     if(!outputStream.is_open()){
-      std::cerr << "ERROR: Could not open " << checkpointFileName_local << " to save local graph!!!\n";
+      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, " to save checkpoint!!!\n");
     }
+    galois::gPrint(id, " : Saving local checkpoint to : ", checkpointFileName_local, "\n");
 
     boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
 
@@ -3140,8 +3140,9 @@ public:
 
     std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
     if(!inputStream.is_open()){
-      std::cerr << "ERROR: Could not open " << checkpointFileName_local << " to save local graph!!!\n";
+      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, " to read checkpoint!!!\n");
     }
+    galois::gPrint(id, " : reading local checkpoint from : ", checkpointFileName_local, "\n");
 
     boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
 
