@@ -54,9 +54,16 @@ struct mpiMessage {
 
 void* alloc_cb(void* ctx, size_t size)
 {
+  lc_mem_fence();
   mpiMessage* msg = (mpiMessage*) ctx;
   msg->buf.resize(size);
-  return &(msg->buf[0]);
+  return msg->buf.data();
+}
+
+void thread_signal(void* signal) 
+{
+  mpiMessage* msg = (mpiMessage*) signal;
+  delete msg;
 }
 
 /**
@@ -76,10 +83,10 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
    */
   std::pair<int, int> initMPI() {
     lc_open(&mv, 1);
+    lc_sync_init(NULL, thread_signal);
     return std::make_pair(getID(), getNum());
   }
 
-  std::deque<mpiMessage> inflight;
   std::list<mpiMessage> recv;
   int save;
 
@@ -96,25 +103,15 @@ public:
     lc_close(mv);
   }
 
-  void complete_send() {
-    while (!inflight.empty()) {
-      auto& f = inflight.front();
-      if (lc_test(&f.ctx)) {
-        memUsageTracker.decrementMemUsage(f.buf.size());
-        inflight.pop_front();
-      } else {
-        break;
-      }
-    }
-  }
-
   virtual void enqueue(message m) {
     memUsageTracker.incrementMemUsage(m.data.size());
-    inflight.emplace_back(m.host, m.tag, m.data);
-    auto& f = inflight.back();
-    f.ctx.type = LC_REQ_PEND;
-    while (!lc_send_queue(mv, f.buf.data(), f.buf.size(), m.host, m.tag, 0, &f.ctx)) {
+    mpiMessage* f = new mpiMessage(m.host, m.tag, m.data);
+    lc_info info = {LC_SYNC_WAKE, LC_SYNC_NULL, {0, (int16_t) m.tag}};
+    while (!lc_send_queue(mv, f->buf.data(), f->buf.size(), m.host, &info, &f->ctx)) {
       progress();
+    }
+    if (lc_post(&f->ctx, (void*) f)) {
+      delete f;
     }
   }
 
@@ -122,7 +119,7 @@ public:
     recv.emplace_back();
     auto& m = recv.back();
     size_t size; lc_qtag tag;
-    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, &m.ctx)) {
+    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, LC_SYNC_NULL, &m.ctx)) {
       m.tag = tag;
       memUsageTracker.incrementMemUsage(size);
     } else {
@@ -153,7 +150,6 @@ public:
   }
 
   virtual void progress() {
-    complete_send();
     probe();
     lc_progress(mv);
   }
