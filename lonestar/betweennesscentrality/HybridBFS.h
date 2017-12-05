@@ -94,6 +94,7 @@ struct HybridBFS {
       },
       galois::no_conflicts(),
       galois::loopname("bfsPushAsync"),
+      galois::steal(),
       galois::wl<BSWL>()
     );
   }
@@ -137,6 +138,7 @@ struct HybridBFS {
           }
         }
       },
+      galois::steal(),
       galois::loopname("bfsPullTopo")
     );
   }
@@ -170,6 +172,7 @@ struct HybridBFS {
           outer->bfsPushBulkSyncOperator(ii, graph, &outer->bags[next], 
                                          newDist);
         },
+        galois::steal(),
         galois::loopname("bfsPushBulkSync")
       );
 
@@ -205,6 +208,7 @@ struct HybridBFS {
                                              newDist);
             }
           },
+          galois::steal(),
           galois::loopname("bfsPushBulkSync")
         );
         numForward += 1;

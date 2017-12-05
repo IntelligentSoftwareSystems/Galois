@@ -211,6 +211,7 @@ struct AsyncAlgo {
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::wl<OBIM>(indexer),
+      galois::steal(),
       galois::loopname("CountPaths")
     );
   }
@@ -268,6 +269,7 @@ struct AsyncAlgo {
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::wl<OBIM>(indexer),
+      galois::steal(),
       galois::loopname("ComputeDep")
     );
   }
@@ -376,8 +378,8 @@ struct LeveledAlgo {
             }
           }
         },
-        galois::loopname("BFS"), 
-        galois::steal()
+        galois::steal(),
+        galois::loopname("BFS")
       );
     }
 
@@ -408,7 +410,7 @@ struct LeveledAlgo {
     // and level 0 only has the source node, which should not be updating
     // its dependency
     for (int i = levels.size() - 2; i > 0; --i) {
-      galois::gInfo(i);
+      //galois::gInfo(i);
       galois::do_all(
         galois::iterate(*levels[i]), 
         [&] (GNode n) {
@@ -426,8 +428,8 @@ struct LeveledAlgo {
             }
           }
         },
-        galois::loopname("ComputeDep"),
-        galois::steal()
+        galois::steal(),
+        galois::loopname("ComputeDep")
       );
     }
     Tdep.stop();

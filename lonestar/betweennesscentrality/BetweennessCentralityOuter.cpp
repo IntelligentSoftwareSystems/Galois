@@ -166,6 +166,7 @@ public:
           succ[i].clear();
         }
       },
+      galois::steal(),
       galois::loopname("Main")
     );
   }
