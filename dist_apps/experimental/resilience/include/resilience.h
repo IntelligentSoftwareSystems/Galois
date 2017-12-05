@@ -66,6 +66,10 @@ static cll::opt<unsigned int> crashNumHosts("crashNumHosts",
                                             cll::desc("number of hosts to crash: "
                                                       " Default -1"),
                                             cll::init(-1));
+static cll::opt<std::string> checkpointFileName("checkpointFileName",
+                                            cll::desc("File name to store the checkpoint data:"
+                                                      " Default checkpoint_#hostId"),
+                                            cll::init("checkpoint"));
 
 
 
@@ -92,7 +96,7 @@ template<typename GraphTy>
 void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
   if(enableFT && recoveryScheme == CP){
     if(_num_iterations%checkpointInterval == 0){
-      _graph.checkpointSaveNodeData();
+      _graph.checkpointSaveNodeData(checkpointFileName);
     }
   }
 }
@@ -140,11 +144,11 @@ void crashSite(GraphTy& _graph){
       //Reconstruct local graph
       //Assumes that local graph file is present
       _graph.read_local_graph_from_file(localGraphFileName);
-      _graph.checkpointApplyNodeData();
+      _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
     } else {
       TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData();
+      _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryHealthy.stop();
     }
   }
