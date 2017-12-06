@@ -12,8 +12,6 @@ ReconvDrivenCut::ReconvDrivenCut( aig::Aig & aig ) : aig( aig ) { }
 
 ReconvDrivenCut::~ReconvDrivenCut() { }
 
-PerThreadRDCutData perThreadRDCutData;
-
 struct Preprocess {
 
 	aig::Graph & aigGraph;
@@ -38,9 +36,10 @@ struct ReconvergenceDrivenCut {
 	//typedef int tt_does_not_need_push;
 
 	aig::Graph & aigGraph;
+	PerThreadRDCutData & perThreadRDCutData;
 	int cutSizeLimit;
 
-	ReconvergenceDrivenCut( aig::Graph & aigGraph, int cutSizeLimit ) : aigGraph( aigGraph ), cutSizeLimit( cutSizeLimit ) { }
+	ReconvergenceDrivenCut( aig::Graph & aigGraph, PerThreadRDCutData & perThreadRDCutData, int cutSizeLimit ) : aigGraph( aigGraph ), perThreadRDCutData( perThreadRDCutData ), cutSizeLimit( cutSizeLimit ) { }
 
 	void operator()( aig::GNode node, auto & ctx ) const {
 	//void operator()( aig::GNode node ) const {
@@ -243,7 +242,7 @@ void ReconvDrivenCut::run( int cutSizeLimit ) {
 
 	
 
-	galois::for_each( galois::iterate( workList.begin(), workList.end() ), ReconvergenceDrivenCut( aigGraph, cutSizeLimit ) , galois::wl< DC_FIFO >(), galois::loopname( "ReconvergenceDrivenCut" ) );
+	galois::for_each( galois::iterate( workList.begin(), workList.end() ), ReconvergenceDrivenCut( aigGraph, perThreadRDCutData, cutSizeLimit ) , galois::wl< DC_FIFO >(), galois::loopname( "ReconvergenceDrivenCut" ) );
 
 }
 

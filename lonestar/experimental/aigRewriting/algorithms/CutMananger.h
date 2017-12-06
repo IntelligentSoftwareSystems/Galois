@@ -81,6 +81,20 @@ private:
 	PerThreadAuxTruth perThreadAuxTruth;
 	Cut ** nodeCuts;
 
+	// Cuts Statistics //
+	galois::GAccumulator< long int > nCuts;
+	galois::GAccumulator< long int > nTriv;
+	galois::GAccumulator< long int > nFilt;
+	galois::GAccumulator< long int > nSatu;
+
+	// Runtime Statistics //
+	galois::GAccumulator< long int > mergeTime;
+	galois::GAccumulator< long int > filterTime;
+	galois::GAccumulator< long int > procTwoTime;
+	galois::GAccumulator< long int > compTime;
+	galois::GAccumulator< long int > scheduleTime;
+
+
 	void computeCutsRec( aig::GNode node, CutPool * cutPool, CutList * cutList, AuxTruth * auxTruth );
 
 	inline bool processTwoCuts( CutPool * cutPool, CutList * cutList, AuxTruth * auxTruth, Cut * lhsCut, Cut * rhsCut, bool lhsPolarity, bool rhsPolarity, int nodeId, int & currentNumCuts );

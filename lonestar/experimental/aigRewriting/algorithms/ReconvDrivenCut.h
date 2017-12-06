@@ -21,6 +21,7 @@ class ReconvDrivenCut {
 private:
 
 	aig::Aig & aig;
+	PerThreadRDCutData perThreadRDCutData;
 
 public:
 

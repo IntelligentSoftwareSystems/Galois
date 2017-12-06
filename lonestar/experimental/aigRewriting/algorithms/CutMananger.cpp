@@ -18,19 +18,6 @@ using namespace std::chrono;
 
 namespace algorithm {
 
-// Cuts Statistics //
-galois::GAccumulator< long int > nCuts;
-galois::GAccumulator< long int > nTriv;
-galois::GAccumulator< long int > nFilt;
-galois::GAccumulator< long int > nSatu;
-
-// Runtime Statistics //
-galois::GAccumulator< long int > mergeTime;
-galois::GAccumulator< long int > filterTime;
-galois::GAccumulator< long int > procTwoTime;
-galois::GAccumulator< long int > compTime;
-galois::GAccumulator< long int > scheduleTime;
-
 CutMananger::CutMananger( aig::Aig & aig, int K, int C, int nThreads, bool compTruth ) : 
 	
 	aig( aig ), K( K ), C( C ), nThreads( nThreads ), compTruth( compTruth ), 
