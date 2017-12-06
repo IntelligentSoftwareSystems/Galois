@@ -49,7 +49,8 @@ class DGAccumulator {
 
 #ifdef GALOIS_USE_LWCI
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), &ompi_op_sum<Ty>, mv);
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+                &galois::runtime::internal::ompi_op_sum<Ty>, mv);
   }
 #else
   inline void reduce_mpi() {
@@ -156,7 +157,8 @@ class DGReduceMax {
    * Use LWCI to reduce max across hosts
    */
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), &ompi_op_max<Ty>, mv);
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+                &galois::runtime::internal::ompi_op_max<Ty>, mv);
   }
   #else
   /**
@@ -288,7 +290,8 @@ class DGReduceMin {
    * Use LWCI to reduce min across hosts
    */
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), &ompi_op_min<Ty>, mv);
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+                &galois::runtime::internal::ompi_op_min<Ty>, mv);
   }
   #else
   /**
