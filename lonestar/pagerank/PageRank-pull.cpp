@@ -90,7 +90,7 @@ static void printTop(Graph& graph, int topn, const char* algo_name,
   std::ofstream out(std::string("out_" + std::to_string(numThreads)));
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     node_data_reference n = graph.getData(*ii);
-    out << *ii << " " << n.value << "\n";
+    out << *ii << " " << n.oldValue << "\n";
 #if 0
     GNode src             = *ii;
     node_data_reference n = graph.getData(src);
