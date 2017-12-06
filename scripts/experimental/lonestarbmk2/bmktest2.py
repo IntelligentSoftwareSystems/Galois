@@ -60,12 +60,12 @@ class SharedMemApp(GraphBMKSharedMem):
                 # isn't an actual file
                 x.set_arg(bmkinput.props.file)
 
-            x.set_arg("-statFile=" +
-                      os.path.expandvars(
-                        os.path.join(config.get_var("logOutputDirectory"),
-                                     self.getUniqueStatFile(numThreads, 
-                                     nameToAppend))
-                      ))
+            #x.set_arg("-statFile=" +
+            #          os.path.expandvars(
+            #            os.path.join(config.get_var("logOutputDirectory"),
+            #                         self.getUniqueStatFile(numThreads, 
+            #                         nameToAppend))
+            #          ))
 
             listOfRunSpecs.append(x)
 
@@ -215,7 +215,22 @@ class PageRank(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.000001") # pagerank tolerance
+            s.set_arg("-tolerance=0.0001") # pagerank tolerance
+        
+        return specs
+
+# for galois 2.2 version of pagerank
+class PageRank2Point2(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank"
+    benchmark = "pagerank"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds transpose graph."""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-graphTranspose=%s" % bmkinput.props.ptranspose) 
+            s.set_arg("-maxIterations=1000")
         
         return specs
 
@@ -320,4 +335,5 @@ class TrianglesEdge(SharedMemApp):
 #            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
 #            SpanningTree(), SSSP(), SurveyPropagation()]
 #BINARIES = [MCM(), PageRank()]
-BINARIES = [BCInnerLeveled()]
+BINARIES = [PageRank2Point2()]
+#BINARIES = [BCInnerLeveled()]

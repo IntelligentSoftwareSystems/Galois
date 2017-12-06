@@ -1,3 +1,6 @@
 [bmktest2-props]
 version = 2
 paths = 
+
+[soc-livejournal]
+ptranspose=/net/ohm/export/iss/inputs/unweighted/soc-LiveJournal1.ptgr
