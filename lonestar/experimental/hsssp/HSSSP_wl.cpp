@@ -33,7 +33,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "hGraph.h"
+#include "DistGraph.h"
 
 
 static const char* const name = "SSSP - Distributed Heterogeneous";
@@ -51,7 +51,7 @@ struct NodeData {
   std::atomic<int> dist_current;
 };
 
-typedef hGraph<NodeData, unsigned int> Graph;
+typedef DistGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
@@ -175,7 +175,7 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_HSSSP;
 
     T_total.start();
 
@@ -184,9 +184,9 @@ int main(int argc, char** argv) {
     T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();
@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
 
    T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " HSSSP (" << maxIterations << ") : " << T_HSSSP.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " HSSSP (" << maxIterations << ") : " << T_HSSSP.get() << "(msec)\n\n";
 
     return 0;
   } catch(const char* c) {

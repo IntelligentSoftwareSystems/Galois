@@ -40,8 +40,8 @@ struct NodeData {
   char blah;
 };
 
-typedef hGraph<NodeData, unsigned> Graph;
-typedef hGraph_edgeCut<NodeData, unsigned> Graph_edgeCut;
+typedef DistGraph<NodeData, unsigned> Graph;
+typedef DistGraph_edgeCut<NodeData, unsigned> Graph_edgeCut;
 typedef typename Graph::GraphNode GNode;
 
 /******************************************************************************/

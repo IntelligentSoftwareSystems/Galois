@@ -128,7 +128,7 @@ struct NodeData {
   uint32_t dist_current;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #if __OPT_VERSION__ >= 3

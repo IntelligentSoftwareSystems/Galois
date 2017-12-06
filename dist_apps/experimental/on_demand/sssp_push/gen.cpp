@@ -131,7 +131,7 @@ struct NodeData {
 galois::DynamicBitSet bitset_dist_current;
 #endif
 
-typedef hGraph<NodeData, unsigned int> Graph;
+typedef DistGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

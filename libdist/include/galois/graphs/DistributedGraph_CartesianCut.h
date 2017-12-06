@@ -30,11 +30,11 @@
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
-class hGraph_cartesianCut : public hGraph<NodeTy, EdgeTy> {
+class DistGraph_cartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
 
 public:
-  typedef hGraph<NodeTy, EdgeTy> base_hGraph;
+  typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
 
 private:
   unsigned numRowHosts;
@@ -49,48 +49,48 @@ private:
 #if 0
   template<bool isVirtual = false, typename std::enable_if<!isVirtual>::type* = nullptr>
   void factorize_hosts() {
-    numColumnHosts = sqrt(base_hGraph::numHosts);
-    while ((base_hGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
-    numRowHosts = base_hGraph::numHosts/numColumnHosts;
+    numColumnHosts = sqrt(base_DistGraph::numHosts);
+    while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
+    numRowHosts = base_DistGraph::numHosts/numColumnHosts;
     assert(numRowHosts>=numColumnHosts);
     if (moreColumnHosts) {
       std::swap(numRowHosts, numColumnHosts);
     }
-    if (base_hGraph::id == 0) {
+    if (base_DistGraph::id == 0) {
       galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
     }
   }
 #endif
 
   void factorize_hosts() {
-    numVirtualHosts = base_hGraph::numHosts*DecomposeFactor;
-    numColumnHosts = sqrt(base_hGraph::numHosts);
-    while ((base_hGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
-    numRowHosts = base_hGraph::numHosts/numColumnHosts;
+    numVirtualHosts = base_DistGraph::numHosts*DecomposeFactor;
+    numColumnHosts = sqrt(base_DistGraph::numHosts);
+    while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
+    numRowHosts = base_DistGraph::numHosts/numColumnHosts;
     assert(numRowHosts>=numColumnHosts);
     if (moreColumnHosts) {
       std::swap(numRowHosts, numColumnHosts);
     }
 
     numRowHosts = numRowHosts*DecomposeFactor;
-    if (base_hGraph::id == 0) {
+    if (base_DistGraph::id == 0) {
       galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
       galois::gPrint("Decomposition factor: ", DecomposeFactor, "\n");
     }
   }
 
   unsigned virtual2RealHost(unsigned virutalHostID){
-    return virutalHostID%base_hGraph::numHosts;
+    return virutalHostID%base_DistGraph::numHosts;
   }
 
   //template<bool isVirtual = false, typename std::enable_if<!isVirtual>::type* = nullptr>
   unsigned gridRowID() const {
-    return (base_hGraph::id / numColumnHosts);
+    return (base_DistGraph::id / numColumnHosts);
   }
 
   //template<bool isVirtual, typename std::enable_if<isVirtual>::type* = nullptr>
   //unsigned gridRowID() const {
-    //return (base_hGraph::id / numColumnHosts);
+    //return (base_DistGraph::id / numColumnHosts);
   //}
 
 
@@ -105,7 +105,7 @@ private:
   //}
 
   unsigned gridColumnID() const {
-    return (base_hGraph::id % numColumnHosts);
+    return (base_DistGraph::id % numColumnHosts);
   }
 
   unsigned gridColumnID(unsigned id) const {
@@ -113,7 +113,7 @@ private:
   }
 
   unsigned getBlockID(uint64_t gid) const {
-    return getHostID(gid)%base_hGraph::numHosts;
+    return getHostID(gid)%base_DistGraph::numHosts;
   }
 
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
@@ -125,20 +125,20 @@ private:
   }
 
   unsigned getColumnHostID(uint64_t gid) const {
-    assert(gid < base_hGraph::numGlobalNodes);
+    assert(gid < base_DistGraph::numGlobalNodes);
     uint32_t blockID = getBlockID(gid);
     return getColumnHostIDOfBlock(blockID);
   }
 
   uint32_t getColumnIndex(uint64_t gid) const {
-    assert(gid < base_hGraph::numGlobalNodes);
+    assert(gid < base_DistGraph::numGlobalNodes);
     auto blockID = getBlockID(gid);
     auto h = getColumnHostIDOfBlock(blockID);
     uint32_t columnIndex = 0;
     for (auto b = 0U; b <= blockID; ++b) {
       if (getColumnHostIDOfBlock(b) == h) {
         uint64_t start, end;
-        std::tie(start, end) = base_hGraph::gid2host[b];
+        std::tie(start, end) = base_DistGraph::gid2host[b];
         if (gid < end) {
           columnIndex += gid - start;
           break; // redundant
@@ -152,10 +152,10 @@ private:
 
   // called only for those hosts with which it shares nodes
   bool isNotCommunicationPartner(unsigned host,
-                                 typename base_hGraph::SyncType syncType,
+                                 typename base_DistGraph::SyncType syncType,
                                  WriteLocation writeLocation,
                                  ReadLocation readLocation) {
-    if (syncType == base_hGraph::syncReduce) {
+    if (syncType == base_DistGraph::syncReduce) {
       switch(writeLocation) {
         case writeSource:
           return (gridRowID() != gridRowID(host));
@@ -170,14 +170,14 @@ private:
     } else { // syncBroadcast
       switch(readLocation) {
         case readSource:
-          if (base_hGraph::currentBVFlag != nullptr) {
-            make_dst_invalid(base_hGraph::currentBVFlag);
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            make_dst_invalid(base_DistGraph::currentBVFlag);
           }
 
           return (gridRowID() != gridRowID(host));
         case readDestination:
-          if (base_hGraph::currentBVFlag != nullptr) {
-            make_src_invalid(base_hGraph::currentBVFlag);
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            make_src_invalid(base_DistGraph::currentBVFlag);
           }
 
           return (gridColumnID() != gridColumnID(host));
@@ -202,24 +202,24 @@ public:
 
   // Return the ID to which gid belongs after patition.
   unsigned getHostID(uint64_t gid) const {
-    assert(gid < base_hGraph::numGlobalNodes);
-    //for (auto h = 0U; h < base_hGraph::numHosts; ++h) {
+    assert(gid < base_DistGraph::numGlobalNodes);
+    //for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
     for (auto h = 0U; h < numVirtualHosts; ++h) {
       uint64_t start, end;
-      std::tie(start, end) = base_hGraph::gid2host[h];
+      std::tie(start, end) = base_DistGraph::gid2host[h];
       if (gid >= start && gid < end) {
         return h;
       }
     }
     assert(false);
-    return base_hGraph::numHosts;
+    return base_DistGraph::numHosts;
   }
 
   // Return if gid is Owned by local host.
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
     for(unsigned d = 0; d < DecomposeFactor; ++d){
-      std::tie(start, end) = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts];
+      std::tie(start, end) = base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts];
       if(gid >= start && gid < end)
         return true;
     }
@@ -228,7 +228,7 @@ public:
 
   // Return is gid is present locally (owned or mirror).
   virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_hGraph::numGlobalNodes);
+    assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
@@ -245,8 +245,8 @@ public:
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::mirrorNodes : base_hGraph::masterNodes;
+  virtual bool nothingToSend(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::mirrorNodes : base_DistGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
       if (columnBlocked) { // does not match processor grid
         return false;
@@ -257,8 +257,8 @@ public:
     }
     return true;
   }
-  virtual bool nothingToRecv(unsigned host, typename base_hGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_hGraph::syncReduce) ? base_hGraph::masterNodes : base_hGraph::mirrorNodes;
+  virtual bool nothingToRecv(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::masterNodes : base_DistGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
       if (columnBlocked) { // does not match processor grid
         return false;
@@ -273,12 +273,12 @@ public:
   /** 
    * Constructor for Cartesian Cut graph
    */
-  hGraph_cartesianCut(const std::string& filename, 
+  DistGraph_cartesianCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false,
               bool readFromFile = false,
-              std::string localGraphFileName = "local_graph") : base_hGraph(host, _numHosts) {
+              std::string localGraphFileName = "local_graph") : base_DistGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
     }
@@ -287,8 +287,8 @@ public:
     Tgraph_construct.start();
 
     if(readFromFile){
-      galois::gPrint("[", base_hGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
-      base_hGraph::read_local_graph_from_file(localGraphFileName);
+      galois::gPrint("[", base_DistGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+      base_DistGraph::read_local_graph_from_file(localGraphFileName);
       Tgraph_construct.stop();
       return;
     }
@@ -298,11 +298,11 @@ public:
     // for the FileGraph which mmaps appropriate regions of memory
     galois::graphs::OfflineGraph g(filename);
 
-    base_hGraph::numGlobalNodes = g.size();
-    base_hGraph::numGlobalEdges = g.sizeEdges();
+    base_DistGraph::numGlobalNodes = g.size();
+    base_DistGraph::numGlobalEdges = g.sizeEdges();
     factorize_hosts();
 
-    base_hGraph::computeMasters(g, scalefactor, false, DecomposeFactor);
+    base_DistGraph::computeMasters(g, scalefactor, false, DecomposeFactor);
 
     // at this point gid2Host has pairs for how to split nodes among
     // hosts; pair has begin and end
@@ -311,9 +311,9 @@ public:
     std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeBegin(DecomposeFactor); 
     std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeEnd(DecomposeFactor); 
     for(unsigned d = 0; d < DecomposeFactor; ++d){
-      nodeBegin[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
+      nodeBegin[d] = base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].first;
       edgeBegin[d] = g.edge_begin(nodeBegin[d]);
-      nodeEnd[d] = base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second;
+      nodeEnd[d] = base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].second;
       edgeEnd[d] = g.edge_begin(nodeEnd[d]);
     }
 
@@ -327,11 +327,11 @@ public:
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       std::stringstream ss;
-      ss << "Host : " << base_hGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
+      ss << "Host : " << base_DistGraph::id<<" : " << nodeBegin[d] << " , " << nodeEnd[d] << "\n";
       mpiGraph[d].loadPartialGraph(filename, nodeBegin[d], nodeEnd[d],
                                    *edgeBegin[d], *edgeEnd[d], 
-                                   base_hGraph::numGlobalNodes,
-                                   base_hGraph::numGlobalEdges);
+                                   base_DistGraph::numGlobalNodes,
+                                   base_DistGraph::numGlobalEdges);
     }
 
     std::vector<uint64_t> prefixSumOfEdges;
@@ -339,15 +339,15 @@ public:
     loadStatistics(g, mpiGraph, prefixSumOfEdges, inspectionTimer); // first pass of the graph file
 
     // ALWAYS allocate even if no nodes as it initializes the LC_CSR_Graph
-    base_hGraph::graph.allocateFrom(numNodes, numEdges);
+    base_DistGraph::graph.allocateFrom(numNodes, numEdges);
 
     assert(prefixSumOfEdges.size() == numNodes);
 
     if (numNodes > 0) {
       //assert(numEdges > 0);
-      base_hGraph::graph.constructNodes();
+      base_DistGraph::graph.constructNodes();
 
-      auto& base_graph = base_hGraph::graph;
+      auto& base_graph = base_DistGraph::graph;
       galois::do_all(
         galois::iterate((uint32_t)0, numNodes),
         [&] (auto n) {
@@ -358,38 +358,38 @@ public:
 
     } 
 
-    if (base_hGraph::numOwned != 0) {
-      base_hGraph::beginMaster = G2L(base_hGraph::gid2host[base_hGraph::id].first);
+    if (base_DistGraph::numOwned != 0) {
+      base_DistGraph::beginMaster = G2L(base_DistGraph::gid2host[base_DistGraph::id].first);
     } else {
       // no owned nodes, therefore empty masters
-      base_hGraph::beginMaster = 0; 
+      base_DistGraph::beginMaster = 0; 
     }
 
-    base_hGraph::printStatistics();
+    base_DistGraph::printStatistics();
 
-    loadEdges(base_hGraph::graph, g, mpiGraph); // second pass of the graph file
+    loadEdges(base_DistGraph::graph, g, mpiGraph); // second pass of the graph file
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       mpiGraph[d].resetAndFree();
     }
 
-    fill_mirrorNodes(base_hGraph::mirrorNodes);
+    fill_mirrorNodes(base_DistGraph::mirrorNodes);
 
     galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
     Tthread_ranges.start();
-    base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
+    base_DistGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
     Tthread_ranges.stop();
 
-    base_hGraph::determine_thread_ranges_master();
-    base_hGraph::determine_thread_ranges_with_edges();
-    base_hGraph::initialize_specific_ranges();
+    base_DistGraph::determine_thread_ranges_master();
+    base_DistGraph::determine_thread_ranges_with_edges();
+    base_DistGraph::initialize_specific_ranges();
 
     Tgraph_construct.stop();
 
     galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM",
                                             GRNAME);
     Tgraph_construct_comm.start();
-    base_hGraph::setup_communication();
+    base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
   }
 
@@ -398,11 +398,11 @@ public:
       std::vector<uint64_t>& prefixSumOfEdges,
       galois::Timer& inspectionTimer) {
 
-    base_hGraph::numOwned = 0;
+    base_DistGraph::numOwned = 0;
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      base_hGraph::numOwned += 
-        base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - 
-        base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first;
+      base_DistGraph::numOwned += 
+        base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].second - 
+        base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].first;
     }
 
     std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
@@ -412,7 +412,7 @@ public:
       for (auto b = 0U; b < numVirtualHosts; ++b) {
         if (getColumnHostIDOfBlock(b) == i) {
           uint64_t start, end;
-          std::tie(start, end) = base_hGraph::gid2host[b];
+          std::tie(start, end) = base_DistGraph::gid2host[b];
           columnBlockSize += end - start;
         }
       }
@@ -423,21 +423,21 @@ public:
     for(unsigned d = 0; d < DecomposeFactor; ++d){
       numOutgoingEdges[d].resize(numColumnHosts);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
-        numOutgoingEdges[d][i].assign((base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].second - base_hGraph::gid2host[base_hGraph::id + d*base_hGraph::numHosts].first), 0);
+        numOutgoingEdges[d][i].assign((base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].second - base_DistGraph::gid2host[base_DistGraph::id + d*base_DistGraph::numHosts].first), 0);
       }
     }
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       mpiGraph[d].resetReadCounters();
 
-      uint64_t rowOffset = base_hGraph::gid2host[base_hGraph::id + 
-                                                 d*base_hGraph::numHosts].first;
+      uint64_t rowOffset = base_DistGraph::gid2host[base_DistGraph::id + 
+                                                 d*base_DistGraph::numHosts].first;
 
       galois::do_all(
-        galois::iterate(base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].first,
-                        base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].second),
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].first,
+                        base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].second),
         [&] (auto src) {
           auto ii = mpiGraph[d].edgeBegin(src);
           auto ee = mpiGraph[d].edgeEnd(src);
@@ -459,7 +459,7 @@ public:
       allBytesRead += mpiGraph[d].getBytesRead();
     }
 
-    galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ", 
+    galois::gPrint("[", base_DistGraph::id, "] Edge inspection time: ", 
                    inspectionTimer.get_usec()/1000000.0f, 
                    " seconds to read ", allBytesRead, " bytes (",
                    allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
@@ -467,7 +467,7 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       unsigned h = (gridRowID() * numColumnHosts) + i;
-      if (h == base_hGraph::id) continue;
+      if (h == base_DistGraph::id) continue;
       galois::runtime::SendBuffer b;
       for(unsigned d = 0; d < DecomposeFactor; ++d){
         galois::runtime::gSerialize(b, numOutgoingEdges[d][i]);
@@ -510,9 +510,9 @@ public:
     numEdges = 0;
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      //unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * numColumnHosts;
-      unsigned hostID = (base_hGraph::id + d*base_hGraph::numHosts);
-      uint64_t src = base_hGraph::gid2host[hostID].first;
+      //unsigned leaderHostID = gridRowID(base_DistGraph::id + d*base_DistGraph::numHosts) * numColumnHosts;
+      unsigned hostID = (base_DistGraph::id + d*base_DistGraph::numHosts);
+      uint64_t src = base_DistGraph::gid2host[hostID].first;
       unsigned i = gridColumnID();
       for (uint32_t j = 0; j < numOutgoingEdges[d][i].size(); ++j) {
         numEdges += numOutgoingEdges[d][i][j];
@@ -525,18 +525,18 @@ public:
     }
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * 
+      unsigned leaderHostID = gridRowID(base_DistGraph::id + d*base_DistGraph::numHosts) * 
                               numColumnHosts;
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         unsigned hostID = leaderHostID + i;
-        if(virtual2RealHost(hostID) == base_hGraph::id) continue;
-        uint64_t src = base_hGraph::gid2host[hostID].first;
+        if(virtual2RealHost(hostID) == base_DistGraph::id) continue;
+        uint64_t src = base_DistGraph::gid2host[hostID].first;
         for (uint32_t j = 0; j < numOutgoingEdges[d][i].size(); ++j) {
           bool createNode = false;
           if (numOutgoingEdges[d][i][j] > 0) {
             createNode = true;
             numEdges += numOutgoingEdges[d][i][j];
-          } else if ((gridColumnID(base_hGraph::id + i*base_hGraph::numHosts) == 
+          } else if ((gridColumnID(base_DistGraph::id + i*base_DistGraph::numHosts) == 
                      getColumnHostID(src)) && 
                      hasIncomingEdge[0].test(getColumnIndex(src))) {
             if (columnBlocked) {
@@ -559,7 +559,7 @@ public:
       }
     }
 
-    base_hGraph::numNodesWithEdges = numNodes;
+    base_DistGraph::numNodesWithEdges = numNodes;
 
     for (unsigned i = 0; i < numRowHosts; ++i) {
       //unsigned hostID;
@@ -568,13 +568,13 @@ public:
         hostID_virtual = (gridColumnID() * numRowHosts) + i;
       } else {
         hostID_virtual = (i * numColumnHosts) + gridColumnID();
-        //hostID_virtual = (i * numColumnHosts) + gridColumnID(base_hGraph::id + d*base_hGraph::numHosts);
+        //hostID_virtual = (i * numColumnHosts) + gridColumnID(base_DistGraph::id + d*base_DistGraph::numHosts);
       }
-      if (virtual2RealHost(hostID_virtual) == (base_hGraph::id)) continue;
+      if (virtual2RealHost(hostID_virtual) == (base_DistGraph::id)) continue;
       if (columnBlocked) {
         bool skip = false;
         for (unsigned d = 0; d < DecomposeFactor; ++d) {
-          unsigned leaderHostID = gridRowID(base_hGraph::id + d * base_hGraph::numHosts) *
+          unsigned leaderHostID = gridRowID(base_DistGraph::id + d * base_DistGraph::numHosts) *
                                   numColumnHosts;
           if ((hostID_virtual >= leaderHostID) && 
               (hostID_virtual < (leaderHostID + numColumnHosts))) {
@@ -584,8 +584,8 @@ public:
         if(skip)
           continue;
       }
-      uint64_t dst = base_hGraph::gid2host[hostID_virtual].first;
-      uint64_t dst_end = base_hGraph::gid2host[hostID_virtual].second;
+      uint64_t dst = base_DistGraph::gid2host[hostID_virtual].first;
+      uint64_t dst_end = base_DistGraph::gid2host[hostID_virtual].second;
       for (; dst < dst_end; ++dst) {
         if (hasIncomingEdge[0].test(getColumnIndex(dst))) {
           localToGlobalVector.push_back(dst);
@@ -601,7 +601,7 @@ public:
   void loadEdges(GraphTy& graph, 
       galois::graphs::OfflineGraph& g,
       std::vector<galois::graphs::BufferedGraph<EdgeTy>>& mpiGraph) {
-    if (base_hGraph::id == 0) {
+    if (base_DistGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
       } else {
@@ -616,7 +616,7 @@ public:
     }
 
     std::atomic<uint32_t> numNodesWithEdges;
-    numNodesWithEdges = base_hGraph::numOwned + dummyOutgoingNodes;
+    numNodesWithEdges = base_DistGraph::numOwned + dummyOutgoingNodes;
     loadEdgesFromFile(graph, g, mpiGraph, numNodesWithEdges);
     galois::on_each([&](unsigned tid, unsigned nthreads){
       receiveEdges(graph, numNodesWithEdges);
@@ -625,7 +625,7 @@ public:
 
     timer.stop();
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", 
+      galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 
                      timer.get_usec()/1000000.0f, 
                      " seconds to read ", mpiGraph[d].getBytesRead(), 
                      " bytes (", 
@@ -655,12 +655,12 @@ public:
       typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
       galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-      const unsigned& id = base_hGraph::id; // manually copy it because it is protected
+      const unsigned& id = base_DistGraph::id; // manually copy it because it is protected
       galois::do_all(
-        galois::iterate(base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].first,
-                        base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].second),
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].first,
+                        base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].second),
         [&] (auto n) {
           auto& gdst_vec = *gdst_vecs.getLocal();
           auto& gdata_vec = *gdata_vecs.getLocal();
@@ -746,12 +746,12 @@ public:
       typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
       galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-      const unsigned& id = base_hGraph::id; // manually copy it because it is protected
+      const unsigned& id = base_DistGraph::id; // manually copy it because it is protected
       galois::do_all(
-        galois::iterate(base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].first,
-                        base_hGraph::gid2host[base_hGraph::id + 
-                                              d*base_hGraph::numHosts].second),
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].first,
+                        base_DistGraph::gid2host[base_DistGraph::id + 
+                                              d*base_DistGraph::numHosts].second),
         [&] (auto n) {
           auto& gdst_vec = *gdst_vecs.getLocal();
           uint32_t lsrc = 0;
@@ -850,7 +850,7 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // receive edges for all mirror nodes
-    while (numNodesWithEdges < base_hGraph::numNodesWithEdges) {
+    while (numNodesWithEdges < base_DistGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       processReceivedEdgeBuffer(p, graph, numNodesWithEdges);
@@ -893,11 +893,11 @@ public:
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         //unsigned hostID = (gridRowID() * numColumnHosts) + i;
-        unsigned hostID_virtual = (gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * 
+        unsigned hostID_virtual = (gridRowID(base_DistGraph::id + d*base_DistGraph::numHosts) * 
                                    numColumnHosts) + i;
-        if (hostID_virtual == (base_hGraph::id + d*base_hGraph::numHosts)) continue;
-        uint64_t src = base_hGraph::gid2host[hostID_virtual].first;
-        uint64_t src_end = base_hGraph::gid2host[hostID_virtual].second;
+        if (hostID_virtual == (base_DistGraph::id + d*base_DistGraph::numHosts)) continue;
+        uint64_t src = base_DistGraph::gid2host[hostID_virtual].first;
+        uint64_t src_end = base_DistGraph::gid2host[hostID_virtual].second;
         unsigned hostID_real = virtual2RealHost(hostID_virtual);
         mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() + 
                                          src_end - src);
@@ -911,24 +911,24 @@ public:
 
     // mirrors for incoming edges
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      unsigned leaderHostID = gridRowID(base_hGraph::id + d*base_hGraph::numHosts) * 
+      unsigned leaderHostID = gridRowID(base_DistGraph::id + d*base_DistGraph::numHosts) * 
                               numColumnHosts;
       for (unsigned i = 0; i < numRowHosts; ++i) {
         unsigned hostID_virtual;
         if (columnBlocked) {
-          hostID_virtual = (gridColumnID(base_hGraph::id + d*base_hGraph::numHosts) * 
+          hostID_virtual = (gridColumnID(base_DistGraph::id + d*base_DistGraph::numHosts) * 
                             numRowHosts) + i;
         } else {
           hostID_virtual = (i * numColumnHosts) + 
-                           gridColumnID(base_hGraph::id + d*base_hGraph::numHosts);
+                           gridColumnID(base_DistGraph::id + d*base_DistGraph::numHosts);
         }
-        if (hostID_virtual == (base_hGraph::id + d*base_hGraph::numHosts)) continue;
+        if (hostID_virtual == (base_DistGraph::id + d*base_DistGraph::numHosts)) continue;
         if (columnBlocked) {
           if ((hostID_virtual >= leaderHostID) && 
               (hostID_virtual < (leaderHostID + numColumnHosts))) continue;
         }
-        uint64_t dst = base_hGraph::gid2host[hostID_virtual].first;
-        uint64_t dst_end = base_hGraph::gid2host[hostID_virtual].second;
+        uint64_t dst = base_DistGraph::gid2host[hostID_virtual].first;
+        uint64_t dst_end = base_DistGraph::gid2host[hostID_virtual].second;
         unsigned hostID_real = virtual2RealHost(hostID_virtual);
         mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() + 
                                          dst_end - dst);
@@ -958,16 +958,16 @@ public:
     return true;
   }
 
-  void reset_bitset(typename base_hGraph::SyncType syncType, 
+  void reset_bitset(typename base_DistGraph::SyncType syncType, 
                     void (*bitset_reset_range)(size_t, size_t)) const {
-    if (base_hGraph::numOwned != 0) {
-      auto endMaster = base_hGraph::beginMaster + base_hGraph::numOwned;
-      if (syncType == base_hGraph::syncBroadcast) { // reset masters
-        bitset_reset_range(base_hGraph::beginMaster, endMaster-1);
+    if (base_DistGraph::numOwned != 0) {
+      auto endMaster = base_DistGraph::beginMaster + base_DistGraph::numOwned;
+      if (syncType == base_DistGraph::syncBroadcast) { // reset masters
+        bitset_reset_range(base_DistGraph::beginMaster, endMaster-1);
       } else { // reset mirrors
-        assert(syncType == base_hGraph::syncReduce);
-        if (base_hGraph::beginMaster > 0) {
-          bitset_reset_range(0, base_hGraph::beginMaster - 1);
+        assert(syncType == base_DistGraph::syncReduce);
+        if (base_DistGraph::beginMaster > 0) {
+          bitset_reset_range(0, base_DistGraph::beginMaster - 1);
         }
         if (endMaster < numNodes) {
           bitset_reset_range(endMaster, numNodes - 1);
@@ -978,9 +978,9 @@ public:
 
   std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
-    if(base_hGraph::beginMaster > 0)
-      mirrorRanges_vec.push_back(std::make_pair(0, base_hGraph::beginMaster));
-    auto endMaster = base_hGraph::beginMaster + base_hGraph::numOwned;
+    if(base_DistGraph::beginMaster > 0)
+      mirrorRanges_vec.push_back(std::make_pair(0, base_DistGraph::beginMaster));
+    auto endMaster = base_DistGraph::beginMaster + base_DistGraph::numOwned;
     if (endMaster < numNodes) {
       mirrorRanges_vec.push_back(std::make_pair(endMaster, numNodes));
     }

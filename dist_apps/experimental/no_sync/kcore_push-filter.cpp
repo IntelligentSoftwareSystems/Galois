@@ -77,7 +77,7 @@ struct NodeData {
   uint8_t flag;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 /******************************************************************************/

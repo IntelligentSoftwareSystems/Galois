@@ -30,11 +30,11 @@
 #include <sstream>
 
 template<typename NodeTy, typename EdgeTy>
-class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
+class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_customEdgeCut";
 
   public:
-    typedef hGraph<NodeTy, EdgeTy> base_hGraph;
+    typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
     /** Utilities for reading partitioned graphs. **/
     struct NodeInfo {
       NodeInfo() :
@@ -106,7 +106,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
     }
 
   virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_hGraph::numGlobalNodes);
+    assert(gid < base_DistGraph::numGlobalNodes);
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
@@ -202,23 +202,23 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
     /**
      * Constructor for Vertex Cut
      */
-    hGraph_customEdgeCut(const std::string& filename, 
+    DistGraph_customEdgeCut(const std::string& filename, 
                const std::string& partitionFolder,
                unsigned host, unsigned _numHosts, 
                std::vector<unsigned>& scalefactor, 
                const std::string& vertexIDMap_filename, 
                bool transpose = false, 
                uint32_t VCutThreshold = 100, 
-               bool bipartite = false) : base_hGraph(host, _numHosts) {
+               bool bipartite = false) : base_DistGraph(host, _numHosts) {
       if (!scalefactor.empty()) {
-        if (base_hGraph::id == 0) {
+        if (base_DistGraph::id == 0) {
           std::cerr << "WARNING: scalefactor not supported for custom-cuts\n";
         }
         scalefactor.clear();
       }
 
       if(vertexIDMap_filename.empty()){
-        if (base_hGraph::id == 0) {
+        if (base_DistGraph::id == 0) {
           std::cerr << "WARNING: no vertexIDMap_filename provided for custom-cuts\n";
         }
         abort();
@@ -233,16 +233,16 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
 
       galois::graphs::OfflineGraph g(filename);
       isBipartite = bipartite;
-      base_hGraph::numGlobalNodes = g.size();
-      base_hGraph::numGlobalEdges = g.sizeEdges();
-      std::cerr << "[" << base_hGraph::id << "] Total nodes : " << 
-                          base_hGraph::numGlobalNodes << " , Total edges : " << 
-                          base_hGraph::numGlobalEdges << "\n";
-      base_hGraph::computeMasters(g, scalefactor, isBipartite);
+      base_DistGraph::numGlobalNodes = g.size();
+      base_DistGraph::numGlobalEdges = g.sizeEdges();
+      std::cerr << "[" << base_DistGraph::id << "] Total nodes : " << 
+                          base_DistGraph::numGlobalNodes << " , Total edges : " << 
+                          base_DistGraph::numGlobalEdges << "\n";
+      base_DistGraph::computeMasters(g, scalefactor, isBipartite);
 
       //Read the vertexIDMap_filename for masters.
-      auto startLoc = base_hGraph::gid2host[base_hGraph::id].first;
-      auto num_entries_to_read = (base_hGraph::gid2host[base_hGraph::id].second - base_hGraph::gid2host[base_hGraph::id].first);
+      auto startLoc = base_DistGraph::gid2host[base_DistGraph::id].first;
+      auto num_entries_to_read = (base_DistGraph::gid2host[base_DistGraph::id].second - base_DistGraph::gid2host[base_DistGraph::id].first);
       assert(num_entries_to_read > 0);
       vertexIDMap.resize(num_entries_to_read);
       readVertexIDMappingFile(vertexIDMap_filename, vertexIDMap, num_entries_to_read, startLoc);
@@ -251,11 +251,11 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
 
       // at this point gid2Host has pairs for how to split nodes among
       // hosts; pair has begin and end
-      uint64_t nodeBegin = base_hGraph::gid2host[base_hGraph::id].first;
+      uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
       typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
         g.edge_begin(nodeBegin);
 
-      uint64_t nodeEnd = base_hGraph::gid2host[base_hGraph::id].second;
+      uint64_t nodeEnd = base_DistGraph::gid2host[base_DistGraph::id].second;
       typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
         g.edge_begin(nodeEnd);
 
@@ -264,13 +264,13 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
 
       galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
       mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
-                                *edgeEnd, base_hGraph::numGlobalNodes,
-      base_hGraph::numGlobalEdges);
+                                *edgeEnd, base_DistGraph::numGlobalNodes,
+      base_DistGraph::numGlobalEdges);
 
       mpiGraph.resetReadCounters();
 
       uint64_t numEdges_distribute = edgeEnd - edgeBegin; 
-      std::cerr << "[" << base_hGraph::id << "] Total edges to distribute : " << 
+      std::cerr << "[" << base_DistGraph::id << "] Total edges to distribute : " << 
                    numEdges_distribute << "\n";
 
       /********************************************
@@ -281,26 +281,26 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
 
       std::vector<uint64_t> prefixSumOfEdges;
       assign_edges_phase1(g, mpiGraph, numEdges_distribute, vertexIDMap,
-                          prefixSumOfEdges, base_hGraph::mirrorNodes,
+                          prefixSumOfEdges, base_DistGraph::mirrorNodes,
                           edgeInspectionTimer);
 
-      base_hGraph::numOwned = numOwned;
-      base_hGraph::numNodesWithEdges = numNodes;
+      base_DistGraph::numOwned = numOwned;
+      base_DistGraph::numNodesWithEdges = numNodes;
 
-      if (base_hGraph::numOwned > 0) {
-        base_hGraph::beginMaster =
-          G2L(localToGlobalVector[0]) ; //base_hGraph::gid2host[base_hGraph::id].first);
+      if (base_DistGraph::numOwned > 0) {
+        base_DistGraph::beginMaster =
+          G2L(localToGlobalVector[0]) ; //base_DistGraph::gid2host[base_DistGraph::id].first);
       } else {
-        base_hGraph::beginMaster = 0;
+        base_DistGraph::beginMaster = 0;
       }
 
       /******************************************
        * Allocate and construct the graph
        *****************************************/
-      base_hGraph::graph.allocateFrom(numNodes, numEdges);
-      base_hGraph::graph.constructNodes();
+      base_DistGraph::graph.allocateFrom(numNodes, numEdges);
+      base_DistGraph::graph.constructNodes();
 
-      auto& base_graph = base_hGraph::graph;
+      auto& base_graph = base_DistGraph::graph;
       galois::do_all(
         galois::iterate((uint32_t)0, numNodes),
         [&] (auto n) {
@@ -309,7 +309,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
         galois::no_stats(),
         galois::loopname("EdgeLoading"));
 
-      loadEdges(base_hGraph::graph, mpiGraph, numEdges_distribute);
+      loadEdges(base_DistGraph::graph, mpiGraph, numEdges_distribute);
 
       mpiGraph.resetAndFree();
 
@@ -318,20 +318,20 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       galois::runtime::getHostBarrier().wait();
 
       if (transpose && (numNodes > 0)) {
-        base_hGraph::graph.transpose();
-        base_hGraph::transposed = true;
+        base_DistGraph::graph.transpose();
+        base_DistGraph::transposed = true;
       } else {
         // else because transpose will find thread ranges for you
 
         galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
         Tthread_ranges.start();
-        base_hGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
+        base_DistGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
         Tthread_ranges.stop();
       }
 
-      base_hGraph::determine_thread_ranges_master();
-      base_hGraph::determine_thread_ranges_with_edges();
-      base_hGraph::initialize_specific_ranges();
+      base_DistGraph::determine_thread_ranges_master();
+      base_DistGraph::determine_thread_ranges_with_edges();
+      base_DistGraph::initialize_specific_ranges();
 
       Tgraph_construct.stop();
 
@@ -341,14 +341,14 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
        * hosts
        ****************************************/
       Tgraph_construct_comm.start();
-      base_hGraph::setup_communication();
+      base_DistGraph::setup_communication();
       Tgraph_construct_comm.stop();
     }
 
     template<typename GraphTy>
     void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                    uint64_t numEdges_distribute){
-      if (base_hGraph::id == 0) {
+      if (base_DistGraph::id == 0) {
         if (std::is_void<typename GraphTy::edge_data_type>::value) {
           fprintf(stderr, "Loading void edge-data while creating edges.\n");
         } else {
@@ -360,7 +360,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       timer.start();
       mpiGraph.resetReadCounters();
 
-      assigned_edges_perhost.resize(base_hGraph::numHosts);
+      assigned_edges_perhost.resize(base_DistGraph::numHosts);
 
       assign_load_send_edges(graph, mpiGraph, numEdges_distribute);
 
@@ -375,7 +375,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       ++galois::runtime::evilPhase;
 
       timer.stop();
-      galois::gPrint("[", base_hGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
+      galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
           " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
           mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
     }
@@ -390,30 +390,30 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
                              std::vector<std::vector<size_t>>& mirrorNodes,
                              galois::Timer& edgeInspectionTimer) {
       // Go over assigned nodes and distribute edges.
-      std::vector<std::vector<uint64_t>> numOutgoingEdges(base_hGraph::numHosts);
-      std::vector<galois::DynamicBitSet> hasIncomingEdge(base_hGraph::numHosts);
+      std::vector<std::vector<uint64_t>> numOutgoingEdges(base_DistGraph::numHosts);
+      std::vector<galois::DynamicBitSet> hasIncomingEdge(base_DistGraph::numHosts);
       std::vector<galois::GAccumulator<uint64_t>> 
-          num_assigned_edges_perhost(base_hGraph::numHosts);
+          num_assigned_edges_perhost(base_DistGraph::numHosts);
       std::vector<galois::GAccumulator<uint32_t>> 
-          num_assigned_nodes_perhost(base_hGraph::numHosts);
+          num_assigned_nodes_perhost(base_DistGraph::numHosts);
       num_total_edges_to_receive = 0;
 
-      auto numNodesAssigned = base_hGraph::gid2host[base_hGraph::id].second - 
-                              base_hGraph::gid2host[base_hGraph::id].first;
+      auto numNodesAssigned = base_DistGraph::gid2host[base_DistGraph::id].second - 
+                              base_DistGraph::gid2host[base_DistGraph::id].first;
 
-      for (uint32_t i = 0; i < base_hGraph::numHosts; ++i) {
+      for (uint32_t i = 0; i < base_DistGraph::numHosts; ++i) {
         numOutgoingEdges[i].assign(numNodesAssigned, 0);
-        hasIncomingEdge[i].resize(base_hGraph::numGlobalNodes);
+        hasIncomingEdge[i].resize(base_DistGraph::numGlobalNodes);
       }
 
       mpiGraph.resetReadCounters();
 
-      uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
+      uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
       auto& net = galois::runtime::getSystemNetworkInterface();
       galois::do_all(
-        galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
-                        base_hGraph::gid2host[base_hGraph::id].second),
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
         [&] (auto src) {
           auto ee = mpiGraph.edgeBegin(src);
           auto ee_end = mpiGraph.edgeEnd(src);
@@ -441,26 +441,26 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       // time should have been started outside of this loop
       edgeInspectionTimer.stop();
 
-      galois::gPrint("[", base_hGraph::id, "] Edge inspection time: ",
+      galois::gPrint("[", base_DistGraph::id, "] Edge inspection time: ",
                      edgeInspectionTimer.get_usec()/1000000.0f, " seconds to read ",
                      mpiGraph.getBytesRead(), " bytes (",
                      mpiGraph.getBytesRead()/(float)edgeInspectionTimer.get_usec(),
                      " MBPS)\n");
 
       uint64_t check_numEdges = 0;
-      for (uint32_t h = 0; h < base_hGraph::numHosts; ++h) {
+      for (uint32_t h = 0; h < base_DistGraph::numHosts; ++h) {
         check_numEdges += num_assigned_edges_perhost[h].reduce();
       }
-      galois::gPrint("[", base_hGraph::id, "] check_numEdges done\n");
+      galois::gPrint("[", base_DistGraph::id, "] check_numEdges done\n");
 
       assert(check_numEdges == numEdges_distribute);
 
-      numOwned = num_assigned_nodes_perhost[base_hGraph::id].reduce();
+      numOwned = num_assigned_nodes_perhost[base_DistGraph::id].reduce();
       /****** Exchange numOutgoingEdges sets *********/
       //send and clear assigned_edges_perhost to receive from other hosts
-      galois::gPrint("[", base_hGraph::id, "] Starting Send of the data\n");
+      galois::gPrint("[", base_DistGraph::id, "] Starting Send of the data\n");
       for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_hGraph::id) continue;
+        if(x == base_DistGraph::id) continue;
         galois::runtime::SendBuffer b;
         galois::runtime::gSerialize(b, num_assigned_nodes_perhost[x].reduce());
         galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
@@ -470,11 +470,11 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       }
 
       net.flush();
-      galois::gPrint("[", base_hGraph::id, "] Sent the data\n");
+      galois::gPrint("[", base_DistGraph::id, "] Sent the data\n");
 
       //receive
       for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_hGraph::id) continue;
+        if(x == base_DistGraph::id) continue;
 
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
@@ -490,22 +490,22 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
         num_total_edges_to_receive += num_edges_from_host;
         numOwned += num_nodes_from_host;
       }
-      galois::gPrint("[", base_hGraph::id, "] Received the data\n");
+      galois::gPrint("[", base_DistGraph::id, "] Received the data\n");
       ++galois::runtime::evilPhase;
 
       for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_hGraph::id) continue;
-        assert(hasIncomingEdge[base_hGraph::id].size() == hasIncomingEdge[x].size());
-        hasIncomingEdge[base_hGraph::id].bitwise_or(hasIncomingEdge[x]);
+        if(x == base_DistGraph::id) continue;
+        assert(hasIncomingEdge[base_DistGraph::id].size() == hasIncomingEdge[x].size());
+        hasIncomingEdge[base_DistGraph::id].bitwise_or(hasIncomingEdge[x]);
       }
 
-      galois::gPrint("[", base_hGraph::id, "] Start: Fill local and global vectors\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: Fill local and global vectors\n");
       numNodes = 0;
       numEdges = 0;
       localToGlobalVector.reserve(numOwned);
       globalToLocalMap.reserve(numOwned);
       uint64_t src = 0;
-      for(uint32_t i = 0; i < base_hGraph::numHosts; ++i){
+      for(uint32_t i = 0; i < base_DistGraph::numHosts; ++i){
         for(unsigned j = 0; j < numOutgoingEdges[i].size(); ++j){
           if(numOutgoingEdges[i][j] > 0){
             /* Subtract 1, since we added 1 before sending to know the
@@ -520,7 +520,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
           ++src;
         }
       }
-      galois::gPrint("[", base_hGraph::id, "] End: Fill local and global vectors\n");
+      galois::gPrint("[", base_DistGraph::id, "] End: Fill local and global vectors\n");
 
       /* At this point numNodes should be equal to the number of
        * nodes owned by the host.
@@ -528,26 +528,26 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
       assert(numNodes == numOwned);
       assert(localToGlobalVector.size() == numOwned);
 
-      galois::gPrint("[", base_hGraph::id, "] Start: Fill Ghosts\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: Fill Ghosts\n");
       /* In a separate loop for ghosts, so that all the masters can be assigned
        * contigous local ids.
        */
-      for(uint64_t i = 0; i < base_hGraph::numGlobalNodes; ++i){
+      for(uint64_t i = 0; i < base_DistGraph::numGlobalNodes; ++i){
         /*
          * if it has incoming edges on this host, then it is a ghosts node.
          * Node should be created for this locally.
          * NOTE: Since this is edge cut, this ghost will not have outgoing edges,
          * therefore, will not add to the prefixSumOfEdges.
          */
-        if (hasIncomingEdge[base_hGraph::id].test(i) && !isOwned(i)){
+        if (hasIncomingEdge[base_DistGraph::id].test(i) && !isOwned(i)){
           localToGlobalVector.push_back(i);
           globalToLocalMap[i] = numNodes++;
           prefixSumOfEdges.push_back(numEdges);
         }
       }
 
-      galois::gPrint("[", base_hGraph::id, "] End: Fill Ghosts\n");
-      //std::cout << base_hGraph::id <<  "] numNodes : " << numNodes << ", numOwned : " << numOwned << ", numEdges : " << numEdges  <<"\n";
+      galois::gPrint("[", base_DistGraph::id, "] End: Fill Ghosts\n");
+      //std::cout << base_DistGraph::id <<  "] numNodes : " << numNodes << ", numOwned : " << numOwned << ", numEdges : " << numEdges  <<"\n";
 
       uint32_t numGhosts = (localToGlobalVector.size() - numOwned);
       std::vector<uint32_t> mirror_mapping_to_hosts;
@@ -555,16 +555,16 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
         mirror_mapping_to_hosts.resize(numGhosts);
       }
 
-      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes send\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: assignedNodes send\n");
 
       /****** Exchange assignedNodes: All to all *********/
       for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_hGraph::id) continue;
+        if(x == base_DistGraph::id) continue;
         galois::runtime::SendBuffer b;
 #if 0
         galois::runtime::gSerialize(b, numOwned);
         for(uint32_t i = 0; i < numOwned; ++i) {
-          if(base_hGraph::id == 0)
+          if(base_DistGraph::id == 0)
             std::cerr << localToGlobalVector[i] << "\n";
           galois::runtime::gSerialize(b,localToGlobalVector[i]);
         }
@@ -573,15 +573,15 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, temp_vec);
         net.sendTagged(x, galois::runtime::evilPhase, b);
       }
-      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes receive\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: assignedNodes receive\n");
 
-      galois::gPrint("[", base_hGraph::id, "] End: assignedNodes send\n");
+      galois::gPrint("[", base_DistGraph::id, "] End: assignedNodes send\n");
       net.flush();
 
-      galois::gPrint("[", base_hGraph::id, "] Start: assignedNodes receive\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: assignedNodes receive\n");
       //receive
       for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_hGraph::id) continue;
+        if(x == base_DistGraph::id) continue;
 
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
@@ -612,7 +612,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
           galois::no_stats(),
           galois::loopname("MirrorToHostAssignment"));
       }
-      galois::gPrint("[", base_hGraph::id, "] End: assignedNodes receive\n");
+      galois::gPrint("[", base_DistGraph::id, "] End: assignedNodes receive\n");
       ++galois::runtime::evilPhase;
 
       //fill mirror nodes
@@ -620,7 +620,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
         mirrorNodes[mirror_mapping_to_hosts[i]].push_back(localToGlobalVector[numOwned + i]);
       }
 
-      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_hGraph::id, numNodes, numEdges);
+      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_DistGraph::id, numNodes, numEdges);
     }
 
     // Helper functions
@@ -649,27 +649,27 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
                                   uint64_t numEdges_distribute) {
         using DstVecType = std::vector<std::vector<uint64_t>>;
         galois::substrate::PerThreadStorage<DstVecType> 
-            gdst_vecs(base_hGraph::numHosts);
+            gdst_vecs(base_DistGraph::numHosts);
 
         using DataVecType = 
             std::vector<std::vector<typename GraphTy::edge_data_type>>;
         galois::substrate::PerThreadStorage<DataVecType> 
-            gdata_vecs(base_hGraph::numHosts);
+            gdata_vecs(base_DistGraph::numHosts);
 
         using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>; 
         galois::substrate::PerThreadStorage<SendBufferVecTy> 
-          sendBuffers(base_hGraph::numHosts);
+          sendBuffers(base_DistGraph::numHosts);
 
         auto& net = galois::runtime::getSystemNetworkInterface();
-        uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
+        uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
-        const unsigned& id = this->base_hGraph::id;
-        const unsigned& numHosts = this->base_hGraph::numHosts;
+        const unsigned& id = this->base_DistGraph::id;
+        const unsigned& numHosts = this->base_DistGraph::numHosts;
 
         // Go over assigned nodes and distribute edges.
         galois::do_all(
-          galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
-                          base_hGraph::gid2host[base_hGraph::id].second),
+          galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                          base_DistGraph::gid2host[base_DistGraph::id].second),
           [&] (auto src) {
             auto ee = mpiGraph.edgeBegin(src);
             auto ee_end = mpiGraph.edgeEnd(src);
@@ -733,8 +733,8 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
              threadNum < sendBuffers.size(); 
              ++threadNum) {
           auto& sbr = *sendBuffers.getRemote(threadNum);
-          for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
-            if (h == this->base_hGraph::id) continue;
+          for (unsigned h = 0; h < this->base_DistGraph::numHosts; ++h) {
+            if (h == this->base_DistGraph::id) continue;
             auto& sendBuffer = sbr[h];
             if (sendBuffer.size() > 0) {
               net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
@@ -756,22 +756,22 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
                                   uint64_t numEdges_distribute) {
         using DstVecType = std::vector<std::vector<uint64_t>>;
         galois::substrate::PerThreadStorage<DstVecType> 
-            gdst_vecs(base_hGraph::numHosts);
+            gdst_vecs(base_DistGraph::numHosts);
 
         using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>; 
         galois::substrate::PerThreadStorage<SendBufferVecTy> 
-          sendBuffers(base_hGraph::numHosts);
+          sendBuffers(base_DistGraph::numHosts);
 
         auto& net = galois::runtime::getSystemNetworkInterface();
-        uint64_t globalOffset = base_hGraph::gid2host[base_hGraph::id].first;
+        uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
-        const unsigned& id = this->base_hGraph::id;
-        const unsigned& numHosts = this->base_hGraph::numHosts;
+        const unsigned& id = this->base_DistGraph::id;
+        const unsigned& numHosts = this->base_DistGraph::numHosts;
 
         // Go over assigned nodes and distribute edges.
         galois::do_all(
-          galois::iterate(base_hGraph::gid2host[base_hGraph::id].first,
-                          base_hGraph::gid2host[base_hGraph::id].second),
+          galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                          base_DistGraph::gid2host[base_DistGraph::id].second),
           [&] (auto src) {
             auto ee = mpiGraph.edgeBegin(src);
             auto ee_end = mpiGraph.edgeEnd(src);
@@ -828,8 +828,8 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
              threadNum < sendBuffers.size(); 
              ++threadNum) {
           auto& sbr = *sendBuffers.getRemote(threadNum);
-          for (unsigned h = 0; h < this->base_hGraph::numHosts; ++h) {
-            if (h == this->base_hGraph::id) continue;
+          for (unsigned h = 0; h < this->base_DistGraph::numHosts; ++h) {
+            if (h == this->base_DistGraph::id) continue;
             auto& sendBuffer = sbr[h];
             if (sendBuffer.size() > 0) {
               net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
@@ -908,28 +908,28 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
    * Returns the total nodes : master + slaves created on the local host.
    */
   uint64_t get_local_total_nodes() const {
-    return (base_hGraph::numOwned);
+    return (base_DistGraph::numOwned);
   }
 
-  void reset_bitset(typename base_hGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
+  void reset_bitset(typename base_DistGraph::SyncType syncType, void (*bitset_reset_range)(size_t, size_t)) const {
     size_t first_owned = 0;
     size_t last_owned = 0;
 
-    if (base_hGraph::numOwned > 0) {
+    if (base_DistGraph::numOwned > 0) {
       first_owned = G2L(localToGlobalVector[0]);
       last_owned = G2L(localToGlobalVector[numOwned - 1]);
       assert(first_owned <= last_owned);
-      assert((last_owned - first_owned + 1) == base_hGraph::numOwned);
+      assert((last_owned - first_owned + 1) == base_DistGraph::numOwned);
     } 
 
-    if (syncType == base_hGraph::syncBroadcast) { // reset masters
+    if (syncType == base_DistGraph::syncBroadcast) { // reset masters
       // only reset if we actually own something
-      if (base_hGraph::numOwned > 0)
+      if (base_DistGraph::numOwned > 0)
         bitset_reset_range(first_owned, last_owned);
     } else { // reset mirrors
-      assert(syncType == base_hGraph::syncReduce);
+      assert(syncType == base_DistGraph::syncReduce);
 
-      if (base_hGraph::numOwned > 0) {
+      if (base_DistGraph::numOwned > 0) {
         if (first_owned > 0) {
           bitset_reset_range(0, first_owned - 1);
         }
@@ -948,7 +948,7 @@ class hGraph_customEdgeCut : public hGraph<NodeTy, EdgeTy> {
 
   void print_string(std::string s) {
     std::stringstream ss_cout;
-    ss_cout << base_hGraph::id << s << "\n";
+    ss_cout << base_DistGraph::id << s << "\n";
     std::cerr << ss_cout.str();
   }
 

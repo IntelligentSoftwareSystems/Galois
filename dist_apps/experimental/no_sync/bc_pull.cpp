@@ -105,12 +105,12 @@ struct NodeData {
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 // no edge data = bfs not sssp
-typedef hGraph<NodeData, void> Graph;
+typedef DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // second type (unsigned int) is for edge weights
 // uncomment this along with graph load below if you want to use sssp
-//typedef hGraph<NodeData, unsigned int> Graph;
+//typedef DistGraph<NodeData, unsigned int> Graph;
 
 /******************************************************************************/
 /* Functors for running the algorithm */

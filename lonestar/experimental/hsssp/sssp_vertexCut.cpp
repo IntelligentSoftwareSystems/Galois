@@ -210,16 +210,16 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
 
     std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
     std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
 
     T_total.start();
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile,partFolder,net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();
@@ -243,7 +243,7 @@ int main(int argc, char** argv) {
       sssp::go(hg);
     T_sssp1.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -253,7 +253,7 @@ int main(int argc, char** argv) {
       sssp::go(hg);
     T_sssp2.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -263,14 +263,14 @@ int main(int argc, char** argv) {
       sssp::go(hg);
     T_sssp3.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp3 : " << T_sssp3.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp3 : " << T_sssp3.get() << " (msec)\n\n";
 
 
    T_total.stop();
 
     auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {

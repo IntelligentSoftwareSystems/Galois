@@ -101,7 +101,7 @@ void heteroSetup(std::vector<unsigned>& scaleFactor);
  * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
-static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
+static void marshalGPUGraph(DistGraph<NodeData, EdgeData>* loadedGraph,
                             struct CUDA_Context** cuda_ctx) {
   auto& net = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
@@ -148,13 +148,13 @@ static void marshalGPUGraph(hGraph<NodeData, EdgeData>* loadedGraph,
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-static hGraph<NodeData, EdgeData>* loadDGraph(
+static DistGraph<NodeData, EdgeData>* loadDGraph(
           std::vector<unsigned>& scaleFactor,
           struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
-  hGraph<NodeData, EdgeData>* loadedGraph = nullptr;
+  DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
   loadedGraph = constructGraph<NodeData, EdgeData, 
                                iterateOutEdges>(scaleFactor);
   assert(loadedGraph != nullptr);
@@ -188,13 +188,13 @@ static hGraph<NodeData, EdgeData>* loadDGraph(
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
+static DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
           std::vector<unsigned>& scaleFactor,
           struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
-  hGraph<NodeData, EdgeData>* loadedGraph = nullptr;
+  DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
   if (inputFileSymmetric) {
@@ -235,13 +235,13 @@ static hGraph<NodeData, EdgeData>* loadSymmetricDGraph(
  * @returns Pointer to the loaded 2-way graph
  */
 template <typename NodeData, typename EdgeData>
-static hGraph<NodeData, EdgeData, true>* 
+static DistGraph<NodeData, EdgeData, true>* 
 loadBDGraph(std::vector<unsigned>& scaleFactor,
             struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
-  hGraph<NodeData, EdgeData, true>* loadedGraph = nullptr;
+  DistGraph<NodeData, EdgeData, true>* loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
   loadedGraph = constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
@@ -274,7 +274,7 @@ loadBDGraph(std::vector<unsigned>& scaleFactor,
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-hGraph<NodeData, EdgeData>* 
+DistGraph<NodeData, EdgeData>* 
 distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
   #ifdef __GALOIS_HET_CUDA__
@@ -299,7 +299,7 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData>* 
+DistGraph<NodeData, EdgeData>* 
 symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
 
@@ -315,7 +315,7 @@ symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
  * TODO
  */
 template <typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData, true>* 
+DistGraph<NodeData, EdgeData, true>* 
 twoWayDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
   #ifdef __GALOIS_HET_CUDA__

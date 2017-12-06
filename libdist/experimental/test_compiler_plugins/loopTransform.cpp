@@ -36,7 +36,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/Dist/hGraph.h"
+#include "galois/Dist/DistGraph.h"
 #include "galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -88,7 +88,7 @@ struct PR_NodeData {
 
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
+typedef DistGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
@@ -288,7 +288,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
+    galois::Timer T_total, T_DistGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = galois::runtime::getHostID();
@@ -329,7 +329,7 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
 #ifndef __GALOIS_HET_CUDA__
     Graph hg(inputFile, net.ID, net.Num);
 #else
@@ -344,7 +344,7 @@ int main(int argc, char** argv) {
       //galois::opencl::cl_env.init(cldevice.Value);
     }
 #endif
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
@@ -393,7 +393,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank : " << T_pageRank.get() << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {

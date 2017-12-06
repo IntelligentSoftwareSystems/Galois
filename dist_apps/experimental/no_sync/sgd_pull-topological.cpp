@@ -102,9 +102,9 @@ struct NodeData {
 };
 
 
-typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef DistGraph<NodeData, void> Graph;
+typedef DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

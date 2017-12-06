@@ -33,7 +33,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "galois/Dist/hGraph.h"
+#include "galois/Dist/DistGraph.h"
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
@@ -53,7 +53,7 @@ struct NodeData {
   unsigned long long comp_current;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 
@@ -190,13 +190,13 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_ConnectedComp1, T_ConnectedComp2, T_ConnectedComp3;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_ConnectedComp1, T_ConnectedComp2, T_ConnectedComp3;
 
     T_total.start();
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();
@@ -220,7 +220,7 @@ int main(int argc, char** argv) {
       ConnectedComp::go(hg);
     T_ConnectedComp1.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
       ConnectedComp::go(hg);
     T_ConnectedComp2.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -240,14 +240,14 @@ int main(int argc, char** argv) {
       ConnectedComp::go(hg);
     T_ConnectedComp3.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp3 : " << T_ConnectedComp3.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp3 : " << T_ConnectedComp3.get() << " (msec)\n\n";
 
 
    T_total.stop();
 
     auto mean_time = (T_ConnectedComp1.get() + T_ConnectedComp2.get() + T_ConnectedComp3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " ConnectedComp3 : " << T_ConnectedComp3.get() <<" ConnectedComp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " ConnectedComp1 : " << T_ConnectedComp1.get() << " ConnectedComp2 : " << T_ConnectedComp2.get() << " ConnectedComp3 : " << T_ConnectedComp3.get() <<" ConnectedComp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {

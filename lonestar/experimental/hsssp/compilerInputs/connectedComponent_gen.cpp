@@ -35,7 +35,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "hGraph.h"
+#include "DistGraph.h"
 
 static const char* const name = "Connected Component Label Propagation - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Connected Component Propagation on Distributed Galois.";
@@ -53,7 +53,7 @@ struct CC_NodeData {
   std::atomic<uint32_t> comp;
 };
 
-typedef hGraph<CC_NodeData, void> Graph;
+typedef DistGraph<CC_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -105,13 +105,13 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_hGraph_init, T_init, T_labelProp;
+    galois::Timer T_total, T_DistGraph_init, T_init, T_labelProp;
 
     T_total.start();
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
 
@@ -147,7 +147,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_labelProp.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_labelProp.get() << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {

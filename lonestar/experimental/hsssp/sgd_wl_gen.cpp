@@ -35,7 +35,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "hGraph.h"
+#include "DistGraph.h"
 
 static const char* const name = "SGD - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Stochastic gradient descent on Distributed Galois.";
@@ -61,7 +61,7 @@ struct SGD_NodeData {
 };
 
 
-typedef hGraph<SGD_NodeData, int> Graph;
+typedef DistGraph<SGD_NodeData, int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;

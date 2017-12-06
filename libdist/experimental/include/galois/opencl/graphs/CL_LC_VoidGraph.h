@@ -7,7 +7,7 @@
 #include "galois/opencl/CL_Header.h"
 #include "galois/opencl/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
-//#include "galois/runtime/hGraph.h"
+//#include "galois/runtime/DistGraph.h"
 #ifndef _GDIST_CL_LC_VOID_Graph_H_
 #define _GDIST_CL_LC_VOID_Graph_H_
 
@@ -288,14 +288,14 @@ namespace galois {
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
                gpu_struct_ptr = gpu_meta= nullptr;
-//               hGraph<NodeDataType, void> g(filename, myid, numHost);
+//               DistGraph<NodeDataType, void> g(filename, myid, numHost);
                HGraph g(filename, myid, numHost);
                fprintf(stderr, "Loading from hgraph\n");
                load_from_galois(g);
             }
             template<typename HGraph>
             void load_from_hgraph(HGraph/*<NodeDataType,void> */& hg) {
-               fprintf(stderr, "Loading device-graph from hGraph with copy-optimization.\n");
+               fprintf(stderr, "Loading device-graph from DistGraph with copy-optimization.\n");
                _max_degree = _num_nodes = _num_edges = 0;
                _num_owned = _global_offset = 0;
                outgoing_index=neighbors=nullptr;

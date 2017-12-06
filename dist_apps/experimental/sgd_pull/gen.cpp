@@ -89,8 +89,8 @@ struct NodeData {
 };
 
 
-typedef hGraph<NodeData, double> Graph;
-//typedef hGraph<NodeData, uint32_t> Graph;
+typedef DistGraph<NodeData, double> Graph;
+//typedef DistGraph<NodeData, uint32_t> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

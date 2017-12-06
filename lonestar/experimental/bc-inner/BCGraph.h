@@ -505,7 +505,7 @@ class BCGraph {
 		}
 	}
 */
-  void touchGraph() {
+  void toucDistGraph() {
 	int sum = 0;
 	for (int j=0; j<nnodes; j++) { 
       sum += nodes[j].data.id;

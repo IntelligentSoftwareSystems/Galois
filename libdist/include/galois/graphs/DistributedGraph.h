@@ -97,7 +97,7 @@ enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
 
 /**
- * Base hGraph class that all distributed graphs extend from.
+ * Base DistGraph class that all distributed graphs extend from.
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
@@ -106,7 +106,7 @@ enum ReadLocation { readSource, readDestination, readAny };
  */
 // TODO change this (WithInEdges)
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
-class hGraph: public GlobalObject {
+class DistGraph: public GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
@@ -534,12 +534,12 @@ public:
   typedef typename GraphTy::edge_iterator edge_iterator;
 
   /**
-   * Constructor for hGraph. Initializes metadata fields.
+   * Constructor for DistGraph. Initializes metadata fields.
    *
    * @param host host number that this graph resides on
    * @param numHosts total number of hosts in the currently executing program
    */
-  hGraph(unsigned host, unsigned numHosts) :
+  DistGraph(unsigned host, unsigned numHosts) :
       GlobalObject(this), round(false), transposed(false), id(host),
       numHosts(numHosts) {
     enforce_data_mode = enforce_metadata;
@@ -2518,7 +2518,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
         g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2554,7 +2554,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
         g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2590,7 +2590,7 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(hGraph* g, FieldFlags& fieldFlags, std::string loopName,
+    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
                      const BITVECTOR_STATUS& bvFlag) {
       bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
       bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
@@ -2717,9 +2717,9 @@ private:
 
   static void syncRecv(uint32_t src, galois::runtime::RecvBuffer& buf) {
     uint32_t oid;
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&);
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&);
     galois::runtime::gDeserialize(buf, oid, fn);
-    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    DistGraph* obj = reinterpret_cast<DistGraph*>(ptrForObj(oid));
     (obj->*fn)(buf);
   }
 
@@ -3156,8 +3156,8 @@ public:
 private:
   template<typename FnTy>
   void recovery_help_landingPad(galois::runtime::RecvBuffer& buff) {
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&) = 
-      &hGraph::checkpoint_mem_apply<FnTy>;
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&) = 
+      &DistGraph::checkpoint_mem_apply<FnTy>;
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t from_id;
     std::string help_str;
@@ -3172,8 +3172,8 @@ private:
 
   template<typename FnTy>
   void recovery_send_help(std::string loopName) {
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&) = 
-      &hGraph::recovery_help_landingPad<FnTy>;
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&) = 
+      &DistGraph::recovery_help_landingPad<FnTy>;
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     galois::runtime::SendBuffer b;
@@ -3204,7 +3204,7 @@ private:
 
   template<typename FnTy>
   void recovery_send_help(std::string loopName) {
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::recovery_help<FnTy>;
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&) = &DistGraph::recovery_help<FnTy>;
     auto& net = galois::runtime::getSystemNetworkInterface();
     galois::runtime::SendBuffer b;
     std::string help_str = "recoveryHelp";
@@ -3537,5 +3537,5 @@ public:
 };
 
 template<typename NodeTy, typename EdgeTy, bool WithInEdges>
-constexpr const char* const hGraph<NodeTy, EdgeTy, WithInEdges>::GRNAME;
+constexpr const char* const DistGraph<NodeTy, EdgeTy, WithInEdges>::GRNAME;
 #endif //_GALOIS_DIST_HGRAPH_H

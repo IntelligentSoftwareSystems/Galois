@@ -7,7 +7,7 @@
 #include "galois/opencl/CL_Header.h"
 #include "galois/opencl/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
-//#include "galois/runtime/hGraph.h"
+//#include "galois/runtime/DistGraph.h"
 #ifndef _GDIST_CL_LC_Graph_H_
 #define _GDIST_CL_LC_Graph_H_
 
@@ -45,8 +45,8 @@ namespace galois {
             outMsgGen.init(ctx->get_default_device(), "buffer_wrapper.cl", "prepSend");
          }
          /*
-          * hGraph - slaveNodes - nodes on other hosts that have a master here. Hence, outMessageIDs
-          * hGraph - masterNodes - nodes on othor hosts that are slaves here. Hence, inMessageIDs
+          * DistGraph - slaveNodes - nodes on other hosts that have a master here. Hence, outMessageIDs
+          * DistGraph - masterNodes - nodes on othor hosts that are slaves here. Hence, inMessageIDs
           * */
          void init(int nh, std::vector<std::vector<size_t>> slaveNodes, std::vector<std::vector<size_t>> masterNodes ){
             num_hosts = nh;
@@ -68,7 +68,7 @@ namespace galois {
          }
          template<typename GraphType, typename Fn>
          void sync_outgoing(GraphType & g){
-            //void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncPullRecvApply<FnTy>;
+            //void (DistGraph::*fn)(galois::runtime::RecvBuffer&) = &DistGraph::syncPullRecvApply<FnTy>;
             auto& net = galois::runtime::getSystemNetworkInterface();
 
             for(size_t h = 0 ; h < num_hosts; ++h){
@@ -185,7 +185,7 @@ namespace galois {
          /*
 template<typename FnTy>
   void sync_push() {
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&) = &DistGraph::syncRecvApply<FnTy>;
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
@@ -242,9 +242,9 @@ template<typename FnTy>
          /*
             static void syncRecv(galois::runtime::RecvBuffer& buf) {
     uint32_t oid;
-    void (hGraph::*fn)(galois::runtime::RecvBuffer&);
+    void (DistGraph::*fn)(galois::runtime::RecvBuffer&);
     galois::runtime::gDeserialize(buf, oid, fn);
-    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    DistGraph* obj = reinterpret_cast<DistGraph*>(ptrForObj(oid));
     (obj->*fn)(buf);
   }
 
@@ -480,7 +480,7 @@ template<typename FnTy>
                            node_data =nullptr;
                            edge_data = nullptr;
                            gpu_struct_ptr = gpu_meta= nullptr;
-//                           hGraph<NodeDataType, EdgeDataType> g(filename, myid, numHost);
+//                           DistGraph<NodeDataType, EdgeDataType> g(filename, myid, numHost);
                            HGraph g(filename, myid, numHost);
                            fprintf(stderr, "Loading from hgraph\n");
                            load_from_galois(g);
@@ -495,14 +495,14 @@ template<typename FnTy>
 //                                       node_data =nullptr;
 //                                       edge_data = nullptr;
 //                                       gpu_struct_ptr = gpu_meta= nullptr;
-//                                       hGraph<NodeDataType, EdgeDataType> g(filename, myid, numHost);
+//                                       DistGraph<NodeDataType, EdgeDataType> g(filename, myid, numHost);
 ////                                       HGraph g(filename, myid, numHost);
 //                                       fprintf(stderr, "Loading from hgraph\n");
 //                                       load_from_galois(g);
 //                                    }
             template<typename HGraph>
             void load_from_hgraph(HGraph/*<NodeDataType,EdgeDataType>*/ & hg) {
-                           fprintf(stderr, "Loading device-graph from hGraph with copy-optimization.\n");
+                           fprintf(stderr, "Loading device-graph from DistGraph with copy-optimization.\n");
                            _max_degree = _num_nodes = _num_edges = 0;
                            _num_owned = _global_offset = 0;
                            outgoing_index=neighbors=nullptr;

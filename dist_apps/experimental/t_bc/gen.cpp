@@ -78,7 +78,7 @@ struct NodeData {
   float bc;
 };
 
-typedef hGraph<NodeData, void, true> Graph;
+typedef DistGraph<NodeData, void, true> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // bitsets for tracking updates

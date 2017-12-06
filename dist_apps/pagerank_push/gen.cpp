@@ -71,7 +71,7 @@ struct NodeData {
 galois::DynamicBitSet bitset_residual;
 galois::DynamicBitSet bitset_nout;
 
-typedef hGraph<NodeData, void> Graph;
+typedef DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 typedef GNode WorkItem;
 

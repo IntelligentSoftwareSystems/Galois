@@ -75,7 +75,7 @@ public:
       ast_utility.init(&R);
       llvm::outs() << "=============================InHandleTranslationUnit===========================\n";
       {
-         //1) Replace hGraph with CLGraph in typedefs
+         //1) Replace DistGraph with CLGraph in typedefs
          MatchFinder graphTypedef;
          GraphTypedefRewriter gtr(R,Context);
          graphTypedef.addMatcher(typedefDecl(isExpansionInMainFile() , hasName("Graph") ).bind("GraphTypeDef"), & gtr);

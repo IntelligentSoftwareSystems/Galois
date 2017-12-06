@@ -98,9 +98,9 @@ struct PR_NodeData {
 
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
-typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
+typedef DistGraph<PR_NodeData, void> Graph;
+typedef DistGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
+typedef DistGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

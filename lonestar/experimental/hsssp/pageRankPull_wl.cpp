@@ -34,7 +34,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "galois/Dist/hGraph.h"
+#include "galois/Dist/DistGraph.h"
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
@@ -55,7 +55,7 @@ struct PR_NodeData {
   std::atomic<int> nout;
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
+typedef DistGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -178,7 +178,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
 
@@ -187,9 +187,9 @@ int main(int argc, char** argv) {
     T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
 
@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
       PageRank_pull::go(hg);
     T_pageRank1.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
       PageRank_pull::go(hg);
     T_pageRank2.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
 
     auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {
