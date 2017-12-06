@@ -198,7 +198,7 @@ public:
   virtual bool isLocal(uint64_t) const = 0;
   virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{}
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0){};
-  virtual std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {}
+  virtual std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const = 0;
 
 
   // Requirement: For all X and Y,

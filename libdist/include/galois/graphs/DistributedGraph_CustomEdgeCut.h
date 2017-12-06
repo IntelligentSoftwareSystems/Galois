@@ -946,6 +946,33 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     }
   }
 
+  std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
+    size_t first_owned = 0;
+    size_t last_owned = 0;
+
+    if (base_hGraph::numOwned > 0) {
+      first_owned = G2L(localToGlobalVector[0]);
+      last_owned = G2L(localToGlobalVector[numOwned - 1]);
+      assert(first_owned <= last_owned);
+      assert((last_owned - first_owned + 1) == base_hGraph::numOwned);
+    }
+
+    std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
+    if(base_hGraph::numOwned > 0) {
+      if (first_owned > 0) {
+        mirrorRanges_vec.push_back(std::make_pair(0, first_owned));
+      }
+      if (last_owned < (numNodes - 1)) {
+        mirrorRanges_vec.push_back(std::make_pair(last_owned + 1, numNodes));
+      }
+    } else {
+      if (numNodes > 0) {
+        mirrorRanges_vec.push_back(std::make_pair(0, numNodes));
+      }
+    }
+    return mirrorRanges_vec;
+  }
+
   void print_string(std::string s) {
     std::stringstream ss_cout;
     ss_cout << base_DistGraph::id << s << "\n";
