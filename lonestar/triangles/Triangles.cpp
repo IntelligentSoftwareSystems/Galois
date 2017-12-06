@@ -63,7 +63,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid node iterator and matrix multiply algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef galois::graphs::LC_Linear_Graph<uint32_t,void>
+typedef galois::graphs::LC_CSR_Graph<uint32_t,void>
   ::with_numa_alloc<true>::type
   ::with_no_lockable<true>::type Graph;
 //typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
@@ -179,30 +179,35 @@ void nodeIteratingAlgo(Graph& graph) {
 
   galois::GAccumulator<size_t> numTriangles;
 
-  galois::do_all(galois::iterate(graph), 
-      [&] (const GNode& n) {
-      // Partition neighbors
-      // [first, ea) [n] [bb, last)
-        Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-        Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-        Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
-        Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
+  galois::runtime::profileVtune(
+      [&] () {
+        galois::do_all(galois::iterate(graph),
+            [&] (const GNode& n) {
+              // Partition neighbors
+              // [first, ea) [n] [bb, last)
+              Graph::edge_iterator first = graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
+              Graph::edge_iterator last = graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
+              Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
+              Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
-        for (; bb != last; ++bb) {
-          GNode B = graph.getEdgeDst(bb);
-          for (auto aa = first; aa != ea; ++aa) {
-            GNode A = graph.getEdgeDst(aa);
-            Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
-            Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
-            Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
-            if (it != ev && graph.getEdgeDst(it) == B) {
-              numTriangles += 1;
+              for (; bb != last; ++bb) {
+                GNode B = graph.getEdgeDst(bb);
+                for (auto aa = first; aa != ea; ++aa) {
+                  GNode A = graph.getEdgeDst(aa);
+                  Graph::edge_iterator vv = graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
+                  Graph::edge_iterator ev = graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
+                  Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
+                  if (it != ev && graph.getEdgeDst(it) == B) {
+                    numTriangles += 1;
+                  }
+                }
+              }
             }
-          }
-        }
-      }
-  , galois::chunk_size<32>() // TODO: tune
-    , galois::loopname("nodeIteratingAlgo"));
+            , galois::chunk_size<32>() // TODO: tune
+            , galois::steal()
+            , galois::loopname("nodeIteratingAlgo"));
+      },
+      "nodeIteratorAlgo");
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
@@ -258,8 +263,9 @@ void edgeIteratingAlgo(Graph& graph) {
                Graph::edge_iterator eb = lowerBound(bbegin, bend, LessThan<Graph>(graph, w.dst));
 
                numTriangles += countEqual(graph, aa, ea, bb, eb);
-             },
-             galois::loopname("edgeIteratingAlgo"));
+             }
+             , galois::loopname("edgeIteratingAlgo")
+             , galois::steal());
       },
       "edgeIteratorAlgo");
 
