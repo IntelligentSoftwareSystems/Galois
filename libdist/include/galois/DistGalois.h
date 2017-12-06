@@ -23,13 +23,10 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  */
-
-// TODO (amber): copied over from libruntime/include/galois/Galois.h
-// Remove duplicate code and only keep distributed stuff
 
 #ifndef GALOIS_DIST_GALOIS_H
 #define GALOIS_DIST_GALOIS_H
@@ -47,7 +44,7 @@
 namespace galois {
 
 /**
- * explicit class to initialize the Galois Runtime
+ * Explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
 class DistMemSys: public runtime::SharedMemRuntime<runtime::DistStatManager> {
@@ -58,44 +55,5 @@ public:
   ~DistMemSys(void);
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// Foreach
-////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
- *
- * @tparam WLTy Worklist policy {@see galois::worklists}
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param fn operator
- * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
- */
-// TODO: revive
-// template<typename IterTy, typename FunctionTy, typename... Args>
-// void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  // runtime::for_each_gen_dist(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
-// }
-
-/**
- * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T
- * is the type of item.
- *
- * @tparam WLTy Worklist policy {@link galois::worklists}
- * @param i initial item
- * @param fn operator
- * @param args optional arguments to loop
- */
-// TODO: revive
-// template<typename ItemTy, typename FunctionTy, typename... Args>
-// void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
-  // ItemTy iwl[1] = {i};
-  // runtime::for_each_gen_dist(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
-// }
-
-
-} //namespace galois
+} // namespace galois
 #endif
