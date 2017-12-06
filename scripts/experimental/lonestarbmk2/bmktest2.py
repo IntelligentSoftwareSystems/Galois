@@ -7,7 +7,7 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 0 
+    startThread = 0
     # thread to end at (inclusive)
     endThread = 40
     # step to use for looping through threads
@@ -60,12 +60,12 @@ class SharedMemApp(GraphBMKSharedMem):
                 # isn't an actual file
                 x.set_arg(bmkinput.props.file)
 
-            #x.set_arg("-statFile=" +
-            #          os.path.expandvars(
-            #            os.path.join(config.get_var("logOutputDirectory"),
-            #                         self.getUniqueStatFile(numThreads, 
-            #                         nameToAppend))
-            #          ))
+            x.set_arg("-statFile=" +
+                      os.path.expandvars(
+                        os.path.join(config.get_var("logOutputDirectory"),
+                                     self.getUniqueStatFile(numThreads, 
+                                     nameToAppend))
+                      ))
 
             listOfRunSpecs.append(x)
 
@@ -188,6 +188,17 @@ class IndependentSet(SharedMemApp):
 class MatrixCompletion(SharedMemApp):
     relativeAppPath = "matrixcompletion/mc"
     benchmark = "matrixcompletion"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        # TODO change this to some canonical version
+        for s in specs:
+            s.set_arg("-algo=block") # algo type
+        
+        return specs
+
 
 class MCM(SharedMemApp):
     relativeAppPath = "matching/bipartite-mcm"
@@ -335,5 +346,5 @@ class TrianglesEdge(SharedMemApp):
 #            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
 #            SpanningTree(), SSSP(), SurveyPropagation()]
 #BINARIES = [MCM(), PageRank()]
-BINARIES = [PageRank2Point2()]
+#BINARIES = [PageRank2Point2()]
 #BINARIES = [BCInnerLeveled()]
