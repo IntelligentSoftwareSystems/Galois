@@ -36,8 +36,8 @@ module load vtune
 #    module load cmake
 #fi
 
-module load atc/1.2
-module load cmake/3.3.2
+module load atc
+module load cmake
 module load tbb
 module load boost
 module load eigen
@@ -63,5 +63,4 @@ if [ "$1" != "min" ]; then
     module load valgrind
   fi
   module load isspython
-  # module load screen #disabling for now because screen was compiled without proper color support
 fi
