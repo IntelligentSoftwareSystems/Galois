@@ -17,7 +17,7 @@ sub find_vtune() {
     foreach my $ver (@vtune_vers) {
       my $base = "/opt/intel/vtune_amplifier$ver/bin64/amplxe-cl";
       if (-e $base) {
-        return $vtune;
+        return $base;
       }
     }
   }
