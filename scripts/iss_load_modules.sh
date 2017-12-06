@@ -10,12 +10,6 @@ module purge
 
 module use /opt/apps/ossw/modulefiles/
 
-if [ $(lsb_release -si) = "CentOS" ] ; then
-    module load c7
-else
-    module load sl6
-fi
-
 if [ $(lsb_release -si) == "CentOS" ] ; then
     module load c7
     module load serf
@@ -25,42 +19,34 @@ fi
 
 module use /net/faraday/workspace/local/modules/modulefiles
 module use /org/centers/cdgc/modules
-module load lapack
-module load vtune
-
-#if [ "$1" == "intel" ]; then
-#    module load intel
-#    module load cmake
-#else 
-#    module load gcc/4.8.1-scale
-#    module load cmake
-#fi
 
 module load atc
 module load cmake
-module load tbb
+module load mpich2
 module load boost
-module load eigen
-module load neon
+module load gdb
+module load isspython # needed for vim
+
 if [ "$SYSTEMTYPE" == "c7" ] ; then
   module load serf
 else
   module load git
 fi
-module load subversion
 
 if [ "$1" != "min" ]; then
-  module load gdb
+  module load tbb
+  module load eigen
+  module load neon
+  module load lapack
+  module load vtune
   module load mkl
-  module load mpich2
   module load texlive
-  module load python
+  module load subversion
+  # module load screen #disabling for now because screen was compiled without proper color support
   if [ "$SYSTEMTYPE" != "c7" ] ; then
     module load gnuplot
     module load doxygen
     module load ghostscript
-    # module load screen #disabling for now because screen was compiled without proper color support
     module load valgrind
   fi
-  module load isspython
 fi
