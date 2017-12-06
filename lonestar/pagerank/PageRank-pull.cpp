@@ -34,6 +34,8 @@
 #include <sstream>
 #include <string>
 
+#define DEBUG 0
+
 namespace cll = llvm::cl;
 
 const char* name = "Page Rank";
@@ -55,6 +57,7 @@ unsigned int iteration   = 0;
 
 struct LNode {
   float value[2];
+  // Compute the out degrees in the original graph
   std::atomic<uint32_t> nout;
 
   float getPageRank() { return value[1]; }
@@ -97,6 +100,7 @@ struct Initialize {
     galois::do_all(galois::iterate(graph), Initialize(graph),
                    galois::no_stats(), galois::loopname("Initialize"));
   }
+
   void operator()(GNode n) const {
     LNode& data   = g.getData(n, galois::MethodFlag::UNPROTECTED);
     data.value[0] = 1.0;
@@ -107,11 +111,14 @@ struct Initialize {
 
 struct Copy {
   Graph& g;
+
   Copy(Graph& g) : g(g) {}
+
   static void go(Graph& graph) {
     galois::do_all(galois::iterate(graph), Copy(graph), galois::no_stats(),
                    galois::loopname("Copy"));
   }
+
   void operator()(GNode n) const {
     LNode& data   = g.getData(n, galois::MethodFlag::UNPROTECTED);
     data.value[1] = data.value[0];
@@ -131,18 +138,22 @@ struct PageRank {
   static void go(Graph& graph) {
     galois::GReduceMax<double> max_delta;
     galois::GAccumulator<unsigned int> small_delta;
+
     while (true) {
       galois::do_all(galois::iterate(graph),
                      PageRank(graph, max_delta, small_delta),
-                     galois::no_stats(), galois::loopname("Process"));
+                     galois::no_stats(), galois::loopname("PageRank"));
 
       float delta   = max_delta.reduce();
       size_t sdelta = small_delta.reduce();
 
+#if DEBUG
       std::cout << "iteration: " << iteration << " max delta: " << delta
                 << " small delta: " << sdelta << " ("
                 << sdelta / (float)graph.size() << ")"
                 << "\n";
+#endif
+
       iteration += 1;
       if (delta <= tolerance || iteration >= maxIterations)
         break;
@@ -169,10 +180,9 @@ struct PageRank {
               ej = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
          jj != ej; ++jj) {
       GNode dst = graph.getEdgeDst(jj);
-      // float w   = graph.getEdgeData(jj);
 
       LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-      sum += ddata.getPageRank(iteration) / ddata.nout /** w*/;
+      sum += ddata.getPageRank(iteration) / ddata.nout;
     }
 
     float value = sum * (1.0 - alpha) + alpha;
@@ -185,7 +195,6 @@ struct PageRank {
   }
 };
 
-//! Make values unique
 template <typename GNode>
 struct TopPair {
   float value;

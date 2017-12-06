@@ -71,7 +71,6 @@ typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
     Graph;
 typedef typename Graph::GraphNode GNode;
 
-//! Make values unique
 template <typename GNode>
 struct TopPair {
   float value;
