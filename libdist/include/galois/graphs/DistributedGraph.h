@@ -150,6 +150,8 @@ protected:
   // master nodes on different hosts. For broadcast
   std::vector<std::vector<size_t>> masterNodes;
 
+  using BITVECTOR_STATUS = galois::runtime::BITVECTOR_STATUS;
+
   // FIXME: pass the flag as function paramater instead
   // a pointer set during sync_on_demand calls that points to the status
   // of a bitvector with regard to where data has been synchronized
@@ -2237,12 +2239,13 @@ private:
     bool use_bitset = true;
 
     if (currentBVFlag != nullptr) {
-      if (readLocation == readSource && src_invalid(*currentBVFlag)) {
+      if (readLocation == readSource && 
+          galois::runtime::src_invalid(*currentBVFlag)) {
         use_bitset = false;
         *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
         currentBVFlag = nullptr;
       } else if (readLocation == readDestination &&
-                 dst_invalid(*currentBVFlag)) {
+                 galois::runtime::dst_invalid(*currentBVFlag)) {
         use_bitset = false;
         *currentBVFlag = BITVECTOR_STATUS::NONE_INVALID;
         currentBVFlag = nullptr;
@@ -2516,8 +2519,10 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
-                     const BITVECTOR_STATUS& bvFlag) {
+    static inline void call(DistGraph* g, 
+                            galois::runtime::FieldFlags& fieldFlags, 
+                            std::string loopName,
+                            const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_src() && fieldFlags.dst_to_src()) {
         g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
       } else if (fieldFlags.src_to_src()) {
@@ -2552,8 +2557,10 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
-                     const BITVECTOR_STATUS& bvFlag) {
+    static inline void call(DistGraph* g, 
+                            galois::runtime::FieldFlags& fieldFlags, 
+                            std::string loopName,
+                            const BITVECTOR_STATUS& bvFlag) {
       if (fieldFlags.src_to_dst() && fieldFlags.dst_to_dst()) {
         g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
       } else if (fieldFlags.src_to_dst()) {
@@ -2588,8 +2595,10 @@ private:
      * @param bvFlag Copy of the bitvector status (valid/invalid at particular
      * locations)
      */
-    static inline void call(DistGraph* g, FieldFlags& fieldFlags, std::string loopName,
-                     const BITVECTOR_STATUS& bvFlag) {
+    static inline void call(DistGraph* g, 
+                            galois::runtime::FieldFlags& fieldFlags, 
+                            std::string loopName,
+                            const BITVECTOR_STATUS& bvFlag) {
       bool src_write = fieldFlags.src_to_src() || fieldFlags.src_to_dst();
       bool dst_write = fieldFlags.dst_to_src() || fieldFlags.dst_to_dst();
 
@@ -2603,12 +2612,12 @@ private:
           if (fieldFlags.src_to_src() && fieldFlags.src_to_dst()) {
             if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
               g->sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (src_invalid(bvFlag)) {
+            } else if (galois::runtime::src_invalid(bvFlag)) {
               // src invalid bitset; sync individually so it can be called
               // without bitset
               g->sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (dst_invalid(bvFlag)) {
+            } else if (galois::runtime::dst_invalid(bvFlag)) {
               // dst invalid bitset; sync individually so it can be called
               // without bitset
               g->sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
@@ -2625,10 +2634,10 @@ private:
           if (fieldFlags.dst_to_src() && fieldFlags.dst_to_dst()) {
             if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
               g->sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (src_invalid(bvFlag)) {
+            } else if (galois::runtime::src_invalid(bvFlag)) {
               g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-            } else if (dst_invalid(bvFlag)) {
+            } else if (galois::runtime::dst_invalid(bvFlag)) {
               g->sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
               g->sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             } else {
@@ -2654,10 +2663,10 @@ private:
         if (src_read && dst_read) {
           if (bvFlag == BITVECTOR_STATUS::NONE_INVALID) {
             g->sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (src_invalid(bvFlag)) {
+          } else if (galois::runtime::src_invalid(bvFlag)) {
             g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
-          } else if (dst_invalid(bvFlag)) {
+          } else if (galois::runtime::dst_invalid(bvFlag)) {
             g->sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
             g->sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
           } else {
@@ -2692,7 +2701,8 @@ public:
   template<ReadLocation readLocation,
            typename ReduceFnTy, typename BroadcastFnTy,
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
-  inline void sync_on_demand(FieldFlags& fieldFlags, std::string loopName) {
+  inline void sync_on_demand(galois::runtime::FieldFlags& fieldFlags, 
+                             std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
     Tsync.start();

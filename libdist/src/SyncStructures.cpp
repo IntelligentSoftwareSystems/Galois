@@ -27,18 +27,19 @@
 
 #include <galois/runtime/SyncStructures.h>
 
-// TODO put in a sensible namespace
-bool src_invalid(BITVECTOR_STATUS bv_flag) {
+using namespace galois::runtime; // for easy access to BITVECTOR_STATUS
+
+bool galois::runtime::src_invalid(BITVECTOR_STATUS bv_flag) {
   return (bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
           bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
-bool dst_invalid(BITVECTOR_STATUS bv_flag) {
+bool galois::runtime::dst_invalid(BITVECTOR_STATUS bv_flag) {
   return (bv_flag == BITVECTOR_STATUS::DST_INVALID || 
           bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
-void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
+void galois::runtime::make_src_invalid(BITVECTOR_STATUS* bv_flag) {
   switch(*bv_flag) {
     case NONE_INVALID:
       *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
@@ -52,7 +53,7 @@ void make_src_invalid(BITVECTOR_STATUS* bv_flag) {
   }
 }
 
-void make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
+void galois::runtime::make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
   switch(*bv_flag) {
     case NONE_INVALID:
       *bv_flag = BITVECTOR_STATUS::DST_INVALID;

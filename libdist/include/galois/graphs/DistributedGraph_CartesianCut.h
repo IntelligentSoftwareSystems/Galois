@@ -174,13 +174,13 @@ private:
       switch(readLocation) {
         case readSource:
           if (base_DistGraph::currentBVFlag != nullptr) {
-            make_dst_invalid(base_DistGraph::currentBVFlag);
+            galois::runtime::make_dst_invalid(base_DistGraph::currentBVFlag);
           }
 
           return (gridRowID() != gridRowID(host));
         case readDestination:
           if (base_DistGraph::currentBVFlag != nullptr) {
-            make_src_invalid(base_DistGraph::currentBVFlag);
+            galois::runtime::make_src_invalid(base_DistGraph::currentBVFlag);
           }
 
           return (gridColumnID() != gridColumnID(host));
