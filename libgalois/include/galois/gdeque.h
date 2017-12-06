@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2017, The University of Texas at Austin. All rights
  * reserved.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
@@ -469,8 +469,10 @@ public:
     ++num;
     if (!last || last->full())
       extend_last();
+    #ifndef NDEBUG
     pointer p = last->emplace_back(std::forward<Args>(args)...);
     assert(p);
+    #endif
   }
 
   template<typename ValueTy>
