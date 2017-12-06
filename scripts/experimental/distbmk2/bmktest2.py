@@ -120,7 +120,7 @@ class BFSPush(DistApp):
     specs = self.get_default_run_specs(bmkinput, config)
 
     for s in specs:
-      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      s.set_arg("-startNode=%s" % bmkinput.props.source)
       
     return specs
 
@@ -133,7 +133,7 @@ class BFSPull(DistApp):
     specs = self.get_default_run_specs(bmkinput, config)
 
     for s in specs:
-      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      s.set_arg("-startNode=%s" % bmkinput.props.source)
       
     return specs
 
@@ -190,7 +190,7 @@ class SSSPPush(DistApp):
     specs = self.get_default_run_specs(bmkinput, config)
 
     for s in specs:
-      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      s.set_arg("-startNode=%s" % bmkinput.props.source)
       
     return specs
 
@@ -203,7 +203,7 @@ class SSSPPull(DistApp):
     specs = self.get_default_run_specs(bmkinput, config)
 
     for s in specs:
-      s.set_arg("-srcNodeId=%s" % bmkinput.props.source)
+      s.set_arg("-startNode=%s" % bmkinput.props.source)
       
     return specs
 

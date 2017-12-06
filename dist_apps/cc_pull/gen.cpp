@@ -52,7 +52,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<uint32_t> src_node("srcNodeId", 
+static cll::opt<uint32_t> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 

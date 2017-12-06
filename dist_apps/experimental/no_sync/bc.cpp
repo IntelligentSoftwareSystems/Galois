@@ -65,7 +65,7 @@ static cll::opt<bool> verify("verify",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned int> startSource("srcNodeId", 
+static cll::opt<unsigned int> startSource("startNode", 
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));

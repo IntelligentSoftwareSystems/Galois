@@ -79,7 +79,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("srcNodeId", 
+static cll::opt<unsigned long long> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 static cll::opt<bool> verify("verify", 

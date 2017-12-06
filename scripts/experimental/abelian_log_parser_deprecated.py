@@ -563,7 +563,7 @@ def time_at_barrier(fileName, benchmark, total_hosts, numRuns, numThreads):
   print sync_pull_avg_time_total
 
 
-#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , CommandLine,0,0,/work/02982/ggill0/Distributed_latest/build_dist_hetero/release_new_gcc/exp/apps/compiler_outputs/bfs_push-topological_edge-cut /scratch/01131/rashid/inputs/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.rgr -srcNodeId=155526494 -maxIterations=10000 -verify=0 -t=15
+#63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , CommandLine,0,0,/work/02982/ggill0/Distributed_latest/build_dist_hetero/release_new_gcc/exp/apps/compiler_outputs/bfs_push-topological_edge-cut /scratch/01131/rashid/inputs/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.rgr -startNode=155526494 -maxIterations=10000 -verify=0 -t=15
 #63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Threads,0,0,15
 #63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Hosts,0,0,4
 #63719d90-126e-4bdb-87d2-b7d878a23abc,(NULL),0 , Runs,0,0,3

@@ -37,7 +37,7 @@ fi
 
 if [ $5 = "rmat28" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
-    cmd_options=$cmd_options" -srcNodeId=155526494"
+    cmd_options=$cmd_options" -startNode=155526494"
   fi
 
   partFileBase="/scratch/01131/rashid/inputs/partitioned"
@@ -76,7 +76,7 @@ fi
 if [ $7 = "twitter" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
     cmd_options=$cmd_options_reset
-    cmd_options=$cmd_options" -srcNodeId=33643219"
+    cmd_options=$cmd_options" -startNode=33643219"
   fi
 
   partFileBase="/scratch/01131/rashid/inputs/partitioned"
