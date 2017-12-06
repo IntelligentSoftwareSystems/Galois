@@ -31,7 +31,7 @@
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"

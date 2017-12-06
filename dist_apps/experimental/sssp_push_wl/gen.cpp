@@ -38,7 +38,7 @@
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/worklists/WorkListDist.h"
 

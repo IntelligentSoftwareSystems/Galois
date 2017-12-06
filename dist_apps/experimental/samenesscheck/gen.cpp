@@ -33,7 +33,7 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 struct NodeData {

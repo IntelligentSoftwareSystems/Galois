@@ -1,4 +1,4 @@
-/** Distributed Accumulator type -*- C++ -*-
+/** Distributed Reducibles -*- C++ -*-
  * @file
  * @section License
  *
@@ -131,66 +131,6 @@ public:
 
     reduceTimer.stop();
 
-    return global_mdata;
-  }
-
-  /* Max reduction across DGAccumulators */
-  // TODO REMOVE THIS
-  Ty reduce_max() {
-    if (local_mdata == 0) local_mdata = mdata.reduce();
-    global_mdata = local_mdata;
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (net.ID + h) % net.Num;
-      galois::runtime::SendBuffer b;
-      gSerialize(b, local_mdata);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
-    }
-    net.flush();
-
-    unsigned num_Hosts_recvd = 1;
-    while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      Ty x_mdata;
-      gDeserialize(p->second, x_mdata);
-      galois::max(global_mdata, x_mdata);
-      ++num_Hosts_recvd;
-    }
-    ++galois::runtime::evilPhase;
-
-    // returns max from all accumulators
-    return global_mdata;
-  }
-
-  /* Min reduction across DGAccumulators */
-  // TODO REMOVE THIS
-  Ty reduce_min() {
-    if (local_mdata == 0) local_mdata = mdata.reduce();
-    global_mdata = local_mdata;
-    for (unsigned h = 1; h < net.Num; ++h) {
-      unsigned x = (net.ID + h) % net.Num;
-      galois::runtime::SendBuffer b;
-      gSerialize(b, local_mdata);
-      net.sendTagged(x, galois::runtime::evilPhase, b);
-    }
-    net.flush();
-
-    unsigned num_Hosts_recvd = 1;
-    while (num_Hosts_recvd < net.Num) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      Ty x_mdata;
-      gDeserialize(p->second, x_mdata);
-      galois::min(global_mdata, x_mdata);
-      ++num_Hosts_recvd;
-    }
-    ++galois::runtime::evilPhase;
-
-    // returns min from all accumulators
     return global_mdata;
   }
 };

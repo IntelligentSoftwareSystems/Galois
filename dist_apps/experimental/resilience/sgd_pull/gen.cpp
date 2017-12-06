@@ -32,7 +32,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/AtomicWrapper.h"
 #include "galois/ArrayWrapper.h"
 #include "galois/runtime/Tracer.h"
