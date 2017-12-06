@@ -104,7 +104,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-using Graph = galois::graphs::LC_Linear_Graph<Node, int32_t>::with_numa_alloc<true>::type;
+using Graph = galois::graphs::LC_CSR_Graph<Node, int32_t>::with_numa_alloc<true>::type;
 using GNode =  Graph::GraphNode;
 
 
@@ -121,7 +121,7 @@ struct PreflowPush {
       galois::optional<GNode> prevDst;
       for (auto e : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(e);
-        if (prevDst) {
+        if (prevDst.is_initialized()) {
           Node& prevNode = graph.getData(*prevDst, galois::MethodFlag::UNPROTECTED);
           Node& currNode = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
           GALOIS_ASSERT(prevNode.id != currNode.id, "Adjacency list cannot have duplicates");
@@ -275,9 +275,6 @@ struct PreflowPush {
 
     struct EdgeDstIter
       : public boost::iterator_facade<EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode> {
-
-      using Base = boost::iterator_facade<EdgeDstIter, GNode, boost::random_access_traversal_tag, GNode>;
-
       Graph* g;
       Graph::edge_iterator ei;
 
@@ -430,20 +427,6 @@ struct PreflowPush {
     PreflowPush& app;
     UpdateHeights(PreflowPush& a) : app(a) {}
 
-    struct LocalState {
-      LocalState(UpdateHeights<version, useCAS>& self,
-          galois::PerIterAllocTy& alloc) {}
-    };
-
-    typedef std::tuple<galois::per_iter_alloc, galois::local_state<LocalState>>
-      function_traits;
-
-    // struct IdFn {
-    //  unsigned long operator()(const GNode& item) const {
-    //    return app.graph.getData(item, galois::MethodFlag::UNPROTECTED).id;
-    //  }
-    //};
-
     /**
      * Do reverse BFS on residual graph.
      */
@@ -524,17 +507,21 @@ struct PreflowPush {
     switch (detAlgo) {
       case nondet:
         galois::for_each(galois::iterate( { sink } ), UpdateHeights<nondet>(*this),
-            galois::loopname("UpdateHeights"),
-            galois::wl<galois::worklists::BulkSynchronous<>>());
+            galois::wl<galois::worklists::BulkSynchronous<>>(),
+            galois::no_conflicts(),
+            galois::loopname("UpdateHeights"));
+        },
         break;
       case detBase:
         galois::for_each(galois::iterate( { sink } ), UpdateHeights<detBase>(*this),
             galois::wl<DWL>(),
+            galois::no_conflicts(),
             galois::loopname("UpdateHeights"));
         break;
       case detDisjoint:
         galois::for_each(galois::iterate( { sink } ), UpdateHeights<detDisjoint>(*this),
             galois::wl<DWL>(),
+            galois::no_conflicts(),
             galois::loopname("UpdateHeights"));
         break;
       default:
@@ -620,11 +607,13 @@ struct PreflowPush {
     };
 
   struct ProcessNonDet {
-    typedef std::tuple<galois::parallel_break> function_traits;
-
     Counter& counter;
     PreflowPush& app;
-    ProcessNonDet(Counter& c, PreflowPush& a) : counter(c), app(a) {
+    const int relabel_interval; // per thread
+    ProcessNonDet(Counter& c, PreflowPush& a) :
+      counter(c), app(a),
+      relabel_interval(app.global_relabel_interval / galois::getActiveThreads())
+    {
     }
 
     template <typename C>
@@ -635,8 +624,9 @@ struct PreflowPush {
           increment += BETA;
         }
 
+        counter += increment;
         if (app.global_relabel_interval > 0 &&
-            counter.reduce() >= app.global_relabel_interval) {
+            counter.peekLocal() >= relabel_interval) { // local check
 
           app.should_global_relabel = true;
           ctx.breakLoop();
@@ -818,10 +808,12 @@ struct PreflowPush {
           if (useHLOrder) {
             galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
                 galois::loopname("Discharge"),
+                galois::parallel_break(),
                 galois::wl<OBIM>(obimIndexer));
           } else {
             galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
-                galois::loopname("Discharge"));
+                galois::loopname("Discharge"),
+                galois::parallel_break());
           }
           break;
         case detBase: {
@@ -865,7 +857,6 @@ struct PreflowPush {
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
-  constexpr bool serial = false;
   LonestarStart(argc, argv, name, desc, url);
 
   PreflowPush app;
@@ -882,12 +873,13 @@ int main(int argc, char** argv) {
   std::cout << "number of nodes: " << app.graph.size() << "\n";
   std::cout << "global relabel interval: " << app.global_relabel_interval
             << "\n";
-  std::cout << "serial execution: " << (serial ? "yes" : "no") << "\n";
 
   galois::StatTimer T;
+  galois::reportPageAlloc("MeminfoPre");
   T.start();
   app.run();
   T.stop();
+  galois::reportPageAlloc("MeminfoPost");
 
   std::cout << "Flow is " << app.graph.getData(app.sink).excess << "\n";
 
