@@ -110,7 +110,7 @@ struct NodeData {
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
-typedef DistGraph<NodeData, unsigned int> Graph;
+typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #if __OPT_VERSION__ >= 3

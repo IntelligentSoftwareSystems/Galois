@@ -135,7 +135,7 @@ struct NodeData {
   uint8_t flag;
 };
 
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates

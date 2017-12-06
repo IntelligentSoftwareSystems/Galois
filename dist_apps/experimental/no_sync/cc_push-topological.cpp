@@ -90,9 +90,9 @@ struct NodeData {
   std::atomic<unsigned int> comp_current;
 };
 
-typedef DistGraph<NodeData, void> Graph;
-typedef DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef galois::graphs::DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

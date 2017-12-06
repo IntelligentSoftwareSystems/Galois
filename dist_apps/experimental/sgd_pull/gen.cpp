@@ -89,8 +89,8 @@ struct NodeData {
 };
 
 
-typedef DistGraph<NodeData, double> Graph;
-//typedef DistGraph<NodeData, uint32_t> Graph;
+typedef galois::graphs::DistGraph<NodeData, double> Graph;
+//typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

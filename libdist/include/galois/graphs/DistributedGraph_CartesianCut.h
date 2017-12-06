@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,6 +27,9 @@
 #define _GALOIS_DIST_HGRAPHCC_H
 
 #include "galois/graphs/DistributedGraph.h"
+
+namespace galois {
+namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
@@ -990,14 +993,15 @@ public:
   /*
    * This function serializes the local data structures using boost binary archive.
    */
-  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, 
+                                        const unsigned int version = 0) const {
 
-    //unsigned ints
+    // unsigned ints
     ar << numNodes;
     ar << numRowHosts;
     ar << numColumnHosts;
 
-    //maps and vectors
+    // maps and vectors
     ar << localToGlobalVector;
     ar << globalToLocalMap;
   }
@@ -1005,17 +1009,19 @@ public:
   /*
    * This function DeSerializes the local data structures using boost binary archive.
    */
-  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
-
-    //unsigned ints
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, 
+                                          const unsigned int version = 0) {
+    // unsigned ints
     ar >> numNodes;
     ar >> numRowHosts;
     ar >> numColumnHosts;
 
-    //maps and vectors
+    // maps and vectors
     ar >> localToGlobalVector;
     ar >> globalToLocalMap;
   }
-
 };
+
+} // end namespace graphs
+} // end namespace galois
 #endif

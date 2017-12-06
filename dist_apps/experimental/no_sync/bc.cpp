@@ -104,12 +104,12 @@ struct NodeData {
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 // no edge data = bfs not sssp
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // second type (unsigned int) is for edge weights
 // uncomment this along with graph load below if you want to use sssp
-//typedef DistGraph<NodeData, unsigned int> Graph;
+//typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 
 
 /******************************************************************************/

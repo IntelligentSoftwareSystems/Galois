@@ -27,6 +27,9 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
+namespace galois {
+namespace graphs {
+
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
 class DistGraph_jaggedCut : public DistGraph<NodeTy, EdgeTy> {
@@ -908,4 +911,7 @@ public:
     return mirrorRanges_vec;
   }
 };
+
+} // end namespace graphs
+} // end namespace galois
 #endif

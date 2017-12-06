@@ -54,7 +54,8 @@ cll::opt<std::string> statFile("statFile",
                               cll::desc("output file to print stats to "), 
                               cll::init(""));
 cll::opt<bool> verify("verify", 
-                              cll::desc("Verify results by outputting results to file"), 
+                              cll::desc("Verify results by outputting results "
+                                        "to file"), 
                               cll::init(false));
 
 #ifdef __GALOIS_HET_CUDA__

@@ -91,9 +91,9 @@ struct NodeData {
   unsigned int dist_current;
 };
 
-typedef DistGraph<NodeData, unsigned int> Graph;
-typedef DistGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
-typedef DistGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
+typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, unsigned int> Graph_edgeCut;
+typedef galois::graphs::DistGraph_vertexCut<NodeData, unsigned int> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

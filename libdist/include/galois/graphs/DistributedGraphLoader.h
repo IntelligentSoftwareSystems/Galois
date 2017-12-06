@@ -35,12 +35,13 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 
-// TODO/FIXME Refactoring a bunch of this code is likely very possible to
-// do without
-
+// TODO/FIXME Refactoring a bunch of this code is likely very possible to do
 /*******************************************************************************
  * Supported partitioning schemes
  ******************************************************************************/
+namespace galois {
+namespace graphs {
+
 enum PARTITIONING_SCHEME {
   OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT,
   JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT,
@@ -63,6 +64,9 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     default: GALOIS_DIE("Unsupported partition");
   }
 }
+} // end namespace graphs
+} // end namespace galois
+
 /*******************************************************************************
  * Graph-loading-related command line arguments
  ******************************************************************************/
@@ -72,12 +76,15 @@ extern cll::opt<std::string> inputFile;
 extern cll::opt<std::string> inputFileTranspose;
 extern cll::opt<bool> inputFileSymmetric;
 extern cll::opt<std::string> partFolder;
-extern cll::opt<PARTITIONING_SCHEME> partitionScheme;
+extern cll::opt<galois::graphs::PARTITIONING_SCHEME> partitionScheme;
 extern cll::opt<unsigned int> VCutThreshold;
 extern cll::opt<std::string> vertexIDMapFileName;
 extern cll::opt<bool> readFromFile;
 extern cll::opt<std::string> localGraphFileName;
 extern cll::opt<bool> saveLocalGraph;
+
+namespace galois {
+namespace graphs {
 
 /*******************************************************************************
  * Graph-loading functions
@@ -486,4 +493,7 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor
       return nullptr;
   }
 }
+
+} // end namespace graphs
+} // end namespace galois
 #endif

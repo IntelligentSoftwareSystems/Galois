@@ -76,7 +76,6 @@
 #include <boost/serialization/vector.hpp>
 #include <boost/serialization/unordered_map.hpp>
 
-
 namespace cll = llvm::cl;
 
 enum MASTERS_DISTRIBUTION {
@@ -95,6 +94,9 @@ extern cll::opt<unsigned> partition_edge_send_buffer_size;
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
 enum ReadLocation { readSource, readDestination, readAny };
+
+namespace galois {
+namespace graphs {
 
 /**
  * Base DistGraph class that all distributed graphs extend from.
@@ -911,12 +913,8 @@ protected:
    * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
    */
   template<typename VectorTy>
-  //inline void determine_thread_ranges(uint32_t total_nodes,
-                               //std::vector<uint64_t> edge_prefix_sum) {
-
   inline void determine_thread_ranges(uint32_t total_nodes,
                                VectorTy& edge_prefix_sum) {
-
     graph.determineThreadRangesByNode(edge_prefix_sum);
   }
 
@@ -3537,5 +3535,9 @@ public:
 };
 
 template<typename NodeTy, typename EdgeTy, bool WithInEdges>
-constexpr const char* const DistGraph<NodeTy, EdgeTy, WithInEdges>::GRNAME;
+constexpr const char* const galois::graphs::DistGraph<NodeTy, EdgeTy, 
+                                                      WithInEdges>::GRNAME;
+} // end namespace graphs
+} // end namespace galois
+
 #endif //_GALOIS_DIST_HGRAPH_H

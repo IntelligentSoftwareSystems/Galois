@@ -66,7 +66,7 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_comp_current;
 
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

@@ -78,7 +78,7 @@ struct NodeData {
   float bc;
 };
 
-typedef DistGraph<NodeData, void, true> Graph;
+typedef galois::graphs::DistGraph<NodeData, void, true> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // bitsets for tracking updates

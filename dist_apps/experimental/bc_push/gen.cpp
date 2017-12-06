@@ -102,9 +102,9 @@ struct NodeData {
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 #ifndef __USE_BFS__
-typedef DistGraph<NodeData, unsigned int> Graph;
+typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 #else
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 #endif
 
 typedef typename Graph::GraphNode GNode;

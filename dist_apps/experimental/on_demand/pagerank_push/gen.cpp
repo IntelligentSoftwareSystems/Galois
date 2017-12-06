@@ -133,7 +133,7 @@ galois::DynamicBitSet bitset_residual;
 #endif
 galois::DynamicBitSet bitset_nout;
 
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 typedef GNode WorkItem;
 

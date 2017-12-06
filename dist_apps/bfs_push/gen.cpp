@@ -73,7 +73,7 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_dist_current;
 
-typedef DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"
@@ -186,8 +186,6 @@ struct BFS {
     graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    using namespace galois::worklists;
-    
     FirstItr_BFS::go(_graph);
 
     unsigned _num_iterations = 1;

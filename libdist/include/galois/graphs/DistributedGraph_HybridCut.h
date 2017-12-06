@@ -29,6 +29,9 @@
 
 #include "galois/graphs/DistributedGraph.h"
 
+namespace galois {
+namespace graphs {
+
 template<typename NodeTy, typename EdgeTy>
 class DistGraph_vertexCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
@@ -1007,6 +1010,8 @@ public:
     ar >> localToGlobalVector;
     ar >> globalToLocalMap;
   }
-
 };
+
+} // end namespace graphs
+} // end namespace galois
 #endif

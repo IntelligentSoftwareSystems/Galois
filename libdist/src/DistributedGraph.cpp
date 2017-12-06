@@ -42,12 +42,13 @@ cll::opt<bool> partitionAgnostic("partitionAgnostic",
                              cll::desc("Do not use partition-aware optimizations"),
                              cll::init(false));
 
-// TODO: move this to DistributedGraph.cpp and use enums
+// TODO: use enums
 cll::opt<DataCommMode> enforce_metadata("metadata",
                              cll::desc("Communication metadata"),
                              cll::values(
                                clEnumValN(noData, "auto",
-                                          "Dynamically choose the metadata automatically"),
+                                          "Dynamically choose the metadata "
+                                          "automatically"),
                                clEnumValN(bitsetData, "bitset",
                                           "Use bitset metadata always"),
                                clEnumValN(offsetsData, "offsets",
@@ -55,11 +56,13 @@ cll::opt<DataCommMode> enforce_metadata("metadata",
                                clEnumValN(gidsData, "gids",
                                           "Use global IDs metadata always"),
                                clEnumValN(onlyData, "none",
-                                          "Do not use any metadata (sends non-updated values)"),
+                                          "Do not use any metadata (sends "
+                                          "non-updated values)"),
                                clEnumValEnd
                              ),
                              cll::init(noData));
-DataCommMode enforce_data_mode; // using non-cll type because it can be used directly by the GPU
+DataCommMode enforce_data_mode; // using non-cll type because it can be used 
+                                // directly by the GPU
 
 cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
                              cll::desc("Type of masters distribution."),
@@ -110,5 +113,6 @@ cll::opt<BareMPI> bare_mpi("bare_mpi",
 #endif
 
 cll::opt<unsigned> partition_edge_send_buffer_size("edge_buffer_size",
-                                 cll::desc("Buffer size for batching edges to send during partitioning."), 
+                                 cll::desc("Buffer size for batching edges to "
+                                           "send during partitioning."), 
                                  cll::init(1400));

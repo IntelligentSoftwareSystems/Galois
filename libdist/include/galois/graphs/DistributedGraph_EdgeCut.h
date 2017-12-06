@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,6 +27,9 @@
 #define _GALOIS_DIST_HGRAPHEC_H
 
 #include "galois/graphs/DistributedGraph.h"
+
+namespace galois {
+namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false,
          bool isBipartite=false>
@@ -503,6 +506,8 @@ class DistGraph_edgeCut : public DistGraph<NodeTy, EdgeTy, WithInEdges> {
     //pairs
     ar >> hostNodes;
   }
-
 };
+
+} // end namespace graphs
+} // end namespace galois
 #endif
