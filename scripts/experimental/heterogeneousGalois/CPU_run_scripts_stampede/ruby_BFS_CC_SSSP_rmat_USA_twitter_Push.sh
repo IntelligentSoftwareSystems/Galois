@@ -31,7 +31,7 @@ fi
 #RMAT25
 if [ $5 = "rmat28" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
-    cmd_options=$cmd_options" -srcNodeId=155526494"
+    cmd_options=$cmd_options" -startNode=155526494"
   fi
 ruby ../../../../../../Distributed_latest/scripts/stampede_jobs.rb  -t "01:42:30" -q "normal" -n 4 -N 4 -i dist_run_script_generated -o ./LOG_jul_31/LOG_${algo}_TH$1\_CM${comm_mode}\_rmat28.rgr_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_rmat28 $cmd_options " -s $6  -e $7 -k 2
 fi
@@ -40,7 +40,7 @@ fi
 if [ $8 = "twitter" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
     cmd_options=$cmd_options_reset
-    cmd_options=$cmd_options" -srcNodeId=33643219"
+    cmd_options=$cmd_options" -startNode=33643219"
   fi
 ruby ../../../../../../Distributed_latest/scripts/stampede_jobs.rb  -t "01:48:00" -q "normal" -n 4 -N 4 -i dist_run_script_generated -o ./LOG_jul_31/LOG_${algo}_TH$1\_CM${comm_mode}\_Twitter-ICWSM10_  -A "Galois"  -c "$ENV_options ibrun ./$algo $GRAPH_twitter $cmd_options" -s $9  -e ${10}  -k 2
 fi

@@ -28,6 +28,8 @@
 
 #include <galois/graphs/DistributedGraphLoader.h>
 
+using namespace galois::graphs;
+
 namespace cll = llvm::cl;
 
 cll::opt<std::string> inputFile(cll::Positional, 
@@ -71,22 +73,31 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme("partition",
                      cll::init(OEC));
 cll::opt<unsigned int> VCutThreshold("VCutThreshold", 
                                  cll::desc("Threshold for high degree edges."), 
-                                 cll::init(1000));
+                                 cll::init(1000),
+                                 cll::Hidden);
 
 cll::opt<std::string> vertexIDMapFileName("vertexIDMapFileName",
-                                       cll::desc("<file containing the vertexID to hosts mapping for the custom edge cut.>"), 
-                                       cll::init(""));
+                                       cll::desc("<file containing the "
+                                                 "vertexID to hosts mapping for "
+                                                 "the custom edge cut.>"), 
+                                       cll::init(""),
+                                       cll::Hidden);
 
 cll::opt<bool> readFromFile("readFromFile",
-                              cll::desc("Set this flag if graph is to be constructed from file (file must be created by Abelian CSR)"),
-                              cll::init(false));
+                              cll::desc("Set this flag if graph is to be "
+                                        "constructed from file (file must be "
+                                        "created by Abelian CSR)"),
+                              cll::init(false),
+                              cll::Hidden);
 
 cll::opt<std::string> localGraphFileName("localGraphFileName",
-                              cll::desc("Name of the local file to construct local graph (file must be created by Abelian CSR)"),
-                              cll::init("local_graph"));
+                              cll::desc("Name of the local file to construct "
+                                        "local graph (file must be created by "
+                                        "Abelian CSR)"),
+                              cll::init("local_graph"),
+                              cll::Hidden);
 
 cll::opt<bool> saveLocalGraph("saveLocalGraph",
-                                             cll::desc("Set to save the local CSR graph"), 
-                                             cll::init(false));
-
-
+                              cll::desc("Set to save the local CSR graph"), 
+                              cll::init(false),
+                              cll::Hidden);

@@ -27,7 +27,7 @@ if [[ $execname == *"kcore"* ]]; then
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
-    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+    FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
 # bc: if rmat15 is not used, specify single source flags else do
@@ -35,7 +35,7 @@ fi
 # TODO currently uses rmat16 (doesn't exist) so everything does single source
 if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
   FLAGS+=" -singleSource"
-  FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+  FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
 fi
 
 source_file=${inputdirname}/source

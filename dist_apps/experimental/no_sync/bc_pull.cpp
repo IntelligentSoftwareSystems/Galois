@@ -43,7 +43,7 @@
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #include "galois/runtime/dGraphLoader.h"
@@ -67,7 +67,7 @@ static cll::opt<bool> verify("verify",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned int> startSource("srcNodeId", 
+static cll::opt<unsigned int> startSource("startNode", 
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));
@@ -105,12 +105,12 @@ struct NodeData {
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 // no edge data = bfs not sssp
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // second type (unsigned int) is for edge weights
 // uncomment this along with graph load below if you want to use sssp
-//typedef hGraph<NodeData, unsigned int> Graph;
+//typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 
 /******************************************************************************/
 /* Functors for running the algorithm */

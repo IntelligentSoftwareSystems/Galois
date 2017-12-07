@@ -98,9 +98,9 @@ struct PR_NodeData {
 
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
-typedef hGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
+typedef galois::graphs::DistGraph<PR_NodeData, void> Graph;
+typedef galois::graphs::DistGraph_edgeCut<PR_NodeData, void> Graph_edgeCut;
+typedef galois::graphs::DistGraph_vertexCut<PR_NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

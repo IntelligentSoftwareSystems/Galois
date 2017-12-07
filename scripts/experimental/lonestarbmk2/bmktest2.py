@@ -94,9 +94,33 @@ class BarnesHut(SharedMemApp):
         
         return specs
 
-class BCInner(SharedMemApp):
+class BCInnerAsync(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
-    benchmark = "bc-inner"
+    benchmark = "bc-inner-async"
+
+    def get_run_spec(self, bmkinput, config):
+        """BC inner async command line setup"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-symmetricGraph") # say it is symmetric
+        
+        return specs
+
+class BCInnerLeveled(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
+    benchmark = "bc-inner-leveled"
+
+    def get_run_spec(self, bmkinput, config):
+        """BC inner async command line setup"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-symmetricGraph") # say it is symmetric
+            s.set_arg("-algo=leveled") # leveled algo
+        
+        return specs
+
 
 class BCOuter(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
@@ -165,6 +189,17 @@ class MatrixCompletion(SharedMemApp):
     relativeAppPath = "matrixcompletion/mc"
     benchmark = "matrixcompletion"
 
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        # TODO change this to some canonical version
+        for s in specs:
+            s.set_arg("-algo=block") # algo type
+        
+        return specs
+
+
 class MCM(SharedMemApp):
     relativeAppPath = "matching/bipartite-mcm"
     benchmark = "mcm"
@@ -191,7 +226,22 @@ class PageRank(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.000001") # pagerank tolerance
+            s.set_arg("-tolerance=0.0001") # pagerank tolerance
+        
+        return specs
+
+# for galois 2.2 version of pagerank
+class PageRank2Point2(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank"
+    benchmark = "pagerank"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds transpose graph."""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-graphTranspose=%s" % bmkinput.props.ptranspose) 
+            s.set_arg("-maxIterations=1000")
         
         return specs
 
@@ -291,7 +341,10 @@ class TrianglesEdge(SharedMemApp):
 
 # specification of binaries to run
 # apps present in Galois 2.2
-BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
-            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
-            SpanningTree(), SSSP(), SurveyPropagation()]
+#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
+#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+#            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
+#            SpanningTree(), SSSP(), SurveyPropagation()]
+#BINARIES = [MCM(), PageRank()]
+#BINARIES = [PageRank2Point2()]
+#BINARIES = [BCInnerLeveled()]

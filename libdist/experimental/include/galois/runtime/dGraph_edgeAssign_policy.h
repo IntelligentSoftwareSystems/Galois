@@ -102,8 +102,8 @@ uint32_t balanced_edge_assignment2(uint64_t src, uint64_t dst, galois::VecBool& 
 #if 0
 /* POLICY */
 if(!is_assigned(src) && !is_assigned(dst)){
-  auto src_host = src%base_hGraph::numHosts;
-  auto dst_host = dst%base_hGraph::numHosts;
+  auto src_host = src%base_DistGraph::numHosts;
+  auto dst_host = dst%base_DistGraph::numHosts;
 
             if(num_edges_assigned[src_host].size() < num_edges_assigned[dst_host].size()){
               assign_node(src,src_host);
@@ -121,7 +121,7 @@ if(!is_assigned(src) && !is_assigned(dst)){
           else {
             if(is_assigned(src) && !is_assigned(dst)){
               auto src_host = get_assigned_host(src);
-              auto dst_host = dst%base_hGraph::numHosts;
+              auto dst_host = dst%base_DistGraph::numHosts;
               if(num_edges_assigned[src_host].size() < num_edges_assigned[dst_host].size()){
                 assign_node(dst, src_host);
               }
@@ -132,7 +132,7 @@ if(!is_assigned(src) && !is_assigned(dst)){
               }
           
             if(!is_assigned(src) && is_assigned(dst)){
-              auto src_host = src%base_hGraph::numHosts;
+              auto src_host = src%base_DistGraph::numHosts;
               auto dst_host = get_assigned_host(dst);
           
           

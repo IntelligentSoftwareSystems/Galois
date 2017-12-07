@@ -33,15 +33,15 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 struct NodeData {
   char blah;
 };
 
-typedef hGraph<NodeData, unsigned> Graph;
-typedef hGraph_edgeCut<NodeData, unsigned> Graph_edgeCut;
+typedef galois::graphs::DistGraph<NodeData, unsigned> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, unsigned> Graph_edgeCut;
 typedef typename Graph::GraphNode GNode;
 
 /******************************************************************************/

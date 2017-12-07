@@ -41,7 +41,7 @@
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #include "galois/runtime/dGraphLoader.h"
@@ -77,7 +77,7 @@ struct NodeData {
   uint8_t flag;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 /******************************************************************************/

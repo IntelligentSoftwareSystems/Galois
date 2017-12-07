@@ -16,7 +16,7 @@ MPI=mpiexec
 FLAGS=
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
-    FLAGS+=" -srcNodeId=`cat ${inputdirname}/${inputname}.source`"
+    FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
 if [[ $execname == *"worklist"* ]]; then

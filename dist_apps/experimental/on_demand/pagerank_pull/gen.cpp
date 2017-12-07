@@ -42,7 +42,7 @@
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 
 #include "galois/runtime/dGraphLoader.h"
 
@@ -133,7 +133,7 @@ galois::DynamicBitSet bitset_residual;
 #endif
 galois::DynamicBitSet bitset_nout;
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

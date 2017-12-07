@@ -35,7 +35,7 @@
 #include "galois/runtime/Tracer.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "galois/runtime/hGraph.h"
+#include "galois/runtime/DistGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";
@@ -44,7 +44,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned int> src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
@@ -57,7 +57,7 @@ struct PR_NodeData {
 
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
+typedef DistGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -181,7 +181,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_pageRank;
 
     T_total.start();
 
@@ -190,9 +190,9 @@ int main(int argc, char** argv) {
     T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
 
@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {

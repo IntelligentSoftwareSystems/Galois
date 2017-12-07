@@ -35,7 +35,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 
 #include "galois/graphs/OfflineGraph.h"
-#include "hGraph.h"
+#include "DistGraph.h"
 
 static const char* const name = "SGD - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Stochastic gradient descent on Distributed Galois.";
@@ -44,7 +44,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned int> src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 #define LATENT_VECTOR_SIZE 2
@@ -62,7 +62,7 @@ struct SGD_NodeData {
 };
 
 
-typedef hGraph<SGD_NodeData, int> Graph;
+typedef DistGraph<SGD_NodeData, int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 static double genRand () {

@@ -35,7 +35,7 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -56,7 +56,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("srcNodeId", 
+static cll::opt<unsigned long long> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -73,7 +73,7 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_dist_current;
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"
@@ -186,8 +186,6 @@ struct BFS {
     graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    using namespace galois::worklists;
-    
     FirstItr_BFS::go(_graph);
 
     unsigned _num_iterations = 1;
@@ -262,47 +260,45 @@ struct BFSSanityCheck {
   Graph* graph;
 
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
-  galois::DGAccumulator<uint32_t>& DGAccumulator_max;
-  galois::GReduceMax<uint32_t>& current_max;
+  galois::DGReduceMax<uint32_t>& DGMax;
 
   BFSSanityCheck(const uint32_t& _infinity, Graph* _graph, 
                  galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam,
-                 galois::GReduceMax<uint32_t>& m) 
+                 galois::DGReduceMax<uint32_t>& dgm)
     : local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
-      DGAccumulator_max(dgam), current_max(m) {}
+      DGMax(dgm) { }
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam,
-                 galois::GReduceMax<uint32_t>& m) {
+                 galois::DGReduceMax<uint32_t>& dgm) {
     dgas.reset();
-    dgam.reset();
+    dgm.reset();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       uint32_t sum, max;
       BFSSanityCheck_cuda(sum, max, infinity, cuda_ctx);
       dgas += sum;
-      dgam = max;
+      dgm.update(max);
     }
     else
   #endif
     {
-      m.reset();
-      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
-                     BFSSanityCheck(infinity, &_graph, dgas, dgam, m),
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
+                                     _graph.masterNodesRange().end()),
+                     BFSSanityCheck(infinity, &_graph, dgas, dgm),
                      galois::no_stats(),
                      galois::loopname("BFSSanityCheck"));
-      dgam = m.reduce();
     }
 
     uint64_t num_visited = dgas.reduce();
-    uint32_t max_distance = dgam.reduce_max();
+    uint32_t max_distance = dgm.reduce();
 
     // Only host 0 will print the info
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::gPrint("Number of nodes visited from source ", src_node, " is ", num_visited, "\n");
-      galois::gPrint("Max distance from source ", src_node, " is ", max_distance, "\n");
+      galois::gPrint("Number of nodes visited from source ", src_node, " is ", 
+                     num_visited, "\n");
+      galois::gPrint("Max distance from source ", src_node, " is ", 
+                     max_distance, "\n");
     }
   }
 
@@ -311,7 +307,7 @@ struct BFSSanityCheck {
 
     if (src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
-      current_max.update(src_data.dist_current);
+      DGMax.update(src_data.dist_current);
     }
   }
 };
@@ -361,8 +357,7 @@ int main(int argc, char** argv) {
   // accumulators for use in operators
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
-  galois::DGAccumulator<uint32_t> DGAccumulator_max;
-  galois::GReduceMax<uint32_t> m;
+  galois::DGReduceMax<uint32_t> m;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BFS::go run ", run, " called\n");
@@ -374,7 +369,7 @@ int main(int argc, char** argv) {
     StatTimer_main.stop();
 
     // sanity check
-    BFSSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max, m);
+    BFSSanityCheck::go(*hg, DGAccumulator_sum, m);
 
     if ((run + 1) != numRuns) {
     #ifdef __GALOIS_HET_CUDA__

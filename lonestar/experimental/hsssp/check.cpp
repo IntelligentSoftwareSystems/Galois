@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "galois/graphs/OfflineGraph.h"
-#include "hGraph.h"
+#include "DistGraph.h"
 
 #include <iostream>
 
@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     for (auto N : g)
       if (N % (1024*128) == 0)
         std::cout << N << " " << *g.edge_begin(N) << " " << *g.edge_end(N) << " " << std::distance(g.edge_begin(N), g.edge_end(N)) << "\n";
-    hGraph<nd, void> hg(argv[1], 0, 4);
+    DistGraph<nd, void> hg(argv[1], 0, 4);
 
     hg.sync_push<Syncer>();
 

@@ -35,7 +35,7 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/graphs/B_LC_CSR_Graph.h"
 
@@ -57,7 +57,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("srcNodeId", 
+static cll::opt<unsigned long long> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -75,7 +75,7 @@ struct NodeData {
 galois::DynamicBitSet bitset_dist_current;
 //uint64_t numChanges;
 
-typedef hGraph<NodeData, void, true> Graph;
+typedef galois::graphs::DistGraph<NodeData, void, true> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

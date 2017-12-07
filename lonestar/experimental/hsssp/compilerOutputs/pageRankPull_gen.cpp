@@ -34,7 +34,7 @@
 #include "galois/runtime/CompilerHelperFunctions.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/Dist/hGraph.h"
+#include "galois/Dist/DistGraph.h"
 #include "galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -87,7 +87,7 @@ struct PR_NodeData {
   std::atomic<int> nout;
 };
 
-typedef hGraph<PR_NodeData, void> Graph;
+typedef DistGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
@@ -286,7 +286,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = galois::runtime::getHostID();
@@ -332,7 +332,7 @@ int main(int argc, char** argv) {
     T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
-    T_hGraph_init.start();
+    T_DistGraph_init.start();
 #ifndef __GALOIS_HET_CUDA__
     Graph hg(inputFile, net.ID, net.Num);
 #else
@@ -347,7 +347,7 @@ int main(int argc, char** argv) {
       //galois::opencl::cl_env.init(cldevice.Value);
     }
 #endif
-    T_hGraph_init.stop();
+    T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
 
@@ -380,7 +380,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
     // Verify
     if(verify){

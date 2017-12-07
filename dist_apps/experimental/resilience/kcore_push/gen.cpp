@@ -34,7 +34,7 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 //For resilience
@@ -69,7 +69,7 @@ struct NodeData {
   uint8_t flag;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates

@@ -35,7 +35,7 @@
 #include "galois/runtime/dGraph_edgeCut.h"
 #include "galois/runtime/dGraph_vertexCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -90,9 +90,9 @@ struct NodeData {
   std::atomic<unsigned int> comp_current;
 };
 
-typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef galois::graphs::DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

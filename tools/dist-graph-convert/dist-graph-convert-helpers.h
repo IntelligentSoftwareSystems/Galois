@@ -35,7 +35,7 @@
 #include "galois/DynamicBitset.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Network.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/graphs/OfflineGraph.h"
 #include "galois/graphs/BufferedGraph.h"
 

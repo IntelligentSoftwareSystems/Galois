@@ -38,7 +38,7 @@
 #include "galois/runtime/dGraph_cartesianCut.h"
 #include "galois/runtime/dGraph_hybridCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #include "galois/runtime/dGraphLoader.h"
@@ -81,7 +81,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("srcNodeId", 
+static cll::opt<unsigned long long> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 static cll::opt<bool> verify("verify", 
@@ -128,7 +128,7 @@ struct NodeData {
   uint32_t dist_current;
 };
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #if __OPT_VERSION__ >= 3

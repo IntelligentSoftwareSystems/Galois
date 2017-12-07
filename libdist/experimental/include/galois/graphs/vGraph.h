@@ -19,7 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
- * Derived from hGraph. Graph abstraction for vertex cut.
+ * Derived from DistGraph. Graph abstraction for vertex cut.
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  *

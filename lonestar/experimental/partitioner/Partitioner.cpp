@@ -74,11 +74,11 @@ typedef unsigned int EdgeDataType;
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
+   galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_HSSSP;
    T_total.start();
-   T_hGraph_init.start();
+   T_DistGraph_init.start();
    galois::graphs::OfflineGraph g(inputFile);
-   T_hGraph_init.stop();
+   T_DistGraph_init.stop();
    //VertexCutInfo vci;
    T_init.start();
    {

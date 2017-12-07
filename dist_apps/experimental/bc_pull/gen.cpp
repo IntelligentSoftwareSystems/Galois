@@ -40,7 +40,7 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -58,7 +58,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned int> startSource("srcNodeId", 
+static cll::opt<unsigned int> startSource("startNode", 
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));
@@ -99,9 +99,9 @@ struct NodeData {
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
 
 #ifndef __USE_BFS__
-typedef hGraph<NodeData, unsigned int> Graph;
+typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 #else
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 #endif
 
 

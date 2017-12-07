@@ -32,7 +32,7 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -52,7 +52,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<uint32_t> src_node("srcNodeId", 
+static cll::opt<uint32_t> src_node("startNode", 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -66,7 +66,7 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_comp_current;
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

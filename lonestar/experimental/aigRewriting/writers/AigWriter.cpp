@@ -24,7 +24,7 @@ bool AigWriter::isOpen() {
 }
 
 void AigWriter::writeAag( Aig & aig ) {
-	aig.resetAndIDs();
+	aig.resetAndIds();
 	writeAagHeader( aig );
 	writeInputs( aig );
 	writeLatchesAag( aig );
@@ -54,21 +54,25 @@ void AigWriter::writeInputs( Aig & aig ) {
 
 void AigWriter::writeLatchesAag( Aig & aig ) {
 	
-	//FIXME
+	aig::Graph & aigGraph = aig.getGraph();
 
-	/*
-	auto latchNodes = aig.getLatchNodes();
-	for (auto latch : latchNodes) {
-		aig::NodeLatch* latchNode = latch.second;
-		aigerFile << nodeIds[latchNode->getId()] * 2 << " ";
-		aig::Node* input = latchNode->getInputNodes().front();
-		bool polarity = latchNode->getInputPolarities().front();
-		bool init = latchNode->getInitialValue();
-		int inputId = 2 * nodeIds[input->getId()];
-		inputId = polarity ? inputId : inputId + 1;
-		aigerFile << inputId << " " << init << std::endl;
+	for ( aig::GNode latchNode : aig.getLatchNodes() ) {
+		aig::NodeData & latchNodeData = aigGraph.getData( latchNode, galois::MethodFlag::READ ); 
+		aigerFile << latchNodeData.id << " ";
+		auto inEdge = aigGraph.in_edge_begin( latchNode );
+		bool inEdgePolarity = aigGraph.getEdgeData( inEdge );
+		aig::GNode inNode = aigGraph.getEdgeDst( inEdge );
+		aig::NodeData & inNodeData = aigGraph.getData( inNode, galois::MethodFlag::READ ); 
+		//bool initState = latchNode->getInitialValue(); // FIXME;
+		if ( inEdgePolarity ) {
+			aigerFile << inNodeData.id << std::endl;
+			//aigerFile << inNodeData.id << " " << initState << std::endl;
+		}
+		else {
+			aigerFile << inNodeData.id + 1 << std::endl;
+			//aigerFile << inNodeData.id + 1 << " " << initState << std::endl;
+		}
 	}
-	*/
 }
 
 void AigWriter::writeOutputs( Aig & aig ) {
@@ -77,9 +81,9 @@ void AigWriter::writeOutputs( Aig & aig ) {
 
 	for ( auto output : aig.getOutputNodes() ) {
 
-		auto inEdge = graph.in_edges( output ).begin();
-		bool inEdgePolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
-		aig::GNode inNode = graph.getEdgeDst( *inEdge );
+		auto inEdge = graph.in_edge_begin( output );
+		bool inEdgePolarity = graph.getEdgeData( inEdge, galois::MethodFlag::READ );
+		aig::GNode inNode = graph.getEdgeDst( inEdge );
 		aig::NodeData & inNodeData = graph.getData( inNode, galois::MethodFlag::READ );
 		if ( inEdgePolarity ) {
 			aigerFile << inNodeData.id * 2 << std::endl;
@@ -94,11 +98,11 @@ void AigWriter::writeAndsAag( Aig & aig ) {
 
 	std::stack< aig::GNode > stack;
 
-	aig.computeTopologicalSort( stack );
+	aig.computeTopologicalSortForAnds( stack );
 
 	aig::Graph & graph = aig.getGraph();
 
-	unsigned int currentID = aig.getNumInputs() + aig.getNumLatches() + 1;
+	//unsigned int currentID = aig.getNumInputs() + aig.getNumLatches() + 1;
 
 	while ( !stack.empty() ) {
 
@@ -112,16 +116,16 @@ void AigWriter::writeAndsAag( Aig & aig ) {
 
 		unsigned int andIndex = nodeData.id * 2;
 
-		auto inEdge = graph.in_edges( node ).begin();
-		bool lhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
-		aig::GNode lhsNode = graph.getEdgeDst( *inEdge );
+		auto inEdge = graph.in_edge_begin( node );
+		bool lhsPolarity = graph.getEdgeData( inEdge, galois::MethodFlag::READ );
+		aig::GNode lhsNode = graph.getEdgeDst( inEdge );
 		aig::NodeData & lhsNodeData = graph.getData( lhsNode, galois::MethodFlag::READ );
 		unsigned int lhsIndex = lhsNodeData.id * 2;
 		lhsIndex = lhsPolarity ? lhsIndex : (lhsIndex+1);
 
 		inEdge++;
-		bool rhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
-		aig::GNode rhsNode = graph.getEdgeDst( *inEdge );
+		bool rhsPolarity = graph.getEdgeData( inEdge, galois::MethodFlag::READ );
+		aig::GNode rhsNode = graph.getEdgeDst( inEdge );
 		aig::NodeData & rhsNodeData = graph.getData( rhsNode, galois::MethodFlag::READ );
 		unsigned int rhsIndex = rhsNodeData.id * 2;		
 		rhsIndex = rhsPolarity ? rhsIndex : (rhsIndex+1); 
@@ -135,7 +139,7 @@ void AigWriter::writeAndsAag( Aig & aig ) {
 }
 
 void AigWriter::writeAig( Aig & aig )  {
-	aig.resetAndIDs();
+	aig.resetAndIds();
 	writeAigHeader( aig );
 	writeLatchesAig( aig );
 	writeOutputs( aig );
@@ -153,30 +157,35 @@ void AigWriter::writeAigHeader( Aig & aig ) {
 }
 
 void AigWriter::writeLatchesAig( Aig & aig ) {
-/*
-	auto latchNodes = aig.getLatchNodes();
-	for (auto latch : latchNodes) {
-		aig::NodeLatch* latchNode = latch.second;
-		aig::Node* input = latchNode->getInputNodes().front();
-		bool polarity = latchNode->getInputPolarities().front();
-		bool init = latchNode->getInitialValue();
-		int inputId = 2 * nodeIds[input->getId()];
-		inputId = polarity ? inputId : inputId + 1;
-		aigerFile << inputId << " " << init << std::endl;
-	}
-*/
 
+	aig::Graph & aigGraph = aig.getGraph();
+
+	for ( aig::GNode latchNode : aig.getLatchNodes() ) {
+		auto inEdge = aigGraph.in_edge_begin( latchNode );
+		bool inEdgePolarity = aigGraph.getEdgeData( inEdge );
+		aig::GNode inNode = aigGraph.getEdgeDst( inEdge );
+		aig::NodeData & inNodeData = aigGraph.getData( inNode, galois::MethodFlag::READ ); 
+		//bool initState = latchNode->getInitialValue(); // FIXME;
+		if ( inEdgePolarity ) {
+			aigerFile << inNodeData.id << std::endl;
+			//aigerFile << inNodeData.id + 1 << " " << initState << std::endl;
+		}
+		else {
+			aigerFile << inNodeData.id + 1 << std::endl;
+			//aigerFile << inNodeData.id + 1 << " " << initState << std::endl;
+		}
+	}
 }
 
 void AigWriter::writeAndsAig( Aig & aig ) {
 
 	std::stack< aig::GNode > stack;
 
-	aig.computeTopologicalSort( stack );
+	aig.computeTopologicalSortForAnds( stack );
 
 	aig::Graph & graph = aig.getGraph();
 
-	unsigned int currentID = aig.getNumInputs() + aig.getNumLatches() + 1;
+	//unsigned int currentID = aig.getNumInputs() + aig.getNumLatches() + 1;
 
 	while ( !stack.empty() ) {
 
@@ -190,19 +199,19 @@ void AigWriter::writeAndsAig( Aig & aig ) {
 
 		unsigned int andIndex = nodeData.id * 2;
 
-		auto inEdge = graph.in_edges( node ).begin();
-		bool lhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
-		aig::GNode lhsNode = graph.getEdgeDst( *inEdge );
+		auto inEdge = graph.in_edge_begin( node );
+		bool lhsPolarity = graph.getEdgeData( inEdge, galois::MethodFlag::READ );
+		aig::GNode lhsNode = graph.getEdgeDst( inEdge );
 		aig::NodeData & lhsNodeData = graph.getData( lhsNode, galois::MethodFlag::READ );
 		unsigned int lhsIndex = lhsNodeData.id * 2;
 		lhsIndex = lhsPolarity ? lhsIndex : (lhsIndex+1);
 
 		inEdge++;
-		bool rhsPolarity = graph.getEdgeData( *inEdge, galois::MethodFlag::READ );
-		aig::GNode rhsNode = graph.getEdgeDst( *inEdge );
+		bool rhsPolarity = graph.getEdgeData( inEdge, galois::MethodFlag::READ );
+		aig::GNode rhsNode = graph.getEdgeDst( inEdge );
 		aig::NodeData & rhsNodeData = graph.getData( rhsNode, galois::MethodFlag::READ );
-		unsigned int rhsIndex = rhsNodeData.id * 2;		
-		rhsIndex = rhsPolarity ? rhsIndex : (rhsIndex+1); 
+		unsigned int rhsIndex = rhsNodeData.id * 2;
+		rhsIndex = rhsPolarity ? rhsIndex : (rhsIndex+1);
 		
 		if ( lhsIndex < rhsIndex ) {
 			std::swap( lhsIndex, rhsIndex );

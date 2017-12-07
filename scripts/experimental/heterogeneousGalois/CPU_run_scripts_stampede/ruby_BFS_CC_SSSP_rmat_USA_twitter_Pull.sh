@@ -39,7 +39,7 @@ fi
 #RMAT28
 if [ $5 = "rmat28" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
-    cmd_options=$cmd_options" -srcNodeId=155526494"
+    cmd_options=$cmd_options" -startNode=155526494"
   fi
 ruby /work/02982/ggill0/Distributed_latest/scripts/stampede_jobs.rb  -t "01:42:30" -q "normal" -n 4 -N 4 -i dist_run_script_generated -o ./LOG_RUNS/LOG_${algo}_TH$1\_ECUT\_${partition}\_rmat28.tgr_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_rmat28 $cmd_options " -s $6  -e $7 -k 2
 fi
@@ -48,7 +48,7 @@ fi
 if [ $8 = "twitter" ]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
     cmd_options=$cmd_options_reset
-    cmd_options=$cmd_options" -srcNodeId=33643219"
+    cmd_options=$cmd_options" -startNode=33643219"
   fi
 ruby /work/02982/ggill0/Distributed_latest/scripts/stampede_jobs.rb  -t "01:48:00" -q "normal" -n 4 -N 4 -i dist_run_script_generated -o ./LOG_RUNS/LOG_${algo}_TH$1\_ECUT\_${partition}\_Twitter-ICWSM10.tgr_  -A "Galois"  -c "$ENV_options ibrun ./$algo $GRAPH_twitter $cmd_options" -s $9  -e ${10}  -k 2
 fi
@@ -56,7 +56,7 @@ fi
 #RMAT15
 if [[ ${11} = "rmat15" ]]; then
   if [ $benchmark = "bfs" ] || [ $benchmark = "sssp" ]; then
-    cmd_options=$cmd_options" -srcNodeId=0"
+    cmd_options=$cmd_options" -startNode=0"
   fi
 ruby /work/02982/ggill0/Distributed_latest/scripts/stampede_jobs.rb  -t "00:12:30" -q "development" -n 4 -N 4 -i dist_run_script_generated -o ./DEV_RUNS/DEV_LOG_${algo}_TH$1\_ECUT\_${partition}\_rmat15.tgr_  -A "Galois" -c "$ENV_options ibrun ./$algo $GRAPH_rmat15 $cmd_options " -s ${12}  -e ${13} -k 2
 fi

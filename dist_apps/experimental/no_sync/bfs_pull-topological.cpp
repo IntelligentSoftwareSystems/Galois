@@ -35,7 +35,7 @@
 #include "galois/runtime/dGraph_edgeCut.h"
 #include "galois/runtime/dGraph_vertexCut.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -68,7 +68,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (Transpose graph)>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned int> src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 static cll::opt<bool> enableVCut("enableVertexCut", cll::desc("Use vertex cut for graph partitioning."), cll::init(false));
@@ -91,9 +91,9 @@ struct NodeData {
   unsigned int dist_current;
 };
 
-typedef hGraph<NodeData, void> Graph;
-typedef hGraph_edgeCut<NodeData, void> Graph_edgeCut;
-typedef hGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef galois::graphs::DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 

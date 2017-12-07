@@ -35,12 +35,13 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 
-// TODO/FIXME Refactoring a bunch of this code is likely very possible to
-// do without
-
+// TODO/FIXME Refactoring a bunch of this code is likely very possible to do
 /*******************************************************************************
  * Supported partitioning schemes
  ******************************************************************************/
+namespace galois {
+namespace graphs {
+
 enum PARTITIONING_SCHEME {
   OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT,
   JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT,
@@ -63,6 +64,9 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     default: GALOIS_DIE("Unsupported partition");
   }
 }
+} // end namespace graphs
+} // end namespace galois
+
 /*******************************************************************************
  * Graph-loading-related command line arguments
  ******************************************************************************/
@@ -72,12 +76,15 @@ extern cll::opt<std::string> inputFile;
 extern cll::opt<std::string> inputFileTranspose;
 extern cll::opt<bool> inputFileSymmetric;
 extern cll::opt<std::string> partFolder;
-extern cll::opt<PARTITIONING_SCHEME> partitionScheme;
+extern cll::opt<galois::graphs::PARTITIONING_SCHEME> partitionScheme;
 extern cll::opt<unsigned int> VCutThreshold;
 extern cll::opt<std::string> vertexIDMapFileName;
 extern cll::opt<bool> readFromFile;
 extern cll::opt<std::string> localGraphFileName;
 extern cll::opt<bool> saveLocalGraph;
+
+namespace galois {
+namespace graphs {
 
 /*******************************************************************************
  * Graph-loading functions
@@ -90,27 +97,27 @@ extern cll::opt<bool> saveLocalGraph;
  * @tparam EdgeData edge data to store in graph
  *
  * @param scaleFactor How to split nodes among hosts
- * @returns a pointer to a newly allocated hGraph based on the command line
+ * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
 template<typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData, true>* constructTwoWayGraph(std::vector<unsigned>& 
+DistGraph<NodeData, EdgeData, true>* constructTwoWayGraph(std::vector<unsigned>& 
                                                            scaleFactor) {
   // TODO template args for 2-way for everything that isn't edge cut
   // TODO do it for edge cut too
-  typedef hGraph_edgeCut<NodeData, EdgeData, true> Graph_edgeCut;
-  //typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
-  //typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  //typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
-  //typedef hGraph_cartesianCut<NodeData, EdgeData, true> 
+  typedef DistGraph_edgeCut<NodeData, EdgeData, true> Graph_edgeCut;
+  //typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  //typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  //typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  //typedef DistGraph_cartesianCut<NodeData, EdgeData, true> 
   //      Graph_checkerboardCut; // assumes push-style
-  //typedef hGraph_jaggedCut<NodeData, EdgeData> 
+  //typedef DistGraph_jaggedCut<NodeData, EdgeData> 
   //      Graph_jaggedCut; // assumes push-style
-  //typedef hGraph_jaggedCut<NodeData, EdgeData, true> 
+  //typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
   //      Graph_jaggedBlockedCut; // assumes push-style
-  //typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  //typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
   //                            Graph_cartesianCut_overDecomposeBy2;
-  //typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  //typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
   //                            Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -188,28 +195,28 @@ hGraph<NodeData, EdgeData, true>* constructTwoWayGraph(std::vector<unsigned>&
  * @tparam NodeData node data to store in graph
  * @tparam EdgeData edge data to store in graph
  * @param scaleFactor How to split nodes among hosts
- * @returns a pointer to a newly allocated hGraph based on the command line
+ * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
 template<typename NodeData, typename EdgeData>
-hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
+DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
                                                     scaleFactor) {
   if (!inputFileSymmetric) {
     GALOIS_DIE("Calling constructSymmetricGraph without inputFileSymmetric "
                "flag");
   }
 
-  typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
-  typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
-  typedef hGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
-  typedef hGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
+  typedef DistGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
+  typedef DistGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
                               Graph_cartesianCut_overDecomposeBy4;
-  typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
   
   switch(partitionScheme) {
@@ -260,26 +267,26 @@ hGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
  * false, will iterate over in edgse
  * @tparam enable_if this function  will only be enabled if iterateOut is true
  * @param scaleFactor How to split nodes among hosts
- * @returns a pointer to a newly allocated hGraph based on the command line
+ * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<iterateOut>::type* = nullptr>
-hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& 
+DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& 
                                            scaleFactor) {
-  typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
-  typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
-  typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, true> 
+  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, true> 
         Graph_checkerboardCut; // assumes push-style
-  typedef hGraph_jaggedCut<NodeData, EdgeData> 
+  typedef DistGraph_jaggedCut<NodeData, EdgeData> 
         Graph_jaggedCut; // assumes push-style
-  typedef hGraph_jaggedCut<NodeData, EdgeData, true> 
+  typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
         Graph_jaggedBlockedCut; // assumes push-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
                               Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -356,27 +363,27 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
  * @tparam enable_if this function  will only be enabled if iterateOut is false
  * (i.e. iterate over in-edges)
  * @param scaleFactor How to split nodes among hosts
- * @returns a pointer to a newly allocated hGraph based on the command line
+ * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<!iterateOut>::type* = nullptr>
-hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
-  typedef hGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
-  typedef hGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, 
+DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
+  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, 
                               true> Graph_cartesianCut; // assumes pull-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, true, 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, true, 
                               true> Graph_checkerboardCut; // assumes pull-style
-  typedef hGraph_jaggedCut<NodeData, EdgeData, false, 
+  typedef DistGraph_jaggedCut<NodeData, EdgeData, false, 
                            true> Graph_jaggedCut; // assumes pull-style
-  typedef hGraph_jaggedCut<NodeData, EdgeData, true, 
+  typedef DistGraph_jaggedCut<NodeData, EdgeData, true, 
                            true> Graph_jaggedBlockedCut; // assumes pull-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, 2> 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, true, 2> 
                               Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
-  typedef hGraph_cartesianCut<NodeData, EdgeData, false, true, 4> 
+  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, true, 4> 
                               Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
-  typedef hGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // 1 host = no concept of cut; just load from edgeCut
@@ -486,4 +493,7 @@ hGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
       return nullptr;
   }
 }
+
+} // end namespace graphs
+} // end namespace galois
 #endif

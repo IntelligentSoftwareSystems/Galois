@@ -49,20 +49,20 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional, 
+static cll::opt<std::string> filename(cll::Positional,
                                  cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string> transposeGraphName("graphTranspose", 
+static cll::opt<std::string> transposeGraphName("graphTranspose",
                                  cll::desc("Transpose of input graph"));
-static cll::opt<bool> symmetricGraph("symmetricGraph", 
+static cll::opt<bool> symmetricGraph("symmetricGraph",
                           cll::desc("Input graph is symmetric"));
-static cll::opt<unsigned int> startNode("startNode", 
-                                  cll::desc("Node to start search from"), 
+static cll::opt<unsigned int> startNode("startNode",
+                                  cll::desc("Node to start search from"),
                                   cll::init(0));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Async Algorithm"),
       clEnumValN(Algo::leveled, "leveled", "Leveled Algorithm"),
-      clEnumValEnd), 
+      clEnumValEnd),
     cll::init(Algo::async));
 
 /**
@@ -104,8 +104,8 @@ typename Algo::Graph::GraphNode initialize(typename Algo::Graph& graph) {
     assert(0);
     abort();
   }
-  
-  // get source 
+
+  // get source
   typename Algo::Graph::iterator it = graph.begin();
   std::advance(it, startNode);
   return *it;
@@ -127,17 +127,17 @@ struct AsyncAlgo {
     float dependencies;
     int dist;
 
-    SNode() 
-      : numPaths(-std::numeric_limits<int>::max()), 
-        dependencies(-std::numeric_limits<float>::max()), 
+    SNode()
+      : numPaths(-std::numeric_limits<int>::max()),
+        dependencies(-std::numeric_limits<float>::max()),
         dist(std::numeric_limits<int>::max()) { }
   };
 
   using InnerGraph = galois::graphs::LC_CSR_Graph<SNode, void>
-                     ::with_no_lockable<true>::type 
+                     ::with_no_lockable<true>::type
                      ::with_numa_alloc<true>::type;
   using Graph = galois::graphs::LC_InOut_Graph<InnerGraph>;
-  using GNode = Graph::GraphNode; 
+  using GNode = Graph::GraphNode;
 
   std::string name() const { return "async"; }
 
@@ -172,7 +172,7 @@ struct AsyncAlgo {
     };
 
     using OBIM = galois::worklists::OrderedByIntegerMetric<
-                   decltype(indexer), 
+                   decltype(indexer),
                    galois::worklists::dChunkedFIFO<ChunkSize>
                  >;
 
@@ -189,7 +189,7 @@ struct AsyncAlgo {
           // number of shortest paths to this node's current count ONLY
           // if it is finalized there; else wait until they are
           for (auto ii = graph.in_edge_begin(n, galois::MethodFlag::UNPROTECTED),
-                    ee = graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED); 
+                    ee = graph.in_edge_end(n, galois::MethodFlag::UNPROTECTED);
                ii != ee;
                ++ii) {
             GNode dst = graph.getInEdgeDst(ii);
@@ -211,6 +211,7 @@ struct AsyncAlgo {
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::wl<OBIM>(indexer),
+      galois::steal(),
       galois::loopname("CountPaths")
     );
   }
@@ -226,7 +227,7 @@ struct AsyncAlgo {
     // (i.e. smaller distances = bigger index)
     // Used by OBIM to prioritize based on highest distance
     auto indexer = [&] (const GNode& n) {
-      return std::numeric_limits<int>::max() - 
+      return std::numeric_limits<int>::max() -
              graph.getData(n, galois::MethodFlag::UNPROTECTED).dist;
     };
 
@@ -244,8 +245,8 @@ struct AsyncAlgo {
           float newDep = 0.0;
           bool allReady = true;
 
-          // loop through successors and grab dependency value for use if 
-          // finalized; if not all dependencies finalized, then reloop until 
+          // loop through successors and grab dependency value for use if
+          // finalized; if not all dependencies finalized, then reloop until
           // they are
           for (auto ii : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(ii);
@@ -253,7 +254,7 @@ struct AsyncAlgo {
 
             if (ddata.dist == sdata.dist + 1) {
               if (ddata.dependencies != -std::numeric_limits<float>::max()) {
-                newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * 
+                newDep += ((float)sdata.numPaths / (float)ddata.numPaths) *
                           (1 + ddata.dependencies);
               } else {
                 allReady = false;
@@ -263,11 +264,12 @@ struct AsyncAlgo {
 
           // only do this if all successors have finalized dep value
           if (allReady) sdata.dependencies = newDep;
-        } 
+        }
       },
       galois::no_conflicts(),
       galois::no_pushes(),
       galois::wl<OBIM>(indexer),
+      galois::steal(),
       galois::loopname("ComputeDep")
     );
   }
@@ -298,12 +300,12 @@ struct LeveledAlgo {
     std::atomic<unsigned long> numPaths;
     float dependencies;
     std::atomic<int> dist;
-    SNode() : numPaths(~0UL), dependencies(-std::numeric_limits<float>::max()), 
+    SNode() : numPaths(~0UL), dependencies(-std::numeric_limits<float>::max()),
               dist(std::numeric_limits<int>::max()) { }
   };
 
   using InnerGraph = galois::graphs::LC_CSR_Graph<SNode,void>
-                       ::with_no_lockable<true>::type 
+                       ::with_no_lockable<true>::type
                        ::with_numa_alloc<true>::type;
   using Graph = galois::graphs::LC_InOut_Graph<InnerGraph>;
   using GNode = Graph::GraphNode;
@@ -355,7 +357,7 @@ struct LeveledAlgo {
       Bag* newBag = levels.back();
 
       galois::do_all(
-        galois::iterate(*b), 
+        galois::iterate(*b),
         [&] (GNode n) {
           auto& sdata = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
@@ -363,9 +365,9 @@ struct LeveledAlgo {
             GNode dst = graph.getEdgeDst(ii);
             SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-            if (ddata.dist.load(std::memory_order_relaxed) == 
+            if (ddata.dist.load(std::memory_order_relaxed) ==
                   std::numeric_limits<int>::max()) {
-              if (std::numeric_limits<int>::max() == 
+              if (std::numeric_limits<int>::max() ==
                     ddata.dist.exchange(sdata.dist + 1)) {
                 newBag->push_back(dst);
               }
@@ -376,8 +378,8 @@ struct LeveledAlgo {
             }
           }
         },
-        galois::loopname("BFS"), 
-        galois::steal()
+        galois::steal(),
+        galois::loopname("BFS")
       );
     }
 
@@ -408,9 +410,9 @@ struct LeveledAlgo {
     // and level 0 only has the source node, which should not be updating
     // its dependency
     for (int i = levels.size() - 2; i > 0; --i) {
-      galois::gInfo(i);
+      //galois::gInfo(i);
       galois::do_all(
-        galois::iterate(*levels[i]), 
+        galois::iterate(*levels[i]),
         [&] (GNode n) {
           SNode& sdata = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
@@ -420,14 +422,14 @@ struct LeveledAlgo {
             SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
             if (ddata.dist == sdata.dist + 1) {
-              sdata.dependencies += 
-                ((float)sdata.numPaths / (float)ddata.numPaths) * 
+              sdata.dependencies +=
+                ((float)sdata.numPaths / (float)ddata.numPaths) *
                   (1 + ddata.dependencies);
             }
           }
         },
-        galois::loopname("ComputeDep"),
-        galois::steal()
+        galois::steal(),
+        galois::loopname("ComputeDep")
       );
     }
     Tdep.stop();
@@ -449,7 +451,7 @@ struct LeveledAlgo {
     while (!levels.empty()) {
       delete levels.back();
       levels.pop_back();
-    }     
+    }
   }
 };
 
@@ -468,7 +470,7 @@ void run() {
   GNode source = initialize<Algo>(graph);
 
   galois::reportPageAlloc("MeminfoPre");
-  galois::preAlloc(numThreads + 
+  galois::preAlloc(numThreads +
                      (3 * graph.size() * sizeof(typename Graph::node_data_type)) /
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoMid");
@@ -479,7 +481,7 @@ void run() {
   T.start();
   algo(graph, source);
   T.stop();
-  
+
   galois::reportPageAlloc("MeminfoPost");
 
   // prints stats for first MAX_COUNT nodes
@@ -490,14 +492,14 @@ void run() {
     galois::gPrint("Printing first ", MAX_COUNT, " values instead\n");
 
     unsigned count = 0;
-    for (typename Graph::iterator ii = graph.begin(), 
-                                  ei = graph.end(); 
-         ii != ei && count < MAX_COUNT; 
+    for (typename Graph::iterator ii = graph.begin(),
+                                  ei = graph.end();
+         ii != ei && count < MAX_COUNT;
          ++ii, ++count) {
       std::cout << count << " "
-                << std::setiosflags(std::ios::fixed) << std::setprecision(6) 
+                << std::setiosflags(std::ios::fixed) << std::setprecision(6)
                 << graph.getData(*ii).dependencies
-                << " " << graph.getData(*ii).numPaths 
+                << " " << graph.getData(*ii).numPaths
                 << " " << graph.getData(*ii).dist
                 << "\n";
     }

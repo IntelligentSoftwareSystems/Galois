@@ -1,4 +1,4 @@
-/**SyncStructures.h -*- C++ -*-
+/** SyncStructures.h -*- C++ -*-
  * @file
  * @section License
  *
@@ -59,6 +59,10 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Field flag class
 ////////////////////////////////////////////////////////////////////////////////
+
+
+namespace galois {
+namespace runtime {
 
 enum BITVECTOR_STATUS {
   NONE_INVALID,
@@ -153,6 +157,9 @@ class FieldFlags {
     bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
 };
+
+} // end namespace runtime
+} // end namespace galois
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reduce Add

@@ -29,9 +29,13 @@
 
 #ifndef _GALOIS_DIST_GLOBAL_OBJECT_H
 #define _GALOIS_DIST_GLOBAL_OBJECT_H
+
+namespace galois {
+namespace runtime {
+
 class GlobalObject {
-  //FIXME: lock?
-  // TODO make a pointer?
+  // FIXME: lock?
+  // TODO make a pointer to avoid static initialization?
   static std::vector<uintptr_t> allobjs;
   uint32_t objID;
 
@@ -51,4 +55,8 @@ class GlobalObject {
     return objID;
   }
 };
+
+} // end namespace runtime
+} // end namespace galois
+
 #endif//_GALOIS_DIST_GLOBAL_OBJECT_H

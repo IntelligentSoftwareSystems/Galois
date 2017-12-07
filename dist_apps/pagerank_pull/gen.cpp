@@ -31,7 +31,7 @@
 #include "DistBenchStart.h"
 #include "galois/gstl.h"
 #include "galois/runtime/Tracer.h"
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"
@@ -72,7 +72,7 @@ struct NodeData {
 galois::DynamicBitSet bitset_residual;
 galois::DynamicBitSet bitset_nout;
 
-typedef hGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"

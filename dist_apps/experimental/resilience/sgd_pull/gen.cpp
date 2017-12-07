@@ -32,7 +32,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 
-#include "galois/DistAccumulator.h"
+#include "galois/DReducible.h"
 #include "galois/AtomicWrapper.h"
 #include "galois/ArrayWrapper.h"
 #include "galois/runtime/Tracer.h"
@@ -92,8 +92,8 @@ struct NodeData {
 };
 
 
-typedef hGraph<NodeData, double> Graph;
-//typedef hGraph<NodeData, uint32_t> Graph;
+typedef galois::graphs::DistGraph<NodeData, double> Graph;
+//typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
 typedef typename Graph::GraphNode GNode;
 
 #include "gen_sync.hh"
