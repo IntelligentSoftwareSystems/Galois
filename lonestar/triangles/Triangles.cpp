@@ -35,9 +35,7 @@
 #include "galois/runtime/Profile.h"
 
 #include <boost/iterator/transform_iterator.hpp>
-#ifdef HAS_EIGEN
-#include <Eigen/Dense>
-#endif
+
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -51,7 +49,6 @@ const char* url = 0;
 enum Algo {
   nodeiterator,
   edgeiterator,
-  hybrid,
 };
 
 namespace cll = llvm::cl;
@@ -60,7 +57,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator (default)"),
       clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"),
-      clEnumValN(Algo::hybrid, "hybrid", "Hybrid node iterator and matrix multiply algorithm"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t,void>
@@ -273,157 +269,6 @@ void edgeIteratingAlgo(Graph& graph) {
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
 
-#ifdef HAS_EIGEN
-/**
- * AYZ algorithm. Combine node iterator algorithm with matrix multiplication.
- * Divide nodes into two categories. Low and high degree ones. Apply node
- * iterator to low degree nodes and matrix multiplication for high degree ones.
- *
- * Node iterator finds triangles such that a < v < b where v is the current
- * node. When we divide nodes into low (v_l) and high (v_h), there are four
- * cases:
- *  (1) v_l < v_l < v_l  ("a < v < b")
- *  (2) v_l < v_l < v_h
- *  (3) v_l < v_h < v_h
- *  (4) v_h < v_h < v_h
- * We divide work by the class of the middle node. In the following code,
- * ProcessLow handles the first three cases and ProcessHigh the last.
- *
- * Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
- * Thesis. Universitat Karlsruhe. 2007.
- */
-struct HybridAlgo {
-  typedef Eigen::Matrix<int, Eigen::Dynamic, Eigen::Dynamic> Matrix;
-
-  Graph& graph;
-  galois::GAccumulator<size_t> numTriangles;
-  Matrix adjacency;
-
-  //! Since nodes are sorted by degree, we can classify nodes based on comparison with node id
-  GNode limit;
-  Graph::iterator limitIterator;
-  int numHighNodes;
-
-  explicit HybridAlgo(Graph& g): graph(g) {}
-
-  //! Node iterator algorithm + populate 
-  template<bool HasLimit>
-  struct ProcessLow {
-    HybridAlgo* self;
-    ProcessLow(HybridAlgo* s): self(s) { }
-
-    void operator()(const GNode& n, galois::UserContext<GNode>&) { (*this)(n); }
-    void operator()(const GNode& n) {
-      // Partition neighbors
-      // [first, ea) [n] [bb, last)
-      Graph::edge_iterator first = self->graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator last = self->graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-      Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(self->graph, n));
-      Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(self->graph, n));
-
-      // If there is a limit, only process the low degree "a" neighbors
-      if (HasLimit) {
-        ea = lowerBound(first, ea, LessThan<Graph>(self->graph, self->limit));
-        last = lowerBound(bb, last, LessThan<Graph>(self->graph, self->limit)); // XXX
-      }
-
-      for (; bb != last; ++bb) {
-        GNode B = self->graph.getEdgeDst(bb);
-        for (auto aa = first; aa != ea; ++aa) {
-          GNode A = self->graph.getEdgeDst(aa);
-          Graph::edge_iterator vv = self->graph.edge_begin(A, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator ev = self->graph.edge_end(A, galois::MethodFlag::UNPROTECTED);
-          Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(self->graph, B));
-          if (it != ev && self->graph.getEdgeDst(it) == B) {
-            self->numTriangles += 1;
-          }
-        }
-      }
-    }
-  };
-
-  bool setLimit() {
-    typedef boost::transform_iterator<GetDegree<Graph>, Graph::iterator> DegreeIterator;
-    DegreeIterator first(graph.begin(), GetDegree<Graph>(graph));
-    DegreeIterator last(graph.end(), GetDegree<Graph>(graph));
-
-    int degreeLimit = static_cast<int>(sqrt(graph.size()));
-    DegreeIterator it = std::lower_bound(first, last, degreeLimit);
-
-    numHighNodes = 0;
-    if (it == last)
-      return false;
-
-    limitIterator = it.base();
-    limit = *limitIterator;
-    numHighNodes = std::distance(limitIterator, graph.end());
-    std::cout << "HighNodes: " << numHighNodes << ", DegreeLimit: " << degreeLimit << "\n";
-    return true;
-  }
-
-  void operator()() {
-
-    if (getenv("GALOIS_DO_NOT_BIND_MAIN_THREAD") == 0) {
-      std::cerr << "To enable full parallelization, set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD=1\n";
-    }
-    Eigen::setNbThreads(numThreads);
-
-    galois::StatTimer Tlimit("SetLimitTime");
-    Tlimit.start();
-    bool hasLimit = setLimit();
-    Tlimit.stop();
-
-    if (hasLimit) {
-      if (true) {
-        std::cout << "Processing high degree nodes\n";
-        adjacency.resize(numHighNodes, numHighNodes);
-        adjacency.setZero();
-
-        size_t limitIdx = graph.getData(this->limit, galois::MethodFlag::UNPROTECTED);
-
-        galois::do_all(galois::iterate(limitIterator, graph.end())
-            , [&, self=this] (const GNode& n) {
-              size_t nidx = graph.getData(n, galois::MethodFlag::UNPROTECTED) - limitIdx;
-              for (Graph::edge_iterator edge : graph.out_edges(n, galois::MethodFlag::UNPROTECTED)) {
-                GNode dst = graph.getEdgeDst(edge);
-                if (dst < self->limit)
-                  continue;
-                size_t didx = graph.getData(dst, galois::MethodFlag::UNPROTECTED) - limitIdx;
-                self->adjacency(nidx, didx) = 1;
-              }
-
-            }
-            , galois::loopname("WriteAdjacency"));
-
-        // Compute matrix^3
-        galois::StatTimer Tmm("MMTime");
-        Tmm.start();
-        Matrix B, C;
-        B.noalias() = adjacency * adjacency;
-        C.noalias() = B * adjacency;
-        Tmm.stop();
-
-        size_t high = C.trace() / 6;
-        std::cout << "NumHighTriangles: " << high << "\n";
-        numTriangles += high;
-      }
-      std::cout << "Processing low degree nodes\n";
-      galois::do_all(galois::iterate(graph)
-          , ProcessLow<true>(this)
-          , galois::loopname("HybridAlgo-1")
-          , galois::steal());
-
-    } else {
-      galois::do_all(galois::iterate(graph)
-          , ProcessLow<false>(this)
-          , galois::loopname("HybridAlgo-2")
-          , galois::steal());
-    }
-    std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
-  }
-};
-#endif
-
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
   typedef galois::graphs::FileGraph G;
   typedef G::GraphNode N;
@@ -479,7 +324,6 @@ void readGraph(Graph& graph) {
   }
 }
 
-
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -507,11 +351,6 @@ int main(int argc, char** argv) {
       edgeIteratingAlgo(graph);
       break;
 
-#ifdef HAS_EIGEN
-    case hybrid: 
-      HybridAlgo(graph)();
-      break;
-#endif
     default: 
       std::cerr << "Unknown algo: " << algo << "\n";
   }
