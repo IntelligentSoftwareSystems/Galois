@@ -555,3 +555,4 @@ install(FILES
   "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
 install(EXPORT GaloisTargets DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
+Example Line 1
