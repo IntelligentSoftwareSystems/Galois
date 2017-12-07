@@ -509,16 +509,17 @@ void SGDNodeMovie(Graph& g, const LearnFN* lf) {
     double step_size = lf->step_size(i);
     galois::gDebug("Step Size: ", step_size);
 
-    galois::do_all(
+    galois::for_each(
       galois::iterate(g), 
-      [&] (GNode node) {
+      [&] (GNode node, auto& ctx) {
         for (auto ii : g.edges(node)) {
           doGradientUpdate(g.getData(node, galois::MethodFlag::UNPROTECTED), 
                            g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), 
                            step_size);
         }
       },
-      galois::steal(),
+      galois::wl<galois::worklists::dChunkedFIFO<8>>(),
+      galois::no_pushes(),
       galois::loopname("SGDNodeMovie")
     );
   }
