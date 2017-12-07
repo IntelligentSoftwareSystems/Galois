@@ -55,9 +55,9 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator (default)"),
-      clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"),
-      clEnumValEnd), cll::init(Algo::nodeiterator));
+      clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
+      clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator (default)"),
+      clEnumValEnd), cll::init(Algo::edgeiterator));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t,void>
   ::with_numa_alloc<true>::type
