@@ -60,7 +60,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
       clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator (default)"),
+#ifdef HAS_EIGEN
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid node iterator and matrix multiply algorithm"),
+#endif
       clEnumValEnd), cll::init(Algo::edgeiterator));
 
 typedef galois::graphs::LC_CSR_Graph<uint32_t,void>
@@ -304,7 +306,7 @@ struct HybridAlgo {
   Graph::iterator limitIterator;
   int numHighNodes;
 
-  explicit HybridAlgo(Graph& g): graph(g) {}
+  explicit HybridAlgo(Graph& g): graph(g) { std::cout << "Hybrid constructed" << std::endl; }
 
   //! Node iterator algorithm + populate 
   template<bool HasLimit>
