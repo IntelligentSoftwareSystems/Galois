@@ -510,7 +510,6 @@ struct PreflowPush {
             galois::wl<galois::worklists::BulkSynchronous<>>(),
             galois::no_conflicts(),
             galois::loopname("UpdateHeights"));
-        },
         break;
       case detBase:
         galois::for_each(galois::iterate( { sink } ), UpdateHeights<detBase>(*this),
