@@ -108,7 +108,7 @@ namespace graphs {
  */
 // TODO change this (WithInEdges)
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
-class DistGraph: public GlobalObject {
+class DistGraph: public galois::runtime::GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
@@ -544,8 +544,8 @@ public:
    * @param numHosts total number of hosts in the currently executing program
    */
   DistGraph(unsigned host, unsigned numHosts) :
-      GlobalObject(this), round(false), transposed(false), id(host),
-      numHosts(numHosts) {
+      galois::runtime::GlobalObject(this), round(false), transposed(false), 
+      id(host), numHosts(numHosts) {
     enforce_data_mode = enforce_metadata;
 
     masterNodes.resize(numHosts);
