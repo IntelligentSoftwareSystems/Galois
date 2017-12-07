@@ -306,7 +306,7 @@ struct HybridAlgo {
   Graph::iterator limitIterator;
   int numHighNodes;
 
-  explicit HybridAlgo(Graph& g): graph(g) { std::cout << "Hybrid constructed" << std::endl; }
+  explicit HybridAlgo(Graph& g): graph(g) { }
 
   //! Node iterator algorithm + populate 
   template<bool HasLimit>
@@ -424,6 +424,13 @@ struct HybridAlgo {
     std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
   }
 };
+
+void runHybridAlgo(Graph& graph) {
+  // cannot declare variables in a switch statement
+  // need to declare it explicitly and then call operator()
+  HybridAlgo hg(graph);
+  hg();
+}
 #endif
 
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
@@ -511,7 +518,7 @@ int main(int argc, char** argv) {
 
 #ifdef HAS_EIGEN
     case hybrid: 
-      HybridAlgo(graph)();
+      runHybridAlgo(graph);
       break;
 #endif
     default: 
