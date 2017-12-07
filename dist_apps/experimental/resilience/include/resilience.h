@@ -94,8 +94,11 @@ std::set<uint32_t> getRandomHosts(){
  */
 template<typename GraphTy>
 void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
+  const auto& net = galois::runtime::getSystemNetworkInterface();
   if(enableFT && recoveryScheme == CP){
     if(_num_iterations%checkpointInterval == 0){
+      if(net.ID == 0)
+	galois::gPrint("Checkpoint for iteration: ", _num_iterations, "\n");    
       _graph.checkpointSaveNodeData(checkpointFileName);
     }
   }
@@ -198,11 +201,11 @@ void crashSite(GraphTy& _graph){
       //Reconstruct local graph
       //Assumes that local graph file is present
       _graph.read_local_graph_from_file(localGraphFileName);
-      _graph.checkpointApplyNodeData();
+      _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
     } else {
       TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData();
+      _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryHealthy.stop();
     }
   }
