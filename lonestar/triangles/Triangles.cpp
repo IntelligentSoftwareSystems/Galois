@@ -203,7 +203,7 @@ void nodeIteratingAlgo(Graph& graph) {
                 }
               }
             }
-            , galois::chunk_size<32>() // TODO: tune
+            , galois::chunk_size<32>()
             , galois::steal()
             , galois::loopname("nodeIteratingAlgo"));
       },
@@ -265,6 +265,7 @@ void edgeIteratingAlgo(Graph& graph) {
                numTriangles += countEqual(graph, aa, ea, bb, eb);
              }
              , galois::loopname("edgeIteratingAlgo")
+             , galois::chunk_size<32>()
              , galois::steal());
       },
       "edgeIteratorAlgo");
