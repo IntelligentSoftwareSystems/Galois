@@ -20,6 +20,18 @@ name = USA-road-d.USA
 file = road/USA-road-d.USA.gr
 format = bin/galois
 
+[unweighted/uk-2007-05.sgr]
+flags = 
+name = uk-2007-05-symmetric
+file = unweighted/uk-2007-05.sgr
+format = bin/galois
+
+[scalefree/symmetric/rmat26.sgr]
+flags = 
+name = rmat26-symmetric
+file = scalefree/symmetric/rmat16-2e26-a=0.57-b=0.19-c=0.19-d=.05.sgr
+format = bin/galois
+
 [meshes/r5M]
 flags = 
 name = r5M

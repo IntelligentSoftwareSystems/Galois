@@ -7,7 +7,9 @@ bc-outer rmat8-2e14
 boruvka USA-road-d.USA
 boruvka-merge USA-road-d.USA
 clustering nothing
+connectedcomponents rmat26-symmetric
 connectedcomponents twitter40-symmetric
+connectedcomponents uk-2007-05-symmetric
 delaunaytriangulation r5Mn
 delaunaytriangulation-det r5Mn
 dmr r5M
