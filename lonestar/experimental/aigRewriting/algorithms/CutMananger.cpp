@@ -643,7 +643,7 @@ struct KCutOperator {
 	
 	KCutOperator( CutMananger & cutMan ) : cutMan( cutMan ) { }
 	
-	void operator()( aig::GNode node, auto& ctx ) {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) {
 
 		aig::Aig & aig = cutMan.getAig();
 		aig::Graph & aigGraph = aig.getGraph();

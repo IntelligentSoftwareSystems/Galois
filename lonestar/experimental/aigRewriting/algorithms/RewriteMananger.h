@@ -1,6 +1,6 @@
 /*
 
- Possani K-Cuts August 29, 2017.
+ Possani Parallel AIG Rewriting, December 7, 2017.
  ABC-based implementation on Galois.
 
 */
@@ -75,7 +75,6 @@ private:
     bool updateLevel;
 	
 	long double rewriteTime;
-
        
 	void lockFaninCone( aig::Graph & aigGraph, aig::GNode node, Cut * cut );
 	int labelMFFC( ThreadContextData * threadCtx, aig::GNode node, int threadId, int travId );
@@ -102,6 +101,8 @@ private:
 	*/
 
 public:
+
+	galois::GAccumulator< long int > nPushes;
 
     RewriteMananger( aig::Aig & aig, CutMananger & cutMan, NPNMananger & npnMan, PreCompGraphMananger & pcgMan, int triesNGraphs,  bool useZeros, bool updateLevel );
 

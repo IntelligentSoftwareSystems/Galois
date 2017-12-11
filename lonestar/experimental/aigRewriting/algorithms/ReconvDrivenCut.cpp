@@ -41,7 +41,7 @@ struct ReconvergenceDrivenCut {
 
 	ReconvergenceDrivenCut( aig::Graph & aigGraph, PerThreadRDCutData & perThreadRDCutData, int cutSizeLimit ) : aigGraph( aigGraph ), perThreadRDCutData( perThreadRDCutData ), cutSizeLimit( cutSizeLimit ) { }
 
-	void operator()( aig::GNode node, auto & ctx ) const {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
 	//void operator()( aig::GNode node ) const {
 
 		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );

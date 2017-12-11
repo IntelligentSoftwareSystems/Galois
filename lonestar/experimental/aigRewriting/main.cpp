@@ -24,6 +24,7 @@ std::string getFileName( std::string path );
 void limitFanout( aig::Aig & aig, int limit );
 
 int main( int argc, char * argv[] ) {
+
 	galois::SharedMemSys G; // shared-memory system object initializes global variables for galois
 	
 	if ( argc < 5 ) {
@@ -138,7 +139,7 @@ int main( int argc, char * argv[] ) {
 	pcgMan.processDecompositionGraphs();
 
 	int triesNGraphs = 500;
-	bool useZeros = true;
+	bool useZeros = false;
 	bool updateLevel = false;
 
 	if ( verbose >= 2 ) {
@@ -157,6 +158,9 @@ int main( int argc, char * argv[] ) {
 	//cutMan.printCutStatistics();
 	//cutMan.printRuntimes();
 	
+	long int nPushes = rwtMan.nPushes.reduce();
+	std::cout << "nPushes: " << nPushes << std::endl;
+
 
 	high_resolution_clock::time_point t2 = high_resolution_clock::now();
 	long double rewriteTime = duration_cast<microseconds>( t2 - t1 ).count();

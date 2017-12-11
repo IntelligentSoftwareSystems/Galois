@@ -1,11 +1,13 @@
 /*
 
- Possani K-Cuts August 29, 2017.
+ Possani Parallel AIG Rewriting, December 7, 2017.
  ABC-based implementation on Galois.
 
 */
 
 #include "RewriteMananger.h"
+
+#include "galois/worklists/WorkListAlt.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -756,7 +758,7 @@ struct RewriteOperator {
 
 	RewriteOperator( RewriteMananger & rwtMan ) : rwtMan( rwtMan ), cutMan( rwtMan.getCutMan() ) { }
 
-	void operator()( aig::GNode node, auto & ctx ) {
+	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) {
 		
 		aig::Graph & aigGraph = rwtMan.getAig().getGraph();
 
@@ -765,7 +767,7 @@ struct RewriteOperator {
 		}
 
 		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::WRITE );
-	
+		
 		if ( nodeData.type == aig::NodeType::AND ) {
 
 			//bool isBarrier = nodeData.isBarrier;
@@ -781,7 +783,7 @@ struct RewriteOperator {
 					fanoutNodes.push_back( fanoutNode );
 					for ( auto inEdge : aigGraph.in_edges( fanoutNode ) ) { }
 				}
-				
+
 				ThreadContextData * threadCtx = rwtMan.getPerThreadContextData().getLocal();
 
 				// Try to rewrite the node
@@ -814,6 +816,7 @@ struct RewriteOperator {
 							if ( cutMan.getNodeCuts()[ nextNodeData.id ] != nullptr ) {
 								cutMan.recycleNodeCuts( nextNodeData.id );
 							}
+							rwtMan.nPushes += 1;
 							ctx.push( nextNode );
 						}
 					}
@@ -838,6 +841,7 @@ struct RewriteOperator {
 							if ( cutMan.getNodeCuts()[ nextNodeData.id ] != nullptr ) {
 								cutMan.recycleNodeCuts( nextNodeData.id );
 							}
+							rwtMan.nPushes += 1;
 							ctx.push( nextNode );
 						}
 					}
@@ -854,13 +858,15 @@ void runRewriteOperator( RewriteMananger & rwtMan, std::vector< int > & levelHis
 	CutMananger & cutMan = rwtMan.getCutMan();
 	aig::Graph & aigGraph = rwtMan.getAig().getGraph();
  
-    // compute the reverse levels if level update is requested
-    //if ( rwtMan.getUpdateLevelFlag() ) {
+	// compute the reverse levels if level update is requested
+	//if ( rwtMan.getUpdateLevelFlag() ) {
         //Abc_NtkStartReverseLevels( pNtk, 0 ); // FIXME
     //}
 
 	galois::InsertBag< aig::GNode > workList;
-    typedef galois::worklists::dChunkedBag<5000> DC_BAG;
+	typedef galois::worklists::dChunkedBag< 5000 > DC_BAG;
+	//typedef galois::worklists::dChunkedFIFO< 5000 > DC_FIFO;
+  	//typedef galois::worklists::AltChunkedFIFO< 5000 > CHUNKED;
 
 	for ( auto pi : rwtMan.getAig().getInputNodes() ) {	
 		aig::NodeData & piData = aigGraph.getData( pi, galois::MethodFlag::UNPROTECTED );
@@ -884,6 +890,7 @@ void runRewriteOperator( RewriteMananger & rwtMan, std::vector< int > & levelHis
 			aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );
 			nextNodeData.counter += 1;
 			if ( nextNodeData.counter == 2 ) {
+				rwtMan.nPushes += 1;
 				workList.push( nextNode );
 			}
 		}
@@ -897,7 +904,7 @@ void runRewriteOperator( RewriteMananger & rwtMan, std::vector< int > & levelHis
 	*/
 	
 	// Galois Parallel Foreach
-	galois::for_each( galois::iterate( workList.begin(), workList.end() ), RewriteOperator( rwtMan ), galois::wl<DC_BAG>(), galois::loopname( "RewriteOperator" ), galois::per_iter_alloc() );
+	galois::for_each( galois::iterate( workList.begin(), workList.end() ), RewriteOperator( rwtMan ), galois::wl< DC_BAG >(), galois::loopname( "RewriteOperator" ), galois::per_iter_alloc() );
 
 	//high_resolution_clock::time_point t2 = high_resolution_clock::now();
 	//rwtMan.setRewriteTime( duration_cast<microseconds>( t2 - t1 ).count() );
