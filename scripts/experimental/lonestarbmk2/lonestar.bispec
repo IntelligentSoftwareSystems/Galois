@@ -15,6 +15,7 @@ delaunaytriangulation-det r5Mn
 dmr r5M
 gmetis USA-road-d.USA
 independentset r4-2e26
+independentset rmat28
 matrixcompletion yahoo-music
 mcm nothing
 pagerank soc-livejournal

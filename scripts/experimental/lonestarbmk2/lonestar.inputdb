@@ -32,6 +32,12 @@ name = rmat26-symmetric
 file = scalefree/symmetric/rmat16-2e26-a=0.57-b=0.19-c=0.19-d=.05.sgr
 format = bin/galois
 
+[scalefree/rmat28.gr]
+flags = 
+name = rmat28
+file = scalefree/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=.05.gr
+format = bin/galois
+
 [meshes/r5M]
 flags = 
 name = r5M
