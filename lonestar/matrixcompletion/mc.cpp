@@ -21,7 +21,8 @@
  * Stochastic gradient descent for matrix factorization, implemented with 
  * Galois.
  *
- * @author: Prad Nelluru <pradn@cs.utexas.edu>
+ * @author Prad Nelluru <pradn@cs.utexas.edu>
+ * @author Loc Hoang <lhoang@utexas.edu> (utility code/code cleanup)
  */
 
 #include "galois/Galois.h"
@@ -162,7 +163,7 @@ unsigned int NUM_RATINGS = 0;
 
 
 ////////////////////////////////////////////////////////////////////////////////
-// Utitlity funcions for use during execution
+// Utility funcions for use during execution
 ////////////////////////////////////////////////////////////////////////////////
 
 /** 
@@ -223,8 +224,6 @@ std::pair<unsigned int, unsigned int> initializeGraphData(Graph& g) {
 
   return std::make_pair(numMovieNodes, numUserNodes);
 }
-
-
 
 // possibly over-typed
 /**
@@ -308,14 +307,13 @@ double doGradientUpdate(Node& movieData, Node& userData, int edgeRating,
   return curError;
 }
 
-
 /**
- * Computes root mean square error of predictions and prints it.
- * Assumes only movie nodes have edges
+ * Calculate root mean square error of predictions .
  *
  * @param g Graph with nodes that have latent vectors
+ * @returns root mean squared error of predictions of edge weights
  */
-void verify(Graph& g) {
+double rootMeanSquaredError(Graph& g) {
   galois::GAccumulator<double> rms;
 
   galois::do_all(
@@ -344,7 +342,19 @@ void verify(Graph& g) {
     }
   );
 
-  double totalRMS = rms.reduce();
+  double rmsSum = rms.reduce();
+  double rmsMean = rmsSum / g.sizeEdges();
+  return sqrt(rmsMean);
+}
+
+/**
+ * Computes root mean square error of predictions and prints it.
+ * Assumes only movie nodes have edges
+ *
+ * @param g Graph with nodes that have latent vectors
+ */
+void verify(Graph& g) {
+  double totalRMS = rootMeanSquaredError(g);
   double normalizedRMS = sqrt(totalRMS / NUM_RATINGS);
   
   galois::gPrint("RMSE Total: ", totalRMS, "; Normalized: ", normalizedRMS, 
