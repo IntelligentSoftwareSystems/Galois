@@ -143,6 +143,7 @@ int main( int argc, char * argv[] ) {
 	bool updateLevel = false;
 
 	if ( verbose >= 2 ) {
+		std::cout << "############### Configurations ################ " << std::endl;
 		std::cout << "K: " << K << std::endl;
 		std::cout << "C: " << C << std::endl;
 		std::cout << "TriesNGraphs: " << triesNGraphs << std::endl;
