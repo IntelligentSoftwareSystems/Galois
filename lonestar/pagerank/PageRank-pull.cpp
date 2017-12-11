@@ -129,23 +129,18 @@ struct PageRank {
 
   Graph& graph;
   galois::GReduceMax<double>& max_delta;
-  galois::GAccumulator<unsigned int>& small_delta;
 
-  PageRank(Graph& _graph, galois::GReduceMax<double>& _max_delta,
-           galois::GAccumulator<unsigned int>& _small_delta)
-      : graph(_graph), max_delta(_max_delta), small_delta(_small_delta) {}
+  PageRank(Graph& _graph, galois::GReduceMax<double>& _max_delta)
+      : graph(_graph), max_delta(_max_delta) {}
 
   static void go(Graph& graph) {
     galois::GReduceMax<double> max_delta;
-    galois::GAccumulator<unsigned int> small_delta;
 
     while (true) {
-      galois::do_all(galois::iterate(graph),
-                     PageRank(graph, max_delta, small_delta),
+      galois::do_all(galois::iterate(graph), PageRank(graph, max_delta),
                      galois::no_stats(), galois::loopname("PageRank"));
 
-      float delta   = max_delta.reduce();
-      size_t sdelta = small_delta.reduce();
+      float delta = max_delta.reduce();
 
 #if DEBUG
       std::cout << "iteration: " << iteration << " max delta: " << delta
@@ -158,7 +153,6 @@ struct PageRank {
       if (delta <= tolerance || iteration >= maxIterations)
         break;
       max_delta.reset();
-      small_delta.reset();
     }
 
     if (iteration >= maxIterations) {
@@ -188,8 +182,6 @@ struct PageRank {
     float value = sum * (1.0 - alpha) + alpha;
     float diff  = std::fabs(value - sdata.getPageRank(iteration));
 
-    if (diff <= tolerance)
-      small_delta += 1;
     max_delta.update(diff);
     sdata.setPageRank(iteration, value);
   }
