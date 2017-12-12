@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_SAMPLING_H
 #define GALOIS_RUNTIME_SAMPLING_H
 
+#include "galois/Galois.h"
 #include "galois/Timer.h"
 #include "galois/gIO.h"
 #include "galois/util.h"
@@ -36,6 +37,10 @@ extern "C" {
 #include <papi.h>
 #include <papiStdEventDefs.h>
 }
+#endif
+
+#ifdef GALOIS_USE_HPCTK
+#include <hpctoolkit.h>
 #endif
 
 #include <cstdlib>
@@ -74,12 +79,40 @@ void profileVtune(const F& func, const char* region) {
 
 #endif
 
+
+#ifdef GALOIS_USE_HPCTK
+void profileHpcTk(const F& func, const char* region) {
+  region = region ? region : "(NULL)";
+
+  GALOIS_ASSERT(galois::substrate::ThreadPool::getTID() == 0
+      , "profileHpcTk can only be called from master thread (thread 0)");
+
+  hpctoolkit_sampling_start();
+
+  timeThis(func, region);
+
+  hpctoolkit_sampling_stop();
+}
+#else
+template <typename F>
+void profileHpcTk(const F& func, const char* region) {
+
+  region = region ? region : "(NULL)";
+  galois::gWarn("HPC Toolkit not enabled or found");
+
+  timeThis(func, region);
+}
+#endif
+
+
 #ifdef GALOIS_USE_PAPI
 
 namespace internal {
 
-  template <typename __T>
-  void papiInit(const __T* __unused=nullptr) {
+  unsigned long papiGetTID(void);
+
+  template <typename __T=void>
+  void papiInit() {
 
     /* Initialize the PAPI library */
     int retval = PAPI_library_init(PAPI_VER_CURRENT);
@@ -92,8 +125,8 @@ namespace internal {
       GALOIS_DIE("Initialization error!");
     }
 
-    if ((retval = PAPI_thread_init(&galois::substrate::ThreadPool::getTID)) != PAPI_OK) {
-      GALOIS_DIE("PAPI thread init failed"));
+    if ((retval = PAPI_thread_init(&papiGetTID)) != PAPI_OK) {
+      GALOIS_DIE("PAPI thread init failed");
     }
 
   }
@@ -136,7 +169,7 @@ namespace internal {
   }
 
   template <typename V1, typename V2, typename V3>
-  void papiStop(V1& eventSets, V2& papiResults, V3& eventNames) {
+  void papiStop(V1& eventSets, V2& papiResults, V3& eventNames, const char* region) {
     galois::on_each([&] (const unsigned tid, const unsigned numT) {
 
       int& eventSet = *eventSets.getLocal();
@@ -155,7 +188,7 @@ namespace internal {
 
       assert(eventNames.size() == papiResults.getLocal()->size() && "Both vectors should be of equal length");
       for (size_t i = 0; i < eventNames.size(); ++i) {
-        galois::runtime::reportStat_Tsum(region, eventNames[i], papiResults[i]);
+        galois::runtime::reportStat_Tsum(region, eventNames[i], (*papiResults.getLocal())[i]);
       }
 
       if (PAPI_unregister_thread() != PAPI_OK) {
@@ -176,7 +209,7 @@ void profilePapi(const F& func, const char* region) {
 
   if (!galois::substrate::EnvCheck(PAPI_VAR_NAME, eventNamesCSV) || eventNamesCSV.empty()) {
     galois::gWarn("No Events specified. Set environment variable GALOIS_PAPI_EVENTS");
-    galois::timeThis(func, name);
+    galois::timeThis(func, region);
     return;
   }
 
@@ -197,7 +230,7 @@ void profilePapi(const F& func, const char* region) {
 
   galois::timeThis(func, region);
 
-  internal::papiStop(eventSets, papiResults, eventNames);
+  internal::papiStop(eventSets, papiResults, eventNames, region);
 
 }
 

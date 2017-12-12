@@ -25,8 +25,25 @@
  * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author M. Amber Hassaan <ahassaan@ices.utexase.edu>
  */
 
+#include "galois/runtime/Profile.h"
+
+#ifdef GALOIS_USE_PAPI
+extern "C" {
+#include <papi.h>
+#include <papiStdEventDefs.h>
+}
+#include <iostream>
+
+unsigned long galois::runtime::internal::papiGetTID(void) {
+  return galois::substrate::ThreadPool::getTID();
+}
+#endif// GALOIS_USE_PAPI
+
+
+#if 0
 #include "galois/runtime/Profile.h"
 #include "galois/runtime/Statistics.h"
 #include "galois/substrate/EnvCheck.h"
@@ -222,3 +239,5 @@ void galois::runtime::endSampling() {
   papi::end(true);
   endPeriod();
 }
+
+#endif

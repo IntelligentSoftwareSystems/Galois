@@ -23,6 +23,7 @@ set(sources
         src/ThreadPool.cpp
         src/SimpleLock.cpp
         src/PtrLock.cpp
+        src/Profile.cpp
         src/EnvCheck.cpp
         src/PerThreadStorage.cpp
         src/HWTopoLinux.cpp
