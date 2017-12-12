@@ -1,15 +1,15 @@
-
 /** Points-to Analysis application -*- C++ -*-
  * @file
  *
- * An inclusion-based points-to analysis algorithm to demostrate the Galois system.
+ * An inclusion-based points-to analysis algorithm to demostrate the Galois 
+ * system.
  *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,29 +22,19 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author rupesh nasre. <rupesh0508@gmail.com>
+ * @author Rupesh Nasre <rupesh0508@gmail.com>
  */
 #include "galois/Galois.h"
-#include "galois/Bag.h"
-#include "SparseBitVector.h"
-#include "galois/Timer.h"
 #include "galois/graphs/Graph.h"
-#include "galois/graphs/FileGraph.h"
-#include "galois/worklists/WorkList.h"
 #include "llvm/Support/CommandLine.h"
+
+#include "SparseBitVector.h"
 
 #include "Lonestar/BoilerPlate.h"
 
-#include <vector>
-#include <iostream>
 #include <fstream>
-#include <string>
-#include <cstdlib>
-#include <stack>
 
 namespace cll = llvm::cl;
-
-namespace {
 
 const char* name = "Points-to Analysis";
 const char* desc = "Performs inclusion-based points-to analysis over the input constraints.";
@@ -52,7 +42,8 @@ const char* url = NULL;
 
 static cll::opt<std::string> input(cll::Positional, cll::desc("<constraints>"), cll::Required);
 
-const unsigned THRESHOLD_LOADSTORE = 500;	// no of nodes to be processed before adding load/store edges.
+// no of nodes to be processed before adding load/store edges.
+const unsigned THRESHOLD_LOADSTORE = 500;	
 const unsigned THRESHOLD_OCD = 500;
 
 struct Node {
@@ -557,8 +548,6 @@ public:
   }
 
   }; // end class PTA
-
-}
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
