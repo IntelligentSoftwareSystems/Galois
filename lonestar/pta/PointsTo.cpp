@@ -100,19 +100,24 @@ public:
 		type = tt;
 	}
 
-	void getSrcDst(unsigned &ss, unsigned &dd) {
-		ss = src;
-		dd = dst;
+  /**
+   * @returns This constraint's src and dst node
+   */
+	std::pair<unsigned, unsigned> getSrcDst() const {
+    return std::pair<unsigned, unsigned>(src, dst);
 	}
 
-	ConstraintType getType() {
+  /**
+   * @returns The type of this constraint
+   */
+	ConstraintType getType() const {
 		return type;
 	}
 
   /**
    * Print out this constraint to stderr
    */
-	void print() {
+	void print() const {
 		if (type == Store) {
 			std::cerr << "*";
 		}
@@ -317,7 +322,7 @@ public:
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
       unsigned src, dst;
       //std::cout << "debug: Processing constraint: "; ii->print();
-      ii->getSrcDst(src, dst);
+      std::tie(src, dst) = ii->getSrcDst();
       unsigned srcrepr = ocd.getFinalRepresentative(src);
       unsigned dstrepr = ocd.getFinalRepresentative(dst);
       if (ii->getType() == PtsToCons::Load) {
@@ -358,9 +363,12 @@ public:
   void processAddressOfCopy(PointsToConstraints &constraints, 
                             UpdatesVec &updates) {
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      unsigned src, dst;
+      unsigned src;
+      unsigned dst;
+
       //std::cout << "debug: Processing constraint: "; ii->print();
-      ii->getSrcDst(src, dst);
+      std::tie(src, dst) = ii->getSrcDst();
+
       if (ii->getType() == PtsToCons::AddressOf) {
         if (result[dst].set(src)) {
           //std::cout << "debug: saving v" << dst << "->v" << src << std::endl;
@@ -398,7 +406,7 @@ public:
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
       unsigned src, dst;
       //std::cout << "debug: Processing constraint: "; ii->print();
-      ii->getSrcDst(src, dst);
+      std::tie(src, dst) = ii->getSrcDst();
       unsigned srcrepr = ocd.getFinalRepresentative(src);
       unsigned dstrepr = ocd.getFinalRepresentative(dst);
       if (ii->getType() == PtsToCons::Load) {
@@ -441,7 +449,8 @@ public:
     unsigned nnodesprocessed = 0;
 
     processAddressOfCopy(addressCopyConstraints, updates);
-          processLoadStoreSerial(loadStoreConstraints, updates, galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps updates empty.
+    processLoadStoreSerial(loadStoreConstraints, updates, 
+                           galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps updates empty.
 
     //std::cout << "debug: no of addr+copy constraints = " << addressCopyConstraints.size() << ", no of load+store constraints = " << loadStoreConstraints.size() << std::endl;
     //std::cout << "debug: no of nodes = " << nodes.size() << std::endl;
