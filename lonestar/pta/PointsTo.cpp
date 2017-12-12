@@ -76,7 +76,7 @@ using GNode = Graph::GraphNode;
  **/
 struct UpdateRequest {
   GNode n;
-  unsigned int w;
+  unsigned int w; // this is the priority of the request
 
   UpdateRequest(GNode& N, unsigned int W)
     : n(N), w(W) {}
@@ -140,131 +140,202 @@ class PTA {
   using PointsToConstraints = std::vector<PtsToCons>;
   using PointsToInfo = std::vector<galois::SparseBitVector>;
 
-  struct OCD {	// Online Cycle Detection and elimination.
-    PTA& outer;
-
-    OCD (PTA& o): outer(o) {}
-
-    void init() {
-      NoRepresentative = outer.numNodes;
-      representative.resize(outer.numNodes);
-      visited.resize(outer.numNodes);
-      for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
-        representative[ii] = NoRepresentative;
-      }
-    }
-    void process(const UpdatesVec& updates) {	// updates of nodes that are sources of new edges.
-
-      for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
-        visited[ii] = false;
-      }
-      unsigned cyclenode = outer.numNodes;	// set to invalid id.
-      for (const UpdateRequest& up: updates) {
-        Node &nn = outer.graph.getData(up.n, galois::MethodFlag::UNPROTECTED);
-        unsigned nodeid = nn.id;
-        //std::cout << "debug: cycle process " << nodeid << std::endl;
-        if (cycleDetect(nodeid, cyclenode)) {
-          cycleCollapse(cyclenode);
-        }
-      }
-    }
-
-    bool cycleDetect(unsigned nodeid, unsigned &cyclenode) {	// it is okay not to detect all cycles as it is only an efficiency concern.
-      nodeid = getFinalRepresentative(nodeid);
-      if (isAncestor(nodeid)) {
-        cyclenode = nodeid;
-        return true;
-      }
-      if (visited[nodeid]) {
-        return false;
-      }
-      visited[nodeid] = true;
-      ancestors.push_back(nodeid);
-
-      GNode nn = outer.nodes[nodeid];
-      for (auto ii = outer.graph.edge_begin(nn, galois::MethodFlag::UNPROTECTED)
-          , ei = outer.graph.edge_end(nn, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
-
-        Node& nn = outer.graph.getData(outer.graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
-        unsigned iiid = nn.id;
-        if (cycleDetect(iiid, cyclenode)) {
-          //return true;	// don't pop from ancestors.
-          cycleCollapse(cyclenode);
-        }
-      }
-      ancestors.pop_back();
-      return false;
-    }
-    void cycleCollapse(unsigned repr) {
-      // assert(repr is present in ancestors).
-      //static unsigned ncycles = 0;
-      unsigned reprrepr = getFinalRepresentative(repr);
-      for (auto ii = ancestors.begin(); ii != ancestors.end(); ++ii) {
-        if (*ii == repr) {
-          //std::cout << "debug: collapsing cycle for " << repr << std::endl;
-          // cycle exists between nodes ancestors[*ii..end].
-          for (auto jj = ii; jj != ancestors.end(); ++jj) {
-            unsigned jjrepr = getFinalRepresentative(*jj);	// jjrepr has no representative.
-            makeRepr(jjrepr, reprrepr);
-          }
-          //std::cout << "debug: cycles collapsed = " << ++ncycles << std::endl;
-          break;
-        }
-      }
-      //ancestors.clear();	// since collapse is called from top level process(), the ancestors need to be cleared for the next element in the updates.
-    }
-    void makeRepr(unsigned nodeid, unsigned repr) {
-      // make repr the representative of nodeid.
-      if (repr != nodeid) {
-        //std::cout << "debug: repr[" << nodeid << "] = " << repr << std::endl;
-        representative[nodeid] = repr;
-        if (!outer.result[repr].isSubsetEq(outer.result[nodeid])) {
-          //outer.graph.getData(nodes[repr]);	// lock it.
-          outer.result[repr].unify(outer.result[nodeid]);
-        }
-      }
-    }
-    unsigned getFinalRepresentative(unsigned nodeid) {
-      unsigned lnnid = nodeid;
-      while (representative[lnnid] != NoRepresentative) {
-        lnnid = representative[lnnid];
-      }
-      // path compression.
-      unsigned repr = representative[nodeid];
-      while (repr != NoRepresentative) {
-        representative[nodeid] = lnnid;
-        nodeid = repr;
-        repr = representative[nodeid];
-      }
-      return lnnid;
-    }
-
+  /** 
+   * Online Cycle Detection and elimination structure + functions.
+   */
+  struct OnlineCycleDetection {	
   private:
+
+    std::vector<unsigned> ancestors;
+    std::vector<bool> visited;
+    std::vector<unsigned> representative;
+    unsigned NoRepresentative; // "constant" that represents no representative
+
+    /**
+     * @returns true of the nodeid is an ancestor node
+     */
     bool isAncestor(unsigned nodeid) {
-      for (auto ii = ancestors.begin(); ii != ancestors.end(); ++ii) {
-        if (*ii == nodeid) {
+      for (unsigned ii : ancestors) {
+        if (ii == nodeid) {
           return true;
         }
       }
       return false;
     }
 
-    std::vector<unsigned> ancestors;
-    std::vector<bool> visited;
-    std::vector<unsigned> representative;
-    unsigned NoRepresentative;
-  };
+    /**
+     * Depth first recursion of the nodeid to see if it eventually
+     * reaches an ancestor, in which case there is a cycle. The cycle is
+     * then collapsed, i.e. all nodes in the cycle have their representative
+     * changed to the representative of the node where the cycle starts.
+     *
+     * Note it is okay not to detect all cycles as it is only an efficiency 
+     * concern.
+     *
+     * @param nodeid nodeid to check the existance of a cycle
+     * @param cyclenode This is used as OUTPUT parameter; if a node is
+     * detected to be an ancestor, it is returned via this variable.
+     * @returns true if a cycle has been detected (i.e. a node has a path
+     * to an ancestor), false otherwise
+     */
+    bool cycleDetect(unsigned nodeid, unsigned &cyclenode) {	
+      nodeid = getFinalRepresentative(nodeid);
 
-  OCD ocd;
+      // if the node is an ancestor, that means there's a path from the ancestor
+      // to the ancestor (i.e. cycle)
+      if (isAncestor(nodeid)) {
+        cyclenode = nodeid;
+        return true;
+      }
+
+      if (visited[nodeid]) {
+        return false;
+      }
+
+      visited[nodeid] = true;
+
+      // keep track of the current depth first search path
+      ancestors.push_back(nodeid);
+
+      GNode nn = outer.nodes[nodeid];
+
+      for (auto ii : outer.graph.edges(nn, galois::MethodFlag::UNPROTECTED)) {
+        // get id of destination node
+        Node& nn = outer.graph.getData(outer.graph.getEdgeDst(ii), 
+                                       galois::MethodFlag::UNPROTECTED);
+        unsigned iiid = nn.id;
+
+        // recursive depth first cycle detection; if a cycle is found,
+        // collapse the path
+        if (cycleDetect(iiid, cyclenode)) {
+          cycleCollapse(cyclenode);
+        }
+      }
+      ancestors.pop_back();
+
+      return false;
+    }
+
+    /**
+     * Make all nodes that are a part of some detected cycle starting at
+     * repr have their representatives changed to the representative of
+     * repr (thereby "collapsing" the cycle).
+     *
+     * @param repr The node at which the cycle begins
+     */
+    void cycleCollapse(unsigned repr) {
+      // assert(repr is present in ancestors).
+      unsigned reprrepr = getFinalRepresentative(repr);
+      for (auto ii = ancestors.begin(); ii != ancestors.end(); ++ii) {
+        if (*ii == repr) {
+          galois::gDebug("collapsing cycle for ", repr);
+          // cycle exists between nodes ancestors[*ii..end].
+          for (auto jj = ii; jj != ancestors.end(); ++jj) {
+            unsigned jjrepr = getFinalRepresentative(*jj);	// jjrepr has no representative.
+            makeRepr(jjrepr, reprrepr);
+          }
+          break;
+        }
+      }
+    }
+
+    /**
+     * Make repr the representative of nodeid.
+     *
+     * @param nodeid node to change the representative of
+     * @param repr nodeid will have its representative changed to this
+     */
+    void makeRepr(unsigned nodeid, unsigned repr) {
+      if (repr != nodeid) {
+        galois::gDebug("repr[", nodeid, "] = ", repr);
+        representative[nodeid] = repr;
+
+        if (!outer.result[repr].isSubsetEq(outer.result[nodeid])) {
+          //outer.graph.getData(nodes[repr]);	// lock it.
+          outer.result[repr].unify(outer.result[nodeid]);
+        }
+      }
+    }
+  public:
+    PTA& outer;
+
+    OnlineCycleDetection(PTA& o) : outer(o) {}
+
+    /**
+     * Init fields (outer needs to have numNodes set).
+     */
+    void init() {
+      NoRepresentative = outer.numNodes;
+      visited.resize(outer.numNodes);
+      representative.resize(outer.numNodes);
+
+      for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
+        representative[ii] = NoRepresentative;
+      }
+    }
+
+    /**
+     * Given a node id, find its representative. Also, do path compression
+     * of the path to the representative.
+     *
+     * @param nodeid Node id to get the representative of
+     * @returns The representative of nodeid
+     */
+    unsigned getFinalRepresentative(unsigned nodeid) {
+      unsigned lnnid = nodeid;
+
+      // Follow chain of representatives until a "root" is reached
+      while (representative[lnnid] != NoRepresentative) {
+        lnnid = representative[lnnid];
+      }
+
+      // path compression; make all things along path to final representative
+      // point to the final representative
+      unsigned repr = representative[nodeid];
+
+      while (repr != NoRepresentative) {
+        representative[nodeid] = lnnid;
+        nodeid = repr;
+        repr = representative[nodeid];
+      }
+
+      return lnnid;
+    }
+
+    /**
+     * Go over all sources of new edges to see if there are cycles in them.
+     * If so, collapse the cycles.
+     *
+     * @param updates vector of nodes that are sources of new edges.
+     */
+    void process(const UpdatesVec& updates) {	
+      for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
+        visited[ii] = false;
+      }
+
+      unsigned cyclenode = NoRepresentative;	// set to invalid id.
+
+      for (const UpdateRequest& up : updates) {
+        Node &nn = outer.graph.getData(up.n, galois::MethodFlag::UNPROTECTED);
+        unsigned nodeid = nn.id;
+        galois::gDebug("cycle process ", nodeid);
+
+        if (cycleDetect(nodeid, cyclenode)) {
+          cycleCollapse(cyclenode);
+        }
+      }
+    }
+  }; // end struct OnlineCycleDetection
+
+
+  OnlineCycleDetection ocd;
   Graph graph;
   std::vector<GNode> nodes;
   PointsToInfo result;
   PointsToConstraints addressCopyConstraints; 
   PointsToConstraints loadStoreConstraints;
   size_t numNodes = 0;
-
 public:
-
   PTA(void) : ocd(*this) { }
 
   /**
@@ -316,15 +387,21 @@ public:
       result[repr].print(std::cout, prefix);
     }
   }
-  void processLoadStoreSerial(PointsToConstraints &constraints, UpdatesVec &updates, galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED) {
+
+  void processLoadStoreSerial(PointsToConstraints &constraints, 
+                              UpdatesVec &updates, 
+                              galois::MethodFlag flag = 
+                                  galois::MethodFlag::UNPROTECTED) {
     // add edges to the graph based on points-to information of the nodes
     // and then add the source of each edge to the updates.
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      unsigned src, dst;
       //std::cout << "debug: Processing constraint: "; ii->print();
+      unsigned src, dst;
       std::tie(src, dst) = ii->getSrcDst();
+
       unsigned srcrepr = ocd.getFinalRepresentative(src);
       unsigned dstrepr = ocd.getFinalRepresentative(dst);
+
       if (ii->getType() == PtsToCons::Load) {
         GNode &nndstrepr = nodes[dstrepr];
         std::vector<unsigned> ptstoOfSrc;
@@ -357,30 +434,38 @@ public:
       }
     }
   }
+
   /**
    * TODO
    */
-  void processAddressOfCopy(PointsToConstraints &constraints, 
+  void processAddressOfCopy(const PointsToConstraints& constraints, 
                             UpdatesVec &updates) {
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
+      //std::cout << "debug: Processing constraint: "; 
+      //ii->print();
+
       unsigned src;
       unsigned dst;
-
-      //std::cout << "debug: Processing constraint: "; ii->print();
       std::tie(src, dst) = ii->getSrcDst();
 
       if (ii->getType() == PtsToCons::AddressOf) {
-        if (result[dst].set(src)) {
-          //std::cout << "debug: saving v" << dst << "->v" << src << std::endl;
+        if (result[dst].set(src)) { // this alters the state of the bitvector
+          galois::gDebug("saving v", dst, "->v", src);
         }
       } else if (src != dst) {	// copy.
         GNode &nn = nodes[src];
         graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
-        //std::cout << "debug: adding edge from " << src << " to " << dst << std::endl;
-        updates.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
+        galois::gDebug("adding edge from ", src, " to ", dst);
+
+        updates.push_back(
+          UpdateRequest(nn, 
+                        graph.getData(nn, 
+                                      galois::MethodFlag::UNPROTECTED).priority)
+        );
       }
     }
   }
+
   unsigned propagate(GNode &src, GNode &dst, galois::MethodFlag flag = galois::MethodFlag::WRITE) {
     unsigned srcid = graph.getData(src, galois::MethodFlag::UNPROTECTED).id;
     unsigned dstid = graph.getData(dst, galois::MethodFlag::UNPROTECTED).id;
@@ -488,14 +573,17 @@ public:
 
     //unsigned nfired = 0;
     //unsigned niter;
+
     galois::substrate::PerThreadStorage<unsigned> nfired;
 
-    for (unsigned i = 0; i < nfired.size(); ++i) {
-      *nfired.getLocal() = 0;
-    }
+    galois::on_each(
+      [&] (unsigned tid, unsigned totalThreads) {
+        *nfired.getLocal() = 0;
+      }
+    );
 
     // Lambda function that gets the key used by the OBIM worklist to order
-    // things
+    // things: grabs the priority of the UpdateRequest
     auto indexer = [] (const UpdateRequest& req) { return req.w; };
     using OBIM = galois::worklists::OrderedByIntegerMetric<
         decltype(indexer), 
@@ -514,12 +602,13 @@ public:
     //galois::for_each<LocalQueues<dChunkedLIFO<32>, FIFO<> > >(updates.begin(), updates.end(), Process());
     //galois::for_each<LocalQueues<ChunkedLIFO<1024>, FIFO<> > >(updates.begin(), updates.end(), Process());
     //galois::for_each<LocalQueues<ChunkedFIFO<1024>, FIFO<> > >(updates.begin(), updates.end(), Process());
-    galois::for_each(galois::iterate(updates),
+    galois::for_each(
+      galois::iterate(updates),
       [this, &nfired] (const UpdateRequest& req, auto& ctx) {
         if (++(*nfired.getLocal()) < THRESHOLD_LOADSTORE) {
           GNode src = req.n;
           for (auto ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-              ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+                    ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
             GNode dst = graph.getEdgeDst(ii);
             unsigned newptsto = this->propagate(src, dst, galois::MethodFlag::WRITE);
             if (newptsto) {
