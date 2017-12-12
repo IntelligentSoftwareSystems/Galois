@@ -27,24 +27,32 @@
 #include "galois/Galois.h"
 #include "galois/graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
-
+#include "Lonestar/BoilerPlate.h"
+#include <fstream>
 #include "SparseBitVector.h"
 
-#include "Lonestar/BoilerPlate.h"
-
-#include <fstream>
+////////////////////////////////////////////////////////////////////////////////
+// Command line parameters
+////////////////////////////////////////////////////////////////////////////////
 
 namespace cll = llvm::cl;
 
 const char* name = "Points-to Analysis";
-const char* desc = "Performs inclusion-based points-to analysis over the input constraints.";
+const char* desc = "Performs inclusion-based points-to analysis over the input "
+                   "constraints.";
 const char* url = NULL;
 
-static cll::opt<std::string> input(cll::Positional, cll::desc("<constraints>"), cll::Required);
+static cll::opt<std::string> input(cll::Positional, 
+                                   cll::desc("Constraints file"), 
+                                   cll::Required);
 
 // no of nodes to be processed before adding load/store edges.
 const unsigned THRESHOLD_LOADSTORE = 500;	
 const unsigned THRESHOLD_OCD = 500;
+
+////////////////////////////////////////////////////////////////////////////////
+// Declaration of strutures, types, and variables
+////////////////////////////////////////////////////////////////////////////////
 
 struct Node {
 	unsigned id;
@@ -54,69 +62,75 @@ struct Node {
 		id = 0;
 		priority = 0;
 	}
-	Node(unsigned lid): id(lid) {
+	Node(unsigned lid) : id(lid) {
 		priority = 0;
 	}
 };
 
-typedef galois::graphs::FirstGraph<Node,void,true> Graph;
-typedef Graph::GraphNode GNode;
+using Graph = galois::graphs::FirstGraph<Node, void, true>;
+using GNode = Graph::GraphNode;
 
-/* copied from Andrew's SSSP. */
-
+/** 
+ * TODO
+ * copied from Andrew's SSSP. 
+ **/
 struct UpdateRequest {
   GNode n;
   unsigned int w;
 
   UpdateRequest(GNode& N, unsigned int W)
-    :n(N), w(W)
-  {}
+    : n(N), w(W) {}
 };
 
-
-//typedef std::pair<GNode,GNode> Edge;
-// typedef galois::gstl::Vector<UpdateRequest> UpdatesVec;
 using UpdatesVec = std::vector<UpdateRequest>;
 
+/**
+ * Class representing a points-to constraint.
+ */
 class PtsToCons {
 public:
-	typedef enum {AddressOf = 0, Copy, Load, Store} ConstraintType;
-
+	using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
+private:
+	unsigned src, dst;
+	ConstraintType type;
+public:
 	PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
 		src = ss;
 		dst = dd;
 		type = tt;
 	}
+
 	void getSrcDst(unsigned &ss, unsigned &dd) {
 		ss = src;
 		dd = dst;
 	}
+
 	ConstraintType getType() {
 		return type;
 	}
+
 	void print() {
 		if (type == Store) {
 			std::cerr << "*";
 		}
+
 		std::cerr << "v" << dst;
 		std::cerr << " = ";
+
 		if (type == Load) {
 			std::cerr << "*";
 		} else if (type == AddressOf) {
 			std::cerr << "&";
 		}
+
 		std::cerr << "v" << src;
 		std::cerr << std::endl;
 	}
-private:
-	unsigned src, dst;
-	ConstraintType type;
 };
 
 class PTA { 
-
-  typedef std::vector<PtsToCons> PointsToConstraints;
-  typedef std::vector<galois::SparseBitVector> PointsToInfo;
+  using PointsToConstraints = std::vector<PtsToCons>;
+  using PointsToInfo = std::vector<galois::SparseBitVector>;
 
   struct OCD {	// Online Cycle Detection and elimination.
 
