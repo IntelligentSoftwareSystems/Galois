@@ -22,7 +22,7 @@
  * Galois.
  *
  * @author Prad Nelluru <pradn@cs.utexas.edu>
- * @author Loc Hoang <lhoang@utexas.edu> (utility code/code cleanup)
+ * @author Loc Hoang <lhoang@utexas.edu> (Some utility code/Code cleanup)
  */
 
 #include "galois/Galois.h"
@@ -38,17 +38,12 @@ static const char* const desc = "Computes Matrix Decomposition using Stochastic 
                                 "Gradient Descent";
 static const char* const url = 0;
 
-// TODO make these command line arguments
-static const int LATENT_VECTOR_SIZE = 20; // Prad's default: 100, Intel: 20
-static const unsigned int MAX_MOVIE_UPDATES = 20; // Prad's default: 5
+// This isn't a command line option because this number needs to be known
+// to define the Node data type
+static const unsigned LATENT_VECTOR_SIZE = 20;
 
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
-
-static const double LEARNING_RATE = 0.001; // GAMMA, Purdue: 0.01 Intel: 0.001
-static const double DECAY_RATE = 0.9; // STEP_DEC, Purdue: 0.1 Intel: 0.9
-static const double LAMBDA = 0.001; // Purdue: 1.0 Intel: 0.001
-static const double BottouInit = 0.1;
 
 enum Algo {
   nodeMovie,
@@ -68,24 +63,43 @@ enum Learn {
   Inv
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Command line parameters
+////////////////////////////////////////////////////////////////////////////////
+
 namespace cll = llvm::cl;
+
 static cll::opt<std::string> inputFile(cll::Positional, 
-                                        cll::desc("<input file>"), 
-                                        cll::Required);
+                                       cll::desc("<input file>"), 
+                                       cll::Required);
 static cll::opt<unsigned> usersPerBlockSlice("usersPerBlk", 
-                                             cll::desc("[users per block slice]"), 
+                                             cll::desc("Users per block slice "
+                                                       "(default 2048)"), 
                                              cll::init(2048));
 static cll::opt<unsigned> moviesPerBlockSlice("moviesPerBlk", 
-                                              cll::desc("[movies per block slice]"), 
+                                              cll::desc("Movies per block "
+                                                        "slice (default 100)"), 
                                               cll::init(350));
 static cll::opt<bool> verifyPerIter("verifyPerIter", 
-                                    cll::desc("compute RMS every iter"), 
+                                    cll::desc("Prints RMS every iteration"), 
                                     cll::init(false));
 static cll::opt<int> shiftFactor("shiftRating", 
                                  cll::desc("Shift ratings down by some constant"),
                                  cll::init(0));
 
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
+// Regarding algorithm termination
+static cll::opt<unsigned> maxUpdates("maxUpdates", 
+                                     cll::desc("Max number of times to update "
+                                               "latent vectors (default 100)"), 
+                                     cll::init(100));
+static cll::opt<double> errorThreshold("errorThreshold", 
+                                       cll::desc("Algo terminates when root "
+                                                 "mean square error is less "
+                                                 "than this number (default 1)"), 
+                                       cll::init(1.0));
+
+// Selection of algo variant + learning function
+static cll::opt<Algo> algo("algo", cll::desc("Algorithm variant:"),
                            cll::values(
                              clEnumVal(nodeMovie, "Node by Movies"),
                              clEnumVal(edgeMovie, "Edge by Movies"),
@@ -102,10 +116,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                              clEnumValEnd
                            ), 
                            cll::init(blockAndSliceBoth));
-
-static cll::opt<Learn> learn("lf", cll::desc("Choose a learning function:"),
+static cll::opt<Learn> learn("lf", cll::desc("Learning function:"),
                              cll::values(
-                               clEnumVal(Intel, "Intel"),
+                               clEnumVal(Intel, "Intel (default)"),
                                clEnumVal(Purdue, "Purdue"),
                                clEnumVal(Bottou, "Bottou"),
                                clEnumVal(Inv, "Simple Inverse"),
@@ -113,6 +126,41 @@ static cll::opt<Learn> learn("lf", cll::desc("Choose a learning function:"),
                              ), 
                              cll::init(Intel));
 
+// Learning params
+static cll::opt<double> learningRate("learningRate",
+                                     cll::desc("Parameter to adjust rate of "
+                                               "learning by way of step size"
+                                               " (default 0.001)"),
+                                     cll::init(0.001));
+static cll::opt<double> intelDecayRate("intelDecay",
+                                       cll::desc("Parameter to adjust rate of "
+                                                 "step size decay for Intel "
+                                                 "learning; higher = slower "
+                                                 "decay (default 0.9)"),
+                                       cll::init(0.9));
+static cll::opt<double> purdueDecayRate("purdueDecay",
+                                       cll::desc("Parameter to adjust rate of "
+                                                 "step size decay for Purdue "
+                                                 "learning; higher = faster "
+                                                 "decay (default 0.1)"),
+                                       cll::init(0.1));
+static cll::opt<double> lambda("lambda",
+                              cll::desc("Lambda learning parameter for "
+                                        "gradient change and Bottou "
+                                        "(default 0.001)"),
+                              cll::init(0.001));
+static cll::opt<double> bottouInit("bottouInit",
+                                   cll::desc("Bottou learning function init "
+                                             "value (default 0.1)"),
+                                   cll::init(0.1));
+
+////////////////////////////////////////////////////////////////////////////////
+// Declaration of strutures, types, and variables
+////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Every graph node is represented by this structure.
+ */
 struct Node {
   // latent vector to be learned
   double latent_vector[LATENT_VECTOR_SIZE]; 
@@ -129,7 +177,7 @@ struct Node {
   void dump(std::ostream& os) {
     os << "{" << latent_vector[0];
 
-    for (int i = 1; i < LATENT_VECTOR_SIZE; ++i) os << ", " << latent_vector[i];
+    for (unsigned i = 1; i < LATENT_VECTOR_SIZE; ++i) os << ", " << latent_vector[i];
 
     os << "}";
   }
@@ -140,6 +188,9 @@ using Graph = typename galois::graphs::LC_CSR_Graph<Node, int>
                          ::with_no_lockable<false>::type;
 using GNode = Graph::GraphNode;
 
+/**
+ * Structure that holds the information needed for a thread do to SGD.
+ */
 struct ThreadWorkItem {
   unsigned int movieRangeStart;
   unsigned int movieRangeEnd;
@@ -161,7 +212,6 @@ unsigned int NUM_MOVIE_NODES = 0;
 unsigned int NUM_USER_NODES = 0;
 unsigned int NUM_RATINGS = 0;
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Utility funcions for use during execution
 ////////////////////////////////////////////////////////////////////////////////
@@ -182,10 +232,6 @@ static double genRand() {
  * @returns pair with number of movies and number of users in the graph
  */
 std::pair<unsigned int, unsigned int> initializeGraphData(Graph& g) {
-  // unsigned int seed = 42;
-  // std::default_random_engine eng(seed);
-  // std::uniform_real_distribution<double> random_lv_value(0, 0.1);
-
   const unsigned SEED = 4562727;
   std::srand(SEED);
 
@@ -199,7 +245,7 @@ std::pair<unsigned int, unsigned int> initializeGraphData(Graph& g) {
     Node& data = g.getData(gnode);
 
     // fill latent vectors with random values
-    for (int i = 0; i < LATENT_VECTOR_SIZE; i++)
+    for (unsigned i = 0; i < LATENT_VECTOR_SIZE; i++)
       data.latent_vector[i] = genRand();
 
     // edges are ratings
@@ -239,7 +285,7 @@ double vectorDot(const Node& movieData, const Node& userData) {
   const double* __restrict__ userLatent = userData.latent_vector;
 
   double dotProduct = 0.0;
-  for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+  for (unsigned i = 0; i < LATENT_VECTOR_SIZE; ++i) {
     dotProduct += userLatent[i] * movieLatent[i];
   }
 
@@ -291,16 +337,16 @@ double doGradientUpdate(Node& movieData, Node& userData, int edgeRating,
   assert(curError < 1000 && curError > -1000);
   
   // take gradient step
-  for (unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++) {
+  for (unsigned i = 0; i < LATENT_VECTOR_SIZE; i++) {
     double prevMovieVal = movieLatent[i];
     double prevUserVal = userLatent[i];
 
     movieLatent[i] += stepSize * (curError * prevUserVal - 
-                                  LAMBDA * prevMovieVal);
+                                  lambda * prevMovieVal);
     assert(std::isnormal(movieLatent[i]));
 
     userLatent[i] += stepSize * (curError * prevMovieVal - 
-                                 LAMBDA * prevUserVal);
+                                 lambda * prevUserVal);
     assert(std::isnormal(userLatent[i]));
   }
 
@@ -308,7 +354,7 @@ double doGradientUpdate(Node& movieData, Node& userData, int edgeRating,
 }
 
 /**
- * Calculate root mean square error of predictions .
+ * Calculate root mean square error of edge weight predictions.
  *
  * @param g Graph with nodes that have latent vectors
  * @returns root mean squared error of predictions of edge weights
@@ -355,10 +401,7 @@ double rootMeanSquaredError(Graph& g) {
  */
 void verify(Graph& g) {
   double totalRMS = rootMeanSquaredError(g);
-  double normalizedRMS = sqrt(totalRMS / NUM_RATINGS);
-  
-  galois::gPrint("RMSE Total: ", totalRMS, "; Normalized: ", normalizedRMS, 
-                 "\n");
+  galois::gPrint("RMSE Total: ", totalRMS, "\n");
 }
 
 /**
@@ -479,19 +522,19 @@ struct LearnFN {
 
 struct PurdueLearnFN : public LearnFN {
   virtual double step_size(unsigned int round) const {
-    return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(round + 1, 1.5));
+    return (learningRate * 1.5) / (1.0 + purdueDecayRate * pow(round + 1, 1.5));
   }
 };
 
 struct IntelLearnFN : public LearnFN {
   virtual double step_size(unsigned int round) const {
-    return LEARNING_RATE * pow(DECAY_RATE, round);
+    return learningRate * pow(intelDecayRate, round);
   }
 };
 
 struct BottouLearnFN : public LearnFN {
   virtual double step_size(unsigned int round) const {
-    return BottouInit / (1 + BottouInit * LAMBDA * round);
+    return bottouInit / (1 + bottouInit * lambda * round);
   }
 };
 
@@ -513,10 +556,13 @@ struct InvLearnFN : public LearnFN {
  * User nodes should not have edges.
  */
 void SGDNodeMovie(Graph& g, const LearnFN* lf) {
-  for (unsigned i = 0; i < MAX_MOVIE_UPDATES; ++i) {
-    if (verifyPerIter) verify(g);
+  unsigned numIterations = 0;
+  double latestError = rootMeanSquaredError(g);
 
-    double step_size = lf->step_size(i);
+  if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
+
+  while (numIterations < maxUpdates && latestError > errorThreshold) {
+    double step_size = lf->step_size(numIterations);
     galois::gDebug("Step Size: ", step_size);
 
     galois::for_each(
@@ -532,6 +578,10 @@ void SGDNodeMovie(Graph& g, const LearnFN* lf) {
       galois::no_pushes(),
       galois::loopname("SGDNodeMovie")
     );
+
+    latestError = rootMeanSquaredError(g);
+    if (verifyPerIter) galois::gPrint("RMS: ", latestError, "\n");
+    numIterations++;
   }
 }
 
@@ -541,6 +591,7 @@ void SGDNodeMovie(Graph& g, const LearnFN* lf) {
 void SGDNodeMoviePriority(Graph& g, const LearnFN* lf) {
   galois::InsertBag<GNode> Movies;
 
+  // get "high priority" movies
   galois::do_all(
     galois::iterate(g),
     [&] (GNode n) {
@@ -550,10 +601,12 @@ void SGDNodeMoviePriority(Graph& g, const LearnFN* lf) {
     }
   );
 
-  for (unsigned i = 0; i < MAX_MOVIE_UPDATES; ++i) {
-    if (verifyPerIter) verify(g);
+  unsigned numIterations = 0;
+  double latestError = rootMeanSquaredError(g);
+  if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
 
-    double step_size = lf->step_size(i);
+  while (numIterations < maxUpdates && latestError > errorThreshold) {
+    double step_size = lf->step_size(numIterations);
     galois::gDebug("Step Size: ", step_size);
 
     galois::for_each(
@@ -577,6 +630,10 @@ void SGDNodeMoviePriority(Graph& g, const LearnFN* lf) {
       galois::wl<galois::worklists::dChunkedFIFO<8>>(),
       galois::loopname("SGDNodeMoviePriority")
     );
+
+    latestError = rootMeanSquaredError(g);
+    if (verifyPerIter) galois::gPrint("RMS: ", latestError, "\n");
+    numIterations++;
   }
 }
 
@@ -587,6 +644,7 @@ void SGDNodeMoviePriority(Graph& g, const LearnFN* lf) {
 void SGDEdgeMovie(Graph& g, const LearnFN* lf) {
   galois::InsertBag<GNode> Movies;
 
+  // get only nodes with edges
   galois::do_all(
     galois::iterate(g),
     [&] (GNode n) {
@@ -594,10 +652,12 @@ void SGDEdgeMovie(Graph& g, const LearnFN* lf) {
     }
   );
 
-  for (unsigned i = 0; i < MAX_MOVIE_UPDATES; ++i) {
-    if (verifyPerIter) verify(g);
+  unsigned numIterations = 0;
+  double latestError = rootMeanSquaredError(g);
+  if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
 
-    double step_size = lf->step_size(i);
+  while (numIterations < maxUpdates && latestError > errorThreshold) {
+    double step_size = lf->step_size(numIterations);
     galois::gDebug("Step Size: ", step_size);
 
     galois::for_each(
@@ -625,6 +685,10 @@ void SGDEdgeMovie(Graph& g, const LearnFN* lf) {
       galois::wl<galois::worklists::dChunkedLIFO<8>>(),
       galois::loopname("SGDEdgeMovie")
     );
+
+    latestError = rootMeanSquaredError(g);
+    if (verifyPerIter) galois::gPrint("RMS: ", latestError, "\n");
+    numIterations++;
   }
 }
 
@@ -820,7 +884,8 @@ struct SGDBlockUsersMovies {
             if (user >= currentUserSliceEndUserId) break;
 
             Node& userData = g.getData(user, galois::MethodFlag::UNPROTECTED);
-            int edgeRating = g.getEdgeData(currentEdge, galois::MethodFlag::UNPROTECTED);  
+            int edgeRating = g.getEdgeData(currentEdge, 
+                                           galois::MethodFlag::UNPROTECTED);  
 
             doGradientUpdate(movieData, userData, edgeRating, stepSize);
 
@@ -901,209 +966,64 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
     AdvanceEdgeOffsets(g)
   );
 
-  // movies = rows, users = columns
-  //unsigned long** debugMatrix = new unsigned long*[numWorkItems];
-  //for (unsigned int i = 0; i < numWorkItems; i++) {
-  //  debugMatrix[i] = new unsigned long[numWorkItems];
-  //}
+  unsigned numIterations = 0;
+  double latestError = rootMeanSquaredError(g);
 
-  // update loop
-  for (unsigned int update = 0; update < MAX_MOVIE_UPDATES; update++) {  
-    if (verifyPerIter) {
-      galois::gDebug("Step Size: ", lf->step_size(update));
-      verify(g);
-    }
+  if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
 
+  while (numIterations < maxUpdates && latestError > errorThreshold) {
     // work on the current blocks, move the block a thread works on to the right
     for (unsigned int j = 0; j < numWorkItems; j++) {  
-      //galois::gDebug("Update ", update, ", Block ", j);
-
       // Each thread works on 1 work item
       galois::do_all(
         galois::iterate(workItems + 0, workItems + numWorkItems),
-        BlockFn(g, lf->step_size(update))
+        BlockFn(g, lf->step_size(numIterations))
       );
 
       // move each thread's user assingment one block to the right
       // (i.e. for the same movie nodes, look at the next range of user nodes)
       for (unsigned int k = 0; k < numWorkItems; k++) {
         ThreadWorkItem& wi = workItems[k];
-        //std::cout << " (" << wi.userRangeStart << "," << wi.userRangeEnd
-        //          << ") " << (long) (wi.timeTaken/1000) << "/"
-        //          << (long) wi.updates;
-        //std::cout << (long) wi.updates << " ";
-
-        //unsigned int column = (j + k) % numWorkItems;
-        //debugMatrix[k][column] = wi.updates;
-        //debugMatrix[k][column] = wi.timeTaken / 1000;
-
-        //std::cout << (long) wi.updates << " ";
-        //std::cout << (long) wi.timeTaken << " ";
-
         unsigned int nextColumn = (j + 1 + k) % numWorkItems;
 
         // shift block over
         wi.userRangeStart = userRangeStartPoints[nextColumn];
         wi.userRangeEnd = userRangeEndPoints[nextColumn];
       }
-
-      //std::cout << std::endl;
     }
-  }
 
-  //for (unsigned int i = 0; i < numWorkItems; i++) {
-  //  for (unsigned int j = 0; j < numWorkItems; j++) {
-  //    std::cout << debugMatrix[i][j] << " ";
-  //  }
-  //  std::cout << std::endl;
-  //}
+    latestError = rootMeanSquaredError(g);
+    if (verifyPerIter) galois::gPrint("RMS: ", latestError, "\n");
+    numIterations++;
+  }
 }
 
+// TODO remove variants below? No concept of iteration + uses explicit locks
 using SpinLock = galois::substrate::PaddedLock<true>;
 
-struct sgd_march {
-  Graph& g;
-  SpinLock* locks; 
-  double step_size;
-  sgd_march(Graph& g, SpinLock* locks, double ss) : g(g), locks(locks), step_size(ss) {}
-
-  void operator()(ThreadWorkItem& workItem) const {
-    galois::Timer timer;
-    timer.start();
-    unsigned int updates = 0;
-    unsigned int conflicts = 0;
-
-    unsigned int usersPerBlockSlice = workItem.usersPerBlockSlice;
-    unsigned int currentBlockSliceEnd = workItem.userRangeStart;
-    unsigned int userRangeEnd = workItem.userRangeEnd;
-
-    unsigned int currentSliceId = workItem.sliceStart;
-    unsigned int sliceUpdates = 0;
-
-    while(sliceUpdates < MAX_MOVIE_UPDATES * workItem.numSlices)
-    {
-      //spinlock_lock(locks[currentSliceId]);
-
-      if(!locks[currentSliceId].try_lock ())
-      {
-        conflicts++;
-        locks[currentSliceId].lock ();
-      }
-
-      //if(workItem.id == 0)
-      //  printf("Currslice %d Slice from %d to ", currentSliceId, currentBlockSliceEnd);
-
-      currentBlockSliceEnd += usersPerBlockSlice;
-      if(currentBlockSliceEnd > userRangeEnd)
-        currentBlockSliceEnd = userRangeEnd;
-
-      //if(workItem.id == 0)
-      //  printf("%d\n", currentBlockSliceEnd);
-
-      //set up movie iterators
-      Graph::iterator movie_it = g.begin();
-      std::advance(movie_it, workItem.movieRangeStart);
-      Graph::iterator end_movie_it = g.begin();
-      std::advance(end_movie_it, workItem.movieRangeEnd);
-
-      //for each movie in the range
-      for(; movie_it != end_movie_it; ++movie_it)
-      {
-        //get movie data
-        GNode movie = *movie_it;
-        Node& movie_data = g.getData(movie);
-
-        unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
-
-        //printf("movie %d edge_offset %d\n", movie, movie_data.edge_offset);
-
-        //for each edge in the range
-        Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
-        Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
-        for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
-        {
-          GNode user = g.getEdgeDst(edge_it);
-
-          //printf("looked at user %d\n", user - NUM_MOVIE_NODES);
-          //stop when you're outside the current block's user range
-          if(user > currentBlockSliceEndUserId)
-            break;
-          //printf("okay user %d\n", user - NUM_MOVIE_NODES);
-
-          Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
-          int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);  
-
-          //do gradient step
-          doGradientUpdate(movie_data, user_data, edge_rating, step_size);
-                                        ++movie_data.updates;
-
-          updates++;
-          //if(workItem.id == 0) printf("yoookay user %d\n", user - NUM_MOVIE_NODES);
-          //if(workItem.id == 13) printf("updates %d\n", updates);
-        }
-
-        //printf("movie %d edge_offset is now %d\n", movie, movie_data.edge_offset);
-
-        //we just looked at the last user
-        if(currentBlockSliceEnd == NUM_USER_NODES)
-        {
-          //start back at the first edge
-          movie_data.edge_offset = 0;
-        }
-      }
-
-      locks[currentSliceId].unlock ();
-
-      currentSliceId++;
-      sliceUpdates++;
-
-      //if(currentSliceId == workItem.numSlices) //hit end of slices
-      if(currentBlockSliceEnd == userRangeEnd)
-      {
-        currentSliceId = 0;
-        currentBlockSliceEnd = 0;
-      }
-    }
-
-    timer.stop();
-    workItem.timeTaken = timer.get_usec();
-    workItem.updates = updates;
-    std::cout << workItem.id << " " << workItem.updates << " " << workItem.timeTaken/1000000 << " " << conflicts << std::endl;
-    //printf("Worker %d took %u to do %u updates.\n", workItem.id, workItem.timeTaken/1000000, workItem.updates);
-  }
-
-};
-
-
-void runSliceMarch(Graph& g, const LearnFN* lf) {
-
-  const unsigned threadCount = galois::getActiveThreads ();
-  unsigned numWorkItems = threadCount;
+void SGDSliceMarch(Graph& g, const LearnFN* lf) {
+  unsigned numWorkItems = galois::getActiveThreads();
   ThreadWorkItem workItems[numWorkItems];
+
   unsigned int moviesPerThread = NUM_MOVIE_NODES / numWorkItems;
   unsigned int usersPerThread = NUM_USER_NODES / numWorkItems;
 
   unsigned int numSlices = NUM_USER_NODES / usersPerBlockSlice;
+  unsigned int slicesPerThread = numSlices / numWorkItems;
 
-  SpinLock* locks = new SpinLock[numSlices];
+  galois::gPrint("numSlices: ", numSlices,
+                 "slicesPerThread: ", slicesPerThread, "\n");
 
-  unsigned int slicesPerThread = numSlices / threadCount;
-  printf("numSlices: %d slicesPerThread: %d\n", numSlices, slicesPerThread);
-
-  //set up initial work ranges for each thread
-  for(unsigned int i = 0; i < numWorkItems; i++)
-  {
+  // set up initial work ranges for each thread
+  for (unsigned int i = 0; i < numWorkItems; i++) {
     ThreadWorkItem wi;
     wi.movieRangeStart = moviesPerThread * i;
     wi.userRangeStart = usersPerThread * i;
     wi.userRangeEnd = NUM_USER_NODES;
 
-    if(i == numWorkItems - 1) //last blocks take the rest
-    {
+    if (i == numWorkItems - 1) { // last block takes the rest
       wi.movieRangeEnd = NUM_MOVIE_NODES;
-    }
-    else
-    {
+    } else {
       wi.movieRangeEnd = wi.movieRangeStart + moviesPerThread;
     }
 
@@ -1124,7 +1044,107 @@ void runSliceMarch(Graph& g, const LearnFN* lf) {
   //advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
   //userRangeStart isn't needed after this point
   galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), AdvanceEdgeOffsets(g));
-  galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), sgd_march(g, locks, step_size));
+
+  SpinLock* locks = new SpinLock[numSlices];
+  galois::do_all(galois::iterate(workItems + 0, workItems + numWorkItems), 
+    [&g, locks, step_size] (ThreadWorkItem& workItem) {
+      galois::Timer timer;
+      timer.start();
+      unsigned int updates = 0;
+      unsigned int conflicts = 0;
+
+      unsigned int usersPerBlockSlice = workItem.usersPerBlockSlice;
+      unsigned int currentBlockSliceEnd = workItem.userRangeStart;
+      unsigned int userRangeEnd = workItem.userRangeEnd;
+
+      unsigned int currentSliceId = workItem.sliceStart;
+      unsigned int sliceUpdates = 0;
+
+      while(sliceUpdates < maxUpdates * workItem.numSlices) {
+        //spinlock_lock(locks[currentSliceId]);
+
+        if(!locks[currentSliceId].try_lock ())
+        {
+          conflicts++;
+          locks[currentSliceId].lock ();
+        }
+
+        //if(workItem.id == 0)
+        //  printf("Currslice %d Slice from %d to ", currentSliceId, currentBlockSliceEnd);
+
+        currentBlockSliceEnd += usersPerBlockSlice;
+        if(currentBlockSliceEnd > userRangeEnd)
+          currentBlockSliceEnd = userRangeEnd;
+
+        //if(workItem.id == 0)
+        //  printf("%d\n", currentBlockSliceEnd);
+
+        //set up movie iterators
+        Graph::iterator movie_it = g.begin();
+        std::advance(movie_it, workItem.movieRangeStart);
+        Graph::iterator end_movie_it = g.begin();
+        std::advance(end_movie_it, workItem.movieRangeEnd);
+
+        //for each movie in the range
+        for(; movie_it != end_movie_it; ++movie_it)
+        {
+          //get movie data
+          GNode movie = *movie_it;
+          Node& movie_data = g.getData(movie);
+
+          unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
+
+          //printf("movie %d edge_offset %d\n", movie, movie_data.edge_offset);
+
+          //for each edge in the range
+          Graph::edge_iterator edge_it = g.edge_begin(movie, galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+          Graph::edge_iterator edge_end = g.edge_end(movie, galois::MethodFlag::UNPROTECTED);
+          for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
+          {
+            GNode user = g.getEdgeDst(edge_it);
+
+            //stop when you're outside the current block's user range
+            if(user > currentBlockSliceEndUserId)
+              break;
+
+            Node& user_data = g.getData(user, galois::MethodFlag::UNPROTECTED);
+            int edge_rating = g.getEdgeData(edge_it, galois::MethodFlag::UNPROTECTED);  
+
+            //do gradient step
+            doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+                                          ++movie_data.updates;
+
+            updates++;
+          }
+
+          //we just looked at the last user
+          if(currentBlockSliceEnd == NUM_USER_NODES)
+          {
+            //start back at the first edge
+            movie_data.edge_offset = 0;
+          }
+        }
+
+        locks[currentSliceId].unlock ();
+
+        currentSliceId++;
+        sliceUpdates++;
+
+        //if(currentSliceId == workItem.numSlices) //hit end of slices
+        if(currentBlockSliceEnd == userRangeEnd)
+        {
+          currentSliceId = 0;
+          currentBlockSliceEnd = 0;
+        }
+      }
+
+      timer.stop();
+      workItem.timeTaken = timer.get_usec();
+      workItem.updates = updates;
+      std::cout << workItem.id << " " << workItem.updates << " " << workItem.timeTaken/1000000 << " " << conflicts << std::endl;
+      //printf("Worker %d took %u to do %u updates.\n", workItem.id, workItem.timeTaken/1000000, workItem.updates);
+    }
+  );
 
   /*for(unsigned int i = 0; i < numWorkItems; i++)
     {
@@ -1285,7 +1305,7 @@ struct sgd_slice_jump {
 
       SliceInfo& nextSlice = slices[nextSliceId];
 
-      if(nextSlice.updates < MAX_MOVIE_UPDATES && xLocks[nextSlice.x].try_lock())
+      if(nextSlice.updates < maxUpdates && xLocks[nextSlice.x].try_lock())
       {
         if(yLocks[nextSlice.y].try_lock())
         {
@@ -1416,8 +1436,12 @@ int main(int argc, char** argv) {
   // fill each node's id & initialize the latent vectors
   std::tie(NUM_MOVIE_NODES, NUM_USER_NODES) = initializeGraphData(g);
 
-  galois::gPrint("Input initialized: num users = ", NUM_USER_NODES, 
-                 ", num movies = ", NUM_MOVIE_NODES, "\n");
+  galois::gPrint("SUMMARY:",
+                 "\nMovies: ", NUM_MOVIE_NODES,
+                 "\nUsers: ", NUM_USER_NODES,
+                 "\nRatings: ", g.sizeEdges(), 
+                 "\nusersPerBlockSlice: ", usersPerBlockSlice, 
+                 "\nmoviesPerBlockSlice: ", moviesPerBlockSlice, "\n");
 
   // shift edges if shiftFactor specified
   if (shiftFactor != 0) {
@@ -1466,7 +1490,7 @@ int main(int argc, char** argv) {
       runBlockSlices<SGDBlockUsersMovies>(g, lf.get());
       break;
     case Algo::sliceMarch:
-      runSliceMarch(g, lf.get());
+      SGDSliceMarch(g, lf.get());
       break;
     case Algo::sliceJump:
       runSliceJump(g, lf.get());
@@ -1475,15 +1499,6 @@ int main(int argc, char** argv) {
 
   mainTimer.stop();
 
-  //verify(g);
-
-  galois::gPrint("SUMMARY:",
-                 "\nMovies ", NUM_MOVIE_NODES,
-                 "\nUsers ", NUM_USER_NODES,
-                 "\nRatings ", g.sizeEdges(), 
-                 "\nusersPerBlockSlice ", usersPerBlockSlice, 
-                 "\nmoviesPerBlockSlice ", moviesPerBlockSlice, 
-                 "\nTime ", mainTimer.get() / 1000.0, "\n");
 
   return 0;
 }
