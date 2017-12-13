@@ -23,6 +23,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Rupesh Nasre <rupesh0508@gmail.com>
+ * @author Loc Hoang <l_hoang@utexas.edu> (mainly documentation/cleanup)
  */
 #include "galois/Galois.h"
 #include "galois/graphs/Graph.h"
@@ -54,6 +55,9 @@ const unsigned THRESHOLD_OCD = 500;
 // Declaration of strutures, types, and variables
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Structure of a node in the graph.
+ */
 struct Node {
 	unsigned id;
 	unsigned priority;
@@ -71,7 +75,8 @@ using Graph = galois::graphs::FirstGraph<Node, void, true>;
 using GNode = Graph::GraphNode;
 
 /** 
- * TODO
+ * Structure representing an update request to the graph.
+ *
  * copied from Andrew's SSSP. 
  **/
 struct UpdateRequest {
@@ -136,16 +141,16 @@ public:
 	}
 };
 
-class PTA { 
+class PTA {
   using PointsToConstraints = std::vector<PtsToCons>;
   using PointsToInfo = std::vector<galois::SparseBitVector>;
 
+ private:
   /** 
    * Online Cycle Detection and elimination structure + functions.
    */
   struct OnlineCycleDetection {	
-  private:
-
+   private:
     std::vector<unsigned> ancestors;
     std::vector<bool> visited;
     std::vector<unsigned> representative;
@@ -256,7 +261,7 @@ class PTA {
         }
       }
     }
-  public:
+   public:
     PTA& outer;
 
     OnlineCycleDetection(PTA& o) : outer(o) {}
@@ -327,7 +332,6 @@ class PTA {
     }
   }; // end struct OnlineCycleDetection
 
-
   OnlineCycleDetection ocd;
   Graph graph;
   std::vector<GNode> nodes;
@@ -335,7 +339,207 @@ class PTA {
   PointsToConstraints addressCopyConstraints; 
   PointsToConstraints loadStoreConstraints;
   size_t numNodes = 0;
-public:
+
+  void processLoadStoreSerial(PointsToConstraints &constraints, 
+                              UpdatesVec &updates, 
+                              galois::MethodFlag flag = 
+                                  galois::MethodFlag::UNPROTECTED) {
+    // add edges to the graph based on points-to information of the nodes
+    // and then add the source of each edge to the updates.
+    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
+      //std::cout << "debug: Processing constraint: "; ii->print();
+      unsigned src, dst;
+      std::tie(src, dst) = ii->getSrcDst();
+
+      unsigned srcrepr = ocd.getFinalRepresentative(src);
+      unsigned dstrepr = ocd.getFinalRepresentative(dst);
+
+      if (ii->getType() == PtsToCons::Load) {
+        GNode &nndstrepr = nodes[dstrepr];
+        std::vector<unsigned> ptsToOfSrc;
+        result[srcrepr].getAllSetBits(ptsToOfSrc);
+        for (auto pointee = ptsToOfSrc.begin(); pointee != ptsToOfSrc.end(); ++pointee) {
+          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
+          if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_begin(nodes[pointeerepr])) {
+            GNode &nn = nodes[pointeerepr];
+            graph.addEdge(nn, nndstrepr, flag);
+            //std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
+            updates.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
+          }
+        }
+      } else {	// store.
+        std::vector<unsigned> ptsToOfDst;
+        bool newEdgeAdded = false;
+        GNode &nnSrcRepr = nodes[srcrepr];
+        result[dstrepr].getAllSetBits(ptsToOfDst);
+        for (auto pointee = ptsToOfDst.begin(); pointee != ptsToOfDst.end(); ++pointee) {
+          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
+          if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
+            graph.addEdge(nnSrcRepr, nodes[pointeerepr], flag);
+            //std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
+            newEdgeAdded = true;
+          }
+        }
+        if (newEdgeAdded) {
+          updates.push_back(UpdateRequest(nnSrcRepr, graph.getData(nnSrcRepr, galois::MethodFlag::UNPROTECTED).priority));
+        }
+      }
+    }
+  }
+
+  // add edges to the graph based on points-to information of the nodes
+  // and then add the source of each edge to the updates.
+  template <typename C>
+  void processLoadStoreParallel(const PointsToConstraints &constraints, 
+                                C& ctx, 
+                                galois::MethodFlag flag = 
+                                    galois::MethodFlag::WRITE) {
+    for (auto& constraint : constraints) {
+      //std::cout << "debug: Processing constraint: "; constraint->print();
+      unsigned src, dst;
+      std::tie(src, dst) = constraint.getSrcDst();
+
+      unsigned srcRepr = ocd.getFinalRepresentative(src);
+      unsigned dstRepr = ocd.getFinalRepresentative(dst);
+
+      if (constraint.getType() == PtsToCons::Load) { 
+        std::vector<unsigned> ptsToOfSrc;
+        result[srcRepr].getAllSetBits(ptsToOfSrc);
+
+        GNode &nnDstRepr = nodes[dstRepr]; // id of dst in graph
+
+        for (unsigned pointee : ptsToOfSrc) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
+
+          // add edge from pointee to dst if it doesn't already exist
+          if (pointeeRepr != dstRepr && 
+              graph.findEdge(nodes[pointeeRepr], nodes[dstRepr]) == 
+                  graph.edge_end(nodes[pointeeRepr])) {
+            GNode &nn = nodes[pointeeRepr];
+
+            galois::gDebug("adding edge from ", pointee, " to ", dst);
+
+            graph.addEdge(nn, nnDstRepr, flag);
+
+            ctx.push(
+              UpdateRequest(nn, 
+                            graph.getData(nn, 
+                                          galois::MethodFlag::WRITE).priority)
+            );
+          }
+        }
+      } else {	// store whatever src has into whatever dst points to
+        std::vector<unsigned> ptsToOfDst;
+        result[dstRepr].getAllSetBits(ptsToOfDst);
+        GNode &nnSrcRepr = nodes[srcRepr];
+        bool newEdgeAdded = false;
+
+        for (unsigned pointee : ptsToOfDst) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
+
+          // add edge from src -> pointee if it doesn't exist
+          if (srcRepr != pointeeRepr && 
+                graph.findEdge(nodes[srcRepr], nodes[pointeeRepr]) == 
+                    graph.edge_end(nodes[srcRepr])) {
+            galois::gDebug("adding edge from ", src, " to ", pointee);
+            graph.addEdge(nnSrcRepr, nodes[pointeeRepr], flag);
+            newEdgeAdded = true;
+          }
+        }
+
+        if (newEdgeAdded) {
+          ctx.push(
+            UpdateRequest(nnSrcRepr, 
+                          graph.getData(nnSrcRepr, 
+                                        galois::MethodFlag::WRITE).priority)
+          );
+        }
+      }
+    }
+  }
+
+  /**
+   * Processes the AddressOf and Copy constraints. 
+   *
+   * Sets the bitvector for AddressOf constraints, i.e. a set bit means
+   * that you point to whtaever that bit represents.
+   *
+   * Creates edges for Copy constraints, i.e. edge from a to b indicates
+   * b is a copy of a.
+   *
+   * @param constraints vector of AddressOf and Copy constraints
+   * @returns vector of UpdatesRequests from all sources with new edges
+   * added by the Copy constraint
+   */
+  UpdatesVec processAddressOfCopy(const PointsToConstraints& constraints) {
+    UpdatesVec updates;
+
+    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
+      //std::cout << "debug: Processing constraint: "; ii->print();
+
+      unsigned src;
+      unsigned dst;
+      std::tie(src, dst) = ii->getSrcDst();
+
+      if (ii->getType() == PtsToCons::AddressOf) {
+        if (result[dst].set(src)) { // this alters the state of the bitvector
+          galois::gDebug("saving v", dst, "->v", src);
+        }
+      } else if (src != dst) {	// copy.
+        GNode &nn = nodes[src];
+        graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
+        galois::gDebug("adding edge from ", src, " to ", dst);
+
+        updates.push_back(
+          UpdateRequest(nn, 
+                        graph.getData(nn, 
+                                      galois::MethodFlag::UNPROTECTED).priority)
+        );
+      }
+    }
+
+    return updates;
+  }
+
+  /**
+   * If an edge exists from src to dst, then dst is a copy of src.
+   * Propogate any points to information from source to dest.
+   *
+   * @param src Source node in graph
+   * @param dst Dest node in graph
+   * @param flag Flag specifying access to the graph. It's only used to 
+   * acquire a lock on the destination's bitvector if the flag specifies
+   * that a lock is necessary (e.g. WRITE)
+   * @returns number changed in the dest bitvector (used to assign priority
+   * in the worklist later)
+   */
+  unsigned propagate(GNode src, GNode dst, 
+                     galois::MethodFlag flag = galois::MethodFlag::WRITE) {
+    unsigned srcID = graph.getData(src, galois::MethodFlag::UNPROTECTED).id;
+    unsigned dstID = graph.getData(dst, galois::MethodFlag::UNPROTECTED).id;
+
+    unsigned newPtsTo = 0;
+
+    if (srcID != dstID) {
+      unsigned srcReprID = ocd.getFinalRepresentative(srcID);
+      unsigned dstReprID = ocd.getFinalRepresentative(dstID);
+
+      // if src is a not subset of dst... (i.e. src has more), then 
+      // propogate src's points to info to dst
+      if (srcReprID != dstReprID && 
+          !result[srcReprID].isSubsetEq(result[dstReprID])) {
+        galois::gDebug("unifying ", dstReprID, " by ", srcReprID);
+        // this getData call only exists to lock the node while in this scope
+        graph.getData(nodes[dstReprID], flag);
+        // newPtsTo is the number of chnages made to the bitvector
+        newPtsTo = result[dstReprID].unify(result[srcReprID]);
+      }
+    }
+
+    return newPtsTo;
+  }
+
+ public:
   PTA(void) : ocd(*this) { }
 
   /**
@@ -362,6 +566,9 @@ public:
     }
   }
 
+  /**
+   * TODO
+   */
   void checkReprPointsTo() {
     for (unsigned ii = 0; ii < result.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
@@ -371,6 +578,9 @@ public:
     }
   }
 
+  /**
+   * TODO
+   */
   unsigned countPointsToFacts() {
     unsigned count = 0;
     for (auto ii = result.begin(); ii != result.end(); ++ii) {
@@ -379,6 +589,10 @@ public:
     }
     return count;
   }
+
+  /**
+   * TODO
+   */
   void printPointsToInfo(PointsToInfo &result) {
     std::string prefix = "v";
     for (auto ii = result.begin(); ii != result.end(); ++ii) {
@@ -388,152 +602,17 @@ public:
     }
   }
 
-  void processLoadStoreSerial(PointsToConstraints &constraints, 
-                              UpdatesVec &updates, 
-                              galois::MethodFlag flag = 
-                                  galois::MethodFlag::UNPROTECTED) {
-    // add edges to the graph based on points-to information of the nodes
-    // and then add the source of each edge to the updates.
-    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      //std::cout << "debug: Processing constraint: "; ii->print();
-      unsigned src, dst;
-      std::tie(src, dst) = ii->getSrcDst();
 
-      unsigned srcrepr = ocd.getFinalRepresentative(src);
-      unsigned dstrepr = ocd.getFinalRepresentative(dst);
-
-      if (ii->getType() == PtsToCons::Load) {
-        GNode &nndstrepr = nodes[dstrepr];
-        std::vector<unsigned> ptstoOfSrc;
-        result[srcrepr].getAllSetBits(ptstoOfSrc);
-        for (auto pointee = ptstoOfSrc.begin(); pointee != ptstoOfSrc.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_begin(nodes[pointeerepr])) {
-            GNode &nn = nodes[pointeerepr];
-            graph.addEdge(nn, nndstrepr, flag);
-            //std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-            updates.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
-          }
-        }
-      } else {	// store.
-        std::vector<unsigned> ptstoOfDst;
-        bool newedgeadded = false;
-        GNode &nnsrcrepr = nodes[srcrepr];
-        result[dstrepr].getAllSetBits(ptstoOfDst);
-        for (auto pointee = ptstoOfDst.begin(); pointee != ptstoOfDst.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
-            graph.addEdge(nnsrcrepr, nodes[pointeerepr], flag);
-            //std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
-            newedgeadded = true;
-          }
-        }
-        if (newedgeadded) {
-          updates.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, galois::MethodFlag::UNPROTECTED).priority));
-        }
-      }
-    }
-  }
-
-  /**
-   * TODO
-   */
-  void processAddressOfCopy(const PointsToConstraints& constraints, 
-                            UpdatesVec &updates) {
-    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      //std::cout << "debug: Processing constraint: "; 
-      //ii->print();
-
-      unsigned src;
-      unsigned dst;
-      std::tie(src, dst) = ii->getSrcDst();
-
-      if (ii->getType() == PtsToCons::AddressOf) {
-        if (result[dst].set(src)) { // this alters the state of the bitvector
-          galois::gDebug("saving v", dst, "->v", src);
-        }
-      } else if (src != dst) {	// copy.
-        GNode &nn = nodes[src];
-        graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
-        galois::gDebug("adding edge from ", src, " to ", dst);
-
-        updates.push_back(
-          UpdateRequest(nn, 
-                        graph.getData(nn, 
-                                      galois::MethodFlag::UNPROTECTED).priority)
-        );
-      }
-    }
-  }
-
-  unsigned propagate(GNode &src, GNode &dst, galois::MethodFlag flag = galois::MethodFlag::WRITE) {
-    unsigned srcid = graph.getData(src, galois::MethodFlag::UNPROTECTED).id;
-    unsigned dstid = graph.getData(dst, galois::MethodFlag::UNPROTECTED).id;
-    unsigned newptsto = 0;
-
-    if (srcid != dstid) {
-      unsigned srcreprid = ocd.getFinalRepresentative(srcid);
-      unsigned dstreprid = ocd.getFinalRepresentative(dstid);
-      if (srcreprid != dstreprid && !result[srcreprid].isSubsetEq(result[dstreprid])) {
-        //std::cout << "debug: unifying " << dstreprid << " by " << srcreprid << std::endl;
-        graph.getData(nodes[dstreprid], flag);
-        newptsto = result[dstreprid].unify(result[srcreprid]);
-        //newptsto = 0;
-      }
-    }
-    return newptsto;
-  }
-
-  template <typename C>
-  void processLoadStoreParallel(PointsToConstraints &constraints, C& ctx, galois::MethodFlag flag = galois::MethodFlag::WRITE) {
-    // add edges to the graph based on points-to information of the nodes
-    // and then add the source of each edge to the updates.
-    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      unsigned src, dst;
-      //std::cout << "debug: Processing constraint: "; ii->print();
-      std::tie(src, dst) = ii->getSrcDst();
-      unsigned srcrepr = ocd.getFinalRepresentative(src);
-      unsigned dstrepr = ocd.getFinalRepresentative(dst);
-      if (ii->getType() == PtsToCons::Load) {
-        GNode &nndstrepr = nodes[dstrepr];
-        std::vector<unsigned> ptstoOfSrc;
-        result[srcrepr].getAllSetBits(ptstoOfSrc);
-        for (auto pointee = ptstoOfSrc.begin(); pointee != ptstoOfSrc.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_end(nodes[pointeerepr])) {
-            GNode &nn = nodes[pointeerepr];
-            graph.addEdge(nn, nndstrepr, flag);
-            //std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-            ctx.push(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::WRITE).priority));
-          }
-        }
-      } else {	// store.
-        std::vector<unsigned> ptstoOfDst;
-        bool newedgeadded = false;
-        GNode &nnsrcrepr = nodes[srcrepr];
-        result[dstrepr].getAllSetBits(ptstoOfDst);
-        for (auto pointee = ptstoOfDst.begin(); pointee != ptstoOfDst.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
-            graph.addEdge(nnsrcrepr, nodes[pointeerepr], flag);
-            //std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
-            newedgeadded = true;
-          }
-        }
-        if (newedgeadded) {
-          ctx.push(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, galois::MethodFlag::WRITE).priority));
-        }
-      }
-    }
-  }
-
+  // TODO
+  // This either hangs or is extremely slow even on the smallest constraint
+  // file we have
   void runSerial() {
-    UpdatesVec updates;
     //unsigned niteration = 0;
     //bool changed = false;
     unsigned nnodesprocessed = 0;
 
-    processAddressOfCopy(addressCopyConstraints, updates);
+    UpdatesVec updates;
+    updates = processAddressOfCopy(addressCopyConstraints);
     processLoadStoreSerial(loadStoreConstraints, updates, 
                            galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps updates empty.
 
@@ -555,19 +634,19 @@ public:
       }
       if (++nnodesprocessed > THRESHOLD_LOADSTORE || updates.empty()) {
         nnodesprocessed = 0;
-              processLoadStoreSerial(loadStoreConstraints, updates);	// add edges to graph, add their sources to updates.
+        processLoadStoreSerial(loadStoreConstraints, updates);	// add edges to graph, add their sources to updates.
         if (updates.size() > THRESHOLD_OCD) {
           ocd.process(updates);
         }
       }
-          }
+    }
   }
 
   void runParallel() {
     UpdatesVec updates;
     //unsigned niteration = 0;
     
-    processAddressOfCopy(addressCopyConstraints, updates);
+    updates = processAddressOfCopy(addressCopyConstraints);
     processLoadStoreSerial(loadStoreConstraints, updates, 
                            galois::MethodFlag::UNPROTECTED);
 
@@ -590,42 +669,35 @@ public:
         galois::worklists::dChunkedFIFO<1024>
     >;
 
-    //using namespace galois::runtime::UpdatesVec;
-    //galois::for_each<LocalQueues<dChunkedFIFO<1024> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<FIFO<> >(updates.begin(), updates.end(), Process());
-    //galois::for_each<ChunkedFIFO<1024> >(updates.begin(), updates.end(), Process());
-    //galois::for_each<dChunkedFIFO<1024> >(updates.begin(), updates.end(), Process());
-    //galois::for_each<ChunkedLIFO<32> >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<ChunkedLIFO<32> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<FIFO<1024> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<ChunkedFIFO<32> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<dChunkedLIFO<32>, FIFO<> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<ChunkedLIFO<1024>, FIFO<> > >(updates.begin(), updates.end(), Process());
-    //galois::for_each<LocalQueues<ChunkedFIFO<1024>, FIFO<> > >(updates.begin(), updates.end(), Process());
+    // TODO this is incorrect as processLoadStoreParallel may potentially
+    // not be called at the very end of execution
     galois::for_each(
       galois::iterate(updates),
       [this, &nfired] (const UpdateRequest& req, auto& ctx) {
         if (++(*nfired.getLocal()) < THRESHOLD_LOADSTORE) {
           GNode src = req.n;
-          for (auto ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-                    ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+
+          //galois::gPrint("testing1\n");
+          for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(ii);
-            unsigned newptsto = this->propagate(src, dst, galois::MethodFlag::WRITE);
-            if (newptsto) {
-              ctx.push(UpdateRequest(dst, newptsto));
+            unsigned newPtsTo = this->propagate(src, dst, 
+                                                galois::MethodFlag::WRITE);
+            if (newPtsTo) {
+              ctx.push(UpdateRequest(dst, newPtsTo));
             }
           }
         } else {
           *(nfired.getLocal()) = 0;
-          this->processLoadStoreParallel(loadStoreConstraints, ctx, galois::MethodFlag::WRITE);
-          /*if (wl.size() > THRESHOLD_OCD) {
-            ocd.process(wl);
-            }*/
-        }
-        /*if (nfired % 500 == 0) {
-          std::cout << ++niter << std::endl;
-          }*/
 
+          this->processLoadStoreParallel(loadStoreConstraints, ctx, 
+                                         galois::MethodFlag::WRITE);
+          //if (wl.size() > THRESHOLD_OCD) {
+          //  ocd.process(wl);
+          //}
+        }
+        //if (nfired % 500 == 0) {
+        //  std::cout << ++niter << std::endl;
+        //}
       },
       galois::loopname("Main"),
       galois::wl<OBIM>(indexer)
@@ -712,7 +784,7 @@ int main(int argc, char** argv) {
   T.start();
 
   // TODO 
-  if (numThreads) {
+  if (numThreads > 1) {
   	std::cout << "-------- Parallel version: " << numThreads << " threads.\n";
     pta.runParallel();
   } else {
