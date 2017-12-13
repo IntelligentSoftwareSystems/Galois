@@ -241,12 +241,14 @@ struct ParallelAlgo {
 
   void process() {
 
+    constexpr unsigned CHUNK_SIZE = 32;
+
     size_t rounds = 0;
 
     init();
 
     galois::do_all(galois::iterate(graph), Initialize(this)
-        , galois::chunk_size<16>(), galois::steal() , galois::loopname("Initialize"));
+        , galois::chunk_size<CHUNK_SIZE>(), galois::steal() , galois::loopname("Initialize"));
 
     while (true) {
       while (true) {
@@ -255,10 +257,10 @@ struct ParallelAlgo {
         std::swap(current, next);
         galois::do_all(galois::iterate(*current)
             , Merge(this)
-            , galois::steal(), galois::chunk_size<16>(), galois::loopname("Merge"));
+            , galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::loopname("Merge"));
         galois::do_all(galois::iterate(*current)
             , Find(this)
-            , galois::steal(), galois::chunk_size<16>(), galois::loopname("Find"));
+            , galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::loopname("Find"));
         current->clear();
 
         if (next->empty())
@@ -429,7 +431,8 @@ void run() {
   algo.initializeGraph();
   Tinitial.stop();
 
-  galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 20);
+  galois::preAlloc( 8 * galois::getActiveThreads() 
+      + 16 * (algo.graph.size() + algo.graph.sizeEdges()) / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;
