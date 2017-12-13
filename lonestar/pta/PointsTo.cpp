@@ -689,6 +689,8 @@ class PTA {
         } else {
           *(nfired.getLocal()) = 0;
 
+          // TODO THIS NEEDS TO BE CALLED BEFORE YOU EXIT THE FOR EACH LOOP
+          // AS IT MIGHT ADD MORE WORK
           this->processLoadStoreParallel(loadStoreConstraints, ctx, 
                                          galois::MethodFlag::WRITE);
           //if (wl.size() > THRESHOLD_OCD) {
