@@ -241,7 +241,7 @@ struct ParallelAlgo {
 
   void process() {
 
-    constexpr unsigned CHUNK_SIZE = 32;
+    constexpr unsigned CHUNK_SIZE = 16;
 
     size_t rounds = 0;
 

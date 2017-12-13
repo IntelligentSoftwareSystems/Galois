@@ -145,6 +145,18 @@ public:
       fastPushBack(pushBuffer);
   }
 
+  //! Push new work 
+  template<typename... Args>
+  inline void push_back(Args&&... args) {
+    this->push(std::forward<Args>(args)...);
+  }
+
+  //! Push new work 
+  template<typename... Args>
+  inline void insert(Args&&... args) {
+    this->push(std::forward<Args>(args)...);
+  }
+
   //! Force the abort of this iteration
   void abort() { galois::runtime::signalConflict(); }
 
