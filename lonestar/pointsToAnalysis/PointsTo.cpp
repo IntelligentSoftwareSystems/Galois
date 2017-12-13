@@ -340,60 +340,12 @@ class PTA {
   PointsToConstraints loadStoreConstraints;
   size_t numNodes = 0;
 
-  void processLoadStoreSerial(PointsToConstraints &constraints, 
-                              UpdatesVec &updates, 
-                              galois::MethodFlag flag = 
-                                  galois::MethodFlag::UNPROTECTED) {
-    // add edges to the graph based on points-to information of the nodes
-    // and then add the source of each edge to the updates.
-    for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
-      //std::cout << "debug: Processing constraint: "; ii->print();
-      unsigned src, dst;
-      std::tie(src, dst) = ii->getSrcDst();
-
-      unsigned srcrepr = ocd.getFinalRepresentative(src);
-      unsigned dstrepr = ocd.getFinalRepresentative(dst);
-
-      if (ii->getType() == PtsToCons::Load) {
-        GNode &nndstrepr = nodes[dstrepr];
-        std::vector<unsigned> ptsToOfSrc;
-        result[srcrepr].getAllSetBits(ptsToOfSrc);
-        for (auto pointee = ptsToOfSrc.begin(); pointee != ptsToOfSrc.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (pointeerepr != dstrepr && graph.findEdge(nodes[pointeerepr], nodes[dstrepr]) == graph.edge_begin(nodes[pointeerepr])) {
-            GNode &nn = nodes[pointeerepr];
-            graph.addEdge(nn, nndstrepr, flag);
-            //std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-            updates.push_back(UpdateRequest(nn, graph.getData(nn, galois::MethodFlag::UNPROTECTED).priority));
-          }
-        }
-      } else {	// store.
-        std::vector<unsigned> ptsToOfDst;
-        bool newEdgeAdded = false;
-        GNode &nnSrcRepr = nodes[srcrepr];
-        result[dstrepr].getAllSetBits(ptsToOfDst);
-        for (auto pointee = ptsToOfDst.begin(); pointee != ptsToOfDst.end(); ++pointee) {
-          unsigned pointeerepr = ocd.getFinalRepresentative(*pointee);
-          if (srcrepr != pointeerepr && graph.findEdge(nodes[srcrepr],nodes[pointeerepr]) == graph.edge_end(nodes[srcrepr])) {
-            graph.addEdge(nnSrcRepr, nodes[pointeerepr], flag);
-            //std::cout << "debug: adding edge from " << src << " to " << *pointee << std::endl;
-            newEdgeAdded = true;
-          }
-        }
-        if (newEdgeAdded) {
-          updates.push_back(UpdateRequest(nnSrcRepr, graph.getData(nnSrcRepr, galois::MethodFlag::UNPROTECTED).priority));
-        }
-      }
-    }
-  }
-
+  // TODO better documentation
   // add edges to the graph based on points-to information of the nodes
   // and then add the source of each edge to the updates.
   template <typename C>
-  void processLoadStoreParallel(const PointsToConstraints &constraints, 
-                                C& ctx, 
-                                galois::MethodFlag flag = 
-                                    galois::MethodFlag::WRITE) {
+  void processLoadStore(const PointsToConstraints &constraints, C& ctx, 
+                        galois::MethodFlag flag = galois::MethodFlag::WRITE) {
     for (auto& constraint : constraints) {
       //std::cout << "debug: Processing constraint: "; constraint->print();
       unsigned src, dst;
@@ -421,7 +373,7 @@ class PTA {
 
             graph.addEdge(nn, nnDstRepr, flag);
 
-            ctx.push(
+            ctx.push_back(
               UpdateRequest(nn, 
                             graph.getData(nn, 
                                           galois::MethodFlag::WRITE).priority)
@@ -448,7 +400,7 @@ class PTA {
         }
 
         if (newEdgeAdded) {
-          ctx.push(
+          ctx.push_back(
             UpdateRequest(nnSrcRepr, 
                           graph.getData(nnSrcRepr, 
                                         galois::MethodFlag::WRITE).priority)
@@ -613,7 +565,7 @@ class PTA {
 
     UpdatesVec updates;
     updates = processAddressOfCopy(addressCopyConstraints);
-    processLoadStoreSerial(loadStoreConstraints, updates, 
+    processLoadStore(loadStoreConstraints, updates, 
                            galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps updates empty.
 
     //std::cout << "debug: no of addr+copy constraints = " << addressCopyConstraints.size() << ", no of load+store constraints = " << loadStoreConstraints.size() << std::endl;
@@ -634,7 +586,7 @@ class PTA {
       }
       if (++nnodesprocessed > THRESHOLD_LOADSTORE || updates.empty()) {
         nnodesprocessed = 0;
-        processLoadStoreSerial(loadStoreConstraints, updates);	// add edges to graph, add their sources to updates.
+        processLoadStore(loadStoreConstraints, updates);	// add edges to graph, add their sources to updates.
         if (updates.size() > THRESHOLD_OCD) {
           ocd.process(updates);
         }
@@ -647,7 +599,7 @@ class PTA {
     //unsigned niteration = 0;
     
     updates = processAddressOfCopy(addressCopyConstraints);
-    processLoadStoreSerial(loadStoreConstraints, updates, 
+    processLoadStore(loadStoreConstraints, updates, 
                            galois::MethodFlag::UNPROTECTED);
 
     //unsigned nfired = 0;
@@ -669,7 +621,7 @@ class PTA {
         galois::worklists::dChunkedFIFO<1024>
     >;
 
-    // TODO this is incorrect as processLoadStoreParallel may potentially
+    // TODO this is incorrect as processLoadStore may potentially
     // not be called at the very end of execution
     galois::for_each(
       galois::iterate(updates),
@@ -691,7 +643,7 @@ class PTA {
 
           // TODO THIS NEEDS TO BE CALLED BEFORE YOU EXIT THE FOR EACH LOOP
           // AS IT MIGHT ADD MORE WORK
-          this->processLoadStoreParallel(loadStoreConstraints, ctx, 
+          this->processLoadStore(loadStoreConstraints, ctx, 
                                          galois::MethodFlag::WRITE);
           //if (wl.size() > THRESHOLD_OCD) {
           //  ocd.process(wl);
