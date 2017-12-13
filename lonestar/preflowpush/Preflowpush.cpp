@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
@@ -735,11 +736,12 @@ struct PreflowPush {
         std::string pfpName = inputFile + ".pfp";
         std::ifstream pfpFile(pfpName.c_str());
         if (!pfpFile.good()) {
-          std::cout << "Writing new input file: " << pfpName << "\n";
+          galois::gPrint("Writing new input file: ", pfpName, "\n");
           writePfpGraph<Graph::edge_data_type>(inputFile, pfpName);
         }
         inputFile = pfpName;
       }
+      galois::gPrint("Reading graph: ", inputFile, "\n");
       galois::graphs::readGraph(graph, inputFile);
 
       // Assume that input edge data has already been converted instead
