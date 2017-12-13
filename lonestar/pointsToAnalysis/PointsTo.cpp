@@ -87,7 +87,7 @@ struct UpdateRequest {
     : n(N), w(W) {}
 };
 
-using UpdatesVec = std::vector<UpdateRequest>;
+using UpdatesVec = galois::gstl::Vector<UpdateRequest>;
 
 /**
  * Class representing a points-to constraint.
@@ -142,8 +142,8 @@ public:
 };
 
 class PTA {
-  using PointsToConstraints = std::vector<PtsToCons>;
-  using PointsToInfo = std::vector<galois::SparseBitVector>;
+  using PointsToConstraints = galois::gstl::Vector<PtsToCons>;
+  using PointsToInfo = galois::gstl::Vector<galois::SparseBitVector>;
 
  private:
   /** 
@@ -151,9 +151,9 @@ class PTA {
    */
   struct OnlineCycleDetection {	
    private:
-    std::vector<unsigned> ancestors;
-    std::vector<bool> visited;
-    std::vector<unsigned> representative;
+    galois::gstl::Vector<unsigned> ancestors;
+    galois::gstl::Vector<bool> visited;
+    galois::gstl::Vector<unsigned> representative;
     unsigned NoRepresentative; // "constant" that represents no representative
 
     /**
@@ -334,7 +334,7 @@ class PTA {
 
   OnlineCycleDetection ocd;
   Graph graph;
-  std::vector<GNode> nodes;
+  galois::gstl::Vector<GNode> nodes;
   PointsToInfo result;
   PointsToConstraints addressCopyConstraints; 
   PointsToConstraints loadStoreConstraints;
@@ -355,7 +355,7 @@ class PTA {
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
       if (constraint.getType() == PtsToCons::Load) { 
-        std::vector<unsigned> ptsToOfSrc;
+        galois::gstl::Vector<unsigned> ptsToOfSrc;
         result[srcRepr].getAllSetBits(ptsToOfSrc);
 
         GNode &nnDstRepr = nodes[dstRepr]; // id of dst in graph
@@ -381,7 +381,7 @@ class PTA {
           }
         }
       } else {	// store whatever src has into whatever dst points to
-        std::vector<unsigned> ptsToOfDst;
+        galois::gstl::Vector<unsigned> ptsToOfDst;
         result[dstRepr].getAllSetBits(ptsToOfDst);
         GNode &nnSrcRepr = nodes[srcRepr];
         bool newEdgeAdded = false;
