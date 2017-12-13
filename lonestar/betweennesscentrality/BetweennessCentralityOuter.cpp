@@ -333,7 +333,7 @@ int main(int argc, char** argv) {
   size_t iterations = std::distance(begin, adjustedEnd);
 
   // vector of nodes we want to process
-  std::vector<GNode> v(begin, adjustedEnd);
+  galois::gstl::Vector<GNode> v(begin, adjustedEnd);
 
   galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
                  " Iterations: ",  iterations, "\n");
