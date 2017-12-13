@@ -27,9 +27,8 @@
 
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
-
+#include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-
 #include <cmath>
 #include <random>
 
@@ -91,7 +90,7 @@ static cll::opt<int> shiftFactor("shiftRating",
 static cll::opt<unsigned> maxUpdates("maxUpdates", 
                                      cll::desc("Max number of times to update "
                                                "latent vectors (default 100)"), 
-                                     cll::init(100));
+                                     cll::init(15));
 static cll::opt<double> errorThreshold("errorThreshold", 
                                        cll::desc("Algo terminates when root "
                                                  "mean square error is less "
