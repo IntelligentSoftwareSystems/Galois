@@ -876,6 +876,8 @@ int main(int argc, char** argv) {
             << "\n";
 
   galois::StatTimer T;
+  galois::preAlloc(numThreads * app.graph.size() /
+                       galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
   T.start();
   app.run();
