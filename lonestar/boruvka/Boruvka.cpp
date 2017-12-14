@@ -31,6 +31,7 @@
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/ParallelSTL.h"
+#include "galois/runtime/Profile.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
@@ -438,7 +439,9 @@ void run() {
   galois::StatTimer T;
 
   T.start();
-  algo();
+  galois::runtime::profileVtune( [&] (void) {
+      algo();
+    }, "boruvka");
   T.stop();
 
   galois::reportPageAlloc("MeminfoPost");
