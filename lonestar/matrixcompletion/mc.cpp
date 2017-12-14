@@ -46,7 +46,6 @@ static const double MAXVAL = 1e+100;
 
 enum Algo {
   nodeMovie,
-  nodeMoviePri,
   edgeMovie,
   block,
   blockAndSliceUsers,
@@ -102,7 +101,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Algorithm variant:"),
                            cll::values(
                              clEnumVal(nodeMovie, "Node by Movies"),
                              clEnumVal(edgeMovie, "Edge by Movies"),
-                             clEnumVal(nodeMoviePri, "Node delta error"),
                              clEnumVal(block, "Block by Users and Movies"),
                              clEnumVal(blockAndSliceUsers, 
                                        "Block by Users and Movies, Slice by "
@@ -453,7 +451,6 @@ struct AdvanceEdgeOffsets {
   }
 };
 
-// TODO see if needed else remove
 // utility function to learn about a graph input
 void count_ratings(Graph& g) {
   const unsigned threadCount = galois::getActiveThreads ();
@@ -515,6 +512,7 @@ void count_ratings(Graph& g) {
 // Learning Functions: Specify learning step size that is dependent on round
 ////////////////////////////////////////////////////////////////////////////////
 
+// TODO remove need for virtual function here
 struct LearnFN {
   virtual double step_size(unsigned int round) const = 0;
 };
@@ -587,55 +585,6 @@ void SGDNodeMovie(Graph& g, const LearnFN* lf) {
 //priority by-movie node-based
 // TODO this implementation seems non-sensical (why are you pushing
 // user nodes to the worklist when they have no edges?)
-void SGDNodeMoviePriority(Graph& g, const LearnFN* lf) {
-  galois::InsertBag<GNode> Movies;
-
-  // get "high priority" movies
-  galois::do_all(
-    galois::iterate(g),
-    [&] (GNode n) {
-      if (std::distance(g.edge_begin(n), g.edge_end(n)) > 100) {
-        Movies.push_back(n);
-      }
-    }
-  );
-
-  unsigned numIterations = 0;
-  double latestError = rootMeanSquaredError(g);
-  if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
-
-  while (numIterations < maxUpdates && latestError > errorThreshold) {
-    double step_size = lf->step_size(numIterations);
-    galois::gDebug("Step Size: ", step_size);
-
-    galois::for_each(
-      galois::iterate(Movies),
-      [&] (GNode node, auto& ctx) {
-        for (auto e: g.edges(node)) {
-          double e1 = doGradientUpdate(g.getData(node), 
-                                       g.getData(g.getEdgeDst(e)), 
-                                       g.getEdgeData(e), step_size);
-          double e2 = g.getEdgeData(e) - 
-                      calcPrediction(g.getData(node), 
-                                     g.getData(g.getEdgeDst(e)));
-
-          if (std::abs(e1 - e2) > 20) {
-            std::cerr << "A" << std::abs(e1 - e2);
-            ctx.push(g.getEdgeDst(e)); // TODO this is non-sensical; users have 
-                                       // no edges (users = edge dst)
-          }
-        }
-      },
-      galois::wl<galois::worklists::dChunkedFIFO<8>>(),
-      galois::loopname("SGDNodeMoviePriority")
-    );
-
-    latestError = rootMeanSquaredError(g);
-    if (verifyPerIter) galois::gPrint("RMS: ", latestError, "\n");
-    numIterations++;
-  }
-}
-
 /** 
  * Simple by-edge grouped by movie (only one edge per movie on the WL at any 
  * time)
@@ -1473,9 +1422,6 @@ int main(int argc, char** argv) {
     case Algo::nodeMovie:
       SGDNodeMovie(g, lf.get());
       break;
-    case Algo::nodeMoviePri:
-      SGDNodeMoviePriority(g, lf.get());
-      break;
     case Algo::edgeMovie:
       SGDEdgeMovie(g, lf.get());
       break;
@@ -1497,7 +1443,6 @@ int main(int argc, char** argv) {
   }
 
   mainTimer.stop();
-
 
   return 0;
 }
