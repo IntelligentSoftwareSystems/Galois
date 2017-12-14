@@ -512,31 +512,26 @@ void count_ratings(Graph& g) {
 // Learning Functions: Specify learning step size that is dependent on round
 ////////////////////////////////////////////////////////////////////////////////
 
-// TODO remove need for virtual function here
-struct LearnFN {
-  virtual double step_size(unsigned int round) const = 0;
-};
-
-struct PurdueLearnFN : public LearnFN {
-  virtual double step_size(unsigned int round) const {
+struct PurdueLearnFN {
+  double step_size(unsigned int round) const {
     return (learningRate * 1.5) / (1.0 + purdueDecayRate * pow(round + 1, 1.5));
   }
 };
 
-struct IntelLearnFN : public LearnFN {
-  virtual double step_size(unsigned int round) const {
+struct IntelLearnFN {
+  double step_size(unsigned int round) const {
     return learningRate * pow(intelDecayRate, round);
   }
 };
 
-struct BottouLearnFN : public LearnFN {
-  virtual double step_size(unsigned int round) const {
+struct BottouLearnFN {
+  double step_size(unsigned int round) const {
     return bottouInit / (1 + bottouInit * lambda * round);
   }
 };
 
-struct InvLearnFN : public LearnFN {
-  virtual double step_size(unsigned int round) const {
+struct InvLearnFN {
+  double step_size(unsigned int round) const {
     return (double)1 / (double)(round + 1);
   }
 };
@@ -864,7 +859,8 @@ struct SGDBlockUsersMovies {
  */
 template<typename BlockFn>
 void runBlockSlices(Graph& g, const LearnFN* lf) {
-  const unsigned numWorkItems = galois::getActiveThreads();
+  // Tune a const multiplication factor
+  const unsigned numWorkItems = C * galois::getActiveThreads();
 
   ThreadWorkItem workItems[numWorkItems];
 
@@ -1373,6 +1369,29 @@ void runSliceJump(Graph& g, const LearnFN* lf) {
 }
 
 
+template <typename A, typename G>
+void runAlgo(const A& algo, G& g) {
+
+  switch (learn) {
+    case Intel:
+      algo(g, IntelLearnFN());
+      break;
+    case Purdue:
+      algo(g, PurdueLearnFN());
+      break;
+    case Bottou:
+      algo(g, BottouLearnFN());
+      break;
+    case Inv:
+      algo(g, InvLearnFN());
+      break;
+    default:
+      std::abort();
+      break;
+  }
+}
+
+
 int main(int argc, char** argv) { 
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -1403,24 +1422,11 @@ int main(int argc, char** argv) {
 
   std::unique_ptr<LearnFN> lf;
 
-  switch (learn) {
-    case Intel:
-      lf.reset(new IntelLearnFN);
-      break;
-    case Purdue:
-      lf.reset(new PurdueLearnFN);
-      break;
-    case Bottou:
-      lf.reset(new BottouLearnFN);
-      break;
-    case Inv:
-      lf.reset(new InvLearnFN);
-      break;
-  }
 
   switch (algo) {
     case Algo::nodeMovie:
-      SGDNodeMovie(g, lf.get());
+      runAlgo(&SGDNodeMovie, g);
+      // SGDNodeMovie(g, lf.get());
       break;
     case Algo::edgeMovie:
       SGDEdgeMovie(g, lf.get());
