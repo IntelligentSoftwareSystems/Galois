@@ -101,12 +101,20 @@ struct SparseBitVector {
       next = nullptr;
     }
 
-    unsigned unify(OneWord *second) {
+    /**
+     * Bitwise or with second's bits field on our field.
+     *
+     * @param second OneWord to do a bitwise or with
+     * @returns 1 if something changed, 0 otherwise
+     *
+     */
+    unsigned unify(OneWord* second) {
       if (second) {
-        WORD oribits = count();
+        WORD oldBits = bits;
         bits |= second->bits;
-        return count() - oribits;
+        return (bits != oldBits);
       }
+
       return 0;
     }
 
@@ -123,28 +131,47 @@ struct SparseBitVector {
       return numElements;
     }
 
-    inline bool isSubsetEq(OneWord *second) {
+    /**
+     * @param second OneWord pointer to compare against
+     * @returns true if second word's bits has everything that this
+     * word's bits have
+     */
+    bool isSubsetEq(OneWord* second) const {
       return (bits & second->bits) == bits;
     }
 
-    OneWord *clone() {
-      OneWord *newword = new OneWord();
+    /**
+     * @returns a pointer to a copy of this word without the preservation
+     * of the linked list
+     */
+    OneWord* clone() const {
+      OneWord* newword = new OneWord();
+
       newword->base = base;
       newword->bits = bits;
-      newword->next = 0;
+      newword->next = nullptr;
+
       return newword;
     }
-    OneWord *cloneAll() {
-      OneWord *newlist = clone();
-      OneWord *ptr2;
 
-      for (OneWord *newlistptr = newlist, *ptr = next; ptr;) {
-        newlistptr->next = ptr->clone();
-        ptr2 = ptr->next; 
-        ptr = ptr2;
-        newlistptr = newlistptr->next;
+    /**
+     * @returns a pointer to a copy of this word WITH the preservation of
+     * the linked list via copies of the list starting from this word
+     */
+    OneWord* cloneAll() const {
+      OneWord* newListBeginning = clone();
+
+      OneWord* curPtr = newListBeginning;
+      OneWord* nextPtr = next;
+
+      // clone down the linked list starting from this pointer
+      while (nextPtr != nullptr) {
+        curPtr->next = nextPtr->clone();
+        nextPtr = nextPtr->next;
+        curPtr = curPtr->next;
       }
-      return newlist;
+
+      return newListBeginning;
     }
 
 
@@ -157,7 +184,7 @@ struct SparseBitVector {
     * @returns Number of set bits in this word
     */
     template<typename VectorTy>
-    unsigned getAllSetBits(VectorTy &setbits) {
+    unsigned getAllSetBits(VectorTy &setbits) const {
       // or mask used to mask set bits
       WORD orMask = 1;
       unsigned numSet = 0;
@@ -234,55 +261,107 @@ struct SparseBitVector {
     }
   }
 
-  unsigned unify(SparseBitVector &second) {
-    unsigned nchanged = 0;
-    OneWord *prev = 0, *ptrone, *ptrtwo;
-    for (ptrone = head, ptrtwo = second.head; ptrone && ptrtwo;) {
-      if (ptrone->base == ptrtwo->base) {
-        nchanged += ptrone->unify(ptrtwo);
-        prev = ptrone; ptrone = ptrone->next;
-        ptrtwo = ptrtwo->next;
-      } else if (ptrone->base < ptrtwo->base) {
-        prev = ptrone; 
-        ptrone = ptrone->next;
-      } else {
-        OneWord *newword = ptrtwo->clone();
-        newword->next = ptrone;
+  /**
+   * Takes the passed in bitvector and does an or with it to update this
+   * bitvector.
+   *
+   * @param second BitVector to merge this one with
+   * @returns a non-negative value if something changed
+   */
+  unsigned unify(const SparseBitVector& second) {
+    unsigned changed = 0;
+
+    OneWord* prev = nullptr;
+    OneWord* ptrOne = head;
+    OneWord* ptrTwo = second.head;
+
+    while (ptrOne != nullptr && ptrTwo != nullptr) {
+      if (ptrOne->base == ptrTwo->base) {
+        // merged ptrTwo's word with our word, then advance both
+        changed += ptrOne->unify(ptrTwo);
+
+        prev = ptrOne;
+        ptrOne = ptrOne->next;
+        ptrTwo = ptrTwo->next;
+      } else if (ptrOne->base < ptrTwo->base) {
+        // advance our pointer until we reach "new" words
+        prev = ptrOne;
+        ptrOne = ptrOne->next;
+      } else { // oneBase > twoBase
+        // add ptrTwo's word that we don't have (otherwise would have been
+        // handled by other case), fix linked list on our side
+        OneWord* newWord = ptrTwo->clone();
+        newWord->next = ptrOne; // this word comes before our current word
+
+        // if previous word exists, make it point to this new word, 
+        // else make this word the new head and prev pointer
         if (prev) {
-          prev->next = newword;
-          prev = newword;
+          prev->next = newWord;
+          prev = newWord;
         } else {
-          head = prev = newword;
+          head = prev = newWord;
         }
-        ptrtwo = ptrtwo->next;
+
+        // done with ptrTwo's word, advance
+        ptrTwo = ptrTwo->next;
+
+        changed++;
       }
     }
-    if (ptrtwo) {
-      OneWord *remaining = ptrtwo->cloneAll();
+
+    // ptrOne = nullptr, but ptrTwo still has values; clone the values and
+    // add them to our own bitvector
+    if (ptrTwo) {
+      OneWord* remaining = ptrTwo->cloneAll();
+
       if (prev) {
         prev->next = remaining;
-      } else if (ptrtwo) {
+      } else {
         head = remaining;
       }
+
+      changed++;
     }
-    return nchanged;
+
+    return changed;
   }
-  bool isSubsetEq(SparseBitVector &second) {
-    OneWord *ptrone, *ptrtwo;
-    for (ptrone = head, ptrtwo = second.head; ptrone && ptrtwo; ptrone = ptrone->next) {
-      if (ptrone->base == ptrtwo->base) {
-        if (!ptrone->isSubsetEq(ptrtwo)) {
+
+  /**
+   * @param second Vector to check if this vector is a subset of
+   * @returns true if this vector is a subset of the second vector
+   */
+  bool isSubsetEq(const SparseBitVector& second) const {
+    OneWord* ptrOne = head;
+    OneWord* ptrTwo = second.head;
+
+    while (ptrOne != nullptr && ptrTwo != nullptr) {
+      if (ptrOne->base == ptrTwo->base) {
+        if (!ptrOne->isSubsetEq(ptrTwo)) {
           return false;
+        } else {
+          // we are done comparing ptrTwo's current head; move on to next
+          ptrTwo = ptrTwo->next;
         }
-        ptrtwo = ptrtwo->next;
-      } else if (ptrone->base > ptrtwo->base) {
-          return false;
+        ptrOne = ptrOne->next;
+      } else if (ptrOne->base < ptrTwo->base) {
+        // two has overtaken 1, i.e. one has something two doesn't since 
+        // otherwise the first case in this if/else chain should have
+        // caught it
+        return false;
+      } else { // greater than case; advance ptrTwo to see if it eventually
+               // reaches what ptrOne is currently at (or skips over it)
+        ptrTwo = ptrTwo->next;
       }
     }
-    if (ptrone) {
+
+    if (ptrOne != nullptr) {
+      // loop exited because ptrTwo is nullptr, meaning this vector has more
+      // than the other vector, i.e. not a subset
       return false;
+    } else {
+      // ptrOne == nullptr => it has sucessfully subset checked all words
+      return true;
     }
-    return true;
   }
 
   /**
@@ -314,7 +393,7 @@ struct SparseBitVector {
    * @returns Number of set bits in this bitvector
    */
   template<typename VectorTy>
-  unsigned getAllSetBits(VectorTy &setBits) {
+  unsigned getAllSetBits(VectorTy &setBits) const {
     unsigned numBits = 0;
 
     // loop through all words in the bitvector and get their set bits
@@ -324,12 +403,13 @@ struct SparseBitVector {
 
     return numBits;
   }
+
   void print(std::ostream& out, std::string prefix = std::string("")) {
     std::vector<unsigned> setbits;
-    unsigned nnodes = getAllSetBits(setbits);
-    out << "Elements(" << nnodes << "): ";
-    for (std::vector<unsigned>::iterator ii = setbits.begin(); ii != setbits.end(); ++ii) {
-      out << prefix << *ii << ", ";
+    unsigned nNodes = getAllSetBits(setbits);
+    out << "Elements(" << nNodes << "): ";
+    for (auto setBitNum : setbits) {
+      out << prefix << setBitNum << ", ";
     }
     out << "\n";
   }
