@@ -4,7 +4,10 @@
 # run as:
 # threads="1 2 4 8 16" vtune.sh program ARGS
 
-threads=${threads:="1 `seq 5 5 40`"};
+TSTEP="5";
+tmax="40";
+threads=${threads:="1 `seq $TSTEP $TSTEP $TMAX`"};
+
 prefix=$(basename $1); # assuming arg 1 is the path to the program being run
 
 scriptsDir=$(dirname $0)
