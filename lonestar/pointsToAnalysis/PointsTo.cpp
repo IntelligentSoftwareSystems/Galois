@@ -77,20 +77,7 @@ struct Node {
 using Graph = galois::graphs::FirstGraph<Node, void, true>;
 using GNode = Graph::GraphNode;
 
-/** 
- * Structure representing an update request to the graph.
- *
- * copied from Andrew's SSSP. 
- **/
-struct UpdateRequest {
-  GNode n;
-  unsigned int w; // this is the priority of the request
-
-  UpdateRequest(GNode& N, unsigned int W)
-    : n(N), w(W) {}
-};
-
-using UpdatesVec = galois::gstl::Vector<UpdateRequest>;
+using UpdatesVec = galois::gstl::Vector<GNode>;
 
 /**
  * Class representing a points-to constraint.
@@ -315,6 +302,7 @@ class PTA {
         repr = representative[nodeid];
       }
 
+      //galois::gPrint(nodeid, ", ", lnnid, "\n");
       return lnnid;
     }
 
@@ -325,14 +313,17 @@ class PTA {
      * @param updates vector of nodes that are sources of new edges.
      */
     void process(const UpdatesVec& updates) { 
+      return; // TODO this (or something it calls) 
+              // is broken and will lead to incorrect results FIXME
+
       for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
         visited[ii] = false;
       }
 
       unsigned cyclenode = NoRepresentative;  // set to invalid id.
 
-      for (const UpdateRequest& up : updates) {
-        Node &nn = outer.graph.getData(up.n, galois::MethodFlag::UNPROTECTED);
+      for (const GNode& up : updates) {
+        Node &nn = outer.graph.getData(up, galois::MethodFlag::UNPROTECTED);
         unsigned nodeid = nn.id;
         galois::gDebug("cycle process ", nodeid);
 
@@ -380,11 +371,7 @@ class PTA {
 
             graph.addEdge(nn, nnDstRepr, flag);
 
-            ctx.push_back(
-              UpdateRequest(nn, 
-                            graph.getData(nn, 
-                                          galois::MethodFlag::WRITE).priority)
-            );
+            ctx.push_back(nn);
           }
         }
       } else {  // store whatever src has into whatever dst points to
@@ -409,11 +396,7 @@ class PTA {
         }
 
         if (newEdgeAdded) {
-          ctx.push_back(
-            UpdateRequest(nnSrcRepr, 
-                          graph.getData(nnSrcRepr, 
-                                        galois::MethodFlag::WRITE).priority)
-          );
+          ctx.push_back(nnSrcRepr);
         }
       }
     }
@@ -450,11 +433,7 @@ class PTA {
         graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
         galois::gDebug("adding edge from ", src, " to ", dst);
 
-        updates.push_back(
-          UpdateRequest(nn, 
-                        graph.getData(nn, 
-                                      galois::MethodFlag::UNPROTECTED).priority)
-        );
+        updates.push_back(nn);
       }
     }
 
@@ -470,8 +449,7 @@ class PTA {
    * @param flag Flag specifying access to the graph. It's only used to 
    * acquire a lock on the destination's bitvector if the flag specifies
    * that a lock is necessary (e.g. WRITE)
-   * @returns number changed in the dest bitvector (used to assign priority
-   * in the worklist later)
+   * @returns non-negative value if any bitvector has changed
    */
   unsigned propagate(GNode src, GNode dst, 
                      galois::MethodFlag flag = galois::MethodFlag::WRITE) {
@@ -486,13 +464,16 @@ class PTA {
 
       // if src is a not subset of dst... (i.e. src has more), then 
       // propogate src's points to info to dst
+      //if (srcReprID != dstReprID) {
       if (srcReprID != dstReprID && 
           !result[srcReprID].isSubsetEq(result[dstReprID])) {
+
         galois::gDebug("unifying ", dstReprID, " by ", srcReprID);
         // this getData call only exists to lock the node while in this scope
+        graph.getData(nodes[srcReprID], flag);
         graph.getData(nodes[dstReprID], flag);
-        // newPtsTo is the number of chnages made to the bitvector
-        newPtsTo = result[dstReprID].unify(result[srcReprID]);
+        // newPtsTo is positive if changes are made
+        newPtsTo += result[dstReprID].unify(result[srcReprID]);
       }
     }
 
@@ -576,17 +557,16 @@ class PTA {
 
     UpdatesVec updates;
     updates = processAddressOfCopy(addressCopyConstraints);
-    //galois::gPrint(updates.size(), " s\n");
     processLoadStore(loadStoreConstraints, updates, 
                      galois::MethodFlag::UNPROTECTED);
-    //galois::gPrint(updates.size(), " s2\n");
 
     unsigned niteration = 0;
 
+    // LIFO
     while (!updates.empty()) {
       galois::gDebug("Iteration ", niteration++, ", updates.size=", 
                      updates.size(), "\n");
-      GNode src = updates.back().n;
+      GNode src = updates.back();
       updates.pop_back();
 
       galois::gDebug("processing updates element ", 
@@ -598,11 +578,15 @@ class PTA {
         unsigned newPtsTo = propagate(src, dst, galois::MethodFlag::UNPROTECTED);
 
         if (newPtsTo) {
-          updates.push_back(UpdateRequest(dst, newPtsTo));
+          updates.push_back(dst);
         }
       }
 
+
       if (updates.empty()) {
+        galois::gPrint("No of points-to facts computed = ", 
+                       countPointsToFacts(), "\n");
+
         // After propagating all constraints, see if load/store
         // constraints need to be added in since graph was potentially updated
         //galois::gPrint(updates.size(), " us1\n");
@@ -621,46 +605,40 @@ class PTA {
    */
   void runParallel() {
     UpdatesVec updates;
-    
     updates = processAddressOfCopy(addressCopyConstraints);
     processLoadStore(loadStoreConstraints, updates, 
                      galois::MethodFlag::UNPROTECTED);
 
-    // Lambda function that gets the key used by the OBIM worklist to order
-    // things: grabs the priority of the UpdateRequest
-    auto indexer = [] (const UpdateRequest& req) { return req.w; };
-    using OBIM = galois::worklists::OrderedByIntegerMetric<
-        decltype(indexer), 
-        galois::worklists::dChunkedFIFO<1024>
-    >;
-
     while (!updates.empty()) {
       galois::for_each(
         galois::iterate(updates),
-        [this] (const UpdateRequest& req, auto& ctx) {
-          GNode src = req.n;
+        [this] (const GNode& req, auto& ctx) {
+          GNode src = req;
 
           for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(ii);
             unsigned newPtsTo = this->propagate(src, dst, 
                                                 galois::MethodFlag::WRITE);
             if (newPtsTo) {
-               ctx.push(UpdateRequest(dst, newPtsTo));
+              ctx.push(dst);
             }
           }
         },
         galois::loopname("MainUpdateLoop"),
-        galois::wl<OBIM>(indexer)
+        galois::wl<galois::worklists::dChunkedFIFO<8>>()
+        //galois::wl<OBIM>(indexer)
       );
+      galois::gPrint("No of points-to facts computed = ", 
+                     countPointsToFacts(), "\n");
 
       updates.clear();
 
-      galois::gPrint("for_each finished: Going to process load/store\n");
-
       // After propagating all constraints, see if load/store constraints need 
       // to be added in since graph was potentially updated
+      //galois::gPrint(updates.size(), " us1\n");
       processLoadStore(loadStoreConstraints, updates, 
                        galois::MethodFlag::UNPROTECTED);
+      //galois::gPrint(updates.size(), " us2\n");
       // do cycle squashing
       if (updates.size() > THRESHOLD_OCD) {
         ocd.process(updates);
@@ -716,9 +694,6 @@ class PTA {
 
     cfile.close();
 
-    galois::gPrint("s ", addressCopyConstraints.size(), " l ",
-                   loadStoreConstraints.size(), " num ", numNodes, "\n");
-
     return numNodes;
   }
 
@@ -763,7 +738,7 @@ int main(int argc, char** argv) {
 
   galois::gPrint("No of points-to facts computed = ", 
                  pta.countPointsToFacts(), "\n");
-  //pta.checkReprPointsTo();
+  pta.checkReprPointsTo();
   //pta.printPointsToInfo();
   /*if (!skipVerify && !verify(result)) {
     std::cerr << "If graph was connected, verification failed\n";
