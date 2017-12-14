@@ -21,8 +21,11 @@
  * of Software or Documentation, including but not limited to those resulting from
  * defects in Software and/or Documentation, or loss or inaccuracy of data of any
  * kind.
+ *
+ * TODO WHAT IS THIS
  * 
  * @author Rupesh Nasre <rupesh0508@gmail.com>
+ * @author Loc Hoang <l_hoang@utexas.edu> (documentation, fixes, cleanup)
  */
 #ifndef GALOIS_SPARSEBITVECTOR_H
 #define GALOIS_SPARSEBITVECTOR_H
@@ -36,35 +39,67 @@
 namespace galois {
 
 /**
- * Concurrent version of sparse bit vector.
+ * Sparse bit vector.
  * 
  * Stores objects as indices in sparse bit vectors.
  * Saves space when the data to be stored is sparsely populated.
  */
 struct SparseBitVector {
-  typedef unsigned long WORD;
-  typedef galois::substrate::SimpleLock LockType;
-  static const unsigned wordsize = sizeof(WORD)*8;
+  using WORD = unsigned long;
+
+  // Number of bits in a word
+  static const unsigned wordsize = sizeof(WORD) * 8;
 
   struct OneWord {
-    WORD bits;
-    unsigned base;
-    struct OneWord *next;
-    LockType kulup;
+    WORD bits; // number that is used as the bitset
+    unsigned base; // used to order the words of the vector
+    struct OneWord* next; // pointer to next word on linked list 
+                          // (using base as order)
 
-    bool set(unsigned oo) {
-      WORD oribits = bits;
-      bits |= ((WORD)1 << oo);
-      return bits != oribits;
+    /**
+     * Sets the bit at the provided offset.
+     *
+     * @param offset Offset to set the bit at
+     * @returns true if the set bit wasn't set previously
+     */
+    bool set(unsigned offset) {
+      WORD beforeBits = bits;
+      bits |= ((WORD)1 << offset);
+      return bits != beforeBits;
     }
 
-    OneWord(unsigned bb, unsigned oo) {
-      base = bb;
-      set(oo);
-      next = 0;
+    /**
+     * Default is create a base at 0.
+     */
+    OneWord() { 
+      OneWord(0);
     }
 
-    OneWord() { }
+    /**
+     * Creates a new word.
+     *
+     * @param _base base of this word, i.e. what order it should go in linked 
+     * list
+     */
+    OneWord(unsigned _base) { 
+      base = _base;
+      bits = 0;
+      next = nullptr;
+    }
+
+    /**
+     * Creates a new word with an initial bit already set.
+     *
+     * @param _base base of this word, i.e. what order it should go in linked 
+     * list
+     * @param _initial Offset to first bit to set in the word
+     */
+    OneWord(unsigned _base, unsigned _initial) {
+      base = _base;
+      bits = 0;
+      set(_initial);
+      next = nullptr;
+    }
 
     unsigned unify(OneWord *second) {
       if (second) {
@@ -74,6 +109,7 @@ struct SparseBitVector {
       }
       return 0;
     }
+
     unsigned count() {
       unsigned numElements = 0;
       WORD powerof2 = 1;
@@ -86,9 +122,11 @@ struct SparseBitVector {
       }
       return numElements;
     }
+
     inline bool isSubsetEq(OneWord *second) {
       return (bits & second->bits) == bits;
     }
+
     OneWord *clone() {
       OneWord *newword = new OneWord();
       newword->base = base;
@@ -101,10 +139,8 @@ struct SparseBitVector {
       OneWord *ptr2;
 
       for (OneWord *newlistptr = newlist, *ptr = next; ptr;) {
-        //ptr->lock();
         newlistptr->next = ptr->clone();
         ptr2 = ptr->next; 
-        //ptr->unlock();
         ptr = ptr2;
         newlistptr = newlistptr->next;
       }
@@ -112,99 +148,111 @@ struct SparseBitVector {
     }
 
 
+   /**
+    * Gets the set bits in this word and adds them to the passed in 
+    * vector.
+    *
+    * @tparam VectorTy vector type that supports push_back
+    * @param setBits Vector to add set bits to
+    * @returns Number of set bits in this word
+    */
     template<typename VectorTy>
-    void getAllSetBits(VectorTy &setbits) {
-      WORD powerof2 = 1;
-      unsigned bitno = 0;
+    unsigned getAllSetBits(VectorTy &setbits) {
+      // or mask used to mask set bits
+      WORD orMask = 1;
+      unsigned numSet = 0;
 
-      for (unsigned ii = 0; ii < wordsize; ++ii) {
-        if (bits & powerof2) {
-          setbits.push_back(base*wordsize + bitno);
+      for (unsigned curBit = 0; curBit < wordsize; ++curBit) {
+        if (bits & orMask) {
+          setbits.push_back(base * wordsize + curBit);
+          numSet++;
         }
-        powerof2 <<= 1;
-        ++bitno;
+
+        orMask <<= 1;
       }
-    }
-    void lock() {
-            kulup.lock();
-    }
-    void unlock() {
-            kulup.unlock();
+
+      return numSet;
     }
   };
 
-  OneWord *head;
-  LockType headkulup;
+  OneWord* head;
 
   SparseBitVector() {
-    init(0);
+    init();
   }
-  void init() {
-    init(0);
-  }
-  void init(unsigned nelements) {
-    head = 0;
-  }
-  void lock() {
-    headkulup.lock();
-  }
-  void unlock() {
-    headkulup.unlock();
-  }
-  bool set(unsigned bit) {
-    unsigned base, offset;
-    getOffsets(bit, base, offset);
 
-    OneWord *ptr, *prev;
-    ptr = head;
-    prev = 0;
-    for (; ptr && ptr->base <= base; ptr = ptr->next) {  // sorted order.
-      if (ptr->base == base) {
-        return ptr->set(offset);
-      }
-      prev = ptr;
-    }
-    OneWord *newword = new OneWord(base, offset);
-    if (prev) {
-      //prev->lock();
-      newword->next = prev->next;
-      prev->next = newword;
-      //prev->unlock();
-    } else {
-      //lock();
-      newword->next = head;
-      head = newword;
-      //unlock();
-    }
-    return true;
+  /**
+   * Initialize by setting head to nullptr
+   */
+  void init() {
+    head = nullptr;
   }
+
+  /**
+   * Set the provided bit in the bitvector. Will create a new word if the
+   * word needed to set the bit doesn't exist yet + will rearrange linked
+   * list of words as necessary.
+   *
+   * @param bit The bit to set in the bitvector
+   * @returns true if the bit set wasn't set previously
+   */
+  bool set(unsigned bit) {
+    unsigned baseWord;
+    unsigned offsetIntoWord;
+
+    std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
+
+    OneWord* curPtr = head;
+    OneWord* prev = nullptr;
+
+    // pointers should be in sorted order TODO check this assumption
+    // loop through linked list to find the correct base word (if it exists)
+    while (curPtr != nullptr && curPtr->base < baseWord) {
+      prev = curPtr;
+      curPtr = curPtr->next;
+    }
+
+    // if base already exists, then set the correct offset bit
+    if (curPtr != nullptr && curPtr->base == baseWord) {
+      return curPtr->set(offsetIntoWord);
+    // else the base wasn't found; create and set, then rearrange linked list
+    // accordingly
+    } else {
+      OneWord *newWord = new OneWord(baseWord, offsetIntoWord);
+
+      // this should point to prev's next, prev should point to this
+      if (prev) {
+        newWord->next = prev->next;
+        prev->next = newWord;
+      // else this is the first word we are adding
+      } else {
+        newWord->next = nullptr;
+        head = newWord;
+      }
+
+      return true;
+    }
+  }
+
   unsigned unify(SparseBitVector &second) {
     unsigned nchanged = 0;
     OneWord *prev = 0, *ptrone, *ptrtwo;
     for (ptrone = head, ptrtwo = second.head; ptrone && ptrtwo;) {
       if (ptrone->base == ptrtwo->base) {
-        //ptrone->lock();
         nchanged += ptrone->unify(ptrtwo);
         prev = ptrone; ptrone = ptrone->next;
         ptrtwo = ptrtwo->next;
-        //prev->unlock();
       } else if (ptrone->base < ptrtwo->base) {
         prev = ptrone; 
-        //prev->lock();
         ptrone = ptrone->next;
-        //prev->unlock();
       } else {
         OneWord *newword = ptrtwo->clone();
         newword->next = ptrone;
         if (prev) {
-          //prev->lock();
           prev->next = newword;
-          //prev->unlock();
           prev = newword;
         } else {
-          //lock();
           head = prev = newword;
-          //unlock();
         }
         ptrtwo = ptrtwo->next;
       }
@@ -212,13 +260,9 @@ struct SparseBitVector {
     if (ptrtwo) {
       OneWord *remaining = ptrtwo->cloneAll();
       if (prev) {
-        //prev->lock();
         prev->next = remaining;
-        //prev->unlock();
       } else if (ptrtwo) {
-        //lock();
         head = remaining;
-        //unlock();
       }
     }
     return nchanged;
@@ -240,10 +284,19 @@ struct SparseBitVector {
     }
     return true;
   }
-  inline void getOffsets(unsigned bit, unsigned &ventry, unsigned &wbit) {
-    ventry = bit / wordsize;
-    wbit = bit % wordsize;
+
+  /**
+   * @param bit Bit that needs to be set
+   * @returns a pair signifying a base word and the offset into a 
+   * baseword that corresponds to bit
+   */
+  std::pair<unsigned, unsigned> getOffsets(unsigned bit) const {
+    unsigned baseWord = bit / wordsize;
+    unsigned offsetIntoWord = bit % wordsize;
+      
+    return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
   }
+
   unsigned count() {
     unsigned nbits = 0;
     for (OneWord *ptr = head; ptr; ptr = ptr->next) {
@@ -252,14 +305,24 @@ struct SparseBitVector {
     return nbits;
   }
 
+  /**
+   * Gets the set bits in this bitvector and adds them to the passed in 
+   * vector.
+   *
+   * @tparam VectorTy vector type that supports push_back
+   * @param setBits Vector to add set bits to
+   * @returns Number of set bits in this bitvector
+   */
   template<typename VectorTy>
-  unsigned getAllSetBits(VectorTy &setbits) {
-    unsigned nnodes = 0;
-    for (OneWord *ptr = head; ptr; ptr = ptr->next) {
-      ptr->getAllSetBits(setbits);
-      ++nnodes;
+  unsigned getAllSetBits(VectorTy &setBits) {
+    unsigned numBits = 0;
+
+    // loop through all words in the bitvector and get their set bits
+    for (OneWord* curPtr = head; curPtr != nullptr; curPtr = curPtr->next) {
+      numBits += curPtr->getAllSetBits(setBits);
     }
-    return nnodes;
+
+    return numBits;
   }
   void print(std::ostream& out, std::string prefix = std::string("")) {
     std::vector<unsigned> setbits;

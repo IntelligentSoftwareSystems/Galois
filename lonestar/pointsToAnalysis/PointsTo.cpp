@@ -23,7 +23,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Rupesh Nasre <rupesh0508@gmail.com>
- * @author Loc Hoang <l_hoang@utexas.edu> (mainly documentation/cleanup)
+ * @author Loc Hoang <l_hoang@utexas.edu> (mainly fixes/documentation/cleanup)
  */
 #include "galois/Galois.h"
 #include "galois/graphs/Graph.h"
@@ -47,8 +47,11 @@ static cll::opt<std::string> input(cll::Positional,
                                    cll::desc("Constraints file"), 
                                    cll::Required);
 
-// no of nodes to be processed before adding load/store edges.
-const unsigned THRESHOLD_LOADSTORE = 500;	
+static cll::opt<bool> useSerial("serial",
+                                cll::desc("Runs serial version of the algorithm "
+                                          "(i.e. 1 thread, no galois::for_each)"), 
+                                cll::init(false));
+
 const unsigned THRESHOLD_OCD = 500;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -59,16 +62,16 @@ const unsigned THRESHOLD_OCD = 500;
  * Structure of a node in the graph.
  */
 struct Node {
-	unsigned id;
-	unsigned priority;
+  unsigned id;
+  unsigned priority;
 
-	Node() {
-		id = 0;
-		priority = 0;
-	}
-	Node(unsigned lid) : id(lid) {
-		priority = 0;
-	}
+  Node() {
+    id = 0;
+    priority = 0;
+  }
+  Node(unsigned lid) : id(lid) {
+    priority = 0;
+  }
 };
 
 using Graph = galois::graphs::FirstGraph<Node, void, true>;
@@ -94,51 +97,51 @@ using UpdatesVec = galois::gstl::Vector<UpdateRequest>;
  */
 class PtsToCons {
 public:
-	using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
+  using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
 private:
-	unsigned src, dst;
-	ConstraintType type;
+  unsigned src, dst;
+  ConstraintType type;
 public:
-	PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
-		src = ss;
-		dst = dd;
-		type = tt;
-	}
+  PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
+    src = ss;
+    dst = dd;
+    type = tt;
+  }
 
   /**
    * @returns This constraint's src and dst node
    */
-	std::pair<unsigned, unsigned> getSrcDst() const {
+  std::pair<unsigned, unsigned> getSrcDst() const {
     return std::pair<unsigned, unsigned>(src, dst);
-	}
+  }
 
   /**
    * @returns The type of this constraint
    */
-	ConstraintType getType() const {
-		return type;
-	}
+  ConstraintType getType() const {
+    return type;
+  }
 
   /**
    * Print out this constraint to stderr
    */
-	void print() const {
-		if (type == Store) {
-			std::cerr << "*";
-		}
+  void print() const {
+    if (type == Store) {
+      std::cerr << "*";
+    }
 
-		std::cerr << "v" << dst;
-		std::cerr << " = ";
+    std::cerr << "v" << dst;
+    std::cerr << " = ";
 
-		if (type == Load) {
-			std::cerr << "*";
-		} else if (type == AddressOf) {
-			std::cerr << "&";
-		}
+    if (type == Load) {
+      std::cerr << "*";
+    } else if (type == AddressOf) {
+      std::cerr << "&";
+    }
 
-		std::cerr << "v" << src;
-		std::cerr << std::endl;
-	}
+    std::cerr << "v" << src;
+    std::cerr << std::endl;
+  }
 };
 
 class PTA {
@@ -146,10 +149,18 @@ class PTA {
   using PointsToInfo = galois::gstl::Vector<galois::SparseBitVector>;
 
  private:
+  Graph graph;
+  galois::gstl::Vector<GNode> nodes;
+  PointsToInfo result; // pointsTo results for nodes
+
+  PointsToConstraints addressCopyConstraints; 
+  PointsToConstraints loadStoreConstraints;
+  size_t numNodes = 0;
+
   /** 
    * Online Cycle Detection and elimination structure + functions.
    */
-  struct OnlineCycleDetection {	
+  struct OnlineCycleDetection { 
    private:
     galois::gstl::Vector<unsigned> ancestors;
     galois::gstl::Vector<bool> visited;
@@ -183,7 +194,7 @@ class PTA {
      * @returns true if a cycle has been detected (i.e. a node has a path
      * to an ancestor), false otherwise
      */
-    bool cycleDetect(unsigned nodeid, unsigned &cyclenode) {	
+    bool cycleDetect(unsigned nodeid, unsigned &cyclenode) {  
       nodeid = getFinalRepresentative(nodeid);
 
       // if the node is an ancestor, that means there's a path from the ancestor
@@ -236,7 +247,7 @@ class PTA {
           galois::gDebug("collapsing cycle for ", repr);
           // cycle exists between nodes ancestors[*ii..end].
           for (auto jj = ii; jj != ancestors.end(); ++jj) {
-            unsigned jjrepr = getFinalRepresentative(*jj);	// jjrepr has no representative.
+            unsigned jjrepr = getFinalRepresentative(*jj);  // jjrepr has no representative.
             makeRepr(jjrepr, reprrepr);
           }
           break;
@@ -256,7 +267,7 @@ class PTA {
         representative[nodeid] = repr;
 
         if (!outer.result[repr].isSubsetEq(outer.result[nodeid])) {
-          //outer.graph.getData(nodes[repr]);	// lock it.
+          //outer.graph.getData(nodes[repr]); // lock it.
           outer.result[repr].unify(outer.result[nodeid]);
         }
       }
@@ -313,12 +324,12 @@ class PTA {
      *
      * @param updates vector of nodes that are sources of new edges.
      */
-    void process(const UpdatesVec& updates) {	
+    void process(const UpdatesVec& updates) { 
       for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
         visited[ii] = false;
       }
 
-      unsigned cyclenode = NoRepresentative;	// set to invalid id.
+      unsigned cyclenode = NoRepresentative;  // set to invalid id.
 
       for (const UpdateRequest& up : updates) {
         Node &nn = outer.graph.getData(up.n, galois::MethodFlag::UNPROTECTED);
@@ -332,13 +343,7 @@ class PTA {
     }
   }; // end struct OnlineCycleDetection
 
-  OnlineCycleDetection ocd;
-  Graph graph;
-  galois::gstl::Vector<GNode> nodes;
-  PointsToInfo result;
-  PointsToConstraints addressCopyConstraints; 
-  PointsToConstraints loadStoreConstraints;
-  size_t numNodes = 0;
+  OnlineCycleDetection ocd; // cycle detector/squasher
 
   // TODO better documentation
   // add edges to the graph based on points-to information of the nodes
@@ -350,9 +355,11 @@ class PTA {
       //std::cout << "debug: Processing constraint: "; constraint->print();
       unsigned src, dst;
       std::tie(src, dst) = constraint.getSrcDst();
+      //galois::gPrint(src, " ", dst, "\n");
 
       unsigned srcRepr = ocd.getFinalRepresentative(src);
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
+      //galois::gPrint("r ", srcRepr, " ", dstRepr, "\n");
 
       if (constraint.getType() == PtsToCons::Load) { 
         galois::gstl::Vector<unsigned> ptsToOfSrc;
@@ -380,13 +387,15 @@ class PTA {
             );
           }
         }
-      } else {	// store whatever src has into whatever dst points to
+      } else {  // store whatever src has into whatever dst points to
         galois::gstl::Vector<unsigned> ptsToOfDst;
         result[dstRepr].getAllSetBits(ptsToOfDst);
-        GNode &nnSrcRepr = nodes[srcRepr];
+        GNode& nnSrcRepr = nodes[srcRepr];
+
         bool newEdgeAdded = false;
 
         for (unsigned pointee : ptsToOfDst) {
+          //galois::gPrint("point ", pointee, "\n");
           unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
 
           // add edge from src -> pointee if it doesn't exist
@@ -414,7 +423,7 @@ class PTA {
    * Processes the AddressOf and Copy constraints. 
    *
    * Sets the bitvector for AddressOf constraints, i.e. a set bit means
-   * that you point to whtaever that bit represents.
+   * that you point to whatever that bit represents.
    *
    * Creates edges for Copy constraints, i.e. edge from a to b indicates
    * b is a copy of a.
@@ -428,7 +437,6 @@ class PTA {
 
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
       //std::cout << "debug: Processing constraint: "; ii->print();
-
       unsigned src;
       unsigned dst;
       std::tie(src, dst) = ii->getSrcDst();
@@ -437,7 +445,7 @@ class PTA {
         if (result[dst].set(src)) { // this alters the state of the bitvector
           galois::gDebug("saving v", dst, "->v", src);
         }
-      } else if (src != dst) {	// copy.
+      } else if (src != dst) {  // copy.
         GNode &nn = nodes[src];
         graph.addEdge(nn, nodes[dst], galois::MethodFlag::UNPROTECTED);
         galois::gDebug("adding edge from ", src, " to ", dst);
@@ -510,7 +518,7 @@ class PTA {
 
     // initialize vector of SparseBitVectors
     for (auto ii = result.begin(); ii != result.end(); ++ii, ++nodeid) {
-      ii->init(numNodes);
+      ii->init();
 
       GNode src = graph.createNode(Node(nodeid));
       graph.addNode(src);
@@ -525,7 +533,8 @@ class PTA {
     for (unsigned ii = 0; ii < result.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
       if (repr != ii && !result[ii].isSubsetEq(result[repr])) {
-        std::cout << "ERROR: pointsto(" << ii << ") is not less than its representative pointsto(" << repr << ").\n";
+        galois::gPrint("ERROR: pointsto(", ii, ") is not less than its "
+                       "representative pointsto(", repr, ").\n");
       }
     }
   }
@@ -545,48 +554,61 @@ class PTA {
   /**
    * TODO
    */
-  void printPointsToInfo(PointsToInfo &result) {
+  void printPointsToInfo() {
     std::string prefix = "v";
     for (auto ii = result.begin(); ii != result.end(); ++ii) {
-      std::cout << prefix << ii - result.begin() << ": ";
+      std::cerr << prefix << ii - result.begin() << ": ";
       unsigned repr = ocd.getFinalRepresentative(ii - result.begin());
-      result[repr].print(std::cout, prefix);
+      result[repr].print(std::cerr, prefix);
     }
   }
 
 
-  // TODO
-  // This either hangs or is extremely slow even on the smallest constraint
-  // file we have
+  /**
+   * Run points-to-analysis without galois::for_each on a single thread.
+   */
   void runSerial() {
-    //unsigned niteration = 0;
-    //bool changed = false;
-    unsigned nnodesprocessed = 0;
+    galois::gDebug("no of addr+copy constraints = ", 
+                   addressCopyConstraints.size(), 
+                   ", no of load+store constraints = ", 
+                   loadStoreConstraints.size());
+    galois::gDebug("no of nodes = ", nodes.size());
 
     UpdatesVec updates;
     updates = processAddressOfCopy(addressCopyConstraints);
+    //galois::gPrint(updates.size(), " s\n");
     processLoadStore(loadStoreConstraints, updates, 
-                           galois::MethodFlag::UNPROTECTED);	// required when there are zero copy constraints which keeps updates empty.
+                     galois::MethodFlag::UNPROTECTED);
+    //galois::gPrint(updates.size(), " s2\n");
 
-    //std::cout << "debug: no of addr+copy constraints = " << addressCopyConstraints.size() << ", no of load+store constraints = " << loadStoreConstraints.size() << std::endl;
-    //std::cout << "debug: no of nodes = " << nodes.size() << std::endl;
+    unsigned niteration = 0;
 
     while (!updates.empty()) {
-        //std::cout << "debug: Iteration " << ++niteration << ", updates.size=" << updates.size() << "\n"; 
+      galois::gDebug("Iteration ", niteration++, ", updates.size=", 
+                     updates.size(), "\n");
       GNode src = updates.back().n;
       updates.pop_back();
 
-      //std::cout << "debug: processing updates element " << graph.getData(src, galois::MethodFlag::UNPROTECTED).id << std::endl;
-          for (auto ii = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      galois::gDebug("processing updates element ", 
+                     graph.getData(src, galois::MethodFlag::UNPROTECTED).id);
+
+      for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
-        unsigned newptsto = propagate(src, dst, galois::MethodFlag::UNPROTECTED);
-        if (newptsto) {
-          updates.push_back(UpdateRequest(dst, newptsto));
+
+        unsigned newPtsTo = propagate(src, dst, galois::MethodFlag::UNPROTECTED);
+
+        if (newPtsTo) {
+          updates.push_back(UpdateRequest(dst, newPtsTo));
         }
       }
-      if (++nnodesprocessed > THRESHOLD_LOADSTORE || updates.empty()) {
-        nnodesprocessed = 0;
-        processLoadStore(loadStoreConstraints, updates);	// add edges to graph, add their sources to updates.
+
+      if (updates.empty()) {
+        // After propagating all constraints, see if load/store
+        // constraints need to be added in since graph was potentially updated
+        //galois::gPrint(updates.size(), " us1\n");
+        processLoadStore(loadStoreConstraints, updates);
+        //galois::gPrint(updates.size(), " us2\n");
+        // do cycle squashing
         if (updates.size() > THRESHOLD_OCD) {
           ocd.process(updates);
         }
@@ -594,24 +616,15 @@ class PTA {
     }
   }
 
+  /**
+   * Run points-to-analysis using galois::for_each as the main loop.
+   */
   void runParallel() {
     UpdatesVec updates;
-    //unsigned niteration = 0;
     
     updates = processAddressOfCopy(addressCopyConstraints);
     processLoadStore(loadStoreConstraints, updates, 
-                           galois::MethodFlag::UNPROTECTED);
-
-    //unsigned nfired = 0;
-    //unsigned niter;
-
-    galois::substrate::PerThreadStorage<unsigned> nfired;
-
-    galois::on_each(
-      [&] (unsigned tid, unsigned totalThreads) {
-        *nfired.getLocal() = 0;
-      }
-    );
+                     galois::MethodFlag::UNPROTECTED);
 
     // Lambda function that gets the key used by the OBIM worklist to order
     // things: grabs the priority of the UpdateRequest
@@ -621,41 +634,38 @@ class PTA {
         galois::worklists::dChunkedFIFO<1024>
     >;
 
-    // TODO this is incorrect as processLoadStore may potentially
-    // not be called at the very end of execution
-    galois::for_each(
-      galois::iterate(updates),
-      [this, &nfired] (const UpdateRequest& req, auto& ctx) {
-        if (++(*nfired.getLocal()) < THRESHOLD_LOADSTORE) {
+    while (!updates.empty()) {
+      galois::for_each(
+        galois::iterate(updates),
+        [this] (const UpdateRequest& req, auto& ctx) {
           GNode src = req.n;
 
-          //galois::gPrint("testing1\n");
           for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(ii);
             unsigned newPtsTo = this->propagate(src, dst, 
                                                 galois::MethodFlag::WRITE);
             if (newPtsTo) {
-              ctx.push(UpdateRequest(dst, newPtsTo));
+               ctx.push(UpdateRequest(dst, newPtsTo));
             }
           }
-        } else {
-          *(nfired.getLocal()) = 0;
+        },
+        galois::loopname("MainUpdateLoop"),
+        galois::wl<OBIM>(indexer)
+      );
 
-          // TODO THIS NEEDS TO BE CALLED BEFORE YOU EXIT THE FOR EACH LOOP
-          // AS IT MIGHT ADD MORE WORK
-          this->processLoadStore(loadStoreConstraints, ctx, 
-                                         galois::MethodFlag::WRITE);
-          //if (wl.size() > THRESHOLD_OCD) {
-          //  ocd.process(wl);
-          //}
-        }
-        //if (nfired % 500 == 0) {
-        //  std::cout << ++niter << std::endl;
-        //}
-      },
-      galois::loopname("Main"),
-      galois::wl<OBIM>(indexer)
-    );
+      updates.clear();
+
+      galois::gPrint("for_each finished: Going to process load/store\n");
+
+      // After propagating all constraints, see if load/store constraints need 
+      // to be added in since graph was potentially updated
+      processLoadStore(loadStoreConstraints, updates, 
+                       galois::MethodFlag::UNPROTECTED);
+      // do cycle squashing
+      if (updates.size() > THRESHOLD_OCD) {
+        ocd.process(updates);
+      }
+    }
   }
 
   /**
@@ -706,6 +716,9 @@ class PTA {
 
     cfile.close();
 
+    galois::gPrint("s ", addressCopyConstraints.size(), " l ",
+                   loadStoreConstraints.size(), " num ", numNodes, "\n");
+
     return numNodes;
   }
 
@@ -730,27 +743,28 @@ int main(int argc, char** argv) {
 
   size_t numNodes = pta.readConstraints(input.c_str());
 
+
   pta.initialize(numNodes);
 
   unsigned numThreads = galois::getActiveThreads();
 
   galois::StatTimer T;
-  T.start();
 
-  // TODO 
-  if (numThreads > 1) {
-  	std::cout << "-------- Parallel version: " << numThreads << " threads.\n";
+  T.start();
+  if (!useSerial) {
+    galois::gPrint("-------- Parallel version: ", numThreads, " threads.\n");
     pta.runParallel();
   } else {
-  	std::cout << "-------- Sequential version.\n";
+    galois::gPrint("-------- Sequential version.\n");
     pta.runSerial();
   }
   T.stop();
 
 
-	//std::cout << "No of points-to facts computed = " << countPointsToFacts() << std::endl;
-	//checkReprPointsTo();
-	//printPointsToInfo(result);
+  galois::gPrint("No of points-to facts computed = ", 
+                 pta.countPointsToFacts(), "\n");
+  //pta.checkReprPointsTo();
+  //pta.printPointsToInfo();
   /*if (!skipVerify && !verify(result)) {
     std::cerr << "If graph was connected, verification failed\n";
     assert(0 && "If graph was connected, verification failed");
