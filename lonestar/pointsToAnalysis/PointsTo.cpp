@@ -30,6 +30,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include <fstream>
+#include <deque>
 #include "SparseBitVector.h"
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -312,7 +313,8 @@ class PTA {
      *
      * @param updates vector of nodes that are sources of new edges.
      */
-    void process(const UpdatesVec& updates) { 
+    template<typename VecType>
+    void process(const VecType& updates) { 
       return; // TODO this (or something it calls) 
               // is broken and will lead to incorrect results FIXME
 
@@ -415,8 +417,9 @@ class PTA {
    * @returns vector of UpdatesRequests from all sources with new edges
    * added by the Copy constraint
    */
-  UpdatesVec processAddressOfCopy(const PointsToConstraints& constraints) {
-    UpdatesVec updates;
+  template<typename VecType>
+  VecType processAddressOfCopy(const PointsToConstraints& constraints) {
+    VecType updates;
 
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
       //std::cout << "debug: Processing constraint: "; ii->print();
@@ -555,19 +558,19 @@ class PTA {
                    loadStoreConstraints.size());
     galois::gDebug("no of nodes = ", nodes.size());
 
-    UpdatesVec updates;
-    updates = processAddressOfCopy(addressCopyConstraints);
+    std::deque<GNode> updates;
+    updates = processAddressOfCopy<std::deque<GNode>>(addressCopyConstraints);
     processLoadStore(loadStoreConstraints, updates, 
                      galois::MethodFlag::UNPROTECTED);
 
     unsigned niteration = 0;
 
-    // LIFO
+    // FIFO
     while (!updates.empty()) {
       galois::gDebug("Iteration ", niteration++, ", updates.size=", 
                      updates.size(), "\n");
-      GNode src = updates.back();
-      updates.pop_back();
+      GNode src = updates.front();
+      updates.pop_front();
 
       galois::gDebug("processing updates element ", 
                      graph.getData(src, galois::MethodFlag::UNPROTECTED).id);
@@ -605,7 +608,7 @@ class PTA {
    */
   void runParallel() {
     UpdatesVec updates;
-    updates = processAddressOfCopy(addressCopyConstraints);
+    updates = processAddressOfCopy<UpdatesVec>(addressCopyConstraints);
     processLoadStore(loadStoreConstraints, updates, 
                      galois::MethodFlag::UNPROTECTED);
 
