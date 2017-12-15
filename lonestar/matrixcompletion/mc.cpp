@@ -547,7 +547,8 @@ struct InvLearnFN {
  *
  * User nodes should not have edges.
  */
-void SGDNodeMovie(Graph& g, const LearnFN* lf) {
+template<typename LearnFN>
+void SGDNodeMovie(Graph& g, const LearnFN& lf) {
   unsigned numIterations = 0;
   double latestError = rootMeanSquaredError(g);
 
@@ -584,7 +585,8 @@ void SGDNodeMovie(Graph& g, const LearnFN* lf) {
  * Simple by-edge grouped by movie (only one edge per movie on the WL at any 
  * time)
  */
-void SGDEdgeMovie(Graph& g, const LearnFN* lf) {
+template<typename LearnFN>
+void SGDEdgeMovie(Graph& g, const LearnFN& lf) {
   galois::InsertBag<GNode> Movies;
 
   // get only nodes with edges
@@ -857,10 +859,11 @@ struct SGDBlockUsersMovies {
  * Common code for running blocked variants of SGD (movies are statically
  * assigned to a thread, and user nodes are cycled among the threads).
  */
-template<typename BlockFn>
-void runBlockSlices(Graph& g, const LearnFN* lf) {
-  // Tune a const multiplication factor
-  const unsigned numWorkItems = C * galois::getActiveThreads();
+template<typename BlockFn, typename LearnFN>
+void runBlockSlices(Graph& g, const LearnFN& lf) {
+  // Tune a const multiplication factor TODO
+  //const unsigned numWorkItems = C * galois::getActiveThreads();
+  const unsigned numWorkItems = galois::getActiveThreads();
 
   ThreadWorkItem workItems[numWorkItems];
 
@@ -945,7 +948,8 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
 // TODO remove variants below? No concept of iteration + uses explicit locks
 using SpinLock = galois::substrate::PaddedLock<true>;
 
-void SGDSliceMarch(Graph& g, const LearnFN* lf) {
+template<typename LearnFN>
+void SGDSliceMarch(Graph& g, const LearnFN& lf) {
   unsigned numWorkItems = galois::getActiveThreads();
   ThreadWorkItem workItems[numWorkItems];
 
@@ -1308,7 +1312,8 @@ struct sgd_slice_jump {
 };
 
 
-void runSliceJump(Graph& g, const LearnFN* lf) {
+template<typename LearnFN>
+void runSliceJump(Graph& g, const LearnFN& lf) {
   //set up parameters
   const unsigned threadCount = galois::getActiveThreads();
   //threadCount + 1 so free slices are always available
@@ -1369,9 +1374,8 @@ void runSliceJump(Graph& g, const LearnFN* lf) {
 }
 
 
-template <typename A, typename G>
+template<typename A, typename G>
 void runAlgo(const A& algo, G& g) {
-
   switch (learn) {
     case Intel:
       algo(g, IntelLearnFN());
@@ -1420,32 +1424,31 @@ int main(int argc, char** argv) {
   galois::StatTimer mainTimer;
   mainTimer.start();
 
-  std::unique_ptr<LearnFN> lf;
-
+  //std::unique_ptr<LearnFN> lf;
 
   switch (algo) {
     case Algo::nodeMovie:
       runAlgo(&SGDNodeMovie, g);
       // SGDNodeMovie(g, lf.get());
       break;
-    case Algo::edgeMovie:
-      SGDEdgeMovie(g, lf.get());
-      break;
-    case Algo::block:
-      runBlockSlices<SGDBlock>(g, lf.get());
-      break;
-    case Algo::blockAndSliceUsers:
-      runBlockSlices<SGDBlockUsers>(g, lf.get());
-      break;
-    case Algo::blockAndSliceBoth:
-      runBlockSlices<SGDBlockUsersMovies>(g, lf.get());
-      break;
-    case Algo::sliceMarch:
-      SGDSliceMarch(g, lf.get());
-      break;
-    case Algo::sliceJump:
-      runSliceJump(g, lf.get());
-      break;
+    //case Algo::edgeMovie:
+    //  SGDEdgeMovie(g, lf.get());
+    //  break;
+    //case Algo::block:
+    //  runBlockSlices<SGDBlock>(g, lf.get());
+    //  break;
+    //case Algo::blockAndSliceUsers:
+    //  runBlockSlices<SGDBlockUsers>(g, lf.get());
+    //  break;
+    //case Algo::blockAndSliceBoth:
+    //  runBlockSlices<SGDBlockUsersMovies>(g, lf.get());
+    //  break;
+    //case Algo::sliceMarch:
+    //  SGDSliceMarch(g, lf.get());
+    //  break;
+    //case Algo::sliceJump:
+    //  runSliceJump(g, lf.get());
+    //  break;
   }
 
   mainTimer.stop();
