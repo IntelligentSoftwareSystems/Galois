@@ -53,6 +53,7 @@ static cll::opt<bool> useSerial("serial",
                                           "(i.e. 1 thread, no galois::for_each)"), 
                                 cll::init(false));
 
+const unsigned THRESHOLD_LS = 500000;
 const unsigned THRESHOLD_OCD = 500;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -64,32 +65,28 @@ const unsigned THRESHOLD_OCD = 500;
  */
 struct Node {
   unsigned id;
-  unsigned priority;
 
   Node() {
     id = 0;
-    priority = 0;
   }
-  Node(unsigned lid) : id(lid) {
-    priority = 0;
-  }
+
+  Node(unsigned lid) : id(lid) { }
 };
 
 using Graph = galois::graphs::FirstGraph<Node, void, true>;
 using GNode = Graph::GraphNode;
-
 using UpdatesVec = galois::gstl::Vector<GNode>;
 
 /**
  * Class representing a points-to constraint.
  */
 class PtsToCons {
-public:
+ public:
   using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
-private:
+ private:
   unsigned src, dst;
   ConstraintType type;
-public:
+ public:
   PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
     src = ss;
     dst = dd;
@@ -150,9 +147,11 @@ class PTA {
    */
   struct OnlineCycleDetection { 
    private:
+    PTA& outer;
     galois::gstl::Vector<unsigned> ancestors;
     galois::gstl::Vector<bool> visited;
     galois::gstl::Vector<unsigned> representative;
+    galois::gstl::Vector<GNode> news; // TODO find better way to do this
     unsigned NoRepresentative; // "constant" that represents no representative
 
     /**
@@ -183,35 +182,35 @@ class PTA {
      * to an ancestor), false otherwise
      */
     bool cycleDetect(unsigned nodeid, unsigned &cyclenode) {  
-      nodeid = getFinalRepresentative(nodeid);
+      unsigned nodeRep = getFinalRepresentative(nodeid);
 
       // if the node is an ancestor, that means there's a path from the ancestor
       // to the ancestor (i.e. cycle)
-      if (isAncestor(nodeid)) {
-        cyclenode = nodeid;
+      if (isAncestor(nodeRep)) {
+        cyclenode = nodeRep;
         return true;
       }
 
-      if (visited[nodeid]) {
+      if (visited[nodeRep]) {
         return false;
       }
 
-      visited[nodeid] = true;
+      visited[nodeRep] = true;
 
       // keep track of the current depth first search path
-      ancestors.push_back(nodeid);
+      ancestors.push_back(nodeRep);
 
-      GNode nn = outer.nodes[nodeid];
+      GNode nn = outer.nodes[nodeRep];
 
       for (auto ii : outer.graph.edges(nn, galois::MethodFlag::UNPROTECTED)) {
         // get id of destination node
         Node& nn = outer.graph.getData(outer.graph.getEdgeDst(ii), 
                                        galois::MethodFlag::UNPROTECTED);
-        unsigned iiid = nn.id;
+        unsigned destID = nn.id;
 
         // recursive depth first cycle detection; if a cycle is found,
         // collapse the path
-        if (cycleDetect(iiid, cyclenode)) {
+        if (cycleDetect(destID, cyclenode)) {
           cycleCollapse(cyclenode);
         }
       }
@@ -229,18 +228,22 @@ class PTA {
      */
     void cycleCollapse(unsigned repr) {
       // assert(repr is present in ancestors).
-      unsigned reprrepr = getFinalRepresentative(repr);
+      unsigned repToChangeTo = getFinalRepresentative(repr);
+
       for (auto ii = ancestors.begin(); ii != ancestors.end(); ++ii) {
         if (*ii == repr) {
           galois::gDebug("collapsing cycle for ", repr);
           // cycle exists between nodes ancestors[*ii..end].
           for (auto jj = ii; jj != ancestors.end(); ++jj) {
             unsigned jjrepr = getFinalRepresentative(*jj);  // jjrepr has no representative.
-            makeRepr(jjrepr, reprrepr);
+            makeRepr(jjrepr, repToChangeTo);
           }
           break;
         }
       }
+
+      news.push_back(outer.nodes[repr]);
+      news.push_back(outer.nodes[repToChangeTo]);
     }
 
     /**
@@ -254,14 +257,22 @@ class PTA {
         galois::gDebug("repr[", nodeid, "] = ", repr);
         representative[nodeid] = repr;
 
-        if (!outer.result[repr].isSubsetEq(outer.result[nodeid])) {
-          //outer.graph.getData(nodes[repr]); // lock it.
+        // the representative needs to have all of the items that the nodes
+        // it is representing has, so if the node has more than the rep,
+        // unify
+        if (!outer.result[nodeid].isSubsetEq(outer.result[repr])) {
+          //outer.graph.getData(nodes[repr]); // lock it TODO figure if nec.
           outer.result[repr].unify(outer.result[nodeid]);
         }
+
+        // push regardless because the node in question might have
+        // been "updated" by virtue of the representative being updated
+        // elsewhere in this cycle detection process
+        news.push_back(outer.nodes[nodeid]); 
       }
     }
+
    public:
-    PTA& outer;
 
     OnlineCycleDetection(PTA& o) : outer(o) {}
 
@@ -286,25 +297,25 @@ class PTA {
      * @returns The representative of nodeid
      */
     unsigned getFinalRepresentative(unsigned nodeid) {
-      unsigned lnnid = nodeid;
+      unsigned finalRep = nodeid;
 
       // Follow chain of representatives until a "root" is reached
-      while (representative[lnnid] != NoRepresentative) {
-        lnnid = representative[lnnid];
+      while (representative[finalRep] != NoRepresentative) {
+        finalRep = representative[finalRep];
       }
 
+      // TODO figure out if path compression might screw things up
       // path compression; make all things along path to final representative
       // point to the final representative
-      unsigned repr = representative[nodeid];
+      unsigned curRep = representative[nodeid];
 
-      while (repr != NoRepresentative) {
-        representative[nodeid] = lnnid;
-        nodeid = repr;
-        repr = representative[nodeid];
+      while (curRep != NoRepresentative) {
+        representative[nodeid] = finalRep;
+        nodeid = curRep;
+        curRep = representative[nodeid];
       }
 
-      //galois::gPrint(nodeid, ", ", lnnid, "\n");
-      return lnnid;
+      return finalRep;
     }
 
     /**
@@ -314,13 +325,18 @@ class PTA {
      * @param updates vector of nodes that are sources of new edges.
      */
     template<typename VecType>
-    void process(const VecType& updates) { 
-      return; // TODO this (or something it calls) 
-              // is broken and will lead to incorrect results FIXME
+    void process(VecType& updates) { 
+      galois::gPrint(getFinalRepresentative(33659), "\n");
+      //return; // TODO this function (or something it calls) is not completely 
+                // correct FIXME
 
+      // TODO this can probably be made more efficient (fill?)
       for (unsigned ii = 0; ii < outer.numNodes; ++ii) {
         visited[ii] = false;
       }
+
+      // TODO don't use news to add to the worklist; find a more efficient way
+      news.clear();
 
       unsigned cyclenode = NoRepresentative;  // set to invalid id.
 
@@ -332,6 +348,11 @@ class PTA {
         if (cycleDetect(nodeid, cyclenode)) {
           cycleCollapse(cyclenode);
         }
+      }
+
+      // TODO find a more efficient way to do this
+      for (auto d : news) {
+        updates.push_back(d);
       }
     }
   }; // end struct OnlineCycleDetection
@@ -348,17 +369,15 @@ class PTA {
       //std::cout << "debug: Processing constraint: "; constraint->print();
       unsigned src, dst;
       std::tie(src, dst) = constraint.getSrcDst();
-      //galois::gPrint(src, " ", dst, "\n");
 
       unsigned srcRepr = ocd.getFinalRepresentative(src);
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
-      //galois::gPrint("r ", srcRepr, " ", dstRepr, "\n");
 
       if (constraint.getType() == PtsToCons::Load) { 
         galois::gstl::Vector<unsigned> ptsToOfSrc;
         result[srcRepr].getAllSetBits(ptsToOfSrc);
 
-        GNode &nnDstRepr = nodes[dstRepr]; // id of dst in graph
+        GNode &nDstRepr = nodes[dstRepr]; // id of dst in graph
 
         for (unsigned pointee : ptsToOfSrc) {
           unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
@@ -367,38 +386,38 @@ class PTA {
           if (pointeeRepr != dstRepr && 
               graph.findEdge(nodes[pointeeRepr], nodes[dstRepr]) == 
                   graph.edge_end(nodes[pointeeRepr])) {
-            GNode &nn = nodes[pointeeRepr];
+            GNode &nPointeeRepr = nodes[pointeeRepr];
 
             galois::gDebug("adding edge from ", pointee, " to ", dst);
 
-            graph.addEdge(nn, nnDstRepr, flag);
+            graph.addEdge(nPointeeRepr, nDstRepr, flag);
 
-            ctx.push_back(nn);
+            ctx.push_back(nPointeeRepr);
           }
         }
       } else {  // store whatever src has into whatever dst points to
         galois::gstl::Vector<unsigned> ptsToOfDst;
         result[dstRepr].getAllSetBits(ptsToOfDst);
-        GNode& nnSrcRepr = nodes[srcRepr];
+        GNode& nSrcRepr = nodes[srcRepr];
 
         bool newEdgeAdded = false;
 
         for (unsigned pointee : ptsToOfDst) {
-          //galois::gPrint("point ", pointee, "\n");
           unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
 
           // add edge from src -> pointee if it doesn't exist
           if (srcRepr != pointeeRepr && 
                 graph.findEdge(nodes[srcRepr], nodes[pointeeRepr]) == 
                     graph.edge_end(nodes[srcRepr])) {
+
             galois::gDebug("adding edge from ", src, " to ", pointee);
-            graph.addEdge(nnSrcRepr, nodes[pointeeRepr], flag);
+            graph.addEdge(nSrcRepr, nodes[pointeeRepr], flag);
             newEdgeAdded = true;
           }
         }
 
         if (newEdgeAdded) {
-          ctx.push_back(nnSrcRepr);
+          ctx.push_back(nSrcRepr);
         }
       }
     }
@@ -477,6 +496,10 @@ class PTA {
         graph.getData(nodes[dstReprID], flag);
         // newPtsTo is positive if changes are made
         newPtsTo += result[dstReprID].unify(result[srcReprID]);
+      } else {
+        if (!result[srcReprID].isSubsetEq(result[dstReprID])) {
+          std::abort();
+        }
       }
     }
 
@@ -563,11 +586,12 @@ class PTA {
     processLoadStore(loadStoreConstraints, updates, 
                      galois::MethodFlag::UNPROTECTED);
 
-    unsigned niteration = 0;
+    unsigned numIterations = 0;
+    unsigned numUps = 0;
 
     // FIFO
     while (!updates.empty()) {
-      galois::gDebug("Iteration ", niteration++, ", updates.size=", 
+      galois::gDebug("Iteration ", numIterations++, ", updates.size=", 
                      updates.size(), "\n");
       GNode src = updates.front();
       updates.pop_front();
@@ -585,10 +609,10 @@ class PTA {
         }
       }
 
-
-      if (updates.empty()) {
-        galois::gPrint("No of points-to facts computed = ", 
-                       countPointsToFacts(), "\n");
+      if (++numUps >= THRESHOLD_LS || updates.empty()) {
+        //galois::gPrint("No of points-to facts computed = ", 
+        //               countPointsToFacts(), "\n");
+        numUps = 0;
 
         // After propagating all constraints, see if load/store
         // constraints need to be added in since graph was potentially updated
@@ -629,7 +653,6 @@ class PTA {
         },
         galois::loopname("MainUpdateLoop"),
         galois::wl<galois::worklists::dChunkedFIFO<8>>()
-        //galois::wl<OBIM>(indexer)
       );
       galois::gPrint("No of points-to facts computed = ", 
                      countPointsToFacts(), "\n");
@@ -721,7 +744,6 @@ int main(int argc, char** argv) {
 
   size_t numNodes = pta.readConstraints(input.c_str());
 
-
   pta.initialize(numNodes);
 
   unsigned numThreads = galois::getActiveThreads();
@@ -737,7 +759,6 @@ int main(int argc, char** argv) {
     pta.runSerial();
   }
   T.stop();
-
 
   galois::gPrint("No of points-to facts computed = ", 
                  pta.countPointsToFacts(), "\n");
