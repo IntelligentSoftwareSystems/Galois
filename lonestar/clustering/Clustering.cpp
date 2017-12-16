@@ -240,16 +240,20 @@ void clusterGalois(GVector<LeafNode*>& lights) {
 }
 
 void clusterSerial(GVector<LeafNode*>& lights) {
+
   int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
   cout << "Temp size is " << tempSize << " coord. arr size should be "
        << tempSize * 3 << endl;
-  GVector<double>* coordinatesArray = new GVector<double>(tempSize * 3);
-  GVector<NodeWrapper*> initialWorklist(lights.size());
-  GVector<ClusterNode*> clusterArray(tempSize);
+
+  std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
+  std::vector<NodeWrapper*> initialWorklist(lights.size());
+  std::vector<ClusterNode*> clusterArray(tempSize);
+
   for (unsigned int i = 0; i < lights.size(); i++) {
     NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
     initialWorklist[i] = nw;
   }
+
   KdTree* tree = (KdTree::createTree(initialWorklist));
   //#if DEBUG_CONSOLE
   cout << "Tree created " << *tree << endl;
@@ -257,53 +261,91 @@ void clusterSerial(GVector<LeafNode*>& lights) {
        << endl;
   //#endif
 
-  GVector<NodeWrapper*> workListOld(0);
-  KdTree::getAll(*tree, workListOld);
-  GVector<NodeWrapper*> workList(0);
-  for (unsigned int i = 0; i < workListOld.size(); i++) {
-    workList.push_back(workListOld[i]);
-  }
-  GVector<NodeWrapper*> newNodes;
-  GVector<NodeWrapper*> allocs;
+  std::vector<NodeWrapper*> workList(0);
+  KdTree::getAll(*tree, workList);
+
+  // TODO: remove
+  // for (unsigned int i = 0; i < workListOld.size(); i++) {
+    // workList.push_back(workListOld[i]);
+  // }
+
+  std::vector<NodeWrapper*> newNodes;
+  std::vector<NodeWrapper*> allocs;
+
   while (true) {
     while (workList.size() > 1) {
       cout << "===================Worklist size :: " << workList.size()
            << "===============" << endl;
+
       NodeWrapper* nodeA = workList.back();
       workList.pop_back();
-      if (tree->contains(*nodeA)) {
-        NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
-        if (nodeB != NULL && tree->contains(*nodeB)) {
-          NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
-          if (nodeBMatch != NULL) {
-            if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
-              if (nodeA < nodeB) {
-                NodeWrapper* newNode = new NodeWrapper(
-                    *nodeA, *nodeB, coordinatesArray, clusterArray);
-                newNodes.push_back(newNode);
-                allocs.push_back(newNode);
-              }
-            } else {
-              newNodes.push_back(nodeA);
-            }
+
+      assert(tree->contains(*nodeA) && "Node not in tree?");
+      auto* match = tree->findBestMatch(*nodeA);
+
+      if (match != nullptr) {
+        assert(tree->contains(*match) && "match not in tree?");
+
+        auto* counterMatch = tree->findBestMatch(*match);
+
+        if (counterMatch != nullptr) {
+          assert(tree->contains(*counterMatch) && "counterMatch not in tree?");
+
+          if (counterMatch->equals(*nodeA)) {
+            auto* ccMatch = tree->findBestMatch(counterMatch);
+            assert(ccMatch && ccMatch->equals(*match) && "mismatch in best matches");
+
+            NodeWrapper* clust  = new NodeWrapper(*nodeA, *nodeB, coordinatesArray, clusterArray);
+            newNodes.push_back(clust);
+            allocs.push_back(clust);
+
+          } else {
+            newNodes.push_back(nodeA);
           }
-        } else {
-          newNodes.push_back(nodeA);
         }
+      } else {
+        newNodes.push_back(nodeA);
       }
+
+      // if (tree->contains(*nodeA)) {
+        // NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
+        // if (nodeB != NULL && tree->contains(*nodeB)) {
+          // NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
+          // if (nodeBMatch != NULL) {
+            // if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
+              // if (nodeA < nodeB) {
+                // NodeWrapper* newNode = new NodeWrapper(
+                    // *nodeA, *nodeB, coordinatesArray, clusterArray);
+                // newNodes.push_back(newNode);
+                // allocs.push_back(newNode);
+              // }
+            // } else {
+              // newNodes.push_back(nodeA);
+            // }
+          // }
+        // } else {
+          // newNodes.push_back(nodeA);
+        // }
+      // }
     }
-    workList.clear();
-    for (GVector<NodeWrapper*>::iterator it    = newNodes.begin(),
-                                         itEnd = newNodes.end();
-         it != itEnd; it++)
-      workList.push_back(*it);
-    cout << "Newly added" << newNodes.size() << endl;
-    if (newNodes.size() < 2)
+
+    if (newNodes.size() < 2) {
       break;
+    }
+
+    workList.clear();
+    for (NodeWrapper* nw: newNodes) {
+      workList.push_back(nw);
+    }
+
+    cout << "Newly added" << newNodes.size() << endl;
+
     KdCell::cleanupTree(tree);
     tree = (KdTree::createTree(workList));
     newNodes.clear();
+    
   }
+
 #if DEBUG_CONSOLE
   cout << "================================================================"
        << endl
@@ -313,13 +355,18 @@ void clusterSerial(GVector<LeafNode*>& lights) {
   //!!!!!!!!!!!!!!!!!!!Cleanup
   KdCell::cleanupTree(tree);
   AbstractNode::cleanup();
+
   for (unsigned int i = 0; i < lights.size(); i++) {
     NodeWrapper* nw = initialWorklist[i];
     delete nw;
   }
-  for (unsigned int i = 0; i < allocs.size(); i++)
-    delete allocs[i];
+
+  for (auto* a: allocs) {
+    delete a;
+  }
+
   delete coordinatesArray;
+
   return;
 }
 
