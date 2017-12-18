@@ -22,6 +22,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "galois/Galois.h"
+#include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
@@ -57,8 +58,7 @@ unsigned int iteration   = 0;
 
 struct LNode {
   float value[2];
-  // Compute the out degrees in the original graph
-  std::atomic<uint32_t> nout;
+  uint32_t nout; // Compute the out degrees in the original graph
 
   float getPageRank() { return value[1]; }
   float getPageRank(unsigned int it) { return value[it & 1]; }
@@ -69,26 +69,31 @@ typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
     Graph;
 typedef typename Graph::GraphNode GNode;
 
-uint32_t atomicAdd(std::atomic<uint32_t>& v, uint32_t delta) {
-  uint32_t old;
-  do {
-    old = v;
-  } while (!v.compare_exchange_strong(old, old + delta));
-  return old;
-}
-
 struct ComputeInDegrees {
   void run(Graph& graph) {
+
+    galois::GVectorPerItemReduce<size_t, std::plus<size_t>> reducer;
+
     galois::do_all(galois::iterate(graph),
                    [&](const GNode src) {
                      for (auto nbr : graph.edges(src)) {
-                       GNode dst   = graph.getEdgeDst(nbr);
-                       auto& ddata = graph.getData(dst);
-                       atomicAdd(ddata.nout, (uint32_t)1);
+                       GNode dst = graph.getEdgeDst(nbr);
+                       reducer.update(dst, (uint32_t)1);
                      }
                    },
                    galois::steal(), galois::no_stats(),
                    galois::loopname("ComputeInDegrees"));
+
+    const auto& degrees = reducer.reduce();
+
+    // Now reduce each vector element in parallel
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode src) {
+                     auto& srcData = graph.getData(src);
+                     srcData.nout  = degrees[src];
+                   },
+                   galois::steal(), galois::no_stats(),
+                   galois::loopname("Reduction"));
   }
 };
 
@@ -243,10 +248,7 @@ int main(int argc, char** argv) {
 
   Graph transposeGraph;
   galois::graphs::readGraph(transposeGraph, filename);
-
-  std::cout << "Read "
-            << std::distance(transposeGraph.begin(), transposeGraph.end())
-            << " Nodes\n";
+  std::cout << "Read " << transposeGraph.size() << " nodes\n";
 
   galois::preAlloc(numThreads + (2 * transposeGraph.size() *
                                  sizeof(typename Graph::node_data_type)) /
