@@ -22,22 +22,19 @@
  * defects in Software and/or Documentation, or loss or inaccuracy of data of any
  * kind.
  *
- * TODO WHAT IS THIS
+ * Sparse bit vector for compact storage of information.
  * 
  * @author Rupesh Nasre <rupesh0508@gmail.com>
- * @author Loc Hoang <l_hoang@utexas.edu> (documentation, fixes, cleanup)
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 #ifndef GALOIS_SPARSEBITVECTOR_H
 #define GALOIS_SPARSEBITVECTOR_H
-
-#include "galois/substrate/SimpleLock.h"
 
 #include <vector>
 #include <string>
 #include <ostream>
 
 namespace galois {
-
 /**
  * Sparse bit vector.
  * 
@@ -66,6 +63,15 @@ struct SparseBitVector {
       WORD beforeBits = bits;
       bits |= ((WORD)1 << offset);
       return bits != beforeBits;
+    }
+
+    /**
+     * @param offset Offset into bits to check status of
+     * @returns true if bit at offset is set, false otherwise
+     */
+    bool test(unsigned offset) {
+      WORD mask = (WORD)1 << offset;
+      return ((bits & mask) == mask);
     }
 
     /**
@@ -118,7 +124,11 @@ struct SparseBitVector {
       return 0;
     }
 
-    unsigned count() {
+    /**
+     * TODO
+     * check correctness too
+     */
+    unsigned count() const {
       unsigned numElements = 0;
       WORD powerof2 = 1;
 
@@ -232,7 +242,7 @@ struct SparseBitVector {
     OneWord* curPtr = head;
     OneWord* prev = nullptr;
 
-    // pointers should be in sorted order TODO check this assumption
+    // pointers should be in sorted order 
     // loop through linked list to find the correct base word (if it exists)
     while (curPtr != nullptr && curPtr->base < baseWord) {
       prev = curPtr;
@@ -251,13 +261,43 @@ struct SparseBitVector {
       if (prev) {
         newWord->next = prev->next;
         prev->next = newWord;
-      // else this is the first word we are adding
       } else {
-        newWord->next = nullptr;
+        if (curPtr == nullptr) {
+          // this is the first word we are adding since both prev and head are 
+          // null; next is nothing
+          newWord->next = nullptr;
+        } else {
+          // this new word goes before curptr; if prev is null and curptr isn't,
+          // it means it had to go before
+          newWord->next = head;
+        }
+
         head = newWord;
       }
 
       return true;
+    }
+  }
+
+  /**
+   * @param bit Bit in bitvector to check status of
+   * @returns True if the argument bit is set in this bitvector, false otherwise
+   */
+  bool test(unsigned bit) const {
+    unsigned baseWord;
+    unsigned offsetIntoWord;
+
+    std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
+    OneWord* curPointer = head;
+
+    while (curPointer != nullptr && curPointer->base < baseWord) {
+      curPointer = curPointer->next;
+    }
+
+    if (curPointer != nullptr && curPointer->base == baseWord) {
+      return curPointer->test(offsetIntoWord);
+    } else {
+      return false;
     }
   }
 
@@ -268,6 +308,7 @@ struct SparseBitVector {
    * @param second BitVector to merge this one with
    * @returns a non-negative value if something changed
    */
+  // TODO check correctness
   unsigned unify(const SparseBitVector& second) {
     unsigned changed = 0;
 
@@ -376,7 +417,11 @@ struct SparseBitVector {
     return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
   }
 
-  unsigned count() {
+  /**
+   * TODO
+   * check correctness too 
+   */
+  unsigned count() const {
     unsigned nbits = 0;
     for (OneWord *ptr = head; ptr; ptr = ptr->next) {
       nbits += ptr->count();
@@ -392,6 +437,7 @@ struct SparseBitVector {
    * @param setBits Vector to add set bits to
    * @returns Number of set bits in this bitvector
    */
+  // TODO return as a pair instead of altering directly
   template<typename VectorTy>
   unsigned getAllSetBits(VectorTy &setBits) const {
     unsigned numBits = 0;
@@ -404,7 +450,10 @@ struct SparseBitVector {
     return numBits;
   }
 
-  void print(std::ostream& out, std::string prefix = std::string("")) {
+  /**
+   * TODO
+   */
+  void print(std::ostream& out, std::string prefix = std::string("")) const {
     std::vector<unsigned> setbits;
     unsigned nNodes = getAllSetBits(setbits);
     out << "Elements(" << nNodes << "): ";
@@ -414,6 +463,7 @@ struct SparseBitVector {
     out << "\n";
   }
 };
-}
+
+} // end namespace galois
 
 #endif //  _GALOIS_SPARSEBITVECTOR_H
