@@ -304,8 +304,7 @@ int main(int argc, char** argv) {
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running Edge Async push version, tolerance: " << tolerance
-            << "\n";
+  std::cout << "Running synchronous Pull version , tolerance: " << tolerance << std::endl;
 
 
   initNodeData(transposeGraph);

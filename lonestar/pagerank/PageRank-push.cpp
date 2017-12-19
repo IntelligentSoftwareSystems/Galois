@@ -25,6 +25,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "galois/Galois.h"
+#include "galois/Bag.h"
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
@@ -44,12 +45,31 @@ const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
 const char* url = 0;
 
-cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"),
+constexpr static const float ALPHA = 0.85;
+constexpr static const unsigned CHUNK_SIZE = 16;
+constexpr static const float TOLERANCE = 1.0e-5;
+constexpr static const unsigned MAX_ITER = 1000;
+
+enum Algo {
+  Async,
+  Sync
+};
+
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
+    cll::values(
+      clEnumVal(Async, "Async"),
+      clEnumVal(Sync, "Sync"),
+      clEnumValEnd), cll::init(Sync));
+
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"),
                                cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
-                                 cll::init(0.000001));
+                                 cll::init(TOLERANCE));
 
-static const float alpha = 0.85;
+cll::opt<unsigned int> maxIterations("maxIterations",
+                                     cll::desc("Maximum iterations, Sync version only"),
+                                     cll::init(MAX_ITER));
+
 typedef double PRTy;
 
 struct LNode {
@@ -57,7 +77,7 @@ struct LNode {
   std::atomic<PRTy> residual;
 
   void init() {
-    value    = 1.0 - alpha;
+    value    = 1.0 - ALPHA;
     residual = 0.0;
   }
 
@@ -67,8 +87,9 @@ struct LNode {
   }
 };
 
-typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
-    Graph;
+typedef galois::graphs::LC_CSR_Graph<LNode, void>
+  ::with_numa_alloc<true>::type
+  ::with_no_lockable<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
 template <typename GNode>
@@ -153,9 +174,132 @@ void initResidual(Graph& graph) {
   galois::do_all(galois::iterate(graph),
                  [&graph](const GNode& src) {
                    auto& data    = graph.getData(src);
-                   data.residual = data.residual * alpha * (1.0 - alpha);
+                   data.residual = data.residual * ALPHA * (1.0 - ALPHA);
                  },
                  galois::loopname("init-res-1"), galois::steal());
+}
+
+void asyncPageRank(Graph& graph) {
+
+  typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
+  galois::for_each(galois::iterate(graph),
+                   [&](GNode src, auto& ctx) {
+                     LNode& sdata = graph.getData(src);
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
+
+                     if (std::fabs(sdata.residual) > tolerance) {
+                       PRTy oldResidual = sdata.residual.exchange(0.0);
+                       sdata.value += oldResidual;
+                       int src_nout = std::distance(graph.edge_begin(src, flag),
+                                                    graph.edge_end(src, flag));
+                       PRTy delta   = oldResidual * ALPHA / src_nout;
+                       // for each out-going neighbors
+                       for (auto jj : graph.edges(src, flag)) {
+                         GNode dst    = graph.getEdgeDst(jj);
+                         LNode& ddata = graph.getData(dst, flag);
+                         auto old     = atomicAdd(ddata.residual, delta);
+                         if (std::fabs(old) <= tolerance &&
+                             std::fabs(old + delta) >= tolerance)
+                           ctx.push(dst);
+                       }
+                     } else { // might need to reschedule self. But why?
+                       // ctx.push(src);
+                     }
+                   },
+                   galois::loopname("Async"), galois::no_conflicts(),
+                   galois::wl<WL>());
+
+}
+
+struct Update {
+  PRTy delta;
+  Graph::edge_iterator beg;
+  Graph::edge_iterator end;
+};
+
+void syncPageRank(Graph& graph) {
+
+  constexpr ptrdiff_t EDGE_PAIR_SIZE = 128;
+
+  galois::InsertBag<Update> updates;
+
+  galois::InsertBag<GNode> activeNodes;
+
+  galois::do_all(galois::iterate(graph),
+      [&] (const GNode& src) {
+        activeNodes.push(src);
+      });
+
+  size_t iter = 0;
+  for ( ; !activeNodes.empty()  && iter < maxIterations; ++iter) {
+
+    galois::do_all(galois::iterate(activeNodes),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
+          LNode& sdata = graph.getData(src, flag);
+
+          if (std::fabs(sdata.residual) > tolerance) {
+            PRTy oldResidual = sdata.residual;
+            sdata.value += oldResidual;
+            sdata.residual = 0.0;
+
+            int src_nout = std::distance(graph.edge_begin(src, flag),
+                                         graph.edge_end(src, flag));
+            PRTy delta   = oldResidual * ALPHA / src_nout;
+
+            auto beg = graph.edge_begin(src, flag);
+            const auto end = graph.edge_end(src, flag);
+
+            assert(beg <= end);
+
+            if ((end - beg) > EDGE_PAIR_SIZE) {
+              for (; beg + EDGE_PAIR_SIZE < end;) {
+                auto ne = beg + EDGE_PAIR_SIZE;
+                updates.push( Update{delta, beg, ne} );
+                beg = ne;
+              }
+            }
+            
+            if ((end - beg) > 0) {
+              updates.push( Update{delta, beg, end} );
+            }
+          }
+        },
+        galois::steal(),
+        galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("IterActive"));
+
+    activeNodes.clear_parallel();
+
+    galois::do_all(galois::iterate(updates),
+        [&] (const Update& up) {
+           constexpr const galois::MethodFlag flag =
+               galois::MethodFlag::UNPROTECTED;
+           // for each out-going neighbors
+           for (auto jj = up.beg; jj != up.end; ++jj) {
+             GNode dst    = graph.getEdgeDst(jj);
+             LNode& ddata = graph.getData(dst, flag);
+             auto old     = atomicAdd(ddata.residual, up.delta);
+             if (std::fabs(old) <= tolerance &&
+                 std::fabs(old + up.delta) >= tolerance) {
+               activeNodes.push(dst);
+             }
+           }
+        },
+       galois::steal(),
+       galois::chunk_size<CHUNK_SIZE>(),
+       galois::loopname("PushRes"));
+
+    updates.clear_parallel();
+
+  }
+
+  if (iter >= maxIterations) {
+    std::cerr << "ERROR: failed to converge in " << iter << " iterations" << std::endl;
+  }
+  
 }
 
 int main(int argc, char** argv) {
@@ -172,7 +316,7 @@ int main(int argc, char** argv) {
             << " Nodes\n";
 
   galois::preAlloc(numThreads +
-                   (2 * graph.size() * sizeof(typename Graph::node_data_type)) /
+                   (5 * graph.size() * sizeof(typename Graph::node_data_type)) /
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
@@ -183,37 +327,20 @@ int main(int argc, char** argv) {
                  [&graph](GNode n) { graph.getData(n).init(); });
 
   initResidual(graph);
-  typedef galois::worklists::dChunkedFIFO<256> WL;
 
   galois::StatTimer Tmain;
   Tmain.start();
-  galois::for_each(galois::iterate(graph),
-                   [&](GNode src, auto& ctx) {
-                     LNode& sdata = graph.getData(src);
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
 
-                     if (std::fabs(sdata.residual) > tolerance) {
-                       PRTy oldResidual = sdata.residual.exchange(0.0);
-                       sdata.value += oldResidual;
-                       int src_nout = std::distance(graph.edge_begin(src, flag),
-                                                    graph.edge_end(src, flag));
-                       PRTy delta   = oldResidual * alpha / src_nout;
-                       // for each out-going neighbors
-                       for (auto jj : graph.edges(src, flag)) {
-                         GNode dst    = graph.getEdgeDst(jj);
-                         LNode& ddata = graph.getData(dst, flag);
-                         auto old     = atomicAdd(ddata.residual, delta);
-                         if (std::fabs(old) <= tolerance &&
-                             std::fabs(old + delta) >= tolerance)
-                           ctx.push(dst);
-                       }
-                     } else { // might need to reschedule self. But why?
-                       // ctx.push(src);
-                     }
-                   },
-                   galois::loopname("Main"), galois::no_conflicts(),
-                   galois::wl<WL>());
+  switch(algo) {
+    case Async:
+      asyncPageRank(graph);
+      break;
+    case Sync:
+      syncPageRank(graph);
+      break;
+    default:
+      std::abort();
+  }
 
   Tmain.stop();
 
