@@ -212,13 +212,14 @@ void asyncPageRank(Graph& graph) {
 
 }
 
-struct Update {
-  PRTy delta;
-  Graph::edge_iterator beg;
-  Graph::edge_iterator end;
-};
 
 void syncPageRank(Graph& graph) {
+
+  struct Update {
+    PRTy delta;
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
 
   constexpr ptrdiff_t EDGE_TILE_SIZE = 128;
 
