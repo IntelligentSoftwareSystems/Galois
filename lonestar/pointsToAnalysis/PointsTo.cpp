@@ -190,8 +190,9 @@ class PTA {
       // keep track of the current depth first search path
       ancestors.push_back(nodeRep);
 
-      galois::gstl::Vector<unsigned> repOutgoingEdges;
-      outerPTA.outgoingEdges[nodeRep].getAllSetBits(repOutgoingEdges);
+      galois::gstl::Vector<unsigned> repOutgoingEdges = 
+        outerPTA.outgoingEdges[nodeRep].
+        getAllSetBits<galois::gstl::Vector<unsigned>>();
 
       for (auto dst : repOutgoingEdges) {
         // recursive depth first cycle detection; if a cycle is found,
@@ -320,6 +321,7 @@ class PTA {
      */
     template<typename VecType>
     void process(VecType& updates) { 
+      return;
       // TODO this can probably be made more efficient (fill?)
       for (unsigned ii = 0; ii < outerPTA.numNodes; ++ii) {
         visited[ii] = false;
@@ -376,8 +378,9 @@ class PTA {
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
       if (constraint.getType() == PtsToCons::Load) { 
-        galois::gstl::Vector<unsigned> ptsToOfSrc;
-        pointsToResult[srcRepr].getAllSetBits(ptsToOfSrc);
+        galois::gstl::Vector<unsigned> ptsToOfSrc = 
+          pointsToResult[srcRepr].
+          getAllSetBits<galois::gstl::Vector<unsigned>>();
 
         for (unsigned pointee : ptsToOfSrc) {
           unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
@@ -393,8 +396,9 @@ class PTA {
           }
         }
       } else {  // store whatever src has into whatever dst points to
-        galois::gstl::Vector<unsigned> ptsToOfDst;
-        pointsToResult[dstRepr].getAllSetBits(ptsToOfDst);
+        galois::gstl::Vector<unsigned> ptsToOfDst = 
+          pointsToResult[dstRepr].
+          getAllSetBits<galois::gstl::Vector<unsigned>>();
 
         bool newEdgeAdded = false;
 
@@ -545,8 +549,9 @@ class PTA {
 
       galois::gDebug("processing updates element ", src);
 
-      galois::gstl::Vector<unsigned> srcOutgoingEdges;
-      outgoingEdges[src].getAllSetBits(srcOutgoingEdges);
+      galois::gstl::Vector<unsigned> srcOutgoingEdges = 
+        outgoingEdges[src].getAllSetBits<galois::gstl::Vector<unsigned>>();
+
 
       for (unsigned dst : srcOutgoingEdges) {
         unsigned newPtsTo = propagate(src, dst);
@@ -588,8 +593,9 @@ class PTA {
       galois::for_each(
         galois::iterate(updates),
         [this] (unsigned req, auto& ctx) {
-          galois::gstl::Vector<unsigned> reqOut;
-          this->outgoingEdges[req].getAllSetBits(reqOut);
+          galois::gstl::Vector<unsigned> reqOut = 
+            this->outgoingEdges[req].
+            getAllSetBits<galois::gstl::Vector<unsigned>>();
 
           for (auto dst : reqOut) {
             unsigned newPtsTo = this->propagate(req, dst);

@@ -34,53 +34,42 @@
 #include <string>
 #include <ostream>
 
+// TODO
+// - get rid of new usage (new doesn't scale well); smart pointers probably
+// better as well
+
 namespace galois {
+
 /**
- * Sparse bit vector.
+ * Sparse bit vector represented as a linked list of words.
  * 
  * Stores objects as indices in sparse bit vectors.
  * Saves space when the data to be stored is sparsely populated.
  */
 struct SparseBitVector {
   using WORD = unsigned long;
-
   // Number of bits in a word
-  static const unsigned wordsize = sizeof(WORD) * 8;
+  static const unsigned wordSize = sizeof(WORD) * 8;
 
+  /**
+   * A single word used as a bitvector. Contains functionality to alter it like
+   * a bitvector.
+   */
   struct OneWord {
+    using WORD = unsigned long;
+  
     WORD bits; // number that is used as the bitset
     unsigned base; // used to order the words of the vector
     struct OneWord* next; // pointer to next word on linked list 
                           // (using base as order)
-
-    /**
-     * Sets the bit at the provided offset.
-     *
-     * @param offset Offset to set the bit at
-     * @returns true if the set bit wasn't set previously
-     */
-    bool set(unsigned offset) {
-      WORD beforeBits = bits;
-      bits |= ((WORD)1 << offset);
-      return bits != beforeBits;
-    }
-
-    /**
-     * @param offset Offset into bits to check status of
-     * @returns true if bit at offset is set, false otherwise
-     */
-    bool test(unsigned offset) {
-      WORD mask = (WORD)1 << offset;
-      return ((bits & mask) == mask);
-    }
-
+  
     /**
      * Default is create a base at 0.
      */
     OneWord() { 
       OneWord(0);
     }
-
+  
     /**
      * Creates a new word.
      *
@@ -92,7 +81,7 @@ struct SparseBitVector {
       bits = 0;
       next = nullptr;
     }
-
+  
     /**
      * Creates a new word with an initial bit already set.
      *
@@ -106,7 +95,28 @@ struct SparseBitVector {
       set(_initial);
       next = nullptr;
     }
-
+  
+    /**
+     * Sets the bit at the provided offset.
+     *
+     * @param offset Offset to set the bit at
+     * @returns true if the set bit wasn't set previously
+     */
+    bool set(unsigned offset) {
+      WORD beforeBits = bits;
+      bits |= ((WORD)1 << offset);
+      return bits != beforeBits;
+    }
+  
+    /**
+     * @param offset Offset into bits to check status of
+     * @returns true if bit at offset is set, false otherwise
+     */
+    bool test(unsigned offset) const {
+      WORD mask = (WORD)1 << offset;
+      return ((bits & mask) == mask);
+    }
+  
     /**
      * Bitwise or with second's bits field on our field.
      *
@@ -120,28 +130,33 @@ struct SparseBitVector {
         bits |= second->bits;
         return (bits != oldBits);
       }
-
+  
       return 0;
     }
-
+  
     /**
-     * TODO
-     * check correctness too
+     * TODO can probably use bit twiddling to get count more efficiently
+     *
+     * @returns The number of set bits in this word
      */
     unsigned count() const {
       unsigned numElements = 0;
-      WORD powerof2 = 1;
-
-      for (unsigned ii = 0; ii < wordsize; ++ii) {
-        if (bits & powerof2) {
-                ++numElements;
+  
+      WORD bitMask = 1;
+  
+      for (unsigned ii = 0; ii < wordSize; ++ii) {
+        if (bits & bitMask) {
+          ++numElements;
         }
-        powerof2 <<= 1;
+  
+        bitMask <<= 1;
       }
       return numElements;
     }
-
+  
     /**
+     * Determines if second has set all of the bits that this objects has set.
+     *
      * @param second OneWord pointer to compare against
      * @returns true if second word's bits has everything that this
      * word's bits have
@@ -149,42 +164,41 @@ struct SparseBitVector {
     bool isSubsetEq(OneWord* second) const {
       return (bits & second->bits) == bits;
     }
-
+  
     /**
      * @returns a pointer to a copy of this word without the preservation
      * of the linked list
      */
     OneWord* clone() const {
-      OneWord* newword = new OneWord();
-
-      newword->base = base;
-      newword->bits = bits;
-      newword->next = nullptr;
-
-      return newword;
+      OneWord* newWord = new OneWord(); // TODO don't use new, find better way
+  
+      newWord->base = base;
+      newWord->bits = bits;
+      newWord->next = nullptr;
+  
+      return newWord;
     }
-
+  
     /**
      * @returns a pointer to a copy of this word WITH the preservation of
      * the linked list via copies of the list starting from this word
      */
     OneWord* cloneAll() const {
       OneWord* newListBeginning = clone();
-
+  
       OneWord* curPtr = newListBeginning;
       OneWord* nextPtr = next;
-
+  
       // clone down the linked list starting from this pointer
       while (nextPtr != nullptr) {
         curPtr->next = nextPtr->clone();
         nextPtr = nextPtr->next;
         curPtr = curPtr->next;
       }
-
+  
       return newListBeginning;
     }
-
-
+  
    /**
     * Gets the set bits in this word and adds them to the passed in 
     * vector.
@@ -198,16 +212,16 @@ struct SparseBitVector {
       // or mask used to mask set bits
       WORD orMask = 1;
       unsigned numSet = 0;
-
-      for (unsigned curBit = 0; curBit < wordsize; ++curBit) {
+  
+      for (unsigned curBit = 0; curBit < wordSize; ++curBit) {
         if (bits & orMask) {
-          setbits.push_back(base * wordsize + curBit);
+          setbits.push_back(base * wordSize + curBit);
           numSet++;
         }
-
+  
         orMask <<= 1;
       }
-
+  
       return numSet;
     }
   };
@@ -229,6 +243,8 @@ struct SparseBitVector {
    * Set the provided bit in the bitvector. Will create a new word if the
    * word needed to set the bit doesn't exist yet + will rearrange linked
    * list of words as necessary.
+   *
+   * TODO make this thread-safe
    *
    * @param bit The bit to set in the bitvector
    * @returns true if the bit set wasn't set previously
@@ -280,6 +296,8 @@ struct SparseBitVector {
   }
 
   /**
+   * Determines if a particular bit in the bitvector is set.
+   *
    * @param bit Bit in bitvector to check status of
    * @returns True if the argument bit is set in this bitvector, false otherwise
    */
@@ -302,13 +320,12 @@ struct SparseBitVector {
   }
 
   /**
-   * Takes the passed in bitvector and does an or with it to update this
+   * Takes the passed in bitvector and does an "or" with it to update this
    * bitvector.
    *
    * @param second BitVector to merge this one with
    * @returns a non-negative value if something changed
    */
-  // TODO check correctness
   unsigned unify(const SparseBitVector& second) {
     unsigned changed = 0;
 
@@ -379,28 +396,29 @@ struct SparseBitVector {
       if (ptrOne->base == ptrTwo->base) {
         if (!ptrOne->isSubsetEq(ptrTwo)) {
           return false;
-        } else {
-          // we are done comparing ptrTwo's current head; move on to next
-          ptrTwo = ptrTwo->next;
         }
+
+        // subset check successful; advance both pointers
         ptrOne = ptrOne->next;
+        ptrTwo = ptrTwo->next;
       } else if (ptrOne->base < ptrTwo->base) {
-        // two has overtaken 1, i.e. one has something two doesn't since 
-        // otherwise the first case in this if/else chain should have
-        // caught it
+        // ptrTwo has overtaken ptrOne, i.e. one has something (a base)
+        // two doesn't
         return false;
-      } else { // greater than case; advance ptrTwo to see if it eventually
-               // reaches what ptrOne is currently at (or skips over it)
+      } else {  // ptrOne > ptrTwo
+        // greater than case; advance ptrTwo to see if it eventually
+        // reaches what ptrOne is currently at
         ptrTwo = ptrTwo->next;
       }
     }
 
     if (ptrOne != nullptr) {
-      // loop exited because ptrTwo is nullptr, meaning this vector has more
-      // than the other vector, i.e. not a subset
+      // if ptrOne is not null, the loop exited because ptrTwo is nullptr, 
+      // meaning this vector has more than the other vector, i.e. not a subset
       return false;
     } else {
-      // ptrOne == nullptr => it has sucessfully subset checked all words
+      // here means ptrOne == nullptr => it has sucessfully subset checked all 
+      // words that matter
       return true;
     }
   }
@@ -411,55 +429,57 @@ struct SparseBitVector {
    * baseword that corresponds to bit
    */
   std::pair<unsigned, unsigned> getOffsets(unsigned bit) const {
-    unsigned baseWord = bit / wordsize;
-    unsigned offsetIntoWord = bit % wordsize;
+    unsigned baseWord = bit / wordSize;
+    unsigned offsetIntoWord = bit % wordSize;
       
     return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
   }
 
   /**
-   * TODO
-   * check correctness too 
+   * @returns number of bits set by all words in this bitvector
    */
   unsigned count() const {
     unsigned nbits = 0;
+
     for (OneWord *ptr = head; ptr; ptr = ptr->next) {
       nbits += ptr->count();
     }
+
     return nbits;
   }
 
   /**
-   * Gets the set bits in this bitvector and adds them to the passed in 
-   * vector.
+   * Gets the set bits in this bitvector and returns them in a vector type.
    *
    * @tparam VectorTy vector type that supports push_back
-   * @param setBits Vector to add set bits to
-   * @returns Number of set bits in this bitvector
+   * @returns Vector with all set bits
    */
-  // TODO return as a pair instead of altering directly
   template<typename VectorTy>
-  unsigned getAllSetBits(VectorTy &setBits) const {
-    unsigned numBits = 0;
+  VectorTy getAllSetBits() const {
+    VectorTy setBits;
 
     // loop through all words in the bitvector and get their set bits
     for (OneWord* curPtr = head; curPtr != nullptr; curPtr = curPtr->next) {
-      numBits += curPtr->getAllSetBits(setBits);
+      curPtr->getAllSetBits(setBits);
     }
 
-    return numBits;
+    return setBits;
   }
 
   /**
-   * TODO
+   * Output the bits that are set in this bitvector.
+   *
+   * @param out Stream to output to
+   * @param prefix A string to append to the set bit numbers
    */
   void print(std::ostream& out, std::string prefix = std::string("")) const {
-    std::vector<unsigned> setbits;
-    unsigned nNodes = getAllSetBits(setbits);
-    out << "Elements(" << nNodes << "): ";
-    for (auto setBitNum : setbits) {
+    std::vector<unsigned> setBits = getAllSetBits<std::vector<unsigned>>();
+    out << "Elements(" << setBits.size() << "): ";
+
+    for (auto setBitNum : setBits) {
       out << prefix << setBitNum << ", ";
     }
+
     out << "\n";
   }
 };
