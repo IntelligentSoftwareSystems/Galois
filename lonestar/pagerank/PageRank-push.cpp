@@ -220,7 +220,7 @@ struct Update {
 
 void syncPageRank(Graph& graph) {
 
-  constexpr ptrdiff_t EDGE_PAIR_SIZE = 128;
+  constexpr ptrdiff_t EDGE_TILE_SIZE = 128;
 
   galois::InsertBag<Update> updates;
 
@@ -254,9 +254,9 @@ void syncPageRank(Graph& graph) {
 
             assert(beg <= end);
 
-            if ((end - beg) > EDGE_PAIR_SIZE) {
-              for (; beg + EDGE_PAIR_SIZE < end;) {
-                auto ne = beg + EDGE_PAIR_SIZE;
+            if ((end - beg) > EDGE_TILE_SIZE) {
+              for (; beg + EDGE_TILE_SIZE < end;) {
+                auto ne = beg + EDGE_TILE_SIZE;
                 updates.push( Update{delta, beg, ne} );
                 beg = ne;
               }
