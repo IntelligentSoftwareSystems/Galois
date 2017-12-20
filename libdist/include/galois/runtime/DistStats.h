@@ -192,7 +192,11 @@ class DistStatManager: public galois::runtime::StatManager {
 
     using Base = internal::BasicStatMap<HostStat<T> >;
 
+#if __GNUC__ < 5
+    static const char* htotalName(const StatTotal::Type& type) {
+#else
     static constexpr const char* htotalName(const StatTotal::Type& type) {
+#endif
       switch(type) {
         case StatTotal::SINGLE: return "HOST_0";
         case StatTotal::TSUM: return "HSUM";
