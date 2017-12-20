@@ -27,6 +27,9 @@
 
 // TODO rebuild gpu code (new things added)
 
+
+#define __USE_BFS__
+
 constexpr static const char* const REGION_NAME = "BC";
 
 /******************************************************************************/
