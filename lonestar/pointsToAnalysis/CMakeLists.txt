@@ -1,1 +1,1 @@
-app(pta)
+app(pta PointsTo.cpp)
