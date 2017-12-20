@@ -68,12 +68,12 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 struct NodeData {
   std::vector<uint32_t> oldMinDistances;
   std::vector<uint32_t> minDistances;
-  std::vector<char> readyFlag;
+  std::vector<char> sentFlag;
 
   std::vector<uint32_t> shortestPathToAdd;
   std::vector<uint32_t> shortestPathNumbers;
 
-  uint32_t sIndexToSend;
+  //uint32_t sIndexToSend;
   uint32_t sToSend;
 
   std::vector<uint32_t> savedRoundNumbers;
@@ -107,11 +107,12 @@ void InitializeGraph(Graph& graph) {
       src_data.shortestPathToAdd.resize(numSourcesPerRound);
       src_data.shortestPathNumbers.resize(numSourcesPerRound);
   
-      src_data.sIndexToSend = numSourcesPerRound;
+      //src_data.sIndexToSend = numSourcesPerRound;
       src_data.sToSend = 0;
   
       src_data.savedRoundNumbers.resize(numSourcesPerRound);
-  
+      src_data.sentFlag.resize(numSourcesPerRound);
+
       src_data.dependencyValues =
        (std::atomic<float>*)malloc(sizeof(std::atomic<float>) * 
                                    numSourcesPerRound);
@@ -137,6 +138,7 @@ void InitializeIteration(Graph& graph) {
       NodeData& src_data = graph.getData(src);
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        // min distance and short path count setup
         if ((offset + i) == graph.getGID(src)) {
           src_data.minDistances[i] = 0;
           src_data.shortestPathNumbers[i] = 1;
@@ -147,12 +149,14 @@ void InitializeIteration(Graph& graph) {
 
         src_data.shortestPathToAdd[i] = 0;
   
-        src_data.sIndexToSend = numSourcesPerRound;
+        //src_data.sIndexToSend = numSourcesPerRound;
         src_data.sToSend = 0;
   
         src_data.savedRoundNumbers[i] = infinity;
         src_data.dependencyValues[i] = 0.0;
         src_data.oldMinDistances[i] = src_data.minDistances[i];
+
+        src_data.sentFlag[i] = 0;
       }
     },
     galois::loopname(graph.get_run_identifier("InitializeIteration").c_str()), 
@@ -171,6 +175,7 @@ void MetadataUpdate(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (src_data.oldMinDistances[i] != src_data.minDistances[i]) {
           src_data.shortestPathNumbers[i] = 0;
+          src_data.sentFlag[i] = 0; // reset sent flag
           // also, this means shortPathToAdd needs to be set 
         }
       }
@@ -303,18 +308,25 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         std::stable_sort(toSort.begin(), toSort.end());
     
         uint32_t indexToSend = numSourcesPerRound + 1;
-        bool shortFound = false;
+
+        // true if a shortest path message should be sent
+        bool shortFound = false; 
+        // true if a message is flipped from not sent to sent
+        bool sentMarked = false;
+
         src_data.sToSend = 0;
     
         //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
     
         //findMessage.start();
+        // TODO I can optimize this loop
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           DWrapper& currentSource = toSort[i]; // safe
           uint32_t currentIndex = currentSource.index; // safe
+          unsigned sumToConsider = i + currentSource.dist;
     
           // determine if we need to send out a message in this round
-          if (!shortFound && i + currentSource.dist == roundNumber) {
+          if (!shortFound && sumToConsider == roundNumber) {
             // save round num
             src_data.savedRoundNumbers[currentIndex] = roundNumber; // safe
     
@@ -322,11 +334,38 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
             // by saving it to another vector
             src_data.sToSend = src_data.shortestPathNumbers[currentIndex];
             indexToSend = currentIndex;
-            src_data.sIndexToSend = indexToSend;
+            //src_data.sIndexToSend = indexToSend;
+            src_data.sentFlag[currentIndex] = true;
     
             shortFound = true;
-          } 
+            sentMarked = true;
+          } else if (sumToConsider > roundNumber) {
+            // not going to be sending any short path message this round
+            // TODO reason if it is possible to break
+          }
+
+          // if we haven't found a message to mark ready yet, mark one (since
+          // we only terminate if all things are marked ready)
+          if (!sentMarked) {
+            if (!src_data.sentFlag[currentIndex]) {
+              src_data.sentFlag[currentIndex] = true;
+              sentMarked = true;
+            }
+          }
+
+          // TODO if we have marked a message ready, is it safe to bail and 
+          // break? (i.e. will there be a short path message to send?)
+          if (sentMarked && shortFound) {
+            break;
+          }
         }
+
+        // if ready message was found, this node should not terminate this
+        // round
+        if (sentMarked) {
+          dga += 1;
+        }
+
         //findMessage.stop();
     
         //galois::StatTimer sendMessage(graph.get_run_identifier("SendMessage").c_str());
@@ -406,16 +445,15 @@ void BackProp(Graph& graph) {
     galois::do_all(
       galois::iterate(allNodesWithEdgesIn),
       [&] (GNode src) {
+
         NodeData& src_data = graph.getData(src);
     
         std::vector<uint32_t> toBackProp;
     
-        // TODO once found, break from for loop if guarantee that only 1 will be 
-        // found (theoretically there is such a guarantee)
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          if (src_data.savedRoundNumbers[i] == roundNumber) {
-            galois::gPrint("yay\n");
+          if (src_data.savedRoundNumbers[i] == currentRound) {
             toBackProp.emplace_back(i);
+            break;
           }
         }
     
@@ -578,12 +616,12 @@ int main(int argc, char** argv) {
     for (auto ii = (*hg).masterNodesRange().begin(); 
               ii != (*hg).masterNodesRange().end(); 
               ++ii) {
-      sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
-              (*hg).getData(*ii).minDistances[vIndex],
-              (*hg).getData(*ii).shortestPathNumbers[vIndex]);
+      //sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
+      //        (*hg).getData(*ii).minDistances[vIndex],
+      //        (*hg).getData(*ii).shortestPathNumbers[vIndex]);
       // outputs betweenness centrality
-      //sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
-      //        (*hg).getData(*ii).bc);
+      sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
+              (*hg).getData(*ii).bc);
       //sprintf(v_out, "%lu %u\n", (*hg).getGID(*ii),
       //        (*hg).getData(*ii).shortestPathNumbers[0]);
 
