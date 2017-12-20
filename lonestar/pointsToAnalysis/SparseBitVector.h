@@ -1,9 +1,6 @@
 /** SparseBitVector -*- C++ -*-
  * @file
  *
- * An inclusion-based points-to analysis algorithm to demostrate the Galois 
- * system.
- *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
