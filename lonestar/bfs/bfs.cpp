@@ -36,13 +36,16 @@
 
 #include <iostream>
 #include <deque>
+#include <type_traits>
 
 namespace cll = llvm::cl;
 
 static const char* name = "Breadth-first Search";
+
 static const char* desc =
   "Computes the shortest path from a source node to all nodes in a directed "
   "graph using a modified Bellman-Ford algorithm";
+
 static const char* url = "breadth_first_search";
 
 static cll::opt<std::string> filename(cll::Positional, 
@@ -74,9 +77,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(SyncTiled));
 
 
-using Graph = galois::graphs::LC_CSR_Graph<Dist, void>
+using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
   ::with_no_lockable<true>::type
-  ::with_numa<true>::type;
+  ::with_numa_alloc<true>::type;
 
 using GNode =  Graph::GraphNode;
 
@@ -85,18 +88,19 @@ using GNode =  Graph::GraphNode;
 
 
 constexpr static const bool TRACK_WORK = false;
-constexpr static const unsigned CHUNK_SIZE = 128u;
+constexpr static const unsigned CHUNK_SIZE = 32u;
 
 
-struct EdgeTile {
-  Graph::edge_iterator beg;
-  Graph::edge_iterator end;
-}
 
 void syncTiledAlgo(Graph& graph, GNode source) {
 
-  constexpr Galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-  constexpr ptrdiff_t EDGE_TILE_SIZE = 256;
+  struct EdgeTile {
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
+
+  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  constexpr ptrdiff_t EDGE_TILE_SIZE = 1024;
 
 
   Dist nextLevel = 0u;
@@ -148,9 +152,6 @@ void syncTiledAlgo(Graph& graph, GNode source) {
               activeNodes.push(dst);
             }
           }
-
-          for (auto e: graph.edges(src, flag)) {
-          }
         },
         galois::steal(),
         galois::chunk_size<CHUNK_SIZE>(),
@@ -163,7 +164,7 @@ void syncTiledAlgo(Graph& graph, GNode source) {
 void syncAlgo(Graph& graph, GNode source) {
 
   using Bag = galois::InsertBag<GNode>;
-  constexpr Galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
   Bag* curr = new Bag();
   Bag* next = new Bag();
@@ -203,45 +204,77 @@ void syncAlgo(Graph& graph, GNode source) {
 
 
 void asyncAlgo(Graph& graph, GNode source) {
-  using namespace galois::worklists;
-  typedef dChunkedFIFO<CHUNK_SIZE> dChunk;
-  typedef BulkSynchronous<dChunkedLIFO<CHUNK_SIZE> > BSWL;
 
-  galois::for_each(galois::iterate({ UpdateRequest{source, 0} })
+  using namespace galois::worklists;
+  typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
+  typedef BulkSynchronous<dChunkedLIFO<CHUNK_SIZE> > BSWL;
+  using WL = BSWL;
+
+  constexpr bool useCAS = !std::is_same<WL, BSWL>::value;
+
+  galois::GAccumulator<size_t> BadWork;
+  galois::GAccumulator<size_t> WLEmptyWork;
+
+  graph.getData(source) = 0;
+
+  galois::for_each(galois::iterate({ UpdateRequest{source, 1} })
       , [&] (const UpdateRequest& req, auto& ctx) {
         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
         Dist sdist = graph.getData(req.n, flag);
         
-        if (req.w != sdist) {
-          if (TRACK_WORK)
+        if (TRACK_WORK) {
+          if (req.w != sdist) {
             WLEmptyWork += 1;
-          return;
-        }
-        
-        for (auto ii : graph.edges(req.n, flag)) {
-          GNode dst = graph.getEdgeDst(ii);
-          auto& ddist  = graph.getData(dst, flag);
-          Dist newDist = sdist + 1;
-          Dist oldDist = ddist;
-          while (newDist < oldDist) {
-            // if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-            if (__sync_bool_compare_and_swap(&ddist, oldDist, newDist)) {
-              if (TRACK_WORK && oldDist != DIST_INFINITY)
-                BadWork += 1;
-              ctx.push(UpdateRequest(dst, newDist));
-            }
+            return;
           }
         }
+
+        Dist newDist = req.w;
+
+        for (auto ii : graph.edges(req.n, flag)) {
+          GNode dst = graph.getEdgeDst(ii);
+          auto& ddata  = graph.getData(dst, flag);
+
+          while (true) {
+
+            Dist oldDist = ddata;
+
+            if (oldDist <= newDist) {
+              break;
+            }
+
+            if (!useCAS || __sync_bool_compare_and_swap(&ddata, oldDist, newDist)) {
+
+              if (!useCAS) {
+                ddata = newDist;
+              }
+
+              if (TRACK_WORK) {
+                if (oldDist != DIST_INFINITY) {
+                   BadWork += 1;
+                }
+              }
+
+              ctx.push( UpdateRequest(dst, newDist + 1) );
+              break;
+            }
+          }
+        } // end for
       }
-      , galois::wl<dChunk>()
+      , galois::wl<BSWL>()
       , galois::loopname("runBFS")
       , galois::no_conflicts());
+
+  if (TRACK_WORK) {
+    galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());
+    galois::runtime::reportStat_Single("BFS", "EmptyWork", WLEmptyWork.reduce());
+  }
 }
 
 void serialAlgo(Graph& graph, GNode source) {
 
   using WL = std::deque<UpdateRequest>;
-  constexpr Galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
   WL wl;
 
@@ -274,17 +307,16 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  galois::GAccumulator<size_t> BadWork;
-  galois::GAccumulator<size_t> WLEmptyWork;
-
   galois::StatTimer T("OverheadTime");
   T.start();
   
   Graph graph;
   GNode source, report;
 
+  std::cout << "Reading from file: " << filename << std::endl;
   galois::graphs::readGraph(graph, filename); 
-  std::cout << "Read " << graph.size() << " nodes\n";
+  std::cout << "Read " << graph.size() << " nodes, "
+    << graph.sizeEdges() << " edges" << std::endl;
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
     std::cerr << "failed to set report: " << reportNode
@@ -303,14 +335,11 @@ int main(int argc, char** argv) {
   size_t approxNodeData = graph.size() * 64;
   // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
   // Graph::edge_data_type) * 2;
-  galois::preAlloc(numThreads +
+  galois::preAlloc(8*numThreads +
                    approxNodeData / galois::runtime::pagePoolSize());
+
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running Asynch with CAS version\n";
-  std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
-  std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
-  std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
   galois::do_all(galois::iterate(graph), 
                        [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
   graph.getData(source) = 0;
@@ -320,15 +349,19 @@ int main(int argc, char** argv) {
 
   switch(algo) {
     case SyncTiled:
+      std::cout << "Running SyncTiled algorithm\n";
       syncTiledAlgo(graph, source);
       break;
     case Sync:
+      std::cout << "Running Sync algorithm\n";
       syncAlgo(graph, source);
       break;
     case Async:
+      std::cout << "Running Async algorithm\n";
       asyncAlgo(graph, source);
       break;
     case Serial:
+      std::cout << "Running Serial algorithm\n";
       serialAlgo(graph, source);
       break;
     default:
@@ -352,10 +385,6 @@ int main(int argc, char** argv) {
     }
   }
 
-  if (TRACK_WORK) {
-    galois::runtime::reportStat_Single("BFS", "BadWork", BadWork.reduce());
-    galois::runtime::reportStat_Single("BFS", "EmptyWork", WLEmptyWork.reduce());
-  }
 
   return 0;
 }

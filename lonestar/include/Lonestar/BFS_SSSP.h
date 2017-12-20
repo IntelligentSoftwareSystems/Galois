@@ -40,10 +40,11 @@ struct not_consistent {
       return;
     
     for (auto ii : g.edges(n)) {
-      Dist ddist = g.getData(g.getEdgeDst(ii));
+      auto dst = g.getEdgeDst(ii);
+      Dist ddist = g.getData(dst);
       Dist w = getEdgeWeight<useOne>(ii);
       if (ddist > dist + w) {
-        std::cout << ddist << " " << dist + w << " " << n << " " << g.getEdgeDst(ii) << "\n"; // XXX
+        std::cout << "Wrong label: " <<  ddist << ", on node: " << dst << ", correct label (from pred): " << dist + w << "\n"; // XXX
         refb = true;
         // return;
       }
@@ -76,7 +77,7 @@ bool verify(Graph& graph, GNode source) {
   galois::do_all(galois::iterate(graph), 
       [&notVisited, &graph] (GNode n) { 
         if (graph.getData(n) >= DIST_INFINITY) 
-        ++notVisited; 
+          ++notVisited; 
         });
 
   if (notVisited)
