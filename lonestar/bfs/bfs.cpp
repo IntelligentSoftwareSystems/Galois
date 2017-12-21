@@ -26,6 +26,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
 #include "galois/Timer.h"
@@ -62,19 +63,19 @@ static cll::opt<int> stepShift("delta",
                                cll::desc("Shift value for the deltastep"),
                                cll::init(10));
 enum Algo {
-  SyncTiled,
-  Sync,
   Async,
+  Sync2p,
+  Sync,
   Serial
 };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumVal(SyncTiled, "SyncTiled"),
+      clEnumVal(Sync2p, "SyncTiled"),
       clEnumVal(Sync, "Sync"),
       clEnumVal(Async, "Async"),
       clEnumVal(Serial, "Serial"),
-      clEnumValEnd), cll::init(SyncTiled));
+      clEnumValEnd), cll::init(Sync2p));
 
 
 using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
@@ -88,19 +89,77 @@ using GNode =  Graph::GraphNode;
 
 
 constexpr static const bool TRACK_WORK = false;
-constexpr static const unsigned CHUNK_SIZE = 32u;
+constexpr static const unsigned CHUNK_SIZE = 256u;
+constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256u;;
+
+struct EdgeTile {
+  Graph::edge_iterator beg;
+  Graph::edge_iterator end;
+};
+
+struct EdgeTileMaker {
+  EdgeTile operator () (Graph::edge_iterator beg, Graph::edge_iterator end) const {
+    return EdgeTile{ beg, end };
+  }
+};
+
+template <typename WL, typename F=EdgeTileMaker >
+void pushEdgeTiles(WL& wl, Graph::edge_iterator beg, const Graph::edge_iterator end, const F& f=F()) {
+  assert(beg <= end);
+
+  if ((end - beg) > EDGE_TILE_SIZE) {
+    for (; beg + EDGE_TILE_SIZE < end;) {
+      auto ne = beg + EDGE_TILE_SIZE;
+      assert(ne < end);
+      wl.push( f(beg, ne) );
+      beg = ne;
+    }
+  }
+  
+  if ((end - beg) > 0) {
+    wl.push( f(beg, end) );
+  }
+}
+
+template <typename WL, typename F=EdgeTileMaker>
+void pushEdgeTiles(WL& wl, Graph& graph, GNode src, const F& f=F()) {
+  auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+  const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+  pushEdgeTiles(wl, beg, end, f);
+
+}
+
+template <typename WL, typename F=EdgeTileMaker>
+void pushEdgeTilesParallel(WL& wl, Graph& graph, GNode src, const F& f=F()) {
+
+  auto beg = graph.edge_begin(src);
+  const auto end = graph.edge_end(src);
+
+  if ((end - beg) > EDGE_TILE_SIZE) {
+
+    galois::on_each(
+        [&] (const unsigned tid, const unsigned numT) {
+
+          auto p = galois::block_range(beg, end, tid, numT);
+
+          auto b = p.first;
+          const auto e = p.second;
+
+          pushEdgeTiles(wl, b, e, f);
+        }, galois::loopname("Init-Tiling"));
 
 
+  } else if ((end - beg) > 0) {
+    wl.push( f(beg, end) );
+  }
+}
 
-void syncTiledAlgo(Graph& graph, GNode source) {
 
-  struct EdgeTile {
-    Graph::edge_iterator beg;
-    Graph::edge_iterator end;
-  };
+void sync2phaseAlgo(Graph& graph, GNode source) {
+
 
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-  constexpr ptrdiff_t EDGE_TILE_SIZE = 1024;
 
 
   Dist nextLevel = 0u;
@@ -115,22 +174,8 @@ void syncTiledAlgo(Graph& graph, GNode source) {
 
     galois::do_all(galois::iterate(activeNodes),
         [&] (const GNode& src) {
-          auto beg = graph.edge_begin(src, flag);
-          const auto end = graph.edge_end(src, flag);
 
-          assert(beg <= end);
-
-          if ((end - beg) > EDGE_TILE_SIZE) {
-            for (; beg + EDGE_TILE_SIZE < end;) {
-              auto ne = beg + EDGE_TILE_SIZE;
-              edgeTiles.push( EdgeTile{beg, ne} );
-              beg = ne;
-            }
-          }
-          
-          if ((end - beg) > 0) {
-            edgeTiles.push( EdgeTile{beg, end} );
-          }
+          pushEdgeTiles(edgeTiles, graph, src);
         
         },
         galois::steal(),
@@ -163,7 +208,7 @@ void syncTiledAlgo(Graph& graph, GNode source) {
 
 void syncAlgo(Graph& graph, GNode source) {
 
-  using Bag = galois::InsertBag<GNode>;
+  using Bag = galois::InsertBag<EdgeTile>;
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
   Bag* curr = new Bag();
@@ -171,7 +216,9 @@ void syncAlgo(Graph& graph, GNode source) {
 
   Dist nextLevel = 0u;
   graph.getData(source, flag) = 0u;
-  next->push(source);
+
+  pushEdgeTilesParallel(*next, graph, source);
+  assert(!next->empty());
 
   while (!next->empty()) {
 
@@ -180,15 +227,15 @@ void syncAlgo(Graph& graph, GNode source) {
     ++nextLevel;
 
     galois::do_all(galois::iterate(*curr),
-        [&] (const GNode& src) {
+        [&] (const EdgeTile& tile) {
 
-          for (auto e: graph.edges(src, flag)) {
+          for (auto e = tile.beg; e != tile.end; ++e) {
             auto dst = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
             if (dstData == DIST_INFINITY) {
               dstData = nextLevel;
-              next->push(dst);
+              pushEdgeTiles(*next, graph, dst);
             }
           }
         },
@@ -205,9 +252,16 @@ void syncAlgo(Graph& graph, GNode source) {
 
 void asyncAlgo(Graph& graph, GNode source) {
 
-  using namespace galois::worklists;
-  typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
-  typedef BulkSynchronous<dChunkedLIFO<CHUNK_SIZE> > BSWL;
+  struct DistEdgeTile {
+    Dist dist;
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
+
+  namespace gwl = galois::worklists;
+  //typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
+  using FIFO = gwl::dChunkedFIFO<CHUNK_SIZE>;
+  using BSWL =  gwl::BulkSynchronous< gwl::dChunkedLIFO<CHUNK_SIZE> >;
   using WL = BSWL;
 
   constexpr bool useCAS = !std::is_same<WL, BSWL>::value;
@@ -216,22 +270,19 @@ void asyncAlgo(Graph& graph, GNode source) {
   galois::GAccumulator<size_t> WLEmptyWork;
 
   graph.getData(source) = 0;
+  galois::InsertBag<DistEdgeTile> initBag;
 
-  galois::for_each(galois::iterate({ UpdateRequest{source, 1} })
-      , [&] (const UpdateRequest& req, auto& ctx) {
+  pushEdgeTilesParallel(initBag, graph, source, 
+      [] (auto beg, auto end) { return DistEdgeTile {1, beg, end}; });
+
+  galois::for_each(galois::iterate(initBag)
+      , [&] (const DistEdgeTile& tile, auto& ctx) {
+
         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-        Dist sdist = graph.getData(req.n, flag);
-        
-        if (TRACK_WORK) {
-          if (req.w != sdist) {
-            WLEmptyWork += 1;
-            return;
-          }
-        }
 
-        Dist newDist = req.w;
+        Dist newDist = tile.dist;
 
-        for (auto ii : graph.edges(req.n, flag)) {
+        for (auto ii = tile.beg; ii != tile.end; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           auto& ddata  = graph.getData(dst, flag);
 
@@ -249,19 +300,14 @@ void asyncAlgo(Graph& graph, GNode source) {
                 ddata = newDist;
               }
 
-              if (TRACK_WORK) {
-                if (oldDist != DIST_INFINITY) {
-                   BadWork += 1;
-                }
-              }
-
-              ctx.push( UpdateRequest(dst, newDist + 1) );
+              pushEdgeTiles(ctx, graph, dst, 
+                  [newDist] (auto beg, auto end) { return DistEdgeTile { newDist+1, beg, end}; });
               break;
             }
           }
         } // end for
       }
-      , galois::wl<BSWL>()
+      , galois::wl<WL>()
       , galois::loopname("runBFS")
       , galois::no_conflicts());
 
@@ -332,7 +378,7 @@ int main(int argc, char** argv) {
   std::advance(it, reportNode);
   report = *it;
 
-  size_t approxNodeData = graph.size() * 64;
+  size_t approxNodeData = 4 * (graph.size() + graph.sizeEdges());
   // size_t approxEdgeData = graph.sizeEdges() * sizeof(typename
   // Graph::edge_data_type) * 2;
   galois::preAlloc(8*numThreads +
@@ -348,9 +394,9 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   switch(algo) {
-    case SyncTiled:
-      std::cout << "Running SyncTiled algorithm\n";
-      syncTiledAlgo(graph, source);
+    case Sync2p:
+      std::cout << "Running Sync2p algorithm\n";
+      sync2phaseAlgo(graph, source);
       break;
     case Sync:
       std::cout << "Running Sync algorithm\n";
