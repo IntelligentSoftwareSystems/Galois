@@ -66,16 +66,18 @@ enum Algo {
   Async,
   Sync2p,
   Sync,
+  SerialSync,
   Serial
 };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumVal(Sync2p, "SyncTiled"),
-      clEnumVal(Sync, "Sync"),
       clEnumVal(Async, "Async"),
+      clEnumVal(Sync2p, "Sync2p"),
+      clEnumVal(Sync, "Sync"),
       clEnumVal(Serial, "Serial"),
-      clEnumValEnd), cll::init(Sync2p));
+      clEnumVal(SerialSync, "SerialSync"),
+      clEnumValEnd), cll::init(Async));
 
 
 using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
@@ -111,13 +113,13 @@ void pushEdgeTiles(WL& wl, Graph::edge_iterator beg, const Graph::edge_iterator 
     for (; beg + EDGE_TILE_SIZE < end;) {
       auto ne = beg + EDGE_TILE_SIZE;
       assert(ne < end);
-      wl.push( f(beg, ne) );
+      wl.push_back( f(beg, ne) );
       beg = ne;
     }
   }
   
   if ((end - beg) > 0) {
-    wl.push( f(beg, end) );
+    wl.push_back( f(beg, end) );
   }
 }
 
@@ -151,7 +153,7 @@ void pushEdgeTilesParallel(WL& wl, Graph& graph, GNode src, const F& f=F()) {
 
 
   } else if ((end - beg) > 0) {
-    wl.push( f(beg, end) );
+    wl.push_back( f(beg, end) );
   }
 }
 
@@ -249,14 +251,23 @@ void syncAlgo(Graph& graph, GNode source) {
   delete next;
 }
 
+struct DistEdgeTile {
+  Dist dist;
+  Graph::edge_iterator beg;
+  Graph::edge_iterator end;
+};
+
+struct DistEdgeTileMaker {
+  Dist dist;
+
+  template <typename EI>
+  DistEdgeTile operator () (const EI& beg, const EI& end) const {
+    return DistEdgeTile {dist, beg, end};
+  }
+};
 
 void asyncAlgo(Graph& graph, GNode source) {
 
-  struct DistEdgeTile {
-    Dist dist;
-    Graph::edge_iterator beg;
-    Graph::edge_iterator end;
-  };
 
   namespace gwl = galois::worklists;
   //typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
@@ -272,8 +283,7 @@ void asyncAlgo(Graph& graph, GNode source) {
   graph.getData(source) = 0;
   galois::InsertBag<DistEdgeTile> initBag;
 
-  pushEdgeTilesParallel(initBag, graph, source, 
-      [] (auto beg, auto end) { return DistEdgeTile {1, beg, end}; });
+  pushEdgeTilesParallel(initBag, graph, source, DistEdgeTileMaker {1});
 
   galois::for_each(galois::iterate(initBag)
       , [&] (const DistEdgeTile& tile, auto& ctx) {
@@ -300,8 +310,7 @@ void asyncAlgo(Graph& graph, GNode source) {
                 ddata = newDist;
               }
 
-              pushEdgeTiles(ctx, graph, dst, 
-                  [newDist] (auto beg, auto end) { return DistEdgeTile { newDist+1, beg, end}; });
+              pushEdgeTiles(ctx, graph, dst, DistEdgeTileMaker {newDist} );
               break;
             }
           }
@@ -345,8 +354,51 @@ void serialAlgo(Graph& graph, GNode source) {
         wl.push_back(UpdateRequest(dst, req.w + 1));
       }
     }
-
   }
+
+  galois::runtime::reportStat_Single("BFS-Serial", "Iterations", iter);
+}
+
+void serialSyncAlgo(Graph& graph, GNode source) {
+  using WL = std::vector<EdgeTile>;
+
+  WL* curr = new WL();
+  WL* next = new WL();
+
+  size_t iter = 0;
+
+  graph.getData(source) = 0;
+  Dist nextLevel = 0;
+
+  pushEdgeTiles(*next, graph, source);
+
+  while (!next->empty()) {
+
+    std::swap(curr, next);
+    next->clear();
+    ++nextLevel;
+
+    iter += curr->size();
+
+    for (const EdgeTile& t: *curr) {
+
+      for (auto e = t.beg; e != t.end; ++e) {
+        auto dst = graph.getEdgeDst(e);
+        auto& dstData = graph.getData(dst);
+
+        if (dstData == DIST_INFINITY) {
+          dstData = nextLevel;
+          pushEdgeTiles(*next, graph, dst);
+        }
+      }
+    }
+  }
+
+
+  delete curr;
+  delete next;
+
+  galois::runtime::reportStat_Single("BFS-Serial", "Iterations", iter);
 }
 
 int main(int argc, char** argv) {
@@ -409,6 +461,10 @@ int main(int argc, char** argv) {
     case Serial:
       std::cout << "Running Serial algorithm\n";
       serialAlgo(graph, source);
+      break;
+    case SerialSync:
+      std::cout << "Running Serial 2 WL algorithm\n";
+      serialSyncAlgo(graph, source);
       break;
     default:
       std::abort();
