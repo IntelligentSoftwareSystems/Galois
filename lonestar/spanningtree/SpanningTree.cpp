@@ -82,15 +82,15 @@ template <bool MakeContinuation, int Limit>
 auto specialized_process(Graph &graph, galois::InsertBag<Edge> &mst) -> decltype(auto) {
   return [&](const GNode &src, const Graph::edge_iterator &start, auto &pusher) {
     Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-    int count = 0;
-    for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-      ++count;
+    int count = 1;
+    for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii, ++count) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       if (sdata.merge(&ddata)) {
         mst.push(std::make_pair(src, dst));
-        if (Limit == 0 || count != Limit)
+        if (Limit == 0 || count != Limit) {
           continue;
+        }
       }
 
       if (MakeContinuation || (Limit != 0 && count == Limit)) {
@@ -190,18 +190,15 @@ int main(int argc, char** argv) {
           [&] (const GNode& src) {
             Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
             if (galois::substrate::ThreadPool::getPackage() == 0) {
-              //process<true, 0>(src, start, items);
               specialized_process<true, 0>(graph, mst)(src, start, items);
             } else {
-              //process<true, 1>(src, start, items);
               specialized_process<true, 1>(graph, mst)(src, start, items);
             }
           },
           galois::loopname("Initialize"));
         galois::for_each(galois::iterate(items),
-          [&] (const BlockedWorkItem& i, auto& ctx) {
-            //process<true, 0>(i.src, i.start, ctx);
-            specialized_process<true, 1>(graph, mst)(i.src, i.start, ctx);
+          [&] (const BlockedWorkItem& i, auto &ctx) {
+            specialized_process<true, 0>(graph, mst)(i.src, i.start, ctx);
           },
           galois::loopname("Merge"),
           galois::no_conflicts(),
