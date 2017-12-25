@@ -37,7 +37,6 @@
 #include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
 
-#include <boost/mpl/if.hpp>
 #include <type_traits>
 
 namespace galois {
@@ -96,7 +95,7 @@ public:
 
 protected:
   class NodeInfo;
-  typedef internal::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
+  typedef internal::EdgeInfoBase<typename std::conditional<HasCompressedNodePtr,uint32_t,NodeInfo*>::type, EdgeTy> EdgeInfo;
   typedef LargeArray<EdgeInfo> EdgeData;
   typedef LargeArray<NodeInfo> NodeData;
   typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
