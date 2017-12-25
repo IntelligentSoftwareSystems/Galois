@@ -115,6 +115,10 @@ public:
     return ret;
   }
 
+  // for compatibility with various stl types
+  inline void push_back(const value_type& x) { this->push(x); }
+  inline void insert(const value_type& x) { this->push(x); }
+
   bool push(const value_type& x) {
     mutex.lock();
     auto p = orderedSet.insert(x);
@@ -225,6 +229,10 @@ public:
   const_reference top() const {
     return container.front();
   }
+
+  // for compatibility with various stl types
+  inline void push_back(const value_type& x) { this->push(x); }
+  inline void insert(const value_type& x) { this->push(x); }
 
   void push(const value_type& x) {
     container.push_back(x);
@@ -337,6 +345,10 @@ public:
 
     return x;
   }
+
+  // for compatibility with various stl types
+  inline void push_back(const value_type& x) { this->push(x); }
+  inline void insert(const value_type& x) { this->push(x); }
 
   void push(const value_type& x) {
     mutex.lock();
