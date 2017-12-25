@@ -24,6 +24,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author M. Amber Hassaan <m.a.hassaan@utexas.edu>
  */
 #include "galois/Galois.h"
 #include "galois/gstl.h"
@@ -33,7 +34,10 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
+
 #include "Lonestar/BoilerPlate.h"
+
+#include "Lonestar/BFS_SSSP.h"
 
 #include <iostream>
 #include <deque>
@@ -86,13 +90,11 @@ using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
 
 using GNode =  Graph::GraphNode;
 
-
-#include "Lonestar/BFS_SSSP.h"
-
-
 constexpr static const bool TRACK_WORK = false;
 constexpr static const unsigned CHUNK_SIZE = 256u;
-constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256u;;
+constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
+
+using BFS = BFS_SSSP<Graph, unsigned int, EDGE_TILE_SIZE>;
 
 struct EdgeTile {
   Graph::edge_iterator beg;
@@ -105,79 +107,26 @@ struct EdgeTileMaker {
   }
 };
 
-template <typename WL, typename F=EdgeTileMaker >
-void pushEdgeTiles(WL& wl, Graph::edge_iterator beg, const Graph::edge_iterator end, const F& f=F()) {
-  assert(beg <= end);
-
-  if ((end - beg) > EDGE_TILE_SIZE) {
-    for (; beg + EDGE_TILE_SIZE < end;) {
-      auto ne = beg + EDGE_TILE_SIZE;
-      assert(ne < end);
-      wl.push_back( f(beg, ne) );
-      beg = ne;
-    }
-  }
-  
-  if ((end - beg) > 0) {
-    wl.push_back( f(beg, end) );
-  }
-}
-
-template <typename WL, typename F=EdgeTileMaker>
-void pushEdgeTiles(WL& wl, Graph& graph, GNode src, const F& f=F()) {
-  auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-  const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-
-  pushEdgeTiles(wl, beg, end, f);
-
-}
-
-template <typename WL, typename F=EdgeTileMaker>
-void pushEdgeTilesParallel(WL& wl, Graph& graph, GNode src, const F& f=F()) {
-
-  auto beg = graph.edge_begin(src);
-  const auto end = graph.edge_end(src);
-
-  if ((end - beg) > EDGE_TILE_SIZE) {
-
-    galois::on_each(
-        [&] (const unsigned tid, const unsigned numT) {
-
-          auto p = galois::block_range(beg, end, tid, numT);
-
-          auto b = p.first;
-          const auto e = p.second;
-
-          pushEdgeTiles(wl, b, e, f);
-        }, galois::loopname("Init-Tiling"));
-
-
-  } else if ((end - beg) > 0) {
-    wl.push_back( f(beg, end) );
-  }
-}
-
-
 void sync2phaseAlgo(Graph& graph, GNode source) {
 
 
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
-
-  Dist nextLevel = 0u;
+  BFS::Dist nextLevel = 0u;
   graph.getData(source, flag) = 0u;
 
   galois::InsertBag<GNode> activeNodes;
   galois::InsertBag<EdgeTile> edgeTiles;
 
   activeNodes.push(source);
+  EdgeTileMaker etm;
 
   while (!activeNodes.empty()) {
 
     galois::do_all(galois::iterate(activeNodes),
         [&] (const GNode& src) {
 
-          pushEdgeTiles(edgeTiles, graph, src);
+          BFS::pushEdgeTiles(edgeTiles, graph, src, etm);
         
         },
         galois::steal(),
@@ -194,7 +143,7 @@ void sync2phaseAlgo(Graph& graph, GNode source) {
             auto dst = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
-            if (dstData == DIST_INFINITY) {
+            if (dstData == BFS::DIST_INFINITY) {
               dstData = nextLevel;
               activeNodes.push(dst);
             }
@@ -216,10 +165,12 @@ void syncAlgo(Graph& graph, GNode source) {
   Bag* curr = new Bag();
   Bag* next = new Bag();
 
-  Dist nextLevel = 0u;
+  BFS::Dist nextLevel = 0u;
   graph.getData(source, flag) = 0u;
 
-  pushEdgeTilesParallel(*next, graph, source);
+  EdgeTileMaker etm;
+
+  BFS::pushEdgeTilesParallel(*next, graph, source, etm);
   assert(!next->empty());
 
   while (!next->empty()) {
@@ -235,9 +186,9 @@ void syncAlgo(Graph& graph, GNode source) {
             auto dst = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst, flag);
 
-            if (dstData == DIST_INFINITY) {
+            if (dstData == BFS::DIST_INFINITY) {
               dstData = nextLevel;
-              pushEdgeTiles(*next, graph, dst);
+              BFS::pushEdgeTiles(*next, graph, dst, etm);
             }
           }
         },
@@ -250,21 +201,6 @@ void syncAlgo(Graph& graph, GNode source) {
   delete curr;
   delete next;
 }
-
-struct DistEdgeTile {
-  Dist dist;
-  Graph::edge_iterator beg;
-  Graph::edge_iterator end;
-};
-
-struct DistEdgeTileMaker {
-  Dist dist;
-
-  template <typename EI>
-  DistEdgeTile operator () (const EI& beg, const EI& end) const {
-    return DistEdgeTile {dist, beg, end};
-  }
-};
 
 void asyncAlgo(Graph& graph, GNode source) {
 
@@ -281,16 +217,16 @@ void asyncAlgo(Graph& graph, GNode source) {
   galois::GAccumulator<size_t> WLEmptyWork;
 
   graph.getData(source) = 0;
-  galois::InsertBag<DistEdgeTile> initBag;
+  galois::InsertBag<BFS::DistEdgeTile> initBag;
 
-  pushEdgeTilesParallel(initBag, graph, source, DistEdgeTileMaker {1});
+  BFS::pushEdgeTilesParallel(initBag, graph, source, BFS::DistEdgeTileMaker {1});
 
   galois::for_each(galois::iterate(initBag)
-      , [&] (const DistEdgeTile& tile, auto& ctx) {
+      , [&] (const BFS::DistEdgeTile& tile, auto& ctx) {
 
         constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
-        Dist newDist = tile.dist;
+        auto newDist = tile.dist;
 
         for (auto ii = tile.beg; ii != tile.end; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
@@ -298,7 +234,7 @@ void asyncAlgo(Graph& graph, GNode source) {
 
           while (true) {
 
-            Dist oldDist = ddata;
+            auto oldDist = ddata;
 
             if (oldDist <= newDist) {
               break;
@@ -310,7 +246,7 @@ void asyncAlgo(Graph& graph, GNode source) {
                 ddata = newDist;
               }
 
-              pushEdgeTiles(ctx, graph, dst, DistEdgeTileMaker {newDist} );
+              BFS::pushEdgeTiles(ctx, graph, dst, BFS::DistEdgeTileMaker {newDist} );
               break;
             }
           }
@@ -328,20 +264,21 @@ void asyncAlgo(Graph& graph, GNode source) {
 
 void serialAlgo(Graph& graph, GNode source) {
 
-  using WL = std::deque<UpdateRequest>;
+  using Req = BFS::UpdateRequest;
+  using WL = std::deque<Req>;
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
 
   WL wl;
 
   graph.getData(source, flag) = 0;
-  wl.push_back(UpdateRequest(source, 1));
+  wl.push_back( Req(source, 1) );
 
   size_t iter = 0;
 
   while (!wl.empty()) {
     ++iter;
 
-    UpdateRequest req = wl.front();
+    Req req = wl.front();
     wl.pop_front();
 
     for (auto e: graph.edges(req.n, flag)) {
@@ -349,9 +286,9 @@ void serialAlgo(Graph& graph, GNode source) {
       auto dst = graph.getEdgeDst(e);
       auto& dstData = graph.getData(dst, flag);
 
-      if (dstData == DIST_INFINITY) {
+      if (dstData == BFS::DIST_INFINITY) {
         dstData = req.w;
-        wl.push_back(UpdateRequest(dst, req.w + 1));
+        wl.push_back( Req(dst, req.w + 1) );
       }
     }
   }
@@ -368,9 +305,9 @@ void serialSyncAlgo(Graph& graph, GNode source) {
   size_t iter = 0;
 
   graph.getData(source) = 0;
-  Dist nextLevel = 0;
+  BFS::Dist nextLevel = 0;
 
-  pushEdgeTiles(*next, graph, source);
+  BFS::pushEdgeTiles(*next, graph, source, EdgeTileMaker());
 
   while (!next->empty()) {
 
@@ -386,9 +323,9 @@ void serialSyncAlgo(Graph& graph, GNode source) {
         auto dst = graph.getEdgeDst(e);
         auto& dstData = graph.getData(dst);
 
-        if (dstData == DIST_INFINITY) {
+        if (dstData == BFS::DIST_INFINITY) {
           dstData = nextLevel;
-          pushEdgeTiles(*next, graph, dst);
+          BFS::pushEdgeTiles(*next, graph, dst, EdgeTileMaker());
         }
       }
     }
@@ -439,7 +376,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre");
 
   galois::do_all(galois::iterate(graph), 
-                       [&graph] (GNode n) { graph.getData(n) = DIST_INFINITY; });
+                       [&graph] (GNode n) { graph.getData(n) = BFS::DIST_INFINITY; });
   graph.getData(source) = 0;
 
   galois::StatTimer Tmain;
@@ -480,7 +417,7 @@ int main(int argc, char** argv) {
             << graph.getData(report) << "\n";
 
   if (!skipVerify) {
-    if (verify<true>(graph, source)) {
+    if (BFS::verify<true>(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
       GALOIS_DIE("Verification failed");
