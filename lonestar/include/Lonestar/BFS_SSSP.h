@@ -1,7 +1,9 @@
+#ifndef LONESTAR_BFS_SSSP_H
+#define  LONESTAR_BFS_SSSP_H
 #include <iostream>
 #include <cstdlib>
 
-template <typename Graph, typename _DistLabel, ptrdiff_t EDGE_TILE_SIZE=256> 
+template <typename Graph, typename _DistLabel, bool USE_EDGE_WT, ptrdiff_t EDGE_TILE_SIZE=256> 
 struct BFS_SSSP {
 
   using Dist = _DistLabel;
@@ -16,6 +18,10 @@ struct BFS_SSSP {
     Dist w;
     UpdateRequest(const GNode& N, Dist W): n(N), w(W) {}
     UpdateRequest(): n(), w(0) {}
+
+    friend bool operator < (const UpdateRequest& left, const UpdateRequest& right) {
+      return left.w == right.w? left.n < right.n : left.w < right.w;
+    }
   };
 
   struct UpdateRequestIndexer {
@@ -39,6 +45,15 @@ struct BFS_SSSP {
     template <typename EI>
     DistEdgeTile operator () (const EI& beg, const EI& end) const {
       return DistEdgeTile {dist, beg, end};
+    }
+  };
+
+  struct DistEdgeTileIndexer {
+    unsigned shift;
+
+    unsigned int operator()(const DistEdgeTile& tile) const {
+      unsigned int t = tile.dist >> shift;
+      return t;
     }
   };
 
@@ -94,19 +109,18 @@ struct BFS_SSSP {
     }
   }
 
-  template<bool useOne>
   struct not_consistent {
     Graph& g;
     std::atomic<bool>& refb;
     not_consistent(Graph& g, std::atomic<bool>& refb) : g(g), refb(refb) {}
 
-    template<bool useOneL, typename iiTy>
-    Dist getEdgeWeight(iiTy ii, typename std::enable_if<useOneL>::type* = nullptr) const {
+    template<bool useWt, typename iiTy>
+    Dist getEdgeWeight(iiTy ii, typename std::enable_if<!useWt>::type* = nullptr) const {
       return 1;
     }
 
-    template<bool useOneL, typename iiTy>
-    Dist getEdgeWeight(iiTy ii, typename std::enable_if<!useOneL>::type* = nullptr) const {
+    template<bool useWt, typename iiTy>
+    Dist getEdgeWeight(iiTy ii, typename std::enable_if<useWt>::type* = nullptr) const {
       return g.getEdgeData(ii);
     }
 
@@ -118,7 +132,7 @@ struct BFS_SSSP {
       for (auto ii : g.edges(n)) {
         auto dst = g.getEdgeDst(ii);
         Dist ddist = g.getData(dst);
-        Dist w = getEdgeWeight<useOne>(ii);
+        Dist w = getEdgeWeight<USE_EDGE_WT>(ii);
         if (ddist > dist + w) {
           std::cout << "Wrong label: " <<  ddist << ", on node: " << dst << ", correct label (from pred): " << dist + w << "\n"; // XXX
           refb = true;
@@ -142,7 +156,6 @@ struct BFS_SSSP {
     }
   };
 
-  template<bool useOne>
   static bool verify(Graph& graph, GNode source) {
     if (graph.getData(source) != 0) {
       std::cerr << "source has non-zero dist value\n";
@@ -161,7 +174,7 @@ struct BFS_SSSP {
 
     std::atomic<bool> not_c;
     galois::do_all(galois::iterate(graph), 
-        not_consistent<useOne>(graph, not_c));
+        not_consistent(graph, not_c));
 
     if (not_c) {
       std::cerr << "node found with incorrect distance\n";
@@ -177,3 +190,82 @@ struct BFS_SSSP {
     return true;
   }
 };
+
+template <typename T, typename BucketFunc, size_t MAX_BUCKETS=543210ul>
+class SerialBucketWL {
+
+  using Bucket = std::deque<T>;
+  using BucketsCont = std::vector<Bucket>;
+
+  size_t m_minBucket;
+  BucketFunc m_func;
+  BucketsCont m_buckets;
+  Bucket m_lastBucket;
+
+  static_assert(MAX_BUCKETS > 0, "MAX_BUCKETS must be > 0");
+
+public:
+  explicit SerialBucketWL(const BucketFunc& f)
+    : 
+      m_minBucket(0ul),
+      m_func(f) 
+  {
+    // reserve enough so that resize never reallocates memory
+    // otherwise, minBucket may return an invalid reference
+    m_buckets.reserve(MAX_BUCKETS);
+  }
+
+  void push_back(const T& item) {
+    size_t b = m_func(item);
+    assert(b >= m_minBucket && "can't push below m_minBucket");
+
+    if (b < m_buckets.size()) {
+      m_buckets[b].push_back(item);
+      return;
+    } else {
+      if (b >= MAX_BUCKETS) {
+        std::cerr << "Increase MAX_BUCKETS limit" << std::endl;
+        m_lastBucket.push_back(item);
+      } else {
+        m_buckets.resize( b+1 );
+        m_buckets[b].push_back(item);
+      }
+    }
+  }
+
+  void goToNextBucket(void) {
+    while (m_minBucket < m_buckets.size() && m_buckets[m_minBucket].empty()) {
+      ++m_minBucket;
+    }
+  }
+
+  Bucket& minBucket(void) {
+    if (m_minBucket < m_buckets.size()) {
+      return m_buckets[m_minBucket];
+    } else {
+      return m_lastBucket;
+    }
+  }
+
+  bool empty(void) const {
+    return emptyImpl(m_minBucket);
+  }
+
+  bool allEmpty(void) const {
+    return emptyImpl(0ul);
+  }
+
+private:
+  bool emptyImpl(size_t start) const {
+    for (size_t i = start; i < m_buckets.size(); ++i) {
+      if (!m_buckets[i].empty()) {
+        return false;
+      }
+    }
+
+    return m_lastBucket.empty();
+  }
+
+};
+
+#endif//  LONESTAR_BFS_SSSP_H

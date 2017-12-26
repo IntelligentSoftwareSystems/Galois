@@ -63,9 +63,9 @@ static cll::opt<unsigned int> startNode("startNode",
 static cll::opt<unsigned int> reportNode("reportNode", 
                                          cll::desc("Node to report distance to"),
                                          cll::init(1));
-static cll::opt<int> stepShift("delta",
-                               cll::desc("Shift value for the deltastep"),
-                               cll::init(10));
+// static cll::opt<unsigned int> stepShift("delta",
+                               // cll::desc("Shift value for the deltastep"),
+                               // cll::init(10));
 enum Algo {
   Async,
   Sync2p,
@@ -94,7 +94,7 @@ constexpr static const bool TRACK_WORK = false;
 constexpr static const unsigned CHUNK_SIZE = 256u;
 constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
 
-using BFS = BFS_SSSP<Graph, unsigned int, EDGE_TILE_SIZE>;
+using BFS = BFS_SSSP<Graph, unsigned int, false, EDGE_TILE_SIZE>;
 
 struct EdgeTile {
   Graph::edge_iterator beg;
@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
             << graph.getData(report) << "\n";
 
   if (!skipVerify) {
-    if (BFS::verify<true>(graph, source)) {
+    if (BFS::verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
       GALOIS_DIE("Verification failed");
