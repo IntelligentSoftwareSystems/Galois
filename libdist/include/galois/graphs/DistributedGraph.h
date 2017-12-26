@@ -95,7 +95,6 @@ namespace graphs {
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-// TODO change this (WithInEdges)
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
 class DistGraph: public galois::runtime::GlobalObject {
 private:
@@ -466,6 +465,9 @@ protected:
     }
 
     timer.stop();
+
+    galois::runtime::reportStat_Tmax(GRNAME, "MasterDistTime", timer.get());
+
     galois::gPrint("[", id, "] Master distribution time : ", timer.get_usec()/1000000.0f,
         " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
         " seeks (", g.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
@@ -1003,7 +1005,8 @@ protected:
 
 private:
   /**
-   * TODO
+   * Let other hosts know about which host has what mirrors/masters; 
+   * used for later communication of mirrors/masters.
    */
   void exchange_info_init() {
     auto& net = galois::runtime::getSystemNetworkInterface();
