@@ -31,14 +31,10 @@
 
 #ifndef GALOIS_GRAPH_BUFGRAPH_H
 #define GALOIS_GRAPH_BUFGRAPH_H
-#include <galois/Galois.h>
 #include <galois/gIO.h>
-#include <galois/gstl.h>
-#include <galois/Threads.h>
 #include <galois/Reduction.h>
-#include <galois/runtime/Network.h>
-
 #include <boost/iterator/counting_iterator.hpp>
+
 namespace galois {
 namespace graphs {
 
@@ -316,7 +312,8 @@ public:
 
   using EdgeIterator = boost::counting_iterator<uint64_t>; 
   /**
-   * Get the index to the first edge of the provided node.
+   * Get the index to the first edge of the provided node THAT THIS GRAPH
+   * HAS LOADED (not necessary the first edge of it globally).
    *
    * @param globalNodeID the global node id of the node to get the edge
    * for
