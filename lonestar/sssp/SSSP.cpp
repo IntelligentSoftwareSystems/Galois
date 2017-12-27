@@ -76,23 +76,25 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(serDelta, "serDelta"),
       clEnumVal(dijkstra, "dijkstra"),
       clEnumVal(serDeltaTiled, "serDeltaTiled"),
-      clEnumValEnd), cll::init(deltaStep));
+      clEnumValEnd), cll::init(deltaTiled));
 
-typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
+// typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
+using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type;
 typedef Graph::GraphNode GNode;
 
 constexpr static const bool TRACK_WORK = false;
-constexpr static const unsigned CHUNK_SIZE = 64;
-constexpr static const ptrdiff_t EDGE_TILE_SIZE = 256;
+constexpr static const unsigned CHUNK_SIZE = 64u;
+constexpr static const ptrdiff_t EDGE_TILE_SIZE = 4096;
 
-using SSSP = BFS_SSSP<Graph, unsigned int, true, EDGE_TILE_SIZE>;
+using SSSP = BFS_SSSP<Graph, uint32_t, true, EDGE_TILE_SIZE>;
 using Dist = SSSP::Dist;
 using UpdateRequest = SSSP::UpdateRequest;
 using UpdateRequestIndexer = SSSP::UpdateRequestIndexer;
 using DistEdgeTile = SSSP::DistEdgeTile;
 using DistEdgeTileIndexer = SSSP::DistEdgeTileIndexer;
 using DistEdgeTileMaker = SSSP::DistEdgeTileMaker;
-
 
 void deltaStepAlgo(Graph& graph, const GNode& source) {
 
@@ -109,9 +111,9 @@ void deltaStepAlgo(Graph& graph, const GNode& source) {
   galois::for_each(galois::iterate( { UpdateRequest{source, 0} } ),
       [&] (const UpdateRequest& req, auto& ctx) {
         const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-        Dist sdist = graph.getData(req.n, flag);
+        const auto& sdata = graph.getData(req.n, flag);
         
-        if (req.w != sdist) {
+        if (req.w != sdata) {
           if (TRACK_WORK)
             WLEmptyWork += 1;
           return;
@@ -119,15 +121,16 @@ void deltaStepAlgo(Graph& graph, const GNode& source) {
         
         for (auto ii : graph.edges(req.n, flag)) {
           GNode dst = graph.getEdgeDst(ii);
-          Dist d    = graph.getEdgeData(ii, flag);
           auto& ddist  = graph.getData(dst, flag);
-          const Dist newDist = sdist + d;
-          Dist oldDist = ddist;
-          while( oldDist > newDist) {
+          Dist ew    = graph.getEdgeData(ii, flag);
+          while (true) {
+            Dist oldDist = ddist;
+            Dist newDist = sdata + ew;
+
+            if (oldDist <= newDist) { break; }
+
             if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-              if (TRACK_WORK && oldDist != SSSP::DIST_INFINITY)
-                BadWork += 1;
-              ctx.push(UpdateRequest(dst, newDist));
+              ctx.push( UpdateRequest(dst, newDist) );
               break;
             }
           }
@@ -142,82 +145,6 @@ void deltaStepAlgo(Graph& graph, const GNode& source) {
     galois::runtime::reportStat_Single("SSSP", "WLEmptyWork", WLEmptyWork.reduce()); 
   }
 
-}
-
-void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
-
-  namespace gwl = galois::worklists;
-
-  using dChunk = gwl:: dChunkedFIFO<CHUNK_SIZE>;
-  using OBIM = gwl::OrderedByIntegerMetric<DistEdgeTileIndexer, dChunk>;
-
-  graph.getData(source) = 0;
-
-  galois::InsertBag<DistEdgeTile> initBag;
-
-  SSSP::pushEdgeTiles(initBag, graph, source, DistEdgeTileMaker {0u});
-
-  galois::for_each(galois::iterate(initBag),
-      [&] (const DistEdgeTile& tile, auto& ctx) {
-
-        const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-
-        for (auto ii = tile.beg; ii != tile.end; ++ii) {
-
-          GNode dst = graph.getEdgeDst(ii);
-          auto& ddist  = graph.getData(dst, flag);
-          const Dist newDist = tile.dist + graph.getEdgeData(ii, flag);
-
-          while (true) {
-            Dist oldDist = ddist;
-
-            if (oldDist <= newDist) { break; }
-
-            // if (__sync_bool_compare_and_swap(&ddist, oldDist, newDist)) {
-            if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-              SSSP::pushEdgeTiles(ctx, graph, dst, DistEdgeTileMaker{newDist} );
-              break;
-            }
-          }
-        }
-      },
-      galois::wl<OBIM>( DistEdgeTileIndexer{stepShift} ), 
-      galois::no_conflicts(), 
-      galois::loopname("SSSP"));
-
-}
-
-void dijkstraAlgo(Graph& graph, const GNode& source) {
-  using WL = galois::MinHeap<UpdateRequest>;
-
-  graph.getData(source) = 0;
-
-  WL wl;
-  wl.push( UpdateRequest(source, 0) );
-
-  size_t iter = 0;
-
-  while (!wl.empty()) {
-    ++iter;
-
-    UpdateRequest req = wl.pop();
-
-    for (auto e: graph.edges(req.n)) {
-
-      GNode dst = graph.getEdgeDst(e);
-      auto& ddata = graph.getData(dst);
-
-      auto newDist = req.w + graph.getEdgeData(e);
-
-      if (newDist < ddata) {
-        ddata = newDist;
-        wl.push( UpdateRequest(dst, newDist) );
-      }
-    }
-
-  }
-
-  galois::runtime::reportStat_Single("SSSP-Dijkstra", "Iterations", iter);
 }
 
 void serialDeltaAlgo(Graph& graph, const GNode& source) {
@@ -263,12 +190,78 @@ void serialDeltaAlgo(Graph& graph, const GNode& source) {
   galois::runtime::reportStat_Single("SSSP-Serial-Delta", "Iterations", iter);
 }
 
-void serialDeltaTiledAlgo(Graph& graph, const GNode& source) {
+struct SrcEdgeTile {
+  GNode src;
+  Dist dist;
+  Graph::edge_iterator beg;
+  Graph::edge_iterator end;
+};
 
-  SerialBucketWL<SSSP::DistEdgeTile, SSSP::DistEdgeTileIndexer> wl(DistEdgeTileIndexer {stepShift});;
+struct SrcEdgeTileMaker {
+  GNode src;
+  Dist dist;
+
+  SrcEdgeTile operator () (const Graph::edge_iterator& beg, const Graph::edge_iterator& end) const {
+    return SrcEdgeTile {src, dist, beg, end};
+  }
+};
+
+void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
+
+  namespace gwl = galois::worklists;
+
+  using dChunk = gwl:: dChunkedFIFO<CHUNK_SIZE>;
+  using OBIM = gwl::OrderedByIntegerMetric<DistEdgeTileIndexer, dChunk>;
+
   graph.getData(source) = 0;
 
-  SSSP::pushEdgeTiles(wl, graph, source, DistEdgeTileMaker{0u});
+  galois::InsertBag<SrcEdgeTile> initBag;
+
+  SSSP::pushEdgeTiles(initBag, graph, source, SrcEdgeTileMaker {source, 0u} );
+
+  galois::for_each(galois::iterate(initBag),
+      [&] (const SrcEdgeTile& tile, auto& ctx) {
+
+        const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+
+        const auto& sdata = graph.getData(tile.src, flag);
+        
+        if (sdata < tile.dist) {
+          // empty work;
+          return;
+        }
+
+        for (auto ii = tile.beg; ii != tile.end; ++ii) {
+
+          GNode dst = graph.getEdgeDst(ii);
+          auto& ddist  = graph.getData(dst, flag);
+          Dist ew = graph.getEdgeData(ii, flag);
+
+          while (true) {
+            Dist oldDist = ddist;
+            Dist newDist = sdata + ew;
+
+            if (oldDist <= newDist) { break; }
+
+            if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
+              SSSP::pushEdgeTiles(ctx, graph, dst, SrcEdgeTileMaker{dst, newDist} );
+              break;
+            }
+          }
+        }
+      },
+      galois::wl<OBIM>( DistEdgeTileIndexer{stepShift} ), 
+      galois::no_conflicts(), 
+      galois::loopname("SSSP"));
+
+}
+
+void serialDeltaTiledAlgo(Graph& graph, const GNode& source) {
+
+  SerialBucketWL<SrcEdgeTile, SSSP::DistEdgeTileIndexer> wl(DistEdgeTileIndexer {stepShift});;
+  graph.getData(source) = 0;
+
+  SSSP::pushEdgeTiles(wl, graph, source, SrcEdgeTileMaker{source, 0u} );
 
   size_t iter = 0ul;
   while (!wl.empty()) {
@@ -277,19 +270,27 @@ void serialDeltaTiledAlgo(Graph& graph, const GNode& source) {
 
     while (!curr.empty()) {
       ++iter;
-      DistEdgeTile tile = curr.front();
+      SrcEdgeTile tile = curr.front();
       curr.pop_front();
+
+      const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+
+      auto& sdata = graph.getData(tile.src, flag);
+      if (sdata < tile.dist) {
+        // empty work;
+        continue;
+      }
 
       for (auto e = tile.beg; e != tile.end; ++e) {
 
         GNode dst = graph.getEdgeDst(e);
         auto& ddata = graph.getData(dst);
 
-        auto newDist = tile.dist + graph.getEdgeData(e);
+        auto newDist = sdata + graph.getEdgeData(e);
 
         if (newDist < ddata) {
           ddata = newDist;
-          SSSP::pushEdgeTiles(wl, graph, dst, DistEdgeTileMaker{newDist} );
+          SSSP::pushEdgeTiles(wl, graph, dst, SrcEdgeTileMaker{dst, newDist} );
         }
       }
     }
@@ -300,6 +301,44 @@ void serialDeltaTiledAlgo(Graph& graph, const GNode& source) {
   if (!wl.allEmpty()) { std::abort(); }
   galois::runtime::reportStat_Single("SSSP-Serial-Delta-Tiled", "Iterations", iter);
 }
+
+void dijkstraAlgo(Graph& graph, const GNode& source) {
+  using WL = galois::MinHeap<UpdateRequest>;
+
+  graph.getData(source) = 0;
+
+  WL wl;
+  wl.push( UpdateRequest(source, 0) );
+
+  size_t iter = 0;
+
+  while (!wl.empty()) {
+    ++iter;
+
+    UpdateRequest req = wl.pop();
+
+    if (graph.getData(req.n) < req.w) {
+      // empty work
+      continue;
+    }
+
+    for (auto e: graph.edges(req.n)) {
+      GNode dst = graph.getEdgeDst(e);
+      auto& ddata = graph.getData(dst);
+
+      auto newDist = req.w + graph.getEdgeData(e);
+
+      if (newDist < ddata) {
+        ddata = newDist;
+        wl.push( UpdateRequest(dst, newDist) );
+      }
+    }
+
+  }
+
+  galois::runtime::reportStat_Single("SSSP-Dijkstra", "Iterations", iter);
+}
+
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -336,7 +375,6 @@ int main(int argc, char** argv) {
                    approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running Asynch with CAS version\n";
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
   std::cout << "WARNING: Do not expect the default to be good for your graph.\n";

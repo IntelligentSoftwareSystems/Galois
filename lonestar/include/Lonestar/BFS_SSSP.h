@@ -51,7 +51,8 @@ struct BFS_SSSP {
   struct DistEdgeTileIndexer {
     unsigned shift;
 
-    unsigned int operator()(const DistEdgeTile& tile) const {
+    template <typename T>
+    unsigned int operator()(const T& tile) const {
       unsigned int t = tile.dist >> shift;
       return t;
     }
