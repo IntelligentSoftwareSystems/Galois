@@ -372,6 +372,11 @@ public:
 
     loadEdges(base_DistGraph::graph, g, mpiGraph); // second pass of the graph file
 
+    if (columnBlocked) {
+      // like an unconstrained vertex-cut
+      base_DistGraph::numNodesWithEdges = numNodes; // all nodes because it is not optimized
+    }
+
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       mpiGraph[d].resetAndFree();
     }
