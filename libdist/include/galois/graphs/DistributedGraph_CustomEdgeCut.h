@@ -250,9 +250,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
       base_DistGraph::numGlobalNodes = g.size();
       base_DistGraph::numGlobalEdges = g.sizeEdges();
-      //std::cerr << "[" << base_DistGraph::id << "] Total nodes : " << 
-      //                    base_DistGraph::numGlobalNodes << " , Total edges : " << 
-      //                    base_DistGraph::numGlobalEdges << "\n";
       base_DistGraph::computeMasters(g, scalefactor, isBipartite);
 
       //Read the vertexIDMap_filename for masters.
@@ -264,11 +261,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       vertexIDMap.resize(num_entries_to_read);
       readVertexIDMappingFile(vertexIDMap_filename, vertexIDMap, 
                               num_entries_to_read, startLoc);
-
-      for (auto thing : vertexIDMap) {
-        printf("%d\n", thing);
-      }
-      //std::cout << "VERTEXMAP size : " << vertexIDMap.size() << " : " << vertexIDMap[200] << "\n";
 
       uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
       typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
