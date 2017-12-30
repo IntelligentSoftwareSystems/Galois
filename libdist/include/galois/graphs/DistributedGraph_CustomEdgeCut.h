@@ -166,32 +166,42 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     /* Reading vertexIDMap binary file
     *  Assuming that vertexIDMap binary file contains int32_t entries.
     */
-    bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, std::vector<int32_t>&vertexIDMap, uint32_t num_entries_to_read, uint32_t startLoc){
+    bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, 
+                                 std::vector<int32_t>&vertexIDMap, 
+                                 uint32_t num_entries_to_read, 
+                                 uint32_t startLoc){
       std::ifstream meta_file(vertexIDMap_filename, std::ifstream::binary);
+
       if (!meta_file.is_open()) {
         std::cerr << "Unable to open file " << vertexIDMap_filename << "! Exiting!\n";
         return false;
       }
-      meta_file.seekg(startLoc, meta_file.beg);
-      //TODO: mmap rather than reading.
-      meta_file.read(reinterpret_cast<char*>(&vertexIDMap[0]), sizeof(int32_t)*(num_entries_to_read));
-      std::cout << " Number of nodes read :: " << num_entries_to_read << "\n";
+
+      meta_file.seekg(startLoc * sizeof(int32_t), meta_file.beg);
+      meta_file.read(reinterpret_cast<char*>(&vertexIDMap[0]), 
+                     sizeof(int32_t)*(num_entries_to_read));
+      galois::gPrint("[", base_DistGraph::id, "] Number of nodes read :: ", 
+                     num_entries_to_read, "\n");
       return true;
     }
 
-    /* Reading the whole vertexIDMap binary file
-    *  Assuming that vertexIDMap binary file contains int32_t entries.
-    */
-    bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, std::vector<int32_t>&vertexIDMap, uint32_t num_entries_to_read){
-      std::ifstream meta_file(vertexIDMap_filename, std::ifstream::binary);
-      if (!meta_file.is_open()) {
-        std::cerr << "Unable to open file " << vertexIDMap_filename << "! Exiting!\n";
-        return false;
-      }
-      meta_file.read(reinterpret_cast<char*>(&vertexIDMap[0]), sizeof(int32_t)*(num_entries_to_read));
-      std::cout << " Number of nodes read :: " << num_entries_to_read << "\n";
-      return true;
-    }
+    ///* Reading the whole vertexIDMap binary file
+    //*  Assuming that vertexIDMap binary file contains int32_t entries.
+    //*/
+    //bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, 
+    //                             std::vector<int32_t>&vertexIDMap, 
+    //                             uint32_t num_entries_to_read) {
+    //  std::ifstream meta_file(vertexIDMap_filename, std::ifstream::binary);
+    //  if (!meta_file.is_open()) {
+    //    std::cerr << "Unable to open file " << vertexIDMap_filename << "! Exiting!\n";
+    //    return false;
+    //  }
+    //  meta_file.read(reinterpret_cast<char*>(&vertexIDMap[0]), 
+    //                 sizeof(int32_t)*(num_entries_to_read));
+    //  galois::gPrint("[", base_DistGraph::id, "] Number of nodes read :: ", 
+    //                 num_entries_to_read, "\n");
+    //  return true;
+    //}
 
 
     std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -221,7 +231,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
         scalefactor.clear();
       }
 
-      if(vertexIDMap_filename.empty()){
+      if (vertexIDMap_filename.empty()) {
         if (base_DistGraph::id == 0) {
           std::cerr << "WARNING: no vertexIDMap_filename provided for custom-cuts\n";
         }
@@ -237,24 +247,29 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
       galois::graphs::OfflineGraph g(filename);
       isBipartite = bipartite;
+
       base_DistGraph::numGlobalNodes = g.size();
       base_DistGraph::numGlobalEdges = g.sizeEdges();
-      std::cerr << "[" << base_DistGraph::id << "] Total nodes : " << 
-                          base_DistGraph::numGlobalNodes << " , Total edges : " << 
-                          base_DistGraph::numGlobalEdges << "\n";
+      //std::cerr << "[" << base_DistGraph::id << "] Total nodes : " << 
+      //                    base_DistGraph::numGlobalNodes << " , Total edges : " << 
+      //                    base_DistGraph::numGlobalEdges << "\n";
       base_DistGraph::computeMasters(g, scalefactor, isBipartite);
 
       //Read the vertexIDMap_filename for masters.
       auto startLoc = base_DistGraph::gid2host[base_DistGraph::id].first;
-      auto num_entries_to_read = (base_DistGraph::gid2host[base_DistGraph::id].second - base_DistGraph::gid2host[base_DistGraph::id].first);
-      assert(num_entries_to_read > 0);
-      vertexIDMap.resize(num_entries_to_read);
-      readVertexIDMappingFile(vertexIDMap_filename, vertexIDMap, num_entries_to_read, startLoc);
+      auto num_entries_to_read = 
+        (base_DistGraph::gid2host[base_DistGraph::id].second - 
+         base_DistGraph::gid2host[base_DistGraph::id].first);
 
+      vertexIDMap.resize(num_entries_to_read);
+      readVertexIDMappingFile(vertexIDMap_filename, vertexIDMap, 
+                              num_entries_to_read, startLoc);
+
+      for (auto thing : vertexIDMap) {
+        printf("%d\n", thing);
+      }
       //std::cout << "VERTEXMAP size : " << vertexIDMap.size() << " : " << vertexIDMap[200] << "\n";
 
-      // at this point gid2Host has pairs for how to split nodes among
-      // hosts; pair has begin and end
       uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
       typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
         g.edge_begin(nodeBegin);
@@ -351,7 +366,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
     template<typename GraphTy>
     void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
-                   uint64_t numEdges_distribute){
+                   uint64_t numEdges_distribute) {
       if (base_DistGraph::id == 0) {
         if (std::is_void<typename GraphTy::edge_data_type>::value) {
           fprintf(stderr, "Loading void edge-data while creating edges.\n");
