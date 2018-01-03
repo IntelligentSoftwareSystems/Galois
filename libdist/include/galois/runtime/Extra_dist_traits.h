@@ -26,8 +26,8 @@
 #include <type_traits>
 #include <boost/mpl/has_xxx.hpp>
 
-#ifndef _GALOIS_EXTRA_TRAITS_
-#define _GALOIS_EXTRA_TRAITS_
+//#ifndef _GALOIS_EXTRA_TRAITS_
+//#define _GALOIS_EXTRA_TRAITS_
 // needed when clang did not define trivially copyable, but clang 3.8 has it
 //from libc++, clang specific
 //namespace std {
@@ -43,8 +43,13 @@
 //#endif
 //#endif
 //}
+//#endif
+
+#if __GNUC__ < 5
+#define __is_trivially_copyable(type) __has_trivial_copy(type)
+#else
+#define __is_trivially_copyable(type) std::is_trivially_copyable<type>::value 
 #endif
-//#define __is_trivially_copyable(type)  __has_trivial_copy(type)
 
 namespace galois {
 namespace runtime {
@@ -61,12 +66,12 @@ namespace runtime {
 
   template<typename T>
   struct is_serializable {
-      static const bool value = has_serialize<T>::value || is_copyable<T>::value || std::is_trivially_copyable<T>::value;
+      static const bool value = has_serialize<T>::value || is_copyable<T>::value || __is_trivially_copyable(T);
     };
 
   template<typename T>
   struct is_memory_copyable {
-      static const bool value = is_copyable<T>::value || std::is_trivially_copyable<T>::value;
+      static const bool value = is_copyable<T>::value || __is_trivially_copyable(T);
     };
 
 } //namepace Runtime

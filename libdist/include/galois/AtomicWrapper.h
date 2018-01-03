@@ -49,7 +49,7 @@ namespace galois {
 
     // only typedef if T is trivially copyable to use mem copy in serialize/deserialize.
     using tt_is_copyable = 
-     typename std::enable_if<std::is_trivially_copyable<T>::value, int>::type;
+     typename std::enable_if<__is_trivially_copyable(T), int>::type;
   };
 }
 #endif

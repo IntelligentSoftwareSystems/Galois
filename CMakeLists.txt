@@ -129,16 +129,6 @@ if(NOT ENABLE_HETERO_GALOIS)
   endif()
 endif()
 
-# More warnings
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  if(CMAKE_COMPILER_IS_GNUCC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
-  endif()
-endif()
-
 # GNU profiling
 if(USE_GPROF)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")

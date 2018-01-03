@@ -1,101 +1,272 @@
-typedef unsigned int Dist;
-static const Dist DIST_INFINITY = std::numeric_limits<Dist>::max() - 1;
+#ifndef LONESTAR_BFS_SSSP_H
+#define  LONESTAR_BFS_SSSP_H
+#include <iostream>
+#include <cstdlib>
 
+template <typename Graph, typename _DistLabel, bool USE_EDGE_WT, ptrdiff_t EDGE_TILE_SIZE=256> 
+struct BFS_SSSP {
 
-struct UpdateRequest {
-  GNode n;
-  Dist w;
-  UpdateRequest(const GNode& N, Dist W): n(N), w(W) {}
-  UpdateRequest(): n(), w(0) {}
-};
+  using Dist = _DistLabel;
 
+  constexpr static const Dist DIST_INFINITY = std::numeric_limits<Dist>::max()/2 - 1;
 
+  using GNode = typename Graph::GraphNode;
+  using EI = typename Graph::edge_iterator;
 
-struct UpdateRequestIndexer {
-  unsigned int operator()(const UpdateRequest& val) const {
-    unsigned int t = val.w >> stepShift;
-    return t;
-  }
-};
+  struct UpdateRequest {
+    GNode n;
+    Dist w;
+    UpdateRequest(const GNode& N, Dist W): n(N), w(W) {}
+    UpdateRequest(): n(), w(0) {}
 
-template<bool useOne>
-struct not_consistent {
-  Graph& g;
-  std::atomic<bool>& refb;
-  not_consistent(Graph& g, std::atomic<bool>& refb) : g(g), refb(refb) {}
+    friend bool operator < (const UpdateRequest& left, const UpdateRequest& right) {
+      return left.w == right.w? left.n < right.n : left.w < right.w;
+    }
+  };
 
-  template<bool useOneL, typename iiTy>
-  Dist getEdgeWeight(iiTy ii, typename std::enable_if<useOneL>::type* = nullptr) const {
-    return 1;
-  }
+  struct UpdateRequestIndexer {
+    unsigned shift;
 
-  template<bool useOneL, typename iiTy>
-  Dist getEdgeWeight(iiTy ii, typename std::enable_if<!useOneL>::type* = nullptr) const {
-    return g.getEdgeData(ii);
-  }
+    unsigned int operator()(const UpdateRequest& val) const {
+      unsigned int t = val.w >> shift;
+      return t;
+    }
+  };
 
-  void operator()(typename Graph::GraphNode n) const {
-    Dist dist = g.getData(n);
-    if (dist == DIST_INFINITY)
-      return;
+  struct DistEdgeTile {
+    Dist dist;
+    EI beg;
+    EI end;
+  };
+
+  struct DistEdgeTileMaker {
+    Dist dist;
+
+    template <typename EI>
+    DistEdgeTile operator () (const EI& beg, const EI& end) const {
+      return DistEdgeTile {dist, beg, end};
+    }
+  };
+
+  struct DistEdgeTileIndexer {
+    unsigned shift;
+
+    template <typename T>
+    unsigned int operator()(const T& tile) const {
+      unsigned int t = tile.dist >> shift;
+      return t;
+    }
+  };
+
+  template <typename WL, typename TileMaker>
+  static void pushEdgeTiles(WL& wl, EI beg, const EI end , const TileMaker& f) {
+    assert(beg <= end);
+
+    if ((end - beg) > EDGE_TILE_SIZE) {
+      for (; beg + EDGE_TILE_SIZE < end;) {
+        auto ne = beg + EDGE_TILE_SIZE;
+        assert(ne < end);
+        wl.push_back( f(beg, ne) );
+        beg = ne;
+      }
+    }
     
-    for (auto ii : g.edges(n)) {
-      Dist ddist = g.getData(g.getEdgeDst(ii));
-      Dist w = getEdgeWeight<useOne>(ii);
-      if (ddist > dist + w) {
-        std::cout << ddist << " " << dist + w << " " << n << " " << g.getEdgeDst(ii) << "\n"; // XXX
-        refb = true;
-        // return;
+    if ((end - beg) > 0) {
+      wl.push_back( f(beg, end) );
+    }
+  }
+
+  template <typename WL, typename TileMaker>
+  static void pushEdgeTiles(WL& wl, Graph& graph, GNode src, const TileMaker& f) {
+    auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+    pushEdgeTiles(wl, beg, end, f);
+
+  }
+
+  template <typename WL, typename TileMaker>
+  static void pushEdgeTilesParallel(WL& wl, Graph& graph, GNode src , const TileMaker& f) {
+
+    auto beg = graph.edge_begin(src);
+    const auto end = graph.edge_end(src);
+
+    if ((end - beg) > EDGE_TILE_SIZE) {
+
+      galois::on_each(
+          [&] (const unsigned tid, const unsigned numT) {
+
+            auto p = galois::block_range(beg, end, tid, numT);
+
+            auto b = p.first;
+            const auto e = p.second;
+
+            pushEdgeTiles(wl, b, e, f);
+          }, galois::loopname("Init-Tiling"));
+
+
+    } else if ((end - beg) > 0) {
+      wl.push_back( f(beg, end) );
+    }
+  }
+
+  struct not_consistent {
+    Graph& g;
+    std::atomic<bool>& refb;
+    not_consistent(Graph& g, std::atomic<bool>& refb) : g(g), refb(refb) {}
+
+    template<bool useWt, typename iiTy>
+    Dist getEdgeWeight(iiTy ii, typename std::enable_if<!useWt>::type* = nullptr) const {
+      return 1;
+    }
+
+    template<bool useWt, typename iiTy>
+    Dist getEdgeWeight(iiTy ii, typename std::enable_if<useWt>::type* = nullptr) const {
+      return g.getEdgeData(ii);
+    }
+
+    void operator()(typename Graph::GraphNode n) const {
+      Dist dist = g.getData(n);
+      if (dist == DIST_INFINITY)
+        return;
+      
+      for (auto ii : g.edges(n)) {
+        auto dst = g.getEdgeDst(ii);
+        Dist ddist = g.getData(dst);
+        Dist w = getEdgeWeight<USE_EDGE_WT>(ii);
+        if (ddist > dist + w) {
+          std::cout << "Wrong label: " <<  ddist << ", on node: " << dst << ", correct label (from pred): " << dist + w << "\n"; // XXX
+          refb = true;
+          // return;
+        }
+      }
+    }
+  };
+
+  struct max_dist {
+    Graph& g;
+    galois::GReduceMax<Dist>& m;
+
+    max_dist(Graph& g, galois::GReduceMax<Dist>& m) : g(g), m(m) {}
+
+    void operator()(typename Graph::GraphNode n) const {
+      Dist d = g.getData(n);
+      if (d == DIST_INFINITY)
+        return;
+      m.update(d);
+    }
+  };
+
+  static bool verify(Graph& graph, GNode source) {
+    if (graph.getData(source) != 0) {
+      std::cerr << "source has non-zero dist value\n";
+      return false;
+    }
+
+    std::atomic<size_t> notVisited(0);
+    galois::do_all(galois::iterate(graph), 
+        [&notVisited, &graph] (GNode n) { 
+          if (graph.getData(n) >= DIST_INFINITY) 
+            ++notVisited; 
+          });
+
+    if (notVisited)
+      std::cerr << notVisited << " unvisited nodes; this is an error if the graph is strongly connected\n";
+
+    std::atomic<bool> not_c;
+    galois::do_all(galois::iterate(graph), 
+        not_consistent(graph, not_c));
+
+    if (not_c) {
+      std::cerr << "node found with incorrect distance\n";
+      return false;
+    }
+
+    galois::GReduceMax<Dist> m;
+    galois::do_all(galois::iterate(graph), 
+        max_dist(graph, m));
+
+    std::cout << "max dist: " << m.reduce() << "\n";
+    
+    return true;
+  }
+};
+
+template <typename T, typename BucketFunc, size_t MAX_BUCKETS=543210ul>
+class SerialBucketWL {
+
+  using Bucket = std::deque<T>;
+  using BucketsCont = std::vector<Bucket>;
+
+  size_t m_minBucket;
+  BucketFunc m_func;
+  BucketsCont m_buckets;
+  Bucket m_lastBucket;
+
+  static_assert(MAX_BUCKETS > 0, "MAX_BUCKETS must be > 0");
+
+public:
+  explicit SerialBucketWL(const BucketFunc& f)
+    : 
+      m_minBucket(0ul),
+      m_func(f) 
+  {
+    // reserve enough so that resize never reallocates memory
+    // otherwise, minBucket may return an invalid reference
+    m_buckets.reserve(MAX_BUCKETS);
+  }
+
+  void push_back(const T& item) {
+    size_t b = m_func(item);
+    assert(b >= m_minBucket && "can't push below m_minBucket");
+
+    if (b < m_buckets.size()) {
+      m_buckets[b].push_back(item);
+      return;
+    } else {
+      if (b >= MAX_BUCKETS) {
+        std::cerr << "Increase MAX_BUCKETS limit" << std::endl;
+        m_lastBucket.push_back(item);
+      } else {
+        m_buckets.resize( b+1 );
+        m_buckets[b].push_back(item);
       }
     }
   }
+
+  void goToNextBucket(void) {
+    while (m_minBucket < m_buckets.size() && m_buckets[m_minBucket].empty()) {
+      ++m_minBucket;
+    }
+  }
+
+  Bucket& minBucket(void) {
+    if (m_minBucket < m_buckets.size()) {
+      return m_buckets[m_minBucket];
+    } else {
+      return m_lastBucket;
+    }
+  }
+
+  bool empty(void) const {
+    return emptyImpl(m_minBucket);
+  }
+
+  bool allEmpty(void) const {
+    return emptyImpl(0ul);
+  }
+
+private:
+  bool emptyImpl(size_t start) const {
+    for (size_t i = start; i < m_buckets.size(); ++i) {
+      if (!m_buckets[i].empty()) {
+        return false;
+      }
+    }
+
+    return m_lastBucket.empty();
+  }
+
 };
 
-struct max_dist {
-  Graph& g;
-  galois::GReduceMax<Dist>& m;
-
-  max_dist(Graph& g, galois::GReduceMax<Dist>& m) : g(g), m(m) {}
-
-  void operator()(typename Graph::GraphNode n) const {
-    Dist d = g.getData(n);
-    if (d == DIST_INFINITY)
-      return;
-    m.update(d);
-  }
-};
-
-template<bool useOne>
-bool verify(Graph& graph, GNode source) {
-  if (graph.getData(source) != 0) {
-    std::cerr << "source has non-zero dist value\n";
-    return false;
-  }
-
-  std::atomic<size_t> notVisited(0);
-  galois::do_all(galois::iterate(graph), 
-      [&notVisited, &graph] (GNode n) { 
-        if (graph.getData(n) >= DIST_INFINITY) 
-        ++notVisited; 
-        });
-
-  if (notVisited)
-    std::cerr << notVisited << " unvisited nodes; this is an error if the graph is strongly connected\n";
-
-  std::atomic<bool> not_c;
-  galois::do_all(galois::iterate(graph), 
-      not_consistent<useOne>(graph, not_c));
-
-  if (not_c) {
-    std::cerr << "node found with incorrect distance\n";
-    return false;
-  }
-
-  galois::GReduceMax<Dist> m;
-  galois::do_all(galois::iterate(graph), 
-      max_dist(graph, m));
-
-  std::cout << "max dist: " << m.reduce() << "\n";
-  
-  return true;
-}
+#endif//  LONESTAR_BFS_SSSP_H

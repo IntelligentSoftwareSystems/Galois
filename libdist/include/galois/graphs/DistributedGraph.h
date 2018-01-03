@@ -31,28 +31,17 @@
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
-#include <vector>
-#include <set>
-#include <algorithm>
 #include <unordered_map>
-#include <iostream>
-#include <fcntl.h>
-#include <sys/mman.h>
 #include <fstream>
 
-#include "galois/gstl.h"
-#include "galois/Galois.h"
-#include "galois/graphs/LC_CSR_Graph.h"
-#include "galois/graphs/B_LC_CSR_Graph.h"
-#include "galois/graphs/BufferedGraph.h"
-#include "galois/runtime/Substrate.h"
-#include "galois/runtime/DistStats.h"
 #include "galois/runtime/GlobalObj.h"
+#include "galois/graphs/BufferedGraph.h"
+#include "galois/graphs/B_LC_CSR_Graph.h"
+#include "galois/runtime/DistStats.h"
 #include "galois/graphs/OfflineGraph.h"
 #include "galois/runtime/SyncStructures.h"
 #include "galois/runtime/DataCommMode.h"
 #include "galois/DynamicBitset.h"
-#include "galois/substrate/ThreadPool.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "galois/cuda/HostDecls.h"
@@ -106,7 +95,6 @@ namespace graphs {
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-// TODO change this (WithInEdges)
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
 class DistGraph: public galois::runtime::GlobalObject {
 private:
@@ -477,6 +465,9 @@ protected:
     }
 
     timer.stop();
+
+    galois::runtime::reportStat_Tmax(GRNAME, "MasterDistTime", timer.get());
+
     galois::gPrint("[", id, "] Master distribution time : ", timer.get_usec()/1000000.0f,
         " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
         " seeks (", g.num_bytes_read()/(float)timer.get_usec(), " MBPS)\n");
@@ -1014,7 +1005,8 @@ protected:
 
 private:
   /**
-   * TODO
+   * Let other hosts know about which host has what mirrors/masters; 
+   * used for later communication of mirrors/masters.
    */
   void exchange_info_init() {
     auto& net = galois::runtime::getSystemNetworkInterface();
