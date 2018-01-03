@@ -37,6 +37,7 @@
 #include "galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+#include "galois/runtime/Profile.h"
 
 #include <utility>
 #include <vector>
@@ -58,6 +59,7 @@ const char* url = 0;
 
 enum Algo {
   async,
+  edgeasync,
   asyncOc,
   blockedasync,
   graphchi,
@@ -92,6 +94,7 @@ static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Outpu
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous (default)"),
+      clEnumValN(Algo::edgeasync, "edgeasync", "Edge-Asynchronous"),
       clEnumValN(Algo::blockedasync, "blockedasync", "Blocked asynchronous"),
       clEnumValN(Algo::asyncOc, "asyncOc", "Asynchronous out-of-core memory"),
       clEnumValN(Algo::labelProp, "labelProp", "Using label propagation algorithm"),
@@ -409,8 +412,60 @@ struct AsyncAlgo {
           }
         },
         galois::loopname("CC-Async"));
+        //, galois::steal()
+        //, galois::chunk_size<1>());
 
 
+    galois::runtime::reportStat_Single("CC-Async", "emptyMerges", emptyMerges.reduce());
+  }
+};
+
+
+struct EdgeAsyncAlgo {
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
+  typedef std::pair<GNode, typename Graph::edge_iterator> Edge;
+
+  template<typename G>
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
+
+  void operator()(Graph& graph) {
+    galois::GAccumulator<size_t> emptyMerges;
+
+    galois::InsertBag<Edge> works;
+
+    galois::do_all(galois::iterate(graph),
+        [&] (const GNode& src) {
+          for (auto ii: graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            if (src < graph.getEdgeDst(ii)) {
+              works.push_back(std::make_pair(src,ii));
+            }
+          }
+        }
+        , galois::loopname("CC-EdgeAsyncInit")
+        , galois::steal());
+
+galois::runtime::profileVtune(
+    [&] () {
+    galois::do_all(galois::iterate(works), 
+        [&] (Edge& e) {
+          Node& sdata = graph.getData(e.first, galois::MethodFlag::UNPROTECTED);
+          GNode dst = graph.getEdgeDst(e.second);
+          Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+
+          if (!sdata.merge(&ddata)) {
+            emptyMerges += 1;
+          }
+        },
+        galois::loopname("CC-EdgeAsync"), galois::steal());
+        //, galois::steal()
+        //, galois::chunk_size<1>());
+
+    }, "CC-EdgeAsync()"
+  ); 
     galois::runtime::reportStat_Single("CC-Async", "emptyMerges", emptyMerges.reduce());
   }
 };
@@ -754,6 +809,7 @@ int main(int argc, char** argv) {
   switch (algo) {
     case Algo::asyncOc: run<AsyncOCAlgo>(); break;
     case Algo::async: run<AsyncAlgo>(); break;
+    case Algo::edgeasync: run<EdgeAsyncAlgo>(); break;
     case Algo::blockedasync: run<BlockedAsyncAlgo>(); break;
     case Algo::labelProp: run<LabelPropAlgo>(); break;
     case Algo::serial: run<SerialAlgo>(); break;
