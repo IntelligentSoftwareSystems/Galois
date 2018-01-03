@@ -468,8 +468,9 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
       numOwned = num_assigned_nodes_perhost[base_DistGraph::id].reduce();
       /****** Exchange numOutgoingEdges sets *********/
-      //send and clear assigned_edges_perhost to receive from other hosts
-      galois::gPrint("[", base_DistGraph::id, "] Starting Send of the data\n");
+      // send and clear assigned_edges_perhost to receive from other hosts
+      galois::gPrint("[", base_DistGraph::id, "] Starting send of the data\n");
+
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_DistGraph::id) continue;
         galois::runtime::SendBuffer b;
