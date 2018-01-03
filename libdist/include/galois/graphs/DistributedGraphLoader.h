@@ -482,7 +482,7 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor
 
     case CEC:
       if (inputFileTranspose.size()) {
-        return new Graph_customEdgeCut(inputFileTranpose, partFolder, net.ID, 
+        return new Graph_customEdgeCut(inputFileTranspose, partFolder, net.ID, 
                                        net.Num, scaleFactor, vertexIDMapFileName, 
                                        false);
       } else {
