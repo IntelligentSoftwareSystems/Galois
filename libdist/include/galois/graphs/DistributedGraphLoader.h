@@ -482,8 +482,9 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor
 
     case CEC:
       if (inputFileTranspose.size()) {
-        return new Graph_customEdgeCut(inputFile, partFolder, net.ID, net.Num, 
-                               scaleFactor, vertexIDMapFileName, false);
+        return new Graph_customEdgeCut(inputFileTranpose, partFolder, net.ID, 
+                                       net.Num, scaleFactor, vertexIDMapFileName, 
+                                       false);
       } else {
         GALOIS_DIE("Error: (od4vc) iterate over in-edges without transpose graph");
         break;
