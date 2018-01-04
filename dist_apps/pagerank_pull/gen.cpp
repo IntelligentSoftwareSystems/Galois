@@ -232,6 +232,8 @@ struct PageRank {
       _graph.set_num_iter(_num_iterations);
       dga.reset();
       PageRank_delta::go(_graph, dga);
+      // reset residual on mirrors
+      _graph.reset_mirrorField<Reduce_add_residual>();
 
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -270,7 +272,6 @@ struct PageRank {
   // Pull deltas from neighbor nodes, then add to self-residual
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
-
 
     for (auto nbr : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(nbr);
