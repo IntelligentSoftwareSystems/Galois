@@ -356,6 +356,75 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       Tgraph_construct_comm.stop();
     }
 
+    // from https:://graphics.stanford.edu/~seander/bithacks.html
+    unsigned int findTrailingZeros(unsigned int v) {
+      unsigned int c;     // c will be the number of zero bits on the right,
+                          // so if v is 1101000 (base 2), then c will be 3
+      // NOTE: if 0 == v, then c = 31.
+      if (v & 0x1) {
+        // special case for odd v (assumed to happen half of the time)
+        c = 0;
+      } else {
+        c = 1;
+      
+        if ((v & 0xffff) == 0) {  
+          v >>= 16;  
+          c += 16;
+        }
+      
+        if ((v & 0xff) == 0) {  
+          v >>= 8;  
+          c += 8;
+        }
+      
+        if ((v & 0xf) == 0) {  
+          v >>= 4;
+          c += 4;
+        }
+      
+        if ((v & 0x3) == 0) {  
+          v >>= 2;
+          c += 2;
+        }
+      
+        c -= v & 0x1;
+      }	
+      
+      return c;
+    }
+
+    /**
+     * Find the communication partner of a particular host for a particular
+     * round during metadata sending.
+     *
+     * @param roundNum current round number
+     * @param hostID the id of this machine
+     * @param numHosts number of hosts total
+     * @returns the communication partner of the host 
+     */
+    unsigned findCommPartner(unsigned roundNum, unsigned hostID, 
+                             unsigned numHosts) {
+      if (roundNum % 2 == 1) {
+        // odd round = odd hosts +, even hosts -
+        if (hostID % 2 == 0) {
+          return (hostID + roundNum) % numHosts;
+        } else {
+          return (hostID + numHosts - roundNum) % numHosts;
+        }
+      } else { 
+        // even round slightly more complex
+        unsigned toDivideBy = (unsigned)1 << findTrailingZeros(roundNum);
+        //printf("divide by %u\n", toDivideBy);
+        unsigned myGroup = hostID / toDivideBy;
+
+        if (myGroup % 2 == 0) { // even group
+          return (hostID + roundNum) % numHosts;
+        } else { // odd group
+          return (hostID + numHosts - roundNum) % numHosts;
+        }
+      }
+    }
+
     template<typename GraphTy>
     void loadEdges(GraphTy& graph, galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                    uint64_t numEdges_distribute) {
@@ -422,6 +491,11 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
       auto& net = galois::runtime::getSystemNetworkInterface();
+
+      if ((net.Num % 2) != 0) {
+        galois::gWarn("CUSTOM EDGE CUT ONLY SUPPORTS POWER OF 2 HOST #S");
+      }
+
       galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                         base_DistGraph::gid2host[base_DistGraph::id].second),
@@ -467,31 +541,46 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       assert(check_numEdges == numEdges_distribute);
 
       numOwned = num_assigned_nodes_perhost[base_DistGraph::id].reduce();
+
+      galois::DynamicBitSet sentHosts;
+      galois::DynamicBitSet recvHosts;
+      sentHosts.resize(net.Num);
+      recvHosts.resize(net.Num);
+
+      sentHosts.set(base_DistGraph::id);
+      recvHosts.set(base_DistGraph::id);
+
       /****** Exchange numOutgoingEdges sets *********/
       // send and clear assigned_edges_perhost to receive from other hosts
-      galois::gPrint("[", base_DistGraph::id, "] Starting send of the data\n");
+      galois::gPrint("[", base_DistGraph::id, "] Starting send/recv of the data\n");
 
-      for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_DistGraph::id) continue;
+      for (unsigned roundNum = 1; roundNum < net.Num; roundNum++) {
+        // find comm partner
+        unsigned commPartner = findCommPartner(roundNum, base_DistGraph::id,
+                                               net.Num);
+
+        galois::gDebug("[", base_DistGraph::id, "] Round ", roundNum, ", comm "
+                       "partner is ", commPartner, "\n");
+
+        // send my data off to comm partner
         galois::runtime::SendBuffer b;
-        galois::runtime::gSerialize(b, num_assigned_nodes_perhost[x].reduce());
-        galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
-        galois::runtime::gSerialize(b, numOutgoingEdges[x]);
-        galois::runtime::gSerialize(b, hasIncomingEdge[x]);
-        net.sendTagged(x, galois::runtime::evilPhase, b);
-      }
+        galois::runtime::gSerialize(b, num_assigned_nodes_perhost[commPartner].reduce());
+        galois::runtime::gSerialize(b, num_assigned_edges_perhost[commPartner].reduce());
+        galois::runtime::gSerialize(b, numOutgoingEdges[commPartner]);
+        numOutgoingEdges[commPartner].clear();
+        galois::runtime::gSerialize(b, hasIncomingEdge[commPartner]);
+        net.sendTagged(commPartner, galois::runtime::evilPhase, b);
+        b.getVec().clear();
 
-      net.flush();
-      galois::gPrint("[", base_DistGraph::id, "] Sent the data\n");
-
-      //receive
-      for (unsigned x = 0; x < net.Num; ++x) {
-        if(x == base_DistGraph::id) continue;
-
+        // expect data from comm partner back
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
           p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         } while(!p);
+
+        if (p->first != commPartner) {
+          GALOIS_DIE("wrong comm partner");
+        }
 
         uint32_t num_nodes_from_host = 0;
         uint64_t num_edges_from_host = 0;
@@ -501,17 +590,64 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gDeserialize(p->second, hasIncomingEdge[p->first]);
         num_total_edges_to_receive += num_edges_from_host;
         numOwned += num_nodes_from_host;
+
+        sentHosts.set(commPartner);
+        recvHosts.set(commPartner);
+
+        galois::runtime::evilPhase++;
       }
-      galois::gPrint("[", base_DistGraph::id, "] Received the data\n");
-      ++galois::runtime::evilPhase;
+
+      if (sentHosts.count() != net.Num) {
+        GALOIS_DIE("not sent to everyone");
+      }
+      if (recvHosts.count() != net.Num) {
+        GALOIS_DIE("not recv from everyone");
+      }
+
+      //for (unsigned x = 0; x < net.Num; ++x) {
+      //  if(x == base_DistGraph::id) continue;
+      //  galois::runtime::SendBuffer b;
+      //  galois::runtime::gSerialize(b, num_assigned_nodes_perhost[x].reduce());
+      //  galois::runtime::gSerialize(b, num_assigned_edges_perhost[x].reduce());
+      //  galois::runtime::gSerialize(b, numOutgoingEdges[x]);
+      //  galois::runtime::gSerialize(b, hasIncomingEdge[x]);
+      //  net.sendTagged(x, galois::runtime::evilPhase, b);
+      //}
+      //net.flush();
+      //galois::gPrint("[", base_DistGraph::id, "] Sent the data\n");
+
+      // receive
+      //for (unsigned x = 0; x < net.Num; ++x) {
+      //  if(x == base_DistGraph::id) continue;
+      //  decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      //  do {
+      //    p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      //  } while(!p);
+
+      //  uint32_t num_nodes_from_host = 0;
+      //  uint64_t num_edges_from_host = 0;
+      //  galois::runtime::gDeserialize(p->second, num_nodes_from_host);
+      //  galois::runtime::gDeserialize(p->second, num_edges_from_host);
+      //  galois::runtime::gDeserialize(p->second, numOutgoingEdges[p->first]);
+      //  galois::runtime::gDeserialize(p->second, hasIncomingEdge[p->first]);
+      //  num_total_edges_to_receive += num_edges_from_host;
+      //  numOwned += num_nodes_from_host;
+      //}
+      //++galois::runtime::evilPhase;
+
+      galois::gPrint("[", base_DistGraph::id, "] Metadata exchange done\n");
 
       for (unsigned x = 0; x < net.Num; ++x) {
         if(x == base_DistGraph::id) continue;
-        assert(hasIncomingEdge[base_DistGraph::id].size() == hasIncomingEdge[x].size());
+
+        assert(hasIncomingEdge[base_DistGraph::id].size() == 
+               hasIncomingEdge[x].size());
+
         hasIncomingEdge[base_DistGraph::id].bitwise_or(hasIncomingEdge[x]);
       }
 
-      galois::gPrint("[", base_DistGraph::id, "] Start: Fill local and global vectors\n");
+      galois::gPrint("[", base_DistGraph::id, "] Start: Fill local and global "
+                     "vectors\n");
       numNodes = 0;
       numEdges = 0;
       localToGlobalVector.reserve(numOwned);
@@ -532,7 +668,8 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
           ++src;
         }
       }
-      galois::gPrint("[", base_DistGraph::id, "] End: Fill local and global vectors\n");
+      galois::gPrint("[", base_DistGraph::id, "] End: Fill local and global "
+                     "vectors\n");
 
       /* At this point numNodes should be equal to the number of
        * nodes owned by the host.
@@ -559,7 +696,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       }
 
       galois::gPrint("[", base_DistGraph::id, "] End: Fill Ghosts\n");
-      //std::cout << base_DistGraph::id <<  "] numNodes : " << numNodes << ", numOwned : " << numOwned << ", numEdges : " << numEdges  <<"\n";
 
       uint32_t numGhosts = (localToGlobalVector.size() - numOwned);
       std::vector<uint32_t> mirror_mapping_to_hosts;
