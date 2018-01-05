@@ -252,7 +252,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::numGlobalEdges = g.sizeEdges();
       base_DistGraph::computeMasters(g, scalefactor, isBipartite);
 
-      //Read the vertexIDMap_filename for masters.
+      // Read the vertexIDMap_filename for masters.
       auto startLoc = base_DistGraph::gid2host[base_DistGraph::id].first;
       auto num_entries_to_read = 
         (base_DistGraph::gid2host[base_DistGraph::id].second - 
@@ -281,15 +281,13 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       mpiGraph.resetReadCounters();
 
       uint64_t numEdges_distribute = edgeEnd - edgeBegin; 
-      std::cerr << "[" << base_DistGraph::id << "] Total edges to distribute : " << 
-                   numEdges_distribute << "\n";
+      fprintf(stderr, "[%u] Total edges to distribute : %lu\n",
+              base_DistGraph::id, numEdges_distribute);
 
       /********************************************
        * Assign edges to the hosts using heuristics
        * and send/recv from other hosts.
        * ******************************************/
-      //print_string(" : assign_send_receive_edges started");
-
       std::vector<uint64_t> prefixSumOfEdges;
       assign_edges_phase1(g, mpiGraph, numEdges_distribute, vertexIDMap,
                           prefixSumOfEdges, base_DistGraph::mirrorNodes,
@@ -299,8 +297,8 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::numNodesWithEdges = numNodes;
 
       if (base_DistGraph::numOwned > 0) {
-        base_DistGraph::beginMaster =
-          G2L(localToGlobalVector[0]) ; //base_DistGraph::gid2host[base_DistGraph::id].first);
+        base_DistGraph::beginMaster = G2L(localToGlobalVector[0]); 
+          //base_DistGraph::gid2host[base_DistGraph::id].first);
       } else {
         base_DistGraph::beginMaster = 0;
       }
@@ -318,7 +316,10 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
         galois::no_stats(),
-        galois::loopname("EdgeLoading"));
+        galois::loopname("EdgeLoading")
+      );
+
+      base_DistGraph::printStatistics();
 
       loadEdges(base_DistGraph::graph, mpiGraph, numEdges_distribute);
 
@@ -333,7 +334,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
         base_DistGraph::transposed = true;
       } else {
         // else because transpose will find thread ranges for you
-
         galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
         Tthread_ranges.start();
         base_DistGraph::determine_thread_ranges(numNodes, prefixSumOfEdges);
@@ -627,12 +627,13 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       galois::gPrint("[", base_DistGraph::id, "] End: assignedNodes receive\n");
       ++galois::runtime::evilPhase;
 
-      //fill mirror nodes
-      for(uint32_t i = 0; i < (localToGlobalVector.size() - numOwned); ++i){
+      // fill mirror nodes
+      for (uint32_t i = 0; i < (localToGlobalVector.size() - numOwned); ++i) {
         mirrorNodes[mirror_mapping_to_hosts[i]].push_back(localToGlobalVector[numOwned + i]);
       }
 
-      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", base_DistGraph::id, numNodes, numEdges);
+      fprintf(stderr, "[%u] Resident nodes : %u , Resident edges : %lu\n", 
+              base_DistGraph::id, numNodes, numEdges);
     }
 
     // Helper functions
