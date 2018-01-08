@@ -97,8 +97,8 @@ getTimersDistributed <- function (logData) {
  computeTimePerIter <- numeric()
  for(i in 1:(numRuns)) {
    j = i - 1 #Vectors are 1 indexed in r
-   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
-   #computeTimeRows <- subset(logData, grepl("^BFS_0_0", REGION) & TOTAL_TYPE != "HostValues")
+   #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
    if(!is.null(computeTimeRows)){
      computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
    }
@@ -159,7 +159,7 @@ getTimersDistributed <- function (logData) {
 }
 #### END: @function to values of timers for distributed memory galois log ##################
 
-#### START: @function to comute per iteration RSD of compute time. ##################
+#### START: @function to compute per iteration RSD of compute time. ##################
 # Parses to get the timer values
 computeRSD <- function (logData, paramList, output) {
   numIter = as.numeric(paramList["iterations"])
@@ -215,8 +215,54 @@ computeRSD <- function (logData, paramList, output) {
   }
 }
 
+#### START: @function to compute max by mean of compute time. ##################
+# Parses to get the timer values
+computeMaxByMean <- function (logData, paramList, output) {
+  numIter = as.numeric(paramList["iterations"])
+
+  benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+  print(paste("benchmark:", benchmarkRegionName))
+
+  ## Number of runs
+  numRuns <- as.numeric((subset(logData, CATEGORY == "Runs" & TOTAL_TYPE != "HostValues"))$TOTAL)
+  print(paste("numRuns:", numRuns))
+
+  maxsum <- numeric()
+  meansum <- numeric()
+  maxbymean <- numeric()
+  for(r in 0:(numRuns - 1)){
+    max <- numeric()
+    mean <- numeric()
+    for(i in 0:(numIter - 1)) {
+      computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", r, "_", i, sep=""), REGION) & TOTAL_TYPE == "HostValues")$TOTAL
+      if(!identical(computeTimeRows, character(0))){
+        computeTimePerHostArr <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
+        mean[i+1] <- mean(computeTimePerHostArr)
+        max[i+1] <- max(computeTimePerHostArr)
+      }
+    }
+    maxsum[r+1] <- sum(max)
+    meansum[r+1] <- sum(mean)
+    maxbymean[r+1] <- round((maxsum[r+1]/meansum[r+1]), digits = 2)
+  }
+  maxsum_avg <- mean(maxsum)
+  meansum_avg <- mean(meansum)
+  maxbymean_avg <- mean(maxbymean)
+  maxbymeanList <- list("maxComputeTime" = maxsum_avg, "meanComputeTime" = meansum_avg, "maxByMeanComputeTime" = maxbymean_avg)
+  outDataList <- append(paramList, maxbymeanList)
+  print(paste("MaxByMeanComputeTime:", maxbymean_avg))
+
+  if(!file.exists(output)){
+    print(paste(output, "Does not exist. Creating new file"))
+    write.csv(as.data.frame(outDataList), file=output, row.names=F, quote=F)
+  } else {
+    print(paste("Appending data to the existing file", output))
+    write.table(as.data.frame(outDataList), file=output, row.names=F, col.names=F, quote=F, append=T, sep=",")
+  }
+}
+
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
   if(isTRUE(isSharedMemGaloisLog)){
@@ -229,7 +275,10 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD) {
     print("Parsing commadline")
     paramList <- parseCmdLine(logData, F)
     print("Parsing timers for distributed memory galois log")
-    if(isTRUE(isComputeRSD)){
+    if(isTRUE(isComputeMaxByMean)){
+      computeMaxByMean(logData, paramList, output)
+    }
+    else if(isTRUE(isComputeRSD)){
       computeRSD(logData, paramList, output)
     }
     else{
@@ -238,7 +287,7 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD) {
   }
 
   ## if computing RSD then normal stats are not printed
-  if(isTRUE(!isComputeRSD)){
+  if(isTRUE(!isComputeRSD && !isComputeMaxByMean)){
     outDataList <- append(paramList, timersList)
     if(!file.exists(output)){
       print(paste(output, "Does not exist. Creating new file"))
@@ -262,7 +311,9 @@ option_list = list(
                      make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
                                                help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]"),
                      make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
-                                               help="If want to compute the RSD of per iteration compute time[default %default]")
+                                               help="To compute the RSD of per iteration compute time[default %default]"),
+                     make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
+                                               help="To compute the max by mean compute time[default %default]")
 
                      )
 
@@ -277,7 +328,7 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s, opt$r)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m)
 }
 
 ##################### END #####################
