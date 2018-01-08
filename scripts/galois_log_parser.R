@@ -240,6 +240,10 @@ computeMaxByMean <- function (logData, paramList, output) {
         mean[i+1] <- mean(computeTimePerHostArr)
         max[i+1] <- max(computeTimePerHostArr)
       }
+      else {
+        mean[i+1] <- 0
+        max[i+1] <- 0
+      }
     }
     maxsum[r+1] <- sum(max)
     meansum[r+1] <- sum(mean)
