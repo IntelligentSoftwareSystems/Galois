@@ -97,8 +97,8 @@ getTimersDistributed <- function (logData) {
  computeTimePerIter <- numeric()
  for(i in 1:(numRuns)) {
    j = i - 1 #Vectors are 1 indexed in r
-   #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
-   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+   #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
+   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
    if(!is.null(computeTimeRows)){
      computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
    }
