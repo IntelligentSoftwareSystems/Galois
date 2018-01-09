@@ -60,6 +60,7 @@ const char* url = 0;
 enum Algo {
   async,
   edgeasync,
+  edgetiledasync,
   asyncOc,
   blockedasync,
   graphchi,
@@ -95,6 +96,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous (default)"),
       clEnumValN(Algo::edgeasync, "edgeasync", "Edge-Asynchronous"),
+      clEnumValN(Algo::edgetiledasync, "edgetiledasync", "EdgeTiled-Asynchronous"),
       clEnumValN(Algo::blockedasync, "blockedasync", "Blocked asynchronous"),
       clEnumValN(Algo::asyncOc, "asyncOc", "Asynchronous out-of-core memory"),
       clEnumValN(Algo::labelProp, "labelProp", "Using label propagation algorithm"),
@@ -421,6 +423,96 @@ struct AsyncAlgo {
 };
 
 
+
+
+struct EdgeTiledAsyncAlgo {
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
+
+  template<typename G>
+  void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
+
+  struct EdgeTile{
+      Node* sData;
+      Graph::edge_iterator beg;
+      Graph::edge_iterator end;
+  };
+
+  struct EdgeTileMaker {
+      EdgeTile operator() (Node* sdata, Graph::edge_iterator beg, Graph::edge_iterator end) const{
+          return EdgeTile{sdata, beg, end};
+      }
+  };
+
+  const int EDGE_TILE_SIZE=256;
+
+
+
+
+  void operator()(Graph& graph) {
+    galois::GAccumulator<size_t> emptyMerges;
+    
+    galois::InsertBag<EdgeTile> works;
+
+    galois::do_all(galois::iterate(graph),
+            [&] (const GNode& src)  {
+            Node& sdata=graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+            const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+
+            assert(beg <= end);
+            if ((end - beg) > EDGE_TILE_SIZE) {
+                for (; beg + EDGE_TILE_SIZE < end;) {
+                    auto ne = beg + EDGE_TILE_SIZE;
+                    assert(ne < end);
+                    works.push_back( EdgeTile{&sdata, beg, ne} );
+                }
+            }
+            
+            if ((end - beg) > 0) {                                                                                               
+                works.push_back( EdgeTile{&sdata, beg, end} );  
+            }    
+        }          
+        , galois::loopname("CC-EdgeTiledAsyncInit")
+        , galois::steal()
+        );
+
+  galois::runtime::profileVtune(
+    [&] () {
+    galois::do_all(galois::iterate(works), 
+        [&] (const EdgeTile& tile) {
+          Node& sdata = *(tile.sData);
+          
+          //Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+
+          for (auto ii = tile.beg; ii != tile.end; ++ii) {
+            GNode dst = graph.getEdgeDst(ii);
+            Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+
+            //if (symmetricGraph && src >= dst)
+            //  continue;
+
+            if (!sdata.merge(&ddata))
+              emptyMerges += 1;
+          }
+        }
+        ,galois::loopname("CC-Async")
+        ,galois::steal()
+        );
+        //, galois::steal()
+        //, galois::chunk_size<1>());
+    },"CC-EdgeTiledAsync()"
+  );
+
+    galois::runtime::reportStat_Single("CC-TiledAsync", "emptyMerges", emptyMerges.reduce());
+  }
+};
+
+
+
 struct EdgeAsyncAlgo {
   typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
@@ -455,6 +547,9 @@ galois::runtime::profileVtune(
           Node& sdata = graph.getData(e.first, galois::MethodFlag::UNPROTECTED);
           GNode dst = graph.getEdgeDst(e.second);
           Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+
+          //if(symmetricGraph && e.first > dst)
+            //continue;
 
           if (!sdata.merge(&ddata)) {
             emptyMerges += 1;
@@ -810,6 +905,7 @@ int main(int argc, char** argv) {
     case Algo::asyncOc: run<AsyncOCAlgo>(); break;
     case Algo::async: run<AsyncAlgo>(); break;
     case Algo::edgeasync: run<EdgeAsyncAlgo>(); break;
+    case Algo::edgetiledasync: run<EdgeTiledAsyncAlgo>(); break;
     case Algo::blockedasync: run<BlockedAsyncAlgo>(); break;
     case Algo::labelProp: run<LabelPropAlgo>(); break;
     case Algo::serial: run<SerialAlgo>(); break;
