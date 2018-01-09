@@ -359,7 +359,8 @@ private:
    */
   void exchangeAssignedEdgeInfo(
      std::vector<galois::GAccumulator<uint64_t>>& assignedEdgesPerHost,
-     std::vector<std::vector<uint64_t>>& numOutgoingEdges
+     //std::vector<std::vector<uint64_t>>& numOutgoingEdges
+     std::vector<std::map<uint64_t, uint64_t>>& numOutgoingEdges
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     num_total_edges_to_receive = 0; 
@@ -372,6 +373,11 @@ private:
       galois::runtime::gSerialize(b, assignedEdgesPerHost[x].reduce());
       galois::runtime::gSerialize(b, numOutgoingEdges[x]);
       net.sendTagged(x, galois::runtime::evilPhase, b);
+    }
+
+    galois::runtime::getHostBarrier().wait();
+    if (base_DistGraph::id == 0) {
+      galois::gPrint("everyone made it past \n");
     }
 
     net.flush();
@@ -404,7 +410,8 @@ private:
    * @returns a prefix sum of the edges for the nodes this partition owns
    */
   std::vector<uint64_t> createMasterMirrorNodes(
-      const std::vector<std::vector<uint64_t>>& numOutgoingEdges,
+      //const std::vector<std::vector<uint64_t>>& numOutgoingEdges,
+      const std::vector<std::map<uint64_t, uint64_t>>& numOutgoingEdges,
       galois::DynamicBitSet& ghosts,
       std::vector<std::vector<size_t>>& mirrorNodes
   ) {
@@ -418,31 +425,64 @@ private:
 
     std::vector<uint64_t> prefixSumOfEdges;
 
-    uint64_t src = 0;
-    for (uint32_t i = 0; i < base_DistGraph::numHosts; ++i) {
-      for (unsigned j = 0; j < numOutgoingEdges[i].size(); ++j) {
-        bool createNode = false;
-        if (numOutgoingEdges[i][j] > 0) {
-          createNode = true;
-          numEdges += numOutgoingEdges[i][j];
-        } else if (isOwned(src)) {
-          createNode = true;
-        }
+    //uint64_t src = 0;
+    //for (uint32_t i = 0; i < base_DistGraph::numHosts; ++i) {
+    //  for (auto curPair = numOutgoingEdges[i].cbegin();
+    //       curPair != numOutgoingEdges[i].cend();
+    //       curPair++) {
 
-        if (createNode) {
-          localToGlobalVector.push_back(src);
-          globalToLocalMap[src] = numNodes++;
-          prefixSumOfEdges.push_back(numEdges);
-          if(!isOwned(src))
-            ghosts.set(src);
-        } else if (ghosts.test(src)) {
-          localToGlobalVector.push_back(src);
-          globalToLocalMap[src] = numNodes++;
-          prefixSumOfEdges.push_back(numEdges);
-        }
-        ++src;
-      }
-    }
+    //    uint64_t nodeID = curPair.first;
+    //    uint64_t nodeNumEdges = curPair.second;
+
+    //    bool createNode = false;
+
+    //    if (nodeNumEdges > 0) {
+    //      createNode = true;
+    //      numEdges += nodeNumEdges;
+    //    } else if (isOwned(nodeID)) {
+    //      createNode = true;
+    //    }
+
+    //    if (createNode) {
+    //      localToGlobalVector.push_back(nodeID);
+    //      globalToLocalMap[src] = numNodes++;
+    //      prefixSumOfEdges.push_back(numEdges);
+    //      if(!isOwned(src))
+    //        ghosts.set(src);
+    //    } else if (ghosts.test(src)) {
+    //      localToGlobalVector.push_back(src);
+    //      globalToLocalMap[src] = numNodes++;
+    //      prefixSumOfEdges.push_back(numEdges);
+    //    }
+    //    ++src;
+    //  }
+    //}
+
+    //uint64_t src = 0;
+    //for (uint32_t i = 0; i < base_DistGraph::numHosts; ++i) {
+    //  for (unsigned j = 0; j < numOutgoingEdges[i].size(); ++j) {
+    //    bool createNode = false;
+    //    if (numOutgoingEdges[i][j] > 0) {
+    //      createNode = true;
+    //      numEdges += numOutgoingEdges[i][j];
+    //    } else if (isOwned(src)) {
+    //      createNode = true;
+    //    }
+
+    //    if (createNode) {
+    //      localToGlobalVector.push_back(src);
+    //      globalToLocalMap[src] = numNodes++;
+    //      prefixSumOfEdges.push_back(numEdges);
+    //      if(!isOwned(src))
+    //        ghosts.set(src);
+    //    } else if (ghosts.test(src)) {
+    //      localToGlobalVector.push_back(src);
+    //      globalToLocalMap[src] = numNodes++;
+    //      prefixSumOfEdges.push_back(numEdges);
+    //    }
+    //    ++src;
+    //  }
+    //}
 
     for (uint64_t x = 0; x < base_DistGraph::numGlobalNodes; ++x){
       if (ghosts.test(x) && !isOwned(x)){
@@ -479,7 +519,8 @@ private:
   ) {
     // number of outgoing edges for each node on a particular host that this
     // host is aware of
-    std::vector<std::vector<uint64_t>> numOutgoingEdges(base_DistGraph::numHosts);
+    //std::vector<std::vector<uint64_t>> numOutgoingEdges(base_DistGraph::numHosts);
+    std::vector<std::map<uint64_t, uint64_t>> numOutgoingEdges;
 
     // how many edges we will give to a particular host
     std::vector<galois::GAccumulator<uint64_t>> 
@@ -489,7 +530,9 @@ private:
                             base_DistGraph::gid2host[base_DistGraph::id].first;
 
     for (uint32_t i = 0; i < base_DistGraph::numHosts; ++i) {
-      numOutgoingEdges[i].assign(base_DistGraph::numOwned, 0);
+      if (base_DistGraph::numOwned != 0) {
+        numOutgoingEdges[i].emplace(std::make_pair(base_DistGraph::numOwned - 1, 0);
+      }
     }
 
     mpiGraph.resetReadCounters();
@@ -513,13 +556,25 @@ private:
           for(; ee != ee_end; ++ee){
             auto gdst = mpiGraph.edgeDestination(*ee);
             auto h = this->find_hostID(gdst);
-            numOutgoingEdges[h][src - globalOffset]++;
+
+            if (numOutgoingEdges[h].find(src - globalOffset) != numOutgoingEdges[h].end()) {
+              numOutgoingEdges[h][src - globalOffset] = numOutgoingEdges[h][src - globalOffset] + 1;
+            } else {
+              numOutgoingEdges[h].emplace(std::make_pair<uint64_t, uint64_t>(src - globalOffset, 0));
+            }
+
+            //numOutgoingEdges[h][src - globalOffset]++;
             num_assigned_edges_perhost[h] += 1;
           }
         } else {
         // otherwise if not high degree keep all edges with the source node
           for (; ee != ee_end; ++ee) {
-            numOutgoingEdges[id][src - globalOffset]++;
+            if (numOutgoingEdges[id].find(src - globalOffset) != numOutgoingEdges[id].end()) {
+              numOutgoingEdges[id][src - globalOffset] = numOutgoingEdges[id][src - globalOffset] + 1;
+            } else {
+              numOutgoingEdges[id].emplace(std::make_pair<uint64_t, uint64_t>(src - globalOffset, 0));
+            }
+            //numOutgoingEdges[id][src - globalOffset]++;
             num_assigned_edges_perhost[id] += 1;
             auto gdst = mpiGraph.edgeDestination(*ee);
             if(!this->isOwned(gdst))
@@ -537,19 +592,26 @@ private:
                    mpiGraph.getBytesRead()/(float)edgeInspectionTimer.get_usec(),
                    " MBPS)\n");
 
+    galois::runtime::getHostBarrier().wait();
+    if (base_DistGraph::id == 0) {
+      galois::gPrint("everyone made it past edge inspection\n");
+    }
+    exit(0);
+
     #ifndef NDEBUG
     uint64_t check_numEdges = 0;
-    for (uint32_t h = 0; h < base_DistGraph::numHosts; ++h) {
-      check_numEdges += num_assigned_edges_perhost[h].reduce();
-    }
+    //for (uint32_t h = 0; h < base_DistGraph::numHosts; ++h) {
+    //  check_numEdges += num_assigned_edges_perhost[h].reduce();
+    //}
     assert(check_numEdges == numEdges_distribute);
     #endif
 
     // send off messages letting hosts know which edges they were assigned
-    exchangeAssignedEdgeInfo(num_assigned_edges_perhost, numOutgoingEdges);
+    //exchangeAssignedEdgeInfo(num_assigned_edges_perhost, numOutgoingEdges);
     // create the master/mirror node mapping based on the information
     // received; returns a prefix sum of edges
-    return createMasterMirrorNodes(numOutgoingEdges, ghosts, mirrorNodes);
+    //return createMasterMirrorNodes(numOutgoingEdges, ghosts, mirrorNodes);
+    return std::vector<uint64_t>();
   }
 
 
