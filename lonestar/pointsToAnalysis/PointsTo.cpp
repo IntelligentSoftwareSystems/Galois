@@ -31,7 +31,7 @@
 #include "Lonestar/BoilerPlate.h"
 #include <fstream>
 #include <deque>
-#include "SparseBitVector.h"
+#include "SparseBVLinkedList.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -53,6 +53,16 @@ static cll::opt<bool> useSerial("serial",
                                           "(i.e. 1 thread, no galois::for_each)"), 
                                 cll::init(false));
 
+static cll::opt<bool> printAnswer("printAnswer",
+                                cll::desc("If set, prints all points to facts "
+                                          "at the end"),
+                                cll::init(false));
+
+static cll::opt<bool> useCycleDetection("ocd",
+                                cll::desc("If set, online cycle detection is"
+                                          " used in algorithm"),
+                                cll::init(false));
+
 const unsigned THRESHOLD_LS = 500000;
 const unsigned THRESHOLD_OCD = 500;
 
@@ -60,8 +70,6 @@ const unsigned THRESHOLD_OCD = 500;
 // Declaration of strutures, types, and variables
 ////////////////////////////////////////////////////////////////////////////////
 
-using UpdatesVector = galois::gstl::Vector<unsigned>;
-using EdgeVector = galois::gstl::Vector<galois::SparseBitVector>;
 
 /**
  * Class representing a points-to constraint.
@@ -70,7 +78,8 @@ class PtsToCons {
  public:
   using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
  private:
-  unsigned src, dst;
+  unsigned src;
+  unsigned dst;
   ConstraintType type;
  public:
   PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
@@ -111,13 +120,15 @@ class PtsToCons {
     }
 
     std::cerr << "v" << src;
+
     std::cerr << std::endl;
   }
 };
 
 class PTA {
-  using PointsToConstraints = galois::gstl::Vector<PtsToCons>;
-  using PointsToInfo = galois::gstl::Vector<galois::SparseBitVector>;
+  using PointsToConstraints = std::vector<PtsToCons>;
+  using PointsToInfo = std::vector<galois::SparseBitVector>;
+  using EdgeVector = std::vector<galois::SparseBitVector>;
 
  private:
   PointsToInfo pointsToResult; // pointsTo results for nodes
@@ -132,7 +143,7 @@ class PTA {
   /** 
    * Online Cycle Detection and elimination structure + functions.
    */
-  struct OnlineCycleDetection { 
+  struct OnlineCycleDetection {
    private:
     PTA& outerPTA; // reference to outer PTA instance to get runtime info
 
@@ -233,6 +244,7 @@ class PTA {
 
       news.push_back(repToChangeTo); // TODO fix/update outgoing
 
+      // idea here was to go over all edges
       //for (unsigned i = 0; i < representative.size(); i++) {
       //  if (representative[i] != NoRepresentative) {
       //    if (representative[i] == repToChangeTo) {
@@ -320,8 +332,11 @@ class PTA {
      * // TODO verify correctness
      */
     template<typename VecType>
-    void process(VecType& updates) { 
-      return;
+    void process(VecType& updates) {
+      if (!useCycleDetection) {
+        return;
+      }
+
       // TODO this can probably be made more efficient (fill?)
       for (unsigned ii = 0; ii < outerPTA.numNodes; ++ii) {
         visited[ii] = false;
@@ -424,7 +439,7 @@ class PTA {
   }
 
   /**
-   * Processes the AddressOf and Copy constraints. 
+   * Processes the AddressOf, Copy constraints. 
    *
    * Sets the bitvector for AddressOf constraints, i.e. a set bit means
    * that you point to whatever that bit represents.
@@ -451,13 +466,12 @@ class PTA {
 
       if (ii.getType() == PtsToCons::AddressOf) { // addressof; save point info
         if (pointsToResult[dst].set(src)) {
-          // this only prints if the bit wasn't already set
+          // this only debug prints if the bit wasn't already set
           galois::gDebug("saving v", dst, "->v", src);
         }
       } else if (src != dst) {  // copy constraint; add an edge
         galois::gDebug("Adding edge from ", src, " to ", dst);
         outgoingEdges[src].set(dst);
-        GALOIS_ASSERT(outgoingEdges[src].test(dst));
         updates.push_back(src);
       }
     }
@@ -482,13 +496,11 @@ class PTA {
 
       // if src is a not subset of dst... (i.e. src has more), then 
       // propogate src's points to info to dst
-      if (srcRepr != dstRepr) {
-      //if (srcRepr != dstRepr && 
-      //    !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
+      if (srcRepr != dstRepr && 
+          !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
         galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
-        //newPtsTo++;
       } else {
         // TODO this is a sanity check, remove for final version?
         if (!pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
@@ -516,7 +528,7 @@ class PTA {
 
     ocd.init();
 
-    // initialize the points to results and the outgoing edges representation
+    // initialize vectors
     for (unsigned i = 0; i < numNodes; i++) {
       pointsToResult[i].init();
       outgoingEdges[i].init();
@@ -547,7 +559,7 @@ class PTA {
       unsigned src = updates.front();
       updates.pop_front();
 
-      galois::gDebug("processing updates element ", src);
+      //galois::gDebug("processing updates element ", src, "\n");
 
       galois::gstl::Vector<unsigned> srcOutgoingEdges = 
         outgoingEdges[src].getAllSetBits<galois::gstl::Vector<unsigned>>();
@@ -556,7 +568,7 @@ class PTA {
       for (unsigned dst : srcOutgoingEdges) {
         unsigned newPtsTo = propagate(src, dst);
 
-        if (newPtsTo) {
+        if (newPtsTo) { // newPtsTo is positive if dst changed
           updates.push_back(dst);
         }
       }
@@ -569,13 +581,12 @@ class PTA {
 
         // After propagating all constraints, see if load/store
         // constraints need to be added in since graph was potentially updated
-        //galois::gPrint(updates.size(), " us1\n");
         processLoadStore(loadStoreConstraints, updates);
-        //galois::gPrint(updates.size(), " us2\n");
+
         // do cycle squashing
-        if (updates.size() > THRESHOLD_OCD) {
+        //if (updates.size() > THRESHOLD_OCD) {
           ocd.process(updates);
-        }
+        //}
       }
     }
   }
@@ -663,11 +674,15 @@ class PTA {
       type = type_converter.as_ctype;
 
       PtsToCons cc(type, src, dst);
+
       if (type == PtsToCons::AddressOf || type == PtsToCons::Copy) {
         addressCopyConstraints.push_back(cc);
       } else if (type == PtsToCons::Load || PtsToCons::Store) {
-        loadStoreConstraints.push_back(cc);
-      }
+        if (offset == 0) { // ignore load/stores with offsets
+          loadStoreConstraints.push_back(cc);
+        } 
+      } 
+      // ignore GEP constraints
     }
 
     cfile.close();
@@ -691,7 +706,9 @@ class PTA {
   }
 
   /**
-   * TODO
+   * Checks to make sure that all representative point to at LEAST
+   * what the nodes that it represents are pointing to. Necessary but not
+   * sufficient check for correctness.
    */
   void checkReprPointsTo() {
     for (unsigned ii = 0; ii < pointsToResult.size(); ++ii) {
@@ -704,7 +721,7 @@ class PTA {
   }
 
   /**
-   * TODO
+   * @returns The total number of points to facts in the system.
    */
   unsigned countPointsToFacts() {
     unsigned count = 0;
@@ -716,7 +733,7 @@ class PTA {
   }
 
   /**
-   * TODO
+   * Prints out points to info for all verticies in the constraint graph.
    */
   void printPointsToInfo() {
     std::string prefix = "v";
@@ -752,16 +769,12 @@ int main(int argc, char** argv) {
   }
   T.stop();
 
-  galois::gPrint("No of points-to facts computed = ", 
-                 pta.countPointsToFacts(), "\n");
+  galois::gPrint("No of points-to facts computed = ", pta.countPointsToFacts(), 
+                 "\n");
   pta.checkReprPointsTo();
-  pta.printPointsToInfo();
-
-  /*if (!skipVerify && !verify(pointsToResult)) {
-    std::cerr << "If graph was connected, verification failed\n";
-    assert(0 && "If graph was connected, verification failed");
-    abort();
-  }*/
+  if (printAnswer) {
+    pta.printPointsToInfo();
+  }
 
   return 0;
 }
