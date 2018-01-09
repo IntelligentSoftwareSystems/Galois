@@ -232,18 +232,12 @@ private:
    * Free all of the buffers in memory.
    */
   void freeMemory() {
-    if (outIndexBuffer != nullptr) {
-      free(outIndexBuffer);
-      outIndexBuffer = nullptr;
-    }
-    if (edgeDestBuffer != nullptr) {
-      free(edgeDestBuffer);
-      edgeDestBuffer = nullptr;
-    }
-    if (edgeDataBuffer != nullptr) {
-      free(edgeDataBuffer);
-      edgeDataBuffer = nullptr;
-    }
+    free(outIndexBuffer);
+    outIndexBuffer = nullptr;
+    free(edgeDestBuffer);
+    edgeDestBuffer = nullptr;
+    free(edgeDataBuffer);
+    edgeDataBuffer = nullptr;
   }
 
 
