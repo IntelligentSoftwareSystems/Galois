@@ -150,7 +150,6 @@ class PTA {
     galois::gstl::Vector<unsigned> ancestors; // TODO find better representation
     galois::gstl::Vector<bool> visited; // TODO use better representation
     galois::gstl::Vector<unsigned> representative;
-    galois::gstl::Vector<unsigned> news; // TODO find better way to do this
 
     unsigned NoRepresentative; // "constant" that represents no representative
 
@@ -241,17 +240,6 @@ class PTA {
           break;
         }
       }
-
-      news.push_back(repToChangeTo); // TODO fix/update outgoing
-
-      // idea here was to go over all edges
-      //for (unsigned i = 0; i < representative.size(); i++) {
-      //  if (representative[i] != NoRepresentative) {
-      //    if (representative[i] == repToChangeTo) {
-      //      news.push_back(outerPTA.nodes[i]);
-      //    }
-      //  }
-      //}
     }
 
     /**
@@ -261,6 +249,7 @@ class PTA {
      * @param repr nodeID will have its representative changed to this
      */
     void makeRepr(unsigned nodeID, unsigned repr) {
+      // TODO rep isn't getting all outgoing edges it needs to; fix it
       if (repr != nodeID) {
         galois::gDebug("change repr[", nodeID, "] = ", repr);
         representative[nodeID] = repr;
@@ -342,9 +331,6 @@ class PTA {
         visited[ii] = false;
       }
 
-      // TODO don't use news to add to the worklist; find a more efficient way?
-      news.clear();
-
       unsigned cycleNode = NoRepresentative;  // set to invalid id.
 
       for (unsigned update : updates) {
@@ -353,11 +339,6 @@ class PTA {
         if (cycleDetect(update, cycleNode)) {
           cycleCollapse(cycleNode);
         }
-      }
-
-      // TODO find a more efficient way to do this
-      for (auto newUp : news) {
-        updates.push_back(newUp);
       }
     }
   }; // end struct OnlineCycleDetection
@@ -585,7 +566,8 @@ class PTA {
 
         // do cycle squashing
         //if (updates.size() > THRESHOLD_OCD) {
-          ocd.process(updates);
+        ocd.process(updates);
+        //checkReprEdges();
         //}
       }
     }
@@ -714,11 +696,26 @@ class PTA {
     for (unsigned ii = 0; ii < pointsToResult.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
       if (repr != ii && !pointsToResult[ii].isSubsetEq(pointsToResult[repr])) {
-        galois::gPrint("ERROR: pointsto(", ii, ") is not less than its "
-                       "representative pointsto(", repr, ").\n");
+        galois::gError("pointsto(", ii, ") is not less than its "
+                       "representative pointsto(", repr, ").");
       }
     }
   }
+
+  /**
+   * Makes sure that the representative of a set of nodes has all of the
+   * edges that the nodes it is representing has.
+   */
+  void checkReprEdges() {
+    for (unsigned ii = 0; ii < outgoingEdges.size(); ++ii) {
+      unsigned repr = ocd.getFinalRepresentative(ii);
+      if (repr != ii && !outgoingEdges[ii].isSubsetEq(pointsToResult[repr])) {
+        galois::gError("edges(", ii, ") is not less than its "
+                       "representative edges(", repr, ").");
+      }
+    }
+  }
+
 
   /**
    * @returns The total number of points to facts in the system.
@@ -771,7 +768,13 @@ int main(int argc, char** argv) {
 
   galois::gPrint("No of points-to facts computed = ", pta.countPointsToFacts(), 
                  "\n");
-  pta.checkReprPointsTo();
+
+  if (!skipVerify) {
+    galois::gInfo("Doing verification step");
+    pta.checkReprPointsTo();
+    pta.checkReprEdges();
+  }
+
   if (printAnswer) {
     pta.printPointsToInfo();
   }
