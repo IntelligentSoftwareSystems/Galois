@@ -169,8 +169,6 @@ public:
 
     galois::StatTimer Tgraph_construct(
       "TIME_GRAPH_CONSTRUCT", GRNAME);
-    galois::StatTimer Tgraph_construct_comm(
-        "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
 
     Tgraph_construct.start();
 
@@ -295,6 +293,8 @@ public:
      * Exchange mirrors and master nodes among
      * hosts
      ****************************************/
+    galois::StatTimer Tgraph_construct_comm(
+        "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
