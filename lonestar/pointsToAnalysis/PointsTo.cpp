@@ -249,9 +249,10 @@ class PTA {
      * @param repr nodeID will have its representative changed to this
      */
     void makeRepr(unsigned nodeID, unsigned repr) {
-      // TODO rep isn't getting all outgoing edges it needs to; fix it
+      // TODO this doesn't get correct results; fix somehow
       if (repr != nodeID) {
         galois::gDebug("change repr[", nodeID, "] = ", repr);
+
         representative[nodeID] = repr;
 
         // the representative needs to have all of the items that the nodes
@@ -568,7 +569,6 @@ class PTA {
         //if (updates.size() > THRESHOLD_OCD) {
         ocd.process(updates);
         //checkReprEdges();
-        //}
       }
     }
   }
@@ -709,7 +709,7 @@ class PTA {
   void checkReprEdges() {
     for (unsigned ii = 0; ii < outgoingEdges.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
-      if (repr != ii && !outgoingEdges[ii].isSubsetEq(pointsToResult[repr])) {
+      if (repr != ii && !outgoingEdges[ii].isSubsetEq(outgoingEdges[repr])) {
         galois::gError("edges(", ii, ") is not less than its "
                        "representative edges(", repr, ").");
       }
