@@ -551,7 +551,7 @@ class PTA {
         unsigned newPtsTo = propagate(src, dst);
 
         if (newPtsTo) { // newPtsTo is positive if dst changed
-          updates.push_back(dst);
+          updates.push_back(ocd.getFinalRepresentative(dst));
         }
       }
 
