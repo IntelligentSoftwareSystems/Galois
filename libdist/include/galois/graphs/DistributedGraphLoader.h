@@ -100,12 +100,13 @@ namespace graphs {
  * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
  */
-template<typename NodeData, typename EdgeData>
-DistGraph<NodeData, EdgeData, true>* constructTwoWayGraph(std::vector<unsigned>& 
-                                                           scaleFactor) {
+template<typename NodeData, typename EdgeData, bool HasNoLockable>
+DistGraph<NodeData, EdgeData, true, HasNoLockable>* 
+constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   // TODO template args for 2-way for everything that isn't edge cut
   // TODO do it for edge cut too
-  typedef DistGraph_edgeCut<NodeData, EdgeData, true> Graph_edgeCut;
+  using Graph_edgeCut = 
+      DistGraph_edgeCut<NodeData, EdgeData, true, HasNoLockable>;
   //typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   //typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   //typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
