@@ -32,11 +32,12 @@ namespace galois {
 namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false,
-         bool isBipartite=false>
-class DistGraph_edgeCut : public DistGraph<NodeTy, EdgeTy, WithInEdges> {
+         bool HasNoLockable=true, bool isBipartite=false>
+class DistGraph_edgeCut 
+    : public DistGraph<NodeTy, EdgeTy, WithInEdges, HasNoLockable> {
   constexpr static const char* const GRNAME = "dGraph_edgeCut";
   public:
-    typedef DistGraph<NodeTy, EdgeTy, WithInEdges> base_DistGraph;
+    using base_DistGraph = DistGraph<NodeTy, EdgeTy, WithInEdges, HasNoLockable>;
     // GID = ghostMap[LID - numOwned]
     std::vector<uint64_t> ghostMap;
     // LID = GlobalToLocalGhostMap[GID]
