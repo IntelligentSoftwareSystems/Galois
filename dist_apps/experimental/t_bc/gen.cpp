@@ -82,7 +82,7 @@ struct NodeData {
   float bc;
 };
 
-// Dist Graph using a bidirectional CSR graph + abstract locks
+// Dist Graph using a bidirectional CSR graph
 using Graph = galois::graphs::DistGraph<NodeData, void, true>;
 using GNode = typename Graph::GraphNode;
 
@@ -92,6 +92,9 @@ using GNode = typename Graph::GraphNode;
 uint64_t offset = 0;
 uint32_t roundNumber = 0;
 
+/**
+ * Graph initialization
+ */
 void InitializeGraph(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
@@ -123,8 +126,11 @@ void InitializeGraph(Graph& graph) {
   );
 }
 
-/* This is used to reset node data when switching to a different 
- * source set */
+
+/** 
+ * This is used to reset node data when switching to a different 
+ * source set 
+ **/
 void InitializeIteration(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
@@ -161,7 +167,8 @@ void InitializeIteration(Graph& graph) {
 };
 
 /**
- * TODO
+ * If min distance has changed, then the number of shortest paths is reset
+ * and the sent flag is reset.
  */
 void MetadataUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -188,7 +195,8 @@ void MetadataUpdate(Graph& graph) {
 // This has dumb overhead even if nothing to update; find a way to make it
 // faster
 /**
- * TODO
+ * Adds the accumulated shortest path values to the actual shortest path
+ * value and resets the accumulator.
  */
 void ShortPathUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -209,47 +217,8 @@ void ShortPathUpdate(Graph& graph) {
   );
 };
 
-//struct ShortPathSends {
-//  Graph* graph;
-//  ShortPathSends(Graph* _graph) : graph(_graph) { }
-//
-//  void static go(Graph& _graph) {
-//    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-//    galois::do_all(
-//      galois::iterate(nodesWithEdges), 
-//      ShortPathSends(&_graph),
-//      galois::loopname(_graph.get_run_identifier("ShortPathSends").c_str()),
-//      galois::no_stats()
-//    );
-//
-//    // TODO graph sync of short paths here
-//    
-//    // TODO residual update + reset
-//    ShortPathUpdate::go(_graph);
-//  }
-//
-//  void operator()(GNode src) const {
-//    NodeData& src_data = graph->getData(src);
-//
-//    for (auto outEdge : graph->edges(src)) {
-//      GNode dst = graph->getEdgeDst(outEdge);
-//      auto& dnode = graph->getData(dst);
-//
-//      // at this point minDist should be synchronized across all hosts
-//      if (src_data.shortPathValueToSend != 0) {
-//        uint32_t indexToUse = src_data.sIndexToSend;
-//
-//        if ((src_data.oldMinDistances[indexToUse] + 1) == 
-//             dnode.minDistances[indexToUse]) {
-//          dnode.shortestPathToAdd[indexToUse] += src_data.shortPathValueToSend;
-//        }
-//      }
-//    }
-//  }
-//};
-
 /**
- * TODO
+ * Update old dist with the latest value of the min distance.
  */
 void OldDistUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -269,7 +238,9 @@ void OldDistUpdate(Graph& graph) {
 };
 
 /**
- * TODO
+ * Wrapper around the distance array for sorting purposes.
+ *
+ * TODO find a way to make this more efficient
  */
 struct DWrapper {
   uint32_t dist;
@@ -283,6 +254,9 @@ struct DWrapper {
   }
 };
 
+/**
+ * Does the wrapping of a vector into a DWrapper for sorting.
+ */
 std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
   std::vector<DWrapper> wrappedVector;
   wrappedVector.reserve(numSourcesPerRound);
@@ -416,18 +390,23 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
       galois::steal()
     );
 
-    MetadataUpdate(graph);
-    ShortPathUpdate(graph);
-    OldDistUpdate(graph);
+    // sync min distance here
 
-    //ShortPathSends::go(graph);
+    MetadataUpdate(graph); // this will reset local short paths if min dist doesn't match
+
+    // sync short path add here
+
+    ShortPathUpdate(graph);
+
+    OldDistUpdate(graph);
 
     roundNumber++;
   } while (dga.reduce());
 }
 
 /**
- * TODO
+ * Get the round number for the backward propagation phase using the round
+ * number from the APSP phase.
  */
 void RoundUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -452,7 +431,8 @@ void RoundUpdate(Graph& graph) {
 }
 
 /**
- * TODO
+ * Back propagate dependency values depending on the round that a node
+ * sent out the shortest path message.
  */
 void BackProp(Graph& graph) {
   const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
@@ -511,7 +491,8 @@ void BackProp(Graph& graph) {
 }
 
 /**
- * TODO
+ * BC sum: take the dependency value for each source and add it to the
+ * final BC value.
  */
 void BC(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -580,7 +561,6 @@ int main(int argc, char** argv) {
     totalNumSources = hg->globalSize();
   }
 
-  galois::StatTimer sortTimer("SortTimer", REGION_NAME);
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
     std::string timer_str("TIMER_" + std::to_string(run));
@@ -631,22 +611,20 @@ int main(int argc, char** argv) {
 
   StatTimer_total.stop();
 
-  //galois::gPrint("total sort time ", sortTimer.get(), "\n");
-
   // Verify, i.e. print out graph data for examination
   if (verify) {
     char *v_out = (char*)malloc(40);
     for (auto ii = (*hg).masterNodesRange().begin(); 
               ii != (*hg).masterNodesRange().end(); 
               ++ii) {
+      // outputs min distance and short path numbers
       //sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
       //        (*hg).getData(*ii).minDistances[vIndex],
       //        (*hg).getData(*ii).shortestPathNumbers[vIndex]);
+
       // outputs betweenness centrality
       sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
               (*hg).getData(*ii).bc);
-      //sprintf(v_out, "%lu %u\n", (*hg).getGID(*ii),
-      //        (*hg).getData(*ii).shortestPathNumbers[0]);
 
       galois::runtime::printOutput(v_out);
     }
