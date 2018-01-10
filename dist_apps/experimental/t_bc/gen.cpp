@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -48,7 +48,7 @@ namespace cll = llvm::cl;
 
 static cll::opt<unsigned int> numSourcesPerRound("numRoundSources", 
                                 cll::desc("Number of sources to use for APSP"),
-                                cll::init(5));
+                                cll::init(10));
 static cll::opt<unsigned int> totalNumSources("numOfSources", 
                                 cll::desc("Total number of sources to do BC"),
                                 cll::init(0));
@@ -73,18 +73,17 @@ struct NodeData {
   std::vector<uint32_t> shortestPathToAdd;
   std::vector<uint32_t> shortestPathNumbers;
 
-  //uint32_t sIndexToSend;
-  uint32_t sToSend;
+  uint32_t APSPIndexToSend;
+  uint32_t shortPathValueToSend;
 
   std::vector<uint32_t> savedRoundNumbers;
-
   std::atomic<float>* dependencyValues;
 
   float bc;
 };
 
-// Dist Graph using a bidirectional CSR graph
-using Graph = galois::graphs::DistGraph<NodeData, void, true>; // add lock if using them
+// Dist Graph using a bidirectional CSR graph + abstract locks
+using Graph = galois::graphs::DistGraph<NodeData, void, true>;
 using GNode = typename Graph::GraphNode;
 
 /******************************************************************************/
@@ -97,7 +96,6 @@ void InitializeGraph(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
   galois::do_all(
-    // pass in begin/end to not use local thread ranges
     galois::iterate(allNodes.begin(), allNodes.end()), 
     [&] (GNode src) {
       NodeData& src_data = graph.getData(src);
@@ -107,8 +105,8 @@ void InitializeGraph(Graph& graph) {
       src_data.shortestPathToAdd.resize(numSourcesPerRound);
       src_data.shortestPathNumbers.resize(numSourcesPerRound);
   
-      //src_data.sIndexToSend = numSourcesPerRound;
-      src_data.sToSend = 0;
+      src_data.APSPIndexToSend = numSourcesPerRound + 1;
+      src_data.shortPathValueToSend = 0;
   
       src_data.savedRoundNumbers.resize(numSourcesPerRound);
       src_data.sentFlag.resize(numSourcesPerRound);
@@ -116,11 +114,9 @@ void InitializeGraph(Graph& graph) {
       src_data.dependencyValues =
        (std::atomic<float>*)malloc(sizeof(std::atomic<float>) * 
                                    numSourcesPerRound);
-  
-      assert(src_data.dependencyValues != 0);
+      GALOIS_ASSERT(src_data.dependencyValues != nullptr);
   
       src_data.bc = 0.0;
-
     },
     galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()), 
     galois::no_stats()
@@ -149,8 +145,8 @@ void InitializeIteration(Graph& graph) {
 
         src_data.shortestPathToAdd[i] = 0;
   
-        //src_data.sIndexToSend = numSourcesPerRound;
-        src_data.sToSend = 0;
+        src_data.APSPIndexToSend = numSourcesPerRound + 1;
+        src_data.shortPathValueToSend = 0;
   
         src_data.savedRoundNumbers[i] = infinity;
         src_data.dependencyValues[i] = 0.0;
@@ -164,6 +160,9 @@ void InitializeIteration(Graph& graph) {
   );
 };
 
+/**
+ * TODO
+ */
 void MetadataUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
@@ -188,6 +187,9 @@ void MetadataUpdate(Graph& graph) {
 // TODO
 // This has dumb overhead even if nothing to update; find a way to make it
 // faster
+/**
+ * TODO
+ */
 void ShortPathUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
   galois::do_all(
@@ -234,18 +236,21 @@ void ShortPathUpdate(Graph& graph) {
 //      auto& dnode = graph->getData(dst);
 //
 //      // at this point minDist should be synchronized across all hosts
-//      if (src_data.sToSend != 0) {
+//      if (src_data.shortPathValueToSend != 0) {
 //        uint32_t indexToUse = src_data.sIndexToSend;
 //
 //        if ((src_data.oldMinDistances[indexToUse] + 1) == 
 //             dnode.minDistances[indexToUse]) {
-//          dnode.shortestPathToAdd[indexToUse] += src_data.sToSend;
+//          dnode.shortestPathToAdd[indexToUse] += src_data.shortPathValueToSend;
 //        }
 //      }
 //    }
 //  }
 //};
 
+/**
+ * TODO
+ */
 void OldDistUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
@@ -263,6 +268,9 @@ void OldDistUpdate(Graph& graph) {
   );
 };
 
+/**
+ * TODO
+ */
 struct DWrapper {
   uint32_t dist;
   uint32_t index;
@@ -286,6 +294,9 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
   return wrappedVector;
 }
 
+/**
+ * TODO
+ */
 void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   const auto& nodesWithEdges = graph.allNodesWithEdgesRange();
 
@@ -314,7 +325,8 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         // true if a message is flipped from not sent to sent
         bool sentMarked = false;
 
-        src_data.sToSend = 0;
+        src_data.shortPathValueToSend = 0;
+        src_data.APSPIndexToSend = indexToSend;
     
         //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
     
@@ -332,9 +344,9 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     
             // note that this index needs to have shortest path number sent out
             // by saving it to another vector
-            src_data.sToSend = src_data.shortestPathNumbers[currentIndex];
+            src_data.shortPathValueToSend = src_data.shortestPathNumbers[currentIndex];
             indexToSend = currentIndex;
-            //src_data.sIndexToSend = indexToSend;
+            src_data.APSPIndexToSend = indexToSend;
             src_data.sentFlag[currentIndex] = true;
     
             shortFound = true;
@@ -365,42 +377,44 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         if (sentMarked) {
           dga += 1;
         }
-
         //findMessage.stop();
-    
-        //galois::StatTimer sendMessage(graph.get_run_identifier("SendMessage").c_str());
-        //sendMessage.start();
-    
-        // there is something to send to other nodes this round
-        if (shortFound) {
-          uint32_t distValue = src_data.oldMinDistances[indexToSend];
-          uint32_t newValue = distValue + 1;
-    
-          for (auto outEdge : graph.edges(src)) {
-            GNode dst = graph.getEdgeDst(outEdge);
-            auto& dnode = graph.getData(dst, galois::MethodFlag::WRITE);
-            uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
-                                            newValue);
-    
-            if (oldValue > newValue) {
-              // overwrite short path with this node's shortest path
-              dnode.shortestPathToAdd[indexToSend] = src_data.sToSend;
-            } else if (oldValue == newValue) {
-              // add to short path
-              dnode.shortestPathToAdd[indexToSend] += src_data.sToSend;
-            }
-          }
-    
-          dga += 1;
-        }
-        //sendMessage.stop();
       },
       galois::loopname(graph.get_run_identifier("APSP").c_str()),
       galois::steal()
     );
 
-    // TODO graph sync here: sync dist, and discard shortpathadd if dist
-    // isn't the min
+    const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
+
+    galois::do_all(
+      galois::iterate(allNodesWithEdgesIn),
+      [&] (GNode dst) {
+        auto& dnode = graph.getData(dst);
+
+        for (auto inEdge : graph.in_edges(dst)) {
+          NodeData& src_data = graph.getData(graph.getInEdgeDst(inEdge));
+          uint32_t indexToSend = src_data.APSPIndexToSend;
+          
+          if (indexToSend != numSourcesPerRound + 1) {
+            uint32_t distValue = src_data.oldMinDistances[indexToSend];
+            uint32_t newValue = distValue + 1;
+            uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
+                                            newValue);
+    
+            if (oldValue > newValue) {
+              // overwrite short path with this node's shortest path
+              dnode.shortestPathToAdd[indexToSend] = src_data.shortPathValueToSend;
+            } else if (oldValue == newValue) {
+              // add to short path
+              dnode.shortestPathToAdd[indexToSend] += src_data.shortPathValueToSend;
+            }
+
+            dga += 1;
+          }
+        }
+      },
+      galois::loopname(graph.get_run_identifier("APSP").c_str()),
+      galois::steal()
+    );
 
     MetadataUpdate(graph);
     ShortPathUpdate(graph);
@@ -412,6 +426,9 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   } while (dga.reduce());
 }
 
+/**
+ * TODO
+ */
 void RoundUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
   graph.set_num_iter(0);
@@ -434,6 +451,9 @@ void RoundUpdate(Graph& graph) {
   );
 }
 
+/**
+ * TODO
+ */
 void BackProp(Graph& graph) {
   const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
 
@@ -490,6 +510,9 @@ void BackProp(Graph& graph) {
   }
 }
 
+/**
+ * TODO
+ */
 void BC(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
   graph.set_num_iter(0);
@@ -521,8 +544,8 @@ void BC(Graph& graph) {
 /* Main method for running */
 /******************************************************************************/
 
-constexpr static const char* const name = "Betweeness Centrality"; 
-constexpr static const char* const desc = "Betweeness Centrality on Distributed "
+constexpr static const char* const name = "PR-Betweeness Centrality"; 
+constexpr static const char* const desc = "PR-Betweeness Centrality on Distributed "
                                           "Galois.";
 constexpr static const char* const url = 0;
 
