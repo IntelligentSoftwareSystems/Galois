@@ -95,14 +95,15 @@ namespace graphs {
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
+template<typename NodeTy, typename EdgeTy, bool WithInEdges=false, 
+         bool HasNoLockable=true>
 class DistGraph: public galois::runtime::GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
   using GraphTy = typename std::conditional<WithInEdges, 
-                    galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, true>,
-                    galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>>::type;
+                   galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable>,
+                   galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable>>::type;
 
   bool round;
 
@@ -3536,9 +3537,9 @@ public:
   }
 };
 
-template<typename NodeTy, typename EdgeTy, bool WithInEdges>
+template<typename NodeTy, typename EdgeTy, bool WithInEdges, bool HasNoLockable>
 constexpr const char* const galois::graphs::DistGraph<NodeTy, EdgeTy, 
-                                                      WithInEdges>::GRNAME;
+                                                      WithInEdges, HasNoLockable>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 
