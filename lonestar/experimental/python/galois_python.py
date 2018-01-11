@@ -3,8 +3,8 @@
 from ctypes import *
 import pprint
 
-__author__ = "Yi-Shan Lu"
-__email__ = "yishanlu@utexas.edu"
+__author__ = "Roshan Dathathri"
+__email__ = "roshan@cs.utexas.edu"
 
 # type definition
 GraphPtr = c_void_p
@@ -42,7 +42,7 @@ class AttrList(Structure):
                 ("value", POINTER(ValTy))]
 
 #glib = cdll.LoadLibrary("/opt/galois/libgalois_python.so")
-glib = cdll.LoadLibrary("/net/faraday/workspace/ylu/galois/release/exp/apps/python/libgalois_python.so")
+glib = cdll.LoadLibrary("./libgalois_python.so")
 
 # cast the result and arg types
 glib.createGraph.restype = GraphPtr
@@ -533,6 +533,77 @@ def test():
     testCoarsening()
     print "pass"
 
+def getopts(argv):
+    opts = {}  # Empty dictionary to store key-value pairs.
+    while argv:  # While there are arguments left to parse...
+        if argv[0][0] == '-':  # Found a "-name value" pair.
+            opts[argv[0]] = argv[1]  # Add key and value to the dictionary.
+        argv = argv[1:]  # Reduce the argument list by copying it starting from index 1.
+    return opts
+
+def readcdm(filename):
+    import csv
+    processes = {}
+    files = {}
+    networks = {}
+    network_actions = {" CREATE_OBJECT", " SENDTO", " RECVFROM", " CONNECT", " ACCEPT"}
+    g = GaloisGraph("cdm")
+    with open(filename, 'r') as csvfile: # first pass - build nodes
+        csvreader = csv.reader(csvfile, delimiter=',')
+        for row in csvreader:
+            processes[row[2]] = -1
+            if row[3] in network_actions:
+                networks[row[4]] = -1
+            # TODO: identify processes based on action
+            else:
+                files[row[4]] = -1
+        nid = 0
+        for process in processes:
+            n = g.addNode(nid)
+            processes[process] = nid
+            g.setNodeAttr(n, "type", "PROCESS")
+            g.setNodeAttr(n, "name", process)
+            nid += 1
+        for f in files:
+            n = g.addNode(nid)
+            files[f] = nid
+            g.setNodeAttr(n, "type", "FILE")
+            g.setNodeAttr(n, "name", f)
+            nid += 1
+        for net in networks:
+            n = g.addNode(nid)
+            networks[net] = nid
+            g.setNodeAttr(n, "type", "NETWORK")
+            g.setNodeAttr(n, "name", net)
+            nid += 1
+        if set(files.keys()) & set(networks.keys()):
+            print "WARNING: files and networks overlap"
+    with open(filename, 'r') as csvfile: # second pass - build edges
+        csvreader = csv.reader(csvfile, delimiter=',')
+        eid = 0
+        for row in csvreader:
+            if row[3] in network_actions:
+                e = g.addEdge(eid, processes[row[2]], networks[row[4]])
+            else:
+                e = g.addEdge(eid, processes[row[2]], files[row[4]])
+            g.setEdgeAttr(e, "type", row[3])
+            g.setEdgeAttr(e, "timestamp", row[0])
+            g.setEdgeAttr(e, "occurrence", row[5])
+            eid += 1
+    for edge in g.getAllEdges():
+        action = g.getEdgeAttr(edge, "type")
+        timestamp = g.getEdgeAttr(edge, "timestamp")
+        occurrence = g.getEdgeAttr(edge, "occurrence")
+        process = g.getNodeAttr(edge.src, "name")
+        obj = g.getNodeAttr(edge.dst, "name")
+        obj_type = g.getNodeAttr(edge.dst, "type")
+        print "PROCESS", process, action, "-", obj_type, obj, "at", timestamp, "(", occurrence, ")"
+
 if __name__ == "__main__":
-    test()
+    #test()
+    from sys import argv
+    myargs = getopts(argv)
+    if '-i' not in myargs:
+        print "Usage: python galois_python.py -i <cdm.csv>"
+    readcdm(myargs['-i'])
 
