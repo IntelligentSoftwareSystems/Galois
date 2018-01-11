@@ -78,7 +78,8 @@ struct NodeData {
 
   std::vector<uint32_t> savedRoundNumbers;
 
-  std::atomic<float>* dependencyValues;
+  std::vector<galois::CopyableAtomic<float>> dependencyToAdd;
+  std::vector<float> dependencyValues;
 
   float bc;
 };
@@ -120,10 +121,8 @@ void InitializeGraph(Graph& graph) {
       cur_data.savedRoundNumbers.resize(numSourcesPerRound);
       cur_data.sentFlag.resize(numSourcesPerRound);
 
-      cur_data.dependencyValues =
-       (std::atomic<float>*)malloc(sizeof(std::atomic<float>) * 
-                                   numSourcesPerRound);
-      GALOIS_ASSERT(cur_data.dependencyValues != nullptr);
+      cur_data.dependencyToAdd.resize(numSourcesPerRound);
+      cur_data.dependencyValues.resize(numSourcesPerRound);
   
       cur_data.bc = 0.0;
     },
@@ -161,7 +160,9 @@ void InitializeIteration(Graph& graph) {
         cur_data.shortPathValueToSend = 0;
   
         cur_data.savedRoundNumbers[i] = infinity;
+        cur_data.dependencyToAdd[i] = 0.0;
         cur_data.dependencyValues[i] = 0.0;
+
         cur_data.oldMinDistances[i] = cur_data.minDistances[i];
 
         cur_data.sentFlag[i] = 0;
@@ -446,6 +447,26 @@ void RoundUpdate(Graph& graph) {
   );
 }
 
+void UpdateDependency(Graph& graph) {
+  const auto& allNodes = graph.allNodesRange();
+
+  galois::do_all(
+    galois::iterate(allNodes.begin(), allNodes.end()), 
+    [&] (GNode curNode) {
+      NodeData& cur_data = graph.getData(curNode);
+  
+      for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        if (cur_data.dependencyToAdd[i] > 0) {
+          cur_data.dependencyValues[i] += cur_data.dependencyToAdd[i].load();
+        }
+        cur_data.dependencyToAdd[i] = 0;
+      }
+    },
+    galois::loopname(graph.get_run_identifier("UpdateDependency").c_str()),
+    galois::no_stats()
+  );
+}
+
 /**
  * Back propagate dependency values depending on the round that a node
  * sent out the shortest path message.
@@ -492,7 +513,7 @@ void BackProp(Graph& graph) {
             // determine if this source is a predecessor
             if (myDistance == (src_data.oldMinDistances[i] + 1)) {
               // add to dependency of predecessor using our finalized one
-              galois::atomicAdd(src_data.dependencyValues[i], toAdd);
+              galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
             }
           }
         }
@@ -501,6 +522,7 @@ void BackProp(Graph& graph) {
       galois::no_stats()
     );
 
+
     // dependency written to source
     // dep needs to be on dst nodes, but final round needs them on all nodes
     if (currentRound != roundNumber) {
@@ -508,8 +530,10 @@ void BackProp(Graph& graph) {
 
     } else {
       // sync all
-
     }
+
+    UpdateDependency(graph);
+
     currentRound++;
   }
 }
