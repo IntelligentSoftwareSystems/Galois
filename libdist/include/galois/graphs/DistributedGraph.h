@@ -1553,9 +1553,15 @@ private:
   }
   
   /**
-   * TODO
+   * Non-bitset extract that uses serializelazy. REQUIRES that the ValTy
+   * be memory copyable.
    */
-  template<SyncType syncType, typename SyncFnTy>
+  template<SyncType syncType, typename SyncFnTy, 
+           typename std::enable_if<
+             galois::runtime::is_memory_copyable<
+               typename SyncFnTy::ValTy
+             >::value
+           >::type* = nullptr>
   void sync_extract(std::string loopName, unsigned from_id, 
                     std::vector<size_t> &indices, galois::runtime::SendBuffer &b) {
     uint32_t num = indices.size();
@@ -1597,6 +1603,25 @@ private:
                              std::to_string(data_mode) + "_" + 
                              get_run_identifier(loopName));
     galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+  }
+
+  /**
+   * Non-bitset extract for when the type of the item being sync'd isn't
+   * memory copyable.
+   *
+   * TODO implement this
+   */
+  template<SyncType syncType, typename SyncFnTy, 
+           typename std::enable_if<
+             !galois::runtime::is_memory_copyable<
+               typename SyncFnTy::ValTy
+             >::value
+           >::type* = nullptr>
+  void sync_extract(std::string loopName, unsigned from_id, 
+                    std::vector<size_t> &indices, 
+                    galois::runtime::SendBuffer &b) {
+    GALOIS_DIE("Non memory copyable sync_extract without bitset not yet "
+               "implemented");
   }
   
   /**
@@ -1695,15 +1720,24 @@ private:
   }
   
   /**
-   * TODO
+   * Extract the data that is going to be sent for synchronization.
+   *
+   * @tparam syncType synchronization type
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has information needed to access bitset
+   *
+   * @param loopName Name to give timer
+   * @param x Host to send to
+   * @param b Buffer that will hold data to send
    */
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
-  void get_send_buffer(std::string loopName, unsigned x, galois::runtime::SendBuffer &b) {
+  void get_send_buffer(std::string loopName, unsigned x, 
+                       galois::runtime::SendBuffer &b) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
     if (BitsetFnTy::is_valid()) {
-      sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x,
-                                                   sharedNodes[x], b);
+      sync_extract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sharedNodes[x], 
+                                                   b);
     } else {
       sync_extract<syncType, SyncFnTy>(loopName, x, sharedNodes[x], b);
     }
