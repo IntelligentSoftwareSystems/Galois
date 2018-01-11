@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,6 +19,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_SERIALIZE_H
 #define GALOIS_RUNTIME_SERIALIZE_H
@@ -118,8 +120,9 @@ class DeSerializeBuffer {
 public:
 
   DeSerializeBuffer() :offset(0) {}
-  DeSerializeBuffer(DeSerializeBuffer&&) = default; //disable copy constructor
-  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) : bufdata(std::move(v)), offset(start) {}
+  DeSerializeBuffer(DeSerializeBuffer&&) = default; // disable copy constructor
+  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) 
+    : bufdata(std::move(v)), offset(start) {}
 
   explicit DeSerializeBuffer(std::vector<uint8_t>& data) {
     bufdata.swap(data);
@@ -170,7 +173,7 @@ public:
   bool atAlignment(size_t a) { return (uintptr_t)r_linearData() % a == 0; }
     
 
-  //Utility
+  // Utility
 
   void print(std::ostream& o) const {
     o << "<{(" << offset << ") " << std::hex;
@@ -266,7 +269,6 @@ static inline size_t gSized(Args&&... args) {
 
 
 namespace internal {
-
 template<typename T>
 inline void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
@@ -324,7 +326,7 @@ void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
 
 template<typename T, typename Alloc>
 inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
-  if (is_memory_copyable<T>::value)
+  if (is_memory_copyable<T>::value) 
     gSerializeLinearSeq(buf, data);
   else
     gSerializeSeq(buf, data);
@@ -362,8 +364,8 @@ inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& dat
      gSerializeObj(buf, data.get_vec());
 }
 
-
-// TODO removed the functions in Bag.h that this function requires
+// TODO removed the functions in Bag.h that this function requires, so this 
+// won't work
 ///**
 // * For serializing insertBag.
 // * Insert contigous memory chunks for each thread
@@ -386,9 +388,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& dat
 //  assert(totalSize == bag.size());
 //  bag.clear();
 //}
-
-
-} //internal
+} // end internal namespace
 
 template<typename T>
 struct LazyRef { size_t off; };
@@ -476,7 +476,6 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, std::basic_string<char, std:
   };
 }
 
-
 template<typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
   seq.clear();
@@ -506,6 +505,7 @@ void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
   }
 }
 
+
 template<typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
   gDeserializeSeq(buf, data);
@@ -531,13 +531,13 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data)
   gDeserializeObj(buf, data.get_vec());
 }
 
+
 } //namespace internal
 
 
 //SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
 //  bufdata.swap(buf.bufdata);
 //}
-
 
 template<typename T1, typename... Args>
 void gDeserialize(DeSerializeBuffer& buf, T1&& t1, Args&&... args) {
@@ -557,6 +557,6 @@ auto gDeserializeRaw(Iter iter, T& data) ->
   return iter;
 }
 
-} //Runtime
-} //Galois
+} // end runtime namespace
+} // end galois namespace
 #endif //SERIALIZE
