@@ -22,6 +22,7 @@
  *
  * Graph Simulation.
  *
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
 #include "galois/Galois.h"
@@ -68,14 +69,18 @@ static cll::opt<std::string> dataGraph("d",
 static cll::opt<std::string> outputFile("o",
                                         cll::desc("[match output]"));
 
-struct QNode {
-  bool matched;
+struct GNode {
   uint32_t label;
-  uint32_t id;
+  uint64_t id; // specific to the label
+  uint64_t matched; // maximum of 64 nodes in the query graph
+  // TODO: make matched a dynamic bitset
 };
 
-template<typename Graph>
-void initializeQueryGraph(Graph& g) {
+typedef galois::graphs::LC_CSR_Graph<GNode, void>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
+
+
+template<typename G>
+void initializeQueryGraph(G& g) {
   uint32_t i = 0;
   for (auto n: g) {
     g.getData(n).id = i++;
@@ -84,13 +89,13 @@ void initializeQueryGraph(Graph& g) {
   galois::do_all(galois::iterate(g),
       [&g] (typename Graph::GraphNode n) {
         auto& data = g.getData(n);
-        data.matched = false;
+        data.matched = 0; // matches to none
         data.label = data.id;
       });
 }
 
-template<typename Graph>
-void initializeDataGraph(Graph& g, uint32_t labelCount) {
+template<typename G>
+void initializeDataGraph(G& g, uint32_t labelCount) {
   uint32_t i = 0;
   for (auto n: g) {
     g.getData(n).id = i++;
@@ -99,7 +104,7 @@ void initializeDataGraph(Graph& g, uint32_t labelCount) {
   galois::do_all(galois::iterate(g),
       [&g, labelCount] (typename Graph::GraphNode n) {
         auto& data = g.getData(n);
-        data.matched = false;
+        data.matched = 0; // matches to none
         data.label = data.id % labelCount; // TODO: change to random
       });
 }
@@ -110,15 +115,16 @@ void matchLabel(QG& qG, DG& dG, W& w) {
       [&dG, &qG, &w] (typename DG::GraphNode dn) {
         auto& dData = dG.getData(dn);
         for (auto qn: qG) {
+          assert(qn < 64); // because matched is 64-bit
           auto& qData = qG.getData(qn);
           if (qData.label == dData.label) {
             if (!qData.matched) {
-              qData.matched = true;
+              qData.matched = 1;
             }
-            dData.matched = true;
-            dData.matchedQGNode = qn;
-            w.push_back(dn);
-            break;
+            if (!dData.matched) {
+              w.push_back(dn);
+            }
+            dData.matched |= 1 << qn; // multiple matches
           }
         }
       },
@@ -153,7 +159,12 @@ void reportSimulation(QG& qG, DG& dG) {
   for (auto dn: dG) {
     auto& dData = dG.getData(dn);
     if (dData.matched) {
-      os << "(" << qG.getData(dData.matchedQGNode).id << ", " << dData.id << ")" << std::endl;
+      for (auto qn: qG) { // multiple matches
+        uint64_t mask = (1 << qn);
+        if (dData.matched & mask) {
+          os << "(" << qG.getData(qn).id << ", " << dData.id << ")" << std::endl;
+        }
+      }
     }
   }
 
@@ -162,28 +173,9 @@ void reportSimulation(QG& qG, DG& dG) {
   }
 }
 
-void runGraphSimulation() {
-  using QGraph = galois::graphs::LC_CSR_Graph<QNode, void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
-  using QGNode = QGraph::GraphNode;
-
-  QGraph qG;
-  galois::graphs::readGraph(qG, queryGraph);
-  std::cout << "Read query graph of " << qG.size() << " nodes" << std::endl;
-  initializeQueryGraph(qG);
-
-  struct DNode {
-    bool matched;
-    QGNode matchedQGNode;
-    uint32_t label;
-    uint32_t id;
-  };
-  using DGraph = galois::graphs::LC_CSR_Graph<DNode, void>::with_no_lockable<true>::type::with_numa_alloc<true>::type;
-  using DGNode = DGraph::GraphNode;
-
-  DGraph dG;
-  galois::graphs::readGraph(dG, dataGraph);
-  std::cout << "Read data graph of " << dG.size() << " nodes" << std::endl;
-  initializeDataGraph(dG, qG.size());
+template<typename QG, typename DG>
+void runGraphSimulation(QG& qG, DG& dG) {
+  using DGNode = Graph::GraphNode;
 
   using WorkQueue = galois::InsertBag<DGNode>;
   WorkQueue w[2];
@@ -211,24 +203,29 @@ void runGraphSimulation() {
         [&dG, &qG, cur, next] (DGNode dn) {
           auto& dData = dG.getData(dn);
 
-          // match children links
-          // TODO: sort query edges and data edges by label, e.g. node data
-          for (auto qe: qG.edges(dData.matchedQGNode)) {
-            auto qDst = qG.getEdgeDst(qe);
+          for (auto qn: qG) { // multiple matches
+            uint64_t mask = (1 << qn);
+            if (dData.matched & mask) {
+              // match children links
+              // TODO: sort query edges and data edges by label, e.g. node data
+              for (auto qe: qG.edges(qn)) {
+                auto qDst = qG.getEdgeDst(qe);
 
-            bool matched = false;
-            for (auto de: dG.edges(dn)) {
-              auto& dDstData = dG.getData(dG.getEdgeDst(de));
-              if (dDstData.matched && qDst == dDstData.matchedQGNode) {
-                matched = true;
-                break;
+                bool matched = false;
+                for (auto de: dG.edges(dn)) {
+                  auto& dDstData = dG.getData(dG.getEdgeDst(de));
+                  if (dDstData.matched & (1 << qDst)) {
+                    matched = true;
+                    break;
+                  }
+                }
+
+                // remove qn from dn when we have an unmatched edge
+                if (!matched) {
+                  dData.matched &= ~mask;
+                  break;
+                }
               }
-            }
-
-            // remove dn when we have an unmatched edge
-            if (!matched) {
-              dData.matched = false;
-              break;
             }
           }
 
@@ -251,12 +248,22 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
+  Graph qG;
+  galois::graphs::readGraph(qG, queryGraph);
+  std::cout << "Read query graph of " << qG.size() << " nodes" << std::endl;
+  initializeQueryGraph(qG);
+
+  Graph dG;
+  galois::graphs::readGraph(dG, dataGraph);
+  std::cout << "Read data graph of " << dG.size() << " nodes" << std::endl;
+  initializeDataGraph(dG, qG.size());
+
   galois::StatTimer T("TotalTime");
   T.start();
 
   switch(simType) {
   case Simulation::graph:
-    runGraphSimulation();
+    runGraphSimulation(qG, dG);
     break;
   case Simulation::dual:
 //    runDualSimulation();
