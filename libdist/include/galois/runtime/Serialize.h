@@ -299,6 +299,10 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::basic_string<char, st
   buf.insert((uint8_t*)data.data(), data.length()+1);
 }
 
+// Forward declaration
+template<typename T, typename Alloc>
+inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data); 
+
 //Fixme: specialize for Sequences with consecutive PODS
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
@@ -475,6 +479,10 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, std::basic_string<char, std:
     c = buf.pop();
   };
 }
+
+// Forward declaration
+template<typename T, typename Alloc>
+void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data);
 
 template<typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
