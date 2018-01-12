@@ -56,6 +56,12 @@ name = twitter40
 file = unweighted/twitter-WWW10-component.gr
 format = bin/galois
 
+[twitter40-transpose]
+flags = 
+name = twitter40-transpose
+file = unweighted/twitter-WWW10-component-transpose.gr
+format = bin/galois
+
 [twitter40-symmetric]
 flags = 
 name = twitter40-symmetric
