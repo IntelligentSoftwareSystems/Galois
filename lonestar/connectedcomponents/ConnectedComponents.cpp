@@ -436,18 +436,19 @@ struct EdgeTiledAsyncAlgo {
   void readGraph(G& graph) { galois::graphs::readGraph(graph, inputFilename); }
 
   struct EdgeTile{
-      Node* sData;
+      //Node* sData;
+      GNode src;
       Graph::edge_iterator beg;
       Graph::edge_iterator end;
   };
 
-  struct EdgeTileMaker {
+  /*struct EdgeTileMaker {
       EdgeTile operator() (Node* sdata, Graph::edge_iterator beg, Graph::edge_iterator end) const{
           return EdgeTile{sdata, beg, end};
       }
-  };
+  };*/
 
-  const int EDGE_TILE_SIZE=256;
+  const int EDGE_TILE_SIZE=48;
 
 
 
@@ -459,7 +460,7 @@ struct EdgeTiledAsyncAlgo {
 
     galois::do_all(galois::iterate(graph),
             [&] (const GNode& src)  {
-            Node& sdata=graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            //Node& sdata=graph.getData(src, galois::MethodFlag::UNPROTECTED);
             auto beg = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
             const auto end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
 
@@ -468,12 +469,13 @@ struct EdgeTiledAsyncAlgo {
                 for (; beg + EDGE_TILE_SIZE < end;) {
                     auto ne = beg + EDGE_TILE_SIZE;
                     assert(ne < end);
-                    works.push_back( EdgeTile{&sdata, beg, ne} );
+                    works.push_back( EdgeTile{src, beg, ne} );
+                    beg = ne;
                 }
             }
             
             if ((end - beg) > 0) {                                                                                               
-                works.push_back( EdgeTile{&sdata, beg, end} );  
+                works.push_back( EdgeTile{src, beg, end} );  
             }    
         }          
         , galois::loopname("CC-EdgeTiledAsyncInit")
@@ -484,30 +486,31 @@ struct EdgeTiledAsyncAlgo {
     [&] () {
     galois::do_all(galois::iterate(works), 
         [&] (const EdgeTile& tile) {
-          Node& sdata = *(tile.sData);
-          
-          //Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          //Node& sdata = *(tile.sData);
+          GNode src = tile.src; 
+          Node& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
           for (auto ii = tile.beg; ii != tile.end; ++ii) {
             GNode dst = graph.getEdgeDst(ii);
             Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-            //if (symmetricGraph && src >= dst)
-            //  continue;
+            if (symmetricGraph && src >= dst)
+              continue;
 
             if (!sdata.merge(&ddata))
               emptyMerges += 1;
           }
         }
-        ,galois::loopname("CC-Async")
+        ,galois::loopname("CC-edgetiledAsync")
         ,galois::steal()
+        , galois::chunk_size<1>()
         );
         //, galois::steal()
         //, galois::chunk_size<1>());
     },"CC-EdgeTiledAsync()"
   );
 
-    galois::runtime::reportStat_Single("CC-TiledAsync", "emptyMerges", emptyMerges.reduce());
+    galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges", emptyMerges.reduce());
   }
 };
 
@@ -548,10 +551,10 @@ galois::runtime::profileVtune(
           GNode dst = graph.getEdgeDst(e.second);
           Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-          //if(symmetricGraph && e.first > dst)
+          if(symmetricGraph && e.first > dst)
             //continue;
-
-          if (!sdata.merge(&ddata)) {
+            ;
+          else if (!sdata.merge(&ddata)) {
             emptyMerges += 1;
           }
         },
