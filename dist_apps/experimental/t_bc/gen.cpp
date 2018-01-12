@@ -1,4 +1,4 @@
-/** Betweeness Centrality (PR) -*- C++ -*-
+/** Betweeness Centrality (Pontecorvi-Ramachandran) -*- C++ -*-
  * @file
  * @section License
  *
@@ -86,6 +86,7 @@ struct NodeData {
 
 galois::DynamicBitSet bitset_minDistances;
 galois::DynamicBitSet bitset_shortestPathToAdd;
+galois::DynamicBitSet bitset_dependencyToAdd;
 
 // Dist Graph using a bidirectional CSR graph
 using Graph = galois::graphs::DistGraph<NodeData, void, true>;
@@ -456,11 +457,22 @@ void UpdateDependency(Graph& graph) {
       NodeData& cur_data = graph.getData(curNode);
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        //if (graph.getGID(curNode) == 3) {
+        //  if (i == 1) {
+        //    printf("c %f, %f", cur_data.dependencyValues[i], 
+        //                         cur_data.dependencyToAdd[i].load());
+        //    //galois::gPrint("c", cur_data.dependencyValues[i], ", ");
+        //    //galois::gPrint(cur_data.dependencyToAdd[i].load(), ", ");
+        //  }
+        //}
         if (cur_data.dependencyToAdd[i] > 0) {
           cur_data.dependencyValues[i] += cur_data.dependencyToAdd[i].load();
         }
         cur_data.dependencyToAdd[i] = 0;
       }
+      //if (graph.getGID(curNode) == 3) {
+      //  galois::gPrint("\n");
+      //}
     },
     galois::loopname(graph.get_run_identifier("UpdateDependency").c_str()),
     galois::no_stats()
@@ -514,6 +526,7 @@ void BackProp(Graph& graph) {
             if (myDistance == (src_data.oldMinDistances[i] + 1)) {
               // add to dependency of predecessor using our finalized one
               galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
+              bitset_shortestPathToAdd.set(src);
             }
           }
         }
@@ -522,15 +535,14 @@ void BackProp(Graph& graph) {
       galois::no_stats()
     );
 
-
+    // TODO #2 this might be wrong (that, or just floating point imprecision)
+    // TODO can be optimized (see comment below)
+    graph.sync<writeSource, readAny, 
+               Reduce_pair_wise_add_array_dependencyToAdd, 
+               Broadcast_dependencyToAdd, 
+               Bitset_dependencyToAdd>("DependencySync");
     // dependency written to source
     // dep needs to be on dst nodes, but final round needs them on all nodes
-    if (currentRound != roundNumber) {
-      // sync to only dests
-
-    } else {
-      // sync all
-    }
 
     UpdateDependency(graph);
 
@@ -543,20 +555,27 @@ void BackProp(Graph& graph) {
  * final BC value.
  */
 void BC(Graph& graph) {
-  const auto& allNodes = graph.allNodesRange();
+  const auto& masterNodes = graph.masterNodesRange();
   graph.set_num_iter(0);
 
   galois::do_all(
-    galois::iterate(allNodes.begin(), allNodes.end()), 
+    galois::iterate(masterNodes.begin(), masterNodes.end()), 
     [&] (GNode node) {
       NodeData& cur_data = graph.getData(node);
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         // exclude sources themselves from BC calculation
         if (graph.getGID(node) != (i + offset)) {
+          //if (graph.getGID(node) == 3) {
+          //  galois::gPrint(cur_data.dependencyValues[i], ", ");
+          //}
           cur_data.bc += cur_data.dependencyValues[i];
         }
+
       }
+      //if (graph.getGID(node) == 3) {
+      //  galois::gPrint("\n");
+      //}
     },
     galois::loopname(graph.get_run_identifier("BC").c_str()),
     galois::no_stats()
@@ -573,9 +592,10 @@ void BC(Graph& graph) {
 /* Main method for running */
 /******************************************************************************/
 
-constexpr static const char* const name = "PR-Betweeness Centrality"; 
-constexpr static const char* const desc = "PR-Betweeness Centrality on Distributed "
-                                          "Galois.";
+constexpr static const char* const name = "Pontecorvi-Ramachandran Betweeness "
+                                          "Centrality"; 
+constexpr static const char* const desc = "Pontecorvi-Ramachandran Betweeness "
+                                          "Centrality on Distributed Galois.";
 constexpr static const char* const url = 0;
 
 int main(int argc, char** argv) {
@@ -611,6 +631,7 @@ int main(int argc, char** argv) {
 
   bitset_minDistances.resize(hg->size());
   bitset_shortestPathToAdd.resize(hg->size());
+  bitset_dependencyToAdd.resize(hg->size());
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");

@@ -99,3 +99,12 @@ GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd,
                                                  std::vector<uint32_t>);
 GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, std::vector<uint32_t>);
 GALOIS_SYNC_STRUCTURE_BITSET(shortestPathToAdd);
+
+
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(
+  dependencyToAdd, 
+  std::vector<galois::CopyableAtomic<float>>
+);
+GALOIS_SYNC_STRUCTURE_BROADCAST(dependencyToAdd, 
+                                std::vector<galois::CopyableAtomic<float>>);
+GALOIS_SYNC_STRUCTURE_BITSET(dependencyToAdd);
