@@ -20,7 +20,8 @@
  *
  * @section Description
  *
- * Wrapper to make atomics copyable.
+ * Wrapper to make atomics copyable (one use case is to be
+ * able to be used in std::vector).
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
@@ -36,20 +37,16 @@ namespace galois {
   public:
     CopyableAtomic() : std::atomic<T>(T{}) {}
 
-    constexpr CopyableAtomic(T desired) : std::atomic<T>(desired) {}
+    constexpr CopyableAtomic(T desired) : std::atomic<T>(desired) { }
 
     constexpr CopyableAtomic(const CopyableAtomic<T>& other) 
-      : CopyableAtomic(other.load(std::memory_order_relaxed)) {}
+      : CopyableAtomic(other.load(std::memory_order_relaxed)) { }
 
     CopyableAtomic& operator=(const CopyableAtomic<T>& other) {
       this->store(other.load(std::memory_order_relaxed), 
                   std::memory_order_relaxed);
       return *this;
     }
-
-    // only typedef if T is trivially copyable to use mem copy in serialize/deserialize.
-    using tt_is_copyable = 
-     typename std::enable_if<__is_trivially_copyable(T), int>::type;
   };
 }
 #endif

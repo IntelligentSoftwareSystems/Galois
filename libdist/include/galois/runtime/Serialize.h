@@ -21,6 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_SERIALIZE_H
 #define GALOIS_RUNTIME_SERIALIZE_H
@@ -50,17 +51,17 @@ namespace runtime {
 //deserialization with default constructor)
 //We can also use this to update original objects during writeback
 
-class DeSerializeBuffer;
+class DeSerializeBuffer; // forward declaration for friend declaration
 
 class SerializeBuffer {
   friend DeSerializeBuffer;
+
   typedef std::vector<uint8_t> vTy;
   vTy bufdata;
 public:
-
   SerializeBuffer() = default;
-  SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
-  //  inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
+  SerializeBuffer(SerializeBuffer&& rhs) = default;  // disable copy constructor
+  //inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
 
   SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len) {}
 
@@ -76,7 +77,9 @@ public:
     std::copy_n(c, bytes, bufdata.begin() + offset);
   }
   
-  //returns offset to use for insertAt
+  /**
+   * @returns offset to use for insertAt
+   */
   size_t encomber(size_t bytes) {
     size_t retval = bufdata.size();
     bufdata.resize(retval+bytes);
@@ -96,8 +99,7 @@ public:
   typedef vTy::size_type size_type;
   size_type size() const { return bufdata.size(); }
 
-  //Utility
-
+  // Utility
   void print(std::ostream& o) const {
     o << "<{" << std::hex;
     for (auto& i : bufdata)
@@ -118,7 +120,6 @@ class DeSerializeBuffer {
   std::vector<uint8_t> bufdata;
   int offset;
 public:
-
   DeSerializeBuffer() :offset(0) {}
   DeSerializeBuffer(DeSerializeBuffer&&) = default; // disable copy constructor
   DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) 
@@ -174,7 +175,6 @@ public:
     
 
   // Utility
-
   void print(std::ostream& o) const {
     o << "<{(" << offset << ") " << std::hex;
     for (auto ii = bufdata.begin(), ee = bufdata.end(); ii != ee; ++ii)
@@ -187,7 +187,6 @@ public:
     return os;
   }
 };
-
 
 namespace internal {
 
@@ -260,15 +259,19 @@ inline size_t adder(size_t a) { return a; }
 template<typename... Args>
 inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(args...); }
 
-} //internal
+} // end internal namespace
 
 template<typename... Args>
 static inline size_t gSized(Args&&... args) {
   return internal::adder(internal::gSizedObj(args)...);
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Serialize support
+////////////////////////////////////////////////////////////////////////////////
 
 namespace internal {
+
 template<typename T>
 inline void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
@@ -289,9 +292,16 @@ template<typename T1, typename T2>
 inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
+
+/**
+ * Specialization for copyable atomic: load atomic data as a plain old 
+ * datatype (POD) and mem copy it to the buffer.
+ */
 template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, const galois::CopyableAtomic<T>& data){
-  buf.insert((uint8_t*)data.load(), sizeof(T));
+inline void gSerializeObj(SerializeBuffer& buf, 
+                          const galois::CopyableAtomic<T>& data){
+  T temp = data.load();
+  buf.insert((uint8_t*)(&temp), sizeof(T));
 }
 
 template <typename A>
@@ -299,11 +309,11 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::basic_string<char, st
   buf.insert((uint8_t*)data.data(), data.length()+1);
 }
 
-// Forward declaration
+// Forward declaration of vector serialize
 template<typename T, typename Alloc>
 inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data); 
 
-//Fixme: specialize for Sequences with consecutive PODS
+// Fixme: specialize for Sequences with consecutive PODS
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
@@ -356,16 +366,15 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
-
-
 //template<typename T>
 //inline void gSerializeObj(SerializeBuffer& buf, const std::vector<galois::CopyableAtomic<T>>& data){
   //gSerializeSeq(buf, data);
 //}
 
-inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& data) {
-     gSerializeObj(buf, data.size());
-     gSerializeObj(buf, data.get_vec());
+inline void gSerializeObj(SerializeBuffer& buf, 
+                          const galois::DynamicBitSet& data) {
+  gSerializeObj(buf, data.size());
+  gSerializeObj(buf, data.get_vec());
 }
 
 // TODO removed the functions in Bag.h that this function requires, so this 
@@ -392,6 +401,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const galois::DynamicBitSet& dat
 //  assert(totalSize == bag.size());
 //  bag.clear();
 //}
+
 } // end internal namespace
 
 template<typename T>
@@ -429,7 +439,7 @@ static inline void gSerialize(SerializeBuffer&) {}
 
 
 ////////////////////////////////////////////////////////////////////////////////
-//Deserialize support
+// Deserialize support
 ////////////////////////////////////////////////////////////////////////////////
 
 namespace internal {
@@ -455,11 +465,24 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
   gDeserialize(buf, data.first, data.second);
 }
 
+/**
+ * Specialization for CopyableAtomic. Loads the POD from the DeserializeBuffer
+ * then stores it into the atomic.
+ */
+template<typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::CopyableAtomic<T>& data){
+  T tempData;
+  uint8_t* pointerToTemp = (uint8_t*)&tempData;
+  buf.extract(pointerToTemp, sizeof(T));
+  data.store(tempData); 
+}
+
 namespace {
 template<int ...> struct seq {};
 template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
 template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
 }
+
 template<typename... T, int... S>
 void gDeserializeTuple(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>) {
   gDeserialize(buf, std::get<S>(data)...);
@@ -470,7 +493,6 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
   return gDeserializeTuple(buf, data, typename gens<sizeof...(T)>::type());
 }
 
-
 template <typename A>
 inline void gDeserializeObj(DeSerializeBuffer& buf, std::basic_string<char, std::char_traits<char>, A>& data) {
   char c = buf.pop();
@@ -480,7 +502,7 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, std::basic_string<char, std:
   };
 }
 
-// Forward declaration
+// Forward declaration of vector deserialize
 template<typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data);
 
@@ -539,9 +561,7 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data)
   gDeserializeObj(buf, data.get_vec());
 }
 
-
 } //namespace internal
-
 
 //SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
 //  bufdata.swap(buf.bufdata);
@@ -567,4 +587,5 @@ auto gDeserializeRaw(Iter iter, T& data) ->
 
 } // end runtime namespace
 } // end galois namespace
-#endif //SERIALIZE
+
+#endif // SERIALIZE DEF end
