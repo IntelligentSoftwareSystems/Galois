@@ -28,59 +28,7 @@
 #ifndef GALOIS_PYTHON_GRAPH_H
 #define GALOIS_PYTHON_GRAPH_H
 
-#include "galois/graphs/Graph.h"
-
-#include <string>
-#include <unordered_map>
-#include <vector>
-
-typedef std::string KeyTy;
-typedef std::string ValTy;
-typedef std::unordered_map<KeyTy, ValTy> Attr;
-
-typedef char * KeyAltTy;
-typedef char * ValAltTy;
-
-struct Node;
-
-#define DIRECTED true
-#define IN_EDGES true
-
-typedef galois::graphs::FirstGraph<Node, Attr, DIRECTED, IN_EDGES> Graph; // Node nodes and Attr edges
-typedef Graph::GraphNode GNode;
-
-// see StatCollector for the design
-struct Node {
-  Attr attr;
-  union {
-    struct {
-      size_t vInt;
-      double vDouble;
-    } ID;
-    struct {
-      size_t vInt1;
-      size_t vInt2;
-    } II;
-    struct {
-      size_t vDouble1;
-      size_t vDouble2;
-    } DD;
-    struct {
-      double vDouble;
-      std::atomic<double> vAtomicDouble;
-    } DAd;
-    std::vector<GNode> vVec;
-  };
-
-  // analyses are responsible to construct/destruct the union properly
-  Node() {}
-  ~Node() {}
-};
-
-struct Edge {
-  GNode src;
-  GNode dst;
-};
+#include "../graphsimulation/GraphSimulation.h"
 
 extern "C" {
 
@@ -88,16 +36,18 @@ Graph *createGraph();
 void deleteGraph(Graph *g);
 void printGraph(Graph *g);
 
-GNode createNode(Graph *g);
-void addNode(Graph *g, const GNode n);
-void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
-const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
-void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
+void allocate(Graph *g, size_t numNodes, size_t numEdges);
+void fixEndEdge(Graph *g, uint32_t nodeIndex, uint64_t edgeIndex);
+void setNode(Graph *g, uint32_t nodeIndex, uint32_t label, uint64_t id);
+void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp);
 
-Edge addEdge(Graph *g, GNode src, GNode dst);
-void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
-const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
-void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
+//void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
+//const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
+//void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
+
+//void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
+//const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
+//void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 
 void setNumThreads(int numThreads);
 size_t getNumNodes(Graph* g);

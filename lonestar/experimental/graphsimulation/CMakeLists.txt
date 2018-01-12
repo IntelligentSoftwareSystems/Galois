@@ -1,1 +1,1 @@
-app(graph-simulation GraphSimulation.cpp)
+app(graph-simulation GraphSimulation.cpp GraphSimulationApp.cpp)
