@@ -62,6 +62,12 @@ name = twitter40-symmetric
 file = unweighted/twitter-WWW10-component-symmetric.gr
 format = bin/galois
 
+[twitter50-transpose]
+flags = 
+name = twitter50-transpose
+file = unweighted/twitter-ICWSM10-component-transpose.gr
+format = bin/galois
+
 [soc-livejournal]
 flags = 
 name = soc-livejournal
