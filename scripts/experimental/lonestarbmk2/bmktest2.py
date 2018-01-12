@@ -20,6 +20,7 @@ class SharedMemApp(GraphBMKSharedMem):
             if x.props.format == 'mesh': return True
             if x.props.format == 'mesh/nodes': return True
             if x.props.format == 'triangles': return True
+            if x.props.format == 'text': return True
             if x.props.format == 'nothing': return True
 
             return False
@@ -189,15 +190,15 @@ class MatrixCompletion(SharedMemApp):
     relativeAppPath = "matrixcompletion/mc"
     benchmark = "matrixcompletion"
 
-    def get_run_spec(self, bmkinput, config):
-        """Adds matrix completion type"""
-        specs = self.get_default_run_specs(bmkinput, config)
+    #def get_run_spec(self, bmkinput, config):
+    #    """Adds matrix completion type"""
+    #    specs = self.get_default_run_specs(bmkinput, config)
 
-        # TODO change this to some canonical version
-        for s in specs:
-            s.set_arg("-algo=block") # algo type
-        
-        return specs
+    #    ## TODO change this to some canonical version
+    #    #for s in specs:
+    #    #    s.set_arg("-algo=block") # algo type
+    #    
+    #    return specs
 
 
 class MCM(SharedMemApp):
@@ -217,9 +218,22 @@ class MCM(SharedMemApp):
         
         return specs
 
-class PageRank(SharedMemApp):
-    relativeAppPath = "pagerank/pagerank"
-    benchmark = "pagerank"
+class PageRankPull(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-pull"
+    benchmark = "pagerank-pull"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.0001") # pagerank tolerance
+        
+        return specs
+
+class PageRankPush(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-push"
+    benchmark = "pagerank-push"
 
     def get_run_spec(self, bmkinput, config):
         """Adds tolerance argument"""
@@ -260,19 +274,9 @@ class PreflowPush(SharedMemApp):
         
         return specs
 
-# TODO what are these constraints this app takes?
 class PointsToAnalysis(SharedMemApp):
     relativeAppPath = "pta/pta"
     benchmark = "pta"
-
-    def get_run_spec(self, bmkinput, config):
-        """Adds pta specific arguments"""
-        specs = self.get_default_run_specs(bmkinput, config)
-
-        for s in specs:
-            s.set_arg("0") # TODO what are contraints?
-        
-        return specs
 
 class SpanningTree(SharedMemApp):
     relativeAppPath = "spanningtree/spanningtree"  
@@ -338,13 +342,9 @@ class TrianglesEdge(SharedMemApp):
         
         return specs
 
-
 # specification of binaries to run
 # apps present in Galois 2.2
-#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
-#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-#            GMetis(), IndependentSet(), MCM(), PageRank(), PreflowPush(), 
-#            SpanningTree(), SSSP(), SurveyPropagation()]
-#BINARIES = [MCM(), PageRank()]
-#BINARIES = [PageRank2Point2()]
-#BINARIES = [BCInnerLeveled()]
+BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
+            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
+            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
