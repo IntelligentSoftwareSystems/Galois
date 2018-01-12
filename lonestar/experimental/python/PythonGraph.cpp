@@ -3,6 +3,23 @@
 #include <iostream>
 
 /*************************************
+ * APIs for GaloisRuntime
+ *************************************/
+void initGaloisRuntime() {
+  static galois::SharedMemSys *G;
+  if (G != NULL) delete G;
+  G = new galois::SharedMemSys();
+}
+
+void setNumThreads(int numThreads) {
+  galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
+}
+
+int getNumThreads() {
+  return galois::getActiveThreads();
+}
+
+/*************************************
  * APIs for PythonGraph
  *************************************/
 Graph *createGraph() {
@@ -29,7 +46,7 @@ void printGraph(Graph* g) {
   }
 }
 
-void allocate(Graph *g, size_t numNodes, size_t numEdges) {
+void allocateGraph(Graph *g, size_t numNodes, size_t numEdges) {
   g->allocateFrom(numNodes, numEdges);
   g->constructNodes();
 }
@@ -80,10 +97,6 @@ void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t
 //  assert(ei != g.edge_end(e.src));
 //  g->getEdgeData(ei).erase(key);
 //}
-
-void setNumThreads(int numThreads) {
-  galois::setActiveThreads(numThreads < 1 ? 1 : numThreads);
-}
 
 size_t getNumNodes(Graph *g) {
   return g->size();

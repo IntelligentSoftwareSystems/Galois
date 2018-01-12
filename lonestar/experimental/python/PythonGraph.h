@@ -32,14 +32,21 @@
 
 extern "C" {
 
+void initGaloisRuntime();
+void setNumThreads(int numThreads);
+int getNumThreads();
+
 Graph *createGraph();
 void deleteGraph(Graph *g);
 void printGraph(Graph *g);
 
-void allocate(Graph *g, size_t numNodes, size_t numEdges);
+void allocateGraph(Graph *g, size_t numNodes, size_t numEdges);
 void fixEndEdge(Graph *g, uint32_t nodeIndex, uint64_t edgeIndex);
 void setNode(Graph *g, uint32_t nodeIndex, uint32_t label, uint64_t id);
 void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp);
+
+size_t getNumNodes(Graph* g);
+size_t getNumEdges(Graph* g);
 
 //void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
 //const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
@@ -48,10 +55,6 @@ void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t
 //void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
 //const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
 //void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
-
-void setNumThreads(int numThreads);
-size_t getNumNodes(Graph* g);
-size_t getNumEdges(Graph* g);
 
 } // extern "C"
 
