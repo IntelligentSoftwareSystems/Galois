@@ -38,7 +38,7 @@
 
 struct Node {
   uint32_t label;
-  uint64_t id; // specific to the label
+  uint32_t id; // specific to the label
   uint64_t matched; // maximum of 64 nodes in the query graph
   // TODO: make matched a dynamic bitset
   // TODO: add custom attributes
@@ -56,3 +56,9 @@ typedef Graph::GraphNode GNode;
 void runGraphSimulation(Graph& queryGraph, Graph& dataGraph);
 void reportGraphSimulation(Graph& queryGraph, Graph& dataGraph, std::string outputFile);
 
+struct AttributedGraph {
+  Graph graph;
+  std::vector<std::string> nodeLabels;
+  std::vector<std::string> edgeLabels;
+  std::vector<std::string> nodeNames;
+};

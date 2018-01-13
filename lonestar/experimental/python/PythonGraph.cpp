@@ -22,87 +22,107 @@ int getNumThreads() {
 /*************************************
  * APIs for PythonGraph
  *************************************/
-Graph *createGraph() {
-  Graph *g = new Graph();
+AttributedGraph *createGraph() {
+  AttributedGraph *g = new AttributedGraph();
   return g;
 }
 
-void deleteGraph(Graph *g) {
+void deleteGraph(AttributedGraph *g) {
   delete g;
 }
 
-void printGraph(Graph* g) {
-  for(auto n: *g) {
-    std::cout << "node " << n << std::endl;
-    auto& nd = g->getData(n);
-    std::cout << "node label " << nd.label << std::endl;
-    std::cout << "node id " << nd.id << std::endl;
-    for(auto e: g->edges(n)) {
-      std::cout << "  edge to " << g->getEdgeDst(e) << std::endl;
-      auto& ed = g->getEdgeData(e);
-      std::cout << "edge label " << ed.label << std::endl;
-      std::cout << "edge timestamp " << ed.timestamp << std::endl;
+void printGraph(AttributedGraph* g) {
+  Graph& graph = g->graph;
+  auto& nodeLabels = g->nodeLabels;
+  auto& edgeLabels = g->edgeLabels;
+  auto& nodeNames = g->nodeNames;
+  for(auto n: graph) {
+    auto& nd = graph.getData(n);
+    auto& srcLabel = nodeLabels[nd.label];
+    auto& srcName = nodeNames[nd.id];
+    for(auto e: graph.edges(n)) {
+      auto& dst = graph.getData(graph.getEdgeDst(e));
+      auto& dstLabel = nodeLabels[dst.label];
+      auto& dstName = nodeNames[dst.id];
+      auto& ed = graph.getEdgeData(e);
+      auto& edgeLabel = edgeLabels[ed.label];
+      auto& edgeTimestamp = ed.timestamp;
+      std::cout << srcLabel << " " << srcName << " " 
+                << edgeLabel << " " << dstLabel << " " 
+                << dstName << " at " << edgeTimestamp << std::endl;
     }
   }
 }
 
-void allocateGraph(Graph *g, size_t numNodes, size_t numEdges) {
-  g->allocateFrom(numNodes, numEdges);
-  g->constructNodes();
+void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t numNodeLabels, size_t numEdgeLabels) {
+  g->graph.allocateFrom(numNodes, numEdges);
+  g->graph.constructNodes();
+  g->nodeLabels.resize(numNodeLabels);
+  g->edgeLabels.resize(numEdgeLabels);
+  g->nodeNames.resize(numNodes);
 }
 
-void fixEndEdge(Graph *g, uint32_t nodeIndex, uint64_t edgeIndex) {
-  g->fixEndEdge(nodeIndex, edgeIndex);
+void fixEndEdge(AttributedGraph *g, uint32_t nodeIndex, uint64_t edgeIndex) {
+  g->graph.fixEndEdge(nodeIndex, edgeIndex);
 }
 
-void setNode(Graph *g, uint32_t nodeIndex, uint32_t label, uint64_t id) {
-  auto& nd = g->getData(nodeIndex);
+void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t label, char *nodeName) {
+  auto& nd = g->graph.getData(nodeIndex);
   nd.label = label;
-  nd.id = id;
+  nd.id = nodeIndex;
+  g->nodeNames[nodeIndex] = nodeName;
 }
 
-void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp) {
+void setNodeLabel(AttributedGraph *g, uint32_t label, char *name) {
+  g->nodeLabels[label] = name;
+}
+
+void setEdgeLabel(AttributedGraph *g, uint32_t label, char *name) {
+  g->edgeLabels[label] = name;
+}
+
+void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp) {
   EdgeData ed;
   ed.label = label;
   ed.timestamp = timestamp;
-  g->constructEdge(edgeIndex, dstNodeIndex, ed);
+  g->graph.constructEdge(edgeIndex, dstNodeIndex, ed);
 }
 
-//void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val) {
+size_t getNumNodes(AttributedGraph *g) {
+  return g->graph.size();
+}
+
+size_t getNumEdges(AttributedGraph *g) {
+  return g->graph.sizeEdges();
+}
+
+//void setNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key, const ValAltTy val) {
 //  g->getData(n).attr[key] = val;
 //}
 //
-//const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
+//const ValAltTy getNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key) {
 //  return const_cast<ValAltTy>(g->getData(n).attr[key].c_str());
 //}
 //
-//void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key) {
+//void removeNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key) {
 //  g->getData(n).attr.erase(key);
 //}
 
-//void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
+//void setEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key, const ValAltTy val) {
 //  auto ei = g->findEdge(e.src, e.dst);
 //  assert(ei != g.edge_end(e.src));
 //  g->getEdgeData(ei)[key] = val;
 //}
 
-//const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
+//const ValAltTy getEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key) {
 //  auto ei = g->findEdge(e.src, e.dst);
 //  assert(ei != g.edge_end(e.src));
 //  return const_cast<ValAltTy>(g->getEdgeData(ei)[key].c_str());
 //}
 
-//void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key) {
+//void removeEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key) {
 //  auto ei = g->findEdge(e.src, e.dst);
 //  assert(ei != g.edge_end(e.src));
 //  g->getEdgeData(ei).erase(key);
 //}
-
-size_t getNumNodes(Graph *g) {
-  return g->size();
-}
-
-size_t getNumEdges(Graph *g) {
-  return g->sizeEdges();
-}
 

@@ -146,7 +146,7 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
                   break;
                 }
               }
-              // TODO: compare matched edges for timestampe and dst-id equality
+              // TODO: compare matched edges for timestamp and dst-id equality
             }
           }
 

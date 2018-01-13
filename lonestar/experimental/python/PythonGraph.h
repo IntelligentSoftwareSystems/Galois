@@ -36,25 +36,27 @@ void initGaloisRuntime();
 void setNumThreads(int numThreads);
 int getNumThreads();
 
-Graph *createGraph();
-void deleteGraph(Graph *g);
-void printGraph(Graph *g);
+AttributedGraph *createGraph();
+void deleteGraph(AttributedGraph *g);
+void printGraph(AttributedGraph *g);
 
-void allocateGraph(Graph *g, size_t numNodes, size_t numEdges);
-void fixEndEdge(Graph *g, uint32_t nodeIndex, uint64_t edgeIndex);
-void setNode(Graph *g, uint32_t nodeIndex, uint32_t label, uint64_t id);
-void constructEdge(Graph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp);
+void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t numNodeLabels, size_t numEdgeLabels);
+void fixEndEdge(AttributedGraph *g, uint32_t nodeIndex, uint64_t edgeIndex);
+void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t label, char* name);
+void setNodeLabel(AttributedGraph *g, uint32_t label, char* name);
+void setEdgeLabel(AttributedGraph *g, uint32_t label, char* name);
+void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp);
 
-size_t getNumNodes(Graph* g);
-size_t getNumEdges(Graph* g);
+size_t getNumNodes(AttributedGraph* g);
+size_t getNumEdges(AttributedGraph* g);
 
-//void setNodeAttr(Graph *g, GNode n, const KeyAltTy key, const ValAltTy val);
-//const ValAltTy getNodeAttr(Graph *g, GNode n, const KeyAltTy key);
-//void removeNodeAttr(Graph *g, GNode n, const KeyAltTy key);
+//void setNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key, const ValAltTy val);
+//const ValAltTy getNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key);
+//void removeNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key);
 
-//void setEdgeAttr(Graph *g, Edge e, const KeyAltTy key, const ValAltTy val);
-//const ValAltTy getEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
-//void removeEdgeAttr(Graph *g, Edge e, const KeyAltTy key);
+//void setEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key, const ValAltTy val);
+//const ValAltTy getEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
+//void removeEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
 
 } // extern "C"
 
