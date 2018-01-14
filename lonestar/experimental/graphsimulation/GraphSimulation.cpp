@@ -32,8 +32,8 @@
 
 template<typename QG, typename DG, typename W>
 void matchLabel(QG& qG, DG& dG, W& w) {
-  galois::do_all(galois::iterate(dG),
-      [&dG, &qG, &w] (typename DG::GraphNode dn) {
+  galois::do_all(galois::iterate(dG.begin(), dG.end()),
+      [&qG, &dG, &w] (typename DG::GraphNode dn) {
         auto& dData = dG.getData(dn);
         dData.matched = 0; // matches to none
         for (auto qn: qG) {
@@ -146,7 +146,7 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
                   break;
                 }
               }
-              // TODO: compare matched edges for timestamp and dst-id equality
+              // TODO: compare matched edges for timestamp and dst-id inequality
             }
           }
 
