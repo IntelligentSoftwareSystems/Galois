@@ -37,7 +37,7 @@
 //typedef std::unordered_map<KeyTy, ValTy> Attr;
 
 struct Node {
-  uint32_t label;
+  uint32_t label; // maximum of 32 node labels
   uint32_t id; // specific to the label
   uint64_t matched; // maximum of 64 nodes in the query graph
   // TODO: make matched a dynamic bitset
@@ -45,7 +45,7 @@ struct Node {
 };
 
 struct EdgeData {
-  uint32_t label;
+  uint32_t label; // maximum  of 32 edge labels
   uint64_t timestamp; // range of timestamp is limited
   // TODO: add custom attributes
 };

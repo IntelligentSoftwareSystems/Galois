@@ -31,6 +31,20 @@ void deleteGraph(AttributedGraph *g) {
   delete g;
 }
 
+unsigned rightmostSetBitPos(uint32_t n) {
+  if (n & 1) return 0;
+
+  // unset rightmost bit and xor with itself
+  n = n ^ (n & (n - 1));
+
+  unsigned pos = 0;
+  while (n) {
+    n >>= 1;
+    pos++;
+  }
+  return pos-1;
+}
+
 void printGraph(AttributedGraph* g) {
   Graph& graph = g->graph;
   auto& nodeLabels = g->nodeLabels;
@@ -38,14 +52,14 @@ void printGraph(AttributedGraph* g) {
   auto& nodeNames = g->nodeNames;
   for(auto n: graph) {
     auto& nd = graph.getData(n);
-    auto& srcLabel = nodeLabels[nd.label];
+    auto& srcLabel = nodeLabels[rightmostSetBitPos(nd.label)];
     auto& srcName = nodeNames[nd.id];
     for(auto e: graph.edges(n)) {
       auto& dst = graph.getData(graph.getEdgeDst(e));
-      auto& dstLabel = nodeLabels[dst.label];
+      auto& dstLabel = nodeLabels[rightmostSetBitPos(dst.label)];
       auto& dstName = nodeNames[dst.id];
       auto& ed = graph.getEdgeData(e);
-      auto& edgeLabel = edgeLabels[ed.label];
+      auto& edgeLabel = edgeLabels[rightmostSetBitPos(ed.label)];
       auto& edgeTimestamp = ed.timestamp;
       std::cout << srcLabel << " " << srcName << " " 
                 << edgeLabel << " " << dstLabel << " " 
@@ -57,7 +71,9 @@ void printGraph(AttributedGraph* g) {
 void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t numNodeLabels, size_t numEdgeLabels) {
   g->graph.allocateFrom(numNodes, numEdges);
   g->graph.constructNodes();
+  assert(numNodeLabels <= 32);
   g->nodeLabels.resize(numNodeLabels);
+  assert(numEdgeLabels <= 32);
   g->edgeLabels.resize(numEdgeLabels);
   g->nodeNames.resize(numNodes);
 }

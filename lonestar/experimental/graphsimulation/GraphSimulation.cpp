@@ -39,7 +39,7 @@ void matchLabel(QG& qG, DG& dG, W& w) {
         for (auto qn: qG) {
           assert(qn < 64); // because matched is 64-bit
           auto& qData = qG.getData(qn);
-          if (qData.label == dData.label) {
+          if (qData.label & dData.label) { // query could be any or multiple labels
             if (!qData.matched) {
               qData.matched = 1;
             }
@@ -131,7 +131,7 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
                 bool matched = false;
                 for (auto de: dG.edges(dn)) {
                   auto deData = dG.getEdgeData(de);
-                  if (qeData.label == deData.label) {
+                  if (qeData.label & deData.label) { // query could be any or multiple labels
                     auto& dDstData = dG.getData(dG.getEdgeDst(de));
                     if (dDstData.matched & (1 << qDst)) {
                       matched = true;
