@@ -58,6 +58,8 @@ size_t getNumEdges(AttributedGraph* g);
 //const ValAltTy getEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
 //void removeEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
 
+void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile);
+
 } // extern "C"
 
 #endif // GALOIS_PYTHON_GRAPH_H

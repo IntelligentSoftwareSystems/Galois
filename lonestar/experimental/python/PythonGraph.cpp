@@ -126,3 +126,10 @@ size_t getNumEdges(AttributedGraph *g) {
 //  g->getEdgeData(ei).erase(key);
 //}
 
+void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile) {
+  runGraphSimulation(queryGraph->graph, dataGraph->graph);
+  if (outputFile != NULL) {
+    reportGraphSimulation(queryGraph->graph, dataGraph->graph, outputFile);
+  }
+}
+
