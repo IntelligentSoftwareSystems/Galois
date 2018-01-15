@@ -31,20 +31,6 @@ void deleteGraph(AttributedGraph *g) {
   delete g;
 }
 
-unsigned rightmostSetBitPos(uint32_t n) {
-  if (n & 1) return 0;
-
-  // unset rightmost bit and xor with itself
-  n = n ^ (n & (n - 1));
-
-  unsigned pos = 0;
-  while (n) {
-    n >>= 1;
-    pos++;
-  }
-  return pos-1;
-}
-
 void printGraph(AttributedGraph* g) {
   Graph& graph = g->graph;
   auto& nodeLabels = g->nodeLabels;
@@ -145,7 +131,7 @@ size_t getNumEdges(AttributedGraph *g) {
 void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile) {
   runGraphSimulation(queryGraph->graph, dataGraph->graph);
   if (outputFile != NULL) {
-    reportGraphSimulation(queryGraph->graph, dataGraph->graph, outputFile);
+    reportGraphSimulation(*queryGraph, *dataGraph, outputFile);
   }
 }
 

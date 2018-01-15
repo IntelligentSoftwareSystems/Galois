@@ -65,35 +65,6 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
   return false;
 }
 
-void reportGraphSimulation(Graph& qG, Graph& dG, std::string outputFile) {
-  std::streambuf* buf;
-  std::ofstream ofs;
-
-  if (outputFile.size()) {
-    ofs.open(outputFile);
-    buf = ofs.rdbuf();
-  } else {
-    buf = std::cout.rdbuf();
-  }
-
-  std::ostream os(buf);
-  for (auto dn: dG) {
-    auto& dData = dG.getData(dn);
-    if (dData.matched) {
-      for (auto qn: qG) { // multiple matches
-        uint64_t mask = (1 << qn);
-        if (dData.matched & mask) {
-          os << "(" << qG.getData(qn).id << ", " << dData.id << ")" << std::endl;
-        }
-      }
-    }
-  }
-
-  if (outputFile.size()) {
-    ofs.close();
-  }
-}
-
 void runGraphSimulation(Graph& qG, Graph& dG) {
   using DGNode = Graph::GraphNode;
 
@@ -218,3 +189,108 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
     sizeNext = std::distance(next->begin(), next->end());
   }
 }
+
+void reportGraphSimulation(Graph& qG, Graph& dG, std::string outputFile) {
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if (outputFile.size()) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  for (auto dn: dG) {
+    auto& dData = dG.getData(dn);
+    if (dData.matched) {
+      for (auto qn: qG) { // multiple matches
+        uint64_t mask = (1 << qn);
+        if (dData.matched & mask) {
+          os << "(" << qG.getData(qn).id << ", " << dData.id << ")" << std::endl;
+        }
+      }
+    }
+  }
+
+  if (outputFile.size()) {
+    ofs.close();
+  }
+}
+
+unsigned rightmostSetBitPos(uint32_t n) {
+  assert(n != 0);
+  if (n & 1) return 0;
+
+  // unset rightmost bit and xor with itself
+  n = n ^ (n & (n - 1));
+
+  unsigned pos = 0;
+  while (n) {
+    n >>= 1;
+    pos++;
+  }
+  return pos-1;
+}
+
+void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string outputFile) {
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if (outputFile.size()) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  Graph& qgraph = qG.graph;
+  auto& qnodeNames = qG.nodeNames;
+  Graph& graph = dG.graph;
+  auto& nodeLabels = dG.nodeLabels;
+  auto& edgeLabels = dG.edgeLabels;
+  auto& nodeNames = dG.nodeNames;
+  for(auto n: graph) {
+    auto& src = graph.getData(n);
+    auto& srcLabel = nodeLabels[rightmostSetBitPos(src.label)];
+    auto& srcName = nodeNames[src.id];
+    for(auto e: graph.edges(n)) {
+      auto& dst = graph.getData(graph.getEdgeDst(e));
+      auto& dstLabel = nodeLabels[rightmostSetBitPos(dst.label)];
+      auto& dstName = nodeNames[dst.id];
+      auto& ed = graph.getEdgeData(e);
+      auto& edgeLabel = edgeLabels[rightmostSetBitPos(ed.label)];
+      auto& edgeTimestamp = ed.timestamp;
+      for(auto qn: qgraph) {
+        uint64_t mask = (1 << qn);
+        if (src.matched & mask) {
+          for(auto qe: qgraph.edges(qn)) {
+            auto& qeData = qgraph.getEdgeData(qe);
+            if (qeData.label & ed.label) { // query could be any or multiple labels
+              auto qDst = qgraph.getEdgeDst(qe);
+              mask = (1 << qDst);
+              if (dst.matched & mask) {
+                auto& qSrcName = qnodeNames[qgraph.getData(qn).id];
+                auto& qDstName = qnodeNames[qgraph.getData(qDst).id];
+                os << srcLabel << " " << srcName << " ("  << qSrcName << ") "
+                   << edgeLabel << " " << dstLabel << " "
+                   << dstName << " ("  << qDstName << ") "
+                   << " at " << edgeTimestamp << std::endl;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (outputFile.size()) {
+    ofs.close();
+  }
+}
+

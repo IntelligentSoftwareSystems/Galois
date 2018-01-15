@@ -62,3 +62,7 @@ struct AttributedGraph {
   std::vector<std::string> edgeLabels;
   std::vector<std::string> nodeNames;
 };
+
+unsigned rightmostSetBitPos(uint32_t n);
+void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGraph, std::string outputFile);
+
