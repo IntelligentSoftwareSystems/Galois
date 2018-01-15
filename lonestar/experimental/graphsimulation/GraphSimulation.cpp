@@ -124,6 +124,7 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
             if (dData.matched & mask) {
               // match children links
               // TODO: sort query edges and data edges by label; e.g., node data
+#ifdef QUERY_GRAPH_GENERAL_SOLUTION
               for (auto qe: qG.edges(qn)) {
                 auto qeData = qG.getEdgeData(qe);
                 auto qDst = qG.getEdgeDst(qe);
@@ -147,6 +148,62 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
                 }
               }
               // TODO: compare matched edges for timestamp and dst-id inequality
+#else
+              // assume query graph has at the most 2 edges for any node
+              auto qe1 = qG.edge_begin(qn);
+              auto qend = qG.edge_end(qn);
+              if (qe1 != qend) {
+                auto& qeData = qG.getEdgeData(qe1);
+                auto qDst = qG.getEdgeDst(qe1);
+
+                bool matched = false;
+                for (auto& de: dG.edges(dn)) {
+                  auto& deData = dG.getEdgeData(de);
+                  if (qeData.label & deData.label) { // query could be any or multiple labels
+                    auto dDst = dG.getEdgeDst(de);
+                    auto& dDstData = dG.getData(dDst);
+                    if (dDstData.matched & (1 << qDst)) {
+
+                      auto qe2 = qe1 + 1;
+                      if (qe2 == qend) { // only 1 edge
+                        matched = true;
+                        break;
+                      } else {
+                        assert ((qe2 + 1) == qend);
+                        // match the second edge
+                        auto& qeData2 = qG.getEdgeData(qe2);
+                        auto qDst2 = qG.getEdgeDst(qe2);
+
+                        for (auto& de2: dG.edges(dn)) {
+                          auto& deData2 = dG.getEdgeData(de2);
+                          if (qeData2.label & deData2.label) { // query could be any or multiple labels
+                            auto dDst2 = dG.getEdgeDst(de2);
+                            auto& dDstData2 = dG.getData(dDst2);
+                            if (dDstData2.matched & (1 << qDst2)) {
+                              assert(qeData.timestamp != qeData2.timestamp);
+                              if ((qeData.timestamp <= qeData2.timestamp) == (deData.timestamp <= deData2.timestamp)) {
+                                if ((qDst != qDst2) == (dDst != dDst2)) {
+                                  matched = true;
+                                  break;
+                                }
+                              }
+                            }
+                          }
+                        }
+
+                        if (matched) break;
+                      }
+                    }
+                  }
+                }
+
+                // remove qn from dn when we have an unmatched edge
+                if (!matched) {
+                  dData.matched &= ~mask;
+                  break;
+                }
+              }
+#endif
             }
           }
 
