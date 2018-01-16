@@ -73,28 +73,34 @@ public:
     T* prev = 0;
     while (rep->m_component.load(std::memory_order_relaxed) != rep) {
       T* next = rep->m_component.load(std::memory_order_relaxed);
-
+    
       if (prev && prev->m_component.load(std::memory_order_relaxed) == rep) {
         prev->m_component.store(next, std::memory_order_relaxed);
       }
       prev = rep;
       rep = next;
     }
+
     return rep;
   }
 
   //! Lock-free merge. Returns if merge was done.
   T* merge(T* b) {
     T* a = m_component.load(std::memory_order_relaxed);
-    while (true) {
+    //while (true) 
+    {
       a = a->findAndCompress();
       b = b->findAndCompress();
+      //a = a->find();
+      //b = b->find();
       if (a == b)
         return 0;
       // Avoid cycles by directing edges consistently
       if (a > b)
         std::swap(a, b);
-      if (a->m_component.compare_exchange_strong(a, b)) {
+      //if (a->m_component.compare_exchange_strong(a, b)) {
+      if(1) {
+        a->m_component.store(b, std::memory_order_relaxed);
         return b;
       }
     }

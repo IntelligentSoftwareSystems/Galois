@@ -448,8 +448,7 @@ struct EdgeTiledAsyncAlgo {
       }
   };*/
 
-  const int EDGE_TILE_SIZE=48;
-
+  const int EDGE_TILE_SIZE=512;
 
 
 
@@ -503,7 +502,7 @@ struct EdgeTiledAsyncAlgo {
         }
         ,galois::loopname("CC-edgetiledAsync")
         ,galois::steal()
-        , galois::chunk_size<1>()
+        , galois::chunk_size<16>()
         );
         //, galois::steal()
         //, galois::chunk_size<1>());
