@@ -3436,6 +3436,25 @@ public:
                        "_" + std::to_string(num_iteration));
   }
 
+  /**
+   * Get a run identifier using the set run and set iteration and
+   * append to the passed in string in addition to the number identifier passed
+   * in.
+   *
+   * @param loop_name String to append the run identifier
+   * @param alterID another ID with which to add to the timer name.
+   *
+   * @returns String with run identifier appended to passed in loop name + 
+   * alterID
+   */
+  inline std::string get_run_identifier(std::string loop_name, 
+                                        unsigned alterID) const {
+    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) + 
+                       "_" + std::to_string(num_run) + "_" + 
+                       std::to_string(num_iteration));
+  }
+
+
   /*
    * Write the local LC_CSR graph to the file on a disk.
    *
