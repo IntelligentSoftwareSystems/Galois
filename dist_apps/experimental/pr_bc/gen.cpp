@@ -28,10 +28,6 @@
 
 constexpr static const char* const REGION_NAME = "PR_BC";
 
-/******************************************************************************/
-/* Sync code/calls was manually written, not compiler generated */
-/******************************************************************************/
-
 #include <iostream>
 #include <limits>
 
@@ -53,55 +49,64 @@ static cll::opt<unsigned int> totalNumSources("numOfSources",
                                 cll::desc("Total number of sources to do BC"),
                                 cll::init(0));
 static cll::opt<unsigned int> vIndex("index", 
-                                cll::desc("DEBUG: Index to print"),
+                                cll::desc("DEBUG: Index to print for dist/short "
+                                          "paths"),
                                 cll::init(0),
                                 cll::Hidden);
+static cll::opt<bool> outputDistPaths("outputDistPaths", 
+                                      cll::desc("DEBUG: Output min distance"
+                                                "/short path counts instead"),
+                                      cll::init(false),
+                                      cll::Hidden);
 
 /******************************************************************************/
 /* Graph structure declarations */
 /******************************************************************************/
-
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 
-// NOTE: types assume that these values will not reach uint64_t: it may
+// NOTE: declared types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
-  std::vector<uint32_t> oldMinDistances;
-  std::vector<uint32_t> minDistances;
-  std::vector<char> sentFlag;
+  std::vector<uint32_t> oldMinDistances; // min distances in a previous round
+  std::vector<uint32_t> minDistances; // current min distances for each source
+  std::vector<uint32_t> shortestPathToAdd; // shortest path accumulator
+  std::vector<uint32_t> shortestPathNumbers; // actual shortest path number
+  std::vector<char> sentFlag; // marks if message has been sent for a source
 
-  std::vector<uint32_t> shortestPathToAdd;
-  std::vector<uint32_t> shortestPathNumbers;
+  uint32_t APSPIndexToSend; // index that needs to be sent in a round
+  uint32_t shortPathValueToSend; // short path value that is sent in a round
 
-  uint32_t APSPIndexToSend;
-  uint32_t shortPathValueToSend;
+  // round numbers saved for determining when to send out back-prop messages
+  std::vector<uint32_t> savedRoundNumbers; 
 
-  std::vector<uint32_t> savedRoundNumbers;
-
+  // accumulator for adding to dependency values
   std::vector<galois::CopyableAtomic<float>> dependencyToAdd;
+  // final dependency values
   std::vector<float> dependencyValues;
 
   float bc;
 };
 
+// Bitsets for tracking which nodes need to be sync'd with respect to a 
+// particular field
 galois::DynamicBitSet bitset_minDistances;
 galois::DynamicBitSet bitset_shortestPathToAdd;
 galois::DynamicBitSet bitset_dependencyToAdd;
 
-// Dist Graph using a bidirectional CSR graph
+// Dist Graph using a bidirectional CSR graph (3rd argument set to true does 
+// this)
 using Graph = galois::graphs::DistGraph<NodeData, void, true>;
 using GNode = typename Graph::GraphNode;
 
 #include "gen_sync.hh"
 
 /******************************************************************************/
-/* Functors for running the algorithm */
+/* Functions for running the algorithm */
 /******************************************************************************/
-uint64_t offset = 0;
-uint32_t roundNumber = 0;
-
 /**
- * Graph initialization
+ * Graph initialization. Initialize all of the node data fields.
+ *
+ * @param graph Local graph to operate on
  */
 void InitializeGraph(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -135,9 +140,12 @@ void InitializeGraph(Graph& graph) {
 
 /** 
  * This is used to reset node data when switching to a different 
- * source set 
+ * source set. Initializes everything for the coming source set.
+ *
+ * @param graph Local graph to operate on
+ * @param offset Offset into sources (i.e. number of sources already done)
  **/
-void InitializeIteration(Graph& graph) {
+void InitializeIteration(Graph& graph, const uint64_t offset) {
   const auto& allNodes = graph.allNodesRange();
 
   galois::do_all(
@@ -154,19 +162,19 @@ void InitializeIteration(Graph& graph) {
           cur_data.minDistances[i] = infinity;
           cur_data.shortestPathNumbers[i] = 0;
         }
+        cur_data.oldMinDistances[i] = cur_data.minDistances[i];
 
         cur_data.shortestPathToAdd[i] = 0;
+        cur_data.sentFlag[i] = 0;
   
         cur_data.APSPIndexToSend = numSourcesPerRound + 1;
         cur_data.shortPathValueToSend = 0;
   
         cur_data.savedRoundNumbers[i] = infinity;
+
         cur_data.dependencyToAdd[i] = 0.0;
         cur_data.dependencyValues[i] = 0.0;
 
-        cur_data.oldMinDistances[i] = cur_data.minDistances[i];
-
-        cur_data.sentFlag[i] = 0;
       }
     },
     galois::loopname(graph.get_run_identifier("InitializeIteration").c_str()), 
@@ -177,6 +185,8 @@ void InitializeIteration(Graph& graph) {
 /**
  * If min distance has changed, then the number of shortest paths is reset
  * and the sent flag is reset.
+ *
+ * @param graph Local graph to operate on
  */
 void MetadataUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -205,6 +215,8 @@ void MetadataUpdate(Graph& graph) {
 /**
  * Adds the accumulated shortest path values to the actual shortest path
  * value and resets the accumulator.
+ *
+ * @param graph Local graph to operate on
  */
 void ShortPathUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -227,6 +239,8 @@ void ShortPathUpdate(Graph& graph) {
 
 /**
  * Update old dist with the latest value of the min distance.
+ *
+ * @param graph Local graph to operate on
  */
 void OldDistUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
@@ -248,7 +262,8 @@ void OldDistUpdate(Graph& graph) {
 /**
  * Wrapper around the distance array for sorting purposes.
  *
- * TODO find a way to make this more efficient
+ * TODO find a way to make this more efficient because this is NOT efficient
+ * at all at scale
  */
 struct DWrapper {
   uint32_t dist;
@@ -264,6 +279,12 @@ struct DWrapper {
 
 /**
  * Does the wrapping of a vector into a DWrapper for sorting.
+ *
+ * TODO find a way to make this more efficient because this is NOT efficient
+ * at all at scale
+ *
+ * @param dVector vector to wrap in DWrapper
+ * @returns Elements of dVector wrapped in a DWrapper
  */
 std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
   std::vector<DWrapper> wrappedVector;
@@ -279,16 +300,25 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
 /**
  * Find all pairs shortest paths for the sources currently being worked on
  * as well as the number of shortest paths for each source.
+ *
+ * @param graph Local graph to operate on
+ * @param dga Distributed accumulator for determining if work was done in
+ * an iteration across all hosts
+ *
+ * @returns total number of rounds needed to do this phase
  */
-void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
+uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   //const auto& nodesWithEdges = graph.allNodesWithEdgesRange();
-  const auto& allNodes = graph.allNodesRange();
+  // all nodes necessary due to round number updates
+  const auto& allNodes = graph.allNodesRange(); 
+  uint32_t roundNumber = 0;
 
   do {
     dga.reset();
     galois::gPrint("Round ", roundNumber, "\n");
     graph.set_num_iter(roundNumber);
 
+    // TODO separate this do_all into separate function
     galois::do_all(
       galois::iterate(allNodes), 
       [&] (GNode curNode) {
@@ -367,6 +397,7 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
       galois::steal()
     );
 
+    // TODO separate below into separate function
     const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
 
     galois::do_all(
@@ -420,13 +451,19 @@ void APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     roundNumber++;
   } while (dga.reduce());
+
+  return roundNumber;
 }
 
 /**
  * Get the round number for the backward propagation phase using the round
- * number from the APSP phase.
+ * number from the APSP phase. This round number determines when a node should
+ * send out a message for the backward propagation of dependency values.
+ *
+ * @param graph Local graph to operate on
+ * @param lastRoundNumber last round number in the APSP phase
  */
-void RoundUpdate(Graph& graph) {
+void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
   const auto& allNodes = graph.allNodesRange();
   graph.set_num_iter(0);
 
@@ -438,8 +475,8 @@ void RoundUpdate(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (src_data.oldMinDistances[i] < infinity) {
           src_data.savedRoundNumbers[i] = 
-              roundNumber - src_data.savedRoundNumbers[i];
-          assert(src_data.savedRoundNumbers[i] <= roundNumber);
+              lastRoundNumber - src_data.savedRoundNumbers[i];
+          assert(src_data.savedRoundNumbers[i] <= lastRoundNumber);
         }
       }
     },
@@ -448,6 +485,11 @@ void RoundUpdate(Graph& graph) {
   );
 }
 
+/**
+ * Add dependency accumulator to final dependency value.
+ *
+ * @param graph Local graph to operate on
+ */
 void UpdateDependency(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
 
@@ -457,22 +499,11 @@ void UpdateDependency(Graph& graph) {
       NodeData& cur_data = graph.getData(curNode);
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        //if (graph.getGID(curNode) == 3) {
-        //  if (i == 1) {
-        //    printf("c %f, %f", cur_data.dependencyValues[i], 
-        //                         cur_data.dependencyToAdd[i].load());
-        //    //galois::gPrint("c", cur_data.dependencyValues[i], ", ");
-        //    //galois::gPrint(cur_data.dependencyToAdd[i].load(), ", ");
-        //  }
-        //}
         if (cur_data.dependencyToAdd[i] > 0) {
           cur_data.dependencyValues[i] += cur_data.dependencyToAdd[i].load();
         }
         cur_data.dependencyToAdd[i] = 0;
       }
-      //if (graph.getGID(curNode) == 3) {
-      //  galois::gPrint("\n");
-      //}
     },
     galois::loopname(graph.get_run_identifier("UpdateDependency").c_str()),
     galois::no_stats()
@@ -482,13 +513,16 @@ void UpdateDependency(Graph& graph) {
 /**
  * Back propagate dependency values depending on the round that a node
  * sent out the shortest path message.
+ *
+ * @param graph Local graph to operate on
+ * @param lastRoundNumber last round number in the APSP phase
  */
-void BackProp(Graph& graph) {
+void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
 
   uint32_t currentRound = 0;
 
-  while (currentRound <= roundNumber) {
+  while (currentRound <= lastRoundNumber) {
     graph.set_num_iter(currentRound);
 
     galois::do_all(
@@ -553,8 +587,11 @@ void BackProp(Graph& graph) {
 /**
  * BC sum: take the dependency value for each source and add it to the
  * final BC value.
+ *
+ * @param graph Local graph to operate on
+ * @param offset Offset into sources (i.e. number of sources already done)
  */
-void BC(Graph& graph) {
+void BC(Graph& graph, uint64_t offset) {
   const auto& masterNodes = graph.masterNodesRange();
   graph.set_num_iter(0);
 
@@ -566,16 +603,10 @@ void BC(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         // exclude sources themselves from BC calculation
         if (graph.getGID(node) != (i + offset)) {
-          //if (graph.getGID(node) == 3) {
-          //  galois::gPrint(cur_data.dependencyValues[i], ", ");
-          //}
           cur_data.bc += cur_data.dependencyValues[i];
         }
 
       }
-      //if (graph.getGID(node) == 3) {
-      //  galois::gPrint("\n");
-      //}
     },
     galois::loopname(graph.get_run_identifier("BC").c_str()),
     galois::no_stats()
@@ -622,13 +653,12 @@ int main(int argc, char** argv) {
   // shared DG accumulator among all steps
   galois::DGAccumulator<uint32_t> dga;
 
-  offset = 0;
-
   if (totalNumSources == 0) {
     galois::gDebug("Total num sources unspecified");
     totalNumSources = hg->globalSize();
   }
 
+  // bitset initialization
   bitset_minDistances.resize(hg->size());
   bitset_shortestPathToAdd.resize(hg->size());
   bitset_dependencyToAdd.resize(hg->size());
@@ -638,34 +668,32 @@ int main(int argc, char** argv) {
     std::string timer_str("TIMER_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
 
-    StatTimer_main.start();
+    // offset into sources to operate on
+    uint64_t offset = 0;
 
-    // TODO declare round number here and pass it in instead of having it be a
-    // global
+    StatTimer_main.start();
 
     while (offset < totalNumSources) {
       galois::gDebug("[", net.ID, "] Offset ", offset, " started");
 
-      // correct in case numsources overflows total num of sources
+      // correct in case numSources overflows total num of sources
       if (offset + numSourcesPerRound > totalNumSources) {
         numSourcesPerRound = totalNumSources - offset;
         galois::gDebug("Num sources for this final round will be ", 
                        numSourcesPerRound);
       }
 
-      InitializeIteration(*hg);
-      APSP(*hg, dga);
+      InitializeIteration(*hg, offset);
 
-      roundNumber--; // subtract to get to terminating round; i.e. last round 
+      // APSP returns total number of rounds taken
+      // subtract 1 to get to terminating round; i.e. last round 
+      uint32_t lastRoundNumber = APSP(*hg, dga) - 1;
 
-      galois::runtime::getHostBarrier().wait();
-
-      RoundUpdate(*hg);
-      BackProp(*hg);
-      BC(*hg);
+      RoundUpdate(*hg, lastRoundNumber);
+      BackProp(*hg, lastRoundNumber);
+      BC(*hg, offset);
 
       offset += numSourcesPerRound;
-      roundNumber = 0;
     }
 
     StatTimer_main.stop();
@@ -676,7 +704,6 @@ int main(int argc, char** argv) {
       (*hg).set_num_run(run + 1);
       (*hg).set_num_iter(0);
       offset = 0;
-      roundNumber = 0;
 
       bitset_minDistances.reset();
 
@@ -689,21 +716,26 @@ int main(int argc, char** argv) {
 
   // Verify, i.e. print out graph data for examination
   if (verify) {
-    char *v_out = (char*)malloc(40);
+    // buffer for text to be written out to file
+    char* v_out = (char*)malloc(40); 
+
     for (auto ii = (*hg).masterNodesRange().begin(); 
               ii != (*hg).masterNodesRange().end(); 
               ++ii) {
-      // outputs min distance and short path numbers
-      //sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
-      //        (*hg).getData(*ii).minDistances[vIndex],
-      //        (*hg).getData(*ii).shortestPathNumbers[vIndex]);
-
-      // outputs betweenness centrality
-      sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
-              (*hg).getData(*ii).bc);
+      if (!outputDistPaths) {
+        // outputs betweenness centrality
+        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
+                                     (*hg).getData(*ii).bc);
+      } else {
+        // outputs min distance and short path numbers
+        sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
+                                      (*hg).getData(*ii).minDistances[vIndex],
+                                      (*hg).getData(*ii).shortestPathNumbers[vIndex]);
+      }
 
       galois::runtime::printOutput(v_out);
     }
+
     free(v_out);
   }
 
