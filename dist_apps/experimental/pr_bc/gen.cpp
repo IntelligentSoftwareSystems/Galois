@@ -298,6 +298,96 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
 }
 
 /**
+ * TODO
+ * @param graph Local graph to operate on
+ * @param roundNumber current round number
+ * @param dga Distributed accumulator for determining if work was done in
+ * an iteration across all hosts
+ */
+void FindMessageToSend(Graph& graph, const uint32_t roundNumber, 
+                       galois::DGAccumulator<uint32_t>& dga) {
+  const auto& allNodes = graph.allNodesRange(); 
+
+  // TODO separate this do_all into separate function
+  galois::do_all(
+    galois::iterate(allNodes), 
+    [&] (GNode curNode) {
+      NodeData& cur_data = graph.getData(curNode);
+      //galois::StatTimer wrapTime(graph.get_run_identifier("WrapTime").c_str());
+      //wrapTime.start();
+      std::vector<DWrapper> toSort = wrapDistVector(cur_data.oldMinDistances);
+      //wrapTime.stop();
+  
+      // TODO can have timer here
+      std::stable_sort(toSort.begin(), toSort.end());
+  
+      uint32_t indexToSend = numSourcesPerRound + 1;
+
+      // true if a shortest path message should be sent
+      bool shortFound = false; 
+      // true if a message is flipped from not sent to sent
+      bool sentMarked = false;
+
+      cur_data.shortPathValueToSend = 0;
+      cur_data.APSPIndexToSend = indexToSend;
+  
+      //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
+  
+      //findMessage.start();
+      // TODO I can optimize this loop
+      for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        DWrapper& currentSource = toSort[i]; // safe
+        uint32_t currentIndex = currentSource.index; // safe
+        unsigned sumToConsider = i + currentSource.dist;
+  
+        // determine if we need to send out a message in this round
+        if (!shortFound && sumToConsider == roundNumber) {
+          // save round num
+          cur_data.savedRoundNumbers[currentIndex] = roundNumber; // safe
+  
+          // note that this index needs to have shortest path number sent out
+          // by saving it to another vector
+          cur_data.shortPathValueToSend = cur_data.shortestPathNumbers[currentIndex];
+          indexToSend = currentIndex;
+          cur_data.APSPIndexToSend = indexToSend;
+          cur_data.sentFlag[currentIndex] = true;
+  
+          shortFound = true;
+          sentMarked = true;
+        } else if (sumToConsider > roundNumber) {
+          // not going to be sending any short path message this round
+          // TODO reason if it is possible to break
+        }
+
+        // if we haven't found a message to mark ready yet, mark one (since
+        // we only terminate if all things are marked ready)
+        if (!sentMarked) {
+          if (!cur_data.sentFlag[currentIndex]) {
+            cur_data.sentFlag[currentIndex] = true;
+            sentMarked = true;
+          }
+        }
+
+        // TODO if we have marked a message ready, is it safe to bail and 
+        // break? (i.e. will there be a short path message to send?)
+        if (sentMarked && shortFound) {
+          break;
+        }
+      }
+
+      // if ready message was found, this node should not terminate this
+      // round
+      if (sentMarked) {
+        dga += 1;
+      }
+      //findMessage.stop();
+    },
+    galois::loopname(graph.get_run_identifier("FindMessageToSend").c_str()),
+    galois::steal()
+  );
+}
+
+/**
  * Find all pairs shortest paths for the sources currently being worked on
  * as well as the number of shortest paths for each source.
  *
@@ -310,7 +400,6 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
 uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   //const auto& nodesWithEdges = graph.allNodesWithEdgesRange();
   // all nodes necessary due to round number updates
-  const auto& allNodes = graph.allNodesRange(); 
   uint32_t roundNumber = 0;
 
   do {
@@ -318,84 +407,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     galois::gPrint("Round ", roundNumber, "\n");
     graph.set_num_iter(roundNumber);
 
-    // TODO separate this do_all into separate function
-    galois::do_all(
-      galois::iterate(allNodes), 
-      [&] (GNode curNode) {
-        NodeData& cur_data = graph.getData(curNode);
-        galois::StatTimer wrapTime(graph.get_run_identifier("WrapTime").c_str());
-    
-        //wrapTime.start();
-        std::vector<DWrapper> toSort = wrapDistVector(cur_data.oldMinDistances);
-        //wrapTime.stop();
-    
-        // TODO can have timer here
-        std::stable_sort(toSort.begin(), toSort.end());
-    
-        uint32_t indexToSend = numSourcesPerRound + 1;
-
-        // true if a shortest path message should be sent
-        bool shortFound = false; 
-        // true if a message is flipped from not sent to sent
-        bool sentMarked = false;
-
-        cur_data.shortPathValueToSend = 0;
-        cur_data.APSPIndexToSend = indexToSend;
-    
-        //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
-    
-        //findMessage.start();
-        // TODO I can optimize this loop
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          DWrapper& currentSource = toSort[i]; // safe
-          uint32_t currentIndex = currentSource.index; // safe
-          unsigned sumToConsider = i + currentSource.dist;
-    
-          // determine if we need to send out a message in this round
-          if (!shortFound && sumToConsider == roundNumber) {
-            // save round num
-            cur_data.savedRoundNumbers[currentIndex] = roundNumber; // safe
-    
-            // note that this index needs to have shortest path number sent out
-            // by saving it to another vector
-            cur_data.shortPathValueToSend = cur_data.shortestPathNumbers[currentIndex];
-            indexToSend = currentIndex;
-            cur_data.APSPIndexToSend = indexToSend;
-            cur_data.sentFlag[currentIndex] = true;
-    
-            shortFound = true;
-            sentMarked = true;
-          } else if (sumToConsider > roundNumber) {
-            // not going to be sending any short path message this round
-            // TODO reason if it is possible to break
-          }
-
-          // if we haven't found a message to mark ready yet, mark one (since
-          // we only terminate if all things are marked ready)
-          if (!sentMarked) {
-            if (!cur_data.sentFlag[currentIndex]) {
-              cur_data.sentFlag[currentIndex] = true;
-              sentMarked = true;
-            }
-          }
-
-          // TODO if we have marked a message ready, is it safe to bail and 
-          // break? (i.e. will there be a short path message to send?)
-          if (sentMarked && shortFound) {
-            break;
-          }
-        }
-
-        // if ready message was found, this node should not terminate this
-        // round
-        if (sentMarked) {
-          dga += 1;
-        }
-        //findMessage.stop();
-      },
-      galois::loopname(graph.get_run_identifier("APSP").c_str()),
-      galois::steal()
-    );
+    FindMessageToSend(graph, roundNumber, dga);
 
     // TODO separate below into separate function
     const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
