@@ -103,6 +103,8 @@ using GNode = typename Graph::GraphNode;
 /******************************************************************************/
 /* Functions for running the algorithm */
 /******************************************************************************/
+uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
+
 /**
  * Graph initialization. Initialize all of the node data fields.
  *
@@ -177,10 +179,12 @@ void InitializeIteration(Graph& graph, const uint64_t offset) {
 
       }
     },
-    galois::loopname(graph.get_run_identifier("InitializeIteration").c_str()), 
+    galois::loopname(graph.get_run_identifier("InitializeIteration",
+                                              macroRound).c_str()), 
     galois::no_stats()
   );
 };
+
 
 /**
  * If min distance has changed, then the number of shortest paths is reset
@@ -204,10 +208,12 @@ void MetadataUpdate(Graph& graph) {
         }
       }
     },
-    galois::loopname(graph.get_run_identifier("MetadataUpdate").c_str()),
+    galois::loopname(graph.get_run_identifier("MetadataUpdate",
+                                              macroRound).c_str()),
     galois::no_stats()
   );
 };
+
 
 // TODO
 // This has dumb overhead even if nothing to update; find a way to make it
@@ -232,10 +238,12 @@ void ShortPathUpdate(Graph& graph) {
         cur_data.shortestPathToAdd[i] = 0;
       }
     },
-    galois::loopname(graph.get_run_identifier("ShortPathUpdate").c_str()),
+    galois::loopname(graph.get_run_identifier("ShortPathUpdate",
+                                              macroRound).c_str()),
     galois::no_stats()
   );
 };
+
 
 /**
  * Update old dist with the latest value of the min distance.
@@ -254,10 +262,12 @@ void OldDistUpdate(Graph& graph) {
         cur_data.oldMinDistances[i] = cur_data.minDistances[i];
       }
     },
-    galois::loopname(graph.get_run_identifier("OldDistUpdate").c_str()),
+    galois::loopname(graph.get_run_identifier("OldDistUpdate",
+                                              macroRound).c_str()),
     galois::no_stats()
   );
 };
+
 
 /**
  * Wrapper around the distance array for sorting purposes.
@@ -276,6 +286,7 @@ struct DWrapper {
     return dist < b.dist;
   }
 };
+
 
 /**
  * Does the wrapping of a vector into a DWrapper for sorting.
@@ -296,6 +307,7 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
 
   return wrappedVector;
 }
+
 
 /**
  * Determine if a node needs to send out a shortest path message in this
@@ -381,10 +393,13 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
         dga += 1;
       }
     },
-    galois::loopname(graph.get_run_identifier("FindMessageToSend").c_str()),
+    galois::loopname(graph.get_run_identifier("FindMessageToSend",
+                                              macroRound).c_str()),
+    galois::no_stats(),
     galois::steal()
   );
 }
+
 
 /**
  * If a node has something to send (as indicated by its indexToSend variable),
@@ -429,10 +444,13 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         }
       }
     },
-    galois::loopname(graph.get_run_identifier("APSP").c_str()),
+    galois::loopname(graph.get_run_identifier("SendAPSPMessages", 
+                                              macroRound).c_str()),
+    galois::no_stats(),
     galois::steal()
   );
 }
+
 
 /**
  * Find all pairs shortest paths for the sources currently being worked on
@@ -459,7 +477,9 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // sync min distance (also resets shortPathAdd if necessary)
     graph.sync<writeDestination, readAny, ReducePairwiseMinAndResetDist, 
-               Broadcast_minDistances, Bitset_minDistances>("MinDistSync");
+               Broadcast_minDistances, 
+               Bitset_minDistances>(std::string("MinDistSync") + "_" + 
+                                    std::to_string(macroRound));
 
     // updates short path count and the sent flag based on results of this
     // round's APSP
@@ -469,7 +489,8 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     graph.sync<writeDestination, readAny, 
                Reduce_pair_wise_add_array_shortestPathToAdd, 
                Broadcast_shortestPathToAdd, 
-               Bitset_shortestPathToAdd>("ShortPathSync");
+               Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
+                                         std::to_string(macroRound));
 
     // update short path count with sync'd accumulator
     ShortPathUpdate(graph);
@@ -481,6 +502,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
   return roundNumber;
 }
+
 
 /**
  * Get the round number for the backward propagation phase using the round
@@ -507,10 +529,12 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
         }
       }
     },
-    galois::loopname(graph.get_run_identifier("RoundUpdate").c_str()),
+    galois::loopname(graph.get_run_identifier("RoundUpdate", 
+                                              macroRound).c_str()),
     galois::no_stats()
   );
 }
+
 
 /**
  * Add dependency accumulator to final dependency value.
@@ -532,10 +556,12 @@ void UpdateDependency(Graph& graph) {
         cur_data.dependencyToAdd[i] = 0;
       }
     },
-    galois::loopname(graph.get_run_identifier("UpdateDependency").c_str()),
+    galois::loopname(graph.get_run_identifier("UpdateDependency",
+                                              macroRound).c_str()),
     galois::no_stats()
   );
 }
+
 
 /**
  * Back propagate dependency values depending on the round that a node
@@ -592,7 +618,8 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
           }
         }
       },
-      galois::loopname(graph.get_run_identifier("BackProp").c_str()),
+      galois::loopname(graph.get_run_identifier("BackProp",
+                                                macroRound).c_str()),
       galois::steal(),
       galois::no_stats()
     );
@@ -602,7 +629,8 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     graph.sync<writeSource, readAny, 
                Reduce_pair_wise_add_array_dependencyToAdd, 
                Broadcast_dependencyToAdd, 
-               Bitset_dependencyToAdd>("DependencySync");
+               Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
+                                       std::to_string(macroRound));
     // dependency written to source
     // dep needs to be on dst nodes, but final round needs them on all nodes
 
@@ -611,6 +639,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     currentRound++;
   }
 }
+
 
 /**
  * BC sum: take the dependency value for each source and add it to the
@@ -636,7 +665,7 @@ void BC(Graph& graph, uint64_t offset) {
 
       }
     },
-    galois::loopname(graph.get_run_identifier("BC").c_str()),
+    galois::loopname(graph.get_run_identifier("BC", macroRound).c_str()),
     galois::no_stats()
   );
 };
@@ -722,6 +751,7 @@ int main(int argc, char** argv) {
       BC(*hg, offset);
 
       offset += numSourcesPerRound;
+      macroRound++;
     }
 
     StatTimer_main.stop();
@@ -732,6 +762,7 @@ int main(int argc, char** argv) {
       (*hg).set_num_run(run + 1);
       (*hg).set_num_iter(0);
       offset = 0;
+      macroRound = 0;
 
       bitset_minDistances.reset();
 
