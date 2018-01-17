@@ -298,7 +298,9 @@ std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
 }
 
 /**
- * TODO
+ * Determine if a node needs to send out a shortest path message in this
+ * round and saves it to the node data struct for later use.
+ *
  * @param graph Local graph to operate on
  * @param roundNumber current round number
  * @param dga Distributed accumulator for determining if work was done in
@@ -308,17 +310,12 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
                        galois::DGAccumulator<uint32_t>& dga) {
   const auto& allNodes = graph.allNodesRange(); 
 
-  // TODO separate this do_all into separate function
   galois::do_all(
     galois::iterate(allNodes), 
     [&] (GNode curNode) {
       NodeData& cur_data = graph.getData(curNode);
-      //galois::StatTimer wrapTime(graph.get_run_identifier("WrapTime").c_str());
-      //wrapTime.start();
       std::vector<DWrapper> toSort = wrapDistVector(cur_data.oldMinDistances);
-      //wrapTime.stop();
   
-      // TODO can have timer here
       std::stable_sort(toSort.begin(), toSort.end());
   
       uint32_t indexToSend = numSourcesPerRound + 1;
@@ -334,7 +331,8 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
       //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
   
       //findMessage.start();
-      // TODO I can optimize this loop
+
+      // TODO I can probably optimize this loop
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         DWrapper& currentSource = toSort[i]; // safe
         uint32_t currentIndex = currentSource.index; // safe
@@ -377,12 +375,61 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
 
       // if ready message was found, this node should not terminate this
       // round
+      //findMessage.stop();
+
       if (sentMarked) {
         dga += 1;
       }
-      //findMessage.stop();
     },
     galois::loopname(graph.get_run_identifier("FindMessageToSend").c_str()),
+    galois::steal()
+  );
+}
+
+/**
+ * If a node has something to send (as indicated by its indexToSend variable),
+ * it will be pulled by all of its outgoing neighbors.
+ *
+ * Pull-style is used here to avoid the need for locks as 2 variables must be 
+ * updated at once.
+ *
+ * @param graph Local graph to operate on
+ * @param dga Distributed accumulator for determining if work was done in
+ * an iteration across all hosts
+ */
+void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
+  const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
+
+  galois::do_all(
+    galois::iterate(allNodesWithEdgesIn),
+    [&] (GNode dst) {
+      auto& dnode = graph.getData(dst);
+
+      for (auto inEdge : graph.in_edges(dst)) {
+        NodeData& src_data = graph.getData(graph.getInEdgeDst(inEdge));
+        uint32_t indexToSend = src_data.APSPIndexToSend;
+        
+        if (indexToSend != numSourcesPerRound + 1) {
+          uint32_t distValue = src_data.oldMinDistances[indexToSend];
+          uint32_t newValue = distValue + 1;
+          uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
+                                          newValue);
+  
+          if (oldValue > newValue) {
+            // overwrite short path with this node's shortest path
+            dnode.shortestPathToAdd[indexToSend] = src_data.shortPathValueToSend;
+          } else if (oldValue == newValue) {
+            // add to short path
+            dnode.shortestPathToAdd[indexToSend] += src_data.shortPathValueToSend;
+          }
+
+          dga += 1;
+          bitset_minDistances.set(dst);
+          bitset_shortestPathToAdd.set(dst);
+        }
+      }
+    },
+    galois::loopname(graph.get_run_identifier("APSP").c_str()),
     galois::steal()
   );
 }
@@ -398,8 +445,6 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @returns total number of rounds needed to do this phase
  */
 uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
-  //const auto& nodesWithEdges = graph.allNodesWithEdgesRange();
-  // all nodes necessary due to round number updates
   uint32_t roundNumber = 0;
 
   do {
@@ -407,58 +452,28 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     galois::gPrint("Round ", roundNumber, "\n");
     graph.set_num_iter(roundNumber);
 
-    FindMessageToSend(graph, roundNumber, dga);
+    // find the message a node needs to send (if any)
+    FindMessageToSend(graph, roundNumber, dga); 
+    // send messages (if any)
+    SendAPSPMessages(graph, dga);
 
-    // TODO separate below into separate function
-    const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
-
-    galois::do_all(
-      galois::iterate(allNodesWithEdgesIn),
-      [&] (GNode dst) {
-        auto& dnode = graph.getData(dst);
-
-        for (auto inEdge : graph.in_edges(dst)) {
-          NodeData& src_data = graph.getData(graph.getInEdgeDst(inEdge));
-          uint32_t indexToSend = src_data.APSPIndexToSend;
-          
-          if (indexToSend != numSourcesPerRound + 1) {
-            uint32_t distValue = src_data.oldMinDistances[indexToSend];
-            uint32_t newValue = distValue + 1;
-            uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
-                                            newValue);
-    
-            if (oldValue > newValue) {
-              // overwrite short path with this node's shortest path
-              dnode.shortestPathToAdd[indexToSend] = src_data.shortPathValueToSend;
-            } else if (oldValue == newValue) {
-              // add to short path
-              dnode.shortestPathToAdd[indexToSend] += src_data.shortPathValueToSend;
-            }
-
-            dga += 1;
-            bitset_minDistances.set(dst);
-            bitset_shortestPathToAdd.set(dst);
-          }
-        }
-      },
-      galois::loopname(graph.get_run_identifier("APSP").c_str()),
-      galois::steal()
-    );
-
-    // sync min distance (also resets short path add if necessary)
+    // sync min distance (also resets shortPathAdd if necessary)
     graph.sync<writeDestination, readAny, ReducePairwiseMinAndResetDist, 
                Broadcast_minDistances, Bitset_minDistances>("MinDistSync");
 
+    // updates short path count and the sent flag based on results of this
+    // round's APSP
     MetadataUpdate(graph); 
 
-    // sync short path add
+    // sync shortPathAdd
     graph.sync<writeDestination, readAny, 
                Reduce_pair_wise_add_array_shortestPathToAdd, 
                Broadcast_shortestPathToAdd, 
                Bitset_shortestPathToAdd>("ShortPathSync");
 
+    // update short path count with sync'd accumulator
     ShortPathUpdate(graph);
-
+    // old dist gets updated with new dist
     OldDistUpdate(graph);
 
     roundNumber++;
@@ -578,6 +593,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
         }
       },
       galois::loopname(graph.get_run_identifier("BackProp").c_str()),
+      galois::steal(),
       galois::no_stats()
     );
 
