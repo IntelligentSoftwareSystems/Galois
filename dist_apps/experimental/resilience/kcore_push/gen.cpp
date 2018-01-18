@@ -251,7 +251,8 @@ struct recovery {
   }
 };
 
-/* Special kcoreStep2 for recovery.
+/* XXX: Not using this currently
+ * Special kcoreStep2 for recovery.
  * It updates degree even for dead nodes since degree is reset for all nodes, therefore needs ot be set to correct value.
  * Use the trim value (i.e. number of incident nodes that have been removed)
  * to update degrees.
