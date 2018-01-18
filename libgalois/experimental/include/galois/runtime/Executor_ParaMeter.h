@@ -122,6 +122,7 @@ void closeStatsFile (void);
 template <typename T, typename PTcont=galois::PerThreadBag<T> >
 class ParaMeterFIFO_WL {
 
+protected:
 
   PTcont* curr;
   PTcont* next;
@@ -149,6 +150,16 @@ public:
   void nextStep(void) {
     std::swap(curr, next);
     next->clear_all_parallel();
+  }
+};
+
+template <typename T>
+class ParaMeterRAND_WL: public ParaMeterFIFO_WL<T, galois::PerThreadVector<T> > {
+  using Base = ParaMeterFIFO_WL<T, galois::PerThreadVector<T> >;
+
+public:
+
+  void pushNext(void) {
   }
 };
 
