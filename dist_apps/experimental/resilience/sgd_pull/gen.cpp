@@ -87,9 +87,15 @@ const unsigned int infinity = std::numeric_limits<unsigned int>::max() / 4;
 
 struct NodeData {
 
-  galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> residual_latent_vector;
-  galois::CopyableArray<double, LATENT_VECTOR_SIZE> latent_vector;
+  //galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> residual_latent_vector;
+  //galois::CopyableArray<double, LATENT_VECTOR_SIZE> latent_vector;
+
+  std::vector<galois::CopyableAtomic<double>> residual_latent_vector;
+  std::vector<double> latent_vector;
 };
+
+
+galois::DynamicBitSet bitset_residual_latent_vector;
 
 
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
@@ -157,12 +163,17 @@ struct InitializeGraph {
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
     _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector>("InitializeGraph");
+                Broadcast_latent_vector, Bitset_residual_latent_vector>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
 
+    //resize vectors
+    sdata.latent_vector.resize(LATENT_VECTOR_SIZE);
+    sdata.residual_latent_vector.resize(LATENT_VECTOR_SIZE);
+
+    bitset_residual_latent_vector.set(src);
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
       sdata.latent_vector[i] = genRand(); // randomly create latent vector 
       sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
@@ -196,7 +207,7 @@ struct recovery {
   }
 
   void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
+    //NodeData& snode = graph->getData(src);
 
   }
 };
@@ -279,13 +290,13 @@ struct SGD {
                 //Broadcast_residual_latent_vector>("SGD");
 
     _graph.sync<writeAny, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
-                Broadcast_residual_latent_vector>("SGD");
+                Broadcast_residual_latent_vector, Bitset_residual_latent_vector>("SGD");
 
       SGD_mergeResidual::go(_graph);
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery>(_graph);
+        crashSite<recovery, InitializeGraph>(_graph);
       }
       /**************************CRASH SITE : end *****************************************/
 
@@ -305,6 +316,7 @@ struct SGD {
     auto& movie_node = sdata.latent_vector;
     auto& residual_movie_node = sdata.residual_latent_vector;
 
+    bitset_residual_latent_vector.set(src);
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src);
          jj != ej;
          ++jj) {
@@ -337,6 +349,7 @@ struct SGD {
         galois::atomicAdd(residual_movie_node[i],  double(step_size * (cur_error * prevUser - LAMBDA * prevMovie)));
         assert(std::isnormal(residual_movie_node[i]));
       }
+      bitset_residual_latent_vector.set(dst);
     }
   }
 };
@@ -368,7 +381,7 @@ int main(int argc, char** argv) {
 #endif
 
   // bitset comm setup
-  //bitset_dist_current.resize(hg->size());
+  bitset_residual_latent_vector.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -400,6 +413,7 @@ int main(int argc, char** argv) {
         //bitset_dist_current_reset_cuda(cuda_ctx);
       } else
 #endif
+      bitset_residual_latent_vector.reset();
 
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
