@@ -29,17 +29,14 @@
 #include "galois/runtime/Executor_ParaMeter.h"
 #include "galois/gIO.h"
 
-namespace galois {
-  namespace runtime {
 
-namespace cll = llvm::cl;
-cll::opt<std::string> paraMeterOutFileOpt ("ParaMeterOut", cll::desc ("output csv stats file for ParaMeter"), cll::init("ParaMeter_Stats.csv"));
-cll::opt<bool> useParaMeterOpt ("useParaMeter", cll::desc ("enable ParaMeter to measure available parallelism"), cll::init(false));
-  } 
-}
+
+#include <ctime>
 
 struct StatsFileManager {
-  static const unsigned FNAME_SIZE = 256;
+
+  constexpr static const char* const PARAM_FILE_ENV_VAR = "GALOIS_PARAMETER_OUTFILE";
+
 
   bool init = false;
   bool isOpen = false;
@@ -52,26 +49,33 @@ struct StatsFileManager {
     close ();
   }
 
+  static void getTimeStampedName(const std::string& statsFileName) {
+
+    constexpr unsigned FNAME_SIZE = 256;
+
+    time_t rawtime;
+    struct tm* timeinfo;
+    
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    
+    strftime(statsFileName, FNAME_SIZE, "ParaMeter-Stats-%Y-%m-%d--%H-%M-%S.csv", timeinfo);
+  }
+
   FILE* get (void) {
     if (!init) {
       init = true;
 
-      statsFileName = galois::runtime::paraMeterOutFileOpt;
-      // time_t rawtime;
-      // struct tm* timeinfo;
-// 
-      // time(&rawtime);
-      // timeinfo = localtime(&rawtime);
-// 
-      // strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
+      if (!galois::substrate::EnvCheck(PARAM_FILE_ENV_VAR, statsFileName)) {
+        statsFileName = "ParaMeter-Stats.csv";
+      }
 
       statsFH = fopen(statsFileName.c_str(), "w");
       GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
 
-      galois::runtime::ParaMeter::StepStats::printHeader(statsFH);
+      galois::runtime::ParaMeter::StepStatsBase::printHeader(statsFH);
 
       fclose(statsFH);
-
     }
 
     if (!isOpen) {
