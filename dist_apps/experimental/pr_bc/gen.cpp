@@ -21,7 +21,7 @@
  * @section Description
  *
  * Compute Betweeness-Centrality on distributed Galois; Matteo
- * Pontecorvi and Vijaya Ramachandran's BC 
+ * Pontecorvi and Vijaya Ramachandran's distributed BC
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -279,8 +279,7 @@ struct DWrapper {
   uint32_t dist;
   uint32_t index;
   
-  DWrapper(uint32_t _dist, uint32_t _index)
-    : dist(_dist), index(_index) { }
+  DWrapper(uint32_t _dist, uint32_t _index) : dist(_dist), index(_index) { }
 
   bool operator<(const DWrapper& b) const {
     return dist < b.dist;
@@ -326,9 +325,18 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
     galois::iterate(allNodes), 
     [&] (GNode curNode) {
       NodeData& cur_data = graph.getData(curNode);
+
+      // TODO determine if creating this sort timer actually adds overhead
+      // to execution time....
+      galois::StatTimer sortTimer(graph.get_run_identifier("SortOverhead", 
+                                                           macroRound).c_str(),
+                                  REGION_NAME);
+
+      sortTimer.start();
       std::vector<DWrapper> toSort = wrapDistVector(cur_data.oldMinDistances);
   
       std::stable_sort(toSort.begin(), toSort.end());
+      sortTimer.stop();
   
       uint32_t indexToSend = numSourcesPerRound + 1;
 
@@ -340,11 +348,7 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
       cur_data.shortPathValueToSend = 0;
       cur_data.APSPIndexToSend = indexToSend;
   
-      //galois::StatTimer findMessage(graph.get_run_identifier("FindMessage").c_str());
-  
-      //findMessage.start();
-
-      // TODO I can probably optimize this loop
+      // TODO I can probably optimize this loop further
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         DWrapper& currentSource = toSort[i]; // safe
         uint32_t currentIndex = currentSource.index; // safe
@@ -387,8 +391,6 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
 
       // if ready message was found, this node should not terminate this
       // round
-      //findMessage.stop();
-
       if (sentMarked) {
         dga += 1;
       }
@@ -613,7 +615,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
             if (myDistance == (src_data.oldMinDistances[i] + 1)) {
               // add to dependency of predecessor using our finalized one
               galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
-              bitset_shortestPathToAdd.set(src);
+              bitset_dependencyToAdd.set(src);
             }
           }
         }
