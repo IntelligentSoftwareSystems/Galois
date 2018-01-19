@@ -95,9 +95,6 @@ struct NodeData {
 };
 
 
-galois::DynamicBitSet bitset_residual_latent_vector;
-
-
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
 //typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
 typedef typename Graph::GraphNode GNode;
@@ -163,7 +160,8 @@ struct InitializeGraph {
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
     _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector, Bitset_residual_latent_vector>("InitializeGraph");
+                Broadcast_latent_vector>("InitializeGraph");
+
   }
 
   void operator()(GNode src) const {
@@ -173,7 +171,6 @@ struct InitializeGraph {
     sdata.latent_vector.resize(LATENT_VECTOR_SIZE);
     sdata.residual_latent_vector.resize(LATENT_VECTOR_SIZE);
 
-    bitset_residual_latent_vector.set(src);
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
       sdata.latent_vector[i] = genRand(); // randomly create latent vector 
       sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
@@ -187,6 +184,7 @@ struct InitializeGraph {
 };
 
 /* Recovery to be called by resilience based fault tolerance
+ * It is a NoOp
  */
 struct recovery {
   Graph * graph;
@@ -202,8 +200,6 @@ struct recovery {
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
 
-    //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                //Broadcast_dist_current, Bitset_dist_current>("RECOVERY");
   }
 
   void operator()(GNode src) const {
@@ -290,7 +286,7 @@ struct SGD {
                 //Broadcast_residual_latent_vector>("SGD");
 
     _graph.sync<writeAny, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
-                Broadcast_residual_latent_vector, Bitset_residual_latent_vector>("SGD");
+                Broadcast_residual_latent_vector>("SGD");
 
       SGD_mergeResidual::go(_graph);
 
@@ -316,7 +312,6 @@ struct SGD {
     auto& movie_node = sdata.latent_vector;
     auto& residual_movie_node = sdata.residual_latent_vector;
 
-    bitset_residual_latent_vector.set(src);
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src);
          jj != ej;
          ++jj) {
@@ -349,7 +344,6 @@ struct SGD {
         galois::atomicAdd(residual_movie_node[i],  double(step_size * (cur_error * prevUser - LAMBDA * prevMovie)));
         assert(std::isnormal(residual_movie_node[i]));
       }
-      bitset_residual_latent_vector.set(dst);
     }
   }
 };
@@ -379,9 +373,6 @@ int main(int argc, char** argv) {
 #else
   Graph* hg = distGraphInitialization<NodeData, double>();
 #endif
-
-  // bitset comm setup
-  bitset_residual_latent_vector.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -413,8 +404,6 @@ int main(int argc, char** argv) {
         //bitset_dist_current_reset_cuda(cuda_ctx);
       } else
 #endif
-      bitset_residual_latent_vector.reset();
-
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
