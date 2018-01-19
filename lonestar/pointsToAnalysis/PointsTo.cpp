@@ -573,43 +573,45 @@ class PTA {
    * Run points-to-analysis using galois::for_each as the main loop.
    */
   void runParallel() {
+    galois::gDebug("no of addr+copy constraints = ", 
+                   addressCopyConstraints.size(), 
+                   ", no of load+store constraints = ", 
+                   loadStoreConstraints.size());
+    galois::gDebug("no of nodes = ", numNodes);
+
     galois::InsertBag<unsigned> updates;
     updates = processAddressOfCopy<galois::InsertBag<unsigned>>(addressCopyConstraints);
-
     processLoadStore(loadStoreConstraints, updates);
 
     while (!updates.empty()) {
       galois::for_each(
         galois::iterate(updates),
         [this] (unsigned req, auto& ctx) {
-          galois::gstl::Vector<unsigned> reqOut = 
-            this->outgoingEdges[req].
-            getAllSetBits<galois::gstl::Vector<unsigned>>();
-
-          for (auto dst : reqOut) {
-            unsigned newPtsTo = this->propagate(req, dst);
+          for (auto dst = this->outgoingEdges[req].begin();
+               dst != this->outgoingEdges[req].end();
+               dst++) {
+            unsigned newPtsTo = this->propagate(req, *dst);
 
             if (newPtsTo) {
-              ctx.push(dst);
+              ctx.push(this->ocd.getFinalRepresentative(*dst));
             }
           }
         },
-        galois::loopname("MainUpdateLoop"),
-        galois::wl<galois::worklists::dChunkedFIFO<8>>()
+        galois::loopname("PointsToMainUpdateLoop"),
+        galois::wl<galois::worklists::dChunkedFIFO<8>>() // TODO exp with this
       );
 
-      galois::gPrint("No of points-to facts computed = ", 
-                     countPointsToFacts(), "\n");
+      galois::gPrint("No of points-to facts computed = ", countPointsToFacts(),
+                     "\n");
 
       updates.clear_parallel();
 
       // After propagating all constraints, see if load/store constraints need 
       // to be added in since graph was potentially updated
-      //galois::gPrint(updates.size(), " us1\n");
       processLoadStore(loadStoreConstraints, updates);
-      //galois::gPrint(updates.size(), " us2\n");
+
       // do cycle squashing
-      ocd.process(updates);
+      ocd.process(updates); // TODO have parallel version
     }
   }
 
