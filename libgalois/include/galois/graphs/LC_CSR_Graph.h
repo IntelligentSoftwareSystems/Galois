@@ -252,20 +252,28 @@ class LC_CSR_Graph :
 
 
  public:
-
-  void serializeNodeData(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
-     ar << nodeData;
-  }
-
-  void deSerializeNodeData(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
-     ar >> nodeData;
-  }
-
-
- public:
   LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
   LC_CSR_Graph() = default;
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
+
+  /**
+   * Serializes node data using Boost.
+   *
+   * @param ar Boost archive to serialize to.
+   */
+  void serializeNodeData(boost::archive::binary_oarchive& ar) const {
+     ar << nodeData;
+  }
+
+  /**
+   * Deserializes a Boost archive containing node data to the local node data
+   * variable.
+   *
+   * @param ar Boost archive to deserialize from.
+   */
+  void deSerializeNodeData(boost::archive::binary_iarchive& ar) {
+     ar >> nodeData;
+  }
 
   /**
    * Accesses the "prefix sum" of this graph; takes advantage of the fact
