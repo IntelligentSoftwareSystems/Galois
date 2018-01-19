@@ -3147,17 +3147,24 @@ public:
    * Checkpoint the complete structure on the node
    *
    ***************************************************************/
-  void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint"){
+  void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint") {
     using namespace boost::archive;
-    galois::StatTimer TimerSaveCheckPoint("TIMER_SAVE_CHECKPOINT", GRNAME);
+    galois::StatTimer TimerSaveCheckPoint(
+      get_run_identifier("TIMER_SAVE_CHECKPOINT").c_str(), 
+      GRNAME
+    );
+
     TimerSaveCheckPoint.start();
-    std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
+    std::string checkpointFileName_local = checkpointFileName + "_" + 
+                                           std::to_string(id);
 
     std::ofstream outputStream(checkpointFileName_local, std::ios::binary);
-    if(!outputStream.is_open()){
-      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, " to save checkpoint!!!\n");
+    if (!outputStream.is_open()) {
+      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, 
+                     " to save checkpoint!!!\n");
     }
-    galois::gPrint(id, " : Saving local checkpoint to : ", checkpointFileName_local, "\n");
+    galois::gPrint("[", id, "] Saving local checkpoint to :", 
+                   checkpointFileName_local, "\n");
 
     boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
 
@@ -3167,17 +3174,25 @@ public:
     TimerSaveCheckPoint.stop();
   }
 
-  void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint"){
+  void checkpointApplyNodeData(std::string checkpointFileName = "checkpoint") {
     using namespace boost::archive;
-    galois::StatTimer TimerApplyCheckPoint("TIMER_APPLY_CHECKPOINT", GRNAME);
+    galois::StatTimer TimerApplyCheckPoint(
+      get_run_identifier("TIMER_APPLY_CHECKPOINT").c_str(), 
+      GRNAME
+    );
+
     TimerApplyCheckPoint.start();
-    std::string checkpointFileName_local = checkpointFileName + "_" + std::to_string(id);
+    std::string checkpointFileName_local = checkpointFileName + "_" +
+                                           std::to_string(id);
 
     std::ifstream inputStream(checkpointFileName_local, std::ios::binary);
-    if(!inputStream.is_open()){
-      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, " to read checkpoint!!!\n");
+
+    if (!inputStream.is_open()) {
+      galois::gPrint("ERROR: Could not open ", checkpointFileName_local, 
+                     " to read checkpoint!!!\n");
     }
-    galois::gPrint(id, " : reading local checkpoint from : ", checkpointFileName_local, "\n");
+    galois::gPrint("[", id, "] reading local checkpoint from: ", 
+                   checkpointFileName_local, "\n");
 
     boost::archive::binary_iarchive ar(inputStream, boost::archive::no_header);
 
@@ -3469,25 +3484,25 @@ public:
 
     std::string fileName = localGraphFileName + "_" + std::to_string(id);
 
-    galois::gPrint("[", id, "] inside save_local_graph_to_file \n");
+    galois::gDebug("[", id, "] inside save_local_graph_to_file \n");
+
     std::ofstream outputStream(fileName, std::ios::binary);
-    if(!outputStream.is_open()){
+    if (!outputStream.is_open()) {
       std::cerr << "ERROR: Could not open " << fileName << " to save local graph!!!\n";
     }
 
     boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
 
-    //graph topology
+    // graph topology
     ar << graph;
     ar << numGlobalNodes;
     ar << numGlobalEdges;
 
-    //bool
+    // bool
     ar << transposed;
 
-
-    //Proxy information
-    //TODO: Find better way to serialize vector of vectors in boost serialization
+    // Proxy information
+    // TODO: Find better way to serialize vector of vectors in boost serialization
     for(uint32_t i = 0; i < numHosts; ++i){
       ar << masterNodes[i];
       ar << mirrorNodes[i];
@@ -3498,7 +3513,7 @@ public:
     ar << numNodesWithEdges;
     ar << gid2host;
 
-    //Serialize partitioning scheme specific data structures.
+    // Serialize partitioning scheme specific data structures.
     boostSerializeLocalGraph(ar);
 
     outputStream.close();
@@ -3536,8 +3551,8 @@ public:
     //bool
     ar >> transposed;
 
-    //Proxy information
-    //TODO: Find better way to Deserialize vector of vectors in boost serialization
+    // Proxy information
+    // TODO: Find better way to Deserialize vector of vectors in boost serialization
     for(uint32_t i = 0; i < numHosts; ++i){
       ar >> masterNodes[i];
       ar >> mirrorNodes[i];
