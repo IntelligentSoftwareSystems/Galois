@@ -9,7 +9,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -200,6 +200,8 @@ class PTA {
       // keep track of the current depth first search path
       ancestors.push_back(nodeRep);
 
+      // don't use an iterator here because outgoing edges might get updated
+      // during this loop
       galois::gstl::Vector<unsigned> repOutgoingEdges = 
         outerPTA.outgoingEdges[nodeRep].
         getAllSetBits<galois::gstl::Vector<unsigned>>();
@@ -375,17 +377,15 @@ class PTA {
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
       if (constraint.getType() == PtsToCons::Load) { 
-        galois::gstl::Vector<unsigned> ptsToOfSrc = 
-          pointsToResult[srcRepr].
-          getAllSetBits<galois::gstl::Vector<unsigned>>();
-
-        for (unsigned pointee : ptsToOfSrc) {
-          unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
+        for (auto pointee = pointsToResult[srcRepr].begin();
+             pointee != pointsToResult[srcRepr].end();
+             pointee++) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
 
           // add edge from pointee to dst if it doesn't already exist
           if (pointeeRepr != dstRepr && 
               !outgoingEdges[pointeeRepr].test(dstRepr)) {
-            galois::gDebug("adding edge from ", pointee, " to ", dst);
+            galois::gDebug("adding edge from ", *pointee, " to ", dst);
             outgoingEdges[pointeeRepr].set(dstRepr);
             GALOIS_ASSERT(outgoingEdges[pointeeRepr].test(dstRepr));
 
@@ -393,19 +393,17 @@ class PTA {
           }
         }
       } else {  // store whatever src has into whatever dst points to
-        galois::gstl::Vector<unsigned> ptsToOfDst = 
-          pointsToResult[dstRepr].
-          getAllSetBits<galois::gstl::Vector<unsigned>>();
-
         bool newEdgeAdded = false;
 
-        for (unsigned pointee : ptsToOfDst) {
-          unsigned pointeeRepr = ocd.getFinalRepresentative(pointee);
+        for (auto pointee = pointsToResult[dstRepr].begin();
+             pointee != pointsToResult[dstRepr].end();
+             pointee++) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
 
           // add edge from src -> pointee if it doesn't exist
           if (srcRepr != pointeeRepr && 
               !outgoingEdges[srcRepr].test(pointeeRepr)) {
-            galois::gDebug("adding edge from ", src, " to ", pointee);
+            galois::gDebug("adding edge from ", src, " to ", *pointee);
             outgoingEdges[srcRepr].set(pointeeRepr);
             GALOIS_ASSERT(outgoingEdges[srcRepr].test(pointeeRepr));
 
@@ -543,15 +541,13 @@ class PTA {
 
       //galois::gDebug("processing updates element ", src, "\n");
 
-      galois::gstl::Vector<unsigned> srcOutgoingEdges = 
-        outgoingEdges[src].getAllSetBits<galois::gstl::Vector<unsigned>>();
-
-
-      for (unsigned dst : srcOutgoingEdges) {
-        unsigned newPtsTo = propagate(src, dst);
+      for (auto dst = outgoingEdges[src].begin(); 
+           dst != outgoingEdges[src].end();
+           dst++) {
+        unsigned newPtsTo = propagate(src, *dst);
 
         if (newPtsTo) { // newPtsTo is positive if dst changed
-          updates.push_back(ocd.getFinalRepresentative(dst));
+          updates.push_back(ocd.getFinalRepresentative(*dst));
         }
       }
 
