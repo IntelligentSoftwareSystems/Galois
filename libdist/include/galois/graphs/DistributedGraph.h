@@ -1698,6 +1698,7 @@ private:
 
     uint32_t num = indices.size();
     static std::vector<typename SyncFnTy::ValTy> val_vec;
+    static std::vector<unsigned int> dummyVector;
 
     Textract.start();
 
@@ -1712,7 +1713,8 @@ private:
         // get everything (note I pass in "indices" as offsets as it won't
         // even get used anyways)
         extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
-                                                       num, indices, val_vec);
+                                                       num, dummyVector, 
+                                                       val_vec);
       }
 
       gSerialize(b, onlyData, val_vec);
