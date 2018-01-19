@@ -170,8 +170,8 @@ class PQuadTree {
     galois::GReduceMin<TupleDataTy> minX;
     galois::GReduceMin<TupleDataTy> minY;
 
-    galois::GReduceMin<TupleDataTy> maxX;
-    galois::GReduceMin<TupleDataTy> maxY;
+    galois::GReduceMax<TupleDataTy> maxX;
+    galois::GReduceMax<TupleDataTy> maxY;
 
     galois::do_all(galois::iterate(begin, end), 
         [&] (const Point* p) {
