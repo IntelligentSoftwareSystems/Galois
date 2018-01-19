@@ -1107,6 +1107,7 @@ private:
    * set.
    *
    * @tparam syncType either reduce or broadcast; only used to name the timer
+   *
    * @param loopName string used to name the timer for this function
    * @param bitset_comm the bitset to get the offsets of
    * @param offsets output: the offset vector that will contain indices into
@@ -1126,7 +1127,6 @@ private:
     galois::StatTimer Toffsets(offsets_timer_str.c_str(), GRNAME);
 
     Toffsets.start();
-
 
     auto activeThreads = galois::getActiveThreads();
     std::vector<unsigned int> t_prefix_bit_counts(activeThreads);
@@ -1197,7 +1197,9 @@ private:
   }
 
   /**
-   * TODO
+   * Determine what data needs to be synchronized based on the passed in
+   * bitset_compute and returns information regarding these need-to-be-sync'd
+   * nodes.
    *
    * @tparam FnTy structure that specifies how synchronization is to be done;
    * only used to get the size of the type being synchronized in this function
@@ -1213,7 +1215,8 @@ private:
    * in indices array need to be synchronized
    * @param offsets OUTPUT: contains indices into bitset_comm that are set 
    * @param bit_set_count OUTPUT: contains number of bits set in bitset_comm
-   * @param data_mode TODO
+   * @param data_mode OUTPUT: the way that this data should be communicated
+   * based on how much data needs to be sent out
    */
   template<typename FnTy, SyncType syncType>
   void get_bitset_and_offsets(const std::string &loopName,
@@ -1245,11 +1248,21 @@ private:
                                         bit_set_count);
     }
 
-    data_mode = get_data_mode<typename FnTy::ValTy>(bit_set_count, indices.size());
+    data_mode = get_data_mode<typename FnTy::ValTy>(bit_set_count,
+                                                    indices.size());
   }
 
   /**
-   * TODO
+   * Extracts data at provided lid.
+   *
+   * This version (reduce) resets the value after extract.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; determines if reset is
+   * necessary
+   *
+   * @param lid local id of node to get data from
+   * @returns data (specified by FnTy) of node with local id lid
    */
   /* Reduction extract resets the value afterwards */
   template<typename FnTy, SyncType syncType,
@@ -1267,9 +1280,17 @@ private:
   }
 
   /**
-   * TODO
+   * Extracts data at provided lid.
+   *
+   * This version (broadcast) does not reset the value after extract.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; determines if reset is
+   * necessary
+   *
+   * @param lid local id of node to get data from
+   * @returns data (specified by FnTy) of node with local id lid
    */
-  /* Broadcast extract doesn't reset the value */
   template<typename FnTy, SyncType syncType,
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline typename FnTy::ValTy extract_wrapper(size_t lid) {
@@ -1282,7 +1303,25 @@ private:
   }
 
   /**
-   * TODO
+   * Based on provided arguments, extracts the data that we are interested
+   * in sending into val_vec.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; used to determine if reseting
+   * the extracted field is necessary
+   * @tparam identity_offsets If this is true, then ignore the offsets
+   * array and just grab directly from indices (i.e. don't pick out
+   * particular elements, just grab contiguous chunk)
+   * @tparam parallelize Determines if parallelizing the extraction is done or
+   * not
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param size Number of elements to extract
+   * @param offsets Holds offsets into "indices" of the data that we are 
+   * interested in
+   * @param val_vec OUTPUT: holds the extracted data
+   * @param start Offset into val_vec to start saving data to
    */
   template<typename FnTy, SyncType syncType, bool identity_offsets = false, 
            bool parallelize = true>
@@ -1294,17 +1333,21 @@ private:
     if (parallelize) {
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
       std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
-      galois::do_all(galois::iterate(start, start + size),
-                     [&](unsigned int n){
-                       unsigned int offset;
-                       if (identity_offsets) offset = n;
-                       else offset = offsets[n];
-                       size_t lid = indices[offset];
-                       val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid);
-                     },
-                     galois::no_stats(),
-                     galois::loopname(get_run_identifier(doall_str).c_str()));
-    } else {
+
+      galois::do_all(
+        galois::iterate(start, start + size),
+        [&] (unsigned int n) {
+          unsigned int offset;
+          if (identity_offsets) offset = n;
+          else offset = offsets[n];
+
+          size_t lid = indices[offset];
+          val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid);
+        },
+        galois::no_stats(),
+        galois::loopname(get_run_identifier(doall_str).c_str())
+      );
+    } else { // non-parallel version
       for (unsigned n = start; n < start + size; ++n) {
         unsigned int offset;
         if (identity_offsets) offset = n;
@@ -1317,7 +1360,9 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
+   *
+   * Serialize lazy variant.
    */
   template<typename FnTy, typename SeqTy, SyncType syncType, 
            bool identity_offsets = false, bool parallelize = true>
@@ -1330,18 +1375,20 @@ private:
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
       std::string doall_str(syncTypeStr + "_EXTRACTVAL_" + loopName);
 
-      galois::do_all(galois::iterate(start, start + size), 
-          [&](unsigned int n) {
-            unsigned int offset;
+      galois::do_all(
+        galois::iterate(start, start + size), 
+        [&](unsigned int n) {
+          unsigned int offset;
 
-            if (identity_offsets) offset = n;
-            else offset = offsets[n];
+          if (identity_offsets) offset = n;
+          else offset = offsets[n];
 
-            size_t lid = indices[offset];
-            gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
-          }, 
-          galois::no_stats(),
-          galois::loopname(get_run_identifier(doall_str).c_str()));
+          size_t lid = indices[offset];
+          gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
+        }, 
+        galois::no_stats(),
+        galois::loopname(get_run_identifier(doall_str).c_str())
+      );
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1356,7 +1403,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1365,7 +1412,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1374,7 +1421,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1388,7 +1435,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1401,7 +1448,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1418,7 +1465,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1433,10 +1480,10 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
-  template<typename VecTy, typename FnTy, SyncType syncType, bool identity_offsets = false, 
-           bool parallelize = true>
+  template<typename VecTy, typename FnTy, SyncType syncType, 
+           bool identity_offsets = false, bool parallelize = true>
   void set_subset(const std::string &loopName, 
                   const VecTy &indices, 
                   size_t size, 
@@ -1474,7 +1521,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1483,7 +1530,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1491,7 +1538,7 @@ private:
     return FnTy::setVal_batch(x, v.data());
   }
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1504,7 +1551,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1517,7 +1564,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<SyncType syncType>
   void convert_lid_to_gid(const std::string &loopName, 
@@ -1535,7 +1582,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<SyncType syncType>
   void convert_gid_to_lid(const std::string &loopName, 
@@ -1563,7 +1610,8 @@ private:
              >::value
            >::type* = nullptr>
   void sync_extract(std::string loopName, unsigned from_id, 
-                    std::vector<size_t> &indices, galois::runtime::SendBuffer &b) {
+                    std::vector<size_t> &indices, 
+                    galois::runtime::SendBuffer &b) {
     uint32_t num = indices.size();
     static std::vector<typename SyncFnTy::ValTy> val_vec; // sometimes wasteful
     static std::vector<unsigned int> offsets;
@@ -1609,7 +1657,18 @@ private:
    * Non-bitset extract for when the type of the item being sync'd isn't
    * memory copyable.
    *
-   * TODO implement this
+   * Extracts all of the data for all nodes in indices and saves it into
+   * a send buffer for return.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam syncFnTy struct that has info on how to do synchronization
+   *
+   * @param loopName loop name used for timers
+   * @param from_id 
+   * @param indices Vector that contains node ids of nodes that we will 
+   * potentially send things to
+   * @param b OUTPUT: buffer that will be sent over the network; contains data
+   * based on set bits in bitset
    */
   template<SyncType syncType, typename SyncFnTy, 
            typename std::enable_if<
@@ -1620,14 +1679,31 @@ private:
   void sync_extract(std::string loopName, unsigned from_id, 
                     std::vector<size_t> &indices, 
                     galois::runtime::SendBuffer &b) {
+    // data mode is all data
     GALOIS_DIE("Non memory copyable sync_extract without bitset not yet "
                "implemented");
+    // get everything
+    //bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
+    //                                                                 val_vec);
   }
   
   /**
-   * TODO
+   * Extracts the data that will be sent to a host in this round of
+   * synchronization based on the passed in bitset and saves it to a
+   * send buffer.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam syncFnTy struct that has info on how to do synchronization
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   * being used for the extraction
+   *
+   * @param loopName loop name used for timers
+   * @param from_id 
+   * @param indices Vector that contains node ids of nodes that we will 
+   * potentially send things to
+   * @param b OUTPUT: buffer that will be sent over the network; contains data
+   * based on set bits in bitset
    */
-  // Bitset variant (uses bitset to determine what to sync)
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_extract(std::string loopName, unsigned from_id,
                     std::vector<size_t> &indices,
@@ -1665,10 +1741,8 @@ private:
                    bit_set_compute, bit_set_comm, offsets, bit_set_count,
                    data_mode);
 
-        // at this point indices should hold local ids of nodes that need
-        // to be accessed
         if (data_mode == onlyData) {
-          bit_set_count = indices.size();
+          bit_set_count = indices.size(); // all of it?
           extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
             bit_set_count, offsets, val_vec);
         } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
@@ -1678,7 +1752,7 @@ private:
       }
 
       size_t redundant_size = (num - bit_set_count) *
-                                sizeof(typename SyncFnTy::ValTy);
+                               sizeof(typename SyncFnTy::ValTy);
       size_t bit_set_size = (bit_set_comm.get_vec().size() * sizeof(uint64_t));
 
       if (redundant_size > bit_set_size) {
@@ -1720,7 +1794,8 @@ private:
   }
   
   /**
-   * Extract the data that is going to be sent for synchronization.
+   * Get data that is going to be sent for synchronization and returns
+   * it in a send buffer.
    *
    * @tparam syncType synchronization type
    * @tparam SyncFnTy synchronization structure with info needed to synchronize
@@ -1728,7 +1803,7 @@ private:
    *
    * @param loopName Name to give timer
    * @param x Host to send to
-   * @param b Buffer that will hold data to send
+   * @param b OUTPUT: Buffer that will hold data to send
    */
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void get_send_buffer(std::string loopName, unsigned x, 
@@ -1751,7 +1826,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1788,7 +1863,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1832,7 +1907,7 @@ private:
 #endif
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1859,7 +1934,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1874,7 +1949,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
            bool parallelize = true>
@@ -1967,7 +2042,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1984,7 +2059,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2009,7 +2084,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2036,7 +2111,7 @@ private:
 #endif
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2059,7 +2134,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2075,7 +2150,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2130,7 +2205,7 @@ private:
   }
 
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2215,7 +2290,7 @@ private:
 #endif
   
   /**
-   * TODO
+   * TODO documentation
    */
   // reduce from mirrors to master
   template<WriteLocation writeLocation, ReadLocation readLocation,
@@ -2252,7 +2327,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   // broadcast from master to mirrors
   template<WriteLocation writeLocation, ReadLocation readLocation,
@@ -2327,7 +2402,7 @@ private:
   // broadcast - master to mirrors
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_src(std::string loopName) {
@@ -2340,7 +2415,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_dst(std::string loopName) {
@@ -2363,7 +2438,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_any(std::string loopName) {
@@ -2376,7 +2451,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_src(std::string loopName) {
@@ -2399,7 +2474,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_dst(std::string loopName) {
@@ -2414,7 +2489,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_any(std::string loopName) {
@@ -2427,7 +2502,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_src(std::string loopName) {
@@ -2440,7 +2515,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_dst(std::string loopName) {
@@ -2454,7 +2529,7 @@ private:
   }
   
   /**
-   * TODO
+   * TODO documentation
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_any(std::string loopName) {
@@ -2465,7 +2540,7 @@ private:
 
 public:
   /**
-   * TODO
+   * TODO documentation
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename ReduceFnTy, typename BroadcastFnTy,
