@@ -21,7 +21,7 @@ independentset USA-road-d.USA
 #independentset rmat28
 matrixcompletion yahoo-music
 mcm nothing
-pagerank-pull twitter50-transpose
+pagerank-pull twitter40-transpose
 pagerank-push soc-livejournal
 preflowpush r4-2e26
 pta nothing
