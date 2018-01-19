@@ -1600,8 +1600,18 @@ private:
   }
   
   /**
-   * Non-bitset extract that uses serializelazy. REQUIRES that the ValTy
-   * be memory copyable.
+   * Non-bitset extract that uses serializelazy to copy data over to the
+   * buffer. REQUIRES that the ValTy be memory copyable.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam syncFnTy struct that has info on how to do synchronization
+   *
+   * @param loopName loop name used for timers
+   * @param from_id 
+   * @param indices Vector that contains node ids of nodes that we will 
+   * potentially send things to
+   * @param b OUTPUT: buffer that will be sent over the network; contains data
+   * based on set bits in bitset
    */
   template<SyncType syncType, typename SyncFnTy, 
            typename std::enable_if<
@@ -1679,12 +1689,44 @@ private:
   void sync_extract(std::string loopName, unsigned from_id, 
                     std::vector<size_t> &indices, 
                     galois::runtime::SendBuffer &b) {
-    // data mode is all data
-    GALOIS_DIE("Non memory copyable sync_extract without bitset not yet "
-               "implemented");
-    // get everything
-    //bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
-    //                                                                 val_vec);
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+
+    DataCommMode data_mode;
+
+    uint32_t num = indices.size();
+    static std::vector<typename SyncFnTy::ValTy> val_vec;
+
+    Textract.start();
+
+    if (num > 0) {
+      data_mode = onlyData;
+      val_vec.resize(num);
+
+      bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
+                                                                       val_vec);
+
+      if (!batch_succeeded) {
+        // get everything (note I pass in "indices" as offsets as it won't
+        // even get used anyways)
+        extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
+                                                       num, indices, val_vec);
+      }
+
+      gSerialize(b, onlyData, val_vec);
+    } else {
+      data_mode = noData;
+      gSerialize(b, noData);
+    }
+
+    Textract.stop();
+
+    std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
+                             std::to_string(data_mode) + "_" + 
+                             get_run_identifier(loopName));
+    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
   
   /**
@@ -1742,7 +1784,7 @@ private:
                    data_mode);
 
         if (data_mode == onlyData) {
-          bit_set_count = indices.size(); // all of it?
+          bit_set_count = indices.size();
           extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
             bit_set_count, offsets, val_vec);
         } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
