@@ -230,10 +230,138 @@ struct SparseBitVector {
   // END ONEWORD
   //////////////////////////////////////////////////////////////////////////////
 
+  //////////////////////////////////////////////////////////////////////////////
+  // Begin Iterator
+  //////////////////////////////////////////////////////////////////////////////
+
+  /**
+   * Iterator for SparseBitVector
+   *
+   * BEHAVIOR IF THE BIT VECTOR IS ALTERED DURING ITERATION IS UNDEFINED.
+   * (i.e. correctness is not guaranteed)
+   */
+  class SBVIterator 
+    : public boost::iterator_facade<SBVIterator, const unsigned, 
+                                    boost::forward_traversal_tag> {
+    SparseBitVector::OneWord* currentHead;
+    unsigned currentBit;
+    unsigned currentValue;
+  
+    void advanceToNextBit(bool inclusive) {
+      if (!inclusive) {
+        currentBit++; // current bit doesn't count for checking
+      }
+  
+      bool found = false;
+      while (!found && currentHead != nullptr) {
+        while (currentBit < SparseBitVector::wordSize) {
+          if (currentHead->test(currentBit)) {
+            found = true;
+            break;
+          } else {
+            currentBit++;
+          }
+        }
+  
+        if (!found) {
+          currentHead = currentHead->next;
+          currentBit = 0;
+        }
+      }
+  
+  
+      if (currentHead != nullptr) {
+        currentValue = (currentHead->base * SparseBitVector::wordSize) + 
+                       currentBit;
+      } else {
+        currentValue = -1;
+      }
+    }
+    
+   public:
+    /**
+     * This is the end for an iterator.
+     */
+    SBVIterator() : currentHead(nullptr), currentBit(0), currentValue(-1) { 
+      currentValue = -1;
+    }
+  
+    SBVIterator(SparseBitVector::OneWord* firstHead) 
+        : currentHead(firstHead), currentBit(0), currentValue(-1) { 
+      advanceToNextBit(true);
+    }
+  
+    SBVIterator(SparseBitVector* bv) : currentBit(0), currentValue(-1) {
+      currentHead = bv->head;
+      advanceToNextBit(true);
+    }
+  
+   private:
+    friend class boost::iterator_core_access;
+  
+    /**
+     * Goes to next bit of bitvector.
+     */
+    void increment() {
+      if (currentHead != nullptr) {
+        advanceToNextBit(false); // false = increment currentBit
+      } // do nothing if head is nullptr (i.e. the end)
+    }
+  
+    /**
+     * @param other Another iterator to compare against
+     * @returns true if other iterator currently points to the same location
+     */
+    bool equal(const SBVIterator& other) const {
+      if (currentHead != nullptr) {
+        if (other.currentHead == currentHead && 
+            other.currentBit == currentBit) {
+          return true;
+        } else {
+          return false;
+        }
+      } else {
+        if (other.currentHead == nullptr) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+    }
+  
+    /**
+     * @returns the current value that the iterator is pointing to
+     */
+    const unsigned& dereference() const {
+      return currentValue;
+    }
+  };
+
+  //////////////////////////////////////////////////////////////////////////////
+  // End Iterator
+  //////////////////////////////////////////////////////////////////////////////
+
   OneWord* head;
 
+  /**
+   * Constructor; inits head to nullptr
+   */
   SparseBitVector() {
     init();
+  }
+
+  /**
+   * @returns iterator to first set element of this bitvector
+   */
+  SBVIterator begin() {
+    return SBVIterator(this);
+  }
+
+  /**
+   * @returns end iterator of this bitvector.
+   */
+  SBVIterator end() {
+    return SBVIterator();
   }
 
   /**
@@ -487,110 +615,9 @@ struct SparseBitVector {
     out << "\n";
   }
 
+
 };
 
-/**
- * Iterator for SparseBitVector
- *
- * BEHAVIOR IF THE BIT VECTOR IS ALTERED DURING ITERATION IS UNDEFINED.
- * (i.e. correctness is not guaranteed)
- */
-class SBVIterator 
-  : public boost::iterator_facade<SBVIterator, const unsigned, 
-                                  boost::forward_traversal_tag> {
-  SparseBitVector::OneWord* currentHead;
-  unsigned currentBit;
-  unsigned currentValue;
-
-  void advanceToNextBit(bool inclusive) {
-    if (!inclusive) {
-      currentBit++; // current bit doesn't count for checking
-    }
-
-    bool found = false;
-    while (!found && currentHead != nullptr) {
-      while (currentBit < SparseBitVector::wordSize) {
-        if (currentHead->test(currentBit)) {
-          found = true;
-          break;
-        } else {
-          currentBit++;
-        }
-      }
-
-      if (!found) {
-        currentHead = currentHead->next;
-        currentBit = 0;
-      }
-    }
-
-
-    if (currentHead != nullptr) {
-      currentValue = (currentHead->base * SparseBitVector::wordSize) + 
-                     currentBit;
-    } else {
-      currentValue = -1;
-    }
-  }
-  
- public:
-  /**
-   * This is the end for an iterator.
-   */
-  SBVIterator() : currentHead(nullptr), currentBit(0), currentValue(-1) { 
-    currentValue = -1;
-  }
-
-  SBVIterator(SparseBitVector::OneWord* firstHead) 
-      : currentHead(firstHead), currentBit(0), currentValue(-1) { 
-    advanceToNextBit(true);
-  }
-
-  SBVIterator(SparseBitVector* bv) : currentBit(0), currentValue(-1) {
-    currentHead = bv->head;
-    advanceToNextBit(true);
-  }
-
- private:
-  friend class boost::iterator_core_access;
-
-  /**
-   * Goes to next bit of bitvector.
-   */
-  void increment() {
-    if (currentHead != nullptr) {
-      advanceToNextBit(false); // false = increment currentBit
-    } // do nothing if head is nullptr (i.e. the end)
-  }
-
-  /**
-   * @param other Another iterator to compare against
-   * @returns true if other iterator currently points to the same location
-   */
-  bool equal(const SBVIterator& other) const {
-    if (currentHead != nullptr) {
-      if (other.currentHead == currentHead && 
-          other.currentBit == currentBit) {
-        return true;
-      } else {
-        return false;
-      }
-    } else {
-      if (other.currentHead == nullptr) {
-        return true;
-      } else {
-        return false;
-      }
-    }
-  }
-
-  /**
-   * @returns the current value that the iterator is pointing to
-   */
-  const unsigned& dereference() const {
-    return currentValue;
-  }
-};
 
 } // end namespace galois
 
