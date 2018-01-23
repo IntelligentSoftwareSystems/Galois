@@ -1280,6 +1280,29 @@ private:
   }
 
   /**
+   * Extracts data at provided lid; uses vecIndex to get the correct element
+   * from the vector.
+   *
+   * This version (reduce) resets the value after extract.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; determines if reset is
+   * necessary
+   *
+   * @param lid local id of node to get data from
+   * @param vecIndex index to grab from vector in node
+   * @returns data (specified by FnTy) of node with local id lid
+   */
+  /* Reduction extract resets the value afterwards */
+  template<typename FnTy, SyncType syncType,
+           typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  inline typename FnTy::ValTy extract_wrapper(size_t lid, unsigned vecIndex) {
+    auto val = FnTy::extract(lid, getData(lid), vecIndex);
+    FnTy::reset(lid, getData(lid), vecIndex);
+    return val;
+  }
+
+  /**
    * Extracts data at provided lid.
    *
    * This version (broadcast) does not reset the value after extract.
@@ -1300,6 +1323,26 @@ private:
     #else
     return FnTy::extract(lid, getData(lid));
     #endif
+  }
+
+  /**
+   * Extracts data at provided lid; uses vecIndex to get the correct element
+   * from the vector in the node.
+   *
+   * This version (broadcast) does not reset the value after extract.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; determines if reset is
+   * necessary
+   *
+   * @param lid local id of node to get data from
+   * @param vecIndex index to grab from vector in node
+   * @returns data (specified by FnTy) of node with local id lid
+   */
+  template<typename FnTy, SyncType syncType,
+           typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
+  inline typename FnTy::ValTy extract_wrapper(size_t lid, unsigned vecIndex) {
+    return FnTy::extract(lid, getData(lid), vecIndex);
   }
 
   /**
@@ -1358,6 +1401,69 @@ private:
       }
     }
   }
+
+  /**
+   * Based on provided arguments, extracts the data that we are interested
+   * in sending into val_vec. Same as above, except it has the vecIndex
+   * arguments and requires vecSync to be true
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType either reduce or broadcast; used to determine if reseting
+   * the extracted field is necessary
+   * @tparam identity_offsets If this is true, then ignore the offsets
+   * array and just grab directly from indices (i.e. don't pick out
+   * particular elements, just grab contiguous chunk)
+   * @tparam parallelize Determines if parallelizing the extraction is done or
+   * not
+   * @tparam vecSync Only set to true if the field being synchronized is a 
+   * vector and synchronization is occuring element by element
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param size Number of elements to extract
+   * @param offsets Holds offsets into "indices" of the data that we are 
+   * interested in
+   * @param val_vec OUTPUT: holds the extracted data
+   * @param vecIndex which element of the vector to extract from node
+   * @param start Offset into val_vec to start saving data to
+   */
+  template<typename FnTy, SyncType syncType, bool identity_offsets = false, 
+           bool parallelize = true, bool vecSync = false,
+           typename std::enable_if<vecSync>::type* = nullptr>
+  void extract_subset(const std::string &loopName,
+                      const std::vector<size_t> &indices, size_t size,
+                      const std::vector<unsigned int> &offsets,
+                      std::vector<typename FnTy::ValTy> &val_vec,
+                      unsigned vecIndex, size_t start = 0) {
+    if (parallelize) {
+      std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+      std::string doall_str(syncTypeStr + "_EXTRACTVAL_VECTOR_" + loopName);
+
+      galois::do_all(
+        galois::iterate(start, start + size),
+        [&] (unsigned int n) {
+          unsigned int offset;
+          if (identity_offsets) offset = n;
+          else offset = offsets[n];
+
+          size_t lid = indices[offset];
+          val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid, vecIndex);
+        },
+        galois::no_stats(),
+        galois::loopname(get_run_identifier(doall_str).c_str())
+      );
+    } else { // non-parallel version
+      for (unsigned n = start; n < start + size; ++n) {
+        unsigned int offset;
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+
+        size_t lid = indices[offset];
+        val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid, vecIndex);
+      }
+    }
+  }
+
 
   /**
    * TODO documentation
@@ -2030,6 +2136,74 @@ private:
                              get_run_identifier(loopName));
     galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
+
+
+  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+           typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = 
+             nullptr>
+  void sync_extract(std::string loopName, unsigned from_id,
+                    std::vector<size_t> &indices,
+                    galois::runtime::SendBuffer &b) {
+    uint32_t num = indices.size();
+    static galois::DynamicBitSet bit_set_comm;
+    static std::vector<typename SyncFnTy::ValTy> val_vec;
+    static std::vector<unsigned int> offsets;
+
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    std::string extract_timer_str(syncTypeStr + "_EXTRACT_VECTOR_" + 
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+
+
+    Textract.start();
+
+    if (num > 0) {
+      bit_set_comm.resize(num);
+      offsets.resize(num);
+      val_vec.resize(num);
+    }
+
+    DataCommMode data_mode;
+    for (unsigned i = 0; i < BitsetFnTy::numBitsets(); i++) {
+      if (num > 0) {
+        size_t bit_set_count = 0;
+
+        // No GPU support currently
+        const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get(i);
+
+        get_bitset_and_offsets<SyncFnTy, syncType>(loopName, indices,
+                   bit_set_compute, bit_set_comm, offsets, bit_set_count,
+                   data_mode);
+        
+        if (data_mode == onlyData) {
+          bit_set_count = indices.size();
+          extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
+            bit_set_count, offsets, val_vec);
+        } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
+          extract_subset<SyncFnTy, syncType, false, true>(loopName, indices,
+            bit_set_count, offsets, val_vec);
+        }
+
+        reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count, 
+                                      bit_set_comm);
+        serializeData<syncType>(loopName, data_mode, bit_set_count, indices,
+                                offsets, bit_set_comm, val_vec, b);
+      } else {
+        // append noData for however many bitsets there are
+        data_mode = noData;
+        gSerialize(b, noData);
+      }
+    }
+
+    Textract.stop();
+
+    // FIXME report metadata mode for the different bitsets?
+    //std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
+    //                         std::to_string(data_mode) + 
+    //                         get_run_identifier(loopName));
+    //galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+  }
+
   
   /**
    * Get data that is going to be sent for synchronization and returns
