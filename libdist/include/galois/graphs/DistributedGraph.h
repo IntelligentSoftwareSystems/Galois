@@ -1403,7 +1403,16 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrap function: extracts data from nodes and resets them to the reduction
+   * identity value as specified by the sync structure. (Reduce only)
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be reduce
+   *
+   * @param x 
+   * @param v vector to extract data to
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1412,7 +1421,15 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrap function: extracts data from nodes. (Broadcast only)
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be broadcast
+   *
+   * @param x 
+   * @param v vector to extract data to
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1421,7 +1438,22 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrap function: extracts data from nodes and resets them to the reduction
+   * identity value as specified by the sync structure. (Reduce only)
+   *
+   * This version specifies more arguments.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be reduce
+   *
+   * @param x 
+   * @param b
+   * @param o 
+   * @param v
+   * @param s
+   * @param data_mode
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1435,7 +1467,21 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrap function: extracts data from nodes (Broadcast only)
+   *
+   * This version specifies more arguments.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be broadcast
+   *
+   * @param x 
+   * @param b
+   * @param o 
+   * @param v
+   * @param s
+   * @param data_mode
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1448,12 +1494,21 @@ private:
   }
 
   /**
-   * TODO documentation
+   * Reduce variant. Takes a value and reduces it according to the sync
+   * structure provided to the function.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType Reduce sync or broadcast sync
+   *
+   * @param lid local id of node to reduce to
+   * @param val value to reduce to
+   * @param bit_set_compute bitset indicating which nodes have changed; updated
+   * if reduction causes a change
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
-                   galois::DynamicBitSet& bit_set_compute) {
+                          galois::DynamicBitSet& bit_set_compute) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     FnTy::reduce(lid, d, val);
@@ -1465,12 +1520,19 @@ private:
   }
 
   /**
-   * TODO documentation
+   * Broadcast variant. Takes a value and sets it according to the sync
+   * structure provided to the function.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType Reduce sync or broadcast sync
+   *
+   * @param lid local id of node to reduce to
+   * @param val value to reduce to
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
-                   galois::DynamicBitSet& bit_set_compute) {
+                          galois::DynamicBitSet&) {
     #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     FnTy::setVal(lid, d, val_vec[n]);
@@ -1480,7 +1542,27 @@ private:
   }
 
   /**
-   * TODO documentation
+   * Given data received from another host and information on which nodes
+   * to update, do the reduce/set of the received data to update local nodes.
+   *
+   * Complement function, in some sense, of extract_subset.
+   *
+   * @tparam VecTy type of indices variable
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Reduce or broadcast
+   * @tparam identity_offsets If this is true, then ignore the offsets
+   * array and just grab directly from indices (i.e. don't pick out
+   * particular elements, just grab contiguous chunk)
+   * @tparam parallelize True if updates to nodes are to be parallelized
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param size Number of elements to set
+   * @param offsets Holds offsets into "indices" of the data that we are 
+   * interested in
+   * @param val_vec holds data we will use to set
+   * @param bit_set_compute bitset indicating which nodes have changed
+   * @param start Offset into val_vec to start saving data to
    */
   template<typename VecTy, typename FnTy, SyncType syncType, 
            bool identity_offsets = false, bool parallelize = true>
@@ -1494,19 +1576,21 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string doall_str(syncTypeStr + "_SETVAL_" + 
                           get_run_identifier(loopName));
+
     if (parallelize) {
-      galois::do_all(galois::iterate(start, start + size), 
-          [&](unsigned int n) {
-            unsigned int offset;
+      galois::do_all(
+        galois::iterate(start, start + size), 
+        [&](unsigned int n) {
+          unsigned int offset;
 
-            if (identity_offsets) offset = n;
-            else offset = offsets[n];
+          if (identity_offsets) offset = n;
+          else offset = offsets[n];
 
-            auto lid = indices[offset];
-            set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
-          }, 
-          galois::no_stats(),
-          galois::loopname(get_run_identifier(doall_str).c_str()));
+          auto lid = indices[offset];
+          set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
+        }, 
+        galois::no_stats(),
+        galois::loopname(get_run_identifier(doall_str).c_str()));
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1521,7 +1605,15 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrapper function to reduce multiple nodes at once.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be reduce
+   *
+   * @param x
+   * @param v 
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1530,15 +1622,37 @@ private:
   }
 
   /**
-   * TODO documentation
+   * GPU wrapper function to set multiple nodes at once.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be broadcast
+   *
+   * @param x
+   * @param v 
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline bool set_batch_wrapper(unsigned x, std::vector<typename FnTy::ValTy> &v) {
     return FnTy::setVal_batch(x, v.data());
   }
+
   /**
-   * TODO documentation
+   * GPU wrapper function to reduce multiple nodes at once. More detailed
+   * arguments.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be reduce
+   *
+   * @param x
+   * @param b
+   * @param o
+   * @param v 
+   * @param s
+   * @param data_mode
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1551,7 +1665,20 @@ private:
   }
   
   /**
-   * TODO documentation
+   * GPU wrapper function to set multiple nodes at once. More detailed
+   * arguments.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Must be broadcast
+   *
+   * @param x
+   * @param b
+   * @param o
+   * @param v 
+   * @param s
+   * @param data_mode
+   *
+   * @returns TODO
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1564,7 +1691,15 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Converts LIDs of nodes we are interested in into GIDs.
+   *
+   * @tparam syncType either reduce or broadcast; only used to name the timer
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param offsets INPUT/OUTPUT holds offsets into "indices" that we should
+   * use; after function completion, holds global ids of nodes we are interested
+   * in
    */
   template<SyncType syncType>
   void convert_lid_to_gid(const std::string &loopName, 
@@ -1573,16 +1708,23 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string doall_str(syncTypeStr + "_LID2GID_" + 
                           get_run_identifier(loopName));
-    galois::do_all(galois::iterate(0ul, offsets.size()), 
-        [&](unsigned int n) {
-          offsets[n] = static_cast<uint32_t>(getGID(indices[offsets[n]]));
-        }, 
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str()));
+    galois::do_all(
+      galois::iterate(0ul, offsets.size()), 
+      [&](unsigned int n) {
+        offsets[n] = static_cast<uint32_t>(getGID(indices[offsets[n]]));
+      }, 
+      galois::no_stats(),
+      galois::loopname(get_run_identifier(doall_str).c_str())
+    );
   }
   
   /**
-   * TODO documentation
+   * Converts a vector of GIDs into local ids.
+   *
+   * @tparam syncType either reduce or broadcast; only used to name the timer
+   *
+   * @param loopName name of loop used to name timer
+   * @param offsets holds GIDs to convert to LIDs
    */
   template<SyncType syncType>
   void convert_gid_to_lid(const std::string &loopName, 
@@ -1591,12 +1733,14 @@ private:
     std::string doall_str(syncTypeStr + "_GID2LID_" + 
                           get_run_identifier(loopName));
 
-    galois::do_all(galois::iterate(0ul, offsets.size()), 
-        [&](unsigned int n) {
-          offsets[n] = getLID(offsets[n]);
-        }, 
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str()));
+    galois::do_all(
+      galois::iterate(0ul, offsets.size()), 
+      [&](unsigned int n) {
+        offsets[n] = getLID(offsets[n]);
+      }, 
+      galois::no_stats(),
+      galois::loopname(get_run_identifier(doall_str).c_str())
+    );
   }
   
   /**
@@ -1784,7 +1928,7 @@ private:
         get_bitset_and_offsets<SyncFnTy, syncType>(loopName, indices,
                    bit_set_compute, bit_set_comm, offsets, bit_set_count,
                    data_mode);
-
+        
         if (data_mode == onlyData) {
           bit_set_count = indices.size();
           extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
@@ -1951,7 +2095,16 @@ private:
 #endif
   
   /**
-   * TODO documentation
+   * Sends data to all hosts (if there is anything that needs to be sent
+   * to that particular host) and adjusts bitset according to sync type.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam syncType either reduce or broadcast
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has information needed to access bitset
+   *
+   * @param loopName used to name timers created by this sync send
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -1978,17 +2131,27 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Sends data over the network to other hosts based on the provided template 
+   * arguments.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam syncType either reduce or broadcast
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
-                                         get_run_identifier(loopName)).c_str(), GRNAME);
+                                 get_run_identifier(loopName)).c_str(), GRNAME);
 
     TSendTime.start();
-    sync_net_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
+    sync_net_send<writeLocation, readLocation, syncType, SyncFnTy,
+                  BitsetFnTy>(loopName);
     TSendTime.stop();
   }
   
@@ -2015,13 +2178,15 @@ private:
     size_t buf_start = 0;
     size_t retval = 0;
 
-    if (num > 0) {
+    if (num > 0) { // only enter if we expect message
       DataCommMode data_mode;
-      galois::runtime::gDeserialize(buf, data_mode);
+      // 1st deserialize gets data mode
+      galois::runtime::gDeserialize(buf, data_mode); 
 
       if (data_mode != noData) {
         size_t bit_set_count = num;
 
+        // get other metadata associated with message if mode isn't OnlyData
         if (data_mode != onlyData) {
           galois::runtime::gDeserialize(buf, bit_set_count);
 
@@ -2041,37 +2206,45 @@ private:
         }
 
         //val_vec.resize(bit_set_count);
+        // get data itself
         galois::runtime::gDeserialize(buf, val_vec);
 
+        // GPU update call
         bool batch_succeeded = set_batch_wrapper<SyncFnTy, syncType>(from_id, 
-                                   bit_set_comm, offsets, val_vec, 
-                                   bit_set_count, data_mode);
+                                                 bit_set_comm, offsets, val_vec, 
+                                                 bit_set_count, data_mode);
 
+        // cpu always enters this block
         if (!batch_succeeded) {
           galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get();
 
           if (data_mode == bitsetData) {
             size_t bit_set_count2;
-            get_offsets_from_bitset<syncType>(loopName, bit_set_comm, offsets, bit_set_count2);
+            get_offsets_from_bitset<syncType>(loopName, bit_set_comm, offsets,
+                                              bit_set_count2);
             assert(bit_set_count ==  bit_set_count2);
           }
 
           if (data_mode == onlyData) {
-            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
-                sharedNodes[from_id], bit_set_count, offsets, val_vec, 
-                bit_set_compute);
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       true, true>(loopName, sharedNodes[from_id], 
+                                   bit_set_count, offsets, val_vec, 
+                                   bit_set_compute);
           } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
-            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, true, true>(loopName, 
-                sharedNodes[from_id], bit_set_count, offsets, val_vec, 
-                bit_set_compute, buf_start);
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       true, true>(loopName, sharedNodes[from_id], 
+                                   bit_set_count, offsets, val_vec, 
+                                   bit_set_compute, buf_start);
           } else if (data_mode == gidsData) {
-            set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(loopName, 
-                offsets, bit_set_count, offsets, val_vec, 
-                bit_set_compute);
+            set_subset<decltype(offsets), SyncFnTy, syncType, true, true>(
+              loopName, offsets, bit_set_count, offsets, val_vec, 
+              bit_set_compute
+            );
           } else { // bitsetData or offsetsData
-            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, false, true>(loopName, 
-                sharedNodes[from_id], bit_set_count, offsets, val_vec, 
-                bit_set_compute);
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       false, true>(loopName, sharedNodes[from_id], 
+                                    bit_set_count, offsets, val_vec, 
+                                    bit_set_compute);
           }
           // TODO: reduce could update the bitset, so it needs to be copied 
           // back to the device
@@ -2155,7 +2328,16 @@ private:
 #endif
   
   /**
-   * TODO documentation
+   * Determines if there is anything to receive from a host and receives/applies
+   * the messages.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam syncType either reduce or broadcast
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2178,7 +2360,16 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Receives messages from all other hosts and "applies" the message (reduce
+   * or set) based on the sync structure provided.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam syncType either reduce or broadcast
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2441,12 +2632,17 @@ private:
   // CVC - cartesian vertex-cut : if source of an edge is mirror, 
   //                              then destination is not, and vice-versa
   // UVC - unconstrained vertex-cut
-
-  // reduce - mirrors to master
-  // broadcast - master to mirrors
+  // Reduce - mirrors to master
+  // Broadcast - master to mirrors
   
   /**
-   * TODO documentation
+   * Do sync necessary for write source, read source.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_src(std::string loopName) {
@@ -2459,7 +2655,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write source, read destination.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_dst(std::string loopName) {
@@ -2482,7 +2684,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write source, read any.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_src_to_any(std::string loopName) {
@@ -2495,7 +2703,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write dest, read source.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_src(std::string loopName) {
@@ -2518,7 +2732,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write dest, read dest.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_dst(std::string loopName) {
@@ -2533,7 +2753,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write dest, read any.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_dst_to_any(std::string loopName) {
@@ -2546,7 +2772,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write any, read src.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_src(std::string loopName) {
@@ -2559,7 +2791,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write any, read dst.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_dst(std::string loopName) {
@@ -2573,7 +2811,13 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Do sync necessary for write any, read any.
+   *
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
   inline void sync_any_to_any(std::string loopName) {
@@ -2584,7 +2828,17 @@ private:
 
 public:
   /**
-   * TODO documentation
+   * Main sync call exposed to the user that calls the correct sync function 
+   * based on provided template arguments. Must provide information through
+   * structures on how to do synchronization/which fields to synchronize.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam ReduceFnTy specify how to do reductions
+   * @tparam BroadcastFnTy specify how to do broadcasts
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename ReduceFnTy, typename BroadcastFnTy,
@@ -2592,6 +2846,7 @@ public:
   inline void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+
     Tsync.start();
 
     if (partitionAgnostic) {
