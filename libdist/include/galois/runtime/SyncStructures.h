@@ -1194,7 +1194,11 @@ struct Bitset_##fieldname {\
 // no GPU code
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)\
 struct Bitset_##fieldname {\
-  static bool is_valid() {\
+  static constexpr bool is_vector_bitset() {\
+    return false;\
+  }\
+\
+  static constexpr bool is_valid() {\
     return true;\
   }\
 \
@@ -1207,5 +1211,28 @@ struct Bitset_##fieldname {\
   }\
 }
 #endif
+
+#define GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(fieldname)\
+struct Bitset_##fieldname {\
+  static unsigned numBitsets() {\
+    return vbitset_##fieldname.size();\
+  }\
+\
+  static constexpr bool is_vector_bitset() {\
+    return true;\
+  }\
+\
+  static constexpr bool is_valid() {\
+    return true;\
+  }\
+\
+  static galois::DynamicBitSet& get(unsigned i) {\
+    return vbitset_##fieldname##[i];\
+  }\
+\
+  static void reset_range(unsigned i, size_t begin, size_t end) {\
+    vbitset_##fieldname##[i].reset(begin, end);\
+  }\
+}
 
 #endif // header guard

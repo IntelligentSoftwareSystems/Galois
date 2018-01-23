@@ -91,8 +91,11 @@ namespace galois {
   static galois::DynamicBitSet EmptyBitset;
 
   struct InvalidBitsetFnTy {
+    static constexpr bool is_vector_bitset() {
+      return false;
+    }
 
-    static bool is_valid() {
+    static constexpr bool is_valid() {
       return false;
     }
 
