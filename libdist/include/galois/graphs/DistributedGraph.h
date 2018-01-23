@@ -1874,7 +1874,80 @@ private:
                              get_run_identifier(loopName));
     galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
-  
+
+  /**
+   * Reports bytes saved by using the bitset to only selectively load data
+   * to send.
+   *
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize;
+   * used for size calculation
+   *
+   * @param loopName loop name used for timers
+   * @param syncTypeStr String used to name timers 
+   * @param totalToSend Total amount of nodes that are potentially sent (not
+   * necessarily all nodees will be sent)
+   * @param bitSetCount Number of nodes that will actually be sent
+   * @param bitSetComm bitset used to send data
+   */
+  template<typename SyncFnTy>
+  void reportRedundantSize(std::string loopName, std::string syncTypeStr,
+                           uint32_t totalToSend, size_t bitSetCount,
+                           const galois::DynamicBitSet& bitSetComm) {
+    size_t redundant_size = (totalToSend - bitSetCount) *
+                            sizeof(typename SyncFnTy::ValTy);
+    size_t bit_set_size = (bitSetComm.get_vec().size() * sizeof(uint64_t));
+
+    if (redundant_size > bit_set_size) {
+      std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + 
+                                     get_run_identifier(loopName));
+                                   
+      galois::runtime::reportStat_Tsum(GRNAME, statSavedBytes_str, 
+                                       (redundant_size - bit_set_size));
+    }
+  }
+
+  /**
+   * Given data to serialize in val_vec, serialize it into the send buffer
+   * depending on the mode of data communication selected for the data.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam VecType type of val_vec, which stores the data to send
+   *
+   * @param loopName loop name used for timers
+   * @param data_mode the way that the data should be communicated
+   * @param bit_set_count the number of items we are sending in this message
+   * @param indices list of all nodes that we are potentially interested in
+   * sending things to
+   * @param offsets contains indicies into "indices" that we are interested in
+   * @param val_vec contains the data that we are serializing to send
+   * @param b the buffer in which to serialize the message we are sending
+   * to
+   */
+  template<SyncType syncType, typename VecType>
+  void serializeData(std::string loopName, DataCommMode data_mode, 
+                     size_t bit_set_count, std::vector<size_t>& indices, 
+                     std::vector<unsigned int>& offsets, 
+                     galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
+                     galois::runtime::SendBuffer &b) {
+    if (data_mode == noData) {
+      gSerialize(b, data_mode);
+    } else if (data_mode == gidsData) {
+      offsets.resize(bit_set_count);
+      convert_lid_to_gid<syncType>(loopName, indices, offsets);
+      val_vec.resize(bit_set_count);
+      gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+    } else if (data_mode == offsetsData) {
+      offsets.resize(bit_set_count);
+      val_vec.resize(bit_set_count);
+      gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+    } else if (data_mode == bitsetData) {
+      val_vec.resize(bit_set_count);
+      gSerialize(b, data_mode, bit_set_count, bit_set_comm, val_vec);
+    } else { // onlyData
+      gSerialize(b, data_mode, val_vec);
+    }
+  }
+
   /**
    * Extracts the data that will be sent to a host in this round of
    * synchronization based on the passed in bitset and saves it to a
@@ -1892,7 +1965,9 @@ private:
    * @param b OUTPUT: buffer that will be sent over the network; contains data
    * based on set bits in bitset
    */
-  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+           typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = 
+             nullptr>
   void sync_extract(std::string loopName, unsigned from_id,
                     std::vector<size_t> &indices,
                     galois::runtime::SendBuffer &b) {
@@ -1916,14 +1991,14 @@ private:
       val_vec.resize(num);
       size_t bit_set_count = 0;
 
-      bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id,
-                               bit_set_comm, offsets, val_vec, bit_set_count,
-                               data_mode);
+      bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(
+        from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode
+      );
 
       // GPUs have a batch function they can use; CPUs do not; therefore, 
       // CPUS always enter this if block
       if (!batch_succeeded) {
-        const galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get();
+        const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
         get_bitset_and_offsets<SyncFnTy, syncType>(loopName, indices,
                    bit_set_compute, bit_set_comm, offsets, bit_set_count,
@@ -1939,35 +2014,10 @@ private:
         }
       }
 
-      size_t redundant_size = (num - bit_set_count) *
-                               sizeof(typename SyncFnTy::ValTy);
-      size_t bit_set_size = (bit_set_comm.get_vec().size() * sizeof(uint64_t));
-
-      if (redundant_size > bit_set_size) {
-        std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + 
-                                       get_run_identifier(loopName));
-                                     
-        galois::runtime::reportStat_Tsum(GRNAME, statSavedBytes_str, 
-                                         (redundant_size - bit_set_size));
-      }
-
-      if (data_mode == noData) {
-        gSerialize(b, data_mode);
-      } else if (data_mode == gidsData) {
-        offsets.resize(bit_set_count);
-        convert_lid_to_gid<syncType>(loopName, indices, offsets);
-        val_vec.resize(bit_set_count);
-        gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
-      } else if (data_mode == offsetsData) {
-        offsets.resize(bit_set_count);
-        val_vec.resize(bit_set_count);
-        gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
-      } else if (data_mode == bitsetData) {
-        val_vec.resize(bit_set_count);
-        gSerialize(b, data_mode, bit_set_count, bit_set_comm, val_vec);
-      } else { // onlyData
-        gSerialize(b, data_mode, val_vec);
-      }
+      reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count, 
+                                    bit_set_comm);
+      serializeData<syncType>(loopName, data_mode, bit_set_count, indices,
+                              offsets, bit_set_comm, val_vec, b);
     } else {
       data_mode = noData;
       gSerialize(b, noData);
