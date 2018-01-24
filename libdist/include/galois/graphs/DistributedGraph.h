@@ -2137,7 +2137,26 @@ private:
     galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
   }
 
-
+  /**
+   * Vector bitset variant.
+   *
+   * Extracts the data that will be sent to a host in this round of
+   * synchronization based on the passed in bitset and saves it to a
+   * send buffer. Unlike other variants, this will extract an entire
+   * vector element by element.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam syncFnTy struct that has info on how to do synchronization
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   * being used for the extraction. MUST BE A VECTOR BITSET
+   *
+   * @param loopName loop name used for timers
+   * @param from_id 
+   * @param indices Vector that contains node ids of nodes that we will 
+   * potentially send things to
+   * @param b OUTPUT: buffer that will be sent over the network; contains data
+   * based on set bits in bitset
+   */
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
            typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = 
              nullptr>
@@ -2177,13 +2196,16 @@ private:
                    bit_set_compute, bit_set_comm, offsets, bit_set_count,
                    data_mode);
         
+        // note the extra template argument which specifies that this is a
+        // vector extract, i.e. get element i of the vector (i passed in as 
+        // argument as well)
         if (data_mode == onlyData) {
           bit_set_count = indices.size();
-          extract_subset<SyncFnTy, syncType, true, true>(loopName, indices,
-            bit_set_count, offsets, val_vec);
+          extract_subset<SyncFnTy, syncType, true, true, true>(loopName, indices,
+            bit_set_count, offsets, val_vec, i);
         } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
-          extract_subset<SyncFnTy, syncType, false, true>(loopName, indices,
-            bit_set_count, offsets, val_vec);
+          extract_subset<SyncFnTy, syncType, false, true, true>(loopName, indices,
+            bit_set_count, offsets, val_vec, i);
         }
 
         reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count, 
@@ -2382,6 +2404,30 @@ private:
   }
 
 
+  /**
+   * Given the data mode, deserialize the rest of a message in a Receive Buffer.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam VecType type of val_vec, which data will be deserialized into
+   *
+   * @param loopName used to name timers for statistics
+   * @param data_mode data mode with which the original message was sent;
+   * determines how to deserialize the rest of the message
+   * @param buf buffer which contains the received message to deserialize
+   *
+   * The rest of the arguments are output arguments (they are passed by
+   * reference)
+   *
+   * @param bit_set_count Var that holds number of bits set (i.e. number of
+   * node changed) after deserialization
+   * @param offsets holds offsets data after deserialization if data mode is 
+   * offsets + data
+   * @param bit_set_comm holds the bitset representing changed nodes after
+   * deserialization of data mode is bitset + data
+   * @param buf_start 
+   * @param retval
+   * @param val_vec The data proper will be deserialized into this vector
+   */
   template<SyncType syncType, typename VecType>
   void deserializeData(std::string loopName,
                        DataCommMode data_mode,
