@@ -1,11 +1,12 @@
 /** Galois Copyable Atomic Wrapper -*- C++ -*-
  * @file
+ *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -29,7 +30,6 @@
 #define _ATOMIC_WRAPPER_H_
 
 #include <atomic>
-#include "galois/runtime/Extra_dist_traits.h"
 
 namespace galois {
   template<class T>
