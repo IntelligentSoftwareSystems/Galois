@@ -1416,7 +1416,8 @@ private:
    * @tparam parallelize Determines if parallelizing the extraction is done or
    * not
    * @tparam vecSync Only set to true if the field being synchronized is a 
-   * vector and synchronization is occuring element by element
+   * vector and synchronization is occuring element by element. MUST BE SET
+   * TO TRUE IN ORDER FOR THIS FUNCTION TO COMPILE.
    *
    * @param loopName name of loop used to name timer
    * @param indices Local ids of nodes that we are interested in
@@ -1427,6 +1428,7 @@ private:
    * @param vecIndex which element of the vector to extract from node
    * @param start Offset into val_vec to start saving data to
    */
+  // TODO find a better way to have this variant without code duplication
   template<typename FnTy, SyncType syncType, bool identity_offsets = false, 
            bool parallelize = true, bool vecSync = false,
            typename std::enable_if<vecSync>::type* = nullptr>
@@ -1626,6 +1628,32 @@ private:
   }
 
   /**
+   * VECTOR VARIANT.
+   *
+   * Reduce variant. Takes a value and reduces it according to the sync
+   * structure provided to the function. Only reduces the element at a 
+   * particular index of the vector field being sychronized.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType Reduce sync or broadcast sync
+   *
+   * @param lid local id of node to reduce to
+   * @param val value to reduce to
+   * @param bit_set_compute bitset indicating which nodes have changed; updated
+   * if reduction causes a change
+   * @param vecIndex which element of the vector to reduce in the node
+   */
+  template<typename FnTy, SyncType syncType, 
+           typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
+                          galois::DynamicBitSet& bit_set_compute,
+                          unsigned vecIndex) {
+    if (FnTy::reduce(lid, getData(lid), val, vecIndex)) {
+      if (bit_set_compute.size() != 0) bit_set_compute.set(lid);
+    }
+  }
+
+  /**
    * Broadcast variant. Takes a value and sets it according to the sync
    * structure provided to the function.
    *
@@ -1646,6 +1674,28 @@ private:
     FnTy::setVal(lid, getData(lid), val);
     #endif
   }
+
+  /**
+   * VECTOR VARIANT.
+   *
+   * Broadcast variant. Takes a value and sets it according to the sync
+   * structure provided to the function. Only sets the element at the specified
+   * index of the vector in the node.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam syncType Reduce sync or broadcast sync
+   *
+   * @param lid local id of node to reduce to
+   * @param val value to reduce to
+   * @param vecIndex which element of the vector to set in the node
+   */
+  template<typename FnTy, SyncType syncType, 
+           typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
+  inline void set_wrapper(size_t lid, typename FnTy::ValTy val, 
+                          galois::DynamicBitSet&, unsigned vecIndex) {
+    FnTy::setVal(lid, getData(lid), val, vecIndex);
+  }
+
 
   /**
    * Given data received from another host and information on which nodes
@@ -1709,6 +1759,81 @@ private:
       }
     }
   }
+
+  /**
+   * VECTOR BITSET VARIANT. 
+   *
+   * Given data received from another host and information on which nodes
+   * to update, do the reduce/set of the received data to update local nodes.
+   * It will only update a single index of the vector specified by the
+   * sync structures at a time.
+   *
+   * Complement function, in some sense, of extract_subset, vector bitset
+   * variant.
+   *
+   * @tparam VecTy type of indices variable
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SyncType Reduce or broadcast
+   * @tparam identity_offsets If this is true, then ignore the offsets
+   * array and just grab directly from indices (i.e. don't pick out
+   * particular elements, just grab contiguous chunk)
+   * @tparam parallelize True if updates to nodes are to be parallelized
+   * @tparam vecSync Only set to true if the field being synchronized is a 
+   * vector. MUST BE SET TO TRUE FOR THIS FUNCTION TO COMPILE
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param size Number of elements to set
+   * @param offsets Holds offsets into "indices" of the data that we are 
+   * interested in
+   * @param val_vec holds data we will use to set
+   * @param bit_set_compute bitset indicating which nodes have changed
+   * @param vecIndex which element of the vector to set in the node
+   * @param start Offset into val_vec to start saving data to
+   */
+  // TODO find a better way to have this variant without code duplication
+  template<typename VecTy, typename FnTy, SyncType syncType, 
+           bool identity_offsets = false, bool parallelize = true,
+           bool vecSync = false,
+           typename std::enable_if<vecSync>::type* = nullptr>
+  void set_subset(const std::string &loopName, const VecTy &indices, 
+                  size_t size, const std::vector<unsigned int> &offsets, 
+                  std::vector<typename FnTy::ValTy> &val_vec, 
+                  galois::DynamicBitSet& bit_set_compute, 
+                  unsigned vecIndex, size_t start = 0) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    std::string doall_str(syncTypeStr + "_SETVAL_VECTOR_" + 
+                          get_run_identifier(loopName));
+
+    if (parallelize) {
+      galois::do_all(
+        galois::iterate(start, start + size), 
+        [&](unsigned int n) {
+          unsigned int offset;
+
+          if (identity_offsets) offset = n;
+          else offset = offsets[n];
+
+          auto lid = indices[offset];
+          set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute,
+                                      vecIndex);
+        }, 
+        galois::no_stats(),
+        galois::loopname(get_run_identifier(doall_str).c_str()));
+    } else {
+      for (unsigned int n = start; n < start + size; ++n) {
+        unsigned int offset;
+
+        if (identity_offsets) offset = n;
+        else offset = offsets[n];
+
+        auto lid = indices[offset];
+        set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute,
+                                    vecIndex);
+      }
+    }
+  }
+
 
   /**
    * GPU wrapper function to reduce multiple nodes at once.
@@ -2559,6 +2684,105 @@ private:
 
     return retval;
   }
+
+  /**
+   * VECTOR BITSET VARIANT.
+   *
+   * Deserializes messages from other hosts and applies them to update local
+   * data based on the provided sync structures. Each message will contain
+   * a series of messages that must be deserialized (the number of such
+   * messages corresponds to the size of the vector that is being synchronized).
+   *
+   * Complement of syncExtract, vector bitset version.
+   *
+   * @tparam syncType either reduce or broadcast
+   * @tparam SyncFnTy synchronization structure with info needed to synchronize
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   * MUST BE VECTOR BITSET
+   *
+   * @param from_id ID of host which the message we are processing was received
+   * from
+   * @param buf Buffer that contains received message from other host
+   * @param loopName used to name timers for statistics
+   */
+  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+           typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = 
+             nullptr>
+  size_t syncRecvApply(uint32_t from_id, galois::runtime::RecvBuffer& buf,
+                       std::string loopName) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    std::string set_timer_str(syncTypeStr + "_SET_VECTOR_" + 
+                              get_run_identifier(loopName));
+    galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+
+    static galois::DynamicBitSet bit_set_comm;
+    static std::vector<typename SyncFnTy::ValTy> val_vec;
+    static std::vector<unsigned int> offsets;
+
+    auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
+    uint32_t num = sharedNodes[from_id].size();
+    size_t retval = 0;
+
+    Tset.start();
+
+    if (num > 0) { // only enter if we expect message from that host
+      for (unsigned i = 0; i < BitsetFnTy::numBitsets(); i++) {
+        DataCommMode data_mode;
+        // 1st deserialize gets data mode
+        galois::runtime::gDeserialize(buf, data_mode); 
+
+        if (data_mode != noData) {
+          size_t bit_set_count = num;
+          size_t buf_start = 0;
+
+          // deserialize the rest of the data in the buffer depending on the data 
+          // mode; arguments passed in here are mostly output vars
+          deserializeData<syncType>(loopName, data_mode, num, buf, bit_set_count, 
+                                    offsets, bit_set_comm, buf_start, retval, 
+                                    val_vec);
+
+          galois::DynamicBitSet &bit_set_compute = BitsetFnTy::get(i);
+
+          if (data_mode == bitsetData) {
+            size_t bit_set_count2;
+            get_offsets_from_bitset<syncType>(loopName, bit_set_comm, offsets,
+                                              bit_set_count2);
+            assert(bit_set_count ==  bit_set_count2);
+          }
+
+          // Note the extra template argument and i argument which cause
+          // execution to deal with a particular element of the vector field
+          // we are synchronizing
+          if (data_mode == onlyData) {
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       true, true, true>(loopName, sharedNodes[from_id], 
+                                   bit_set_count, offsets, val_vec, 
+                                   bit_set_compute, i);
+          } else if (data_mode == dataSplit || data_mode == dataSplitFirst) {
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       true, true, true>(loopName, sharedNodes[from_id], 
+                                   bit_set_count, offsets, val_vec, 
+                                   bit_set_compute, i, buf_start);
+          } else if (data_mode == gidsData) {
+            set_subset<decltype(offsets), SyncFnTy, syncType, true, true, true>(
+              loopName, offsets, bit_set_count, offsets, val_vec, 
+              bit_set_compute, i
+            );
+          } else { // bitsetData or offsetsData
+            set_subset<decltype(sharedNodes[from_id]), SyncFnTy, syncType, 
+                       false, true, true>(loopName, sharedNodes[from_id], 
+                                          bit_set_count, offsets, val_vec, 
+                                          bit_set_compute, i);
+          }
+        }
+      }
+    }
+
+    Tset.stop();
+
+    return retval;
+  }
+
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
