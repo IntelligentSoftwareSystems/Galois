@@ -714,7 +714,7 @@ struct MatchingMF {
         node.height = 0;
     }
 
-    constexpr static const bool useCAS = false;
+    constexpr bool useCAS = false;
 
     galois::StatTimer T("BfsTime");
     T.start();

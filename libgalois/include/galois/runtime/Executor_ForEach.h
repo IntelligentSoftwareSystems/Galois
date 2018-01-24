@@ -37,6 +37,7 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
+#include "galois/gIO.h"// TODO: remove
 #include "galois/gtuple.h"
 #include "galois/Mem.h"
 #include "galois/Timer.h"
@@ -258,8 +259,8 @@ protected:
     galois::optional<value_type> p;
     bool didWork = false;
     while ((p = wl.pop())) {
-      doProcess(*p, tld);
       didWork = true;
+      doProcess(*p, tld);
     }
     return didWork;
   }
@@ -271,8 +272,8 @@ protected:
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
       while ((!limit || num < limit) && (p = lwl.pop())) {
-        doProcess(aborted.value(*p), tld);
         ++num;
+        doProcess(aborted.value(*p), tld);
       }
     } else {
       clearReleasable();
@@ -282,8 +283,8 @@ protected:
 #else
     try {
       while ((!limit || num < limit) && (p = lwl.pop())) {
-        doProcess(aborted.value(*p), tld);
         ++num;
+        doProcess(aborted.value(*p), tld);
       }
     } catch (ConflictFlag const& flag) {
       abortIteration(*p, tld);
