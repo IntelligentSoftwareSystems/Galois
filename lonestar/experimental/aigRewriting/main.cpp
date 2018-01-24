@@ -2,10 +2,10 @@
 #include "writers/AigWriter.h"
 
 #include "subjectgraph/aig/Aig.h"
-#include "algorithms/CutMananger.h"
-#include "algorithms/NPNMananger.h"
-#include "algorithms/RewriteMananger.h"
-#include "algorithms/PreCompGraphMananger.h"
+#include "algorithms/CutManager.h"
+#include "algorithms/NPNManager.h"
+#include "algorithms/RewriteManager.h"
+#include "algorithms/PreCompGraphManager.h"
 #include "algorithms/ReconvDrivenCut.h"
 
 #include "galois/Galois.h"
@@ -126,15 +126,15 @@ int main( int argc, char * argv[] ) {
 
 	int K = 4, C = 500;
 	bool compTruth = true;
-	algorithm::CutMananger cutMan( aig, K, C, numThreads, compTruth );
+	algorithm::CutManager cutMan( aig, K, C, numThreads, compTruth );
 	//algorithm::runKCutOperator( cutMan );
 	//cutMan.printAllCuts();
 	//cutMan.printCutStatistics();
 	//cutMan.printRuntimes();
 
-	algorithm::NPNMananger npnMan;
+	algorithm::NPNManager npnMan;
 
-	algorithm::PreCompGraphMananger pcgMan( npnMan );
+	algorithm::PreCompGraphManager pcgMan( npnMan );
 	pcgMan.loadPreCompGraphFromArray();
 	pcgMan.processDecompositionGraphs();
 
@@ -153,7 +153,7 @@ int main( int argc, char * argv[] ) {
 		std::cout << "nThreads: " << numThreads << std::endl;
 	}
 
-	algorithm::RewriteMananger rwtMan( aig, cutMan, npnMan, pcgMan, triesNGraphs, useZeros, updateLevel );
+	algorithm::RewriteManager rwtMan( aig, cutMan, npnMan, pcgMan, triesNGraphs, useZeros, updateLevel );
 	algorithm::runRewriteOperator( rwtMan, levelHistogram );
 	//cutMan.printAllCuts();
 	//cutMan.printCutStatistics();

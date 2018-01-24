@@ -1,3 +1,11 @@
+/*
+ 
+ @Vinicius Possani 
+ Parallel Rewriting January 5, 2018.
+ ABC-based implementation on Galois.
+
+*/
+
 #include "ReconvDrivenCut.h"
 
 #include <iostream>
