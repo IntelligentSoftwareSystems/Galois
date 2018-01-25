@@ -92,6 +92,12 @@ name = yahoo-music
 file = weighted/bipartite/yahoo.gr
 format = bin/galois
 
+[java/pta/tshark_constraints]
+flags = 
+name = tshark_constraints
+file = java/pta/tshark_constraints.txt
+format = text
+
 [nothing]
 flags = 
 name = nothing

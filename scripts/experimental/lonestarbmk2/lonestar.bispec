@@ -24,7 +24,7 @@ mcm nothing
 pagerank-pull twitter40-transpose
 pagerank-push soc-livejournal
 preflowpush r4-2e26
-pta nothing
+pta tshark_constraints
 spanningtree r4-2e26
 sssp r4-2e26
 surveypropagation nothing
