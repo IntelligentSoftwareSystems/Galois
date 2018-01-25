@@ -21,8 +21,8 @@
  *
  * Sparse bit vector for compact storage of information.
  * 
- * @author Rupesh Nasre <rupesh0508@gmail.com>
  * @author Loc Hoang <l_hoang@utexas.edu>
+ * @author Rupesh Nasre <rupesh0508@gmail.com>
  */
 #ifndef GALOIS_SPARSEBITVECTOR_H
 #define GALOIS_SPARSEBITVECTOR_H
@@ -30,11 +30,13 @@
 #include <vector>
 #include <string>
 #include <ostream>
+#include <utility>
 #include <boost/iterator/iterator_facade.hpp>
 
 // TODO
 // - get rid of new usage (new doesn't scale well); smart pointers probably
 // better as well
+// - rename some things to be consistent with Concurrent Sparse Bit Vector
 
 namespace galois {
 
@@ -123,7 +125,6 @@ struct SparseBitVector {
      *
      * @param second OneWord to do a bitwise or with
      * @returns 1 if something changed, 0 otherwise
-     *
      */
     unsigned unify(OneWord* second) {
       if (second) {
@@ -614,10 +615,7 @@ struct SparseBitVector {
 
     out << "\n";
   }
-
-
 };
-
 
 } // end namespace galois
 
