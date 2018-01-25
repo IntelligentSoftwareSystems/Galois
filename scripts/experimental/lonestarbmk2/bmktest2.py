@@ -7,7 +7,7 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 40
+    startThread = 0
     # thread to end at (inclusive)
     endThread = 40
     # step to use for looping through threads
