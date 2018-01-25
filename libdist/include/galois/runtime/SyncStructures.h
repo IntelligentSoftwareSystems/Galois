@@ -1227,11 +1227,13 @@ struct Bitset_##fieldname {\
   }\
 \
   static galois::DynamicBitSet& get(unsigned i) {\
-    return vbitset_##fieldname##[i];\
+    return vbitset_##fieldname[i];\
   }\
 \
-  static void reset_range(unsigned i, size_t begin, size_t end) {\
-    vbitset_##fieldname##[i].reset(begin, end);\
+  static void reset_range(size_t begin, size_t end) {\
+    for (unsigned i = 0; i < vbitset_##fieldname.size(); i++) {\
+      vbitset_##fieldname[i].reset(begin, end);\
+    }\
   }\
 }
 
