@@ -50,6 +50,7 @@
 #include <ctime>
 #include <deque>
 #include <vector>
+#include <random>
 
 #include "llvm/Support/CommandLine.h"
 
@@ -144,7 +145,7 @@ public:
   }
 
   void pushNext(const T& item) {
-    next->push_back(item);
+    next->get().push_back(item);
   }
 
   void nextStep(void) {
@@ -157,9 +158,19 @@ template <typename T>
 class ParaMeterRAND_WL: public ParaMeterFIFO_WL<T, galois::PerThreadVector<T> > {
   using Base = ParaMeterFIFO_WL<T, galois::PerThreadVector<T> >;
 
+  using RNG = std::mt19937;
+
+  galois::substrate::PerThreadStorage<RNG> pt_rng;
+
 public:
 
-  void pushNext(void) {
+  void pushNext(const T& item) {
+    auto& lwl = Base::next->get();
+    lwl.push_back(item);
+
+    std::uniform_int_distribution<size_t> dist(0, lwl.size());
+    size_t rindex = dist(
+
   }
 };
 
@@ -171,7 +182,7 @@ class ParaMeterExecutor {
   typedef typename worklists::GFIFO<int>::template retype<value_type>::type WorkListTy;
 
   static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<does_voidnot_need_push_tag, ArgsTy>::value;
   static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
@@ -363,9 +374,9 @@ public:
   typedef T value_type;
 
 
-  using with_fifo = ParaMeter<T, ParaMeter::SchedType::FIFO>;
-  using with_random = ParaMeter<T, ParaMeter::SchedType::RAND>;
-  using with_lifo = ParaMeter<T, ParaMeter::SchedType::LIFO>;
+  using fifo = ParaMeter<T, ParaMeter::SchedType::FIFO>;
+  using random = ParaMeter<T, ParaMeter::SchedType::RAND>;
+  using lifo = ParaMeter<T, ParaMeter::SchedType::LIFO>;
 
 };
 
@@ -417,5 +428,5 @@ void for_each_ParaMeter (const R& range, const F& func, const ArgsTuple& argsTup
  *
  * interface:
  * - file set by environment variable
- * - ParaMeter invoked by choosing wl type, e.g. ParaMeter<>::with_rand, or ParaMeter<>::with_fifo
+ * - ParaMeter invoked by choosing wl type, e.g. ParaMeter<>::with_rand, or ParaMeter<>::fifo
  */
