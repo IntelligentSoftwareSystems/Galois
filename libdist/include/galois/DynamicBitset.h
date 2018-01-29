@@ -28,7 +28,7 @@
 #define _GALOIS_DYNAMIC_BIT_SET_
 
 #include "galois/AtomicWrapper.h"
-#include <cstdio>
+#include <boost/mpl/has_xxx.hpp>
 #include <climits> // CHAR_BIT
 #include <vector>
 #include <assert.h>
