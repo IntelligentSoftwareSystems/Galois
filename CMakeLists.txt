@@ -59,6 +59,9 @@ set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
+# Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
+set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
+
 ###### Configure (users don't need to go beyond here) ######
 
 enable_testing()
