@@ -1246,6 +1246,9 @@ struct Broadcast_##fieldname {\
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)\
 struct Bitset_##fieldname {\
+  static constexpr bool is_vector_bitset() {\
+    return false;\
+  }\
   static bool is_valid() {\
     return true;\
   }\
