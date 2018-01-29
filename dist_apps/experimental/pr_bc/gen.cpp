@@ -59,6 +59,12 @@ static cll::opt<bool> outputDistPaths("outputDistPaths",
                                       cll::init(false),
                                       cll::Hidden);
 
+static cll::opt<bool> dummy("wrong", 
+                            cll::desc("DEBUGxxxxxxxxxxxxxxx Output min distance"
+                                      "/short path counts instead"),
+                            cll::init(false),
+                            cll::Hidden);
+
 /******************************************************************************/
 /* Graph structure declarations */
 /******************************************************************************/
@@ -89,7 +95,10 @@ struct NodeData {
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a 
 // particular field
-galois::DynamicBitSet bitset_minDistances;
+std::vector<galois::DynamicBitSet> vbitset_minDistances;
+std::vector<galois::DynamicBitSet> vbitset_shortestPathToAdd;
+std::vector<galois::DynamicBitSet> vbitset_dependencyToAdd;
+
 galois::DynamicBitSet bitset_shortestPathToAdd;
 galois::DynamicBitSet bitset_dependencyToAdd;
 
@@ -441,8 +450,9 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
           }
 
           dga += 1;
-          bitset_minDistances.set(dst);
-          bitset_shortestPathToAdd.set(dst);
+          vbitset_minDistances[indexToSend].set(dst);
+
+          bitset_shortestPathToAdd.set(dst); // TODO
         }
       }
     },
@@ -469,7 +479,8 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
   do {
     dga.reset();
-    galois::gPrint("Round ", roundNumber, "\n");
+    galois::gPrint("[", galois::runtime::getSystemNetworkInterface().ID, "]", 
+                   " Round ", roundNumber, "\n");
     graph.set_num_iter(roundNumber);
 
     // find the message a node needs to send (if any)
@@ -496,6 +507,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // update short path count with sync'd accumulator
     ShortPathUpdate(graph);
+
     // old dist gets updated with new dist
     OldDistUpdate(graph);
 
@@ -615,7 +627,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
             if (myDistance == (src_data.oldMinDistances[i] + 1)) {
               // add to dependency of predecessor using our finalized one
               galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
-              bitset_dependencyToAdd.set(src);
+              bitset_dependencyToAdd.set(src); // TODO
             }
           }
         }
@@ -718,9 +730,20 @@ int main(int argc, char** argv) {
   }
 
   // bitset initialization
-  bitset_minDistances.resize(hg->size());
+  vbitset_minDistances.resize(numSourcesPerRound);
+  vbitset_shortestPathToAdd.resize(numSourcesPerRound);
+  vbitset_dependencyToAdd.resize(numSourcesPerRound);
+
+  for (unsigned i = 0; i < numSourcesPerRound; i++) {
+    vbitset_minDistances[i].resize(hg->size());
+    vbitset_shortestPathToAdd[i].resize(hg->size());
+    vbitset_dependencyToAdd[i].resize(hg->size());
+  }
+
   bitset_shortestPathToAdd.resize(hg->size());
   bitset_dependencyToAdd.resize(hg->size());
+
+  uint64_t origNumRoundSources = numSourcesPerRound;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
@@ -765,8 +788,16 @@ int main(int argc, char** argv) {
       (*hg).set_num_iter(0);
       offset = 0;
       macroRound = 0;
+      numSourcesPerRound = origNumRoundSources;
 
-      bitset_minDistances.reset();
+      for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        vbitset_minDistances[i].reset();
+        vbitset_shortestPathToAdd[i].reset();
+        vbitset_dependencyToAdd[i].reset();
+      }
+
+      bitset_shortestPathToAdd.reset();
+      bitset_dependencyToAdd.reset();
 
       InitializeGraph(*hg);
       galois::runtime::getHostBarrier().wait();

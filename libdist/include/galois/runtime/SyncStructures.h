@@ -55,6 +55,7 @@
 #define SYNC_STRUCT_MACROS
 
 #include <cstdint> // for uint types used below
+#include <galois/gIO.h> // for GALOIS DIE
 
 ////////////////////////////////////////////////////////////////////////////////
 // Field flag class
@@ -1060,6 +1061,45 @@ struct Broadcast_##fieldname {\
   }\
 }
 #endif
+
+#define GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(fieldname, fieldtype)\
+struct Broadcast_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node,\
+                       unsigned vecIndex) {\
+    return node.fieldname[vecIndex];\
+  }\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {\
+    GALOIS_DIE("Execution shouldn't get here\n");\
+    return node.fieldname[0];\
+  }\
+\
+  static bool extract_batch(unsigned, unsigned long long int *, unsigned int* ,\
+                            ValTy *, size_t *, DataCommMode *) {\
+    return false;\
+  }\
+\
+  static bool extract_batch(unsigned, ValTy *) {\
+    return false;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y,\
+                     unsigned vecIndex) {\
+    node.fieldname[vecIndex] = y;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
+    GALOIS_DIE("Execution shouldn't get here\n");\
+  }\
+\
+  static bool setVal_batch(unsigned, unsigned long long int*, unsigned int*,\
+                           ValTy*, size_t, DataCommMode) {\
+    return false;\
+  }\
+}
+
 
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included

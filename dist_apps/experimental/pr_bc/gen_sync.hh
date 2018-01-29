@@ -25,29 +25,32 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+// MinDistances
+////////////////////////////////////////////////////////////////////////////////
+
 /**
  * Manually defined sync structure for reducing minDistances. Needs to be manual
  * as there is a reset operation that is contingent on changes to the minimum
  * distance.
  */
 struct ReducePairwiseMinAndResetDist {
-  using ValTy = std::vector<uint32_t>;
+  using ValTy = uint32_t;
 
-  static ValTy extract(uint32_t node_id, const struct NodeData& node) {
-    //galois::gPrint("extract min\n");
-    return node.minDistances;
+  static ValTy extract(uint32_t node_id, const struct NodeData& node, 
+                       unsigned vecIndex) {
+    return node.minDistances[vecIndex];
   }
 
-  static bool extract_reset_batch(unsigned from_id,
-                                  unsigned long long int* b,
-                                  unsigned int* o,
-                                  ValTy* y,
-                                  size_t* s,
-                                  DataCommMode* data_mode) {
+  static bool extract_reset_batch(unsigned, unsigned long long int*,
+                                  unsigned int*, ValTy*, size_t*,
+                                  DataCommMode*) {
     return false;
   }
 
-  static bool extract_reset_batch(unsigned from_id, ValTy *y) {
+  static bool extract_reset_batch(unsigned, ValTy*) {
     return false;
   }
 
@@ -58,48 +61,52 @@ struct ReducePairwiseMinAndResetDist {
    * distance changes, then shortestPathToAdd must be set to 0 as it is
    * now invalid.
    */
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
+  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y,
+                     unsigned vecIndex) {
     bool returnVar = false;
 
-    ValTy& myDistances = node.minDistances;
+    std::vector<ValTy>& myDistances = node.minDistances;
 
-    for (unsigned i = 0; i < myDistances.size(); i++) {
-      uint32_t oldDist = galois::min(myDistances[i], y[i]);
+    uint32_t oldDist = galois::min(myDistances[vecIndex], y);
 
-      // if there's a change, reset the shortestPathsAdd var
-      if (oldDist > myDistances[i]) {
-        node.shortestPathToAdd[i] = 0;
-        returnVar = true;
-      }
+    // if there's a change, reset the shortestPathsAdd var
+    if (oldDist > myDistances[vecIndex]) {
+      node.shortestPathToAdd[vecIndex] = 0;
+      returnVar = true;
     }
 
     return returnVar;
   }
 
-  static bool reduce_batch(unsigned from_id,
-                           unsigned long long int *b,
-                           unsigned int *o,
-                           ValTy *y,
-                           size_t s,
-                           DataCommMode data_mode) {
+  static bool reduce_batch(unsigned, unsigned long long int*, unsigned int *,
+                           ValTy*, size_t, DataCommMode) {
     return false;
   }
 
   /**
    * do nothing for reset
    */
-  static void reset (uint32_t node_id, struct NodeData &node) {
+  static void reset(uint32_t node_id, struct NodeData &node, unsigned vecIndex) {
     return;
   }
 };
-GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, std::vector<uint32_t>);
-GALOIS_SYNC_STRUCTURE_BITSET(minDistances);
+
+GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
+
+////////////////////////////////////////////////////////////////////////////////
+// Shortest Path
+////////////////////////////////////////////////////////////////////////////////
+
 
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd, 
                                                  std::vector<uint32_t>);
 GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, std::vector<uint32_t>);
 GALOIS_SYNC_STRUCTURE_BITSET(shortestPathToAdd);
 
+////////////////////////////////////////////////////////////////////////////////
+// Dependency
+////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(
   dependencyToAdd, 
