@@ -36,6 +36,8 @@
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
+#include "galois/runtime/Profile.h"
+
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
@@ -516,7 +518,9 @@ int main(int argc, char** argv) {
 
   galois::StatTimer T;
   T.start();
-  Process(graph, tree, ptrPoints).generateMesh();
+  galois::runtime::profileVtune(
+      [&] () { Process(graph, tree, ptrPoints).generateMesh(); },
+      "MeshGeneration");
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 
