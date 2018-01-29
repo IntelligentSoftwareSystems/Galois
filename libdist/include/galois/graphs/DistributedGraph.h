@@ -1570,7 +1570,7 @@ private:
                              std::vector<typename FnTy::ValTy> &v, 
                              size_t &s, DataCommMode& data_mode) {
     return FnTy::extract_reset_batch(x, 
-        (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), &s, 
+        (uint64_t *)b.get_vec().data(), o.data(), v.data(), &s, 
         &data_mode);
   }
 
@@ -1597,7 +1597,7 @@ private:
                              std::vector<unsigned int> &o, 
                              std::vector<typename FnTy::ValTy> &v, 
                              size_t &s, DataCommMode& data_mode) const {
-    return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::extract_batch(x, (uint64_t *)b.get_vec().data(), 
                                o.data(), v.data(), &s, &data_mode);
   }
 
@@ -1891,7 +1891,7 @@ private:
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
-    return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::reduce_batch(x, (uint64_t *)b.get_vec().data(), 
                               o.data(), v.data(), s, data_mode);
   }
   
@@ -1917,7 +1917,7 @@ private:
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
-    return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::setVal_batch(x, (uint64_t *)b.get_vec().data(), 
                               o.data(), v.data(), s, data_mode);
   }
   

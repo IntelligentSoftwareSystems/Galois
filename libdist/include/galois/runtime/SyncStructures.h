@@ -179,7 +179,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -212,7 +212,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -245,7 +245,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -262,7 +262,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -290,7 +290,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -323,7 +323,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -356,7 +356,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -373,7 +373,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -405,7 +405,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -438,7 +438,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -466,7 +466,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -483,7 +483,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -510,7 +510,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -543,7 +543,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -571,7 +571,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -588,7 +588,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -619,7 +619,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -651,7 +651,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -679,7 +679,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -696,7 +696,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -723,7 +723,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -755,7 +755,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -783,7 +783,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -800,7 +800,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -827,7 +827,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -860,7 +860,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -889,7 +889,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -906,7 +906,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -930,7 +930,7 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -947,7 +947,7 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -979,7 +979,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1010,7 +1010,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1034,7 +1034,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1051,7 +1051,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1075,7 +1075,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1106,7 +1106,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1130,7 +1130,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1147,7 +1147,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1178,7 +1178,7 @@ struct Bitset_##fieldname {\
   static galois::DynamicBitSet& get() {\
     if (personality == GPU_CUDA) \
       get_bitset_##fieldname##_cuda(cuda_ctx,\
-        (unsigned long long int *)bitset_##fieldname.get_vec().data());\
+        (uint64_t *)bitset_##fieldname.get_vec().data());\
     return bitset_##fieldname;\
   }\
 \

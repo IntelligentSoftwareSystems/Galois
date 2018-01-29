@@ -327,7 +327,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 }
 
 template<typename DataType, SharedType sharedType, bool reset>
-void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets_comm, DataType *v, size_t *v_size, DataCommMode *data_mode, DataType i = 0) {
+void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets_comm, DataType *v, size_t *v_size, DataCommMode *data_mode, DataType i = 0) {
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {
     shared = &ctx->master;
@@ -387,7 +387,7 @@ void batch_get_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context
 }
 
 template<typename DataType, SharedType sharedType, UpdateOp op>
-void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets_comm, DataType *v, size_t v_size, DataCommMode data_mode) {
+void batch_set_shared_field(struct CUDA_Context_Common *ctx, struct CUDA_Context_Field<DataType> *field, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets_comm, DataType *v, size_t v_size, DataCommMode data_mode) {
   assert(data_mode != noData);
   struct CUDA_Context_Shared *shared;
   if (sharedType == sharedMaster) {

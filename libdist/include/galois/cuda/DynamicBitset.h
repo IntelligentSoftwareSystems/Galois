@@ -7,7 +7,7 @@
 class DynamicBitset {
   size_t num_bits_capacity;
   size_t num_bits;
-  unsigned long long int *bit_vector;
+  uint64_t *bit_vector;
 
 public:
   DynamicBitset()
@@ -30,9 +30,10 @@ public:
   void alloc(size_t nbits) {
     assert(num_bits == 0);
     assert(sizeof(unsigned long long int) * 8 == 64);
+    assert(sizeof(uint64_t) * 8 == 64);
     num_bits_capacity = nbits;
     num_bits = nbits;
-    CUDA_SAFE_CALL(cudaMalloc(&bit_vector, vec_size() * sizeof(unsigned long long int)));
+    CUDA_SAFE_CALL(cudaMalloc(&bit_vector, vec_size() * sizeof(uint64_t)));
     reset();
   }
 
@@ -51,17 +52,17 @@ public:
   }
 
   __device__ __host__ size_t alloc_size() const {
-    return vec_size() * sizeof(unsigned long long int);
+    return vec_size() * sizeof(uint64_t);
   }
 
   void reset() {
-    CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, vec_size() * sizeof(unsigned long long int)));
+    CUDA_SAFE_CALL(cudaMemset(bit_vector, 0, vec_size() * sizeof(uint64_t)));
   }
 
   // assumes bit_vector is not updated (set) in parallel
   __device__ bool test(const size_t id) const {
     size_t bit_index = id/64;
-    unsigned long long int bit_offset = 1;
+    uint64_t bit_offset = 1;
     bit_offset <<= (id%64);
     return ((bit_vector[bit_index] & bit_offset) != 0);
   }
@@ -71,7 +72,7 @@ public:
     unsigned long long int bit_offset = 1;
     bit_offset <<= (id%64);
     if ((bit_vector[bit_index] & bit_offset) == 0) { // test and set
-      atomicOr(&bit_vector[bit_index], bit_offset);
+      atomicOr((unsigned long long int *)&bit_vector[bit_index], bit_offset);
     }
   }
 
@@ -82,18 +83,18 @@ public:
 
   // different indices can be updated in parallel
   // but assumes same index is not updated in parallel
-  __device__ void batch_bitwise_and(const size_t bit_index, const unsigned long long int mask) {
+  __device__ void batch_bitwise_and(const size_t bit_index, const uint64_t mask) {
     bit_vector[bit_index] &= mask;
   }
 
-  void copy_to_cpu(unsigned long long int *bit_vector_cpu_copy) {
+  void copy_to_cpu(uint64_t *bit_vector_cpu_copy) {
     assert(bit_vector_cpu_copy != NULL);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, vec_size() * sizeof(unsigned long long int), cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, vec_size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
   }
 
-  void copy_to_gpu(unsigned long long int * cpu_bit_vector) {
+  void copy_to_gpu(uint64_t * cpu_bit_vector) {
     assert(cpu_bit_vector != NULL);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(unsigned long long int), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
   }
 };
 
