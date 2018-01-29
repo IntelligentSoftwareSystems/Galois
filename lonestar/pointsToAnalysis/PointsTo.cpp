@@ -424,6 +424,15 @@ class PTA {
     }
   }
 
+  struct InvokeDoAll {
+    template <typename I, typename F, typename... Args>
+    void operator() (const I& iter, const F& f, Args&&... args) {
+      // do_all(iter, f, args...);
+      auto range = iter();
+      std::for_each(range.first, range.second, f);
+    }
+  };
+
   /**
    * Adds edges to the graph based on load/store constraints in parallel.
    *
