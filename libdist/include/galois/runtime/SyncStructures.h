@@ -921,7 +921,6 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
 }
 #endif
 
-// Non-GPU code
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_##fieldname {\
   typedef fieldtype ValTy;\
@@ -960,6 +959,42 @@ struct Reduce_pair_wise_add_array_##fieldname {\
     { galois::resetVec(node.fieldname); }\
   }\
 }
+
+#define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(fieldname, fieldtype) \
+struct Reduce_pair_wise_add_array_single_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node,\
+                       unsigned vecIndex) {\
+    return node.fieldname[vecIndex];\
+  }\
+\
+  static bool extract_reset_batch(unsigned, unsigned long long int*,\
+                                  unsigned int*, ValTy*,\
+                                  size_t*, DataCommMode*) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned, ValTy*) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y,\
+                     unsigned vecIndex) {\
+    node.fieldname[vecIndex] = node.fieldname[vecIndex] + y;\
+    return true;\
+  }\
+\
+  static bool reduce_batch(unsigned, unsigned long long int*,\
+                           unsigned int*, ValTy *, size_t, DataCommMode) {\
+    return false;\
+  }\
+\
+  static void reset(uint32_t node_id, struct NodeData &node, unsigned vecIndex) {\
+    node.fieldname[vecIndex] = 0;\
+  }\
+}
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
