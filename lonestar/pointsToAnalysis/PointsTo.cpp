@@ -22,8 +22,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Rupesh Nasre <rupesh0508@gmail.com>
  * @author Loc Hoang <l_hoang@utexas.edu>
+ * @author Rupesh Nasre <rupesh0508@gmail.com>
  */
 #include "galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
@@ -61,11 +61,14 @@ static cll::opt<bool> printAnswer("printAnswer",
 
 static cll::opt<bool> useCycleDetection("ocd",
                                 cll::desc("If set, online cycle detection is"
-                                          " used in algorithm"),
+                                          " used in algorithm (serial only)"),
                                 cll::init(false));
 
-const unsigned THRESHOLD_LS = 500000;
-const unsigned THRESHOLD_OCD = 500;
+static cll::opt<unsigned> THRESHOLD_LS("lsThreshold",
+                            cll::desc("Determines how many constraints to "
+                                      "process before load/store constraints "
+                                      "are reprocessed (serial only)"),
+                            cll::init(500000));
 
 ////////////////////////////////////////////////////////////////////////////////
 // Declaration of strutures, types, and variables
@@ -163,7 +166,7 @@ class PTA {
 
     /**
      * @returns true of the nodeid is an ancestor node
-     * TODO find better way to do this instead of linear scan
+     * FIXME find better way to do this instead of linear scan
      */
     bool isAncestor(unsigned nodeid) {
       for (unsigned ii : ancestors) {
@@ -259,7 +262,6 @@ class PTA {
      * @param repr nodeID will have its representative changed to this
      */
     void makeRepr(unsigned nodeID, unsigned repr) {
-      // TODO this doesn't get correct results; fix somehow
       if (repr != nodeID) {
         galois::gDebug("change repr[", nodeID, "] = ", repr);
 
@@ -329,7 +331,6 @@ class PTA {
      * If so, collapse the cycles.
      *
      * @param updates vector of nodes that are sources of new edges.
-     * // TODO verify correctness
      */
     template<typename VecType>
     void process(VecType& updates) {
@@ -424,6 +425,15 @@ class PTA {
     }
   }
 
+  struct InvokeDoAll {
+    template <typename I, typename F, typename... Args>
+    void operator() (const I& iter, const F& f, Args&&... args) {
+      // do_all(iter, f, args...);
+      auto range = iter();
+      std::for_each(range.first, range.second, f);
+    }
+  };
+
   /**
    * Adds edges to the graph based on load/store constraints in parallel.
    *
@@ -492,7 +502,6 @@ class PTA {
       }
     );
   }
-
 
   /**
    * Processes the AddressOf, Copy constraints. 
@@ -626,13 +635,12 @@ class PTA {
       unsigned srcRepr = ocd.getFinalRepresentative(src);
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
-      // if src is a not subset of dst... (i.e. src has more), then 
-      // propogate src's points to info to dst
+      // propogate src's points to info to dst if necessary
       if (srcRepr != dstRepr && 
           !cPointsToResult[srcRepr].isSubsetEq(cPointsToResult[dstRepr])) {
         // newPtsTo is positive if changes are made
         newPtsTo += cPointsToResult[dstRepr].unify(cPointsToResult[srcRepr]);
-      } 
+      }
     }
 
     return newPtsTo;
@@ -650,6 +658,7 @@ class PTA {
   void initialize(size_t n) {
     numNodes = n;
 
+    // initialize different constructs based on which version is being run
     if (useSerial) {
       pointsToResult.resize(numNodes);
       outgoingEdges.resize(numNodes);
@@ -697,6 +706,7 @@ class PTA {
     while (!updates.empty()) {
       galois::gDebug("Iteration ", numIterations++, ", updates.size=", 
                      updates.size(), "\n");
+
       unsigned src = updates.front();
       updates.pop_front();
 
@@ -710,12 +720,12 @@ class PTA {
         if (newPtsTo) { // newPtsTo is positive if dst changed
           updates.push_back(ocd.getFinalRepresentative(*dst));
         }
+
+        numUps++;
       }
 
-      if (updates.empty()) {
-        //galois::gPrint("i = ", numIterations, "\n");
-        galois::gPrint("No of points-to facts computed = ", 
-                       countPointsToFacts(), "\n");
+      if (updates.empty() || numUps >= THRESHOLD_LS) {
+        galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
         numUps = 0;
 
         // After propagating all constraints, see if load/store
@@ -723,9 +733,7 @@ class PTA {
         processLoadStore(loadStoreConstraints, updates);
 
         // do cycle squashing
-        //if (updates.size() > THRESHOLD_OCD) {
         ocd.process(updates);
-        //checkReprEdges();
       }
     }
   }
@@ -746,8 +754,6 @@ class PTA {
     );
     processLoadStoreParallel(loadStoreConstraints, updates);
 
-    galois::gPrint("here\n");
-
     while (!updates.empty()) {
       galois::for_each(
         galois::iterate(updates),
@@ -767,18 +773,16 @@ class PTA {
         galois::wl<galois::worklists::dChunkedFIFO<8>>() // TODO exp with this
       );
 
-      galois::gPrint("No of points-to facts computed = ", 
-                      countPointsToFactsParallel(), "\n");
+      galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
 
       updates.clear_parallel();
 
       // After propagating all constraints, see if load/store constraints need 
       // to be added in since graph was potentially updated
-      // TODO process parallel
       processLoadStoreParallel(loadStoreConstraints, updates);
 
       // do cycle squashing
-      //ocd.process(updates); // TODO have parallel version
+      //ocd.process(updates); // TODO have parallel version, if possible
     }
   }
 
@@ -789,6 +793,9 @@ class PTA {
    * @returns number of nodes in the constraint graph
    */
   unsigned readConstraints(const char *file) {
+    galois::gInfo("GEP constraints (constraint type 4) and any constraints "
+                  "with offsets are ignored.");
+
     unsigned numNodes = 0;
     unsigned nconstraints = 0;
 
@@ -887,26 +894,22 @@ class PTA {
    */
   unsigned countPointsToFacts() {
     unsigned count = 0;
-    for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
-      unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
-      count += pointsToResult[repr].count();
+
+    // use correct data structure depending on version run
+    if (!useSerial) {
+      for (auto ii = cPointsToResult.begin(); ii != cPointsToResult.end(); ++ii) {
+        unsigned repr = ocd.getFinalRepresentative(ii - cPointsToResult.begin());
+        count += cPointsToResult[repr].count();
+      }
+    } else {
+      for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
+        unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
+        count += pointsToResult[repr].count();
+      }
     }
+
     return count;
   }
-
-  /**
-   * @returns The total number of points to facts in the system.
-   */
-  // TODO make parallel?
-  unsigned countPointsToFactsParallel() {
-    unsigned count = 0;
-    for (auto ii = cPointsToResult.begin(); ii != cPointsToResult.end(); ++ii) {
-      unsigned repr = ocd.getFinalRepresentative(ii - cPointsToResult.begin());
-      count += cPointsToResult[repr].count();
-    }
-    return count;
-  }
-
 
   /**
    * Prints out points to info for all verticies in the constraint graph.
@@ -937,21 +940,21 @@ int main(int argc, char** argv) {
 
   T.start();
   if (!useSerial) {
-    galois::gPrint("-------- Parallel version: ", numThreads, " threads.\n");
+    galois::gInfo("-------- Parallel version: ", numThreads, " threads.");
+    galois::gInfo("Note correctness of this version is relative to the serial "
+                  "version.");
     pta.runParallel();
   } else {
-    galois::gPrint("-------- Sequential version.\n");
+    galois::gInfo("-------- Sequential version.");
+    galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
+                  "best performance; its current setting may not be the best for "
+                  "your input and may actually degrade performance.");
+
     pta.runSerial();
   }
   T.stop();
 
-  if (useSerial) {
-    galois::gPrint("No of points-to facts computed = ", pta.countPointsToFacts(), 
-                   "\n");
-  } else {
-    galois::gPrint("No of points-to facts computed = ", pta.countPointsToFactsParallel(), 
-                   "\n");
-  }
+  galois::gInfo("No of points-to facts computed = ", pta.countPointsToFacts());
 
   if (!skipVerify) {
     galois::gInfo("Doing verification step");

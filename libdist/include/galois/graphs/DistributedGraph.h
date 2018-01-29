@@ -1437,6 +1437,8 @@ private:
                       const std::vector<unsigned int> &offsets,
                       std::vector<typename FnTy::ValTy> &val_vec,
                       unsigned vecIndex, size_t start = 0) {
+    val_vec.resize(offsets.size()); // resive val vec for this vecIndex
+
     if (parallelize) {
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
       std::string doall_str(syncTypeStr + "_EXTRACTVAL_VECTOR_" + loopName);
@@ -1570,7 +1572,7 @@ private:
                              std::vector<typename FnTy::ValTy> &v, 
                              size_t &s, DataCommMode& data_mode) {
     return FnTy::extract_reset_batch(x, 
-        (unsigned long long int *)b.get_vec().data(), o.data(), v.data(), &s, 
+        (uint64_t *)b.get_vec().data(), o.data(), v.data(), &s, 
         &data_mode);
   }
 
@@ -1597,7 +1599,7 @@ private:
                              std::vector<unsigned int> &o, 
                              std::vector<typename FnTy::ValTy> &v, 
                              size_t &s, DataCommMode& data_mode) const {
-    return FnTy::extract_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::extract_batch(x, (uint64_t *)b.get_vec().data(), 
                                o.data(), v.data(), &s, &data_mode);
   }
 
@@ -1891,7 +1893,7 @@ private:
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
-    return FnTy::reduce_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::reduce_batch(x, (uint64_t *)b.get_vec().data(), 
                               o.data(), v.data(), s, data_mode);
   }
   
@@ -1917,7 +1919,7 @@ private:
                          std::vector<unsigned int> &o, 
                          std::vector<typename FnTy::ValTy> &v, size_t &s, 
                          DataCommMode& data_mode) {
-    return FnTy::setVal_batch(x, (unsigned long long int *)b.get_vec().data(), 
+    return FnTy::setVal_batch(x, (uint64_t *)b.get_vec().data(), 
                               o.data(), v.data(), s, data_mode);
   }
   
@@ -2312,6 +2314,8 @@ private:
     // a different index in the vector field we are synchronizing
     for (unsigned i = 0; i < BitsetFnTy::numBitsets(); i++) {
       if (num > 0) {
+        bit_set_comm.reset();
+
         size_t bit_set_count = 0;
 
         // No GPU support currently
@@ -2325,10 +2329,12 @@ private:
         // vector extract, i.e. get element i of the vector (i passed in as 
         // argument as well)
         if (data_mode == onlyData) {
+          //galois::gInfo(id, " node ", i, " has data to send");
           bit_set_count = indices.size();
           extract_subset<SyncFnTy, syncType, true, true, true>(loopName, indices,
             bit_set_count, offsets, val_vec, i);
         } else if (data_mode != noData) { // bitsetData or offsetsData or gidsData
+          //galois::gInfo(id, " node ", i, " has data to send");
           extract_subset<SyncFnTy, syncType, false, true, true>(loopName, indices,
             bit_set_count, offsets, val_vec, i);
         }
@@ -2339,7 +2345,6 @@ private:
                                 offsets, bit_set_comm, val_vec, b);
       } else {
         // append noData for however many bitsets there are
-        data_mode = noData;
         gSerialize(b, noData);
       }
     }
@@ -2366,7 +2371,9 @@ private:
    * @param x Host to send to
    * @param b OUTPUT: Buffer that will hold data to send
    */
-  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+           typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = 
+              nullptr>
   void get_send_buffer(std::string loopName, unsigned x, 
                        galois::runtime::SendBuffer &b) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
@@ -2384,6 +2391,24 @@ private:
 
     galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, b.size());
   }
+
+  template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+           typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = 
+              nullptr>
+  void get_send_buffer(std::string loopName, unsigned x, 
+                       galois::runtime::SendBuffer &b) {
+    auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
+
+    syncExtract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sharedNodes[x], 
+                                                b);
+
+    std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
+    std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_VECTOR_" + 
+                                  get_run_identifier(loopName));
+
+    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, b.size());
+  }
+
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
@@ -3052,9 +3077,15 @@ private:
 #endif
   
   /**
-   * TODO documentation
+   * Does a reduction of data from mirror nodes to master nodes.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam ReduceFnTy reduce sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
-  // reduce from mirrors to master
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename ReduceFnTy, typename BitsetFnTy>
   inline void reduce(std::string loopName) {
@@ -3089,9 +3120,15 @@ private:
   }
   
   /**
-   * TODO documentation
+   * Does a broadcast of data from master to mirror nodes.
+   *
+   * @tparam writeLocation Location data is written (src or dst)
+   * @tparam readLocation Location data is read (src or dst)
+   * @tparam BroadcastFnTy broadcast sync structure for the field
+   * @tparam BitsetFnTy struct that has info on how to access the bitset
+   *
+   * @param loopName used to name timers for statistics
    */
-  // broadcast from master to mirrors
   template<WriteLocation writeLocation, ReadLocation readLocation,
            typename BroadcastFnTy, typename BitsetFnTy>
   inline void broadcast(std::string loopName) {

@@ -8,23 +8,17 @@ boruvka USA-road-d.USA
 boruvka-merge USA-road-d.USA
 clustering nothing
 connectedcomponents rmat26-symmetric
-#connectedcomponents twitter40-symmetric
-connectedcomponents uk-2007-05-symmetric
-# todo usa symmetric
 delaunaytriangulation r5Mn
 delaunaytriangulation-det r5Mn
 dmr r5M
 gmetis USA-road-d.USA
-# todo sym graph for independent set
-independentset USA-road-d.USA
-#independentset r4-2e26
-#independentset rmat28
+independentset rmat28-symmetric
 matrixcompletion yahoo-music
 mcm nothing
 pagerank-pull twitter40-transpose
 pagerank-push soc-livejournal
 preflowpush r4-2e26
-pta nothing
+pta tshark_constraints
 spanningtree r4-2e26
 sssp r4-2e26
 surveypropagation nothing

@@ -13,7 +13,7 @@
 
 #pragma once
 #include "cub/cub.cuh"
-#include "atomic_float.h"
+#include "atomic_helpers.h"
 
 template<typename Type>
 class HGReducible {
@@ -40,7 +40,7 @@ public:
     local = T(temp_storage).Sum(local);
 
     if(threadIdx.x == 0 && local)  {
-      atomicAdd((Type *) HGReducible<Type>::rv, local);
+      atomicTestAdd((Type *) HGReducible<Type>::rv, local);
     }
   }
 
@@ -66,7 +66,7 @@ public:
     local = T(temp_storage).Reduce(local, maxOp);
 
     if(threadIdx.x == 0 && local)  {
-      atomicMax((Type *) HGReducible<Type>::rv, local);
+      atomicTestMax((Type *) HGReducible<Type>::rv, local);
     }
   }
 
@@ -92,7 +92,7 @@ public:
     local = T(temp_storage).Reduce(local, minOp);
 
     if(threadIdx.x == 0 && (local != 1073741823))  {
-      atomicMin((Type *) HGReducible<Type>::rv, local);
+      atomicTestMin((Type *) HGReducible<Type>::rv, local);
     }
   }
 
