@@ -99,9 +99,6 @@ std::vector<galois::DynamicBitSet> vbitset_minDistances;
 std::vector<galois::DynamicBitSet> vbitset_shortestPathToAdd;
 std::vector<galois::DynamicBitSet> vbitset_dependencyToAdd;
 
-galois::DynamicBitSet bitset_shortestPathToAdd;
-galois::DynamicBitSet bitset_dependencyToAdd;
-
 // Dist Graph using a bidirectional CSR graph (3rd argument set to true does 
 // this)
 using Graph = galois::graphs::DistGraph<NodeData, void, true>;
@@ -213,7 +210,6 @@ void MetadataUpdate(Graph& graph) {
         if (cur_data.oldMinDistances[i] != cur_data.minDistances[i]) {
           cur_data.shortestPathNumbers[i] = 0;
           cur_data.sentFlag[i] = 0; // reset sent flag
-          // also, this means shortPathToAdd needs to be set 
         }
       }
     },
@@ -451,8 +447,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
           dga += 1;
           vbitset_minDistances[indexToSend].set(dst);
-
-          bitset_shortestPathToAdd.set(dst); // TODO
+          vbitset_shortestPathToAdd[indexToSend].set(dst);
         }
       }
     },
@@ -499,8 +494,14 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     MetadataUpdate(graph); 
 
     // sync shortPathAdd
+    //graph.sync<writeDestination, readAny, 
+    //           Reduce_pair_wise_add_array_shortestPathToAdd, 
+    //           Broadcast_shortestPathToAdd, 
+    //           Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
+    //                                     std::to_string(macroRound));
+
     graph.sync<writeDestination, readAny, 
-               Reduce_pair_wise_add_array_shortestPathToAdd, 
+               Reduce_pair_wise_add_array_single_shortestPathToAdd, 
                Broadcast_shortestPathToAdd, 
                Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
                                          std::to_string(macroRound));
@@ -627,7 +628,8 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
             if (myDistance == (src_data.oldMinDistances[i] + 1)) {
               // add to dependency of predecessor using our finalized one
               galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
-              bitset_dependencyToAdd.set(src); // TODO
+
+              vbitset_dependencyToAdd[i].set(src); 
             }
           }
         }
@@ -638,10 +640,9 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
       galois::no_stats()
     );
 
-    // TODO #2 this might be wrong (that, or just floating point imprecision)
     // TODO can be optimized (see comment below)
     graph.sync<writeSource, readAny, 
-               Reduce_pair_wise_add_array_dependencyToAdd, 
+               Reduce_pair_wise_add_array_single_dependencyToAdd, 
                Broadcast_dependencyToAdd, 
                Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
                                        std::to_string(macroRound));
@@ -740,9 +741,6 @@ int main(int argc, char** argv) {
     vbitset_dependencyToAdd[i].resize(hg->size());
   }
 
-  bitset_shortestPathToAdd.resize(hg->size());
-  bitset_dependencyToAdd.resize(hg->size());
-
   uint64_t origNumRoundSources = numSourcesPerRound;
 
   for (auto run = 0; run < numRuns; ++run) {
@@ -795,9 +793,6 @@ int main(int argc, char** argv) {
         vbitset_shortestPathToAdd[i].reset();
         vbitset_dependencyToAdd[i].reset();
       }
-
-      bitset_shortestPathToAdd.reset();
-      bitset_dependencyToAdd.reset();
 
       InitializeGraph(*hg);
       galois::runtime::getHostBarrier().wait();

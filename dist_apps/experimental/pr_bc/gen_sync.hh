@@ -25,8 +25,6 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // MinDistances
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,20 +96,17 @@ GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
 // Shortest Path
 ////////////////////////////////////////////////////////////////////////////////
 
-
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd, 
-                                                 std::vector<uint32_t>);
-GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, std::vector<uint32_t>);
-GALOIS_SYNC_STRUCTURE_BITSET(shortestPathToAdd);
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
+                                                        uint32_t);
+GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint32_t);
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Dependency
 ////////////////////////////////////////////////////////////////////////////////
 
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(
-  dependencyToAdd, 
-  std::vector<galois::CopyableAtomic<float>>
-);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependencyToAdd, 
-                                std::vector<galois::CopyableAtomic<float>>);
-GALOIS_SYNC_STRUCTURE_BITSET(dependencyToAdd);
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
+                                                        galois::CopyableAtomic<float>);
+GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
+                                              galois::CopyableAtomic<float>);
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
