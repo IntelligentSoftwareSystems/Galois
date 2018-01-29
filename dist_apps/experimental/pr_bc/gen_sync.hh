@@ -63,7 +63,7 @@ struct ReducePairwiseMinAndResetDist {
                      unsigned vecIndex) {
     bool returnVar = false;
 
-    std::vector<ValTy>& myDistances = node.minDistances;
+    auto& myDistances = node.minDistances;
 
     uint32_t oldDist = galois::min(myDistances[vecIndex], y);
 

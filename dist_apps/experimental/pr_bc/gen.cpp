@@ -73,22 +73,22 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 // NOTE: declared types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
-  std::vector<uint32_t> oldMinDistances; // min distances in a previous round
-  std::vector<uint32_t> minDistances; // current min distances for each source
-  std::vector<uint32_t> shortestPathToAdd; // shortest path accumulator
-  std::vector<uint32_t> shortestPathNumbers; // actual shortest path number
-  std::vector<char> sentFlag; // marks if message has been sent for a source
+  galois::gstl::Vector<uint32_t> oldMinDistances; // min distances in a previous round
+  galois::gstl::Vector<uint32_t> minDistances; // current min distances for each source
+  galois::gstl::Vector<uint32_t> shortestPathToAdd; // shortest path accumulator
+  galois::gstl::Vector<uint32_t> shortestPathNumbers; // actual shortest path number
+  galois::gstl::Vector<char> sentFlag; // marks if message has been sent for a source
 
   uint32_t APSPIndexToSend; // index that needs to be sent in a round
   uint32_t shortPathValueToSend; // short path value that is sent in a round
 
   // round numbers saved for determining when to send out back-prop messages
-  std::vector<uint32_t> savedRoundNumbers; 
+  galois::gstl::Vector<uint32_t> savedRoundNumbers; 
 
   // accumulator for adding to dependency values
-  std::vector<galois::CopyableAtomic<float>> dependencyToAdd;
+  galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyToAdd;
   // final dependency values
-  std::vector<float> dependencyValues;
+  galois::gstl::Vector<float> dependencyValues;
 
   float bc;
 };
@@ -301,7 +301,7 @@ struct DWrapper {
  * @param dVector vector to wrap in DWrapper
  * @returns Elements of dVector wrapped in a DWrapper
  */
-std::vector<DWrapper> wrapDistVector(const std::vector<uint32_t>& dVector) {
+std::vector<DWrapper> wrapDistVector(const galois::gstl::Vector<uint32_t>& dVector) {
   std::vector<DWrapper> wrappedVector;
   wrappedVector.reserve(numSourcesPerRound);
 
@@ -494,12 +494,6 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     MetadataUpdate(graph); 
 
     // sync shortPathAdd
-    //graph.sync<writeDestination, readAny, 
-    //           Reduce_pair_wise_add_array_shortestPathToAdd, 
-    //           Broadcast_shortestPathToAdd, 
-    //           Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
-    //                                     std::to_string(macroRound));
-
     graph.sync<writeDestination, readAny, 
                Reduce_pair_wise_add_array_single_shortestPathToAdd, 
                Broadcast_shortestPathToAdd, 
