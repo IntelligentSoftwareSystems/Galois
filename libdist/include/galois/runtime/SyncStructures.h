@@ -1111,7 +1111,7 @@ struct Broadcast_##fieldname {\
     return node.fieldname[0];\
   }\
 \
-  static bool extract_batch(unsigned, unsigned long long int *, unsigned int* ,\
+  static bool extract_batch(unsigned, unsigned long int *, unsigned int* ,\
                             ValTy *, size_t *, DataCommMode *) {\
     return false;\
   }\
@@ -1129,7 +1129,7 @@ struct Broadcast_##fieldname {\
     GALOIS_DIE("Execution shouldn't get here\n");\
   }\
 \
-  static bool setVal_batch(unsigned, unsigned long long int*, unsigned int*,\
+  static bool setVal_batch(unsigned, unsigned long int*, unsigned int*,\
                            ValTy*, size_t, DataCommMode) {\
     return false;\
   }\
