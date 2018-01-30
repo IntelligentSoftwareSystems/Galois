@@ -32,7 +32,6 @@
 #include <fstream>
 #include <deque>
 #include "SparseBitVector.h"
-#include "ConcurrentSparseBitVector.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -131,8 +130,8 @@ class PtsToCons {
 
 class PTA {
   using PointsToConstraints = std::vector<PtsToCons>;
-  using PointsToInfo = std::vector<galois::SparseBitVector>;
-  using EdgeVector = std::vector<galois::SparseBitVector>;
+  using PointsToInfo = std::vector<galois::SerialSparseBitVector>;
+  using EdgeVector = std::vector<galois::SerialSparseBitVector>;
 
   using ConcurrentPTInfo = std::vector<galois::ConcurrentSparseBitVector>;
   using ConcurrentEdgeVector = std::vector<galois::ConcurrentSparseBitVector>;
