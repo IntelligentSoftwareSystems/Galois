@@ -1,7 +1,7 @@
 #!/bin/sh
 
 if ! [ -z "$ABELIAN_GALOIS_ROOT" ]; then
-  BASE_DIR=${ABELIAN_GALOIS_ROOT}/exp/apps
+  BASE_DIR=${ABELIAN_GALOIS_ROOT}/dist_apps/experimental
 else
   BASE_DIR=..
 fi
