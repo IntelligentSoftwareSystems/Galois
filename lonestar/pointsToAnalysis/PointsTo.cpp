@@ -25,7 +25,9 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  * @author Rupesh Nasre <rupesh0508@gmail.com>
  */
+
 #include "galois/Galois.h"
+#include "Invokers.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include <iostream>
@@ -128,21 +130,24 @@ class PtsToCons {
   }
 };
 
-class PTA {
+/**
+ * Points to analysis runner base class. Does not have a run method itself.
+ *
+ * @tparam IsConcurrent if set to true, the data structures used for points
+ * to results and outgoing edges will be thread safe
+ */
+template <bool IsConcurrent>
+class PTABase {
+  // sparse bit vector is concurrent or serial based on template parameter
+  using SparseBitVector = galois::SparseBitVector<IsConcurrent>;
+
   using PointsToConstraints = std::vector<PtsToCons>;
-  using PointsToInfo = std::vector<galois::SerialSparseBitVector>;
-  using EdgeVector = std::vector<galois::SerialSparseBitVector>;
+  using PointsToInfo = std::vector<SparseBitVector>;
+  using EdgeVector = std::vector<SparseBitVector>;
 
-  using ConcurrentPTInfo = std::vector<galois::ConcurrentSparseBitVector>;
-  using ConcurrentEdgeVector = std::vector<galois::ConcurrentSparseBitVector>;
-
- private:
+ protected:
   PointsToInfo pointsToResult; // pointsTo results for nodes
   EdgeVector outgoingEdges; // holds outgoing edges of a node
-
-  // concurrent versions of the above
-  ConcurrentPTInfo cPointsToResult; 
-  ConcurrentEdgeVector cOutgoingEdges;
 
   PointsToConstraints addressCopyConstraints; 
   PointsToConstraints loadStoreConstraints;
@@ -155,7 +160,7 @@ class PTA {
    */
   struct OnlineCycleDetection {
    private:
-    PTA& outerPTA; // reference to outer PTA instance to get runtime info
+    PTABase<IsConcurrent>& outerPTA; // reference to outer PTA instance to get runtime info
 
     galois::gstl::Vector<unsigned> ancestors; // TODO find better representation
     galois::gstl::Vector<bool> visited; // TODO use better representation
@@ -212,9 +217,8 @@ class PTA {
 
       // don't use an iterator here because outgoing edges might get updated
       // during this loop
-      galois::gstl::Vector<unsigned> repOutgoingEdges = 
-        outerPTA.outgoingEdges[nodeRep].
-        getAllSetBits<galois::gstl::Vector<unsigned>>();
+      std::vector<unsigned> repOutgoingEdges = 
+        outerPTA.outgoingEdges[nodeRep].getAllSetBits();
 
       for (auto dst : repOutgoingEdges) {
         // recursive depth first cycle detection; if a cycle is found,
@@ -281,8 +285,7 @@ class PTA {
     }
 
    public:
-
-    OnlineCycleDetection(PTA& o) : outerPTA(o) {}
+    OnlineCycleDetection(PTABase<IsConcurrent>& o) : outerPTA(o) {}
 
     /**
      * Init fields (outerPTA needs to have numNodes set).
@@ -355,7 +358,7 @@ class PTA {
   }; // end struct OnlineCycleDetection
 ////////////////////////////////////////////////////////////////////////////////
 
-  OnlineCycleDetection ocd; // cycle detector/squasher
+  OnlineCycleDetection ocd; // cycle detector/squasher; only works with serial 
 
   /**
    * Adds edges to the graph based on load/store constraints.
@@ -368,92 +371,18 @@ class PTA {
    *
    * Any updated nodes are returned in the updates vector.
    *
+   * @tparam LoopInvoker Functor that will run the loop
    * @tparam VecType object that supports a push_back function that represents
    * nodes to be worked on
    *
    * @param constraints Load/store constraints to use to add edges
    * @param updates output variable that will have updated nodes added to it
    */
-  template <typename VecType>
-  void processLoadStore(const PointsToConstraints &constraints, VecType& updates) {
-    for (auto& constraint : constraints) {
-      unsigned src;
-      unsigned dst;
-      std::tie(src, dst) = constraint.getSrcDst();
-
-      unsigned srcRepr = ocd.getFinalRepresentative(src);
-      unsigned dstRepr = ocd.getFinalRepresentative(dst);
-
-      if (constraint.getType() == PtsToCons::Load) { 
-        for (auto pointee = pointsToResult[srcRepr].begin();
-             pointee != pointsToResult[srcRepr].end();
-             pointee++) {
-          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
-
-          // add edge from pointee to dst if it doesn't already exist
-          if (pointeeRepr != dstRepr && 
-              !outgoingEdges[pointeeRepr].test(dstRepr)) {
-            galois::gDebug("adding edge from ", *pointee, " to ", dst);
-            outgoingEdges[pointeeRepr].set(dstRepr);
-
-            updates.push_back(pointeeRepr);
-          }
-        }
-      } else {  // store whatever src has into whatever dst points to
-        bool newEdgeAdded = false;
-
-        for (auto pointee = pointsToResult[dstRepr].begin();
-             pointee != pointsToResult[dstRepr].end();
-             pointee++) {
-          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
-
-          // add edge from src -> pointee if it doesn't exist
-          if (srcRepr != pointeeRepr && 
-              !outgoingEdges[srcRepr].test(pointeeRepr)) {
-            galois::gDebug("adding edge from ", src, " to ", *pointee);
-            outgoingEdges[srcRepr].set(pointeeRepr);
-
-            newEdgeAdded = true;
-          }
-        }
-
-        if (newEdgeAdded) {
-          updates.push_back(srcRepr);
-        }
-      }
-    }
-  }
-
-  struct InvokeDoAll {
-    template <typename I, typename F, typename... Args>
-    void operator() (const I& iter, const F& f, Args&&... args) {
-      // do_all(iter, f, args...);
-      auto range = iter();
-      std::for_each(range.first, range.second, f);
-    }
-  };
-
-  /**
-   * Adds edges to the graph based on load/store constraints in parallel.
-   *
-   * A load from src -> dst means anything that src points to must also
-   * point to dst. 
-   *
-   * A store from src -> dst means src must point to anything
-   * that dst points to.
-   *
-   * Any updated nodes are returned in the updates vector.
-   *
-   * @tparam VecType object that supports a push_back function that represents
-   * nodes to be worked on
-   *
-   * @param constraints Load/store constraints to use to add edges
-   * @param updates output variable that will have updated nodes added to it
-   */
-  template <typename VecType>
-  void processLoadStoreParallel(const PointsToConstraints &constraints, 
-                                VecType& updates) {
-    galois::do_all(
+  template <typename LoopInvoker, typename VecType>
+  void processLoadStore(const PointsToConstraints &constraints,
+                        VecType& updates) {
+    
+    LoopInvoker() (
       galois::iterate(constraints),
       [&] (auto constraint) {
         unsigned src;
@@ -464,15 +393,15 @@ class PTA {
         unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
         if (constraint.getType() == PtsToCons::Load) { 
-          for (auto pointee = cPointsToResult[srcRepr].begin();
-               pointee != cPointsToResult[srcRepr].end();
+          for (auto pointee = pointsToResult[srcRepr].begin();
+               pointee != pointsToResult[srcRepr].end();
                pointee++) {
             unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
 
             // add edge from pointee to dst if it doesn't already exist
             if (pointeeRepr != dstRepr && 
-                !cOutgoingEdges[pointeeRepr].test(dstRepr)) {
-              cOutgoingEdges[pointeeRepr].set(dstRepr);
+                !outgoingEdges[pointeeRepr].test(dstRepr)) {
+              outgoingEdges[pointeeRepr].set(dstRepr);
 
               updates.push_back(pointeeRepr);
             }
@@ -480,15 +409,15 @@ class PTA {
         } else {  // store whatever src has into whatever dst points to
           bool newEdgeAdded = false;
 
-          for (auto pointee = cPointsToResult[dstRepr].begin();
-               pointee != cPointsToResult[dstRepr].end();
+          for (auto pointee = pointsToResult[dstRepr].begin();
+               pointee != pointsToResult[dstRepr].end();
                pointee++) {
             unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
 
             // add edge from src -> pointee if it doesn't exist
             if (srcRepr != pointeeRepr && 
-                !cOutgoingEdges[srcRepr].test(pointeeRepr)) {
-              cOutgoingEdges[srcRepr].set(pointeeRepr);
+                !outgoingEdges[srcRepr].test(pointeeRepr)) {
+              outgoingEdges[srcRepr].set(pointeeRepr);
 
               newEdgeAdded = true;
             }
@@ -511,6 +440,7 @@ class PTA {
    * Creates edges for Copy constraints, i.e. edge from a to b indicates
    * b is a copy of a.
    *
+   * @tparam LoopInvoker Functor that will run the loop
    * @tparam VecType object that supports a push_back function as well
    * as iteration over pushed objects
    *
@@ -518,52 +448,11 @@ class PTA {
    * @returns vector of UpdatesRequests from all sources with new edges
    * added by the Copy constraint
    */
-  template<typename VecType>
+  template <typename LoopInvoker, typename VecType>
   VecType processAddressOfCopy(const PointsToConstraints& constraints) {
     VecType updates;
 
-    for (auto& ii : constraints) {
-      unsigned src;
-      unsigned dst;
-
-      std::tie(src, dst) = ii.getSrcDst();
-
-      if (ii.getType() == PtsToCons::AddressOf) { // addressof; save point info
-        if (pointsToResult[dst].set(src)) {
-          // this only debug prints if the bit wasn't already set
-          galois::gDebug("saving v", dst, "->v", src);
-        }
-      } else if (src != dst) {  // copy constraint; add an edge
-        galois::gDebug("Adding edge from ", src, " to ", dst);
-        outgoingEdges[src].set(dst);
-        updates.push_back(src);
-      }
-    }
-
-    return updates;
-  }
-
-  /**
-   * Processes the AddressOf, Copy constraints in parallel.
-   *
-   * Sets the bitvector for AddressOf constraints, i.e. a set bit means
-   * that you point to whatever that bit represents.
-   *
-   * Creates edges for Copy constraints, i.e. edge from a to b indicates
-   * b is a copy of a.
-   *
-   * @tparam VecType object that supports a push_back function as well
-   * as iteration over pushed objects
-   *
-   * @param constraints vector of AddressOf and Copy constraints
-   * @returns vector of UpdatesRequests from all sources with new edges
-   * added by the Copy constraint
-   */
-  template<typename VecType>
-  VecType processAddressOfCopyParallel(const PointsToConstraints& constraints) {
-    VecType updates;
-
-    galois::do_all(
+    LoopInvoker() (
       galois::iterate(constraints),
       [&] (auto ii) {
         unsigned src;
@@ -572,9 +461,9 @@ class PTA {
         std::tie(src, dst) = ii.getSrcDst();
 
         if (ii.getType() == PtsToCons::AddressOf) { // addressof; save point info
-          cPointsToResult[dst].set(src);
+          pointsToResult[dst].set(src);
         } else if (src != dst) {  // copy constraint; add an edge
-          cOutgoingEdges[src].set(dst);
+          outgoingEdges[src].set(dst);
           updates.push_back(src);
         }
       }
@@ -582,7 +471,6 @@ class PTA {
 
     return updates;
   }
-
 
   /**
    * If an edge exists from src to dst, then dst is a copy of src.
@@ -606,47 +494,14 @@ class PTA {
         galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
-      } else {
-        // TODO this is a sanity check, remove for final version?
-        if (!pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
-          std::abort();
-        }
-      }
-    }
-
-    return newPtsTo;
-  }
-
-  /**
-   * Parallel version (uses parallel data structures). 
-   *
-   * If an edge exists from src to dst, then dst is a copy of src.
-   * Propogate any points to information from source to dest.
-   *
-   * @param src Source node in graph
-   * @param dst Dest node in graph
-   * @returns non-negative value if any bitvector has changed
-   */
-  unsigned propagateParallel(unsigned src, unsigned dst) {
-    unsigned newPtsTo = 0;
-
-    if (src != dst) {
-      unsigned srcRepr = ocd.getFinalRepresentative(src);
-      unsigned dstRepr = ocd.getFinalRepresentative(dst);
-
-      // propogate src's points to info to dst if necessary
-      if (srcRepr != dstRepr && 
-          !cPointsToResult[srcRepr].isSubsetEq(cPointsToResult[dstRepr])) {
-        // newPtsTo is positive if changes are made
-        newPtsTo += cPointsToResult[dstRepr].unify(cPointsToResult[srcRepr]);
-      }
+      } 
     }
 
     return newPtsTo;
   }
 
  public:
-  PTA(void) : ocd(*this) { }
+  PTABase(void) : ocd(*this) { }
 
   /**
    * Given the number of nodes in the constraint graph, initialize the
@@ -658,131 +513,16 @@ class PTA {
     numNodes = n;
 
     // initialize different constructs based on which version is being run
-    if (useSerial) {
-      pointsToResult.resize(numNodes);
-      outgoingEdges.resize(numNodes);
+    pointsToResult.resize(numNodes);
+    outgoingEdges.resize(numNodes);
 
-      // initialize vectors
-      for (unsigned i = 0; i < numNodes; i++) {
-        pointsToResult[i].init();
-        outgoingEdges[i].init();
-      }
-    } else {
-      cPointsToResult.resize(numNodes);
-      cOutgoingEdges.resize(numNodes);
-
-      // initialize vectors
-      galois::do_all(
-        galois::iterate(0u, (unsigned)numNodes),
-        [&] (auto i) {
-          cPointsToResult[i].init();
-          cOutgoingEdges[i].init();
-        }
-      );
+    // initialize vectors
+    for (unsigned i = 0; i < numNodes; i++) {
+      pointsToResult[i].init();
+      outgoingEdges[i].init();
     }
 
     ocd.init();
-  }
-
-  /**
-   * Run points-to-analysis without galois::for_each on a single thread.
-   */
-  void runSerial() {
-    galois::gDebug("no of addr+copy constraints = ", 
-                   addressCopyConstraints.size(), 
-                   ", no of load+store constraints = ", 
-                   loadStoreConstraints.size());
-    galois::gDebug("no of nodes = ", numNodes);
-
-    std::deque<unsigned> updates;
-    updates = processAddressOfCopy<std::deque<unsigned>>(addressCopyConstraints);
-    processLoadStore(loadStoreConstraints, updates);
-
-    unsigned numIterations = 0;
-    unsigned numUps = 0;
-
-    // FIFO
-    while (!updates.empty()) {
-      galois::gDebug("Iteration ", numIterations++, ", updates.size=", 
-                     updates.size(), "\n");
-
-      unsigned src = updates.front();
-      updates.pop_front();
-
-      //galois::gDebug("processing updates element ", src, "\n");
-
-      for (auto dst = outgoingEdges[src].begin(); 
-           dst != outgoingEdges[src].end();
-           dst++) {
-        unsigned newPtsTo = propagate(src, *dst);
-
-        if (newPtsTo) { // newPtsTo is positive if dst changed
-          updates.push_back(ocd.getFinalRepresentative(*dst));
-        }
-
-        numUps++;
-      }
-
-      if (updates.empty() || numUps >= THRESHOLD_LS) {
-        galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
-        numUps = 0;
-
-        // After propagating all constraints, see if load/store
-        // constraints need to be added in since graph was potentially updated
-        processLoadStore(loadStoreConstraints, updates);
-
-        // do cycle squashing
-        ocd.process(updates);
-      }
-    }
-  }
-
-  /**
-   * Run points-to-analysis using galois::for_each as the main loop.
-   */
-  void runParallel() {
-    galois::gDebug("no of addr+copy constraints = ", 
-                   addressCopyConstraints.size(), 
-                   ", no of load+store constraints = ", 
-                   loadStoreConstraints.size());
-    galois::gDebug("no of nodes = ", numNodes);
-
-    galois::InsertBag<unsigned> updates;
-    updates = processAddressOfCopyParallel<galois::InsertBag<unsigned>>(
-      addressCopyConstraints
-    );
-    processLoadStoreParallel(loadStoreConstraints, updates);
-
-    while (!updates.empty()) {
-      galois::for_each(
-        galois::iterate(updates),
-        [this] (unsigned req, auto& ctx) {
-          for (auto dst = this->cOutgoingEdges[req].begin();
-               dst != this->cOutgoingEdges[req].end();
-               dst++) {
-            unsigned newPtsTo = this->propagateParallel(req, *dst); 
-
-            if (newPtsTo) {
-              ctx.push(this->ocd.getFinalRepresentative(*dst));
-            }
-          }
-        },
-        galois::loopname("PointsToMainUpdateLoop"),
-        galois::no_conflicts(),
-        galois::wl<galois::worklists::dChunkedFIFO<8>>() // TODO exp with this
-      );
-
-      galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
-
-      updates.clear_parallel();
-
-      // After propagating all constraints, see if load/store constraints need 
-      // to be added in since graph was potentially updated
-      processLoadStoreParallel(loadStoreConstraints, updates);
-
-      // do cycle squashing
-      //ocd.process(updates); // TODO have parallel version, if possible
-    }
   }
 
   /**
@@ -894,17 +634,9 @@ class PTA {
   unsigned countPointsToFacts() {
     unsigned count = 0;
 
-    // use correct data structure depending on version run
-    if (!useSerial) {
-      for (auto ii = cPointsToResult.begin(); ii != cPointsToResult.end(); ++ii) {
-        unsigned repr = ocd.getFinalRepresentative(ii - cPointsToResult.begin());
-        count += cPointsToResult[repr].count();
-      }
-    } else {
-      for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
-        unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
-        count += pointsToResult[repr].count();
-      }
+    for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
+      unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
+      count += pointsToResult[repr].count();
     }
 
     return count;
@@ -916,50 +648,132 @@ class PTA {
   void printPointsToInfo() {
     std::string prefix = "v";
 
-    if (!useSerial) {
-      for (auto ii = cPointsToResult.begin(); ii != cPointsToResult.end(); ++ii) {
-        std::cerr << prefix << ii - cPointsToResult.begin() << ": ";
-        unsigned repr = ocd.getFinalRepresentative(ii - cPointsToResult.begin());
-        cPointsToResult[repr].print(std::cerr, prefix);
-      }
-    } else {
-      for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
-        std::cerr << prefix << ii - pointsToResult.begin() << ": ";
-        unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
-        pointsToResult[repr].print(std::cerr, prefix);
-      }
+    for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
+      std::cerr << prefix << ii - pointsToResult.begin() << ": ";
+      unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
+      pointsToResult[repr].print(std::cerr, prefix);
     }
   }
 }; // end class PTA
 
-int main(int argc, char** argv) {
-  galois::SharedMemSys G;
-  LonestarStart(argc, argv, name, desc, url);
+/**
+ * Serial points to executor.
+ */
+class PTASerial : public PTABase<false> {
+ public:
+  /**
+   * Run points-to-analysis on a single thread.
+   */
+  void run() {
+    galois::gDebug("no of addr+copy constraints = ", 
+                   addressCopyConstraints.size(), 
+                   ", no of load+store constraints = ", 
+                   loadStoreConstraints.size());
+    galois::gDebug("no of nodes = ", numNodes);
 
-  PTA pta;
+    std::deque<unsigned> updates;
+    updates = processAddressOfCopy<galois::InvokeStdForEach, 
+                                   std::deque<unsigned>>(addressCopyConstraints);
+    processLoadStore<galois::InvokeStdForEach>(loadStoreConstraints, updates);
 
+    unsigned numUps = 0;
+
+    // FIFO
+    while (!updates.empty()) {
+      unsigned src = updates.front();
+      updates.pop_front();
+
+      for (auto dst = outgoingEdges[src].begin(); 
+           dst != outgoingEdges[src].end();
+           dst++) {
+        unsigned newPtsTo = propagate(src, *dst);
+
+        if (newPtsTo) { // newPtsTo is positive if dst changed
+          updates.push_back(ocd.getFinalRepresentative(*dst));
+        }
+
+        numUps++;
+      }
+
+      if (updates.empty() || numUps >= THRESHOLD_LS) {
+        galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
+        numUps = 0;
+
+        // After propagating all constraints, see if load/store
+        // constraints need to be added in since graph was potentially updated
+        processLoadStore<galois::InvokeStdForEach>(loadStoreConstraints, updates);
+
+        // do cycle squashing
+        ocd.process(updates);
+      }
+    }
+  }
+};
+
+/**
+ * Concurrent points to executor.
+ */
+class PTAConcurrent : public PTABase<true> {
+ public:
+  /**
+   * Run points-to-analysis using galois::for_each as the main loop.
+   */
+  void run() {
+    galois::gDebug("no of addr+copy constraints = ", 
+                   addressCopyConstraints.size(), 
+                   ", no of load+store constraints = ", 
+                   loadStoreConstraints.size());
+    galois::gDebug("no of nodes = ", numNodes);
+
+    galois::InsertBag<unsigned> updates;
+    updates = processAddressOfCopy<galois::InvokeDoAll, galois::InsertBag<unsigned>>(
+      addressCopyConstraints
+    );
+    processLoadStore<galois::InvokeDoAll>(loadStoreConstraints, updates);
+
+    while (!updates.empty()) {
+      galois::for_each(
+        galois::iterate(updates),
+        [this] (unsigned req, auto& ctx) {
+          for (auto dst = this->outgoingEdges[req].begin();
+               dst != this->outgoingEdges[req].end();
+               dst++) {
+            unsigned newPtsTo = this->propagate(req, *dst); 
+
+            if (newPtsTo) ctx.push(this->ocd.getFinalRepresentative(*dst));
+          }
+        },
+        galois::loopname("PointsToMainUpdateLoop"),
+        galois::no_conflicts(),
+        galois::wl<galois::worklists::dChunkedFIFO<8>>() // TODO exp with this
+      );
+
+      galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
+
+      updates.clear_parallel();
+
+      // After propagating all constraints, see if load/store constraints need 
+      // to be added in since graph was potentially updated
+      processLoadStore<galois::InvokeDoAll>(loadStoreConstraints, updates);
+
+      // do cycle squashing
+      //ocd.process(updates); // TODO have parallel version, if possible
+    }
+  }
+};
+
+/**
+ * Method from running PTA. 
+ */
+template <typename PTAClass>
+void runPTA(PTAClass& pta) {
   size_t numNodes = pta.readConstraints(input.c_str());
-
   pta.initialize(numNodes);
 
-  unsigned numThreads = galois::getActiveThreads();
-
-  galois::StatTimer T;
+  galois::StatTimer T; // main timer
 
   T.start();
-  if (!useSerial) {
-    galois::gInfo("-------- Parallel version: ", numThreads, " threads.");
-    galois::gInfo("Note correctness of this version is relative to the serial "
-                  "version.");
-    pta.runParallel();
-  } else {
-    galois::gInfo("-------- Sequential version.");
-    galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
-                  "best performance; its current setting may not be the best for "
-                  "your input and may actually degrade performance.");
-
-    pta.runSerial();
-  }
+  pta.run();
   T.stop();
 
   galois::gInfo("No of points-to facts computed = ", pta.countPointsToFacts());
@@ -972,6 +786,31 @@ int main(int argc, char** argv) {
 
   if (printAnswer) {
     pta.printPointsToInfo();
+  }
+}
+
+int main(int argc, char** argv) {
+  galois::SharedMemSys G;
+  LonestarStart(argc, argv, name, desc, url);
+
+  unsigned numThreads = galois::getActiveThreads();
+
+  // depending on serial or concurrent, create the correct class and pass it
+  // into the run harness which takes care of the rest
+  if (!useSerial) {
+    galois::gInfo("-------- Parallel version: ", numThreads, " threads.");
+    galois::gInfo("Note correctness of this version is relative to the serial "
+                  "version.");
+    
+    PTAConcurrent p;
+    runPTA(p);
+  } else {
+    galois::gInfo("-------- Sequential version.");
+    galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
+                  "best performance; its current setting may not be the best for "
+                  "your input and may actually degrade performance.");
+    PTASerial p;
+    runPTA(p);
   }
 
   return 0;

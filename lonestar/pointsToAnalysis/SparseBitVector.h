@@ -795,9 +795,8 @@ struct SparseBitVector {
    * @tparam VectorTy vector type that supports push_back
    * @returns Vector with all set bits
    */
-  template<typename VectorTy>
-  VectorTy getAllSetBits() const {
-    VectorTy setBits;
+  std::vector<unsigned> getAllSetBits() const {
+    std::vector<unsigned> setBits;
 
     // loop through all words in the bitvector and get their set bits
     for (Node* curPtr = head; curPtr != nullptr; curPtr = curPtr->_next) {
@@ -814,7 +813,7 @@ struct SparseBitVector {
    * @param prefix A string to append to the set bit numbers
    */
   void print(std::ostream& out, std::string prefix = std::string("")) const {
-    std::vector<unsigned> setBits = getAllSetBits<std::vector<unsigned>>();
+    std::vector<unsigned> setBits = getAllSetBits();
     out << "Elements(" << setBits.size() << "): ";
 
     for (auto setBitNum : setBits) {
@@ -837,9 +836,6 @@ struct SparseBitVector {
     return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
   }
 };
-
-using ConcurrentSparseBitVector = internal::SparseBitVector<true>;
-using SerialSparseBitVector = internal::SparseBitVector<false>;
 
 } // end galois namespace
 
