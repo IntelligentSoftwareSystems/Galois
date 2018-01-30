@@ -86,8 +86,7 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()), 
-                                 cuda_ctx);
+        InitializeGraph_allNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -120,8 +119,7 @@ struct FirstItr_ConnectedComp{
                              (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      FirstItr_ConnectedComp_cuda(*nodesWithEdges.begin(), 
-                                  *nodesWithEdges.end(), cuda_ctx);
+      FirstItr_ConnectedComp_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
@@ -182,9 +180,8 @@ struct ConnectedComp {
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        ConnectedComp_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                           __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        ConnectedComp_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -220,6 +217,8 @@ struct ConnectedComp {
     if (snode.comp_old > snode.comp_current) {
       snode.comp_old = snode.comp_current;
 
+      DGAccumulator_accum+= 1;
+
       for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
@@ -227,8 +226,6 @@ struct ConnectedComp {
         uint32_t old_dist = galois::atomicMin(dnode.comp_current, new_dist);
         if (old_dist > new_dist) bitset_comp_current.set(dst);
       }
-
-      DGAccumulator_accum+= 1;
     }
   }
 };
@@ -252,8 +249,8 @@ struct ConnectedCompSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum;
-      ConnectedCompSanityCheck_cuda(sum, cuda_ctx);
+      uint64_t sum;
+      ConnectedCompSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
     }
     else

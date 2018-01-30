@@ -52,10 +52,6 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<uint32_t> src_node("startNode", 
-                                             cll::desc("ID of the source node"), 
-                                             cll::init(0));
-
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
@@ -89,8 +85,7 @@ struct InitializeGraph {
     		galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
     		StatTimer_cuda.start();
 
-        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()), 
-                             cuda_ctx);
+        InitializeGraph_allNodes_cuda(cuda_ctx);
 
     		StatTimer_cuda.stop();
     	} else if (personality == CPU)
@@ -129,9 +124,8 @@ struct ConnectedComp {
         std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        ConnectedComp_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                           __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        ConnectedComp_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -194,8 +188,8 @@ struct ConnectedCompSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum;
-      ConnectedCompSanityCheck_cuda(sum, cuda_ctx);
+      uint64_t sum;
+      ConnectedCompSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
     }
     else
