@@ -916,10 +916,19 @@ class PTA {
    */
   void printPointsToInfo() {
     std::string prefix = "v";
-    for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
-      std::cerr << prefix << ii - pointsToResult.begin() << ": ";
-      unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
-      pointsToResult[repr].print(std::cerr, prefix);
+
+    if (!useSerial) {
+      for (auto ii = cPointsToResult.begin(); ii != cPointsToResult.end(); ++ii) {
+        std::cerr << prefix << ii - cPointsToResult.begin() << ": ";
+        unsigned repr = ocd.getFinalRepresentative(ii - cPointsToResult.begin());
+        cPointsToResult[repr].print(std::cerr, prefix);
+      }
+    } else {
+      for (auto ii = pointsToResult.begin(); ii != pointsToResult.end(); ++ii) {
+        std::cerr << prefix << ii - pointsToResult.begin() << ": ";
+        unsigned repr = ocd.getFinalRepresentative(ii - pointsToResult.begin());
+        pointsToResult[repr].print(std::cerr, prefix);
+      }
     }
   }
 }; // end class PTA
