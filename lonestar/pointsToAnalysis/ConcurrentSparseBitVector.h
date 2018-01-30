@@ -64,8 +64,8 @@ struct ConcurrentSparseBitVector {
      */
     Node(unsigned base) {
       _base = base;
-      _bitVector.store(0);
-      _next.store(nullptr);
+      _bitVector = 0;
+      _next = nullptr;
     }
 
     /**
@@ -79,9 +79,9 @@ struct ConcurrentSparseBitVector {
       // set bit at offset
       unsigned toStore = 0;
       toStore |= ((WORD)1 << offset);
-      _bitVector.store(toStore);
+      _bitVector = toStore;
 
-      _next.store(nullptr);
+      _next = nullptr;
     }
 
     
@@ -163,8 +163,8 @@ struct ConcurrentSparseBitVector {
         new Node(0); // TODO don't use new, find better way
   
       newWord->_base = _base;
-      newWord->_bitVector.store(_bitVector);
-      newWord->_next.store(nullptr);
+      newWord->_bitVector = _bitVector;
+      newWord->_next = nullptr;
   
       return newWord;
     }
@@ -332,14 +332,14 @@ struct ConcurrentSparseBitVector {
    * Default constructor = nullptr
    */
   ConcurrentSparseBitVector() {
-    head.store(nullptr);
+    head = nullptr;
   }
 
   /**
    * Initialize by setting head to nullptr
    */
   void init() {
-    head.store(nullptr);
+    head = nullptr;
   }
 
   /**
@@ -394,7 +394,7 @@ struct ConcurrentSparseBitVector {
             new Node(baseWord, offsetIntoWord);
         // note at this point curPtr is the next element in the list that
         // the new one we create should point to
-        (newWord->_next).store(curPtr);
+        (newWord->_next) = curPtr;
 
         // attempt a compare and swap: if it fails, that means the list was
         // altered, so go back to beginning of this loop to check again
@@ -537,7 +537,7 @@ struct ConcurrentSparseBitVector {
           // ptrone
           Node* newWord = ptrTwo->clone();
           // newWord comes before our current word
-          (newWord->_next).store(ptrOne); 
+          (newWord->_next) = ptrOne; 
 
           if (prev) {
             if (!std::atomic_compare_exchange_weak(&(prev->_next), &ptrOne, 
@@ -547,6 +547,7 @@ struct ConcurrentSparseBitVector {
               delete newWord;
               continue;
             } 
+            prev = newWord;
           } else {
             if (!std::atomic_compare_exchange_weak(&head, &ptrOne, newWord)) {
               // if it fails, return to the top; ptrOne has new value
@@ -604,9 +605,7 @@ struct ConcurrentSparseBitVector {
   unsigned count() const {
     unsigned nbits = 0;
 
-    for (Node* ptr = head; 
-         ptr; 
-         ptr = (ptr->_next)) {
+    for (Node* ptr = head; ptr; ptr = (ptr->_next)) {
       nbits += ptr->count();
     }
 
