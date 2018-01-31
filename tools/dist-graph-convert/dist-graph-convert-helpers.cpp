@@ -46,6 +46,7 @@ std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
 
     int nodesRead; 
     MPI_Get_count(&readStatus, MPI_UINT32_T, &nodesRead);
+    GALOIS_ASSERT(nodesRead != MPI_UNDEFINED, "Nodes read is MPI_UNDEFINED");
     numToRead -= nodesRead;
     numRead += nodesRead;
     readPosition += nodesRead * sizeof(uint32_t);
@@ -344,8 +345,8 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::BufferedGraph<void> mpiGraph;
-  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+  galois::graphs::BufferedGraph<void> bufGraph;
+  bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
   size_t numNodesToRead = nodesToRead.second - nodesToRead.first;
@@ -357,11 +358,11 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     [&] (uint32_t gID) {
       size_t vectorIndex = gID - nodesToRead.first;
 
-      uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
-      uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+      uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+      uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
 
       for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-        uint32_t edgeDest = mpiGraph.edgeDestination(i);
+        uint32_t edgeDest = bufGraph.edgeDestination(i);
         if (edgeDest != gID) {
           nonDupSets[vectorIndex].insert(edgeDest);
         }
@@ -574,6 +575,8 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
     
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     nodesToWrite -= itemsWritten;
     totalWritten += itemsWritten;
     nodeIndexOffset += itemsWritten * sizeof(uint64_t);
@@ -600,6 +603,8 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
 
       int itemsWritten;
       MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+      GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                    "itemsWritten is MPI_UNDEFINED");
       numToWrite -= itemsWritten;
       totalWritten += itemsWritten;
       edgeDestOffset += sizeof(uint32_t) * itemsWritten;
@@ -624,6 +629,8 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
 
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     numToWrite -= itemsWritten;
     totalWritten += itemsWritten;
     edgeDestOffset += sizeof(uint32_t) * itemsWritten;
@@ -645,6 +652,8 @@ void writeEdgeDataData(MPI_File& gr, uint64_t edgeDataOffset,
                              toWrite, MPI_UINT32_T, &writeStatus));
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     numToWrite -= itemsWritten;
     numWritten += itemsWritten;
     edgeDataOffset += itemsWritten * sizeof(uint32_t);
