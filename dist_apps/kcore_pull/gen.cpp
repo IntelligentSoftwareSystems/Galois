@@ -93,14 +93,12 @@ struct DegreeCounting {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
   #ifdef __GALOIS_HET_CUDA__
-    // TODO calls all wrong
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_DegreeCounting_" + 
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      InitializeGraph2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                            cuda_ctx);
+      DegreeCounting_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -121,8 +119,7 @@ struct DegreeCounting {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    src_data.current_degree = std::distance(graph->edge_begin(src), 
-                                            graph->edge_end(src));
+    src_data.current_degree = std::distance(graph->edge_begin(src), graph->edge_end(src));
     bitset_current_degree.set(src);
 
     //// technically can use std::dist above, but this is more easily 
@@ -145,15 +142,13 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
 
-#ifdef __GALOIS_HET_CUDA__
+  #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      // TODO calls all wrong
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      InitializeGraph1_cuda(*(allNodes.begin()), *(allNodes.end()), 
-                            cuda_ctx);
+      InitializeGraph_allNodes_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -193,8 +188,18 @@ struct LiveUpdate {
     const auto& allNodes = _graph.allNodesRange();
     dga.reset();
 
-    // TODO GPU code
-
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_LiveUpdate_" + 
+                           (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      unsigned int __retval = 0;
+      LiveUpdate_allNodes_cuda(__retval, k_core_num, cuda_ctx);
+      dga += __retval;
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       LiveUpdate{ k_core_num, &_graph, dga },
@@ -224,7 +229,7 @@ struct LiveUpdate {
         DGAccumulator_accum += 1;
 
         // let neighbors pull from me next round
-        assert(sdata.pull_flag == false);
+        //assert(sdata.pull_flag == false);
         sdata.pull_flag = true;
       }
     } else {
@@ -255,6 +260,16 @@ struct KCore {
     do {
       _graph.set_num_iter(iterations);
 
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
+                             (_graph.get_run_identifier()));
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+        StatTimer_cuda.start();
+        KCore_nodesWithEdges_cuda(cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
+    #endif
       galois::do_all(
         galois::iterate(nodesWithEdges),
         KCore{ &_graph },
@@ -317,8 +332,8 @@ struct KCoreSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum = 0;
-      //KCoreSanityCheck_cuda(sum, cuda_ctx);
+      uint64_t sum = 0;
+      KCoreSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
     }
     else

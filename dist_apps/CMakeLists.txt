@@ -66,4 +66,4 @@ distApp(sssp_pull)
 distApp(sssp_push)
 
 distApp(kcore_push)
-distAppNoGPU(kcore_pull)
+distApp(kcore_pull)
