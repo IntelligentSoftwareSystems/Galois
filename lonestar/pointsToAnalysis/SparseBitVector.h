@@ -198,8 +198,9 @@ struct SparseBitVector {
      * @returns a pointer to a copy of this word without the preservation
      * of the linked list
      */
-    Node* clone() const {
-      Node* newWord = new Node(0); // TODO don't use new, find better way
+    Node* clone(galois::FixedSizeAllocator<Node>* nodeAllocator) const {
+      Node* newWord = nodeAllocator->allocate(1);
+      nodeAllocator->construct(newWord, 0);
   
       newWord->_base = _base;
       newWord->_bitVector = _bitVector;
@@ -369,25 +370,39 @@ struct SparseBitVector {
   // head of linked list
   NodeType head;
   // allocator of new nodes
-  galois::FixedSizeAllocator<Node>* wordAllocator;
+  galois::FixedSizeAllocator<Node>* nodeAllocator;
 
   /**
    * Default constructor = nullptrs
    */
   SparseBitVector() {
     head = nullptr;
-    wordAllocator = nullptr;
+    nodeAllocator = nullptr;
+  }
+
+  /**
+   * Free all nodes allocated with the node allocator
+   */
+  ~SparseBitVector() {
+    if (nodeAllocator) { // check to make sure nodeAllocator isn't null
+      while (head) {
+        Node* current = head;
+        head = current->_next;
+        nodeAllocator->destroy(current);
+        nodeAllocator->deallocate(current, 1);
+      }
+    }
   }
 
   /**
    * Initialize by setting head to nullptr and saving the word allocator.
    *
-   * @param _wordAllocator allocator object for nodes to use when creating
+   * @param _nodeAllocator allocator object for nodes to use when creating
    * a new linked list node
    */
-  void init(galois::FixedSizeAllocator<Node>* _wordAllocator) {
+  void init(galois::FixedSizeAllocator<Node>* _nodeAllocator) {
     head = nullptr;
-    wordAllocator = _wordAllocator;
+    nodeAllocator = _nodeAllocator;
   }
 
   /**
@@ -438,11 +453,12 @@ struct SparseBitVector {
       // else the base wasn't found; create and set, then rearrange linked list
       // accordingly
       } else {
-        // TODO use allocator
-        Node* newWord = new Node(baseWord, offsetIntoWord);
+        Node* newWord = nodeAllocator->allocate(1);
+        nodeAllocator->construct(newWord, baseWord, offsetIntoWord);
+
         // note at this point curPtr is the next element in the list that
         // the new one we create should point to
-        (newWord->_next) = curPtr;
+        newWord->_next = curPtr;
 
         // attempt a compare and swap: if it fails, that means the list was
         // altered, so go back to beginning of this loop to check again
@@ -453,8 +469,8 @@ struct SparseBitVector {
           } else {
             // if it fails, return to the top; current pointer has new value
             // that needs to be checked
-            // TODO allocator
-            delete newWord;
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
           }
         } else {
           if (std::atomic_compare_exchange_weak(&head, &curPtr, newWord)) {
@@ -462,8 +478,8 @@ struct SparseBitVector {
           } else {
             // if it fails, return to the top; current pointer has new value
             // that needs to be checked
-            // TODO allocator
-            delete newWord;
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
           }
         }
       }
@@ -503,8 +519,8 @@ struct SparseBitVector {
     // else the base wasn't found; create and set, then rearrange linked list
     // accordingly
     } else {
-      Node* newWord = wordAllocator->allocate(1);
-      wordAllocator->construct(newWord, baseWord, offsetIntoWord);
+      Node* newWord = nodeAllocator->allocate(1);
+      nodeAllocator->construct(newWord, baseWord, offsetIntoWord);
 
       // this should point to prev's next, prev should point to this
       if (prev) {
@@ -648,7 +664,7 @@ struct SparseBitVector {
         } else { // oneBase > twoBase
           // two has something we don't have; add it between prev and current
           // ptrone
-          Node* newWord = ptrTwo->clone();
+          Node* newWord = ptrTwo->clone(nodeAllocator);
           // newWord comes before our current word
           (newWord->_next) = ptrOne; 
 
@@ -657,14 +673,16 @@ struct SparseBitVector {
                                                   newWord)) {
               // if it fails, return to the top; ptrOne has new value
               // that needs to be checked
-              delete newWord;
+              nodeAllocator->destroy(newWord);
+              nodeAllocator->deallocate(newWord, 1);
               continue;
             } 
           } else {
             if (!std::atomic_compare_exchange_weak(&head, &ptrOne, newWord)) {
               // if it fails, return to the top; ptrOne has new value
               // that needs to be checked
-              delete newWord;
+              nodeAllocator->destroy(newWord);
+              nodeAllocator->deallocate(newWord, 1);
               continue;
             }
           }
@@ -680,7 +698,7 @@ struct SparseBitVector {
       // ptrOne = nullptr, but ptrTwo still has values; clone values
       // and attempt to add 
       while (ptrTwo) {
-        Node* newWord = ptrTwo->clone();
+        Node* newWord = ptrTwo->clone(nodeAllocator);
 
         // note ptrOne in below cases should be nullptr...
         if (prev) {
@@ -688,14 +706,16 @@ struct SparseBitVector {
                                                 newWord)) {
             // if it fails, return to the top; ptrOne has new value
             // that needs to be checked
-            delete newWord;
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
             break; // goes out to outermost while loop
           } 
         } else {
           if (!std::atomic_compare_exchange_weak(&head, &ptrOne, newWord)) {
             // if it fails, return to the top; ptrOne has new value
             // that needs to be checked
-            delete newWord;
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
             break; // goes out to outermost while loop
           }
         }
@@ -742,7 +762,7 @@ struct SparseBitVector {
       } else { // oneBase > twoBase
         // two has something we don't have; add it between prev and current
         // ptrone
-        Node* newWord = ptrTwo->clone();
+        Node* newWord = ptrTwo->clone(nodeAllocator);
         // newWord comes before our current word
         newWord->_next = ptrOne; 
 
@@ -762,7 +782,7 @@ struct SparseBitVector {
 
     // ptrOne = nullptr, but ptrTwo still has values; clone values and add 
     while (ptrTwo) {
-      Node* newWord = ptrTwo->clone();
+      Node* newWord = ptrTwo->clone(nodeAllocator);
 
       if (prev) {
         prev->_next = newWord;

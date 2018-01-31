@@ -510,10 +510,10 @@ class PTABase {
    * structures needed for the points-to algorithm.
    *
    * @param n Number of nodes in the constraint graph
-   * @param wordAllocator galois allocator object to allocate nodes in the
+   * @param nodeAllocator galois allocator object to allocate nodes in the
    * sparse bit vector
    */
-  void initialize(size_t n, NodeAllocator& wordAllocator) {
+  void initialize(size_t n, NodeAllocator& nodeAllocator) {
     numNodes = n;
 
     // initialize different constructs based on which version is being run
@@ -522,8 +522,8 @@ class PTABase {
 
     // initialize vectors
     for (unsigned i = 0; i < numNodes; i++) {
-      pointsToResult[i].init(&wordAllocator);
-      outgoingEdges[i].init(&wordAllocator);
+      pointsToResult[i].init(&nodeAllocator);
+      outgoingEdges[i].init(&nodeAllocator);
     }
 
     ocd.init();
@@ -770,9 +770,9 @@ class PTAConcurrent : public PTABase<true> {
  * Method from running PTA. 
  */
 template <typename PTAClass, typename Alloc>
-void runPTA(PTAClass& pta, Alloc wordAllocator) {
+void runPTA(PTAClass& pta, Alloc nodeAllocator) {
   size_t numNodes = pta.readConstraints(input.c_str());
-  pta.initialize(numNodes, wordAllocator);
+  pta.initialize(numNodes, nodeAllocator);
 
   galois::StatTimer T; // main timer
 
@@ -809,16 +809,16 @@ int main(int argc, char** argv) {
     
     PTAConcurrent p;
     galois::FixedSizeAllocator<typename galois::SparseBitVector<true>::Node> 
-      wordAllocator;
-    runPTA(p, wordAllocator);
+      nodeAllocator;
+    runPTA(p, nodeAllocator);
   } else {
     galois::gInfo("-------- Sequential version.");
     galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
                   "best performance; its current setting may not be the best for "
                   "your input and may actually degrade performance.");
     PTASerial p;
-    galois::FixedSizeAllocator<typename galois::SparseBitVector<false>::Node> wordAllocator;
-    runPTA(p, wordAllocator);
+    galois::FixedSizeAllocator<typename galois::SparseBitVector<false>::Node> nodeAllocator;
+    runPTA(p, nodeAllocator);
   }
 
   return 0;
