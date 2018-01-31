@@ -373,6 +373,9 @@ struct Gr2CGr : public Conversion {
   }
 };
 
+/**
+ * TODO documentation
+ */
 struct Gr2RGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
@@ -389,7 +392,6 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 1: remap sources
     ////////////////////////////////////////////////////////////////////////////
-
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
@@ -422,6 +424,7 @@ struct Gr2RGr : public Conversion {
     std::vector<uint32_t> node2NewNode = readRandomNodeMapping(nodeMapBinary,
                                                                localNodeBegin,
                                                                localNumNodes);
+
     // TODO refactor
     std::vector<uint32_t> remappedEdges;
     GALOIS_ASSERT(localNumNodes == localSrcToDest.size());
@@ -525,7 +528,22 @@ int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   galois::setActiveThreads(threadsToUse);
 
-  // TODO make sure MPI is initialized (this may use MPI write)
+  // make sure MPI is initialized (do it if not)
+  int initCheck;
+  MPI_Initialized(&initCheck);
+
+  bool manualInit = false;
+
+  if (!initCheck) {
+    manualInit = true;
+
+    int initResult;
+    MPICheck(MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &initResult));
+
+    if (initResult < MPI_THREAD_MULTIPLE) {
+      GALOIS_DIE("unable to init mpi with thread multiple");
+    }
+  }
 
   switch (convertMode) {
     case edgelist2gr: 
@@ -543,6 +561,12 @@ int main(int argc, char** argv) {
     case nodemap2binary:
       convert<Nodemap2Binary>(); break;
     default: abort();
+
   }
+
+  if (manualInit) {
+    MPI_Finalize();
+  }
+
   return 0;
 }
