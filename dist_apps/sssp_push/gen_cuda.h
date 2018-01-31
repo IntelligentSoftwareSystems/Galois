@@ -20,6 +20,7 @@ void batch_set_mirror_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned 
 void batch_set_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_add_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
+void batch_reset_node_dist_current_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v);
 
 void get_bitset_dist_old_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute);
 void bitset_dist_old_reset_cuda(struct CUDA_Context* ctx);
@@ -38,6 +39,7 @@ void batch_set_mirror_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from
 void batch_set_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_add_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
+void batch_reset_node_dist_old_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v);
 
 void FirstItr_SSSP_cuda(unsigned int __begin, unsigned int __end, struct CUDA_Context* ctx);
 void FirstItr_SSSP_allNodes_cuda(struct CUDA_Context* ctx);

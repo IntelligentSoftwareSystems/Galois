@@ -122,6 +122,10 @@ void batch_min_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id, uint6
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->delta, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_delta_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, float v) {
+	reset_data_field<float>(&ctx->delta, begin, end, v);
+}
+
 void get_bitset_nout_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
 	ctx->nout.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
@@ -196,6 +200,10 @@ void batch_add_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64
 
 void batch_min_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->nout, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_reset_node_nout_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->nout, begin, end, v);
 }
 
 void get_bitset_residual_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
@@ -274,6 +282,10 @@ void batch_min_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id, ui
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->residual, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_residual_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, float v) {
+	reset_data_field<float>(&ctx->residual, begin, end, v);
+}
+
 void get_bitset_value_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
 	ctx->value.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
@@ -348,5 +360,9 @@ void batch_add_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id, uint6
 
 void batch_min_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, float *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<float, sharedMaster, minOp>(ctx, &ctx->value, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_reset_node_value_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, float v) {
+	reset_data_field<float>(&ctx->value, begin, end, v);
 }
 

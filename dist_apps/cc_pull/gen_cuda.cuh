@@ -110,3 +110,7 @@ void batch_min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->comp_current, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_comp_current_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->comp_current, begin, end, v);
+}
+

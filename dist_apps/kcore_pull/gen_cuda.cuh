@@ -122,6 +122,10 @@ void batch_min_node_current_degree_cuda(struct CUDA_Context* ctx, unsigned from_
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->current_degree, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_current_degree_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->current_degree, begin, end, v);
+}
+
 void get_bitset_flag_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
 	ctx->flag.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
@@ -196,6 +200,10 @@ void batch_add_node_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64
 
 void batch_min_node_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint8_t *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<uint8_t, sharedMaster, minOp>(ctx, &ctx->flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_reset_node_flag_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint8_t v) {
+	reset_data_field<uint8_t>(&ctx->flag, begin, end, v);
 }
 
 void get_bitset_pull_flag_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
@@ -274,6 +282,10 @@ void batch_min_node_pull_flag_cuda(struct CUDA_Context* ctx, unsigned from_id, u
 	batch_set_shared_field<uint8_t, sharedMaster, minOp>(ctx, &ctx->pull_flag, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_pull_flag_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint8_t v) {
+	reset_data_field<uint8_t>(&ctx->pull_flag, begin, end, v);
+}
+
 void get_bitset_trim_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
 	ctx->trim.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
@@ -348,5 +360,9 @@ void batch_add_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64
 
 void batch_min_node_trim_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->trim, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_reset_node_trim_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->trim, begin, end, v);
 }
 

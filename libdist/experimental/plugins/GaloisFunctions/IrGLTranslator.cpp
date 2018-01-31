@@ -751,7 +751,8 @@ public:
       header << "void batch_set_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
       header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
       header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
-      header << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n\n";
+      header << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+      header << "void batch_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, " << var.second << " v);\n\n";
     }
     for (auto& kernel : HostKernelsToArgumentsMap) {
       header << "void " << kernel.first << "_cuda(";
@@ -881,6 +882,9 @@ public:
       cuheader << "}\n\n";
       cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedMaster, minOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, " << var.second << " v) {\n";
+      cuheader << "\treset_data_field<" << var.second << ">(&ctx->" << var.first << ", begin, end, v);\n";
       cuheader << "}\n\n";
     }
     cuheader.close();

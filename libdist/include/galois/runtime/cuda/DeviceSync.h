@@ -169,6 +169,16 @@ __global__ void batch_max_subset(index_type subset_size, const unsigned int * __
 	}
 }
 
+template<typename DataType>
+__global__ void batch_reset(DataType * __restrict__ array, index_type begin, index_type end, DataType val) {
+	unsigned tid = TID_1D;
+	unsigned nthreads = TOTAL_THREADS_1D;
+	index_type src_end = end;
+	for (index_type src = begin + tid; src < src_end; src += nthreads) {
+    array[src] = val;
+	}
+}
+
 __global__ void batch_get_subset_bitset(index_type subset_size, const unsigned int * __restrict__ indices, DynamicBitset * __restrict__ is_subset_updated, DynamicBitset * __restrict__ is_array_updated) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
@@ -274,6 +284,16 @@ void reset_bitset_field(struct CUDA_Context_Field<DataType> *field,
                                            vec_begin, vec_end, 
                                            test1, bit_index1, mask1, 
                                            test2, bit_index2, mask2);
+}
+
+template<typename DataType>
+void reset_data_field(struct CUDA_Context_Field<DataType> *field, 
+                        size_t begin, size_t end, DataType val) {
+	dim3 blocks;
+	dim3 threads;
+	kernel_sizing(blocks, threads);
+
+  batch_reset<DataType> <<<blocks, threads>>>(field->data.gpu_wr_ptr(), (index_type) begin, (index_type) end, val);
 }
 
 void get_offsets_from_bitset(index_type bitset_size, unsigned int * __restrict__ offsets, DynamicBitset * __restrict__ bitset, size_t * __restrict__ num_set_bits) {

@@ -203,6 +203,15 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    if (personality == GPU_CUDA) {\
+      batch_reset_node_##fieldname##_cuda(cuda_ctx, begin, end, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       add_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -255,6 +264,10 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
     return false;\
   }\
 \
@@ -314,6 +327,15 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    if (personality == GPU_CUDA) {\
+      batch_reset_node_##fieldname##_cuda(cuda_ctx, begin, end, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       add_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -366,6 +388,10 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
     return false;\
   }\
 \
@@ -429,6 +455,10 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -477,6 +507,10 @@ struct Reduce_set_##fieldname {\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
     return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
@@ -534,6 +568,10 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -582,6 +620,10 @@ struct Reduce_set_##fieldname {\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
     return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
@@ -643,6 +685,10 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -690,6 +736,10 @@ struct Reduce_min_##fieldname {\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
     return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
@@ -747,6 +797,10 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -794,6 +848,10 @@ struct Reduce_min_##fieldname {\
 \
   static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
     return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
   }\
 \
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
@@ -848,6 +906,10 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
       return true;\
     }\
     assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
     return false;\
   }\
 \
@@ -902,6 +964,10 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
   }\
@@ -942,6 +1008,10 @@ struct Reduce_pair_wise_add_array_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::addArray(node.fieldname, y); return true;}\
   }\
@@ -976,6 +1046,10 @@ struct Reduce_pair_wise_add_array_single_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned, ValTy*) {\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
     return false;\
   }\
 \

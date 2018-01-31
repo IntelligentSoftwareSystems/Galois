@@ -4528,17 +4528,24 @@ public:
     auto mirrorRanges = getMirrorRanges();
     for(auto r : mirrorRanges){
         assert(r.first < r.second);
-        galois::do_all(galois::iterate(r.first, r.second),
-            [&](uint32_t lid) {
-              #ifdef __GALOIS_HET_OPENCL__
-              CLNodeDataWrapper d = clGraph.getDataW(lid);
-              FnTy::reset(lid, d);
-              #else
-              FnTy::reset(lid, getData(lid));
-              #endif
-            },
-            galois::no_stats(),
-            galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
+
+        // GPU call
+        bool batch_succeeded = FnTy::reset_batch(r.first, r.second - 1);
+
+        // CPU always enters this block
+        if (!batch_succeeded) {
+          galois::do_all(galois::iterate(r.first, r.second),
+              [&](uint32_t lid) {
+                #ifdef __GALOIS_HET_OPENCL__
+                CLNodeDataWrapper d = clGraph.getDataW(lid);
+                FnTy::reset(lid, d);
+                #else
+                FnTy::reset(lid, getData(lid));
+                #endif
+              },
+              galois::no_stats(),
+              galois::loopname(get_run_identifier("RESET:MIRRORS").c_str()));
+        }
     }
   }
 };

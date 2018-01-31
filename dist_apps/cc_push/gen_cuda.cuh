@@ -114,6 +114,10 @@ void batch_min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->comp_current, from_id, bitset_comm, offsets, v, v_size, data_mode);
 }
 
+void batch_reset_node_comp_current_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->comp_current, begin, end, v);
+}
+
 void get_bitset_comp_old_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {
 	ctx->comp_old.is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);
 }
@@ -188,5 +192,9 @@ void batch_add_node_comp_old_cuda(struct CUDA_Context* ctx, unsigned from_id, ui
 
 void batch_min_node_comp_old_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, minOp>(ctx, &ctx->comp_old, from_id, bitset_comm, offsets, v, v_size, data_mode);
+}
+
+void batch_reset_node_comp_old_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
+	reset_data_field<uint32_t>(&ctx->comp_old, begin, end, v);
 }
 

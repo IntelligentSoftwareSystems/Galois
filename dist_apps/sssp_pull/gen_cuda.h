@@ -20,6 +20,7 @@ void batch_set_mirror_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned 
 void batch_set_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_add_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
 void batch_min_node_dist_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, uint32_t *v, size_t v_size, DataCommMode data_mode);
+void batch_reset_node_dist_current_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v);
 
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end, const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context* ctx);
 void InitializeGraph_allNodes_cuda(const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context* ctx);

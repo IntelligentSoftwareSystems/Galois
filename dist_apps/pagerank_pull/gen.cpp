@@ -231,11 +231,7 @@ struct PageRank {
       dga.reset();
       PageRank_delta::go(_graph, dga);
       // reset residual on mirrors
-      #ifdef __GALOIS_HET_CUDA__
-      // FIXME
-      #else
       _graph.reset_mirrorField<Reduce_add_residual>();
-      #endif
 
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
