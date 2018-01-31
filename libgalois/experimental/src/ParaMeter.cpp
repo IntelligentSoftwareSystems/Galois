@@ -28,6 +28,7 @@
 
 #include "galois/runtime/Executor_ParaMeter.h"
 #include "galois/gIO.h"
+#include "galois/substrate/EnvCheck.h"
 
 
 
@@ -49,7 +50,7 @@ struct StatsFileManager {
     close ();
   }
 
-  static void getTimeStampedName(const std::string& statsFileName) {
+  static void getTimeStampedName(std::string& statsFileName) {
 
     constexpr unsigned FNAME_SIZE = 256;
 
@@ -67,7 +68,8 @@ struct StatsFileManager {
       init = true;
 
       if (!galois::substrate::EnvCheck(PARAM_FILE_ENV_VAR, statsFileName)) {
-        statsFileName = "ParaMeter-Stats.csv";
+        // statsFileName = "ParaMeter-Stats.csv";
+        getTimeStampedName(statsFileName);
       }
 
       statsFH = fopen(statsFileName.c_str(), "w");

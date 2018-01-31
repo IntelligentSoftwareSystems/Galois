@@ -120,10 +120,12 @@ FILE* getStatsFile (void);
 void closeStatsFile (void);
 
 
-template <typename T, typename PTcont=galois::PerThreadBag<T> >
+template <typename T>
 class ParaMeterFIFO_WL {
 
 protected:
+
+  using PTcont = galois::PerThreadVector<T>;
 
   PTcont* curr;
   PTcont* next;
@@ -152,28 +154,70 @@ public:
     std::swap(curr, next);
     next->clear_all_parallel();
   }
-};
 
-template <typename T>
-class ParaMeterRAND_WL: public ParaMeterFIFO_WL<T, galois::PerThreadVector<T> > {
-  using Base = ParaMeterFIFO_WL<T, galois::PerThreadVector<T> >;
-
-  using RNG = std::mt19937;
-
-  galois::substrate::PerThreadStorage<RNG> pt_rng;
-
-public:
-
-  void pushNext(const T& item) {
-    auto& lwl = Base::next->get();
-    lwl.push_back(item);
-
-    std::uniform_int_distribution<size_t> dist(0, lwl.size());
-    size_t rindex = dist(
-
+  bool empty(void) const {
+    return next->empty_all();
   }
 };
 
+template <typename T>
+class ParaMeterRAND_WL: public ParaMeterFIFO_WL<T> {
+  using Base = ParaMeterFIFO_WL<T>;
+
+public:
+
+  auto iterateCurr(void) {
+    galois::on_each(
+        [&] (int tid, int numT) {
+          auto& lwl = Base::curr->get();
+
+          std::mt19937 rng(std::random_device()());
+          std::shuffle(lwl.begin(), lwl.end(), rng);
+
+        });
+
+    return galois::runtime::makeLocalRange(*Base::curr);
+  }
+};
+
+template <typename T>
+class ParaMeterLIFO_WL: public ParaMeterFIFO_WL<T> {
+  using Base = ParaMeterFIFO_WL<T>;
+
+public:
+
+  auto iterateCurr(void) {
+
+    // TODO: use reverse iterator instead of std::reverse
+    galois::on_each(
+        [&] (int tid, int numT) {
+          auto& lwl = Base::curr->get();
+          std::reverse(lwl.begin(), lwl.end());
+
+        });
+
+    return galois::runtime::makeLocalRange(*Base::curr);
+  }
+};
+
+enum class SchedType {
+  FIFO, RAND, LIFO;
+};
+
+template <typename T, SchedType SCHED>
+struct ChooseWL {};
+
+template <typename T> ChooseWL<T, SchedType::FIFO> {
+  using type = ParaMeterFIFO_WL<T>;
+};
+
+template <typename T> ChooseWL<T, SchedType::LIFO> {
+  using type = ParaMeterLIFO_WL<T>;
+};
+
+template <typename T> ChooseWL<T, SchedType::RAND> {
+  using type = ParaMeterRAND_WL<T>;
+};
 
 
 template<class T, class FunctionTy, class ArgsTy>
@@ -186,6 +230,8 @@ class ParaMeterExecutor {
   static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+
+  using WL = typename ChooseWL<T, typename WorkListTy::SCHEDULE>::type;
 
   struct IterationContext {
     T val;
@@ -204,6 +250,13 @@ class ParaMeterExecutor {
   };
 
 
+
+private:
+  WL m_wl;
+  FunctionTy m_func;
+  const char* loopname;
+  FILE* m_statsFile;
+  FixedSizeAllocator<IterationContext> m_iterAlloc;
 
   IterationContext* newIteration(const T& val) {
     IterationContext* it = m_iterAlloc.allocate(1);
@@ -238,27 +291,6 @@ class ParaMeterExecutor {
 
     return numLocks;
   }
-
-public:
-  static_assert(!needsBreak, "not supported by this executor");
-
-  ParaMeterExecutor(FunctionTy& f, const ArgsTy& args): 
-    m_func(f),
-    loopname(get_by_supertype<loopname_tag>(args).value),
-    m_statsFile(getStatsFile())
-  {}
-
-  // called serially once
-  template<typename RangeTy>
-  void init(const RangeTy& range) {
-    execute(range);
-  }
-
-  // called once on each thread followed by a barrier
-  template<typename RangeTy>
-  void initThread(const RangeTy& range) const {}
-
-  void operator() (void) {}
 
 private:
   template <typename R>
@@ -342,18 +374,27 @@ private:
 
     closeStatsFile();
   }
+public:
+  static_assert(!needsBreak, "not supported by this executor");
 
-private:
-  WorkList m_wl;
-  FunctionTy m_func;
-  const char* loopname;
-  FILE* m_statsFile;
-  FixedSizeAllocator<IterationContext> m_iterAlloc;
-};
+  ParaMeterExecutor(FunctionTy& f, const ArgsTy& args): 
+    m_func(f),
+    loopname(get_by_supertype<loopname_tag>(args).value),
+    m_statsFile(getStatsFile())
+  {}
 
+  // called serially once
+  template<typename RangeTy>
+  void init(const RangeTy& range) {
+    execute(range);
+  }
 
-enum class SchedType {
-  FIFO, RAND, LIFO;
+  // called once on each thread followed by a barrier
+  template<typename RangeTy>
+  void initThread(const RangeTy& range) const {}
+
+  void operator() (void) {}
+
 };
 
 
@@ -373,6 +414,7 @@ public:
 
   typedef T value_type;
 
+  constexpr static const SchedType SCHEDULE = SCHED;
 
   using fifo = ParaMeter<T, ParaMeter::SchedType::FIFO>;
   using random = ParaMeter<T, ParaMeter::SchedType::RAND>;
