@@ -199,8 +199,7 @@ struct SparseBitVector {
      * of the linked list
      */
     Node* clone() const {
-      Node* newWord = 
-        new Node(0); // TODO don't use new, find better way
+      Node* newWord = new Node(0); // TODO don't use new, find better way
   
       newWord->_base = _base;
       newWord->_bitVector = _bitVector;
@@ -369,22 +368,26 @@ struct SparseBitVector {
                                              Node*>::type;
   // head of linked list
   NodeType head;
-
   // allocator of new nodes
-  galois::FixedSizeAllocator<Node> wordAllocator;
+  galois::FixedSizeAllocator<Node>* wordAllocator;
 
   /**
-   * Default constructor = nullptr
+   * Default constructor = nullptrs
    */
   SparseBitVector() {
     head = nullptr;
+    wordAllocator = nullptr;
   }
 
   /**
-   * Initialize by setting head to nullptr
+   * Initialize by setting head to nullptr and saving the word allocator.
+   *
+   * @param _wordAllocator allocator object for nodes to use when creating
+   * a new linked list node
    */
-  void init() {
+  void init(galois::FixedSizeAllocator<Node>* _wordAllocator) {
     head = nullptr;
+    wordAllocator = _wordAllocator;
   }
 
   /**
@@ -500,8 +503,8 @@ struct SparseBitVector {
     // else the base wasn't found; create and set, then rearrange linked list
     // accordingly
     } else {
-      Node* newWord = wordAllocator.allocate(1);
-      wordAllocator.construct(newWord, baseWord, offsetIntoWord);
+      Node* newWord = wordAllocator->allocate(1);
+      wordAllocator->construct(newWord, baseWord, offsetIntoWord);
 
       // this should point to prev's next, prev should point to this
       if (prev) {

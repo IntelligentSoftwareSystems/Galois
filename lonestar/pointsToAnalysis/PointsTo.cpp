@@ -145,6 +145,8 @@ class PTABase {
   using PointsToInfo = std::vector<SparseBitVector>;
   using EdgeVector = std::vector<SparseBitVector>;
 
+  using NodeAllocator = galois::FixedSizeAllocator<typename SparseBitVector::Node>;
+
  protected:
   PointsToInfo pointsToResult; // pointsTo results for nodes
   EdgeVector outgoingEdges; // holds outgoing edges of a node
@@ -501,15 +503,17 @@ class PTABase {
   }
 
  public:
-  PTABase(void) : ocd(*this) { }
+  PTABase() : ocd(*this) { }
 
   /**
    * Given the number of nodes in the constraint graph, initialize the
    * structures needed for the points-to algorithm.
    *
    * @param n Number of nodes in the constraint graph
+   * @param wordAllocator galois allocator object to allocate nodes in the
+   * sparse bit vector
    */
-  void initialize(size_t n) {
+  void initialize(size_t n, NodeAllocator& wordAllocator) {
     numNodes = n;
 
     // initialize different constructs based on which version is being run
@@ -518,8 +522,8 @@ class PTABase {
 
     // initialize vectors
     for (unsigned i = 0; i < numNodes; i++) {
-      pointsToResult[i].init();
-      outgoingEdges[i].init();
+      pointsToResult[i].init(&wordAllocator);
+      outgoingEdges[i].init(&wordAllocator);
     }
 
     ocd.init();
@@ -765,10 +769,10 @@ class PTAConcurrent : public PTABase<true> {
 /**
  * Method from running PTA. 
  */
-template <typename PTAClass>
-void runPTA(PTAClass& pta) {
+template <typename PTAClass, typename Alloc>
+void runPTA(PTAClass& pta, Alloc wordAllocator) {
   size_t numNodes = pta.readConstraints(input.c_str());
-  pta.initialize(numNodes);
+  pta.initialize(numNodes, wordAllocator);
 
   galois::StatTimer T; // main timer
 
@@ -795,6 +799,7 @@ int main(int argc, char** argv) {
 
   unsigned numThreads = galois::getActiveThreads();
 
+
   // depending on serial or concurrent, create the correct class and pass it
   // into the run harness which takes care of the rest
   if (!useSerial) {
@@ -803,14 +808,17 @@ int main(int argc, char** argv) {
                   "version.");
     
     PTAConcurrent p;
-    runPTA(p);
+    galois::FixedSizeAllocator<typename galois::SparseBitVector<true>::Node> 
+      wordAllocator;
+    runPTA(p, wordAllocator);
   } else {
     galois::gInfo("-------- Sequential version.");
     galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
                   "best performance; its current setting may not be the best for "
                   "your input and may actually degrade performance.");
     PTASerial p;
-    runPTA(p);
+    galois::FixedSizeAllocator<typename galois::SparseBitVector<false>::Node> wordAllocator;
+    runPTA(p, wordAllocator);
   }
 
   return 0;
