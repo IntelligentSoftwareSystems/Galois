@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -28,10 +28,6 @@
 #define __USE_BFS__ // GPU always uses BFS
 
 constexpr static const char* const REGION_NAME = "BC";
-
-/******************************************************************************/
-/* Sync code/calls was manually written, not compiler generated */
-/******************************************************************************/
 
 #include <iostream>
 #include <limits>
@@ -59,7 +55,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned long long> startSource("startNode", // not uint64_t due to a bug in llvm cl 
+static cll::opt<unsigned long long> startSource("startNode",// not uint64_t due to a bug in llvm cl 
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));
@@ -67,11 +63,13 @@ static cll::opt<unsigned int> numberOfSources("numOfSources",
                                 cll::desc("Number of sources to use for "
                                           "betweeness-centraility"),
                                 cll::init(0));
+static cll::opt<bool> randomSources("randomSources", 
+                                cll::desc("Use random sources."),
+                                cll::init(false));
 
 /******************************************************************************/
 /* Graph structure declarations */
 /******************************************************************************/
-
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 static uint64_t current_src_node = 0;
 
@@ -541,14 +539,14 @@ struct NumShortestPathsChanges {
     if (src_data.current_length != local_infinity) {
       // decrement predecessor by trim then reset
       if (src_data.trim > 0) {
-#ifdef DEBUG_ASSERTIONS_BC
+        #ifdef DEBUG_ASSERTIONS_BC
         // TODO use a Galois assert here? this is extremely important
         if (src_data.trim > src_data.num_predecessors) {
           printf("src is %lu trim is %u, pred is %u\n", graph->L2G(src),
                  src_data.trim.load(), src_data.num_predecessors.load());
           assert(src_data.trim <= src_data.num_predecessors); 
         }
-#endif
+        #endif
 
         src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
         src_data.trim = 0;
@@ -668,7 +666,6 @@ struct NumShortestPaths {
       // can do a num succ check for optimization
       //if (src_data.propogation_flag && src_data.num_successors > 0) {
       if (src_data.propogation_flag) {
-
         // set flag so that it doesn't propogate its info more than once
         src_data.propogation_flag = false;
 
@@ -1220,17 +1217,23 @@ int main(int argc, char** argv) {
 
   #endif
 
-  // random num generate for sources
-  std::minstd_rand0 r_generator;
-  r_generator.seed(100);
-  std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->globalSize() - 1);
+  if (!randomSources) {
+    for (unsigned i = 0; i < numberOfSources; i++) {
+      random_sources.insert(i);
+    }
+  } else {
+    // random num generate for sources
+    std::minstd_rand0 r_generator;
+    r_generator.seed(100);
+    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->globalSize() - 1);
+  
+    if (numberOfSources != 0) {
+      // uncomment this to have srcnodeid included as well
+      //random_sources.insert(startSource);
 
-  if (numberOfSources != 0) {
-    // uncomment this to have srcnodeid included as well
-    //random_sources.insert(startSource);
-
-    while (random_sources.size() < numberOfSources) {
-      random_sources.insert(r_dist(r_generator));
+      while (random_sources.size() < numberOfSources) {
+        random_sources.insert(r_dist(r_generator));
+      }
     }
   }
 
@@ -1241,12 +1244,6 @@ int main(int argc, char** argv) {
     counter++;
   }
   #endif
-
-  random_sources.clear();
-
-  for (unsigned i = 0; i < numberOfSources; i++) {
-    random_sources.insert(i);
-  }
 
   bitset_to_add.resize(h_graph->size());
   bitset_to_add_float.resize(h_graph->size());
