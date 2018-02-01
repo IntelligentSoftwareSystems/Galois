@@ -25,10 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-// TODO rebuild gpu code (new things added)
-
-
-#define __USE_BFS__
+#define __USE_BFS__ // GPU always uses BFS
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -62,7 +59,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC"),
                                 cll::init(false));
-static cll::opt<unsigned int> startSource("startNode", 
+static cll::opt<unsigned long long> startSource("startNode", // not uint64_t due to a bug in llvm cl 
                                 cll::desc("Starting source node used for "
                                           "betweeness-centrality"),
                                 cll::init(0));
@@ -146,7 +143,7 @@ struct InitializeGraph {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+        InitializeGraph_allNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -164,7 +161,6 @@ struct InitializeGraph {
     NodeData& src_data = graph->getData(src);
 
     src_data.betweeness_centrality = 0;
-
     src_data.num_shortest_paths = 0;
     src_data.num_successors = 0;
     src_data.num_predecessors = 0;
@@ -202,10 +198,7 @@ struct InitializeIteration {
 
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeIteration_cuda(
-          *allNodes.begin(), *allNodes.end(),
-          infinity, current_src_node, cuda_ctx
-        );
+        InitializeIteration_allNodes_cuda(infinity, current_src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -294,15 +287,12 @@ struct FirstIterationSSSP {
     for (auto current_edge : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(current_edge);
 
-      if (src == dst) {
-        continue;
-      }
-
       auto& dst_data = graph->getData(dst);
 
       #ifndef __USE_BFS__
-      uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                              src_data.current_length + 1;
+      auto edge_weight = graph->getEdgeData(current_edge);
+      // make edge_weight non-zero: zero edge-weights create infinite shortest paths
+      uint32_t new_dist = edge_weight + 1 + src_data.current_length;
       #else
       // BFS 
       uint32_t new_dist = 1 + src_data.current_length;
@@ -345,8 +335,8 @@ struct SSSP {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -399,15 +389,12 @@ struct SSSP {
       for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
 
-        if (src == dst) {
-          continue;
-        }
-
         auto& dst_data = graph->getData(dst);
 
         #ifndef __USE_BFS__
-        uint32_t new_dist = graph->getEdgeData(current_edge) + 
-                            src_data.current_length + 1;
+        auto edge_weight = graph->getEdgeData(current_edge);
+        // make edge_weight non-zero: zero edge-weights create infinite shortest paths
+        uint32_t new_dist = edge_weight + 1 + src_data.current_length;
         #else
         uint32_t new_dist = 1 + src_data.current_length;
         #endif
@@ -443,8 +430,7 @@ struct PredAndSucc {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        PredAndSucc_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                         infinity, cuda_ctx);
+        PredAndSucc_nodesWithEdges_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -480,15 +466,12 @@ struct PredAndSucc {
     if (src_data.current_length != local_infinity) {
       for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
-        // ignore self loops
-        if (dst == src) {
-          continue;
-        }
 
         auto& dst_data = graph->getData(dst);
 
         #ifndef __USE_BFS__
         // SSSP
+        // make edge_weight non-zero: zero edge-weights create infinite shortest paths
         uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
         #else
         // BFS
@@ -533,12 +516,7 @@ struct NumShortestPathsChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        // TODO local infinity needed
-        NumShortestPathsChanges_cuda(
-          *nodesWithEdges.begin(),
-          *nodesWithEdges.end(),
-          cuda_ctx
-        );
+        NumShortestPathsChanges_nodesWithEdges_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -563,12 +541,14 @@ struct NumShortestPathsChanges {
     if (src_data.current_length != local_infinity) {
       // decrement predecessor by trim then reset
       if (src_data.trim > 0) {
+#ifdef DEBUG_ASSERTIONS_BC
         // TODO use a Galois assert here? this is extremely important
         if (src_data.trim > src_data.num_predecessors) {
           printf("src is %lu trim is %u, pred is %u\n", graph->L2G(src),
                  src_data.trim.load(), src_data.num_predecessors.load());
           assert(src_data.trim <= src_data.num_predecessors); 
         }
+#endif
 
         src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
         src_data.trim = 0;
@@ -576,7 +556,7 @@ struct NumShortestPathsChanges {
         // if I hit 0 predecessors after trim, set the flag to true (i.e. says
         // I need to propogate my value)
         if (src_data.num_predecessors == 0) {
-          assert(!src_data.propogation_flag);
+          //assert(!src_data.propogation_flag);
           src_data.propogation_flag = true;
         }
       }
@@ -629,9 +609,8 @@ struct NumShortestPaths {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        NumShortestPaths_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                              __retval, infinity, cuda_ctx);
+        uint32_t __retval = 0;
+        NumShortestPaths_nodesWithEdges_cuda(__retval, infinity, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -690,23 +669,17 @@ struct NumShortestPaths {
       //if (src_data.propogation_flag && src_data.num_successors > 0) {
       if (src_data.propogation_flag) {
 
+        // set flag so that it doesn't propogate its info more than once
+        src_data.propogation_flag = false;
+
         for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
-
-          // ignore self loops
-          if (dst == src) {
-            continue;
-          }
-          
-          // ignore "shortest path" to source
-          if (graph->L2G(dst) == local_current_src_node) {
-            continue;
-          }
 
           auto& dst_data = graph->getData(dst);
 
           #ifndef __USE_BFS__
           // SSSP
+          // make edge_weight non-zero: zero edge-weights create infinite shortest paths
           uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
           #else
           // BFS
@@ -715,7 +688,7 @@ struct NumShortestPaths {
 
           uint32_t paths_to_add = src_data.num_shortest_paths;
 
-          assert(paths_to_add >= 1);
+          //assert(paths_to_add >= 1);
 
           if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
@@ -729,9 +702,6 @@ struct NumShortestPaths {
             DGAccumulator_accum += 1;
           }
         }
-
-        // set flag so that it doesn't propogate its info more than once
-        src_data.propogation_flag = false;
       }
     }
   }
@@ -753,6 +723,19 @@ struct PropagationFlagUpdate {
 
     // TODO gpu code
 
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      //std::string impl_str("CUDA_DO_ALL_IMPL_PropagationFlagUpdate");
+      std::string impl_str(
+        //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PropagationFlagUpdate")
+        "CUDA_DO_ALL_IMPL_PropagationFlagUpdate"
+      );
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      PropagationFlagUpdate_nodesWithEdges_cuda(infinity, cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       PropagationFlagUpdate(infinity, &_graph), 
@@ -771,14 +754,14 @@ struct PropagationFlagUpdate {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    assert(src_data.num_predecessors == 0);
+    //assert(src_data.num_predecessors == 0);
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors == 0) {
         src_data.propogation_flag = true;
         bitset_propogation_flag.set(src);
       } else {
-        assert(src_data.propogation_flag == false);
+        //assert(src_data.propogation_flag == false);
       }
     }
   }
@@ -806,11 +789,7 @@ struct DependencyPropChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        DependencyPropChanges_cuda(
-          *nodesWithEdges.begin(), 
-          *nodesWithEdges.end(),
-          infinity, cuda_ctx
-        );
+        DependencyPropChanges_nodesWithEdges_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -844,18 +823,18 @@ struct DependencyPropChanges {
 
       if (src_data.num_successors == 0 && src_data.propogation_flag) {
         // has had dependency back-propogated; reset the flag
-        assert(src_data.trim == 0);
+        //assert(src_data.trim == 0);
         src_data.propogation_flag = false;
         bitset_propogation_flag.set(src);
       } else if (src_data.trim > 0) {
         // decrement successor by trim then reset
-        assert(src_data.trim <= src_data.num_successors);
+        //assert(src_data.trim <= src_data.num_successors);
 
         src_data.num_successors = src_data.num_successors - src_data.trim;
         src_data.trim = 0;
 
         if (src_data.num_successors == 0) {
-          assert(!src_data.propogation_flag);
+          //assert(!src_data.propogation_flag);
           src_data.propogation_flag = true;
           bitset_propogation_flag.set(src);
         }
@@ -900,11 +879,8 @@ struct DependencyPropagation {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        DependencyPropagation_cuda(
-          *nodesWithEdges.begin(), *nodesWithEdges.end(),
-          __retval, infinity, current_src_node, cuda_ctx
-        );
+        uint32_t __retval = 0;
+        DependencyPropagation_nodesWithEdges_cuda(__retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -957,23 +933,19 @@ struct DependencyPropagation {
     // + do not redo computation if src has no successors left
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors > 0) {
-        if (graph->getGID(src) != local_current_src_node) {
+        if (graph->getGID(src) == local_current_src_node) {
+          // this is source of this iteration's of sssp/bfs; reset num succ to 0
+          // so loop isn't entered again
+          src_data.num_successors = 0;
+        } else {
           for (auto current_edge : graph->edges(src)) {
             GNode dst = graph->getEdgeDst(current_edge);
-
-            // ignore self loops
-            if (dst == src) {
-              continue;
-            }
-
-            if (graph->L2G(dst) == local_current_src_node) {
-              continue;
-            }
 
             auto& dst_data = graph->getData(dst);
 
             #ifndef __USE_BFS__
             // SSSP
+            // make edge_weight non-zero: zero edge-weights create infinite shortest paths
             uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
             #else
             // BFS
@@ -988,14 +960,14 @@ struct DependencyPropagation {
                 // increment my trim for later use to decrement successor
                 galois::atomicAdd(src_data.trim, (unsigned int)1);
 
-                assert(src_data.num_shortest_paths != 0);
-                assert(dst_data.num_shortest_paths != 0);
+                //assert(src_data.num_shortest_paths != 0);
+                //assert(dst_data.num_shortest_paths != 0);
 
                 // update my to_add_float (which is later used to update dependency)
-                galois::add(src_data.to_add_float, 
-                (((float)src_data.num_shortest_paths / 
-                      (float)dst_data.num_shortest_paths) * 
-                 (float)(1.0 + dst_data.dependency)));
+                float contrib = src_data.num_shortest_paths;
+                contrib /= dst_data.num_shortest_paths;
+                contrib *= (1.0 + dst_data.dependency);
+                galois::add(src_data.to_add_float, contrib);
 
                 bitset_trim.set(src);
                 bitset_to_add_float.set(src);
@@ -1004,10 +976,6 @@ struct DependencyPropagation {
               }
             }
           }
-        } else {
-          // this is source of this iteration's of sssp/bfs; reset num succ to 0
-          // so loop isn't entered again
-          src_data.num_successors = 0;
         }
       }
     }
@@ -1099,7 +1067,7 @@ struct BC {
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+        BC_nodesWithEdges_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
