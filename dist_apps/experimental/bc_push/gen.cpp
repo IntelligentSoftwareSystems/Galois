@@ -1091,89 +1091,64 @@ struct BC {
 /* Sanity check */
 /******************************************************************************/
 
-//struct Sanity {
-//  Graph* graph;
-//
-//  static float current_max;
-//  static float current_min;
-//
-//  galois::DGAccumulator<float>& DGAccumulator_max;
-//  galois::DGAccumulator<float>& DGAccumulator_min;
-//  galois::DGAccumulator<double>& DGAccumulator_sum;
-//
-//  Sanity(Graph* _graph,
-//      galois::DGAccumulator<float>& _DGAccumulator_max,
-//      galois::DGAccumulator<float>& _DGAccumulator_min,
-//      galois::DGAccumulator<double>& _DGAccumulator_sum
-//  ) : 
-//    graph(_graph),
-//    DGAccumulator_max(_DGAccumulator_max),
-//    DGAccumulator_min(_DGAccumulator_min),
-//    DGAccumulator_sum(_DGAccumulator_sum) {}
-//
-//  void static go(Graph& _graph,
-//    galois::DGAccumulator<float>& DGA_max,
-//    galois::DGAccumulator<float>& DGA_min,
-//    galois::DGAccumulator<double>& DGA_sum
-//  ) {
-//  #ifdef __GALOIS_HET_CUDA__
-//    if (personality == GPU_CUDA) {
-//      // TODO currently no GPU support for sanity check operator
-//      fprintf(stderr, "Warning: No GPU support for sanity check; might get "
-//                      "wrong results.\n");
-//    }
-//  #endif
-//
-//    DGA_max.reset();
-//    DGA_min.reset();
-//    DGA_sum.reset();
-//
-//    galois::do_all(galois::iterate(_graph.allNodesRange().begin(), 
-//                                   _graph.allNodesRange().end()),
-//                   Sanity(
-//                     &_graph,
-//                     DGA_max,
-//                     DGA_min,
-//                     DGA_sum
-//                   ), 
-//                   galois::no_stats(),
-//                   galois::loopname("Sanity"));
-//
-//    DGA_max = current_max;
-//    DGA_min = current_min;
-//
-//    float max_bc = DGA_max.reduce_max();
-//    float min_bc = DGA_min.reduce_min();
-//    double bc_sum = DGA_sum.reduce();
-//
-//    // Only node 0 will print data
-//    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-//      printf("Max BC is %f\n", max_bc);
-//      printf("Min BC is %f\n", min_bc);
-//      printf("BC sum is %f\n", bc_sum);
-//    }
-//  }
-//  
-//  /* Gets the max, min rank from all owned nodes and
-//   * also the sum of ranks */
-//  void operator()(GNode src) const {
-//    NodeData& sdata = graph->getData(src);
-//
-//    if (graph->isOwned(graph->getGID(src))) {
-//      if (current_max < sdata.betweeness_centrality) {
-//        current_max = sdata.betweeness_centrality;
-//      }
-//
-//      if (current_min > sdata.betweeness_centrality) {
-//        current_min = sdata.betweeness_centrality;
-//      }
-//
-//      DGAccumulator_sum += sdata.betweeness_centrality;
-//    }
-//  }
-//};
-//float Sanity::current_max = 0;
-//float Sanity::current_min = std::numeric_limits<float>::max() / 4;
+struct Sanity {
+  Graph* graph;
+
+  galois::DGReduceMax<float>& DGAccumulator_max;
+  galois::DGReduceMin<float>& DGAccumulator_min;
+  galois::DGAccumulator<double>& DGAccumulator_sum;
+
+  Sanity(Graph* _graph, galois::DGReduceMax<float>& _DGAccumulator_max,
+         galois::DGReduceMin<float>& _DGAccumulator_min,
+         galois::DGAccumulator<double>& _DGAccumulator_sum) 
+    : graph(_graph),
+      DGAccumulator_max(_DGAccumulator_max),
+      DGAccumulator_min(_DGAccumulator_min),
+      DGAccumulator_sum(_DGAccumulator_sum) {}
+
+  void static go(Graph& _graph, galois::DGReduceMax<float>& DGA_max,
+                 galois::DGReduceMin<float>& DGA_min,
+                 galois::DGAccumulator<double>& DGA_sum) {
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      // TODO
+    }
+    #endif
+
+    DGA_max.reset();
+    DGA_min.reset();
+    DGA_sum.reset();
+
+    galois::do_all(
+      galois::iterate(_graph.masterNodesRange().begin(), 
+                      _graph.masterNodesRange().end()),
+      Sanity( &_graph, DGA_max, DGA_min, DGA_sum), 
+      galois::no_stats(),
+      galois::loopname("Sanity")
+    );
+
+    float max_bc = DGA_max.reduce();
+    float min_bc = DGA_min.reduce();
+    double bc_sum = DGA_sum.reduce();
+
+    // Only node 0 will print data
+    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      galois::gPrint("Max BC is ", max_bc, "\n");
+      galois::gPrint("Min BC is ", min_bc, "\n");
+      galois::gPrint("BC sum is ", bc_sum, "\n");
+    }
+  }
+  
+  /* Gets the max, min rank from all owned nodes and
+   * also the sum of ranks */
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+
+    DGAccumulator_max.update(sdata.betweeness_centrality);
+    DGAccumulator_min.update(sdata.betweeness_centrality);
+    DGAccumulator_sum += sdata.betweeness_centrality;
+  }
+};
 
 /******************************************************************************/
 /* Main method for running */
@@ -1267,9 +1242,9 @@ int main(int argc, char** argv) {
   galois::DGAccumulator<uint32_t> dga;
 
   // sanity dg accumulators
-  //galois::DGAccumulator<float> dga_max;
-  //galois::DGAccumulator<float> dga_min;
-  //galois::DGAccumulator<double> dga_sum;
+  galois::DGReduceMax<float> dga_max;
+  galois::DGReduceMin<float> dga_min;
+  galois::DGAccumulator<double> dga_sum;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
@@ -1280,15 +1255,7 @@ int main(int argc, char** argv) {
       BC::go(*h_graph, dga);
     StatTimer_main.stop();
 
-    //Sanity::current_max = 0;
-    //Sanity::current_min = std::numeric_limits<float>::max() / 4;
-
-    //Sanity::go(
-    //  *h_graph,
-    //  dga_max,
-    //  dga_min,
-    //  dga_sum
-    //);
+    Sanity::go(*h_graph, dga_max, dga_min, dga_sum);
 
     // re-init graph for next run
     if ((run + 1) != numRuns) {
