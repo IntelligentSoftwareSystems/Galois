@@ -397,6 +397,8 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 1: remap sources
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Source remap phase entering\n");
+
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
     Uint64Pair edgesToRead;
@@ -409,6 +411,7 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 2: remap destinations
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Dest remap phase entering\n");
 
     // make each host remap a relatively even number of destination nodes by
     // assigning/sending (this is the point of the transpose edge list above)
@@ -417,6 +420,11 @@ struct Gr2RGr : public Conversion {
   
     PairVoVUint32 receivedEdgeInfo =
         sendAndReceiveAssignedEdges<EdgeTy>(hostToNodes, localEdges);
+
+    // at this point, localEdges has been freed
+
+    galois::gPrint("[", hostID, "] Received destinations to remap\n");
+
     VoVUint32 localSrcToDest = receivedEdgeInfo.first;
     VoVUint32 localSrcToData = receivedEdgeInfo.second;
 
@@ -429,6 +437,8 @@ struct Gr2RGr : public Conversion {
     std::vector<uint32_t> node2NewNode = readRandomNodeMapping(nodeMapBinary,
                                                                localNodeBegin,
                                                                localNumNodes);
+
+    galois::gPrint("[", hostID, "] Remapping destinations now\n");
 
     // TODO refactor
     std::vector<uint32_t> remappedEdges;
@@ -459,6 +469,7 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 3: write now randomized-node edges to new file
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Entering writing phase\n");
 
     // we have the randomized nodes in remappedEdges; execution proceeds
     // like the other converters from this point on
