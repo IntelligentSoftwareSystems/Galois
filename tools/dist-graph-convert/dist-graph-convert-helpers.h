@@ -412,6 +412,22 @@ std::vector<Uint64Pair> getChunkToHostMapping(
       const std::vector<Uint64Pair>& chunkToNode);
 
 /**
+ * Given a chunk edge count prefix sum and the chunk to node mapping, assign
+ * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even 
+ * number of edges and return the node mapping. LINEAR SEARCH VERSION.
+ *
+ * @param chunkCountsPrefixSum prefix sum of edges in chunks
+ * @param chunkToNode mapping of chunk to nodes the chunk has
+ * @returns a host to node mapping where each host very roughly has a balanced
+ * number of edges
+ */
+// TODO this crashes for some reason
+std::vector<Uint64Pair> getChunkToHostMappingLinear(
+      const std::vector<uint64_t>& chunkCountsPrefixSum,
+      const std::vector<Uint64Pair>& chunkToNode);
+
+
+/**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
  * an even number of edges. 
  *
