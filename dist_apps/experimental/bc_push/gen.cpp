@@ -26,6 +26,7 @@
  */
 
 #define __USE_BFS__ // GPU always uses BFS
+#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -231,9 +232,11 @@ struct InitializeIteration {
     src_data.num_successors = 0;
     src_data.dependency = 0;
 
-    assert(src_data.trim.load() == 0);
-    assert(src_data.to_add.load() == 0);
-    assert(src_data.to_add_float == 0);
+    #ifdef BCDEBUG
+    GALOIS_ASSERT(src_data.trim.load() == 0);
+    GALOIS_ASSERT(src_data.to_add.load() == 0);
+    GALOIS_ASSERT(src_data.to_add_float == 0);
+    #endif
   }
 };
 
@@ -539,12 +542,12 @@ struct NumShortestPathsChanges {
     if (src_data.current_length != local_infinity) {
       // decrement predecessor by trim then reset
       if (src_data.trim > 0) {
-        #ifdef DEBUG_ASSERTIONS_BC
+        #ifdef BCDEBUG
         // TODO use a Galois assert here? this is extremely important
         if (src_data.trim > src_data.num_predecessors) {
           printf("src is %lu trim is %u, pred is %u\n", graph->L2G(src),
                  src_data.trim.load(), src_data.num_predecessors.load());
-          assert(src_data.trim <= src_data.num_predecessors); 
+          GALOIS_ASSERT(src_data.trim <= src_data.num_predecessors); 
         }
         #endif
 
@@ -685,7 +688,9 @@ struct NumShortestPaths {
 
           uint32_t paths_to_add = src_data.num_shortest_paths;
 
-          //assert(paths_to_add >= 1);
+          #ifdef BCDEBUG
+          GALOIS_ASSERT(paths_to_add >= 1);
+          #endif
 
           if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
@@ -751,14 +756,18 @@ struct PropagationFlagUpdate {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    //assert(src_data.num_predecessors == 0);
+    #ifdef BCDEBUG
+    GALOIS_ASSERT(src_data.num_predecessors == 0);
+    #endif
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors == 0) {
         src_data.propogation_flag = true;
         bitset_propogation_flag.set(src);
       } else {
-        //assert(src_data.propogation_flag == false);
+        #ifdef BCDEBUG
+        GALOIS_ASSERT(src_data.propogation_flag == false);
+        #endif
       }
     }
   }
@@ -820,18 +829,24 @@ struct DependencyPropChanges {
 
       if (src_data.num_successors == 0 && src_data.propogation_flag) {
         // has had dependency back-propogated; reset the flag
-        //assert(src_data.trim == 0);
+        #ifdef BCDEBUG
+        GALOIS_ASSERT(src_data.trim == 0);
+        #endif
         src_data.propogation_flag = false;
         bitset_propogation_flag.set(src);
       } else if (src_data.trim > 0) {
         // decrement successor by trim then reset
-        //assert(src_data.trim <= src_data.num_successors);
+        #ifdef BCDEBUG
+        GALOIS_ASSERT(src_data.trim <= src_data.num_successors);
+        #endif
 
         src_data.num_successors = src_data.num_successors - src_data.trim;
         src_data.trim = 0;
 
         if (src_data.num_successors == 0) {
-          //assert(!src_data.propogation_flag);
+          #ifdef BCDEBUG
+          GALOIS_ASSERT(!src_data.propogation_flag);
+          #endif
           src_data.propogation_flag = true;
           bitset_propogation_flag.set(src);
         }
@@ -957,8 +972,10 @@ struct DependencyPropagation {
                 // increment my trim for later use to decrement successor
                 galois::atomicAdd(src_data.trim, (unsigned int)1);
 
-                //assert(src_data.num_shortest_paths != 0);
-                //assert(dst_data.num_shortest_paths != 0);
+                #ifdef BCDEBUG
+                GALOIS_ASSERT(src_data.num_shortest_paths != 0);
+                GALOIS_ASSERT(dst_data.num_shortest_paths != 0);
+                #endif
 
                 // update my to_add_float (which is later used to update dependency)
                 float contrib = src_data.num_shortest_paths;
