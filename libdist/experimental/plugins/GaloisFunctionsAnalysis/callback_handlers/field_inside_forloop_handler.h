@@ -48,7 +48,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
         
         for(auto i : info->edgeData_map) {
           for(auto j : i.second) {
-            //llvm::outs() << j.VAR_NAME << "\n";
+            llvm::outs() << "Fields inside edge loop: " << j.VAR_NAME << "\n";
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
@@ -100,8 +100,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
               auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
 
-              //memExpr->dump();
               if(memExpr){
+                //memExpr->dumpColor();
                 auto pType = memExpr->getType();
                 auto templatePtr = pType->getAs<TemplateSpecializationType>();
                 string Ty;
@@ -234,6 +234,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op || ifMinOp || whileCAS_op) {
+                  llvm::outs() << " syncFlags_entry : " << field_entry.FIELD_NAME << "\n";
                   SyncFlag_entry syncFlags_entry;
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.VAR_NAME = j.VAR_NAME;
@@ -334,7 +335,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(atomicAdd_op){
-                  //llvm::outs() << "NOT  INSIDE  FIELD \n";
                   //atomicAdd_op->dump();
                   string reduceOP = "add";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
@@ -346,8 +346,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(atomicMin_op){
-                  //llvm::outs() << "NOT  INSIDE  FIELD \n";
-                  //atomicAdd_op->dump();
                   string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 

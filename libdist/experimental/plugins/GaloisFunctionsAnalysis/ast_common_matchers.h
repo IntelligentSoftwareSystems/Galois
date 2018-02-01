@@ -85,7 +85,9 @@ static const TypeMatcher AnyType = anything();
                                                           hasDescendant(memberExpr(hasDescendant(memberExpr().bind("getData_memExpr_graph"))))
                                                      ).bind("calleeName_getEdgeDst");
 
-      StatementMatcher EdgeForLoopMatcher = forStmt(hasLoopInit(anyOf(
+      /***Supports both Old style for and new range based for  ******/
+      StatementMatcher EdgeForLoopMatcher = anyOf(forStmt(
+                                                 hasLoopInit(anyOf(
                                                   declStmt(declCountIs(2),
                                                               containsDeclaration(0, InitDeclMatcher),
                                                               containsDeclaration(1, EndDeclMatcher)),
@@ -104,8 +106,13 @@ static const TypeMatcher AnyType = anything();
                                                                 hasArgument(0, declRefExpr(to(
                                                                       varDecl())))))),
                                               hasDescendant(getDataCallExprMatcher_insideFor)
-                                              ).bind("forLoopName");
-
+                                              ).bind("forLoopName"),
+                                              forRangeStmt(hasDescendant(getDataCallExprMatcher_insideFor)).bind("forLoopName")
+                                              );
+#if 0
+      /***** New forRangeStmt *********/
+      StatementMatcher EdgeForLoopMatcher = forRangeStmt(hasDescendant(getDataCallExprMatcher_insideFor)).bind("forLoopName"); 
+#endif
       /****************************************************************************************************************/
 
 

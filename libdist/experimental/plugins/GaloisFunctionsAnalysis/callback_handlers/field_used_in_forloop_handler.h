@@ -180,9 +180,10 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   break;
                 }
                 else if(atomicAdd_op){
-                  llvm::outs() << "INSIDE  FIELD \n";
+                  llvm::outs() <<"--------------------> " << j.VAR_NAME << " : " << j.FIELD_NAME << "\n";
                   atomicAdd_op->dump();
-                  string reduceOP = "{ galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
+                  //string reduceOP = "{ galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "pair_wise_add_array";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
                   string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";

@@ -46,12 +46,13 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
         clang::PrintingPolicy Policy(LangOpts);
 
         auto forVector = Results.Nodes.getNodeAs<clang::CXXBindTemporaryExpr>("forVector");
-        //forVector->dump();
+        forVector->dump();
         for(auto i : info->getData_map) {
           for(auto j : i.second) {
             //llvm::outs() << j.VAR_NAME << "\n";
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
+            string str_assignment_complexVec = "equalOpComplexVec_" + j.VAR_NAME+ "_" + i.first;
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
@@ -85,7 +86,11 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
+              auto complex_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_complexVec);
               auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
+
+              //if(assignmentOP_vec)
+                //assignmentOP_vec->dumpColor();
 
 
               /**Figure out variable type to set the reset value **/
@@ -97,7 +102,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 string Ty;
                 /** It is complex type e.g atomic<int>**/
                 if (templatePtr) {
-                  templatePtr->getArg(0).getAsType().dump();
+                  //templatePtr->getArg(0).getAsType().dump();
                   Ty = templatePtr->getArg(0).getAsType().getAsString();
                   //llvm::outs() << "TYPE FOUND ---->" << Ty << "\n";
                 }
@@ -113,15 +118,6 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 }
                 string Num_ele = "0";
                 bool is_vector = is_vector_type(Ty, Type, Num_ele);
-                /*
-                std::regex re("([(a-z)]+)[[:space:]&]*(\[[0-9][[:d:]]*\])");
-                std::smatch sm;
-                if(std::regex_match(Ty, sm, re)) {
-                   Type = "std::vector<" + sm[1].str() + ">";
-                   Num_ele = sm[2].str();
-                   Num_ele.erase(0,1);
-                   Num_ele.erase(Num_ele.size() -1);
-                }*/
 
                 ReductionOps_entry reduceOP_entry;
                 NodeField_entry field_entry;
@@ -172,10 +168,6 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   break;
                 }
 
-                if(assignmentOP_vec) {
-                  //assignmentOP_vec->dump();
-                }
-
                 if(minusOP){
                   string str_minusOP;
                   llvm::raw_string_ostream s(str_minusOP);
@@ -183,7 +175,6 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   minusOP->printPretty(s, 0, Policy);
                   str_minusOP = s.str();
                   minusOP->dumpColor();
-                  llvm::outs() << "____________________________> : " << s.str() << "\n";
 
                   SourceLocation minusOP_loc = minusOP->getSourceRange().getBegin();
                   unsigned len_rm = minusOP->getSourceRange().getEnd().getRawEncoding() -  minusOP_loc.getRawEncoding() + 1;
@@ -224,7 +215,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   syncFlags_entry.FIELD_NAME = new_field_name;
                   syncFlags_entry.RW = "write";
                   syncFlags_entry.AT = "writeSource";
-                    syncFlags_entry.IS_RESET = true;
+                  syncFlags_entry.IS_RESET = true;
                   if(!syncFlags_entry_exists(syncFlags_entry, info->syncFlags_map[i.first])){
                     info->syncFlags_map[i.first].push_back(syncFlags_entry);
                   }
@@ -284,7 +275,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   syncFlags_entry.FIELD_NAME = field_entry.FIELD_NAME;
                   syncFlags_entry.RW = "write";
                   syncFlags_entry.AT = "writeSource";
-                  if(assignmentOP)
+                  if(assignmentOP || assignmentOP_vec)
                     syncFlags_entry.IS_RESET = true;
                   else
                     syncFlags_entry.IS_RESET = false;
