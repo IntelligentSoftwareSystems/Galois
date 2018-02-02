@@ -48,6 +48,12 @@ static cll::opt<unsigned int> numSourcesPerRound("numRoundSources",
 static cll::opt<unsigned int> totalNumSources("numOfSources", 
                                 cll::desc("Total number of sources to do BC"),
                                 cll::init(0));
+static cll::opt<bool> useSingleSource("singleSource", 
+                                      cll::desc("Use a single source."),
+                                      cll::init(false));
+static cll::opt<unsigned long long> startNode("startNode", 
+                                      cll::desc("Single source start node."),
+                                      cll::init(0));
 static cll::opt<unsigned int> vIndex("index", 
                                 cll::desc("DEBUG: Index to print for dist/short "
                                           "paths"),
@@ -58,12 +64,6 @@ static cll::opt<bool> outputDistPaths("outputDistPaths",
                                                 "/short path counts instead"),
                                       cll::init(false),
                                       cll::Hidden);
-
-static cll::opt<bool> dummy("wrong", 
-                            cll::desc("DEBUGxxxxxxxxxxxxxxx Output min distance"
-                                      "/short path counts instead"),
-                            cll::init(false),
-                            cll::Hidden);
 
 /******************************************************************************/
 /* Graph structure declarations */
@@ -724,6 +724,11 @@ int main(int argc, char** argv) {
     totalNumSources = hg->globalSize();
   }
 
+  if (useSingleSource) {
+    totalNumSources = 1;
+    numSourcesPerRound = 1;
+  }
+
   // bitset initialization
   vbitset_minDistances.resize(numSourcesPerRound);
   vbitset_shortestPathToAdd.resize(numSourcesPerRound);
@@ -755,6 +760,10 @@ int main(int argc, char** argv) {
         numSourcesPerRound = totalNumSources - offset;
         galois::gDebug("Num sources for this final round will be ", 
                        numSourcesPerRound);
+      }
+
+      if (useSingleSource) {
+        offset = startNode;
       }
 
       InitializeIteration(*hg, offset);
