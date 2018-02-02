@@ -44,7 +44,7 @@ namespace cll = llvm::cl;
 
 static cll::opt<unsigned int> numSourcesPerRound("numRoundSources", 
                                 cll::desc("Number of sources to use for APSP"),
-                                cll::init(10));
+                                cll::init(1));
 static cll::opt<unsigned int> totalNumSources("numOfSources", 
                                 cll::desc("Total number of sources to do BC"),
                                 cll::init(0));
@@ -75,12 +75,12 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 struct NodeData {
   galois::gstl::Vector<uint32_t> oldMinDistances; // min distances in a previous round
   galois::gstl::Vector<uint32_t> minDistances; // current min distances for each source
-  galois::gstl::Vector<uint32_t> shortestPathToAdd; // shortest path accumulator
-  galois::gstl::Vector<uint32_t> shortestPathNumbers; // actual shortest path number
+  galois::gstl::Vector<uint64_t> shortestPathToAdd; // shortest path accumulator
+  galois::gstl::Vector<uint64_t> shortestPathNumbers; // actual shortest path number
   galois::gstl::Vector<char> sentFlag; // marks if message has been sent for a source
 
   uint32_t APSPIndexToSend; // index that needs to be sent in a round
-  uint32_t shortPathValueToSend; // short path value that is sent in a round
+  uint64_t shortPathValueToSend; // short path value that is sent in a round
 
   // round numbers saved for determining when to send out back-prop messages
   galois::gstl::Vector<uint32_t> savedRoundNumbers; 
@@ -239,6 +239,12 @@ void ShortPathUpdate(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (cur_data.shortestPathToAdd[i] > 0) {
           cur_data.shortestPathNumbers[i] += cur_data.shortestPathToAdd[i];
+          if (cur_data.shortestPathNumbers[i] > 100000000) {
+            if (graph.isOwned(graph.L2G(curNode))) {
+              galois::gPrint("source ", graph.L2G(curNode), " path num ",
+                             cur_data.shortestPathNumbers[i], "\n");
+            }
+          }
         }
         cur_data.shortestPathToAdd[i] = 0;
       }

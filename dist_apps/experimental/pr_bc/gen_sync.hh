@@ -97,8 +97,8 @@ GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
 ////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
-                                                        uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint32_t);
+                                                        uint64_t);
+GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint64_t);
 GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
 
 ////////////////////////////////////////////////////////////////////////////////
