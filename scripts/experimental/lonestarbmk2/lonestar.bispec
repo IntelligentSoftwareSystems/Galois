@@ -15,6 +15,7 @@ gmetis USA-road-d.USA
 independentset rmat28-symmetric
 matrixcompletion yahoo-music
 mcm nothing
+pagerank22 twitter40
 pagerank-pull twitter40-transpose
 pagerank-push soc-livejournal
 preflowpush r4-2e26

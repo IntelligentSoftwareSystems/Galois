@@ -246,7 +246,7 @@ class PageRankPush(SharedMemApp):
 # for galois 2.2 version of pagerank
 class PageRank2Point2(SharedMemApp):
     relativeAppPath = "pagerank/pagerank"
-    benchmark = "pagerank"
+    benchmark = "pagerank22"
 
     def get_run_spec(self, bmkinput, config):
         """Adds transpose graph."""
