@@ -68,6 +68,7 @@ private:
   bool isTopological;
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
+  std::unordered_set<const Stmt *> elseStmts;
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
   std::stringstream declString, varDeclString, bodyString;
@@ -389,21 +390,57 @@ public:
     return traverse;
   }
 
-  virtual bool TraverseStmt(Stmt *S) {
-    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
-    if (traverse && S) {
-      if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
-        bodyString << "]),\n"; // end ForAll
-        bodyString << "),\n"; // end ClosureHint
-        // ASSUMPTION: no code after edge-loop
-        // FIXME: assert that there is no code after the edge-loop
-      } else if (isa<IfStmt>(S)) {
-        if (conditional > 0) {
-          bodyString << "]),\n"; // end If
-          --conditional;
-        }
+  virtual bool TraverseCXXForRangeStmt(CXXForRangeStmt* forStmt) {
+    assert(forStmt);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseCXXForRangeStmt(forStmt);
+    if (traverse) {
+      bodyString << "]),\n"; // end ForAll
+      bodyString << "),\n"; // end ClosureHint
+      // ASSUMPTION: no code after edge-loop
+      // FIXME: assert that there is no code after the edge-loop
+    }
+    return traverse;
+  }
+
+  virtual bool TraverseForStmt(ForStmt* forStmt) {
+    assert(forStmt);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseForStmt(forStmt);
+    if (traverse) {
+      bodyString << "]),\n"; // end ForAll
+      bodyString << "),\n"; // end ClosureHint
+      // ASSUMPTION: no code after edge-loop
+      // FIXME: assert that there is no code after the edge-loop
+    }
+    return traverse;
+  }
+
+  virtual bool TraverseIfStmt(IfStmt* ifStmt) {
+    assert(ifStmt);
+    const Stmt* elseStmt = ifStmt->getElse();
+    if (elseStmt) {
+      assert(elseStmts.find(elseStmt) == elseStmts.end());
+      elseStmts.insert(elseStmt);
+    }
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseIfStmt(ifStmt);
+    if (elseStmt) {
+      assert(elseStmts.find(elseStmt) == elseStmts.end());
+    }
+    if (traverse) {
+      if (conditional > 0) {
+        bodyString << "]),\n"; // end If
+        --conditional;
       }
     }
+    return traverse;
+  }
+
+  virtual bool TraverseStmt(Stmt *S) {
+    bool elseStmt = (elseStmts.find(S) != elseStmts.end());
+    if (elseStmt) {
+      bodyString << "],\n[\n"; // else of If
+      elseStmts.erase(S);
+    }
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
     return traverse;
   }
 
