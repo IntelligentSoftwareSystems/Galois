@@ -615,7 +615,7 @@ struct NumShortestPaths {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         uint32_t __retval = 0;
-        NumShortestPaths_nodesWithEdges_cuda(__retval, infinity, cuda_ctx);
+        NumShortestPaths_nodesWithEdges_cuda(__retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -961,7 +961,8 @@ struct DependencyPropagation {
           // this is source of this iteration's of sssp/bfs; reset num succ to 0
           // so loop isn't entered again
           src_data.num_successors = 0;
-        } else {
+        }
+        if (graph->getGID(src) != local_current_src_node) {
           for (auto current_edge : graph->edges(src)) {
             GNode dst = graph->getEdgeDst(current_edge);
 
@@ -1127,11 +1128,11 @@ struct Sanity {
 
   galois::DGReduceMax<float>& DGAccumulator_max;
   galois::DGReduceMin<float>& DGAccumulator_min;
-  galois::DGAccumulator<double>& DGAccumulator_sum;
+  galois::DGAccumulator<float>& DGAccumulator_sum;
 
   Sanity(Graph* _graph, galois::DGReduceMax<float>& _DGAccumulator_max,
          galois::DGReduceMin<float>& _DGAccumulator_min,
-         galois::DGAccumulator<double>& _DGAccumulator_sum) 
+         galois::DGAccumulator<float>& _DGAccumulator_sum) 
     : graph(_graph),
       DGAccumulator_max(_DGAccumulator_max),
       DGAccumulator_min(_DGAccumulator_min),
@@ -1139,7 +1140,7 @@ struct Sanity {
 
   void static go(Graph& _graph, galois::DGReduceMax<float>& DGA_max,
                  galois::DGReduceMin<float>& DGA_min,
-                 galois::DGAccumulator<double>& DGA_sum) {
+                 galois::DGAccumulator<float>& DGA_sum) {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       // TODO
@@ -1160,7 +1161,7 @@ struct Sanity {
 
     float max_bc = DGA_max.reduce();
     float min_bc = DGA_min.reduce();
-    double bc_sum = DGA_sum.reduce();
+    float bc_sum = DGA_sum.reduce();
 
     // Only node 0 will print data
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -1275,7 +1276,7 @@ int main(int argc, char** argv) {
   // sanity dg accumulators
   galois::DGReduceMax<float> dga_max;
   galois::DGReduceMin<float> dga_min;
-  galois::DGAccumulator<double> dga_sum;
+  galois::DGAccumulator<float> dga_sum;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BC::go run ", run, " called\n");
