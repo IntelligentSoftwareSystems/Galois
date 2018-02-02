@@ -512,6 +512,7 @@ public:
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
     while (conditional > 0) {
+      // ASSUMPTION: for loop is in If block, which does not have a corresponding Else block
       bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
       --conditional;
     }
@@ -545,6 +546,7 @@ public:
     }
     symbolTable.insert(variableName);
     while (conditional > 0) {
+      // ASSUMPTION: for loop is in If block, which does not have a corresponding Else block
       bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
       --conditional;
     }
