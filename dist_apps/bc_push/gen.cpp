@@ -25,7 +25,6 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-//#define __USE_BFS__ // GPU always uses BFS
 //#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
@@ -40,6 +39,7 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
+//#define __USE_BFS__ // also defined in gen_cuda.h
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
@@ -290,14 +290,12 @@ struct FirstIterationSSSP {
 
       auto& dst_data = graph->getData(dst);
 
+      auto edge_weight = 1;
       #ifndef __USE_BFS__
-      auto edge_weight = graph->getEdgeData(current_edge);
       // make edge_weight non-zero: zero edge-weights create infinite shortest paths
-      uint32_t new_dist = edge_weight + 1 + src_data.current_length;
-      #else
-      // BFS 
-      uint32_t new_dist = 1 + src_data.current_length;
+      edge_weight += graph->getEdgeData(current_edge);
       #endif
+      uint32_t new_dist = edge_weight + src_data.current_length;
 
       galois::atomicMin(dst_data.current_length, new_dist);
 
@@ -392,13 +390,12 @@ struct SSSP {
 
         auto& dst_data = graph->getData(dst);
 
+        auto edge_weight = 1;
         #ifndef __USE_BFS__
-        auto edge_weight = graph->getEdgeData(current_edge);
         // make edge_weight non-zero: zero edge-weights create infinite shortest paths
-        uint32_t new_dist = edge_weight + 1 + src_data.current_length;
-        #else
-        uint32_t new_dist = 1 + src_data.current_length;
+        edge_weight += graph->getEdgeData(current_edge);
         #endif
+        uint32_t new_dist = edge_weight + src_data.current_length;
 
         uint32_t old = galois::atomicMin(dst_data.current_length, new_dist);
 
@@ -470,13 +467,10 @@ struct PredAndSucc {
 
         auto& dst_data = graph->getData(dst);
 
+        auto edge_weight = 1;
         #ifndef __USE_BFS__
-        // SSSP
         // make edge_weight non-zero: zero edge-weights create infinite shortest paths
-        uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
-        #else
-        // BFS
-        uint32_t edge_weight = 1;
+        edge_weight += graph->getEdgeData(current_edge);
         #endif
 
         if ((src_data.current_length + edge_weight) == dst_data.current_length) {
@@ -681,13 +675,10 @@ struct NumShortestPaths {
 
           auto& dst_data = graph->getData(dst);
 
+          auto edge_weight = 1;
           #ifndef __USE_BFS__
-          // SSSP
           // make edge_weight non-zero: zero edge-weights create infinite shortest paths
-          uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
-          #else
-          // BFS
-          uint32_t edge_weight = 1;
+          edge_weight += graph->getEdgeData(current_edge);
           #endif
 
           uint64_t paths_to_add = src_data.num_shortest_paths;
@@ -968,13 +959,10 @@ struct DependencyPropagation {
 
             auto& dst_data = graph->getData(dst);
 
+            auto edge_weight = 1;
             #ifndef __USE_BFS__
-            // SSSP
             // make edge_weight non-zero: zero edge-weights create infinite shortest paths
-            uint32_t edge_weight = graph->getEdgeData(current_edge) + 1;
-            #else
-            // BFS
-            uint32_t edge_weight = 1;
+            edge_weight += graph->getEdgeData(current_edge);
             #endif
 
             // only operate if a dst flag is set (i.e. no more succ, finalized
@@ -1141,16 +1129,25 @@ struct Sanity {
   void static go(Graph& _graph, galois::DGReduceMax<float>& DGA_max,
                  galois::DGReduceMin<float>& DGA_min,
                  galois::DGAccumulator<float>& DGA_sum) {
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      // TODO
-    }
-    #endif
 
     DGA_max.reset();
     DGA_min.reset();
     DGA_sum.reset();
 
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_Sanity"));
+      std::string impl_str("CUDA_DO_ALL_IMPL_Sanity");
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      float sum, max, min;
+      Sanity_masterNodes_cuda(sum, max, min, cuda_ctx);
+      DGA_sum += sum;
+      DGA_max.update(max);
+      DGA_min.update(min);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
     galois::do_all(
       galois::iterate(_graph.masterNodesRange().begin(), 
                       _graph.masterNodesRange().end()),
