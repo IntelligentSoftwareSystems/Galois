@@ -25,8 +25,8 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#define __USE_BFS__ // GPU always uses BFS
-#define BCDEBUG
+//#define __USE_BFS__ // GPU always uses BFS
+//#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -83,19 +83,19 @@ struct NodeData {
   uint32_t old_length;
 
   // Betweeness centrality vars
-  uint32_t num_shortest_paths;
+  uint64_t num_shortest_paths; // 64 because # paths can get really big
   uint32_t num_successors;
   std::atomic<uint32_t> num_predecessors;
   std::atomic<uint32_t> trim;
-  std::atomic<uint32_t> to_add;
+  std::atomic<uint64_t> to_add;
 
   float to_add_float;
   float dependency;
 
   float betweeness_centrality;
 
-  // used to determine if data has been propogated yet
-  uint8_t propogation_flag;
+  // used to determine if data has been propagated yet
+  uint8_t propagation_flag;
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
@@ -116,7 +116,7 @@ galois::DynamicBitSet bitset_num_successors;
 galois::DynamicBitSet bitset_num_predecessors;
 galois::DynamicBitSet bitset_trim;
 galois::DynamicBitSet bitset_current_length;
-galois::DynamicBitSet bitset_propogation_flag;
+galois::DynamicBitSet bitset_propagation_flag;
 galois::DynamicBitSet bitset_dependency;
 
 // sync structures
@@ -167,7 +167,7 @@ struct InitializeGraph {
     src_data.to_add = 0;
     src_data.to_add_float = 0;
     src_data.dependency = 0;
-    src_data.propogation_flag = false;
+    src_data.propagation_flag = false;
   }
 };
 
@@ -221,12 +221,12 @@ struct InitializeIteration {
       src_data.current_length = local_infinity;
       src_data.old_length = local_infinity;
       src_data.num_shortest_paths = 0;
-      src_data.propogation_flag = false;
+      src_data.propagation_flag = false;
     } else {
       src_data.current_length = 0;
       src_data.old_length = 0; 
       src_data.num_shortest_paths = 1;
-      src_data.propogation_flag = true;
+      src_data.propagation_flag = true;
     }
     src_data.num_predecessors = 0;
     src_data.num_successors = 0;
@@ -555,10 +555,12 @@ struct NumShortestPathsChanges {
         src_data.trim = 0;
 
         // if I hit 0 predecessors after trim, set the flag to true (i.e. says
-        // I need to propogate my value)
+        // I need to propagate my value)
         if (src_data.num_predecessors == 0) {
-          //assert(!src_data.propogation_flag);
-          src_data.propogation_flag = true;
+          #ifdef BCDEBUG
+          GALOIS_ASSERT(!src_data.propagation_flag);
+          #endif
+          src_data.propagation_flag = true;
         }
       }
 
@@ -598,6 +600,8 @@ struct NumShortestPaths {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
+      galois::gPrint("Round ", iterations, "\n");
+
       _graph.set_num_iter(iterations);
       dga.reset();
 
@@ -656,7 +660,7 @@ struct NumShortestPaths {
    *
    * Propogate the shortest path value through all outgoing edges where this
    * source is a predecessor in the DAG, then
-   * set a flag saying that we should not propogate it any more (otherwise you
+   * set a flag saying that we should not propagate it any more (otherwise you
    * send extra).
    *
    * Additionally, decrement the predecessor field on the destination nodes of
@@ -667,10 +671,10 @@ struct NumShortestPaths {
 
     if (src_data.current_length != local_infinity) {
       // can do a num succ check for optimization
-      //if (src_data.propogation_flag && src_data.num_successors > 0) {
-      if (src_data.propogation_flag) {
-        // set flag so that it doesn't propogate its info more than once
-        src_data.propogation_flag = false;
+      //if (src_data.propagation_flag && src_data.num_successors > 0) {
+      if (src_data.propagation_flag) {
+        // set flag so that it doesn't propagate its info more than once
+        src_data.propagation_flag = false;
 
         for (auto current_edge : graph->edges(src)) {
           GNode dst = graph->getEdgeDst(current_edge);
@@ -686,11 +690,19 @@ struct NumShortestPaths {
           uint32_t edge_weight = 1;
           #endif
 
-          uint32_t paths_to_add = src_data.num_shortest_paths;
+          uint64_t paths_to_add = src_data.num_shortest_paths;
 
           #ifdef BCDEBUG
+          if (paths_to_add < 1) {
+            galois::gPrint("bad source global id is ", graph->L2G(src), "\n");
+            galois::gPrint("dist is ", src_data.current_length.load(), "\n");
+            galois::gPrint("succ is ", src_data.num_successors, "\n");
+            galois::gPrint("pred is ", src_data.num_predecessors.load(), "\n");
+            galois::gPrint("to add is ", paths_to_add, "\n");
+          }
           GALOIS_ASSERT(paths_to_add >= 1);
           #endif
+
 
           if ((src_data.current_length + edge_weight) == dst_data.current_length) {
             // need to add my num_short_paths to dest
@@ -748,9 +760,9 @@ struct PropagationFlagUpdate {
     // note that only nodes with succ == 0 will have their flags sync'd
     // by this call (through bitset; only set for those cases); the others
     // do not need to be sync'd as they will (or should) all be false already
-    _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
-                Broadcast_propogation_flag, 
-                Bitset_propogation_flag>("PropagationFlagUpdate");
+    _graph.sync<writeSource, readDestination, Reduce_set_propagation_flag, 
+                Broadcast_propagation_flag, 
+                Bitset_propagation_flag>("PropagationFlagUpdate");
   }
 
   void operator()(GNode src) const {
@@ -762,11 +774,11 @@ struct PropagationFlagUpdate {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors == 0) {
-        src_data.propogation_flag = true;
-        bitset_propogation_flag.set(src);
+        src_data.propagation_flag = true;
+        bitset_propagation_flag.set(src);
       } else {
         #ifdef BCDEBUG
-        GALOIS_ASSERT(src_data.propogation_flag == false);
+        GALOIS_ASSERT(src_data.propagation_flag == false);
         #endif
       }
     }
@@ -808,10 +820,10 @@ struct DependencyPropChanges {
     );
 
     // need reduce set for flag
-    _graph.sync<writeSource, readDestination, Reduce_set_propogation_flag, 
-                Broadcast_propogation_flag,
-                //Bitset_propogation_flag>("DependencyPropChanges_prop_flag");
-                Bitset_propogation_flag>("DependencyPropChanges");
+    _graph.sync<writeSource, readDestination, Reduce_set_propagation_flag, 
+                Broadcast_propagation_flag,
+                //Bitset_propagation_flag>("DependencyPropChanges_prop_flag");
+                Bitset_propagation_flag>("DependencyPropChanges");
   }
 
   void operator()(GNode src) const {
@@ -827,13 +839,13 @@ struct DependencyPropChanges {
         bitset_dependency.set(src);
       }
 
-      if (src_data.num_successors == 0 && src_data.propogation_flag) {
-        // has had dependency back-propogated; reset the flag
+      if (src_data.num_successors == 0 && src_data.propagation_flag) {
+        // has had dependency back-propagated; reset the flag
         #ifdef BCDEBUG
         GALOIS_ASSERT(src_data.trim == 0);
         #endif
-        src_data.propogation_flag = false;
-        bitset_propogation_flag.set(src);
+        src_data.propagation_flag = false;
+        bitset_propagation_flag.set(src);
       } else if (src_data.trim > 0) {
         // decrement successor by trim then reset
         #ifdef BCDEBUG
@@ -845,17 +857,17 @@ struct DependencyPropChanges {
 
         if (src_data.num_successors == 0) {
           #ifdef BCDEBUG
-          GALOIS_ASSERT(!src_data.propogation_flag);
+          GALOIS_ASSERT(!src_data.propagation_flag);
           #endif
-          src_data.propogation_flag = true;
-          bitset_propogation_flag.set(src);
+          src_data.propagation_flag = true;
+          bitset_propagation_flag.set(src);
         }
       }
     }
   }
 };
 
-/* Do dependency propogation which is required for betweeness centraility
+/* Do dependency propagation which is required for betweeness centraility
  * calculation */
 struct DependencyPropagation {
   const uint32_t &local_infinity;
@@ -871,7 +883,7 @@ struct DependencyPropagation {
       graph(_graph),
       DGAccumulator_accum(dga) {}
 
-  /* Look at all nodes to do propogation until no more work is done */
+  /* Look at all nodes to do propagation until no more work is done */
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
     uint32_t accum_result;
@@ -966,7 +978,7 @@ struct DependencyPropagation {
 
             // only operate if a dst flag is set (i.e. no more succ, finalized
             // dependency to take)
-            if (dst_data.propogation_flag) {
+            if (dst_data.propagation_flag) {
               // dest on shortest path with this node as predecessor
               if ((src_data.current_length + edge_weight) == dst_data.current_length) {
                 // increment my trim for later use to decrement successor
@@ -975,6 +987,8 @@ struct DependencyPropagation {
                 #ifdef BCDEBUG
                 GALOIS_ASSERT(src_data.num_shortest_paths != 0);
                 GALOIS_ASSERT(dst_data.num_shortest_paths != 0);
+                GALOIS_ASSERT(dst_data.num_shortest_paths >=
+                              src_data.num_shortest_paths);
                 #endif
 
                 // update my to_add_float (which is later used to update dependency)
@@ -1244,7 +1258,7 @@ int main(int argc, char** argv) {
   bitset_num_predecessors.resize(h_graph->size());
   bitset_trim.resize(h_graph->size());
   bitset_current_length.resize(h_graph->size());
-  bitset_propogation_flag.resize(h_graph->size());
+  bitset_propagation_flag.resize(h_graph->size());
   bitset_dependency.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
@@ -1289,7 +1303,7 @@ int main(int argc, char** argv) {
         bitset_trim_reset_cuda(cuda_ctx);
         bitset_current_length_reset_cuda(cuda_ctx);
         bitset_old_length_reset_cuda(cuda_ctx);
-        bitset_propogation_flag_reset_cuda(cuda_ctx);
+        bitset_propagation_flag_reset_cuda(cuda_ctx);
         bitset_dependency_reset_cuda(cuda_ctx);
       } else
     #endif
@@ -1301,7 +1315,7 @@ int main(int argc, char** argv) {
       bitset_num_predecessors.reset();
       bitset_trim.reset();
       bitset_current_length.reset();
-      bitset_propogation_flag.reset();
+      bitset_propagation_flag.reset();
       bitset_dependency.reset();
       }
 
