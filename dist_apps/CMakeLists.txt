@@ -67,3 +67,5 @@ distApp(sssp_push)
 
 distApp(kcore_push)
 distApp(kcore_pull)
+
+distApp(bc_push)

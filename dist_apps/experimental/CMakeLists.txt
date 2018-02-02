@@ -36,7 +36,6 @@ distApp(bfs_push_od)
 
 distApp(pagerank_pull_od)
 
-distAppNoGPU(bc_push)
 distAppNoGPU(bc_pull)
 
 distAppNoGPU(sgd_pull)
