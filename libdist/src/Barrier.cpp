@@ -118,6 +118,9 @@ public:
       ++received;
     }
     ++galois::runtime::evilPhase;
+    if (galois::runtime::evilPhase >= 64000) { // limit defined by MPI or LCI
+      galois::runtime::evilPhase = 1;
+    }
   }
 };
 } // end namespace ""

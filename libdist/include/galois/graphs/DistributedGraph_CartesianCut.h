@@ -520,7 +520,7 @@ public:
       }
       galois::runtime::gDeserialize(b, hasIncomingEdge[h]);
     }
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
 
     for (unsigned i = 1; i < numColumnHosts; ++i) {
       hasIncomingEdge[0].bitwise_or(hasIncomingEdge[i]);
@@ -651,7 +651,7 @@ public:
     galois::on_each([&](unsigned tid, unsigned nthreads){
       receiveEdges(graph, numNodesWithEdges);
     });
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
 
     timer.stop();
     for (unsigned d = 0; d < DecomposeFactor; ++d) {

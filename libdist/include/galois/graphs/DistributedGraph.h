@@ -181,6 +181,13 @@ protected:
                                      sizeEdges());
   }
 
+  void inline increment_evilPhase() {
+    ++galois::runtime::evilPhase;
+    if (galois::runtime::evilPhase >= 64000) { // limit defined by MPI or LCI
+      galois::runtime::evilPhase = 1;
+    }
+  }
+
 public:
   /****** VIRTUAL FUNCTIONS *********/
   virtual uint32_t G2L(uint64_t) const = 0 ;
@@ -358,7 +365,7 @@ private:
       }
       ++received;
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
   }
 
   //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
@@ -411,7 +418,7 @@ private:
       galois::runtime::gDeserialize(b, gid2host[p->first]);
       ++received;
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
   }
 
 protected:
@@ -1032,7 +1039,7 @@ private:
 
       galois::runtime::gDeserialize(p->second, masterNodes[p->first]);
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
   }
 
   /**
@@ -1092,7 +1099,7 @@ private:
       global_total_mirror_nodes += total_mirror_nodes_from_others;
       global_total_owned_nodes += total_owned_nodes_from_others;
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
 
     assert(numGlobalNodes == global_total_owned_nodes);
     // report stats
@@ -2908,7 +2915,7 @@ private:
       syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second, 
                                                     loopName);
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
   }
   
   /**
@@ -3845,7 +3852,7 @@ private:
 
       syncRecvApply_ck<FnTy>(p->first, p->second, loopName);
     }
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
 
     TsyncReduce.stop();
   }
@@ -4041,7 +4048,7 @@ public:
 
     checkpoint_recvBuffer = std::move(p->second);
 
-    ++galois::runtime::evilPhase;
+    increment_evilPhase();
     Tcheckpoint_recv.stop();
     Tcheckpoint.stop();
   }

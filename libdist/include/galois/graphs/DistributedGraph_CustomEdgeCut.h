@@ -452,7 +452,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
           receive_edges(graph, edgesToReceive);
         });
 
-      ++galois::runtime::evilPhase;
+      base_DistGraph::increment_evilPhase();
 
       timer.stop();
       galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", timer.get_usec()/1000000.0f, 
@@ -594,7 +594,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
         sentHosts.set(commPartner);
         recvHosts.set(commPartner);
 
-        galois::runtime::evilPhase++;
+        base_DistGraph::increment_evilPhase();
       }
 
       if (sentHosts.count() != net.Num) {
@@ -633,7 +633,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       //  num_total_edges_to_receive += num_edges_from_host;
       //  numOwned += num_nodes_from_host;
       //}
-      //++galois::runtime::evilPhase;
+      //base_DistGraph::increment_evilPhase();
 
       galois::gPrint("[", base_DistGraph::id, "] Metadata exchange done\n");
 
@@ -761,7 +761,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
           galois::loopname("MirrorToHostAssignment"));
       }
       galois::gPrint("[", base_DistGraph::id, "] End: assignedNodes receive\n");
-      ++galois::runtime::evilPhase;
+      base_DistGraph::increment_evilPhase();
 
       // fill mirror nodes
       for (uint32_t i = 0; i < (localToGlobalVector.size() - numOwned); ++i) {
