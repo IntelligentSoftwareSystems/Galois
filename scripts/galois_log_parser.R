@@ -159,6 +159,59 @@ getTimersDistributed <- function (logData) {
 }
 #### END: @function to values of timers for distributed memory galois log ##################
 
+#### START: @function to compute per iteration communication volume. ##################
+# Parses to get the timer values
+computePerIterVolume <- function (logData, paramList, output) {
+  numIter = as.numeric(paramList["iterations"])
+  print(numIter)
+
+  benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+  print(paste("benchmark:", benchmarkRegionName))
+
+  ## Number of runs
+  numRuns <- as.numeric((subset(logData, CATEGORY == "Runs" & TOTAL_TYPE != "HostValues"))$TOTAL)
+  print(paste("numRuns:", numRuns))
+
+  output_perIterVol_file <- paste(output, "_perIterVolume", sep="")
+
+  ## Doing 1st iteration separately to see if new file is to be created or if file already exists.
+  #STAT, 0, dGraph, REDUCE_SEND_BYTES_BFS_0_0, HSUM, 23587108
+  for(r in 0:(numRuns - 1)){
+    commVolumeRow <- subset(logData, grepl(paste("SEND_BYTES_", benchmarkRegionName, "_", r, "_", 0, sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL
+    if(!identical(commVolumeRow, character(0))){
+      #print(commVolumeRow)
+      totalCommVolSentPerIter <- sum(as.numeric(commVolumeRow))
+      commVolList <- list("run" = r, "iter" = 0, "sendBytesPerIter" = totalCommVolSentPerIter)
+      outDataList <- append(paramList, commVolList)
+      if(!file.exists(output_perIterVol_file)){
+        print(paste(output_perIterVol_file, "Does not exist. Creating new file to record per iteration volume"))
+        write.csv(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, quote=F)
+      } else {
+        print(paste("Appending data to the existing file", output_perIterVol_file))
+        write.table(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+      }
+      #print(totalCommVolSentPerIter)
+    }
+  }
+
+  for(i in 1:(numIter - 1)) {
+    for(r in 0:(numRuns - 1)){
+      commVolumeRow <- subset(logData, grepl(paste("SEND_BYTES_", benchmarkRegionName, "_", r, "_", i, sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL
+      if(!identical(commVolumeRow, character(0))){
+        #print(commVolumeRow)
+        totalCommVolSentPerIter <- sum(as.numeric(commVolumeRow))
+        commVolList <- list("run" = r, "iter" = i, "sendBytesPerIter" = totalCommVolSentPerIter)
+        outDataList <- append(paramList, commVolList)
+        write.table(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+        #print(totalCommVolSentPerIter)
+      }
+    }
+  }
+}
+
+
+
+
 #### START: @function to compute per iteration RSD of compute time. ##################
 # Parses to get the timer values
 computeRSD <- function (logData, paramList, output) {
@@ -266,9 +319,10 @@ computeMaxByMean <- function (logData, paramList, output) {
 }
 
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
+  printNormalStats = TRUE;
   if(isTRUE(isSharedMemGaloisLog)){
     print("Parsing commadline")
     paramList <- parseCmdLine(logData, T)
@@ -281,9 +335,15 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
     print("Parsing timers for distributed memory galois log")
     if(isTRUE(isComputeMaxByMean)){
       computeMaxByMean(logData, paramList, output)
+      printNormalStats = FALSE
     }
     else if(isTRUE(isComputeRSD)){
       computeRSD(logData, paramList, output)
+      printNormalStats = FALSE
+    }
+    else if(isTRUE(isComputePerIterVol)){
+      computePerIterVolume(logData, paramList, output)
+      printNormalStats = FALSE
     }
     else{
       timersList <- getTimersDistributed(logData)
@@ -291,7 +351,8 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
   }
 
   ## if computing RSD then normal stats are not printed
-  if(isTRUE(!isComputeRSD && !isComputeMaxByMean)){
+  #if(isTRUE(!isComputeRSD && !isComputeMaxByMean && !isComputePerIterVol)){
+  if(isTRUE(printNormalStats)){
     outDataList <- append(paramList, timersList)
     if(!file.exists(output)){
       print(paste(output, "Does not exist. Creating new file"))
@@ -317,7 +378,9 @@ option_list = list(
                      make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
                                                help="To compute the RSD of per iteration compute time[default %default]"),
                      make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
-                                               help="To compute the max by mean compute time[default %default]")
+                                               help="To compute the max by mean compute time[default %default]"),
+                     make_option(c("-p", "--perItrVolume"), action="store_true", default=FALSE,
+                                               help="To get the per iteration communication volume [default %default]")
 
                      )
 
@@ -332,7 +395,7 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p)
 }
 
 ##################### END #####################
