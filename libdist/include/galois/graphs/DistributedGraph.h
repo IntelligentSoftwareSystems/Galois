@@ -1011,6 +1011,14 @@ protected:
     assert(specificRanges.size() == 3);
   }
 
+  /**
+   * Specific range editor: makes the range for edges equivalent to the range
+   * for masters.
+   */
+  void edgesEqualMasters() {
+    specificRanges[2] = specificRanges[1];
+  }
+
 private:
   /**
    * Let other hosts know about which host has what mirrors/masters; 

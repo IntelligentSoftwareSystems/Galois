@@ -344,6 +344,8 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::determine_thread_ranges_with_edges();
       base_DistGraph::initialize_specific_ranges();
 
+      base_DistGraph::edgesEqualMasters(); // edges should be masters
+
       Tgraph_construct.stop();
 
       /*****************************************
