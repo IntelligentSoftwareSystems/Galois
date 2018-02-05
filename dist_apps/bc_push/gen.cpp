@@ -25,7 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-//#define BCDEBUG
+#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -594,8 +594,6 @@ struct NumShortestPaths {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      galois::gPrint("Round ", iterations, "\n");
-
       _graph.set_num_iter(iterations);
       dga.reset();
 
@@ -840,6 +838,10 @@ struct DependencyPropChanges {
       } else if (src_data.trim > 0) {
         // decrement successor by trim then reset
         #ifdef BCDEBUG
+        if (src_data.trim > src_data.num_successors) {
+          galois::gPrint("Bad node is ", graph->L2G(src), "\n");
+          src_data.dump();
+        }
         GALOIS_ASSERT(src_data.trim <= src_data.num_successors);
         #endif
 
@@ -909,7 +911,6 @@ struct DependencyPropagation {
         galois::no_stats()
       );
     }
-                    
 
       _graph.sync<writeSource, readSource, Reduce_add_trim, 
                   Broadcast_trim, Bitset_trim>("DependencyPropagation");
