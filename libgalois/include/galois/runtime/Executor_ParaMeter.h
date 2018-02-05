@@ -36,6 +36,7 @@
 
 #include "galois/gtuple.h"
 #include "galois/Reduction.h"
+#include "galois/PerThreadContainer.h"
 #include "galois/Traits.h"
 #include "galois/Mem.h"
 #include "galois/runtime/Context.h"
@@ -85,7 +86,7 @@ struct OrderedStepStats: public StepStatsBase {
   }
 
   void dump(FILE* out, const char* loopname) const {
-    Base::dump(out, loopname, step, parallelism.reduceRO (), wlSize, 0ul);
+    Base::dump(out, loopname, step, parallelism.reduce(), wlSize, 0ul);
   }
 };
 
@@ -171,7 +172,8 @@ public:
         [&] (int tid, int numT) {
           auto& lwl = Base::curr->get();
 
-          std::mt19937 rng(std::random_device()());
+          std::random_device r;
+          std::mt19937 rng(r());
           std::shuffle(lwl.begin(), lwl.end(), rng);
 
         });
@@ -201,37 +203,37 @@ public:
 };
 
 enum class SchedType {
-  FIFO, RAND, LIFO;
+  FIFO, RAND, LIFO
 };
 
 template <typename T, SchedType SCHED>
 struct ChooseWL {};
 
-template <typename T> ChooseWL<T, SchedType::FIFO> {
+template <typename T> struct ChooseWL<T, SchedType::FIFO> {
   using type = ParaMeterFIFO_WL<T>;
 };
 
-template <typename T> ChooseWL<T, SchedType::LIFO> {
+template <typename T> struct ChooseWL<T, SchedType::LIFO> {
   using type = ParaMeterLIFO_WL<T>;
 };
 
-template <typename T> ChooseWL<T, SchedType::RAND> {
+template <typename T> struct ChooseWL<T, SchedType::RAND> {
   using type = ParaMeterRAND_WL<T>;
 };
 
 
 template<class T, class FunctionTy, class ArgsTy>
 class ParaMeterExecutor {
-  typedef T value_type;
-  typedef typename worklists::GFIFO<int>::template retype<value_type>::type WorkListTy;
 
-  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_voidnot_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+  using value_type = T;
+  using WorkListTy = typename get_by_supertype<wl_tag, ArgsTy>::template retype<T>::type;
 
-  using WL = typename ChooseWL<T, typename WorkListTy::SCHEDULE>::type;
+  static const bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
+  static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+
 
   struct IterationContext {
     T val;
@@ -249,10 +251,11 @@ class ParaMeterExecutor {
     }
   };
 
+  using PWL = typename ChooseWL<T, typename WorkListTy::SCHEDULE>::type;
 
 
 private:
-  WL m_wl;
+  PWL m_wl;
   FunctionTy m_func;
   const char* loopname;
   FILE* m_statsFile;
