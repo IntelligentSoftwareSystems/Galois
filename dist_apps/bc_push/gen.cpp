@@ -96,6 +96,21 @@ struct NodeData {
 
   // used to determine if data has been propagated yet
   uint8_t propagation_flag;
+
+  #ifdef BCDEBUG
+  void dump() {
+    galois::gPrint("DUMP: ", current_length.load(), " ",
+                   old_length, " ",
+                   num_shortest_paths, " ",
+                   num_successors, " ",
+                   num_predecessors.load(), " ",
+                   trim.load(), " ",
+                   to_add.load(), " ",
+                   to_add_float, " ",
+                   dependency, " ",
+                   (bool)propagation_flag, "\n");
+  }
+  #endif
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
