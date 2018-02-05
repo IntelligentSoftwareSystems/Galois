@@ -25,7 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#define BCDEBUG
+//#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
