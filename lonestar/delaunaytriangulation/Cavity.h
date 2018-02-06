@@ -56,7 +56,7 @@ class Cavity: private boost::noncopyable {
 
   //! Find triangles that border cavity but are not in the cavity
   void findOutside() {
-    for (auto ii: searcher.inside) {
+    for (const auto& ii: searcher.inside) {
       for (auto jj: graph.edges(ii, galois::MethodFlag::UNPROTECTED)) {
         GNode n = graph.getEdgeDst(jj);
         // i.e., if (!e.boundary() && e.inCircle(point->t())) 

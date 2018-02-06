@@ -230,7 +230,7 @@ class ReadPoints {
     minX = minY = std::numeric_limits<double>::max();
     maxX = maxY = std::numeric_limits<double>::min();
 
-    for (auto& p: points) {
+    for (const auto& p: points) {
       double x = p.t().x();
       double y = p.t().y();
       if (x < minX)
