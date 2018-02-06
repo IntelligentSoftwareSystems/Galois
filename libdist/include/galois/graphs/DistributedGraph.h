@@ -183,7 +183,8 @@ protected:
 
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
-    if (galois::runtime::evilPhase >= 64000) { // limit defined by MPI or LCI
+    if (galois::runtime::evilPhase >= 
+          std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
     }
   }
