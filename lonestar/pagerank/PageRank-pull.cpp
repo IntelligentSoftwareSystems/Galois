@@ -160,6 +160,127 @@ void finalizePR(Graph& g) {
                  galois::no_stats(), galois::loopname("Finalize"));
 }
 
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
+
+void computePageRankET(Graph& graph) {
+  struct ActivePRNode {
+    GNode src;
+    Graph::edge_iterator beg;
+    Graph::edge_iterator end;
+  };
+
+  constexpr ptrdiff_t EDGE_TILE_SIZE = 128;
+
+  galois::InsertBag<ActivePRNode> activeNodes;
+  galois::LargeArray<std::atomic<PRTy>> vec;
+  vec.allocateInterleaved(graph.size());
+
+  unsigned int iteration = 0;
+  galois::GReduceMax<float> max_delta;
+
+  while (true) {
+    // Split work not by nodes but by edges, to take into account high degree
+    // nodes.
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
+
+                     auto beg       = graph.edge_begin(src, flag);
+                     const auto end = graph.edge_end(src, flag);
+                     assert(beg <= end);
+
+                     // Edge tiling for large outdegree nodes
+                     if ((end - beg) > EDGE_TILE_SIZE) {
+                       for (; beg + EDGE_TILE_SIZE < end;) {
+                         auto ne = beg + EDGE_TILE_SIZE;
+                         activeNodes.push(ActivePRNode{src, beg, ne});
+                         beg = ne;
+                       }
+                     }
+
+                     if ((end - beg) > 0) {
+                       activeNodes.push(ActivePRNode{src, beg, end});
+                     }
+
+                   },
+                   galois::no_stats(), galois::steal(),
+                   galois::chunk_size<CHUNK_SIZE>(),
+                   galois::loopname("SplitByEdges"));
+
+    galois::do_all(galois::iterate(activeNodes),
+                   [&](const ActivePRNode& prNode) {
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
+                     GNode src        = prNode.src;
+                     PRTy partial_sum = 0.0;
+                     for (auto ii = prNode.beg; ii != prNode.end; ++ii) {
+                       GNode dst    = graph.getEdgeDst(ii);
+                       LNode& ddata = graph.getData(dst, flag);
+                       partial_sum += ddata.getPageRank(iteration) / ddata.nout;
+                     }
+                     atomicAdd(vec[src], partial_sum);
+                   },
+                   galois::no_stats(), galois::steal(),
+                   galois::chunk_size<CHUNK_SIZE>(),
+                   galois::loopname("ActivePRNode"));
+
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
+                     LNode& sdata = graph.getData(src, flag);
+
+                     // New value of pagerank after computing contributions from
+                     // incoming
+                     // edges in the original graph
+                     float value = vec[src] * ALPHA + (1.0 - ALPHA);
+                     // Find the delta in new and old pagerank values
+                     float diff =
+                         std::fabs(value - sdata.getPageRank(iteration));
+
+                     // Do not update pagerank before the diff is computed since
+                     // there is a
+                     // data dependence on the pagerank value
+                     sdata.setPageRank(iteration, value);
+                     max_delta.update(diff);
+                   },
+                   galois::no_stats(), galois::loopname("PageRankFinalize"));
+
+    float delta = max_delta.reduce();
+
+#if DEBUG
+    std::cout << "iteration: " << iteration << " max delta: " << delta << "\n";
+#endif
+
+    iteration += 1;
+    if (delta <= tolerance || iteration >= maxIterations) {
+      break;
+    }
+    max_delta.reset();
+
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) { vec[src] = 0; }, galois::no_stats(),
+                   galois::loopname("ClearSums"));
+  } // end while(true)
+
+  if (iteration >= maxIterations) {
+    std::cout << "Failed to converge\n";
+  }
+
+  if (iteration & 1) {
+    // Result already in right place
+  } else {
+    finalizePR(graph);
+  }
+}
+
 void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
@@ -208,7 +329,7 @@ void computePageRank(Graph& graph) {
       break;
     }
     max_delta.reset();
-  }
+  } // end while(true)
 
   if (iteration >= maxIterations) {
     std::cout << "Failed to converge\n";
@@ -281,7 +402,7 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
-  computePageRank(transposeGraph);
+  computePageRankET(transposeGraph);
 
   Tmain.stop();
 
