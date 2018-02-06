@@ -18,6 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * @author Swarnendu Biswas <sbiswas@ices.utexas.edu>
  */
 
 #include "Lonestar/BoilerPlate.h"
@@ -181,6 +182,10 @@ void computePageRankET(Graph& graph) {
   galois::LargeArray<std::atomic<PRTy>> vec;
   vec.allocateInterleaved(graph.size());
 
+  galois::do_all(galois::iterate(graph),
+                 [&](const GNode& src) { vec[src] = 0; }, galois::no_stats(),
+                 galois::loopname("InitSums"));
+
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
@@ -214,6 +219,7 @@ void computePageRankET(Graph& graph) {
                    galois::chunk_size<CHUNK_SIZE>(),
                    galois::loopname("SplitByEdges"));
 
+    // Compute partial contributions to the final pagerank from the edge tiles
     galois::do_all(galois::iterate(activeNodes),
                    [&](const ActivePRNode& prNode) {
                      constexpr const galois::MethodFlag flag =
@@ -231,6 +237,9 @@ void computePageRankET(Graph& graph) {
                    galois::chunk_size<CHUNK_SIZE>(),
                    galois::loopname("ActivePRNode"));
 
+    activeNodes.clear_parallel();
+
+    // Finalize pagerank for this iteration
     galois::do_all(galois::iterate(graph),
                    [&](const GNode& src) {
                      constexpr const galois::MethodFlag flag =
@@ -402,6 +411,7 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
+  // computePageRank(transposeGraph);
   computePageRankET(transposeGraph);
 
   Tmain.stop();
