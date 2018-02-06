@@ -38,40 +38,40 @@
 #include <sstream>
 #include <string>
 
-#define DEBUG 0
-
 namespace cll = llvm::cl;
-
-const char* name = "Page Rank";
-const char* desc = "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
-const char* url  = 0;
 
 constexpr static const unsigned CHUNK_SIZE = 16;
 
 // We require a transpose graph since this is a pull-style algorithm
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<tranpose of input graph>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<tranpose of input graph>"),
+                                      cll::Required);
 // Any delta in pagerank computation across iterations that is greater than the
 // tolerance means the computation has not yet converged.
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(TOLERANCE));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(MAX_ITER));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
+                                 cll::init(TOLERANCE));
+static cll::opt<unsigned int> maxIterations("maxIterations",
+                                            cll::desc("Maximum iterations"),
+                                            cll::init(MAX_ITER));
 
 struct LNode {
-  float value[2]; // Final pagerank value is in value[1]
-  uint32_t nout;  // Compute the out degrees in the original graph
+  PRTy value[2]; // Final pagerank value is in value[1]
+  uint32_t nout; // Compute the out degrees in the original graph
 
-  float getPageRank() const { return value[1]; }
-  float getPageRank(unsigned int it) const { return value[it & 1]; }
-  void setPageRank(unsigned it, float v) { value[(it + 1) & 1] = v; }
+  PRTy getPageRank() const { return value[1]; }
+  PRTy getPageRank(unsigned int it) const { return value[it & 1]; }
+  void setPageRank(unsigned it, PRTy v) { value[(it + 1) & 1] = v; }
   void finalize(void) { value[1] = value[0]; }
 };
 
-typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<true>::type ::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
+    true>::type ::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
 void initNodeData(Graph& g) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
-                   LNode& data   = g.getData(n, galois::MethodFlag::UNPROTECTED);
+                   LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
                    data.value[0] = PR_INIT_VAL;
                    data.value[1] = PR_INIT_VAL;
                    data.nout     = 0;
@@ -86,8 +86,9 @@ void computeOutDeg(Graph& graph) {
   galois::LargeArray<std::atomic<size_t>> vec;
   vec.allocateInterleaved(graph.size());
 
-  galois::do_all(galois::iterate(graph), [&](const GNode& src) { vec.constructAt(src, 0ul); }, galois::no_stats(),
-                 galois::loopname("InitDegVec"));
+  galois::do_all(galois::iterate(graph),
+                 [&](const GNode& src) { vec.constructAt(src, 0ul); },
+                 galois::no_stats(), galois::loopname("InitDegVec"));
 
   galois::do_all(galois::iterate(graph),
                  [&](const GNode& src) {
@@ -98,7 +99,8 @@ void computeOutDeg(Graph& graph) {
                      vec[dst].fetch_add(1ul);
                    }
                  },
-                 galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::no_stats(), galois::loopname("ComputeDeg"));
+                 galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+                 galois::no_stats(), galois::loopname("ComputeDeg"));
 
   galois::do_all(galois::iterate(graph),
                  [&](const GNode& src) {
@@ -163,31 +165,37 @@ void computePageRank(Graph& graph) {
   galois::GReduceMax<float> max_delta;
 
   while (true) {
-    galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) {
-                     LNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-                     float sum    = 0.0;
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
 
-                     for (auto jj = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
-                               ej = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-                          jj != ej; ++jj) {
-                       GNode dst = graph.getEdgeDst(jj);
+          LNode& sdata = graph.getData(src, flag);
+          float sum    = 0.0;
 
-                       LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-                       sum += ddata.getPageRank(iteration) / ddata.nout;
-                     }
+          for (auto jj = graph.edge_begin(src, flag),
+                    ej = graph.edge_end(src, flag);
+               jj != ej; ++jj) {
+            GNode dst = graph.getEdgeDst(jj);
 
-                     // New value of pagerank after computing contributions from incoming
-                     // edges in the original graph
-                     float value = sum * ALPHA + (1.0 - ALPHA);
-                     // Find the delta in new and old pagerank values
-                     float diff = std::fabs(value - sdata.getPageRank(iteration));
+            LNode& ddata = graph.getData(dst, flag);
+            sum += ddata.getPageRank(iteration) / ddata.nout;
+          }
 
-                     // Do not update pagerank before the diff is computed
-                     sdata.setPageRank(iteration, value);
-                     max_delta.update(diff);
-                   },
-                   galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(), galois::loopname("PageRank"));
+          // New value of pagerank after computing contributions from incoming
+          // edges in the original graph
+          float value = sum * ALPHA + (1.0 - ALPHA);
+          // Find the delta in new and old pagerank values
+          float diff = std::fabs(value - sdata.getPageRank(iteration));
+
+          // Do not update pagerank before the diff is computed since there is a
+          // data dependence on the pagerank value
+          sdata.setPageRank(iteration, value);
+          max_delta.update(diff);
+        },
+        galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("PageRank"));
 
     float delta = max_delta.reduce();
 
@@ -224,7 +232,7 @@ static void printTop(Graph& graph, int topn) {
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src             = *ii;
     node_data_reference n = graph.getData(src);
-    float value           = n.getPageRank();
+    PRTy value            = n.getPageRank();
     Pair key(value, src);
 
     if ((int)top.size() < topn) {
@@ -240,7 +248,8 @@ static void printTop(Graph& graph, int topn) {
 
   int rank = 1;
   std::cout << "Rank PageRank Id\n";
-  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
+  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend();
+       ii != ei; ++ii, ++rank) {
     std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
 }
@@ -255,14 +264,16 @@ int main(int argc, char** argv) {
   Graph transposeGraph;
   std::cout << "Reading graph: " << filename << std::endl;
   galois::graphs::readGraph(transposeGraph, filename);
-  std::cout << "Read " << transposeGraph.size() << " nodes, " << transposeGraph.sizeEdges() << " edges\n";
+  std::cout << "Read " << transposeGraph.size() << " nodes, "
+            << transposeGraph.sizeEdges() << " edges\n";
 
-  galois::preAlloc(numThreads + (2 * transposeGraph.size() * sizeof(typename Graph::node_data_type)) /
+  galois::preAlloc(numThreads + (2 * transposeGraph.size() *
+                                 sizeof(typename Graph::node_data_type)) /
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running synchronous Pull version, tolerance:" << tolerance << ", maxIterations:" << maxIterations
-            << "\n";
+  std::cout << "Running synchronous Pull version, tolerance:" << tolerance
+            << ", maxIterations:" << maxIterations << "\n";
 
   initNodeData(transposeGraph);
   computeOutDeg(transposeGraph);

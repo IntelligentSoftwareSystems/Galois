@@ -23,11 +23,20 @@
 #ifndef LONESTAR_PAGERANK_CONSTANTS_H
 #define LONESTAR_PAGERANK_CONSTANTS_H
 
+const char* name = "Page Rank";
+const char* desc =
+    "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
+const char* url = 0;
+
 constexpr static const float ALPHA       = 0.85;
 constexpr static const float TOLERANCE   = 1.0e-5;
 constexpr static const unsigned MAX_ITER = 1000;
 
 constexpr static const float PR_INIT_VAL = 1.0;
+
+#define DEBUG 0
+
+typedef float PRTy;
 
 template <typename GNode>
 struct TopPair {
