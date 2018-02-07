@@ -34,7 +34,7 @@ constexpr static const unsigned MAX_ITER = 1000;
 
 constexpr static const float PR_INIT_VAL = 1.0;
 
-#define DEBUG 1
+#define DEBUG 0
 
 typedef float PRTy;
 

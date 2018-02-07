@@ -41,7 +41,15 @@
 
 namespace cll = llvm::cl;
 
-constexpr static const unsigned CHUNK_SIZE = 16;
+constexpr static const unsigned CHUNK_SIZE = 32;
+
+enum Algo { PR_Pull, PR_Pull_ET };
+
+static cll::opt<Algo> algo(
+    "algo", cll::desc("Choose an algorithm:"),
+    cll::values(clEnumVal(PR_Pull, "PUll"),
+                clEnumVal(PR_Pull_ET, "Pull with edge tiling"), clEnumValEnd),
+    cll::init(PR_Pull));
 
 // We require a transpose graph since this is a pull-style algorithm
 static cll::opt<std::string> filename(cll::Positional,
@@ -172,19 +180,25 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 void computePageRankET(Graph& graph) {
   struct ActivePRNode {
     GNode src;
+    bool needAtomic;
     Graph::edge_iterator beg;
     Graph::edge_iterator end;
   };
 
-  constexpr ptrdiff_t EDGE_TILE_SIZE = 128;
+  constexpr ptrdiff_t EDGE_TILE_SIZE = 1024;
 
   galois::InsertBag<ActivePRNode> activeNodes;
-  galois::LargeArray<std::atomic<PRTy>> vec;
-  vec.allocateInterleaved(graph.size());
+  galois::LargeArray<std::atomic<PRTy>> atomicVec;
+  atomicVec.allocateInterleaved(graph.size());
+  galois::LargeArray<PRTy> nonAtomicVec;
+  nonAtomicVec.allocateInterleaved(graph.size());
 
   galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) { vec[src] = 0; }, galois::no_stats(),
-                 galois::loopname("InitSums"));
+                 [&](const GNode& src) {
+                   atomicVec[src]    = 0;
+                   nonAtomicVec[src] = 0;
+                 },
+                 galois::no_stats(), galois::loopname("InitSumsInVectors"));
 
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
@@ -201,17 +215,20 @@ void computePageRankET(Graph& graph) {
                      const auto end = graph.edge_end(src, flag);
                      assert(beg <= end);
 
+                     bool needsAtomicStore = false;
                      // Edge tiling for large outdegree nodes
                      if ((end - beg) > EDGE_TILE_SIZE) {
+                       needsAtomicStore = true;
                        for (; beg + EDGE_TILE_SIZE < end;) {
                          auto ne = beg + EDGE_TILE_SIZE;
-                         activeNodes.push(ActivePRNode{src, beg, ne});
+                         activeNodes.push(ActivePRNode{src, true, beg, ne});
                          beg = ne;
                        }
                      }
 
                      if ((end - beg) > 0) {
-                       activeNodes.push(ActivePRNode{src, beg, end});
+                       activeNodes.push(ActivePRNode{
+                           src, (needsAtomicStore) ? true : false, beg, end});
                      }
 
                    },
@@ -231,11 +248,24 @@ void computePageRankET(Graph& graph) {
                        LNode& ddata = graph.getData(dst, flag);
                        partial_sum += ddata.getPageRank(iteration) / ddata.nout;
                      }
-                     atomicAdd(vec[src], partial_sum);
+                     if (prNode.needAtomic) {
+                       atomicAdd(atomicVec[src], partial_sum);
+                     } else {
+                       nonAtomicVec[src] += partial_sum;
+                     }
                    },
                    galois::no_stats(), galois::steal(),
                    galois::chunk_size<CHUNK_SIZE>(),
                    galois::loopname("ActivePRNode"));
+
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     if (atomicVec[src] > nonAtomicVec[src]) {
+                       assert(nonAtomicVec[prNode.src] == 0);
+                       nonAtomicVec[src] = atomicVec[src];
+                     }
+                   },
+                   galois::no_stats(), galois::loopname("CopySumsInVectors"));
 
     activeNodes.clear_parallel();
 
@@ -249,7 +279,7 @@ void computePageRankET(Graph& graph) {
                      // New value of pagerank after computing contributions from
                      // incoming
                      // edges in the original graph
-                     float value = vec[src] * ALPHA + (1.0 - ALPHA);
+                     float value = nonAtomicVec[src] * ALPHA + (1.0 - ALPHA);
                      // Find the delta in new and old pagerank values
                      float diff =
                          std::fabs(value - sdata.getPageRank(iteration));
@@ -275,8 +305,11 @@ void computePageRankET(Graph& graph) {
     max_delta.reset();
 
     galois::do_all(galois::iterate(graph),
-                   [&](const GNode& src) { vec[src] = 0; }, galois::no_stats(),
-                   galois::loopname("ClearSums"));
+                   [&](const GNode& src) {
+                     nonAtomicVec[src] = 0;
+                     atomicVec[src]    = 0;
+                   },
+                   galois::no_stats(), galois::loopname("ClearSums"));
   } // end while(true)
 
   if (iteration >= maxIterations) {
@@ -397,7 +430,7 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
-  galois::preAlloc(numThreads + (2 * transposeGraph.size() *
+  galois::preAlloc(numThreads + (3 * transposeGraph.size() *
                                  sizeof(typename Graph::node_data_type)) /
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
@@ -411,8 +444,15 @@ int main(int argc, char** argv) {
   galois::StatTimer Tmain;
   Tmain.start();
 
-  // computePageRank(transposeGraph);
-  computePageRankET(transposeGraph);
+  switch (algo) {
+  case PR_Pull: {
+    computePageRank(transposeGraph);
+    break;
+  }
+  case PR_Pull_ET: {
+    computePageRankET(transposeGraph);
+  }
+  }
 
   Tmain.stop();
 

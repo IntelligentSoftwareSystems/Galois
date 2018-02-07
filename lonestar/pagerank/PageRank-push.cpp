@@ -301,11 +301,13 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   switch (algo) {
-  case Async:
+  case Async: {
     asyncPageRank(graph);
     break;
-  case Sync:
+  }
+  case Sync: {
     syncPageRank(graph);
+  }
   }
 
   Tmain.stop();
