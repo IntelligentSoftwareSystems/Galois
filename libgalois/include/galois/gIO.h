@@ -76,7 +76,7 @@ template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
-  //  gWarnStr(os.str());
+  gWarnStr(os.str());
 }
 
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
