@@ -481,7 +481,7 @@ public:
         ApplyOperator {*this}, galois::loopname {"apply_operator"}, galois::wl<SrcWL_ty>());
 
     std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n",
-        numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
+        numPush.reduce(), numPush.reduce() + initSources.size_all  ());
 
     t_exec.stop ();
   }

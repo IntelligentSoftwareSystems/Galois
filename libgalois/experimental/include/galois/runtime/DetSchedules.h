@@ -97,9 +97,9 @@ template <typename R, typename C, typename F, typename N>
 void for_each_det_choice (const R&  range, const C& cmp, const N& nhoodVisitor, const F& func, const char* loopname, const DetExecType& detExec=detExecTypeArg) {
 
   switch (detExec) {
-    case kdg_i:
-      galois::runtime::for_each_ordered_2p_win (range, cmp, nhoodVisitor, func, loopname);
-      break;
+    //case kdg_i:
+    //  galois::runtime::for_each_ordered_2p_win (range, cmp, nhoodVisitor, func, loopname);
+    //  break;
 
     case kdg_ar:
       GALOIS_DIE ("not implemented yet");

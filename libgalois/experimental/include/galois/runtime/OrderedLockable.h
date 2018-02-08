@@ -40,7 +40,7 @@
 namespace galois {
 namespace runtime {
 
-using dbg = galois::substrate::debug<1>;
+using dbg = galois::debug<1>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
@@ -424,12 +424,16 @@ template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename O
 class OrderedExecutorBase {
 protected:
 
-  static const bool NEEDS_CUSTOM_LOCKING = exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
-  static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value
-    || !std::is_same<ExFunc, internal::DummyExecFunc>::value;
+  static const bool NEEDS_CUSTOM_LOCKING = 
+      exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
+  static const bool HAS_EXEC_FUNC = 
+      exists_by_supertype<has_exec_function_tag, ArgsTuple>::value
+      || !std::is_same<ExFunc, internal::DummyExecFunc>::value;
 
-  static const bool ENABLE_PARAMETER = get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
-  static const bool NEEDS_PUSH = !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;
+  static const bool ENABLE_PARAMETER = 
+      get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
+  //static const bool NEEDS_PUSH = 
+  //    !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;
 
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;

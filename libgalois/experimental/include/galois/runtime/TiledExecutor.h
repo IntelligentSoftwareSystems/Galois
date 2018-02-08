@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2018, The University of Texas at Austin. All rights
  * reserved.
  *
  */
@@ -33,7 +33,7 @@
 #include "galois/LargeArray.h"
 #include "galois/NoDerefIterator.h"
 #include "galois/gstl.h"
-#include "galois/runtime/ll/PaddedLock.h"
+#include "galois/substrate/PaddedLock.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 #include <atomic>
@@ -49,7 +49,7 @@ namespace galois { namespace runtime {
 template<typename Graph, bool UseExp = false>
 class Fixed2DGraphTiledExecutor {
   static constexpr int numDims = 2;
-  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::substrate::PaddedLock<true> SpinLock;
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::iterator iterator;
   typedef typename Graph::edge_iterator edge_iterator;
@@ -90,10 +90,9 @@ class Fixed2DGraphTiledExecutor {
 
   Graph& g;
   int cutoff; // XXX: UseExp
-  galois::runtime::Barrier& barrier; // XXX: UseExp
+  galois::substrate::Barrier& barrier; // XXX: UseExp
   //std::array<galois::LargeArray<SpinLock>, numDims> locks;
   //galois::LargeArray<Task> tasks;
-  galois::Statistic failures;
   std::array<std::vector<SpinLock>, numDims> locks;
   std::vector<Task> tasks;
   size_t numTasks;
@@ -287,9 +286,17 @@ class Fixed2DGraphTiledExecutor {
       start[i] = std::min(block[i] * tid, numBlocks[i] - 1);
     }
 
-    unsigned coresPerPackage = LL::getMaxCores() / LL::getMaxPackages();
+    unsigned coresPerPackage = galois::substrate::getThreadPool().getMaxCores() / 
+                               galois::substrate::getThreadPool().getMaxPackages();
     if (useLocks)
-      start = { { start[0], std::min(block[1] * LL::getPackageForThread(tid) * coresPerPackage, numBlocks[1] - 1) } };
+      start = { { start[0], 
+                  std::min(
+                    block[1] * 
+                      galois::substrate::getThreadPool().getPackage(tid) * 
+                      coresPerPackage, 
+                    numBlocks[1] - 1
+                  ) 
+              } };
 
     Point p = start;
 
@@ -342,7 +349,7 @@ class Fixed2DGraphTiledExecutor {
       nextPoint(p, dim, 1);
     }
 
-    failures += 1;
+    galois::runtime::reportStat_Tsum("TiledExecutor", "Failures", 1);
     return nullptr;
   }
 
@@ -359,7 +366,8 @@ class Fixed2DGraphTiledExecutor {
       }
       nextPoint(p, dim, 1);
     }
-    failures += 1;
+
+    galois::runtime::reportStat_Tsum("TiledExecutor", "Failures", 1);
     return nullptr;
   }
 
@@ -442,8 +450,9 @@ class Fixed2DGraphTiledExecutor {
   };
 
 public:
-  Fixed2DGraphTiledExecutor(Graph& g, int cutoff = 0):
-    g(g), cutoff(cutoff), barrier(galois::runtime::getSystemBarrier()), failures("PopFailures") { }
+  Fixed2DGraphTiledExecutor(Graph& g, int cutoff = 0)
+    : g(g), cutoff(cutoff), 
+      barrier(galois::runtime::getBarrier(galois::getActiveThreads())) { }
 
   template<typename Function>
   void execute(
@@ -459,7 +468,7 @@ public:
     galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      galois::runtime::LL::gWarn("Missing tasks");
+      galois::gWarn("Missing tasks");
   }
 
   template<typename Function>
@@ -476,7 +485,7 @@ public:
     galois::on_each(p);
     //TODO remove after worklist fix
     if (std::any_of(tasks.begin(), tasks.end(), [this](Task& t) { return t.updates.value < maxUpdates; }))
-      galois::runtime::LL::gWarn("Missing tasks");
+      galois::gWarn("Missing tasks");
   }
 };
 

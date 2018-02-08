@@ -35,7 +35,7 @@ class SafetyTestLoop {
   struct GetActive: public std::unary_function<Ctxt, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
-      return c->getActive ();
+      return c->getActive();
     }
   };
 
@@ -117,8 +117,8 @@ protected:
     }
 
     // TODO: complete this class
-    void push (Ctxt* c) {
-      assert (c);
+    void push(Ctxt* c) {
+      assert(c);
 
       WindowWL::push (c->getActive ());
 
@@ -214,25 +214,23 @@ protected:
   //  TODO: spill range 
   template <typename WinWL, typename WL>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, WL& wl) {
-
     //    dbg::print("Spilling to winWL");
-
     // TODO: fix this loop, change to do_all_choice
     assert (targetCommitRatio != 0.0);
+
     on_each(
-        [this, &wl, &winWL] (const unsigned tid, const unsigned numT) {
-          while (!wl.get ().empty ()) {
-            auto e  = wl.get ().back ();
-            wl.get ().pop_back ();
+      [this, &wl, &winWL] (const unsigned tid, const unsigned numT) {
+        while (!wl.get().empty ()) {
+          auto e  = wl.get ().back ();
+          wl.get ().pop_back ();
+          //dbg::print("Spilling: ", c, " with active: ", c->getActive ());
+          winWL.push(c);
+        }
+      }
+    );
 
-            //            dbg::print("Spilling: ", c, " with active: ", c->getActive ());
-
-            winWL.push (c);
-          }
-        });
-
-    assert (wl.empty_all ());
-    assert (!winWL.empty ());
+    assert(wl.empty_all());
+    assert(!winWL.empty());
   }
 
   template <typename WinWL, typename WL>
@@ -316,8 +314,8 @@ protected:
 
 
     if (targetCommitRatio != 0.0) {
-      size_t currCommits = roundCommits.reduceRO (); 
-      size_t prevWindowSize = roundTasks.reduceRO ();
+      size_t currCommits = roundCommits.reduce(); 
+      size_t prevWindowSize = roundTasks.reduce();
       refill (winWL, wl, currCommits, prevWindowSize);
     }
 
@@ -335,11 +333,11 @@ protected:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
     ++rounds;
-    totalCommits += roundCommits.reduceRO ();
-    totalTasks += roundTasks.reduceRO ();
+    totalCommits += roundCommits.reduce();
+    totalTasks += roundTasks.reduce();
 
-    if (roundTasks.reduceRO () > 0) {
-      assert (roundCommits.reduceRO() > 0 && "No commits this round, No progress");
+    if (roundTasks.reduce() > 0) {
+      assert (roundCommits.reduce() > 0 && "No commits this round, No progress");
     }
 
     // std::printf ("Round:%zd, tasks: %zd, commits: %zd\n", 
