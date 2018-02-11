@@ -240,7 +240,7 @@ struct SGD {
     const auto& net = galois::runtime::getSystemNetworkInterface();
     galois::gPrint("Nodes with edges on : ", net.ID, " : ", std::distance(nodesWithEdges.begin(), nodesWithEdges.end()), "\n");
     do {
-      std::cerr << "ITERATION : " << _num_iterations << "\n";
+      galois::gPrint("ITERATION : ",  _num_iterations, "\n");
 
       auto step_size = getstep_size(_num_iterations);
       _graph.set_num_iter(_num_iterations);
@@ -264,7 +264,10 @@ struct SGD {
       rms_normalized = std::sqrt(dga.reduce() /
                                  _graph.globalSizeEdges());
       galois::gDebug("RMS Normalized : ", rms_normalized);
-      galois::gPrint("RMS : ", rms_normalized, "\n");
+      galois::gPrint("RMS Normalized: ", rms_normalized, "\n");
+      //galois::runtime::reportStat_Single(regionname,
+          //_graph.get_run_identifier("RMS_NORMALIZED"), 
+          //(double)rms_normalized);
     } while((_num_iterations < maxIterations) && (rms_normalized > 1));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
