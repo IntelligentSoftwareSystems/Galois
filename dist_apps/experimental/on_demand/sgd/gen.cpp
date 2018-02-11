@@ -228,6 +228,7 @@ struct SGD {
     double rms_normalized = 0.0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
+      galois::gPrint("ITERATION : ",  _num_iterations, "\n");
       auto step_size = getstep_size(_num_iterations);
       dga.reset();
       #ifdef __GALOIS_HET_CUDA__
