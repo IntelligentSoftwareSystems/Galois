@@ -77,7 +77,7 @@ __global__ void InitializeIteration(CSRGraph graph, unsigned int __begin, unsign
   }
   // FP: "21 -> 22;
 }
-__global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length)
+__global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, DynamicBitset& bitset_current_length)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -193,6 +193,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
 #endif
           new_dist = edge_weight + p_current_length[src];
           atomicTestMin(&p_current_length[dst], new_dist);
+          bitset_current_length.set(dst);
         }
       }
       // FP: "56 -> 57;
@@ -239,6 +240,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
 #endif
             new_dist = edge_weight + p_current_length[src];
             atomicTestMin(&p_current_length[dst], new_dist);
+            bitset_current_length.set(dst);
           }
         }
       }
@@ -281,6 +283,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
 #endif
           new_dist = edge_weight + p_current_length[src];
           atomicTestMin(&p_current_length[dst], new_dist);
+          bitset_current_length.set(dst);
         }
       }
       // FP: "107 -> 108;
@@ -294,7 +297,7 @@ __global__ void FirstIterationSSSP(CSRGraph graph, unsigned int __begin, unsigne
   }
   // FP: "112 -> 113;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_current_length, uint32_t * p_old_length, DynamicBitset& bitset_current_length, HGAccumulator<uint32_t> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -425,6 +428,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           old = atomicTestMin(&p_current_length[dst], new_dist);
           if (old > new_dist)
           {
+            bitset_current_length.set(dst);
             DGAccumulator_accum.reduce( 1);
           }
         }
@@ -476,6 +480,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
             old = atomicTestMin(&p_current_length[dst], new_dist);
             if (old > new_dist)
             {
+              bitset_current_length.set(dst);
               DGAccumulator_accum.reduce( 1);
             }
           }
@@ -523,6 +528,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
           old = atomicTestMin(&p_current_length[dst], new_dist);
           if (old > new_dist)
           {
+            bitset_current_length.set(dst);
             DGAccumulator_accum.reduce( 1);
           }
         }
@@ -540,7 +546,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
   DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGAccumulator_accum_ts);
   // FP: "131 -> 132;
 }
-__global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors)
+__global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors, DynamicBitset& bitset_num_predecessors, DynamicBitset& bitset_num_successors)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -664,6 +670,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
           {
             atomicTestAdd(&p_num_successors[src], (unsigned int)1);
             atomicTestAdd(&p_num_predecessors[dst], (unsigned int)1);
+            bitset_num_successors.set(src);
+            bitset_num_predecessors.set(dst);
           }
         }
       }
@@ -712,6 +720,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
             {
               atomicTestAdd(&p_num_successors[src], (unsigned int)1);
               atomicTestAdd(&p_num_predecessors[dst], (unsigned int)1);
+              bitset_num_successors.set(src);
+              bitset_num_predecessors.set(dst);
             }
           }
         }
@@ -756,6 +766,8 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
           {
             atomicTestAdd(&p_num_successors[src], (unsigned int)1);
             atomicTestAdd(&p_num_predecessors[dst], (unsigned int)1);
+            bitset_num_successors.set(src);
+            bitset_num_predecessors.set(dst);
           }
         }
       }
@@ -770,7 +782,7 @@ __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int _
   }
   // FP: "121 -> 122;
 }
-__global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim)
+__global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_num_shortest_paths)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -799,13 +811,14 @@ __global__ void NumShortestPathsChanges(CSRGraph graph, unsigned int __begin, un
         {
           p_num_shortest_paths[src] += p_to_add[src];
           p_to_add[src] = 0;
+          bitset_num_shortest_paths.set(src);
         }
       }
     }
   }
   // FP: "20 -> 21;
 }
-__global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint64_t * p_num_shortest_paths, uint8_t * p_propagation_flag, uint64_t * p_to_add, uint32_t * p_trim, DynamicBitset& bitset_to_add, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -943,6 +956,8 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
           {
             atomicTestAdd(&p_to_add[dst], paths_to_add);
             atomicTestAdd(&p_trim[dst], (unsigned int)1);
+            bitset_to_add.set(dst);
+            bitset_trim.set(dst);
             DGAccumulator_accum.reduce( 1);
           }
         }
@@ -994,6 +1009,8 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
             {
               atomicTestAdd(&p_to_add[dst], paths_to_add);
               atomicTestAdd(&p_trim[dst], (unsigned int)1);
+              bitset_to_add.set(dst);
+              bitset_trim.set(dst);
               DGAccumulator_accum.reduce( 1);
             }
           }
@@ -1041,6 +1058,8 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
           {
             atomicTestAdd(&p_to_add[dst], paths_to_add);
             atomicTestAdd(&p_trim[dst], (unsigned int)1);
+            bitset_to_add.set(dst);
+            bitset_trim.set(dst);
             DGAccumulator_accum.reduce( 1);
           }
         }
@@ -1058,7 +1077,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
   DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGAccumulator_accum_ts);
   // FP: "137 -> 138;
 }
-__global__ void PropagationFlagUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_successors, uint8_t * p_propagation_flag)
+__global__ void PropagationFlagUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_successors, uint8_t * p_propagation_flag, DynamicBitset& bitset_propagation_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -1077,13 +1096,14 @@ __global__ void PropagationFlagUpdate(CSRGraph graph, unsigned int __begin, unsi
         if (p_num_successors[src] == 0)
         {
           p_propagation_flag[src] = true;
+          bitset_propagation_flag.set(src);
         }
       }
     }
   }
   // FP: "12 -> 13;
 }
-__global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim)
+__global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim, DynamicBitset& bitset_dependency, DynamicBitset& bitset_propagation_flag)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -1103,10 +1123,12 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
         {
           p_dependency[src] += p_to_add_float[src];
           p_to_add_float[src] = 0.0;
+          bitset_dependency.set(src);
         }
         if (p_num_successors[src] == 0 && p_propagation_flag[src])
         {
           p_propagation_flag[src] = false;
+          bitset_propagation_flag.set(src);
         }
         else
         {
@@ -1117,6 +1139,7 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
             if (p_num_successors[src] == 0)
             {
               p_propagation_flag[src] = true;
+              bitset_propagation_flag.set(src);
             }
           }
         }
@@ -1125,7 +1148,7 @@ __global__ void DependencyPropChanges(CSRGraph graph, unsigned int __begin, unsi
   }
   // FP: "25 -> 26;
 }
-__global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint64_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
+__global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint64_t  local_current_src_node, const uint32_t  local_infinity, uint32_t * p_current_length, float * p_dependency, uint64_t * p_num_shortest_paths, uint32_t * p_num_successors, uint8_t * p_propagation_flag, float * p_to_add_float, uint32_t * p_trim, DynamicBitset& bitset_to_add_float, DynamicBitset& bitset_trim, HGAccumulator<uint32_t> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -1277,6 +1300,8 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
               contrib /= p_num_shortest_paths[dst];
               contrib *= (1.0 + p_dependency[dst]);
               atomicTestAdd(&p_to_add_float[src], contrib);
+              bitset_trim.set(src);
+              bitset_to_add_float.set(src);
               DGAccumulator_accum.reduce( 1);
             }
           }
@@ -1333,6 +1358,8 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
                 contrib /= p_num_shortest_paths[dst];
                 contrib *= (1.0 + p_dependency[dst]);
                 atomicTestAdd(&p_to_add_float[src], contrib);
+                bitset_trim.set(src);
+                bitset_to_add_float.set(src);
                 DGAccumulator_accum.reduce( 1);
               }
             }
@@ -1385,6 +1412,8 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
               contrib /= p_num_shortest_paths[dst];
               contrib *= (1.0 + p_dependency[dst]);
               atomicTestAdd(&p_to_add_float[src], contrib);
+              bitset_trim.set(src);
+              bitset_to_add_float.set(src);
               DGAccumulator_accum.reduce( 1);
             }
           }
@@ -1537,7 +1566,7 @@ void FirstIterationSSSP_cuda(unsigned int  __begin, unsigned int  __end, struct 
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr());
+  FirstIterationSSSP <<<blocks, __tb_FirstIterationSSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()));
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1577,7 +1606,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, uint32_t & DGAccumula
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->current_length.data.gpu_wr_ptr(), ctx->old_length.data.gpu_wr_ptr(), *(ctx->current_length.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -1611,7 +1640,7 @@ void PredAndSucc_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr());
+  PredAndSucc <<<blocks, __tb_PredAndSucc>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), *(ctx->num_predecessors.is_updated.gpu_rd_ptr()), *(ctx->num_successors.is_updated.gpu_rd_ptr()));
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1643,7 +1672,7 @@ void NumShortestPathsChanges_cuda(unsigned int  __begin, unsigned int  __end, co
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  NumShortestPathsChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  NumShortestPathsChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_predecessors.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->num_shortest_paths.is_updated.gpu_rd_ptr()));
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1683,7 +1712,7 @@ void NumShortestPaths_cuda(unsigned int  __begin, unsigned int  __end, uint32_t 
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  NumShortestPaths <<<blocks, __tb_NumShortestPaths>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
@@ -1717,7 +1746,7 @@ void PropagationFlagUpdate_cuda(unsigned int  __begin, unsigned int  __end, cons
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  PropagationFlagUpdate <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr());
+  PropagationFlagUpdate <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), *(ctx->propagation_flag.is_updated.gpu_rd_ptr()));
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1749,7 +1778,7 @@ void DependencyPropChanges_cuda(unsigned int  __begin, unsigned int  __end, cons
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  DependencyPropChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr());
+  DependencyPropChanges <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->dependency.is_updated.gpu_rd_ptr()), *(ctx->propagation_flag.is_updated.gpu_rd_ptr()));
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -1789,7 +1818,7 @@ void DependencyPropagation_cuda(unsigned int  __begin, unsigned int  __end, uint
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  DependencyPropagation <<<blocks, __tb_DependencyPropagation>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  DependencyPropagation <<<blocks, __tb_DependencyPropagation>>>(ctx->gg, __begin, __end, local_current_src_node, local_infinity, ctx->current_length.data.gpu_wr_ptr(), ctx->dependency.data.gpu_wr_ptr(), ctx->num_shortest_paths.data.gpu_wr_ptr(), ctx->num_successors.data.gpu_wr_ptr(), ctx->propagation_flag.data.gpu_wr_ptr(), ctx->to_add_float.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->to_add_float.is_updated.gpu_rd_ptr()), *(ctx->trim.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;

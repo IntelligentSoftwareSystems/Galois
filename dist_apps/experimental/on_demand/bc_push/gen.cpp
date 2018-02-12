@@ -370,7 +370,7 @@ struct SSSP {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
-        SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
+        SSSP_allNodes_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -481,7 +481,7 @@ struct PredAndSucc {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        PredAndSucc_nodesWithEdges_cuda(infinity, cuda_ctx);
+        PredAndSucc_allNodes_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -588,7 +588,7 @@ struct NumShortestPathsChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        NumShortestPathsChanges_nodesWithEdges_cuda(infinity, cuda_ctx);
+        NumShortestPathsChanges_allNodes_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -689,7 +689,7 @@ struct NumShortestPaths {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         uint32_t __retval = 0;
-        NumShortestPaths_nodesWithEdges_cuda(__retval, infinity, current_src_node, cuda_ctx);
+        NumShortestPaths_allNodes_cuda(__retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -839,7 +839,7 @@ struct PropagationFlagUpdate {
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      PropagationFlagUpdate_nodesWithEdges_cuda(infinity, cuda_ctx);
+      PropagationFlagUpdate_allNodes_cuda(infinity, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -908,7 +908,7 @@ struct DependencyPropChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        DependencyPropChanges_nodesWithEdges_cuda(infinity, cuda_ctx);
+        DependencyPropChanges_allNodes_cuda(infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -1019,7 +1019,7 @@ struct DependencyPropagation {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         uint32_t __retval = 0;
-        DependencyPropagation_nodesWithEdges_cuda(__retval, infinity, current_src_node, cuda_ctx);
+        DependencyPropagation_allNodes_cuda(__retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -1231,7 +1231,7 @@ struct BC {
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        BC_nodesWithEdges_cuda(cuda_ctx);
+        BC_allNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
