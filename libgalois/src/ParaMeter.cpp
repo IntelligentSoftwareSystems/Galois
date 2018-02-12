@@ -53,6 +53,7 @@ struct StatsFileManager {
   static void getTimeStampedName(std::string& statsFileName) {
 
     constexpr unsigned FNAME_SIZE = 256;
+    char buf[FNAME_SIZE];
 
     time_t rawtime;
     struct tm* timeinfo;
@@ -60,7 +61,8 @@ struct StatsFileManager {
     time(&rawtime);
     timeinfo = localtime(&rawtime);
     
-    strftime(statsFileName, FNAME_SIZE, "ParaMeter-Stats-%Y-%m-%d--%H-%M-%S.csv", timeinfo);
+    strftime(buf, FNAME_SIZE, "ParaMeter-Stats-%Y-%m-%d--%H-%M-%S.csv", timeinfo);
+    statsFileName = buf;
   }
 
   FILE* get (void) {

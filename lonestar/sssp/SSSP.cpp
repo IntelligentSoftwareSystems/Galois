@@ -136,8 +136,7 @@ void deltaStepAlgo(Graph& graph, const GNode& source) {
           }
         }
       },
-      // galois::wl<OBIM>( UpdateRequestIndexer{stepShift} ), 
-      galois::wl<gwl::ParaMeter<> >(),
+      galois::wl<OBIM>( UpdateRequestIndexer{stepShift} ), 
       galois::no_conflicts(), 
       galois::loopname("SSSP"));
 
