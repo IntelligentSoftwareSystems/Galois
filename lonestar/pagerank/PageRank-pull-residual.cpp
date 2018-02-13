@@ -45,6 +45,8 @@ namespace cll = llvm::cl;
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
 
+constexpr static const unsigned CHUNK_SIZE = 32;
+
 // We require a transpose graph since this is a pull-style algorithm
 static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<tranpose of input graph>"),
@@ -63,139 +65,111 @@ struct LNode {
 };
 
 galois::LargeArray<PRTy> delta;
-galois::LargeArray<PRTy> residual;
+galois::LargeArray<std::atomic<PRTy>> residual;
 
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
-/* (Re)initialize all fields to 0 except for residual which needs to be 0.15
- * everywhere */
-struct ResetGraph {
-  Graph* graph;
+void initNodeData(Graph& g) {
+  galois::do_all(galois::iterate(g),
+                 [&](const GNode& n) {
+                   auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
+                   sdata.value = PR_INIT_VAL;
+                   sdata.nout  = 0;
+                   delta[n]    = 0;
+                   residual[n] = ALPHA;
+                 },
+                 galois::no_stats(), galois::loopname("initNodeData"));
+}
 
-  ResetGraph(Graph* _graph) : graph(_graph) {}
+void computeOutDeg(Graph& graph) {
+  galois::StatTimer t("computeOutDeg");
+  t.start();
 
-  void static go(Graph& _graph) {
-    galois::do_all(galois::iterate(_graph), ResetGraph{&_graph},
-                   galois::no_stats(), galois::loopname("ResetGraph"));
-  }
+  galois::LargeArray<std::atomic<size_t>> vec;
+  vec.allocateInterleaved(graph.size());
 
-  void operator()(GNode src) const {
-    auto& sdata   = graph->getData(src);
-    sdata.value   = 0;
-    sdata.nout    = 0;
-    delta[src]    = 0;
-    residual[src] = ALPHA;
-  }
-};
+  galois::do_all(galois::iterate(graph),
+                 [&](const GNode& src) { vec.constructAt(src, 0ul); },
+                 galois::no_stats(), galois::loopname("InitDegVec"));
 
-struct InitializeGraph {
-  Graph* graph;
+  galois::do_all(galois::iterate(graph),
+                 [&](const GNode& src) {
+                   for (auto nbr : graph.edges(src)) {
+                     GNode dst = graph.getEdgeDst(nbr);
+                     // This is equivalent to computing the outdegree in the
+                     // original (not transpose) graph
+                     vec[dst].fetch_add(1ul);
+                   }
+                 },
+                 galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+                 galois::no_stats(), galois::loopname("ComputeDeg"));
 
-  InitializeGraph(Graph* _graph) : graph(_graph) {}
+  galois::do_all(galois::iterate(graph),
+                 [&](const GNode& src) {
+                   auto& srcData = graph.getData(src);
+                   srcData.nout  = vec[src];
+                 },
+                 galois::no_stats(), galois::loopname("CopyDeg"));
 
-  void static go(Graph& _graph) {
-    ResetGraph::go(_graph);
+  t.stop();
+}
 
-    // doing a local do all because we are looping over edges
-    galois::do_all(galois::iterate(_graph), InitializeGraph{&_graph},
-                   galois::steal(), galois::no_stats(),
-                   galois::loopname("InitializeGraph"));
-  }
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
 
-  // Calculate "outgoing" edges for destination nodes (note we are using
-  // the tranpose graph for pull algorithms)
-  void operator()(GNode src) const {
-    for (auto nbr : graph->edges(src)) {
-      GNode dst   = graph->getEdgeDst(nbr);
-      auto& ddata = graph->getData(dst);
-      galois::atomicAdd(ddata.nout, (uint32_t)1);
-    }
-  }
-};
+void computePageRankResidual(Graph& graph) {
+  unsigned int iterations = 0;
+  while (true) {
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     auto& sdata = graph.getData(src);
+                     delta[src]  = 0;
 
-struct PageRank_delta {
-  const float& local_alpha;
-  cll::opt<float>& local_tolerance;
-  Graph* graph;
-
-  galois::GAccumulator<unsigned int>& GAccumulator_accum;
-
-  PageRank_delta(const float& _local_alpha, cll::opt<float>& _local_tolerance,
-                 Graph* _graph, galois::GAccumulator<unsigned int>& _dga)
-      : local_alpha(_local_alpha), local_tolerance(_local_tolerance),
-        graph(_graph), GAccumulator_accum(_dga) {}
-
-  void static go(Graph& _graph, galois::GAccumulator<unsigned int>& dga) {
-    const auto& allNodes = _graph.allNodesRange();
-
-    galois::do_all(galois::iterate(_graph),
-                   PageRank_delta{ALPHA, tolerance, &_graph, dga},
+                     if (residual[src] > tolerance) {
+                       sdata.value += residual[src];
+                       if (sdata.nout > 0) {
+                         delta[src] = residual[src] * (1 - ALPHA) / sdata.nout;
+                         //  GAccumulator_accum += 1;
+                       }
+                       residual[src] = 0;
+                     }
+                   },
                    galois::no_stats(), galois::loopname("PageRank_delta"));
-  }
 
-  void operator()(GNode src) const {
-    auto& sdata = graph->getData(src);
-    delta[src]  = 0;
+    galois::do_all(galois::iterate(graph),
+                   [&](const GNode& src) {
+                     float sum = 0;
+                     for (auto nbr : graph.edges(src)) {
+                       GNode dst = graph.getEdgeDst(nbr);
+                       if (delta[dst] > 0) {
+                         sum += delta[dst];
+                       }
+                     }
+                     if (sum > 0) {
+                       atomicAdd(residual[src], sum);
+                     }
+                   },
+                   galois::steal(), galois::no_stats(),
+                   galois::loopname("PageRank"));
 
-    if (residual[src] > local_tolerance) {
-      sdata.value += residual[src];
-      if (sdata.nout > 0) {
-        delta[src] = residual[src] * (1 - local_alpha) / sdata.nout;
-        GAccumulator_accum += 1;
-      }
-      residual[src] = 0;
+    iterations++;
+
+    if (iterations >= maxIterations) {
+      break;
     }
+  } // end while(true)
+
+  if (iterations >= maxIterations) {
+    std::cout << "Failed to converge\n";
   }
-};
-
-struct PageRank {
-  Graph* graph;
-
-  PageRank(Graph* _graph) : graph(_graph) {}
-
-  void static go(Graph& _graph, galois::GAccumulator<unsigned int>& dga) {
-    unsigned _num_iterations = 0;
-
-    do {
-      _graph.set_num_iter(_num_iterations);
-      dga.reset();
-      PageRank_delta::go(_graph, dga);
-
-      galois::do_all(
-          galois::iterate(_graph), PageRank{&_graph}, galois::steal(),
-          galois::no_stats(),
-          galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
-
-      // galois::runtime::reportStat_Tsum(
-      //     REGION_NAME, "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()),
-      //     (unsigned long)dga.read_local());
-
-      ++_num_iterations;
-    } while ((_num_iterations < maxIterations) &&
-             dga.reduce(_graph.get_run_identifier()));
-
-    // galois::runtime::reportStat_Single(
-    //     REGION_NAME, "NUM_ITERATIONS_" +
-    //     std::to_string(_graph.get_run_num()), (unsigned
-    //     long)_num_iterations);
-  }
-
-  // Pull deltas from neighbor nodes, then add to self-residual
-  void operator()(GNode src) const {
-    float sum = 0;
-    for (auto nbr : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(nbr);
-      if (delta[dst] > 0) {
-        sum += delta[dst];
-      }
-    }
-    if (sum > 0) {
-      galois::add(residual[src], sum);
-    }
-  }
-};
+}
 
 // Gets various values from the pageranks values/residuals of the graph
 // struct PageRankSanity {
@@ -304,8 +278,8 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
-  residual.allocateInterleaved(transposeGraph.size());
   delta.allocateInterleaved(transposeGraph.size());
+  residual.allocateInterleaved(transposeGraph.size());
 
   galois::preAlloc(numThreads + (3 * transposeGraph.size() *
                                  sizeof(typename Graph::node_data_type)) /
@@ -315,13 +289,10 @@ int main(int argc, char** argv) {
   std::cout << "Running synchronous Pull version, tolerance:" << tolerance
             << ", maxIterations:" << maxIterations << "\n";
 
-  galois::StatTimer initGraph("InitGraph");
-  initGraph.start();
-  InitializeGraph::go(*hg);
-  initGraph.stop();
+  initNodeData(transposeGraph);
+  computeOutDeg(transposeGraph);
 
   galois::GAccumulator<unsigned int> PageRank_accum;
-
   galois::GAccumulator<float> DGA_sum;
   galois::GAccumulator<float> DGA_sum_residual;
   galois::GAccumulator<uint64_t> DGA_residual_over_tolerance;
@@ -332,17 +303,14 @@ int main(int argc, char** argv) {
 
   galois::StatTimer prTimer("PageRank");
   prTimer.start();
-  PageRank::go(*hg, PageRank_accum);
+  computePageRankResidual(transposeGraph);
   prTimer.stop();
 
+  galois::reportPageAlloc("MeminfoPost");
   // // sanity check
   // PageRankSanity::go(*hg, DGA_sum, DGA_sum_residual,
   //                    DGA_residual_over_tolerance, max_value, min_value,
   //                    max_residual, min_residual);
-
-  InitializeGraph::go(*hg);
-
-  overheadTime.stop();
 
   // // Verify
   // if (verify) {
@@ -353,5 +321,6 @@ int main(int argc, char** argv) {
   //   }
   // }
 
+  overheadTime.stop();
   return 0;
 }

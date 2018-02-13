@@ -82,7 +82,7 @@ typedef typename Graph::GraphNode GNode;
 void initNodeData(Graph& g) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
-                   LNode& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
+                   auto& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
                    data.value[0] = PR_INIT_VAL;
                    data.value[1] = PR_INIT_VAL;
                    data.nout     = 0;
