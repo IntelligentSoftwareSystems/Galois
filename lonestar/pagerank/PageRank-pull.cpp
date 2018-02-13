@@ -22,7 +22,7 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
-#include "constants.h"
+#include "PageRank-constants.h"
 #include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/PerThreadContainer.h"
@@ -40,6 +40,8 @@
 #include <string>
 
 namespace cll = llvm::cl;
+const char* desc =
+    "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 
 constexpr static const unsigned CHUNK_SIZE = 32;
 

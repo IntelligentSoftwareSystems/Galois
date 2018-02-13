@@ -24,9 +24,7 @@
 #define LONESTAR_PAGERANK_CONSTANTS_H
 
 const char* name = "Page Rank";
-const char* desc =
-    "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
-const char* url = 0;
+const char* url  = 0;
 
 constexpr static const float ALPHA       = 0.85;
 constexpr static const float TOLERANCE   = 1.0e-5;
