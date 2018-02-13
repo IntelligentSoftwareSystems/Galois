@@ -1,4 +1,4 @@
-/**  -*- C++ -*-
+/** Tiled executor -*- C++ -*-
  * @file
  * @section License
  *
@@ -26,34 +26,24 @@
  *
  */
 
-#ifndef GALOIS_RUNTIME_TILEDEXECUTOR_H
-#define GALOIS_RUNTIME_TILEDEXECUTOR_H
+#ifndef _GALOIS_RUNTIME_TILEDEXECUTOR_H_
+#define _GALOIS_RUNTIME_TILEDEXECUTOR_H_
 
 #include "galois/Galois.h"
 #include "galois/LargeArray.h"
 #include "galois/NoDerefIterator.h"
-#include "galois/gstl.h"
-#include "galois/substrate/PaddedLock.h"
 
-#include <boost/iterator/transform_iterator.hpp>
-#include <atomic>
-#include <algorithm>
-#include <array>
-#include <vector>
-#include <cstddef>
-#include <functional>
-#include <mutex>
-
-namespace galois { namespace runtime {
+namespace galois {
+namespace runtime {
 
 template<typename Graph, bool UseExp = false>
 class Fixed2DGraphTiledExecutor {
   static constexpr int numDims = 2;
-  typedef galois::substrate::PaddedLock<true> SpinLock;
-  typedef typename Graph::GraphNode GNode;
-  typedef typename Graph::iterator iterator;
-  typedef typename Graph::edge_iterator edge_iterator;
-  typedef std::array<size_t, numDims> Point;
+  using SpinLock = galois::substrate::PaddedLock<true>;
+  using GNode = typename Graph::GraphNode;
+  using iterator = typename Graph::iterator;
+  using edge_iterator = Graph::edge_iterator;
+  using Point = std::array<size_t, numDims>
 
   template<typename T>
   struct SimpleAtomic {
@@ -61,7 +51,9 @@ class Fixed2DGraphTiledExecutor {
     SimpleAtomic(): value(0) { }
     SimpleAtomic(const SimpleAtomic& o): value(o.value.load()) { }
     T relaxedLoad() { return value.load(std::memory_order_relaxed); }
-    void relaxedAdd(T delta) { value.store(relaxedLoad() + delta, std::memory_order_relaxed); }
+    void relaxedAdd(T delta) { 
+      value.store(relaxedLoad() + delta, std::memory_order_relaxed);
+    }
   };
 
   /**
@@ -85,8 +77,8 @@ class Fixed2DGraphTiledExecutor {
     }
   };
 
-  typedef galois::NoDerefIterator<edge_iterator> no_deref_iterator;
-  typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+  using no_deref_iterator = galois::NoDerefIterator<edge_iterator>;
+  using edge_dst_iterator = boost::transform_iterator<GetDst, no_deref_iterator>; 
 
   Graph& g;
   int cutoff; // XXX: UseExp
@@ -489,5 +481,6 @@ public:
   }
 };
 
-} } // end namespace
+} // end runtime namespace
+} // end galois namespace
 #endif
