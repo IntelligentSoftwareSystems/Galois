@@ -40,6 +40,10 @@
 #include <cassert>
 #include <cstdlib>
 
+#ifdef GALOIS_USE_LONGJMP_ABORT
+#include <setjmp.h>
+#endif
+
 namespace galois {
 namespace runtime {
 
@@ -50,6 +54,9 @@ enum ConflictFlag {
   BREAK = 2
 };
 
+#ifdef GALOIS_USE_LONGJMP_ABORT
+extern thread_local jmp_buf execFrame;
+#endif
 
 //! used to release lock over exception path
 static inline void clearConflictLock() { }

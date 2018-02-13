@@ -266,7 +266,7 @@ private:
   const char* loopname;
   FILE* m_statsFile;
   FixedSizeAllocator<IterationContext> m_iterAlloc;
-  bool m_broken = false;
+  galois::GReduceLogicalOR m_broken = false;
 
   IterationContext* newIteration(const T& item) {
     IterationContext* it = m_iterAlloc.allocate(1);
@@ -339,22 +339,36 @@ private:
           stats.wlSize += 1;
 
           setThreadContext(&(it->ctx));
+          bool broke = false;
 
+          if (needsBreak) {
+            it->facing.setBreakFlag(&broke);
+          }
+
+#ifdef GALOIS_USE_LONGJMP_ABORT
+          int flag = 0;
+          if ((flag = setjmp(execFrame)) == 0) {
+            m_func(it->item, it->facing.data ());
+
+          } else {
+#else 
           try {
             m_func(it->item, it->facing.data ());
 
-          } catch (ConflictFlag flag) {
+          } catch (const ConflictFlag& flag) {
+#endif
             clearConflictLock();
             switch (flag) {
               case galois::runtime::CONFLICT:
                 it->doabort = true;
                 break;
-              case galois::runtime::BREAK:
-                m_broken = true;
-                break;
               default:
                 std::abort ();
             }
+          }
+
+          if (needsBreak && broke) {
+            m_broken.update(true);
           }
 
           setThreadContext(nullptr);
@@ -416,7 +430,7 @@ private:
       stats.dump(m_statsFile, loopname);
       stats.nextStep();
 
-      if (needsBreak && m_broken) {
+      if (needsBreak && m_broken.reduce()) {
         break;
       }
 

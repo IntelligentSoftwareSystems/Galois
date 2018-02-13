@@ -38,10 +38,29 @@
 //! Global thread context for each active thread
 static __thread galois::runtime::SimpleRuntimeContext* thread_ctx = 0;
 
+#ifdef GALOIS_USE_LONGJMP_ABORT
 
+thread_local jmp_buf galois::runtime::execFrame;
+
+void galois::runtime::signalFailSafe(void) {
+  longjmp(galois::runtime::execFrame, galois::runtime::REACHED_FAILSAFE);
+  std::abort(); // shouldn't reach here after longjmp
+}
+
+void galois::runtime::signalConflict(Lockable* lockable) {
+  longjmp(galois::runtime::execFrame, galois::runtime::CONFLICT);
+  std::abort(); // shouldn't reach here after longjmp
+}
+
+#else
 void galois::runtime::signalFailSafe(void) {
   throw galois::runtime::REACHED_FAILSAFE;
 }
+
+void galois::runtime::signalConflict(Lockable* lockable) {
+  throw galois::runtime::CONFLICT; // Conflict
+}
+#endif
 
 void galois::runtime::setThreadContext(galois::runtime::SimpleRuntimeContext* ctx) {
   thread_ctx = ctx;
@@ -49,10 +68,6 @@ void galois::runtime::setThreadContext(galois::runtime::SimpleRuntimeContext* ct
 
 galois::runtime::SimpleRuntimeContext* galois::runtime::getThreadContext() {
   return thread_ctx;
-}
-
-void galois::runtime::signalConflict(Lockable* lockable) {
-  throw galois::runtime::CONFLICT; // Conflict
 }
 
 #ifdef GALOIS_USE_EXP
