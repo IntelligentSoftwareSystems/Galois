@@ -51,7 +51,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
-static cll::opt<unsigned long long> src_node("startNode", 
+static cll::opt<unsigned long long> src_node("startNode", // not uint64_t due to a bug in llvm cl 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -94,8 +94,7 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
-                             infinity, src_node, cuda_ctx);
+        InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -135,9 +134,8 @@ struct SSSP {
           std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
           galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
           StatTimer_cuda.start();
-          int __retval = 0;
-          SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                    __retval, cuda_ctx);
+          unsigned int __retval = 0;
+          SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
           dga += __retval;
           StatTimer_cuda.stop();
         } else if (personality == CPU)
@@ -209,8 +207,9 @@ struct SSSPSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum, max;
-      SSSPSanityCheck_cuda(sum, max, infinity, cuda_ctx);
+      uint64_t sum;
+      uint32_t max;
+      SSSPSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
       dgas += sum;
       dgm.update(max);
     }

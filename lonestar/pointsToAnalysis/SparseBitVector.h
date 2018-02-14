@@ -6,7 +6,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
  * AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
  * PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
@@ -19,123 +19,196 @@
  * defects in Software and/or Documentation, or loss or inaccuracy of data of any
  * kind.
  *
- * Sparse bit vector for compact storage of information.
+ * Sparse bit vector for compact storage of information. Has a concurrent
+ * and a non-concurrent mode.
  * 
  * @author Loc Hoang <l_hoang@utexas.edu>
- * @author Rupesh Nasre <rupesh0508@gmail.com>
  */
-#ifndef GALOIS_SPARSEBITVECTOR_H
-#define GALOIS_SPARSEBITVECTOR_H
 
-#include <vector>
-#include <string>
-#include <ostream>
+#ifndef _GALOIS_SPARSEBITVECTOR_
+#define _GALOIS_SPARSEBITVECTOR_
+
+#include <galois/AtomicWrapper.h>
+#include <galois/Mem.h>
 #include <utility>
 #include <boost/iterator/iterator_facade.hpp>
-
-// TODO
-// - get rid of new usage (new doesn't scale well); smart pointers probably
-// better as well
-// - rename some things to be consistent with Concurrent Sparse Bit Vector
 
 namespace galois {
 
 /**
- * Sparse bit vector represented as a linked list of words.
- * 
- * Stores objects as indices in sparse bit vectors.
- * Saves space when the data to be stored is sparsely populated.
+ * Sparse bit vector using a linked list. Also thread safe; however, only
+ * guarantee is that functions return values based on the state of the
+ * vector AT THE TIME THE FUNCTION IS CALLED. (i.e. if concurrent update 
+ * happens in a function call, the update may or may not be visible).
  */
+template <bool IsConcurrent>
 struct SparseBitVector {
-  using WORD = unsigned long;
-  // Number of bits in a word
+  using WORD = unsigned int;
   static const unsigned wordSize = sizeof(WORD) * 8;
 
   //////////////////////////////////////////////////////////////////////////////
-  // BEGIN ONEWORD
-  //////////////////////////////////////////////////////////////////////////////
+
   /**
-   * A single word used as a bitvector. Contains functionality to alter it like
-   * a bitvector.
+   * Node in sparse bit vector linked list
    */
-  struct OneWord {
-    using WORD = unsigned long;
-  
-    WORD bits; // number that is used as the bitset
-    unsigned base; // used to order the words of the vector
-    struct OneWord* next; // pointer to next word on linked list 
-                          // (using base as order)
-  
+  struct Node {
+    unsigned _base; // base to multiply by/used to sort linked list
+    // If concurrent, then wrap these in a copyable atomic
+    using WordType = typename std::conditional<IsConcurrent, 
+                                               galois::CopyableAtomic<WORD>, 
+                                               WORD>::type;
+    WordType _bitVector; // stores set bits for a base
+
+    using NodeType = typename std::conditional<IsConcurrent, 
+                                               galois::CopyableAtomic<Node*>, 
+                                               Node*>::type;
+    NodeType _next; // pointer to next node in linked list
+
     /**
-     * Default is create a base at 0.
-     */
-    OneWord() { 
-      OneWord(0);
-    }
-  
-    /**
-     * Creates a new word.
+     * Needs a base when being constructed.
      *
-     * @param _base base of this word, i.e. what order it should go in linked 
-     * list
+     * @param base
      */
-    OneWord(unsigned _base) { 
-      base = _base;
-      bits = 0;
-      next = nullptr;
+    Node(unsigned base) {
+      _base = base;
+      _bitVector = 0;
+      _next = nullptr;
     }
-  
+
     /**
-     * Creates a new word with an initial bit already set.
+     * Construct with an already set 
      *
-     * @param _base base of this word, i.e. what order it should go in linked 
-     * list
-     * @param _initial Offset to first bit to set in the word
+     * @param base
      */
-    OneWord(unsigned _base, unsigned _initial) {
-      base = _base;
-      bits = 0;
-      set(_initial);
-      next = nullptr;
+    Node(unsigned base, unsigned offset) {
+      _base = base;
+
+      // set bit at offset
+      unsigned toStore = 0;
+      toStore |= ((WORD)1 << offset);
+      _bitVector = toStore;
+
+      _next = nullptr;
     }
-  
+    
     /**
-     * Sets the bit at the provided offset.
+     * Thread safe set. Uses compare and swap to atomically update the 
+     * bitvector.
      *
      * @param offset Offset to set the bit at
      * @returns true if the set bit wasn't set previously
      */
+    template<bool A = IsConcurrent, typename std::enable_if<A>::type* = nullptr>
     bool set(unsigned offset) {
-      WORD beforeBits = bits;
-      bits |= ((WORD)1 << offset);
-      return bits != beforeBits;
+      unsigned expected = _bitVector;
+      unsigned newValue = expected | ((WORD)1 << offset);
+      bool changed = (expected != newValue);
+
+      while (changed && !std::atomic_compare_exchange_weak(&_bitVector, 
+                          &expected, newValue)) {
+        // if cas fails, then update new value 
+        newValue = expected | ((WORD)1 << offset);
+        changed = (expected != newValue);
+      }
+
+      return changed;
     }
-  
+
+    /**
+     * Sets the bit at the provided offset. Not thread safe/ not concurrent 
+     * version.
+     *
+     * @param offset Offset to set the bit at
+     * @returns true if the set bit wasn't set previously
+     */
+    template<bool A = IsConcurrent, typename std::enable_if<!A>::type* = nullptr>
+    bool set(unsigned offset) {
+      WORD beforeBits = _bitVector;
+      _bitVector |= ((WORD)1 << offset);
+      return _bitVector != beforeBits;
+    }
+
     /**
      * @param offset Offset into bits to check status of
      * @returns true if bit at offset is set, false otherwise
      */
     bool test(unsigned offset) const {
       WORD mask = (WORD)1 << offset;
-      return ((bits & mask) == mask);
+      return ((_bitVector & mask) == mask);
     }
-  
+
+    /**
+     * Determines if second has set all of the bits that this objects has set.
+     *
+     * @param second pointer to compare against
+     * @returns true if second word's bits has everything that this
+     * word's bits have
+     */
+    bool isSubsetEq(Node* second) const {
+      WORD current = _bitVector;
+      return (current & (second->_bitVector)) == current;
+    }
+
     /**
      * Bitwise or with second's bits field on our field.
      *
-     * @param second OneWord to do a bitwise or with
+     * @param second sbv node to do a bitwise or with
      * @returns 1 if something changed, 0 otherwise
      */
-    unsigned unify(OneWord* second) {
+    template<bool A = IsConcurrent, typename std::enable_if<A>::type* = nullptr>
+    unsigned unify(Node* second) {
       if (second) {
-        WORD oldBits = bits;
-        bits |= second->bits;
-        return (bits != oldBits);
+        WORD oldVector = _bitVector;
+        WORD newVector = oldVector | (second->_bitVector);
+        bool changed = (oldVector != newVector);
+
+        while (changed && !std::atomic_compare_exchange_weak(&_bitVector, 
+                              &oldVector, newVector)) {
+          // if cas fails, update again
+          newVector = oldVector | (second->_bitVector);
+          changed = (oldVector != newVector);
+        }
+
+        return changed;
       }
   
       return 0;
     }
+
+    /**
+     * Bitwise or with second's bits field on our field. Non-concurrent
+     * version.
+     *
+     * @param second Node to do a bitwise or with
+     * @returns 1 if something changed, 0 otherwise
+     */
+    template<bool A = IsConcurrent, typename std::enable_if<!A>::type* = nullptr>
+    unsigned unify(Node* second) {
+      if (second) {
+        WORD oldBits = _bitVector;
+        _bitVector |= second->_bitVector;
+        return (_bitVector != oldBits);
+      }
   
+      return 0;
+    }
+
+    // TODO revise this to use a Galois allocator
+    /**
+     * @returns a pointer to a copy of this word without the preservation
+     * of the linked list
+     */
+    Node* clone(galois::FixedSizeAllocator<Node>* nodeAllocator) const {
+      Node* newWord = nodeAllocator->allocate(1);
+      nodeAllocator->construct(newWord, 0);
+  
+      newWord->_base = _base;
+      newWord->_bitVector = _bitVector;
+      newWord->_next = nullptr;
+  
+      return newWord;
+    }
+
     /**
      * TODO can probably use bit twiddling to get count more efficiently
      *
@@ -145,6 +218,7 @@ struct SparseBitVector {
       unsigned numElements = 0;
   
       WORD bitMask = 1;
+      WORD bits = _bitVector;
   
       for (unsigned ii = 0; ii < wordSize; ++ii) {
         if (bits & bitMask) {
@@ -155,84 +229,35 @@ struct SparseBitVector {
       }
       return numElements;
     }
-  
+
     /**
-     * Determines if second has set all of the bits that this objects has set.
+     * Gets the set bits in this word and adds them to the passed in 
+     * vector.
      *
-     * @param second OneWord pointer to compare against
-     * @returns true if second word's bits has everything that this
-     * word's bits have
+     * @tparam VectorTy vector type that supports push_back
+     * @param setBits Vector to add set bits to
+     * @returns Number of set bits in this word
      */
-    bool isSubsetEq(OneWord* second) const {
-      return (bits & second->bits) == bits;
-    }
-  
-    /**
-     * @returns a pointer to a copy of this word without the preservation
-     * of the linked list
-     */
-    OneWord* clone() const {
-      OneWord* newWord = new OneWord(); // TODO don't use new, find better way
-  
-      newWord->base = base;
-      newWord->bits = bits;
-      newWord->next = nullptr;
-  
-      return newWord;
-    }
-  
-    /**
-     * @returns a pointer to a copy of this word WITH the preservation of
-     * the linked list via copies of the list starting from this word
-     */
-    OneWord* cloneAll() const {
-      OneWord* newListBeginning = clone();
-  
-      OneWord* curPtr = newListBeginning;
-      OneWord* nextPtr = next;
-  
-      // clone down the linked list starting from this pointer
-      while (nextPtr != nullptr) {
-        curPtr->next = nextPtr->clone();
-        nextPtr = nextPtr->next;
-        curPtr = curPtr->next;
-      }
-  
-      return newListBeginning;
-    }
-  
-   /**
-    * Gets the set bits in this word and adds them to the passed in 
-    * vector.
-    *
-    * @tparam VectorTy vector type that supports push_back
-    * @param setBits Vector to add set bits to
-    * @returns Number of set bits in this word
-    */
     template<typename VectorTy>
     unsigned getAllSetBits(VectorTy &setbits) const {
       // or mask used to mask set bits
       WORD orMask = 1;
       unsigned numSet = 0;
-  
+      WORD bits = _bitVector;
+ 
       for (unsigned curBit = 0; curBit < wordSize; ++curBit) {
         if (bits & orMask) {
-          setbits.push_back(base * wordSize + curBit);
+          setbits.push_back(_base * wordSize + curBit);
           numSet++;
         }
-  
+ 
         orMask <<= 1;
       }
-  
+ 
       return numSet;
     }
   };
-  //////////////////////////////////////////////////////////////////////////////
-  // END ONEWORD
-  //////////////////////////////////////////////////////////////////////////////
 
-  //////////////////////////////////////////////////////////////////////////////
-  // Begin Iterator
   //////////////////////////////////////////////////////////////////////////////
 
   /**
@@ -244,7 +269,7 @@ struct SparseBitVector {
   class SBVIterator 
     : public boost::iterator_facade<SBVIterator, const unsigned, 
                                     boost::forward_traversal_tag> {
-    SparseBitVector::OneWord* currentHead;
+    Node* currentHead;
     unsigned currentBit;
     unsigned currentValue;
   
@@ -255,7 +280,7 @@ struct SparseBitVector {
   
       bool found = false;
       while (!found && currentHead != nullptr) {
-        while (currentBit < SparseBitVector::wordSize) {
+        while (currentBit < wordSize) {
           if (currentHead->test(currentBit)) {
             found = true;
             break;
@@ -265,15 +290,14 @@ struct SparseBitVector {
         }
   
         if (!found) {
-          currentHead = currentHead->next;
+          currentHead = (currentHead->_next);
           currentBit = 0;
         }
       }
   
   
       if (currentHead != nullptr) {
-        currentValue = (currentHead->base * SparseBitVector::wordSize) + 
-                       currentBit;
+        currentValue = (currentHead->_base * wordSize) + currentBit;
       } else {
         currentValue = -1;
       }
@@ -287,13 +311,13 @@ struct SparseBitVector {
       currentValue = -1;
     }
   
-    SBVIterator(SparseBitVector::OneWord* firstHead) 
+    SBVIterator(Node* firstHead) 
         : currentHead(firstHead), currentBit(0), currentValue(-1) { 
       advanceToNextBit(true);
     }
   
     SBVIterator(SparseBitVector* bv) : currentBit(0), currentValue(-1) {
-      currentHead = bv->head;
+      currentHead = (bv->head);
       advanceToNextBit(true);
     }
   
@@ -339,16 +363,46 @@ struct SparseBitVector {
   };
 
   //////////////////////////////////////////////////////////////////////////////
-  // End Iterator
-  //////////////////////////////////////////////////////////////////////////////
 
-  OneWord* head;
+  using NodeType = typename std::conditional<IsConcurrent, 
+                                             galois::CopyableAtomic<Node*>, 
+                                             Node*>::type;
+  // head of linked list
+  NodeType head;
+  // allocator of new nodes
+  galois::FixedSizeAllocator<Node>* nodeAllocator;
 
   /**
-   * Constructor; inits head to nullptr
+   * Default constructor = nullptrs
    */
   SparseBitVector() {
-    init();
+    head = nullptr;
+    nodeAllocator = nullptr;
+  }
+
+  /**
+   * Free all nodes allocated with the node allocator
+   */
+  ~SparseBitVector() {
+    if (nodeAllocator) { // check to make sure nodeAllocator isn't null
+      while (head) {
+        Node* current = head;
+        head = current->_next;
+        nodeAllocator->destroy(current);
+        nodeAllocator->deallocate(current, 1);
+      }
+    }
+  }
+
+  /**
+   * Initialize by setting head to nullptr and saving the word allocator.
+   *
+   * @param _nodeAllocator allocator object for nodes to use when creating
+   * a new linked list node
+   */
+  void init(galois::FixedSizeAllocator<Node>* _nodeAllocator) {
+    head = nullptr;
+    nodeAllocator = _nodeAllocator;
   }
 
   /**
@@ -366,10 +420,70 @@ struct SparseBitVector {
   }
 
   /**
-   * Initialize by setting head to nullptr
+   * Set the provided bit num in the bitvector. Will create a new word if the
+   * word needed to set the bit doesn't exist yet + will rearrange linked
+   * list of words as necessary.
+   *
+   * @param num The bit to set in the bitvector
+   * @returns true if the bit set wasn't set previously
    */
-  void init() {
-    head = nullptr;
+  template<bool A = IsConcurrent, typename std::enable_if<A>::type* = nullptr>
+  bool set(unsigned num) {
+    unsigned baseWord;
+    unsigned offsetIntoWord;
+
+    // determine base word and bit that corresponds to the num
+    std::tie(baseWord, offsetIntoWord) = getOffsets(num);
+
+    Node* curPtr = head;
+    Node* prev = nullptr;
+
+    // while true due to fact that compare and swap (CAS) may fail
+    while (true) {
+      // pointers should be in sorted order 
+      // loop through linked list to find the correct base word (if it exists)
+      while (curPtr != nullptr && curPtr->_base < baseWord) {
+        prev = curPtr;
+        curPtr = (curPtr->_next);
+      }
+
+      // if base already exists, then set the correct offset bit
+      if (curPtr != nullptr && curPtr->_base == baseWord) {
+        return curPtr->set(offsetIntoWord);
+      // else the base wasn't found; create and set, then rearrange linked list
+      // accordingly
+      } else {
+        Node* newWord = nodeAllocator->allocate(1);
+        nodeAllocator->construct(newWord, baseWord, offsetIntoWord);
+
+        // note at this point curPtr is the next element in the list that
+        // the new one we create should point to
+        newWord->_next = curPtr;
+
+        // attempt a compare and swap: if it fails, that means the list was
+        // altered, so go back to beginning of this loop to check again
+        if (prev) {
+          if (std::atomic_compare_exchange_weak(&(prev->_next), &curPtr, 
+                                                newWord)) {
+            return true;
+          } else {
+            // if it fails, return to the top; current pointer has new value
+            // that needs to be checked
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
+          }
+        } else {
+          if (std::atomic_compare_exchange_weak(&head, &curPtr, newWord)) {
+            return true;
+          } else {
+            // if it fails, return to the top; current pointer has new value
+            // that needs to be checked
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -377,48 +491,50 @@ struct SparseBitVector {
    * word needed to set the bit doesn't exist yet + will rearrange linked
    * list of words as necessary.
    *
-   * TODO make this thread-safe
+   * Not thread safe.
    *
    * @param bit The bit to set in the bitvector
    * @returns true if the bit set wasn't set previously
    */
+  template<bool A = IsConcurrent, typename std::enable_if<!A>::type* = nullptr>
   bool set(unsigned bit) {
     unsigned baseWord;
     unsigned offsetIntoWord;
 
     std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
 
-    OneWord* curPtr = head;
-    OneWord* prev = nullptr;
+    Node* curPtr = head;
+    Node* prev = nullptr;
 
     // pointers should be in sorted order 
     // loop through linked list to find the correct base word (if it exists)
-    while (curPtr != nullptr && curPtr->base < baseWord) {
+    while (curPtr != nullptr && curPtr->_base < baseWord) {
       prev = curPtr;
-      curPtr = curPtr->next;
+      curPtr = curPtr->_next;
     }
 
     // if base already exists, then set the correct offset bit
-    if (curPtr != nullptr && curPtr->base == baseWord) {
+    if (curPtr != nullptr && curPtr->_base == baseWord) {
       return curPtr->set(offsetIntoWord);
     // else the base wasn't found; create and set, then rearrange linked list
     // accordingly
     } else {
-      OneWord *newWord = new OneWord(baseWord, offsetIntoWord);
+      Node* newWord = nodeAllocator->allocate(1);
+      nodeAllocator->construct(newWord, baseWord, offsetIntoWord);
 
       // this should point to prev's next, prev should point to this
       if (prev) {
-        newWord->next = prev->next;
-        prev->next = newWord;
+        newWord->_next = prev->_next;
+        prev->_next = newWord;
       } else {
         if (curPtr == nullptr) {
           // this is the first word we are adding since both prev and head are 
           // null; next is nothing
-          newWord->next = nullptr;
+          newWord->_next = nullptr;
         } else {
           // this new word goes before curptr; if prev is null and curptr isn't,
           // it means it had to go before
-          newWord->next = head;
+          newWord->_next = head;
         }
 
         head = newWord;
@@ -428,24 +544,30 @@ struct SparseBitVector {
     }
   }
 
+
   /**
-   * Determines if a particular bit in the bitvector is set.
+   * Determines if a particular number bit in the bitvector is set.
    *
-   * @param bit Bit in bitvector to check status of
-   * @returns True if the argument bit is set in this bitvector, false otherwise
+   * Note it may return false if a bit is set concurrently by another 
+   * thread.
+   *
+   * @param num Bit in bitvector to check status of
+   * @returns true if the argument bit is set in this bitvector, false 
+   * otherwise. May also return false if the bit being tested for is set
+   * concurrently by another thread.
    */
-  bool test(unsigned bit) const {
+  bool test(unsigned num) const {
     unsigned baseWord;
     unsigned offsetIntoWord;
 
-    std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
-    OneWord* curPointer = head;
+    std::tie(baseWord, offsetIntoWord) = getOffsets(num);
+    Node* curPointer = head;
 
-    while (curPointer != nullptr && curPointer->base < baseWord) {
-      curPointer = curPointer->next;
+    while (curPointer != nullptr && curPointer->_base < baseWord) {
+      curPointer = (curPointer->_next);
     }
 
-    if (curPointer != nullptr && curPointer->base == baseWord) {
+    if (curPointer != nullptr && curPointer->_base == baseWord) {
       return curPointer->test(offsetIntoWord);
     } else {
       return false;
@@ -453,95 +575,44 @@ struct SparseBitVector {
   }
 
   /**
-   * Takes the passed in bitvector and does an "or" with it to update this
-   * bitvector.
+   * READ THIS REGARDING THE CONCURRENT VERSION OF THIS:
    *
-   * @param second BitVector to merge this one with
-   * @returns a non-negative value if something changed
-   */
-  unsigned unify(const SparseBitVector& second) {
-    unsigned changed = 0;
-
-    OneWord* prev = nullptr;
-    OneWord* ptrOne = head;
-    OneWord* ptrTwo = second.head;
-
-    while (ptrOne != nullptr && ptrTwo != nullptr) {
-      if (ptrOne->base == ptrTwo->base) {
-        // merged ptrTwo's word with our word, then advance both
-        changed += ptrOne->unify(ptrTwo);
-
-        prev = ptrOne;
-        ptrOne = ptrOne->next;
-        ptrTwo = ptrTwo->next;
-      } else if (ptrOne->base < ptrTwo->base) {
-        // advance our pointer until we reach "new" words
-        prev = ptrOne;
-        ptrOne = ptrOne->next;
-      } else { // oneBase > twoBase
-        // add ptrTwo's word that we don't have (otherwise would have been
-        // handled by other case), fix linked list on our side
-        OneWord* newWord = ptrTwo->clone();
-        newWord->next = ptrOne; // this word comes before our current word
-
-        // if previous word exists, make it point to this new word, 
-        // else make this word the new head and prev pointer
-        if (prev) {
-          prev->next = newWord;
-          prev = newWord;
-        } else {
-          head = prev = newWord;
-        }
-
-        // done with ptrTwo's word, advance
-        ptrTwo = ptrTwo->next;
-
-        changed++;
-      }
-    }
-
-    // ptrOne = nullptr, but ptrTwo still has values; clone the values and
-    // add them to our own bitvector
-    if (ptrTwo) {
-      OneWord* remaining = ptrTwo->cloneAll();
-
-      if (prev) {
-        prev->next = remaining;
-      } else {
-        head = remaining;
-      }
-
-      changed++;
-    }
-
-    return changed;
-  }
-
-  /**
+   * This function, in some sense, will not return false incorrectly (i.e. 
+   * if it returns false, then at that point in time this vector actually
+   * isnt' a subset of the other vector; however, it is entirely possible
+   * that a concurrent update will change that as this function is returning
+   * "false").
+   *
+   * So basically, no guarantees. It exists to somewhat optimize some steps
+   * of PointsTo, but it should not be relied on if writes to THIS bitvector
+   * can happen concurrently (writes to second are fine).
+   *
+   * In serial execution it will work as expected.
+   *
    * @param second Vector to check if this vector is a subset of
    * @returns true if this vector is a subset of the second vector
    */
   bool isSubsetEq(const SparseBitVector& second) const {
-    OneWord* ptrOne = head;
-    OneWord* ptrTwo = second.head;
+    Node* ptrOne = head;
+    Node* ptrTwo = second.head;
 
     while (ptrOne != nullptr && ptrTwo != nullptr) {
-      if (ptrOne->base == ptrTwo->base) {
+      if (ptrOne->_base == ptrTwo->_base) {
         if (!ptrOne->isSubsetEq(ptrTwo)) {
           return false;
         }
 
         // subset check successful; advance both pointers
-        ptrOne = ptrOne->next;
-        ptrTwo = ptrTwo->next;
-      } else if (ptrOne->base < ptrTwo->base) {
+        ptrOne = (ptrOne->_next);
+        ptrTwo = (ptrTwo->_next);
+      } else if (ptrOne->_base < ptrTwo->_base) {
         // ptrTwo has overtaken ptrOne, i.e. one has something (a base)
         // two doesn't
         return false;
       } else {  // ptrOne > ptrTwo
         // greater than case; advance ptrTwo to see if it eventually
         // reaches what ptrOne is currently at
-        ptrTwo = ptrTwo->next;
+        ptrTwo = (ptrTwo->_next);
       }
     }
 
@@ -557,15 +628,175 @@ struct SparseBitVector {
   }
 
   /**
-   * @param bit Bit that needs to be set
-   * @returns a pair signifying a base word and the offset into a 
-   * baseword that corresponds to bit
+   * Concurrent version. 
+   *
+   * Takes the passed in bitvector and does an "or" with it to update this
+   * bitvector.
+   *
+   * ONLY GUARANTEE IS THAT YOU WILL GET THINGS IN second THAT EXISTED
+   * AT TIME OF CALL; IF second IS UPDATED CONCURRENTLY, YOU MAY OR MAY
+   * NOT GET THOSE UPDATES.
+   *
+   * @param second BitVector to merge this one with
+   * @returns a non-negative value if something changed
    */
-  std::pair<unsigned, unsigned> getOffsets(unsigned bit) const {
-    unsigned baseWord = bit / wordSize;
-    unsigned offsetIntoWord = bit % wordSize;
-      
-    return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
+  template<bool A = IsConcurrent, typename std::enable_if<A>::type* = nullptr>
+  unsigned unify(const SparseBitVector& second) {
+    unsigned changed = 0;
+
+    Node* prev = nullptr;
+    Node* ptrOne = head;
+    Node* ptrTwo = second.head;
+
+    while (ptrTwo != nullptr) {
+      while (ptrOne != nullptr && ptrTwo != nullptr) {
+        if (ptrOne->_base == ptrTwo->_base) {
+          // merged ptrTwo's word with our word, then advance both
+          changed += ptrOne->unify(ptrTwo);
+
+          prev = ptrOne;
+          ptrOne = (ptrOne->_next);
+          ptrTwo = (ptrTwo->_next);
+        } else if (ptrOne->_base < ptrTwo->_base) {
+          // advance our pointer until we reach new bases we don't have
+          prev = ptrOne;
+          ptrOne = (ptrOne->_next);
+        } else { // oneBase > twoBase
+          // two has something we don't have; add it between prev and current
+          // ptrone
+          Node* newWord = ptrTwo->clone(nodeAllocator);
+          // newWord comes before our current word
+          (newWord->_next) = ptrOne; 
+
+          if (prev) {
+            if (!std::atomic_compare_exchange_weak(&(prev->_next), &ptrOne, 
+                                                  newWord)) {
+              // if it fails, return to the top; ptrOne has new value
+              // that needs to be checked
+              nodeAllocator->destroy(newWord);
+              nodeAllocator->deallocate(newWord, 1);
+              continue;
+            } 
+          } else {
+            if (!std::atomic_compare_exchange_weak(&head, &ptrOne, newWord)) {
+              // if it fails, return to the top; ptrOne has new value
+              // that needs to be checked
+              nodeAllocator->destroy(newWord);
+              nodeAllocator->deallocate(newWord, 1);
+              continue;
+            }
+          }
+
+          prev = newWord;
+          // done with ptrTwo's word, advance
+          ptrTwo = (ptrTwo->_next);
+
+          changed++;
+        }
+      }
+
+      // ptrOne = nullptr, but ptrTwo still has values; clone values
+      // and attempt to add 
+      while (ptrTwo) {
+        Node* newWord = ptrTwo->clone(nodeAllocator);
+
+        // note ptrOne in below cases should be nullptr...
+        if (prev) {
+          if (!std::atomic_compare_exchange_weak(&(prev->_next), &ptrOne, 
+                                                newWord)) {
+            // if it fails, return to the top; ptrOne has new value
+            // that needs to be checked
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
+            break; // goes out to outermost while loop
+          } 
+        } else {
+          if (!std::atomic_compare_exchange_weak(&head, &ptrOne, newWord)) {
+            // if it fails, return to the top; ptrOne has new value
+            // that needs to be checked
+            nodeAllocator->destroy(newWord);
+            nodeAllocator->deallocate(newWord, 1);
+            break; // goes out to outermost while loop
+          }
+        }
+
+        prev = newWord;
+        ptrTwo = (ptrTwo->_next);
+
+        changed++;
+      }
+    }
+
+    return changed;
+  }
+
+  /**
+   * Non-concurrent version.
+   *
+   * Takes the passed in bitvector and does an "or" with it to update this
+   * bitvector.
+   *
+   * @param second BitVector to merge this one with
+   * @returns a non-negative value if something changed
+   */
+  template<bool A = IsConcurrent, typename std::enable_if<!A>::type* = nullptr>
+  unsigned unify(const SparseBitVector& second) {
+    unsigned changed = 0;
+
+    Node* prev = nullptr;
+    Node* ptrOne = head;
+    Node* ptrTwo = second.head;
+
+    while (ptrOne != nullptr && ptrTwo != nullptr) {
+      if (ptrOne->_base == ptrTwo->_base) {
+        // merged ptrTwo's word with our word, then advance both
+        changed += ptrOne->unify(ptrTwo);
+
+        prev = ptrOne;
+        ptrOne = ptrOne->_next;
+        ptrTwo = ptrTwo->_next;
+      } else if (ptrOne->_base < ptrTwo->_base) {
+        // advance our pointer until we reach new bases we don't have
+        prev = ptrOne;
+        ptrOne = (ptrOne->_next);
+      } else { // oneBase > twoBase
+        // two has something we don't have; add it between prev and current
+        // ptrone
+        Node* newWord = ptrTwo->clone(nodeAllocator);
+        // newWord comes before our current word
+        newWord->_next = ptrOne; 
+
+        if (prev) {
+          prev->_next = newWord;
+        } else {
+          head = newWord;
+        }
+
+        prev = newWord;
+        // done with ptrTwo's word, advance
+        ptrTwo = ptrTwo->_next;
+
+        changed++;
+      }
+    }
+
+    // ptrOne = nullptr, but ptrTwo still has values; clone values and add 
+    while (ptrTwo) {
+      Node* newWord = ptrTwo->clone(nodeAllocator);
+
+      if (prev) {
+        prev->_next = newWord;
+      } else {
+        head = newWord;
+      }
+
+      prev = newWord;
+      ptrTwo = (ptrTwo->_next);
+
+      changed++;
+    }
+
+    return changed;
   }
 
   /**
@@ -574,7 +805,7 @@ struct SparseBitVector {
   unsigned count() const {
     unsigned nbits = 0;
 
-    for (OneWord *ptr = head; ptr; ptr = ptr->next) {
+    for (Node* ptr = head; ptr; ptr = (ptr->_next)) {
       nbits += ptr->count();
     }
 
@@ -587,12 +818,11 @@ struct SparseBitVector {
    * @tparam VectorTy vector type that supports push_back
    * @returns Vector with all set bits
    */
-  template<typename VectorTy>
-  VectorTy getAllSetBits() const {
-    VectorTy setBits;
+  std::vector<unsigned> getAllSetBits() const {
+    std::vector<unsigned> setBits;
 
     // loop through all words in the bitvector and get their set bits
-    for (OneWord* curPtr = head; curPtr != nullptr; curPtr = curPtr->next) {
+    for (Node* curPtr = head; curPtr != nullptr; curPtr = curPtr->_next) {
       curPtr->getAllSetBits(setBits);
     }
 
@@ -606,7 +836,7 @@ struct SparseBitVector {
    * @param prefix A string to append to the set bit numbers
    */
   void print(std::ostream& out, std::string prefix = std::string("")) const {
-    std::vector<unsigned> setBits = getAllSetBits<std::vector<unsigned>>();
+    std::vector<unsigned> setBits = getAllSetBits();
     out << "Elements(" << setBits.size() << "): ";
 
     for (auto setBitNum : setBits) {
@@ -615,8 +845,21 @@ struct SparseBitVector {
 
     out << "\n";
   }
+ 
+ private:
+  /**
+   * @param num Bit that needs to be set
+   * @returns a pair signifying a base word and the offset into a 
+   * baseword that corresponds to num
+   */
+  std::pair<unsigned, unsigned> getOffsets(unsigned num) const {
+    unsigned baseWord = num / wordSize;
+    unsigned offsetIntoWord = num % wordSize;
+      
+    return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
+  }
 };
 
-} // end namespace galois
+} // end galois namespace
 
-#endif //  _GALOIS_SPARSEBITVECTOR_H
+#endif 

@@ -338,7 +338,7 @@ private:
         receiveAssignedEdges(graph, edgesToReceive);
       });
 
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
 
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 
@@ -390,7 +390,7 @@ private:
       galois::runtime::gDeserialize(p->second, numOutgoingEdges[p->first]);
       num_total_edges_to_receive += num_edges_from_host;
     }
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
   }
 
   /**

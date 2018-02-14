@@ -473,7 +473,7 @@ public:
           galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     printf ("DAG created with %zd nodes, %zd edges\n",
-        numNodes.reduceRO (), numEdges.reduceRO ());
+            numNodes.reduce (), numEdges.reduce ());
   }
 
 };

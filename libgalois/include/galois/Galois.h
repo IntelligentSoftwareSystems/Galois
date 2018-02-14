@@ -37,6 +37,7 @@
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/Executor_OnEach.h"
 #include "galois/runtime/Executor_Ordered.h"
+#include "galois/runtime/Executor_ParaMeter.h"
 #include "galois/runtime/Mem.h"
 
 #include "galois/worklists/WorkList.h"

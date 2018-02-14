@@ -93,7 +93,7 @@ struct ResetGraph {
         std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+        ResetGraph_allNodes_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -135,8 +135,7 @@ struct InitializeGraph {
           (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), alpha, 
-                             cuda_ctx);
+        InitializeGraph_nodesWithEdges_cuda(alpha, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -158,9 +157,8 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.residual = local_alpha;
-    galois::atomicAdd(sdata.nout, 
-      (uint32_t) std::distance(graph->edge_begin(src), 
-                               graph->edge_end(src)));
+    uint32_t num_edges = std::distance(graph->edge_begin(src), graph->edge_end(src));
+    galois::atomicAdd(sdata.nout, num_edges);
     bitset_nout.set(src);
   }
 };
@@ -184,8 +182,7 @@ struct PageRank_delta {
       std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      PageRank_delta_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                          alpha, tolerance, cuda_ctx);
+      PageRank_delta_nodesWithEdges_cuda(alpha, tolerance, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -232,9 +229,8 @@ struct PageRank {
         std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        PageRank_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
-                      __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        PageRank_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -271,6 +267,8 @@ struct PageRank {
       float _delta = sdata.delta;
       sdata.delta = 0;
 
+      DGAccumulator_accum+= 1; // this should be moved to Pagerank_delta operator
+
       for (auto nbr : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(nbr);
         NodeData& ddata = graph->getData(dst);
@@ -279,7 +277,6 @@ struct PageRank {
 
         bitset_residual.set(dst);
       }
-      DGAccumulator_accum+= 1; // this should be moved to PagerankCopy operator
     }
   }
 };
@@ -342,13 +339,12 @@ struct PageRankSanity {
       float _min_value;
       float _sum_value;
       float _sum_residual;
-      uint32_t num_residual_over_tolerance;
+      uint64_t num_residual_over_tolerance;
       float _max_residual;
       float _min_residual;
-      PageRankSanityCheck_cuda(_max_value, _min_value, _sum_value, 
-                               _sum_residual, num_residual_over_tolerance,
-                               _max_residual, _min_residual, tolerance, 
-                               cuda_ctx);
+      PageRankSanity_masterNodes_cuda(num_residual_over_tolerance, _sum_value, _sum_residual, 
+                               _max_residual, _max_value, _min_residual, _min_value, 
+                               tolerance, cuda_ctx);
       DGA_sum += _sum_value;
       DGA_sum_residual += _sum_residual;
       DGA_residual_over_tolerance += num_residual_over_tolerance;

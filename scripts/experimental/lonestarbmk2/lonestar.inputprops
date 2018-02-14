@@ -4,3 +4,6 @@ paths =
 
 [soc-livejournal]
 ptranspose=/net/ohm/export/iss/inputs/unweighted/soc-LiveJournal1.ptgr
+
+[twitter40]
+ptranspose=/net/ohm/export/iss/inputs/unweighted/twitter-WWW10-component.ptgr

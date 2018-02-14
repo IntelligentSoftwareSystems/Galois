@@ -163,14 +163,14 @@ struct DetKDGexecutorAddRem {
               "kdg_ar");
           break;
 
-        case IKDG:
-          for_each_ordered_2p_win (
-              galois::runtime::makeLocalRange (*currWL),
-              cmp,
-              nhoodVisitor,
-              ApplyOperator{*this},
-              "ikdg", false); // false to avoid toggling threadPool wakeup
-          break;
+        //case IKDG:
+        //  for_each_ordered_2p_win (
+        //      galois::runtime::makeLocalRange (*currWL),
+        //      cmp,
+        //      nhoodVisitor,
+        //      ApplyOperator{*this},
+        //      "ikdg", false); // false to avoid toggling threadPool wakeup
+        //  break;
 
         default:
           std::abort ();

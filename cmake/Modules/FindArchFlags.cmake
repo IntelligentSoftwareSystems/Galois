@@ -5,7 +5,8 @@
 #  ARCH_EXE_FLAGS - Compiler flags to enable architecture-specific optimizations
 include(CheckCXXCompilerFlag)
 
-set(ARCH_CXX_FLAGS_CANDIDATES -march=native)
+set(ARCH_CXX_FLAGS_CANDIDATES -march="${USE_ARCH}")
+
 if(ARCH STREQUAL "mic")
   if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     list(APPEND ARCH_CXX_FLAGS_CANDIDATES -mmic)

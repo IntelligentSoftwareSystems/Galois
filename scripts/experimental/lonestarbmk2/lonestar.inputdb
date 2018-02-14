@@ -14,6 +14,18 @@ name = r4-2e26
 file = random/r4-2e26.gr
 format = bin/galois
 
+[random/r4-2e26.sgr]
+flags = 
+name = r4-2e26-symmetric
+file = random/symmetric/r4-2e26.gr
+format = bin/galois
+
+[random/rmat25.sgr]
+flags = 
+name = rmat25-symmetric
+file = scalefree/symmetric/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.sgr
+format = bin/galois
+
 [road/USA-road-d.USA.gr]
 flags = 
 name = USA-road-d.USA
@@ -36,6 +48,12 @@ format = bin/galois
 flags = 
 name = rmat28
 file = scalefree/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=.05.gr
+format = bin/galois
+
+[scalefree/random/rmat28.sgr]
+flags = 
+name = rmat28-symmetric
+file = scalefree/randomized/symmetric/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.srgr
 format = bin/galois
 
 [meshes/r5M]
@@ -91,6 +109,12 @@ flags =
 name = yahoo-music
 file = weighted/bipartite/yahoo.gr
 format = bin/galois
+
+[java/pta/tshark_constraints]
+flags = 
+name = tshark_constraints
+file = java/pta/tshark_constraints.txt
+format = text
 
 [nothing]
 flags = 

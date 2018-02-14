@@ -55,6 +55,7 @@
 #define SYNC_STRUCT_MACROS
 
 #include <cstdint> // for uint types used below
+#include <galois/gIO.h> // for GALOIS DIE
 
 ////////////////////////////////////////////////////////////////////////////////
 // Field flag class
@@ -179,7 +180,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -202,6 +203,15 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    if (personality == GPU_CUDA) {\
+      batch_reset_node_##fieldname##_cuda(cuda_ctx, begin, end, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       add_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -212,7 +222,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -245,7 +255,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -257,12 +267,16 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::add(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -290,7 +304,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -313,6 +327,15 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    if (personality == GPU_CUDA) {\
+      batch_reset_node_##fieldname##_cuda(cuda_ctx, begin, end, (ValTy)0);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       add_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -323,7 +346,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -356,7 +379,7 @@ struct Reduce_add_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -368,12 +391,16 @@ struct Reduce_add_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::add(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -405,7 +432,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -428,6 +455,10 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -438,7 +469,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -466,7 +497,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -478,12 +509,16 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::set(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -510,7 +545,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -533,6 +568,10 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -543,7 +582,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -571,7 +610,7 @@ struct Reduce_set_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -583,12 +622,16 @@ struct Reduce_set_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::set(fieldname[node_id], y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -619,7 +662,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -642,6 +685,10 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -651,7 +698,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -679,7 +726,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -691,12 +738,16 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { return y < galois::min(node.fieldname, y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -723,7 +774,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -746,6 +797,10 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       return y < min_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -755,7 +810,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -783,7 +838,7 @@ struct Reduce_min_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -795,12 +850,16 @@ struct Reduce_min_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { return y < galois::min(fieldname[node_id], y); }\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -827,7 +886,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -850,6 +909,10 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     if (personality == GPU_CUDA) {\
       set_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
@@ -860,7 +923,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -889,7 +952,7 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -901,12 +964,16 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::pairWiseAvg_vec(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -920,7 +987,6 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
 }
 #endif
 
-// Non-GPU code
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_##fieldname {\
   typedef fieldtype ValTy;\
@@ -930,7 +996,7 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 \
   static bool extract_reset_batch(unsigned from_id,\
-                                  unsigned long long int *b,\
+                                  uint64_t *b,\
                                   unsigned int *o,\
                                   ValTy *y,\
                                   size_t *s,\
@@ -942,12 +1008,16 @@ struct Reduce_pair_wise_add_array_##fieldname {\
     return false;\
   }\
 \
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
   static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
     { galois::addArray(node.fieldname, y); return true;}\
   }\
 \
   static bool reduce_batch(unsigned from_id,\
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -959,6 +1029,46 @@ struct Reduce_pair_wise_add_array_##fieldname {\
     { galois::resetVec(node.fieldname); }\
   }\
 }
+
+#define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(fieldname, fieldtype) \
+struct Reduce_pair_wise_add_array_single_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node,\
+                       unsigned vecIndex) {\
+    return node.fieldname[vecIndex];\
+  }\
+\
+  static bool extract_reset_batch(unsigned, unsigned long long int*,\
+                                  unsigned int*, ValTy*,\
+                                  size_t*, DataCommMode*) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned, ValTy*) {\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return false;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y,\
+                     unsigned vecIndex) {\
+    node.fieldname[vecIndex] = node.fieldname[vecIndex] + y;\
+    return true;\
+  }\
+\
+  static bool reduce_batch(unsigned, unsigned long long int*,\
+                           unsigned int*, ValTy *, size_t, DataCommMode) {\
+    return false;\
+  }\
+\
+  static void reset(uint32_t node_id, struct NodeData &node, unsigned vecIndex) {\
+    node.fieldname[vecIndex] = 0;\
+  }\
+}
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -979,7 +1089,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1010,7 +1120,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1034,7 +1144,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1051,7 +1161,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1060,6 +1170,45 @@ struct Broadcast_##fieldname {\
   }\
 }
 #endif
+
+#define GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(fieldname, fieldtype)\
+struct Broadcast_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node,\
+                       unsigned vecIndex) {\
+    return node.fieldname[vecIndex];\
+  }\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {\
+    GALOIS_DIE("Execution shouldn't get here\n");\
+    return node.fieldname[0];\
+  }\
+\
+  static bool extract_batch(unsigned, unsigned long int *, unsigned int* ,\
+                            ValTy *, size_t *, DataCommMode *) {\
+    return false;\
+  }\
+\
+  static bool extract_batch(unsigned, ValTy *) {\
+    return false;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y,\
+                     unsigned vecIndex) {\
+    node.fieldname[vecIndex] = y;\
+  }\
+\
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
+    GALOIS_DIE("Execution shouldn't get here\n");\
+  }\
+\
+  static bool setVal_batch(unsigned, unsigned long int*, unsigned int*,\
+                           ValTy*, size_t, DataCommMode) {\
+    return false;\
+  }\
+}
+
 
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
@@ -1075,7 +1224,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1106,7 +1255,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1130,7 +1279,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool extract_batch(unsigned from_id,\
-                            unsigned long long int *b,\
+                            uint64_t *b,\
                             unsigned int *o,\
                             ValTy *y,\
                             size_t *s,\
@@ -1147,7 +1296,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static bool setVal_batch(unsigned from_id, \
-                           unsigned long long int *b,\
+                           uint64_t *b,\
                            unsigned int *o,\
                            ValTy *y,\
                            size_t s,\
@@ -1171,6 +1320,9 @@ struct Broadcast_##fieldname {\
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)\
 struct Bitset_##fieldname {\
+  static constexpr bool is_vector_bitset() {\
+    return false;\
+  }\
   static bool is_valid() {\
     return true;\
   }\
@@ -1178,7 +1330,7 @@ struct Bitset_##fieldname {\
   static galois::DynamicBitSet& get() {\
     if (personality == GPU_CUDA) \
       get_bitset_##fieldname##_cuda(cuda_ctx,\
-        (unsigned long long int *)bitset_##fieldname.get_vec().data());\
+        (uint64_t *)bitset_##fieldname.get_vec().data());\
     return bitset_##fieldname;\
   }\
 \
@@ -1227,11 +1379,13 @@ struct Bitset_##fieldname {\
   }\
 \
   static galois::DynamicBitSet& get(unsigned i) {\
-    return vbitset_##fieldname##[i];\
+    return vbitset_##fieldname[i];\
   }\
 \
-  static void reset_range(unsigned i, size_t begin, size_t end) {\
-    vbitset_##fieldname##[i].reset(begin, end);\
+  static void reset_range(size_t begin, size_t end) {\
+    for (unsigned i = 0; i < vbitset_##fieldname.size(); i++) {\
+      vbitset_##fieldname[i].reset(begin, end);\
+    }\
   }\
 }
 

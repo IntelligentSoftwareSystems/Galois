@@ -97,7 +97,7 @@ struct ResetGraph {
       std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
+      ResetGraph_allNodes_cuda(alpha, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
@@ -134,8 +134,7 @@ struct InitializeGraph {
         (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
-                           cuda_ctx);
+      InitializeGraph_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
@@ -186,9 +185,8 @@ struct PageRank_delta {
         (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      int __retval = 0;
-      PageRank_delta_cuda(*allNodes.begin(), *allNodes.end(),
-                          __retval, alpha, tolerance, cuda_ctx);
+      unsigned int __retval = 0;
+      PageRank_delta_allNodes_cuda(__retval, alpha, tolerance, cuda_ctx);
       dga += __retval;
       StatTimer_cuda.stop();
     } else if (personality == CPU)
@@ -241,7 +239,7 @@ struct PageRank {
           (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        PageRank_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+        PageRank_nodesWithEdges_cuda(cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
       #endif
@@ -344,13 +342,12 @@ struct PageRankSanity {
       float _min_value;
       float _sum_value;
       float _sum_residual;
-      uint32_t num_residual_over_tolerance;
+      uint64_t num_residual_over_tolerance;
       float _max_residual;
       float _min_residual;
-      PageRankSanityCheck_cuda(_max_value, _min_value, _sum_value, 
-                               _sum_residual, num_residual_over_tolerance,
-                               _max_residual, _min_residual, tolerance, 
-                               cuda_ctx);
+      PageRankSanity_masterNodes_cuda(num_residual_over_tolerance, _sum_value, _sum_residual, 
+                               _max_residual, _max_value, _min_residual, _min_value, 
+                               tolerance, cuda_ctx);
       DGA_sum += _sum_value;
       DGA_sum_residual += _sum_residual;
       DGA_residual_over_tolerance += num_residual_over_tolerance;

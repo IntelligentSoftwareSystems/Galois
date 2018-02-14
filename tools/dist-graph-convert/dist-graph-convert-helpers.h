@@ -412,6 +412,22 @@ std::vector<Uint64Pair> getChunkToHostMapping(
       const std::vector<Uint64Pair>& chunkToNode);
 
 /**
+ * Given a chunk edge count prefix sum and the chunk to node mapping, assign
+ * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even 
+ * number of edges and return the node mapping. LINEAR SEARCH VERSION.
+ *
+ * @param chunkCountsPrefixSum prefix sum of edges in chunks
+ * @param chunkToNode mapping of chunk to nodes the chunk has
+ * @returns a host to node mapping where each host very roughly has a balanced
+ * number of edges
+ */
+// TODO this crashes for some reason
+std::vector<Uint64Pair> getChunkToHostMappingLinear(
+      const std::vector<uint64_t>& chunkCountsPrefixSum,
+      const std::vector<Uint64Pair>& chunkToNode);
+
+
+/**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
  * an even number of edges. 
  *
@@ -510,8 +526,8 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
-  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+  galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
+  bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
 
@@ -528,8 +544,8 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
     galois::do_all(
       galois::iterate(nodesToRead.first, nodesToRead.second),
       [&] (uint32_t gID) {
-        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
 
         // offset into which we should start writing data in edgeData
         uint64_t edgeDataOffset; 
@@ -541,7 +557,7 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
 
         // loop through all edges
         for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeSource = mpiGraph.edgeDestination(i);
+          uint32_t edgeSource = bufGraph.edgeDestination(i);
           // src is saved as dest and dest is saved as source (transpose)
           edgeData[edgeDataOffset] = edgeSource;
           edgeData[edgeDataOffset + 1] = gID;
@@ -549,7 +565,7 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
           if (std::is_void<EdgeDataTy>::value) {
             edgeDataOffset += 2;
           } else {
-            edgeData[edgeDataOffset + 2] = mpiGraph.edgeData(i);
+            edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
             edgeDataOffset += 3;
           }
         }
@@ -580,8 +596,8 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
   // TODO change this
-  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
-  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+  galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
+  bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
 
@@ -598,8 +614,8 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
     galois::do_all(
       galois::iterate(nodesToRead.first, nodesToRead.second),
       [&] (uint32_t gID) {
-        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
 
         // offset into which we should start writing data in edgeData
         uint64_t edgeDataOffset; 
@@ -611,7 +627,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
 
         // loop through all edges, create 2 edges for every edge
         for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeDest = mpiGraph.edgeDestination(i);
+          uint32_t edgeDest = bufGraph.edgeDestination(i);
           edgeData[edgeDataOffset] = gID;
           edgeData[edgeDataOffset + 1] = edgeDest;
 
@@ -620,7 +636,7 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
             edgeData[edgeDataOffset + 3] = gID;
             edgeDataOffset += 4;
           } else {
-            uint32_t edgeWeight = mpiGraph.edgeData(i);
+            uint32_t edgeWeight = bufGraph.edgeData(i);
 
             edgeData[edgeDataOffset + 2] = edgeWeight;
 
@@ -656,13 +672,35 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 );
 
+/**
+ * Loads the node to new node mapping, then reads the edges that this host
+ * has been assigned into a buffer. The catch is that it reads them
+ * in a TRANSPOSED manner, and it remaps the original source node to
+ * its new node id.
+ *
+ * i.e. source nodes are remapped to new id, but destination nodes aren't
+ * Edges are returned in a destination, source (and optionally edge data)
+ * order
+ *
+ * @tparam EdgeDataTy type of edge data to read
+ *
+ * @param inputFile path to input Galois binary graph
+ * @param nodesToRead a pair that has the range of nodes that should be read
+ * @param edgesToRead a pair that has the range of edges that should be read
+ * @param totalNumNodes Total number of nodes in the graph
+ * @param totalNumEdges Total number of edges in the graph
+ * @param mappedBinary binary file with info that maps a node to its new node
+ *
+ * @returns A vector of transposed edges (with or without edge data
+ * depending on edge data type)
+ */
 template<typename EdgeDataTy>
 std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
     const std::string& mappedBinary) {
-  galois::graphs::BufferedGraph<EdgeDataTy> mpiGraph;
-  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+  galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
+  bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
   std::vector<uint32_t> edgeData;
@@ -681,8 +719,8 @@ std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
     galois::do_all(
       galois::iterate(nodesToRead.first, nodesToRead.second),
       [&] (uint32_t gID) {
-        uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
 
         // offset into which we should start writing data in edgeData
         uint64_t edgeDataOffset; 
@@ -697,7 +735,7 @@ std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
 
         // loop through all edges
         for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeSource = mpiGraph.edgeDestination(i);
+          uint32_t edgeSource = bufGraph.edgeDestination(i);
           // src is saved as dest and dest is saved as source (transpose)
           edgeData[edgeDataOffset] = edgeSource;
           edgeData[edgeDataOffset + 1] = mappedSource;
@@ -705,13 +743,13 @@ std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
           if (std::is_void<EdgeDataTy>::value) {
             edgeDataOffset += 2;
           } else {
-            edgeData[edgeDataOffset + 2] = mpiGraph.edgeData(i);
+            edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
             edgeDataOffset += 3;
           }
         }
       },
       galois::steal(),
-      galois::loopname("TODO")
+      galois::loopname("RemapDestinations")
     );
   }
 
@@ -945,7 +983,6 @@ void sendAssignedEdges(
     });
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
-
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go

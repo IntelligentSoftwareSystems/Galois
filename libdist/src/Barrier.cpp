@@ -34,6 +34,7 @@
 
 #include <cstdlib>
 #include <cstdio>
+#include <limits>
 /*
 class StupidDistBarrier : public galois::substrate::Barrier {
   Barrier& localBarrier;
@@ -118,6 +119,9 @@ public:
       ++received;
     }
     ++galois::runtime::evilPhase;
+    if (galois::runtime::evilPhase >= std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
+      galois::runtime::evilPhase = 1;
+    }
   }
 };
 } // end namespace ""

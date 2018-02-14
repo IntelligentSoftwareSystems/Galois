@@ -186,7 +186,8 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
 
 
       if(callFS){
-        callFS->dumpColor();
+        //callFS->dumpColor();
+        //llvm::outs() << "----------------------------------- HERE ------------------------\n";
         auto callRecordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("do_all_recordDecl");
         string struct_name = callRecordDecl->getNameAsString();
 
@@ -205,6 +206,7 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
         for(auto i : info->reductionOps_map){
           if((i.first == struct_name) &&  (i.second.size() > 0)){
             for(auto j : i.second){
+              //llvm::outs() << "i : " << i.first << ", j : " << j.FIELD_NAME << "\n";
               stringstream SSAfter;
               j.READFLAG = "";
               j.WRITEFLAG = "";
@@ -212,12 +214,13 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
               for(auto h : info->syncFlags_map[struct_name]){
                 if(h.FIELD_NAME == j.FIELD_NAME){
                   for(auto k : info->syncFlags_map[struct_name]){
+                    //llvm::outs() << "\tk : " << k.FIELD_NAME << "\n";
                     if(k.FIELD_NAME == h.FIELD_NAME){
                       if(k.RW == "read"){
                         if(j.READFLAG == "")
                           j.READFLAG = k.AT;
                         else if(((j.READFLAG == "readSource") && (k.AT == "readDestination")) || ((j.READFLAG == "readDestination") && (k.AT == "readSource"))){
-                          llvm::outs() << k.FIELD_NAME << " : " << j.READFLAG << " : k.AT : " << k.AT << "\n";
+                          //llvm::outs() << k.FIELD_NAME << " : " << j.READFLAG << " : k.AT : " << k.AT << "\n";
                           j.READFLAG = "readAny";
                         }
                       }
@@ -236,11 +239,21 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
                 }
               }
 
-              if(j.SYNC_TYPE == "sync_push")
+              //llvm::outs() << " j.SYNC_TYPE : " << j.SYNC_TYPE << "\n";
+              //TODO: Hack: READ and WRITE flags are not setting correctly.
+              if(j.READFLAG == "")
+                j.READFLAG = "readAny";
+              if(j.WRITEFLAG == "")
+                j.WRITEFLAG = "writeAny";
+
+              if(j.SYNC_TYPE == "sync_push"){
+                //llvm::outs() << "\t sync_push\n";
                 SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
+              }
               else if(j.SYNC_TYPE == "sync_pull")
                 SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG <<"\")";
 
+              llvm::outs() << "Printing SSAfter : " << SSAfter.str() << "\n";
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
             }
@@ -315,7 +328,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                     hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(AnyType)).bind("varDeclName"))).bind("variableDecl_getEdgeDst"))
                                 ).bind("calleeName"), &callExprHandler);
 
-
       /****************************************************************************************************************/
 
   }
@@ -379,6 +391,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment_complexVec = "equalOpComplexVec_" + j.VAR_NAME+ "_" + i.first;
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
@@ -439,12 +452,24 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
                                                                               hasDescendant(binaryOperator(hasOperatorName("+"),
                                                                                                               hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For ComplexType vectors : NodeData.field[i] = val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment_vec),
+                                                                      /** For ComplexType vectors : NodeData.field[i] += val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator+="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_plusOp_vec),
                                                                       /** For ComplexType : NodeData.field = val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
 
-                                                                      binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_assignment_vec),
+                                                                      /** For vector with base types **/
+                                                                      binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr))), hasAncestor(compoundStmt().bind("cmd"))).bind(str_assignment_vec),
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
+
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
                                                                       /** Atomic min **/
@@ -504,7 +529,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       /****************************************************************************************************************/
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified inside the Galois all edges forLoop *******************/
+      llvm::outs() << " ********************************** NOW ***************************\n";
       for (auto i : info.edgeData_map) {
+          llvm::outs() << "--> i " << i.first << "\n"; 
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
@@ -577,6 +604,16 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("="),
                                                                             hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
 
+                                                                      /** For ComplexType vectors : NodeData.field[i] = val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment_vec),
+                                                                      /** For ComplexType vectors : NodeData.field[i] += val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator+="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_plusOp_vec),
 
                                                                       /** For ComplexType : NodeData.field += val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("+="),
@@ -749,6 +786,16 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("="),
                                                                             hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
 
+                                                                      /** For ComplexType vectors : NodeData.field[i] = val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_declRefExpr)).bind(str_assignment_vec),
+                                                                      /** For ComplexType vectors : NodeData.field[i] += val: field is complexType **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator+="))))),
+                                                                             hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))),
+                                                                             hasDescendant(LHS_declRefExpr)).bind(str_plusOp_vec),
 
                                                                       /** For ComplexType : NodeData.field += val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("+="),
@@ -767,7 +814,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_assignment_vec),
 
                                                                        /** Galois::atomicAdd(field, val) **/
-                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExpr)).bind(str_atomicAdd),
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasDescendant(LHS_declRefExpr)).bind(str_atomicAdd),
+                                                                      //callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExprVector)).bind(str_atomicAdd),
 
                                                                       /** Galois Reset noticed **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("reset"))))), hasAnyArgument(LHS_memExpr)).bind(str_resetField),
@@ -924,8 +972,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
           string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
           string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_atomicMin = "atomicMin_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
           /** Only need sync_pull if modified **/
+          //TODO: See if writeSource is going over allNodes and if it is writing the same value to all nodes, then no sync is required.
+          //If not going over allNodes or writing different things, then need to sync pull.
           llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
           if(j.SYNC_TYPE == "sync_pull_maybe"){
             StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);

@@ -373,13 +373,21 @@ struct Gr2CGr : public Conversion {
   }
 };
 
+/**
+ * Given a binary mapping of node to another node (i.e. random mapping), remap
+ * the graph vertex order.
+ */
 struct Gr2RGr : public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& inputFile, const std::string& outputFile) {
     GALOIS_ASSERT(!(outputFile.empty()), "gr2rgr needs an output file");
     GALOIS_ASSERT(!(nodeMapBinary.empty()), "gr2rgr needs binary mapping");
+
     auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t hostID = net.ID;
+    if (hostID == 0) {
+      galois::gPrint("Node map binary is ", nodeMapBinary, "\n");
+    }
 
     uint64_t totalNumNodes;
     uint64_t totalNumEdges;
@@ -389,6 +397,7 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 1: remap sources
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Source remap phase entering\n");
 
     // get "read" assignment of nodes (i.e. nodes this host is responsible for)
     Uint64Pair nodesToRead;
@@ -402,6 +411,7 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 2: remap destinations
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Dest remap phase entering\n");
 
     // make each host remap a relatively even number of destination nodes by
     // assigning/sending (this is the point of the transpose edge list above)
@@ -410,6 +420,11 @@ struct Gr2RGr : public Conversion {
   
     PairVoVUint32 receivedEdgeInfo =
         sendAndReceiveAssignedEdges<EdgeTy>(hostToNodes, localEdges);
+
+    // at this point, localEdges has been freed
+
+    galois::gPrint("[", hostID, "] Received destinations to remap\n");
+
     VoVUint32 localSrcToDest = receivedEdgeInfo.first;
     VoVUint32 localSrcToData = receivedEdgeInfo.second;
 
@@ -422,6 +437,9 @@ struct Gr2RGr : public Conversion {
     std::vector<uint32_t> node2NewNode = readRandomNodeMapping(nodeMapBinary,
                                                                localNodeBegin,
                                                                localNumNodes);
+
+    galois::gPrint("[", hostID, "] Remapping destinations now\n");
+
     // TODO refactor
     std::vector<uint32_t> remappedEdges;
     GALOIS_ASSERT(localNumNodes == localSrcToDest.size());
@@ -451,6 +469,7 @@ struct Gr2RGr : public Conversion {
     ////////////////////////////////////////////////////////////////////////////
     // phase 3: write now randomized-node edges to new file
     ////////////////////////////////////////////////////////////////////////////
+    galois::gPrint("[", hostID, "] Entering writing phase\n");
 
     // we have the randomized nodes in remappedEdges; execution proceeds
     // like the other converters from this point on
@@ -499,12 +518,14 @@ struct Nodemap2Binary : public Conversion {
     // determine where to start writing using prefix sum of read nodes
     std::vector<uint64_t> nodesEachHostRead =
         getEdgesPerHost(nodesToWrite.size());
+
     for (unsigned i = 1; i < nodesEachHostRead.size(); i++) {
       nodesEachHostRead[i] += nodesEachHostRead[i - 1];
     }
+
     uint64_t fileOffset; 
     if (hostID != 0) {
-      fileOffset = nodesEachHostRead[hostID - 1];
+      fileOffset = nodesEachHostRead[hostID - 1] * sizeof(uint32_t);
     } else {
       fileOffset = 0;
     }
@@ -525,7 +546,15 @@ int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
   galois::setActiveThreads(threadsToUse);
 
-  // TODO make sure MPI is initialized (this may use MPI write)
+  // need to initialize MPI if using LWCI (else already initialized)
+  #ifdef GALOIS_USE_LWCI
+  int initResult;
+  MPICheck(MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &initResult));
+
+  if (initResult < MPI_THREAD_MULTIPLE) {
+    GALOIS_DIE("unable to init mpi with thread multiple");
+  }
+  #endif
 
   switch (convertMode) {
     case edgelist2gr: 
@@ -543,6 +572,12 @@ int main(int argc, char** argv) {
     case nodemap2binary:
       convert<Nodemap2Binary>(); break;
     default: abort();
+
   }
+
+  #ifdef GALOIS_USE_LWCI
+  MPICheck(MPI_Finalize());
+  #endif
+
   return 0;
 }

@@ -44,6 +44,7 @@
 #include <atomic>
 #include <vector>
 #include <type_traits>
+#include <random>
 
 namespace galois {
 namespace runtime {
@@ -471,8 +472,8 @@ public:
 
     // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
-    reportStat_Single (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
-    reportStat_Single (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
+    reportStat_Single (loopname, "heavy-edges-visited", edgesVisited.reduce());
+    reportStat_Single (loopname, "heavy-edges-flipped", edgesFlipped.reduce());
 
     t.stop ();
 
@@ -804,7 +805,7 @@ public:
 
     t_verify.stop ();
 
-    if (foundError.reduceRO ()) {
+    if (foundError.reduce()) {
       GALOIS_DIE ("ERROR! Coloring verification failed!\n");
     } else {
       printf ("OK! Coloring verification succeeded!\n");
@@ -824,7 +825,7 @@ public:
   }
 
   unsigned getNumColors (void) const {
-    return maxColors.reduceRO () + 1;
+    return maxColors.reduce() + 1;
   }
 
 };
@@ -1888,7 +1889,7 @@ public:
       dagManager.runDAGcomputation (f, sources, loopname, galois::chunk_size<CHUNK_SIZE> ());
       t_dag_exec.stop ();
 
-      bool term = (numPushes.reduceRO () == 0);
+      bool term = (numPushes.reduce() == 0);
 
 
       if (term) { break; }
@@ -2033,8 +2034,8 @@ public:
           // sumSucc[i].reduceRO (),
           // sumSucc[i].reduceRO ()/sz);
 //
-      sumAllDegree += sumDegree[i].reduceRO ();
-      sumAllDAGsucc += sumSucc[i].reduceRO ();
+      sumAllDegree += sumDegree[i].reduce();
+      sumAllDAGsucc += sumSucc[i].reduce();
     }
 
     // for (unsigned i = 0; i < numColors; ++i) {
@@ -2062,9 +2063,9 @@ public:
 
     for (unsigned i = 0; i < numColors; ++i) {
       integralSize += colorBags[i].size_all ();
-      integralDeg += sumDegree[i].reduceRO ();
-      integralSucc += sumSucc[i].reduceRO ();
-      integralPred += (sumDegree[i].reduceRO () - sumSucc[i].reduceRO ());
+      integralDeg += sumDegree[i].reduce();
+      integralSucc += sumSucc[i].reduce();
+      integralPred += (sumDegree[i].reduce() - sumSucc[i].reduce());
 
       printf ("%d, %zd, %3lf, %3lf, %3lf, %3lf\n",
           i,
@@ -2104,7 +2105,7 @@ public:
     for (unsigned i = 0; i < numColors; ++i) {
 
       cutOffColor = i + 1;
-      runningSum += bagSizes[i].reduceRO ();
+      runningSum += bagSizes[i].reduce();
 
       if (double (runningSum) / double (numNodes) > WORK_CUTOFF_LIM) {
         break;
@@ -2328,7 +2329,7 @@ public:
           galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 
 
-      if (numPushes.reduceRO () == 0) {
+      if (numPushes.reduce() == 0) {
         break;
       }
       t_heavy.stop ();

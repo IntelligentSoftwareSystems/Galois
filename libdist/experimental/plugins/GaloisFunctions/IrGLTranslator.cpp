@@ -32,10 +32,16 @@ using namespace llvm;
 #define COMPUTE_FILENAME "._compute_kernels"
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
-#define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+// ASSUMPTIONS
+#define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_" // TODO: detect automatically
+#define __GALOIS_BITSET_VARIABLE_PREFIX__ "bitset_"
 #define __GALOIS_ACCUMULATOR_TYPE__ "galois::DGAccumulator"
+#define __GALOIS_REDUCEMAX_TYPE__ "galois::DGReduceMax"
+#define __GALOIS_REDUCEMIN_TYPE__ "galois::DGReduceMin"
 
 namespace {
+
+typedef std::tuple<std::vector<std::string>, std::vector<std::string>, std::vector<std::string>> tuple3strings;
 
 // finds and replaces all occurrences
 // ensures progress even if replaceWith contains toReplace
@@ -62,18 +68,21 @@ private:
   bool isTopological;
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
+  std::unordered_set<const Stmt *> elseStmts;
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
-  std::string accumulatorName;
   std::stringstream declString, varDeclString, bodyString;
+  std::map<std::string, std::string> accumulatorToTypeMap;
+  std::map<std::string, std::string> reducemaxToTypeMap;
+  std::map<std::string, std::string> reduceminToTypeMap;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
+  std::map<std::string, std::string> bitsetVariableToTypeMap;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
   std::map<std::string, std::string> &SharedVariablesToTypeMap;
-  std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
-  std::set<std::string> &KernelsHavingReturnValue;
+  std::map<std::string, tuple3strings > &KernelToArgumentsMap;
 
   unsigned conditional; // if (generated) code is enclosed within an if-condition
   bool conditional_pop; // if (generated) code is enclosed within an (generated) if-condition for pop
@@ -81,17 +90,19 @@ private:
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
-      std::string accumName,
+      std::map<std::string, std::string> accumToTypeMap,
+      std::map<std::string, std::string> maxToTypeMap,
+      std::map<std::string, std::string> minToTypeMap,
       std::map<std::string, std::string> &sharedVariables,
-      std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels,
-      std::set<std::string> &returnKernels) : 
+      std::map<std::string, tuple3strings > &kernels) : 
     //astContext(context),
     rewriter(R),
     isTopological(isTopo),
-    accumulatorName(accumName),
+    accumulatorToTypeMap(accumToTypeMap),
+    reducemaxToTypeMap(maxToTypeMap),
+    reduceminToTypeMap(minToTypeMap),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
-    KernelsHavingReturnValue(returnKernels),
     conditional(0),
     conditional_pop(false)
   {}
@@ -180,7 +191,7 @@ public:
           break;
         }
       }
-      findAndReplace(text, "galois::atomic", "atomic");
+      findAndReplace(text, "galois::atomic", "atomicTest");
     }
     {
       std::size_t start = 0;
@@ -194,7 +205,7 @@ public:
           break;
         }
       }
-      findAndReplace(text, "galois::min", "atomicMin");
+      findAndReplace(text, "galois::min", "atomicTestMin");
     }
     {
       std::size_t start = 0;
@@ -208,7 +219,7 @@ public:
           break;
         }
       }
-      findAndReplace(text, "galois::add", "atomicAdd");
+      findAndReplace(text, "galois::add", "atomicTestAdd");
     }
 
     {
@@ -241,11 +252,34 @@ public:
     findAndReplace(text, "std::fabs", "fabs");
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
 
-    if (!accumulatorName.empty() && (text.find(accumulatorName) == 0)) {
-      std::size_t begin = text.find("=");
-      std::size_t end = text.find(";", begin);
-      std::string value = text.substr(begin+1, end - begin - 3);
-      text = "ReturnFromParallelFor(\"" + value + "\")";
+    for (auto& it : accumulatorToTypeMap) {
+      auto accumulatorName = it.first;
+      if (text.find(accumulatorName) == 0) {
+        std::size_t begin = text.find("=");
+        std::size_t end = text.find(";", begin);
+        std::string value = text.substr(begin+1, end - begin - 3);
+        text = accumulatorName + ".reduce(" + value + ")";
+      }
+    }
+
+    for (auto& it : reducemaxToTypeMap) {
+      auto reducemaxName = it.first;
+      if (text.find(reducemaxName) == 0) {
+        std::size_t begin = text.find("(");
+        std::size_t end = text.find(")", begin);
+        std::string value = text.substr(begin+1, end - begin - 1);
+        text = reducemaxName + ".reduce(" + value + ")";
+      }
+    }
+
+    for (auto& it : reduceminToTypeMap) {
+      auto reduceminName = it.first;
+      if (text.find(reduceminName) == 0) {
+        std::size_t begin = text.find("(");
+        std::size_t end = text.find(")", begin);
+        std::string value = text.substr(begin+1, end - begin - 1);
+        text = reduceminName + ".reduce(" + value + ")";
+      }
     }
 
     return text;
@@ -300,8 +334,26 @@ public:
       }
       assert(conditional == 0);
       bodyString << "]),\n"; // end ForAll
+      for (auto& it : accumulatorToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+      }
       bodyString << "]),\n"; // end Kernel
-      std::vector<std::string> arguments, globalArguments;
+      std::vector<std::string> globalArguments, arguments, bitsetArguments;
       for (auto& global : globalVariableToTypeMap) {
         declString << ", ('" << global.second << "', '" << global.first << "')";
         globalArguments.push_back(global.first);
@@ -312,8 +364,22 @@ public:
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
-      KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
-      if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
+      for (auto& bitset : bitsetVariableToTypeMap) {
+        declString << ", ('DynamicBitset&', '" << bitset.first << "')";
+        auto str = bitset.first;
+        findAndReplace(str, __GALOIS_BITSET_VARIABLE_PREFIX__, "");
+        bitsetArguments.push_back(str);
+      }
+      for (auto& it : accumulatorToTypeMap) {
+        declString << ", ('HGAccumulator<" << it.second << ">', '" << it.first << "')";
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        declString << ", ('HGReduceMax<" << it.second << ">', '" << it.first << "')";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        declString << ", ('HGReduceMin<" << it.second << ">', '" << it.first << "')";
+      }
+      KernelToArgumentsMap[funcName] = std::make_tuple(globalArguments, arguments, bitsetArguments);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
@@ -324,20 +390,57 @@ public:
     return traverse;
   }
 
-  virtual bool TraverseStmt(Stmt *S) {
-    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
-    if (traverse && S) {
-      if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
-        bodyString << "]),\n"; // end ForAll
-        bodyString << "),\n"; // end ClosureHint
-        // FIXME: assert that there is no code after the edge-iterator
-      } else if (isa<IfStmt>(S)) {
-        if (conditional > 0) {
-          bodyString << "]),\n"; // end If
-          --conditional;
-        }
+  virtual bool TraverseCXXForRangeStmt(CXXForRangeStmt* forStmt) {
+    assert(forStmt);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseCXXForRangeStmt(forStmt);
+    if (traverse) {
+      bodyString << "]),\n"; // end ForAll
+      bodyString << "),\n"; // end ClosureHint
+      // ASSUMPTION: no code after edge-loop
+      // FIXME: assert that there is no code after the edge-loop
+    }
+    return traverse;
+  }
+
+  virtual bool TraverseForStmt(ForStmt* forStmt) {
+    assert(forStmt);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseForStmt(forStmt);
+    if (traverse) {
+      bodyString << "]),\n"; // end ForAll
+      bodyString << "),\n"; // end ClosureHint
+      // ASSUMPTION: no code after edge-loop
+      // FIXME: assert that there is no code after the edge-loop
+    }
+    return traverse;
+  }
+
+  virtual bool TraverseIfStmt(IfStmt* ifStmt) {
+    assert(ifStmt);
+    const Stmt* elseStmt = ifStmt->getElse();
+    if (elseStmt) {
+      assert(elseStmts.find(elseStmt) == elseStmts.end());
+      elseStmts.insert(elseStmt);
+    }
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseIfStmt(ifStmt);
+    if (elseStmt) {
+      assert(elseStmts.find(elseStmt) == elseStmts.end());
+    }
+    if (traverse) {
+      if (conditional > 0) {
+        bodyString << "]),\n"; // end If
+        --conditional;
       }
     }
+    return traverse;
+  }
+
+  virtual bool TraverseStmt(Stmt *S) {
+    bool elseStmt = (elseStmts.find(S) != elseStmts.end());
+    if (elseStmt) {
+      bodyString << "],\n[\n"; // else of If
+      elseStmts.erase(S);
+    }
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
     return traverse;
   }
 
@@ -346,11 +449,32 @@ public:
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', '__nowned')";
-    // FIXME: assuming first parameter is GNode
+    declString << "Kernel(\"" << funcName << "\", [G.param()";
+    // ASSUMPTION: first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
       declString << ", ('unsigned int', '__begin'), ('unsigned int', '__end')";
+      for (auto& it : accumulatorToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CDecl([(\"__shared__ " << br << "::TempStorage\", \"" << name << "_ts\", \"\")]),\n";
+        bodyString << "CBlock([\"" << name << ".thread_entry()\"]),\n";
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CDecl([(\"__shared__ " << br << "::TempStorage\", \"" << name << "_ts\", \"\")]),\n";
+        bodyString << "CBlock([\"" << name << ".thread_entry()\"]),\n";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
+        bodyString << "CDecl([(\"__shared__ " << br << "::TempStorage\", \"" << name << "_ts\", \"\")]),\n";
+        bodyString << "CBlock([\"" << name << ".thread_entry()\"]),\n";
+      }
       bodyString << "ForAll(\"" << vertexName << "\", G.nodes(\"__begin\", \"__end\"),\n[\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \" = " << vertexName << " < __end\")]),\n"; // hack for IrGL compiler
       bodyString << "If(\"pop\", [\n"; // hack to handle nested parallelism (should be handled by IrGL compiler in the future)
@@ -388,6 +512,7 @@ public:
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
     while (conditional > 0) {
+      // ASSUMPTION: for loop is in If block, which does not have a corresponding Else block
       bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
       --conditional;
     }
@@ -421,6 +546,7 @@ public:
     }
     symbolTable.insert(variableName);
     while (conditional > 0) {
+      // ASSUMPTION: for loop is in If block, which does not have a corresponding Else block
       bodyString << "], [ CBlock([\"pop = false\"]), ]),\n"; // end If
       --conditional;
     }
@@ -495,7 +621,7 @@ public:
         record = cxxCallExpr->getRecordDecl();
       }
       if (record && 
-          (record->getNameAsString().compare("GReducible") == 0)) {
+          (record->getNameAsString().compare("GReducible") == 0)) { // not used
         Expr *implicit = cxxCallExpr->getImplicitObjectArgument();
         if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
           implicit = cast->getSubExpr();
@@ -517,6 +643,13 @@ public:
         std::string type = argument->getType().getUnqualifiedType().getAsString();
         parameterToTypeMap[reduceVar] = FormatType(type);
       } else {
+        if (record && 
+            (record->getNameAsString().compare("DynamicBitSet") == 0)) {
+          auto varName = rewriter.getRewrittenText(cxxCallExpr->getImplicitObjectArgument()->getSourceRange());
+          if (bitsetVariableToTypeMap.find(varName) == bitsetVariableToTypeMap.end()) {
+            bitsetVariableToTypeMap[varName] = "DynamicBitset"; // type ignored
+          }
+        }
         WriteCBlock(rewriter.getRewrittenText(callExpr->getSourceRange()));
       }
     }
@@ -582,7 +715,9 @@ public:
       parameterToTypeMap[varName] = FormatType(type);
     }
     else if ((symbolTable.find(varName) == symbolTable.end()) 
-        && (varName.compare(accumulatorName) != 0)
+        && (accumulatorToTypeMap.find(varName) == accumulatorToTypeMap.end())
+        && (reducemaxToTypeMap.find(varName) == reducemaxToTypeMap.end())
+        && (reduceminToTypeMap.find(varName) == reduceminToTypeMap.end())
         && (type.find("Graph") != 0)) {
       if (globalVariableToTypeMap.find(varName) == globalVariableToTypeMap.end()) {
         assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
@@ -598,13 +733,14 @@ private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool requiresWorklist; // shared across kernels
-  std::string accumulatorName;
   std::ofstream Output;
 
+  std::map<std::string, std::string> accumulatorToTypeMap;
+  std::map<std::string, std::string> reducemaxToTypeMap;
+  std::map<std::string, std::string> reduceminToTypeMap;
   std::map<std::string, std::string> SharedVariablesToTypeMap;
-  std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > KernelToArgumentsMap;
+  std::map<std::string, tuple3strings > KernelToArgumentsMap;
   std::map<std::string, std::vector<std::string> > HostKernelsToArgumentsMap;
-  std::set<std::string> KernelsHavingReturnValue;
 
   std::string FileNamePath;
 
@@ -625,10 +761,9 @@ public:
 
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
-    header << "#pragma once\n";
-    header << "#include \"galois/runtime/Cuda/cuda_mtypes.h\"\n";
+    header << "#pragma once\n\n";
     header << "#include \"galois/runtime/DataCommMode.h\"\n";
-    header << "\nstruct CUDA_Context;\n";
+    header << "#include \"galois/cuda/HostDecls.h\"\n\n";
     if (requiresWorklist) {
       header << "\nstruct CUDA_Worklist {\n";
       header << "\tint *in_items;\n";
@@ -636,38 +771,34 @@ public:
       header << "\tint *out_items;\n";
       header << "\tint num_out_items;\n";
       header << "\tint max_size;\n";
-      header << "};\n";
+      header << "};\n\n";
     }
-    header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
-    header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
-    header << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
-    if (requiresWorklist) {
-      header << "struct CUDA_Worklist *wl, double wl_dup_factor, ";
-    }
-    header << "MarshalGraph &g, unsigned num_hosts);\n\n";
-    header << "void reset_CUDA_context(struct CUDA_Context *ctx);\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
-      header << "void bitset_" << var.first << "_clear_cuda(struct CUDA_Context *ctx);\n";
-      header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
-      header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
-      header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
-      header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
-      header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
-      header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode);\n";
-      header << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
-      header << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode);\n";
-      header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i);\n";
-      header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode, " << var.second << " i);\n";
-      header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
-      header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
-      header << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n\n";
+      header << "void get_bitset_" << var.first << "_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute);\n";
+      header << "void bitset_" << var.first << "_reset_cuda(struct CUDA_Context* ctx);\n";
+      header << "void bitset_" << var.first << "_reset_cuda(struct CUDA_Context* ctx, size_t begin, size_t end);\n";
+      header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID);\n";
+      header << "void set_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void add_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v);\n";
+      header << "bool min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode);\n";
+      header << "void batch_get_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_get_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode);\n";
+      header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i);\n";
+      header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode, " << var.second << " i);\n";
+      header << "void batch_set_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+      header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+      header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+      header << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode);\n";
+      header << "void batch_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, " << var.second << " v);\n\n";
     }
     for (auto& kernel : HostKernelsToArgumentsMap) {
       header << "void " << kernel.first << "_cuda(";
       for (auto& argument : kernel.second) {
         header << argument << ", ";
       }
-      header << "struct CUDA_Context *ctx);\n";
+      header << "struct CUDA_Context* ctx);\n";
     }
     header.close();
 
@@ -679,7 +810,7 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
-    cuheader << "#include \"galois/runtime/Cuda/cuda_helpers.h\"\n\n";
+    cuheader << "#include \"galois/runtime/cuda/DeviceSync.h\"\n\n";
     cuheader << "struct CUDA_Context : public CUDA_Context_Common {\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tstruct CUDA_Context_Field<" << var.second << "> " << var.first << ";\n";
@@ -690,16 +821,16 @@ public:
       cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
     }
     cuheader << "};\n\n";
-    cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
-    cuheader << "\tstruct CUDA_Context *ctx;\n";
-    cuheader << "\tctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));\n";
+    cuheader << "struct CUDA_Context* get_CUDA_context(int id) {\n";
+    cuheader << "\tstruct CUDA_Context* ctx;\n";
+    cuheader << "\tctx = (struct CUDA_Context* ) calloc(1, sizeof(struct CUDA_Context));\n";
     cuheader << "\tctx->id = id;\n";
     cuheader << "\treturn ctx;\n";
     cuheader << "}\n\n";
-    cuheader << "bool init_CUDA_context(struct CUDA_Context *ctx, int device) {\n";
+    cuheader << "bool init_CUDA_context(struct CUDA_Context* ctx, int device) {\n";
     cuheader << "\treturn init_CUDA_context_common(ctx, device);\n";
     cuheader << "}\n\n";
-    cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
+    cuheader << "void load_graph_CUDA(struct CUDA_Context* ctx, ";
     if (requiresWorklist) {
       cuheader << "struct CUDA_Worklist *wl, double wl_dup_factor, ";
     }
@@ -726,58 +857,73 @@ public:
     }
     cuheader << "\treset_CUDA_context(ctx);\n";
     cuheader << "}\n\n";
-    cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";
+    cuheader << "void reset_CUDA_context(struct CUDA_Context* ctx) {\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->" << var.first << ".data.zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     cuheader << "}\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
-      cuheader << "void bitset_" << var.first << "_clear_cuda(struct CUDA_Context *ctx) {\n";
-      cuheader << "\tctx->" << var.first << ".is_updated.cpu_rd_ptr()->clear();\n";
+      cuheader << "void get_bitset_" << var.first << "_cuda(struct CUDA_Context* ctx, uint64_t* bitset_compute) {\n";
+      cuheader << "\tctx->" << var.first << ".is_updated.cpu_rd_ptr()->copy_to_cpu(bitset_compute);\n";
       cuheader << "}\n\n";
-      cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
+      cuheader << "void bitset_" << var.first << "_reset_cuda(struct CUDA_Context* ctx) {\n";
+      cuheader << "\tctx->" << var.first << ".is_updated.cpu_rd_ptr()->reset();\n";
+      cuheader << "}\n\n";
+      cuheader << "void bitset_" << var.first << "_reset_cuda(struct CUDA_Context* ctx, size_t begin, size_t end) {\n";
+      cuheader << "\treset_bitset_field(&ctx->" << var.first << ", begin, end);\n";
+      cuheader << "}\n\n";
+      cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".data.cpu_rd_ptr();\n";
       cuheader << "\treturn " << var.first << "[LID];\n";
       cuheader << "}\n\n";
-      cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".data.cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
-      cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".data.cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] += v;\n";
       cuheader << "}\n\n";
-      cuheader << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "bool min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned LID, " << var.second << " v) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".data.cpu_wr_ptr();\n";
-      cuheader << "\tif (" << var.first << "[LID] > v)\n";
+      cuheader << "\tif (" << var.first << "[LID] > v){\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
+      cuheader << "\t\treturn true;\n";
+      cuheader << "\t}\n";
+      cuheader << "\treturn false;\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMaster, false>(ctx, &ctx->" << var.first << ", from_id, v);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
+      cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
       cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMaster, false>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
-      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedSlave, false>(ctx, &ctx->" << var.first << ", from_id, v);\n";
+      cuheader << "void batch_get_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMirror, false>(ctx, &ctx->" << var.first << ", from_id, v);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_slave_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
-      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedSlave, false>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+      cuheader << "void batch_get_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode) {\n";
+      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMirror, false>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i) {\n";
-      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedSlave, true>(ctx, &ctx->" << var.first << ", from_id, v, i);\n";
+      cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i) {\n";
+      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMirror, true>(ctx, &ctx->" << var.first << ", from_id, v, i);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode, " << var.second << " i) {\n";
-      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedSlave, true>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode, i);\n";
+      cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t *v_size, DataCommMode *data_mode, " << var.second << " i) {\n";
+      cuheader << "\tbatch_get_shared_field<" << var.second << ", sharedMirror, true>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode, i);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
-      cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedSlave, setOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+      cuheader << "void batch_set_mirror_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
+      cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedMirror, setOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
+      cuheader << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
+      cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedMaster, setOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedMaster, addOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
       cuheader << "}\n\n";
-      cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, unsigned long long int *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
+      cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context* ctx, unsigned from_id, uint64_t *bitset_comm, unsigned int *offsets, " << var.second << " *v, size_t v_size, DataCommMode data_mode) {\n";
       cuheader << "\tbatch_set_shared_field<" << var.second << ", sharedMaster, minOp>(ctx, &ctx->" << var.first << ", from_id, bitset_comm, offsets, v, v_size, data_mode);\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_reset_node_" << var.first << "_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, " << var.second << " v) {\n";
+      cuheader << "\treset_data_field<" << var.second << ">(&ctx->" << var.first << ", begin, end, v);\n";
       cuheader << "}\n\n";
     }
     cuheader.close();
@@ -799,8 +945,6 @@ public:
     for (auto& var : SharedVariablesToTypeMap) {
       std::string upper = var.first;
       std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      IrGLAST << "CDeclGlobal([(\"" << var.second 
-        << " *\", \"P_" << upper << "\", \"\")]),\n";
     }
 
     std::ifstream compute(COMPUTE_FILENAME);
@@ -857,18 +1001,32 @@ public:
     if (begin == 0) {
       // generate kernel for operator
       assert(callExpr->getNumArgs() > 2);
-      auto arg_type = callExpr->getArg(2)->getType();
+      // ASSUMPTION: Argument 1 (0-indexed) is operator
+      auto arg_type = callExpr->getArg(1)->getType();
       assert(arg_type->isStructureType());
+      // TODO: use anonymous function instead of class-operator()
       RecordDecl *record = arg_type->getAsStructureType()->getDecl();
       CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
       // find if there are any accumulators being used
       for (auto decl : cxxrecord->decls()) {
-        auto var = dyn_cast<VarDecl>(decl);
-        if (var && var->isStaticDataMember()) {
-          std::string type = var->getType().getAsString();
-          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
-            accumulatorName = var->getNameAsString();
-            break;
+        auto field = dyn_cast<FieldDecl>(decl);
+        if (field) {
+          auto templateType = field->getType().getNonReferenceType().getSingleStepDesugaredType(*astContext).getTypePtr()->getAs<TemplateSpecializationType>();
+          if (templateType) {
+            std::string type = templateType->getCanonicalTypeInternal().getAsString();
+            if (type.find(__GALOIS_ACCUMULATOR_TYPE__) != std::string::npos) {
+              auto accumulatorName = field->getNameAsString();
+              auto argType = templateType->getArg(0).getAsType().getAsString();
+              accumulatorToTypeMap[accumulatorName] = argType;
+            } else if (type.find(__GALOIS_REDUCEMAX_TYPE__) != std::string::npos) {
+              auto reducemaxName = field->getNameAsString();
+              auto argType = templateType->getArg(0).getAsType().getAsString();
+              reducemaxToTypeMap[reducemaxName] = argType;
+            } else if (type.find(__GALOIS_REDUCEMIN_TYPE__) != std::string::npos) {
+              auto reduceminName = field->getNameAsString();
+              auto argType = templateType->getArg(0).getAsType().getAsString();
+              reduceminToTypeMap[reduceminName] = argType;
+            }
           }
         }
       }
@@ -881,10 +1039,11 @@ public:
           //method->dump();
           IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
               isTopological,
-              accumulatorName,
+              accumulatorToTypeMap,
+              reducemaxToTypeMap,
+              reduceminToTypeMap,
               SharedVariablesToTypeMap,
-              KernelToArgumentsMap,
-              KernelsHavingReturnValue);
+              KernelToArgumentsMap);
           operatorVisitor.TraverseDecl(method);
           break;
         }
@@ -895,25 +1054,58 @@ public:
       // kernel signature
       Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
       std::stringstream Output_topo_all, Output_topo_all_body;
+      std::stringstream Output_topo_masters, Output_topo_masters_body;
+      std::stringstream Output_topo_nodeswithedges, Output_topo_nodeswithedges_body;
+      std::stringstream Output_topo_common, Output_topo_common_body;
       Output << "Kernel(\"" << kernelName << "_cuda\", [";
       if (isTopological) {
-        Output_topo_all << "Kernel(\"" << kernelName << "_all_cuda\", [";
+        Output_topo_all << "Kernel(\"" << kernelName << "_allNodes_cuda\", [";
         Output_topo_all_body << "CBlock([\"" << kernelName << "_cuda(";
-        Output_topo_all_body << "0, ctx->nowned, ";
+        Output_topo_all_body << "0, ctx->gg.nnodes, ";
+        Output_topo_masters << "Kernel(\"" << kernelName << "_masterNodes_cuda\", [";
+        Output_topo_masters_body << "CBlock([\"" << kernelName << "_cuda(";
+        Output_topo_masters_body << "ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ";
+        Output_topo_nodeswithedges << "Kernel(\"" << kernelName << "_nodesWithEdges_cuda\", [";
+        Output_topo_nodeswithedges_body << "CBlock([\"" << kernelName << "_cuda(";
+        Output_topo_nodeswithedges_body << "0, ctx->numNodesWithEdges, ";
       }
-      std::vector<std::string> arguments, arguments_topo_all;
+      std::vector<std::string> arguments, arguments_topo_common;
       if (isTopological) {
         Output << "('unsigned int ', '__begin'), ('unsigned int ', '__end'), ";
         arguments.push_back("unsigned int __begin");
         arguments.push_back("unsigned int __end");
       }
-      if (!accumulatorName.empty()) {
-        Output << "('int &', '__retval'), ";
-        arguments.push_back("int & __retval");
+      for (auto& it : accumulatorToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "('" << type << " &', '" << name << "'), ";
+        arguments.push_back(type + " & " + name);
         if (isTopological) {
-          Output_topo_all << "('int &', '__retval'), ";
-          Output_topo_all_body << "__retval, ";
-          arguments_topo_all.push_back("int & __retval");
+          Output_topo_common << "('" << type << " &', '" << name << "'), ";
+          Output_topo_common_body << name << ", ";
+          arguments_topo_common.push_back(type + " & " + name);
+        }
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "('" << type << " &', '" << name << "'), ";
+        arguments.push_back(type + " & " + name);
+        if (isTopological) {
+          Output_topo_common << "('" << type << " &', '" << name << "'), ";
+          Output_topo_common_body << name << ", ";
+          arguments_topo_common.push_back(type + " & " + name);
+        }
+      }
+      for (auto& it : reduceminToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "('" << type << " &', '" << name << "'), ";
+        arguments.push_back(type + " & " + name);
+        if (isTopological) {
+          Output_topo_common << "('" << type << " &', '" << name << "'), ";
+          Output_topo_common_body << name << ", ";
+          arguments_topo_common.push_back(type + " & " + name);
         }
       }
       for (auto field : cxxrecord->fields()) {
@@ -923,18 +1115,20 @@ public:
           Output << "('" << type << "', '" << name << "'), ";
           arguments.push_back(type + " " + name);
           if (isTopological) {
-            Output_topo_all << "('" << type << "', '" << name << "'), ";
-            Output_topo_all_body << name << ", ";
-            arguments_topo_all.push_back(type + " " + name);
+            Output_topo_common << "('" << type << "', '" << name << "'), ";
+            Output_topo_common_body << name << ", ";
+            arguments_topo_common.push_back(type + " " + name);
           }
         } 
       }
       HostKernelsToArgumentsMap[kernelName] = arguments;
-      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
+      Output << "('struct CUDA_Context* ', 'ctx')],\n[\n";
       if (isTopological) {
-        HostKernelsToArgumentsMap[kernelName + "_all"] = arguments_topo_all;
-        Output_topo_all << "('struct CUDA_Context *', 'ctx')],\n[\n";
-        Output_topo_all_body << "ctx)\"]),\n";
+        HostKernelsToArgumentsMap[kernelName + "_allNodes"] = arguments_topo_common;
+        HostKernelsToArgumentsMap[kernelName + "_masterNodes"] = arguments_topo_common;
+        HostKernelsToArgumentsMap[kernelName + "_nodesWithEdges"] = arguments_topo_common;
+        Output_topo_common << "('struct CUDA_Context* ', 'ctx')],\n[\n";
+        Output_topo_common_body << "ctx)\"]),\n";
       }
 
       // initialize blocks and threads
@@ -942,39 +1136,84 @@ public:
       Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
       Output << "CBlock([\"kernel_sizing(blocks, threads)\"]),\n";
 
-      // generate call to kernel
-      bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
       if (!isTopological) {
         requiresWorklist = true;
         Output << "CBlock([\"ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items)\"]),\n";
         Output << "CBlock([\"ctx->out_wl.will_write()\"]),\n";
         Output << "CBlock([\"ctx->out_wl.reset()\"]),\n";
       }
+
+      for (auto& it : accumulatorToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "CDecl([(\"Shared<" << type << ">\", \"" << name << "val\", \" = Shared<" << type << ">(1)\")]),\n";
+        Output << "CDecl([(\"HGAccumulator<" << type << ">\", \"_" << name << "\", \"\")]),\n";
+        Output << "CBlock([\"*(" << name << "val.cpu_wr_ptr()) = 0\"]),\n";
+        Output << "CBlock([\"_" << name << ".rv = " << name << "val.gpu_wr_ptr()\"]),\n";
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "CDecl([(\"Shared<" << type << ">\", \"" << name << "val\", \" = Shared<" << type << ">(1)\")]),\n";
+        Output << "CDecl([(\"HGReduceMax<" << type << ">\", \"_" << name << "\", \"\")]),\n";
+        Output << "CBlock([\"*(" << name << "val.cpu_wr_ptr()) = 0\"]),\n";
+        Output << "CBlock([\"_" << name << ".rv = " << name << "val.gpu_wr_ptr()\"]),\n";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        auto name = it.first;
+        auto type = it.second;
+        Output << "CDecl([(\"Shared<" << type << ">\", \"" << name << "val\", \" = Shared<" << type << ">(1)\")]),\n";
+        Output << "CDecl([(\"HGReduceMin<" << type << ">\", \"_" << name << "\", \"\")]),\n";
+        Output << "CBlock([\"*(" << name << "val.cpu_wr_ptr()) = 0\"]),\n";
+        Output << "CBlock([\"_" << name << ".rv = " << name << "val.gpu_wr_ptr()\"]),\n";
+      }
+
+      // generate call to kernel
       Output << "Invoke(\"" << kernelName << "\", ";
-      Output << "(\"ctx->gg\", \"ctx->nowned\"";
+      Output << "(\"ctx->gg\"";
       if (isTopological) {
         Output << ", \"__begin\", \"__end\"";
       }
       auto& karguments = KernelToArgumentsMap[kernelName];
-      for (auto& argument : karguments.first) {
+      for (auto& argument : std::get<0>(karguments)) {
         Output << ", \"" << argument << "\"";
       }
-      for (auto& argument : karguments.second) {
+      for (auto& argument : std::get<1>(karguments)) {
         Output << ", \"ctx->" << argument << ".data.gpu_wr_ptr()\"";
       }
       if (!isTopological) {
         Output << ", \"ctx->in_wl\"";
         Output << ", \"ctx->out_wl\"";
       }
-      Output << ")";
-      if (hasAReturnValue) {
-        Output << ", \"SUM\"";
+      for (auto& argument : std::get<2>(karguments)) {
+        Output << ", \"*(ctx->" << argument << ".is_updated.gpu_rd_ptr())\"";
       }
+      for (auto& it : accumulatorToTypeMap) {
+        Output << ", \"_" << it.first << "\"";
+      }
+      for (auto& it : reducemaxToTypeMap) {
+        Output << ", \"_" << it.first << "\"";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        Output << ", \"_" << it.first << "\"";
+      }
+      Output << ")";
       Output << "),\n";
       Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
-      if (hasAReturnValue) {
-        Output << "CBlock([\"__retval = *(retval.cpu_rd_ptr())\"], parse = False),\n";
+
+      for (auto& it : accumulatorToTypeMap) {
+        auto name = it.first;
+        Output << "CBlock([\"" << name << " = *(" << name << "val.cpu_rd_ptr())\"]),\n";
       }
+      for (auto& it : reducemaxToTypeMap) {
+        auto name = it.first;
+        Output << "CBlock([\"" << name << " = *(" << name << "val.cpu_rd_ptr())\"]),\n";
+      }
+      for (auto& it : reduceminToTypeMap) {
+        auto name = it.first;
+        Output << "CBlock([\"" << name << " = *(" << name << "val.cpu_rd_ptr())\"]),\n";
+      }
+
       if (!isTopological) {
         Output << "CBlock([\"ctx->out_wl.update_cpu()\"]),\n";
         Output << "CBlock([\"ctx->shared_wl->num_out_items = ctx->out_wl.nitems()\"]),\n";
@@ -984,12 +1223,26 @@ public:
 
       if (isTopological) {
         Output << Output_topo_all.str();
+        Output << Output_topo_common.str();
         Output << Output_topo_all_body.str();
+        Output << Output_topo_common_body.str();
+        Output << "], host = True),\n"; // end Kernel
+        Output << Output_topo_masters.str();
+        Output << Output_topo_common.str();
+        Output << Output_topo_masters_body.str();
+        Output << Output_topo_common_body.str();
+        Output << "], host = True),\n"; // end Kernel
+        Output << Output_topo_nodeswithedges.str();
+        Output << Output_topo_common.str();
+        Output << Output_topo_nodeswithedges_body.str();
+        Output << Output_topo_common_body.str();
         Output << "], host = True),\n"; // end Kernel
       }
 
       Output.close();
-      accumulatorName.clear();
+      accumulatorToTypeMap.clear();
+      reducemaxToTypeMap.clear();
+      reduceminToTypeMap.clear();
 
       std::string fileName = rewriter.getSourceMgr().getFilename(cxxrecord->getLocStart()).str();
       std::size_t found = fileName.rfind(".");

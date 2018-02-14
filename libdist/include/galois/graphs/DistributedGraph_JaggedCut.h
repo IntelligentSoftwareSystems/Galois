@@ -425,7 +425,7 @@ private:
       auto& b = p->second;
       galois::runtime::gDeserialize(b, jaggedColumnMap[h]);
     }
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
   }
 
   void loadStatistics(galois::graphs::OfflineGraph& g,
@@ -498,7 +498,7 @@ private:
       galois::runtime::gDeserialize(b, numOutgoingEdges[h]);
       galois::runtime::gDeserialize(b, hasIncomingEdge[h]);
     }
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
 
     auto max_nodes = hasIncomingEdge[0].size(); // imprecise
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -626,7 +626,7 @@ private:
         receiveEdges(graph, edgesToReceive);
       });
 
-    ++galois::runtime::evilPhase;
+    base_DistGraph::increment_evilPhase();
 
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 

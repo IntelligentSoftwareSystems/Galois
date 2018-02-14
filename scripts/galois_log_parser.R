@@ -52,6 +52,10 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
  runID <- (subset(logData, CATEGORY == "Run_UUID"& TOTAL_TYPE != "HostValues"))$TOTAL
 
  numIterations <- (subset(logData, CATEGORY == "NUM_ITERATIONS_0"& TOTAL_TYPE != "HostValues"))$TOTAL
+ #If numIterations is not printed in the log files
+ if(identical(numIterations, character(0))){
+   numIterations <- 0
+ }
 
  ## returnList for distributed galois log
  returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations)
@@ -94,25 +98,54 @@ getTimersDistributed <- function (logData) {
  print(paste("numRuns:", numRuns))
 
  ## Total compute time (galois::do_alls)
- computeTimePerIter <- numeric()
- for(i in 1:(numRuns)) {
-   j = i - 1 #Vectors are 1 indexed in r
-   #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
-   computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
-   if(!is.null(computeTimeRows)){
-     computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
+ computeTimeMean <- 0
+ if(benchmarkRegionName == "BC"){
+   regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
+   for( region in regions){
+     print(region)
+     computeTimeRows <- subset(logData, grepl(paste("^", region, "$", sep=""), REGION) & CATEGORY == "Time" & TOTAL_TYPE == "HMAX")$TOTAL
+     if(!is.null(computeTimeRows)){
+       print(paste(region, " : time :  ", as.numeric(computeTimeRows)))
+       computeTimeMean = computeTimeMean + round(as.numeric(computeTimeRows)/numRuns, digits = 2)
+     }
    }
  }
- computeTimeMean <- (mean(computeTimePerIter))
+ else {
+   computeTimePerIter <- numeric(numRuns)
+   for(i in 1:(numRuns)) {
+     j = i - 1 #Vectors are 1 indexed in r
+     #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
+     computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
+     if(!is.null(computeTimeRows)){
+       computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
+     }
+   }
+   computeTimeMean <- (mean(computeTimePerIter))
+ }
  print(paste("computeTimeMean:", computeTimeMean))
 
  ##Total sync time.
- syncTimePerIter <- numeric()
- for(i in 1:(numRuns)) {
-   j = i - 1 #Vectors are 1 indexed in r
-   syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
-   if(!is.null(syncTimeRows)){
-     syncTimePerIter[i] <- sum(as.numeric(syncTimeRows))
+ syncTimePerIter <- numeric(numRuns)
+ if(benchmarkRegionName == "BC"){
+   regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
+   for(i in 1:(numRuns)) {
+     j = i - 1 #Vectors are 1 indexed in r
+     for(region in regions){
+       syncTimeRows <- subset(logData, grepl(paste("SYNC_", region, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+       if(!is.null(syncTimeRows)){
+         #print(region)
+         syncTimePerIter[i] <- syncTimePerIter[i] + sum(as.numeric(syncTimeRows))
+       }
+     }
+   }
+ }
+ else{
+   for(i in 1:(numRuns)) {
+     j = i - 1 #Vectors are 1 indexed in r
+     syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+     if(!is.null(syncTimeRows)){
+       syncTimePerIter[i] <- sum(as.numeric(syncTimeRows))
+     }
    }
  }
  syncTimeMean <- (mean(syncTimePerIter))
@@ -133,7 +166,20 @@ getTimersDistributed <- function (logData) {
 
  ## Total bytes sent in reduce and broadcast phase in run 0.
  ### Same number of bytes are being sent in all the runs.
- syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE != "HostValues")$TOTAL))
+ syncBytes <- 0
+ if(benchmarkRegionName == "BC"){
+   regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
+   for(region in regions){
+     sendBytesRegion <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", region, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+     print(paste(region, " : ", sendBytesRegion))
+     syncBytes <- syncBytes + sendBytesRegion 
+     print(syncBytes)
+   }
+ }
+ else {
+   #syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE != "HostValues")$TOTAL))
+   syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+ }
  print(paste("syncBytes:", syncBytes))
 
  ##Graph construction time
@@ -155,9 +201,119 @@ getTimersDistributed <- function (logData) {
  }
 
  returnList <- list("replicationFac" = replicationFactor, "totalTime" = totalTime, "totalTimeExec" = totalTimeExecMean, "computeTime" = computeTimeMean, "syncTime" = syncTimeMean, "barrierTime" = barrierTimeMean, "syncBytes" = syncBytes, "graphConstructTime"= graphConstructTime, "communicationMemUsageMax" = communicationMemUsageMax, "communicationMemUsageMin" = communicationMemUsageMin)
+ print(length(returnList))
  return(returnList)
 }
 #### END: @function to values of timers for distributed memory galois log ##################
+
+#### START: @function to compute per iteration communication volume. ##################
+# Parses to get the timer values
+computePerIterVolume <- function (logData, paramList, output) {
+  numIter = as.numeric(paramList["iterations"])
+  print(numIter)
+
+  benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+  print(paste("benchmark:", benchmarkRegionName))
+
+  ## Number of runs
+  numRuns <- as.numeric((subset(logData, CATEGORY == "Runs" & TOTAL_TYPE != "HostValues"))$TOTAL)
+  print(paste("numRuns:", numRuns))
+
+  output_perIterVol_file <- paste(output, "_perIterVolume", sep="")
+  output_perIterVolRangePercentage_file <- paste(output, "_perIterVolumeRangePercentage", sep="")
+
+  ## Doing 1st iteration separately to see if new file is to be created or if file already exists.
+  #STAT, 0, dGraph, REDUCE_SEND_BYTES_BFS_0_0, HSUM, 23587108
+  ## To collect the data points in separate ranges of data volume
+  low = 0
+  medium = 0
+  high = 0
+
+  for(r in 0:(numRuns - 1)){
+    commVolumeRow <- subset(logData, grepl(paste("SEND_BYTES_", benchmarkRegionName, "_", r, "_", 0, "$" , sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL
+    #print(commVolumeRow)
+    if(!identical(commVolumeRow, character(0))){
+      print(commVolumeRow)
+      totalCommVolSentPerIter <- sum(as.numeric(commVolumeRow))
+      vol = totalCommVolSentPerIter/(1024*1024)
+      if(vol <= 100 )
+        low = low + 1
+      else if(vol > 100 && vol <= 1000)
+        medium = medium + 1
+      else if(vol > 1000)
+        high = high + 1
+
+      commVolList <- list("run" = r, "iter" = 0, "sendBytesPerIter" = totalCommVolSentPerIter)
+      outDataList <- append(paramList, commVolList)
+      if(!file.exists(output_perIterVol_file)){
+        print(paste(output_perIterVol_file, "Does not exist. Creating new file to record per iteration volume"))
+        write.csv(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, quote=F)
+      } else {
+        print(paste("Appending data to the existing file", output_perIterVol_file))
+        write.table(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+      }
+      print(totalCommVolSentPerIter)
+    }
+  }
+
+  for(i in 1:(numIter - 1)) {
+    for(r in 0:(numRuns - 1)){
+      commVolumeRow <- subset(logData, grepl(paste("SEND_BYTES_", benchmarkRegionName, "_", r, "_", i, "$" ,sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL
+      if(!identical(commVolumeRow, character(0))){
+        #print(commVolumeRow)
+        totalCommVolSentPerIter <- sum(as.numeric(commVolumeRow))
+        vol = totalCommVolSentPerIter/(1024*1024)
+        if(vol <= 100 )
+          low = low + 1
+        else if(vol > 100 && vol <= 1000)
+          medium = medium + 1
+        else if(vol > 1000)
+          high = high + 1
+
+        commVolList <- list("run" = r, "iter" = i, "sendBytesPerIter" = totalCommVolSentPerIter)
+        outDataList <- append(paramList, commVolList)
+        write.table(as.data.frame(outDataList), file=output_perIterVol_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+        #print(totalCommVolSentPerIter)
+      }
+    }
+  }
+
+
+  totalNumber <- low + medium + high
+  if(!file.exists(output_perIterVolRangePercentage_file)){
+    print(paste(output_perIterVolRangePercentage_file, "Does not exist. Creating new file to record per iteration volume in ranges"))
+    rangeList_low <- list("rangeLabel" = "low", "value" = low, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_low)
+    write.csv(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, quote=F)
+
+    rangeList_medium <- list("rangeLabel" = "medium", "value" = medium, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_medium)
+    write.table(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+
+    rangeList_high <- list("rangeLabel" = "high", "value" = high, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_high)
+    write.table(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+  } else {
+
+    print(paste("Appending data to the existing file", output_perIterVolRangePercentage_file))
+
+    rangeList_low <- list("rangeLabel" = "low", "value" = low, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_low)
+    write.table(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+
+    rangeList_medium <- list("rangeLabel" = "medium", "value" = medium, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_medium)
+    write.table(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+
+    rangeList_high <- list("rangeLabel" = "high", "value" = high, "total" = totalNumber)
+    outDataList <- append(paramList, rangeList_high)
+    write.table(as.data.frame(outDataList), file=output_perIterVolRangePercentage_file, row.names=F, col.names=F, quote=F, append=T, sep=",")
+  }
+
+}
+
+
+
 
 #### START: @function to compute per iteration RSD of compute time. ##################
 # Parses to get the timer values
@@ -230,24 +386,47 @@ computeMaxByMean <- function (logData, paramList, output) {
   maxsum <- numeric()
   meansum <- numeric()
   maxbymean <- numeric()
-  for(r in 0:(numRuns - 1)){
-    max <- numeric()
-    mean <- numeric()
-    for(i in 0:(numIter - 1)) {
-      computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", r, "_", i, sep=""), REGION) & TOTAL_TYPE == "HostValues")$TOTAL
-      if(!identical(computeTimeRows, character(0))){
-        computeTimePerHostArr <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
-        mean[i+1] <- mean(computeTimePerHostArr)
-        max[i+1] <- max(computeTimePerHostArr)
+
+  if(benchmarkRegionName == "BC"){
+    maxsum <- 0
+    meansum <- 0
+    regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
+    for( region in regions){
+     print(region)
+     computeTimeRows <- subset(logData, grepl(paste("^", region, "$", sep=""), REGION) & CATEGORY == "Time" & TOTAL_TYPE == "HostValues")$TOTAL
+     if(!is.null(computeTimeRows)){
+       print(computeTimeRows)
+       computeTimePerHost <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
+       maxsum[1] <- maxsum[1] +  round(max(as.numeric(computeTimePerHost))/numRuns, digits = 2)
+       meansum[1] <- meansum[1] + round(mean(as.numeric(computeTimePerHost))/numRuns, digits = 2)
+     }
+   }
+   maxbymean[1] <- round(maxsum[1]/meansum[1], digits = 2)
+   print(paste(region, " : maxsum :  ", maxsum))
+   print(paste(region, " : meansum :  ", meansum))
+   print(paste(region, " : maxbymean :  ", maxbymean))
+
+  }
+  else {
+    for(r in 0:(numRuns - 1)){
+      max <- numeric()
+      mean <- numeric()
+      for(i in 0:(numIter - 1)) {
+        computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", r, "_", i, sep=""), REGION) & TOTAL_TYPE == "HostValues")$TOTAL
+        if(!identical(computeTimeRows, character(0))){
+          computeTimePerHostArr <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
+          mean[i+1] <- mean(computeTimePerHostArr)
+          max[i+1] <- max(computeTimePerHostArr)
+        }
+        else {
+          mean[i+1] <- 0
+          max[i+1] <- 0
+        }
       }
-      else {
-        mean[i+1] <- 0
-        max[i+1] <- 0
-      }
+      maxsum[r+1] <- sum(max)
+      meansum[r+1] <- sum(mean)
+      maxbymean[r+1] <- round((maxsum[r+1]/meansum[r+1]), digits = 2)
     }
-    maxsum[r+1] <- sum(max)
-    meansum[r+1] <- sum(mean)
-    maxbymean[r+1] <- round((maxsum[r+1]/meansum[r+1]), digits = 2)
   }
   maxsum_avg <- mean(maxsum)
   meansum_avg <- mean(meansum)
@@ -266,9 +445,10 @@ computeMaxByMean <- function (logData, paramList, output) {
 }
 
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
+  printNormalStats = TRUE;
   if(isTRUE(isSharedMemGaloisLog)){
     print("Parsing commadline")
     paramList <- parseCmdLine(logData, T)
@@ -281,9 +461,15 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
     print("Parsing timers for distributed memory galois log")
     if(isTRUE(isComputeMaxByMean)){
       computeMaxByMean(logData, paramList, output)
+      printNormalStats = FALSE
     }
     else if(isTRUE(isComputeRSD)){
       computeRSD(logData, paramList, output)
+      printNormalStats = FALSE
+    }
+    else if(isTRUE(isComputePerIterVol)){
+      computePerIterVolume(logData, paramList, output)
+      printNormalStats = FALSE
     }
     else{
       timersList <- getTimersDistributed(logData)
@@ -291,7 +477,8 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
   }
 
   ## if computing RSD then normal stats are not printed
-  if(isTRUE(!isComputeRSD && !isComputeMaxByMean)){
+  #if(isTRUE(!isComputeRSD && !isComputeMaxByMean && !isComputePerIterVol)){
+  if(isTRUE(printNormalStats)){
     outDataList <- append(paramList, timersList)
     if(!file.exists(output)){
       print(paste(output, "Does not exist. Creating new file"))
@@ -317,7 +504,9 @@ option_list = list(
                      make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
                                                help="To compute the RSD of per iteration compute time[default %default]"),
                      make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
-                                               help="To compute the max by mean compute time[default %default]")
+                                               help="To compute the max by mean compute time[default %default]"),
+                     make_option(c("-p", "--perItrVolume"), action="store_true", default=FALSE,
+                                               help="To get the per iteration communication volume [default %default]")
 
                      )
 
@@ -332,7 +521,7 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p)
 }
 
 ##################### END #####################

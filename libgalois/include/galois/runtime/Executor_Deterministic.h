@@ -1483,13 +1483,13 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     this->allocLocalState(tld.facing, tld.fn2);
     int result = 0;
-#ifdef GALOIS_USE_LONGJMP
-    if ((result = setjmp(hackjmp)) == 0) {
+#ifdef GALOIS_USE_LONGJMP_ABORT
+    if ((result = setjmp(execFrame)) == 0) {
 #else
     try {
 #endif
       tld.fn1(ctx->item.val, tld.facing.data());
-#ifdef GALOIS_USE_LONGJMP
+#ifdef GALOIS_USE_LONGJMP_ABORT
     } else { clearConflictLock(); }
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
@@ -1526,13 +1526,13 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
   tld.facing.resetFirstPass();
   ctx->resetFirstPass();
   int result = 0;
-#ifdef GALOIS_USE_LONGJMP
-  if ((result = setjmp(hackjmp)) == 0) {
+#ifdef GALOIS_USE_LONGJMP_ABORT
+  if ((result = setjmp(execFrame)) == 0) {
 #else
   try {
 #endif
     tld.fn2(ctx->item.val, tld.facing.data());
-#ifdef GALOIS_USE_LONGJMP
+#ifdef GALOIS_USE_LONGJMP_ABORT
   } else { clearConflictLock(); }
 #else
   } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }

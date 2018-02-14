@@ -49,15 +49,12 @@ class CallExprHandler : public MatchFinder::MatchCallback {
         LangOpts.CPlusPlus = true;
         clang::PrintingPolicy Policy(LangOpts);
 
-        //record->dump();
         if (call && record) {
 
+          //record->dumpColor();
           getData_entry DataEntry_obj;
           string STRUCT = record->getNameAsString();
           llvm::outs() << STRUCT << "\n\n";
-          /* if (STRUCT == "InitializeGraph") {
-             record->dump();
-             }*/
           string NAME = "";
           string TYPE = "";
 
@@ -66,12 +63,18 @@ class CallExprHandler : public MatchFinder::MatchCallback {
           string str_field;
           llvm::raw_string_ostream s(str_field);
           /** Returns something like this->graphName **/
+          if(memExpr_graph){
           memExpr_graph->printPretty(s, 0, Policy);
           DataEntry_obj.GRAPH_NAME = s.str();
+          } else {
+            /* If not found, use generic name. */
+            DataEntry_obj.GRAPH_NAME = "graph";
+          }
 
           auto func = call->getDirectCallee();
           if (func) {
             string functionName = func->getNameAsString();
+            llvm::outs() << " functionName : " << functionName << "\n"; 
             if (functionName == "getData") {
 
               auto binaryOP = Results.Nodes.getNodeAs<clang::Stmt>("getDataAssignment");
@@ -128,6 +131,7 @@ class CallExprHandler : public MatchFinder::MatchCallback {
               /** This is inside for loop which has getData as well. **/
               llvm::outs() << "Found getEdgeDst \n";
               auto forStatement = Results.Nodes.getNodeAs<clang::ForStmt>("forLoopName");
+              //forStatement->dumpColor();
               auto varDecl_edgeDst = Results.Nodes.getNodeAs<clang::VarDecl>("varDeclName");
               //varDecl_edgeDst->dump();
               string varName_edgeDst = varDecl_edgeDst->getNameAsString();

@@ -55,7 +55,7 @@ class SharedMemApp(GraphBMKSharedMem):
                 pass
             elif bmkinput.props.format != "mesh":
                 x.set_arg(bmkinput.props.file, bmk2.AT_INPUT_FILE)
-            else:
+            else: # mesh
                 # don't specify with input file flag as it doesn't exist (mesh
                 # loads multiple files, so the file specified in the inputdb
                 # isn't an actual file
@@ -160,7 +160,6 @@ class DelaunayTriangulation(SharedMemApp):
     relativeAppPath = "delaunaytriangulation/delaunaytriangulation"
     benchmark = "delaunaytriangulation"
 
-# TODO segfaults
 class DelaunayTriangulationDet(SharedMemApp):
     relativeAppPath = "delaunaytriangulation/delaunaytriangulation-det"
     benchmark = "delaunaytriangulation-det"
@@ -247,7 +246,7 @@ class PageRankPush(SharedMemApp):
 # for galois 2.2 version of pagerank
 class PageRank2Point2(SharedMemApp):
     relativeAppPath = "pagerank/pagerank"
-    benchmark = "pagerank"
+    benchmark = "pagerank22"
 
     def get_run_spec(self, bmkinput, config):
         """Adds transpose graph."""
@@ -259,7 +258,6 @@ class PageRank2Point2(SharedMemApp):
         
         return specs
 
-# TODO crashes
 class PreflowPush(SharedMemApp):
     relativeAppPath = "preflowpush/preflowpush"
     benchmark = "preflowpush"
@@ -275,7 +273,7 @@ class PreflowPush(SharedMemApp):
         return specs
 
 class PointsToAnalysis(SharedMemApp):
-    relativeAppPath = "pta/pta"
+    relativeAppPath = "pointsToAnalysis/pta"
     benchmark = "pta"
 
 class SpanningTree(SharedMemApp):

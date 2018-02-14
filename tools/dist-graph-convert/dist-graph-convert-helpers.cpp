@@ -46,6 +46,7 @@ std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
 
     int nodesRead; 
     MPI_Get_count(&readStatus, MPI_UINT32_T, &nodesRead);
+    GALOIS_ASSERT(nodesRead != MPI_UNDEFINED, "Nodes read is MPI_UNDEFINED");
     numToRead -= nodesRead;
     numRead += nodesRead;
     readPosition += nodesRead * sizeof(uint32_t);
@@ -317,8 +318,17 @@ std::vector<Uint64Pair> getChunkToHostMapping(
     uint64_t upperNode = chunkToNode[upperChunk].first;
 
     if (hostID == 0) {
-      printf("Host %lu gets nodes %lu to %lu (count %lu)\n", h, 
-              lowerNode, upperNode, upperNode - lowerNode);
+      uint64_t edgeCount;
+      if (lowerChunk == upperChunk) {
+        edgeCount = 0;
+      } else if (lowerChunk == 0) {
+        edgeCount = chunkCountsPrefixSum[upperChunk - 1];
+      } else {
+        edgeCount = chunkCountsPrefixSum[upperChunk - 1] - 
+                    chunkCountsPrefixSum[lowerChunk - 1];
+      }
+      printf("Host %lu gets nodes %lu to %lu (count %lu), with %lu edges\n", h, 
+             lowerNode, upperNode, upperNode - lowerNode, edgeCount);
     }
 
     finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
@@ -326,6 +336,123 @@ std::vector<Uint64Pair> getChunkToHostMapping(
 
   return finalMapping;
 }
+
+std::vector<Uint64Pair> getChunkToHostMappingLinear(
+      const std::vector<uint64_t>& chunkCountsPrefixSum,
+      const std::vector<Uint64Pair>& chunkToNode) {
+  GALOIS_DIE("Currently does not work."); // TODO fix this function
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+  uint64_t totalNumHosts = galois::runtime::getSystemNetworkInterface().Num;
+
+  uint64_t totalWeight = chunkCountsPrefixSum.back();
+  uint64_t weightPerPartition = (totalWeight + totalNumHosts - 1) / totalNumHosts;
+  uint64_t totalChunks = chunkCountsPrefixSum.size();
+
+  // TODO corner case handling (1 host, more hosts than chunks)
+
+  uint32_t currentHost = 0;
+  uint64_t currentChunk = 0;
+
+  uint64_t accountedEdges = 0;
+
+  std::vector<uint64_t> hostRanges(totalNumHosts + 1);
+  hostRanges[0] = 0;
+
+  while (currentChunk < totalChunks && currentHost < totalNumHosts) {
+    uint32_t hostsRemaining = totalNumHosts - currentHost;
+    GALOIS_ASSERT(totalChunks - currentChunk >= hostsRemaining);
+
+    // Handle case where only 1 host left or 1-1 host-chunk mapping
+    if (hostsRemaining == 1) {
+      // assign the rest of chunks to last host
+      hostRanges[currentHost + 1] = totalChunks;
+    } else if ((totalChunks - currentChunk) == hostsRemaining) {
+      // one chunk to each host
+      for (unsigned i = 0; i < hostsRemaining; i++) {
+        hostRanges[++currentHost] = (++currentChunk);
+      }
+    }
+
+    // Number of edges in current chunk
+    uint64_t chunkEdges;
+    if (currentChunk > 0) {
+      chunkEdges = chunkCountsPrefixSum[currentChunk] -
+                   chunkCountsPrefixSum[currentChunk - 1];
+    } else { // currentChunk == 0
+      chunkEdges = chunkCountsPrefixSum[0];
+    }
+
+    // Num edges division currently has not accounting chunkEdges into it
+    uint64_t edgeCountWithoutCurrent;
+    if (currentChunk > 0) {
+      edgeCountWithoutCurrent = chunkCountsPrefixSum[currentChunk] - 
+                                accountedEdges - chunkEdges;
+    } else { // currentChunk == 0
+      edgeCountWithoutCurrent = 0;
+    }
+
+    // If chunk edges is large, then don't add to current host unless host
+    // doesn't have much to begin with
+    if (chunkEdges > (3 * weightPerPartition / 4)) {
+      // If adding this chunk to current host too much, add to next host
+      // instead
+      if (edgeCountWithoutCurrent > (weightPerPartition / 4)) {
+        GALOIS_ASSERT(currentChunk != 0);
+
+        // assign to next host
+        // Beginning of next is current chunk
+        hostRanges[currentHost + 1] = currentChunk;
+        accountedEdges = chunkCountsPrefixSum[currentChunk - 1];
+        currentHost++;
+        continue;
+      }
+    }
+
+    // otherwise handle regularly
+    uint64_t currentEdgeCount = edgeCountWithoutCurrent + chunkEdges;
+
+    if (currentEdgeCount >= weightPerPartition) {
+      hostRanges[++currentHost] = currentChunk + 1;
+      accountedEdges = chunkCountsPrefixSum[currentChunk];
+    }
+
+    currentChunk++;
+  }
+
+  galois::gPrint("[", hostID, "] Done here\n");
+
+  GALOIS_ASSERT(hostRanges[0] == 0);
+  GALOIS_ASSERT(hostRanges[totalNumHosts] == totalChunks);
+
+  // handle pair creation
+  std::vector<Uint64Pair> finalMapping;
+  for (uint64_t h = 0; h < totalNumHosts; h++) {
+    uint64_t lowerChunk = hostRanges[h];
+    uint64_t upperChunk = hostRanges[h + 1];
+
+    uint64_t lowerNode = chunkToNode[lowerChunk].first;
+    uint64_t upperNode = chunkToNode[upperChunk].first;
+
+    if (hostID == 0) {
+      uint64_t edgeCount;
+      if (lowerChunk == upperChunk) {
+        edgeCount = 0;
+      } else if (lowerChunk == 0) {
+        edgeCount = chunkCountsPrefixSum[upperChunk - 1];
+      } else {
+        edgeCount = chunkCountsPrefixSum[upperChunk - 1] - 
+                    chunkCountsPrefixSum[lowerChunk - 1];
+      }
+      printf("Host %lu gets nodes %lu to %lu (count %lu), with %lu edges\n", h, 
+             lowerNode, upperNode, upperNode - lowerNode, edgeCount);
+    }
+
+    finalMapping.emplace_back(Uint64Pair(lowerNode, upperNode));
+  }
+
+  return finalMapping;
+}
+
 
 DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr) {
   uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
@@ -344,8 +471,8 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     const std::string& inputFile, Uint64Pair nodesToRead, 
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
 ) {
-  galois::graphs::BufferedGraph<void> mpiGraph;
-  mpiGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
+  galois::graphs::BufferedGraph<void> bufGraph;
+  bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
                             edgesToRead.first, edgesToRead.second, 
                             totalNumNodes, totalNumEdges);
   size_t numNodesToRead = nodesToRead.second - nodesToRead.first;
@@ -357,11 +484,11 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
     [&] (uint32_t gID) {
       size_t vectorIndex = gID - nodesToRead.first;
 
-      uint64_t edgeBegin = *mpiGraph.edgeBegin(gID);
-      uint64_t edgeEnd = *mpiGraph.edgeEnd(gID);
+      uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+      uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
 
       for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-        uint32_t edgeDest = mpiGraph.edgeDestination(i);
+        uint32_t edgeDest = bufGraph.edgeDestination(i);
         if (edgeDest != gID) {
           nonDupSets[vectorIndex].insert(edgeDest);
         }
@@ -574,6 +701,8 @@ void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
     
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT64_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     nodesToWrite -= itemsWritten;
     totalWritten += itemsWritten;
     nodeIndexOffset += itemsWritten * sizeof(uint64_t);
@@ -600,6 +729,8 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
 
       int itemsWritten;
       MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+      GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                    "itemsWritten is MPI_UNDEFINED");
       numToWrite -= itemsWritten;
       totalWritten += itemsWritten;
       edgeDestOffset += sizeof(uint32_t) * itemsWritten;
@@ -624,6 +755,8 @@ void writeEdgeDestData(MPI_File& gr, uint64_t edgeDestOffset,
 
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     numToWrite -= itemsWritten;
     totalWritten += itemsWritten;
     edgeDestOffset += sizeof(uint32_t) * itemsWritten;
@@ -645,6 +778,8 @@ void writeEdgeDataData(MPI_File& gr, uint64_t edgeDataOffset,
                              toWrite, MPI_UINT32_T, &writeStatus));
     int itemsWritten;
     MPI_Get_count(&writeStatus, MPI_UINT32_T, &itemsWritten);
+    GALOIS_ASSERT(itemsWritten != MPI_UNDEFINED, 
+                  "itemsWritten is MPI_UNDEFINED");
     numToWrite -= itemsWritten;
     numWritten += itemsWritten;
     edgeDataOffset += itemsWritten * sizeof(uint32_t);

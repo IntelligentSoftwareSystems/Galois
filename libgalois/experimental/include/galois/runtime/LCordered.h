@@ -539,7 +539,7 @@ public:
     t_create.start ();
     galois::runtime::do_all_gen(
         range,
-				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt)
+				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
         std::make_tuple(
           galois::loopname("create_initial_contexts")));
     t_create.stop ();

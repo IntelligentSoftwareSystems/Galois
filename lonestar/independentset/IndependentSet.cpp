@@ -279,7 +279,8 @@ struct DefaultAlgo {
 
     switch (algo) {
       case nondet: 
-        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
+        // galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
+        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<galois::worklists::ParaMeter<> >());
         break;
       case detBase:
         galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<DWL>());
