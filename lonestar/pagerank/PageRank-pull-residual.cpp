@@ -126,19 +126,22 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 
 void computePageRankResidual(Graph& graph) {
   unsigned int iterations = 0;
+  galois::GAccumulator<unsigned int> accum;
+
   while (true) {
+    std::cout << "Iteration: " << iterations << "\n";
     galois::do_all(galois::iterate(graph),
                    [&](const GNode& src) {
                      auto& sdata = graph.getData(src);
                      delta[src]  = 0;
 
-                     if (residual[src] > tolerance) {
-                       sdata.value += residual[src];
+                     if (std::fabs(residual[src]) > tolerance) {
+                       PRTy oldResidual = residual[src].exchange(0.0);
+                       sdata.value += oldResidual;
                        if (sdata.nout > 0) {
-                         delta[src] = residual[src] * (1 - ALPHA) / sdata.nout;
-                         //  GAccumulator_accum += 1;
+                         delta[src] = oldResidual * ALPHA / sdata.nout;
+                         accum += 1;
                        }
-                       residual[src] = 0;
                      }
                    },
                    galois::no_stats(), galois::loopname("PageRank_delta"));
@@ -161,9 +164,10 @@ void computePageRankResidual(Graph& graph) {
 
     iterations++;
 
-    if (iterations >= maxIterations) {
+    if (iterations >= maxIterations || !accum.reduce()) {
       break;
     }
+    accum.reset();
   } // end while(true)
 
   if (iterations >= maxIterations) {
@@ -286,7 +290,7 @@ int main(int argc, char** argv) {
                                     galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "Running synchronous Pull version, tolerance:" << tolerance
+  std::cout << "Running Pull residual version, tolerance:" << tolerance
             << ", maxIterations:" << maxIterations << "\n";
 
   initNodeData(transposeGraph);
