@@ -64,14 +64,45 @@ struct LNode {
   std::atomic<uint32_t> nout;
 };
 
-galois::LargeArray<PRTy> delta;
-galois::LargeArray<std::atomic<PRTy>> residual;
-
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
-void initNodeData(Graph& g) {
+template <typename Graph>
+static void printTop(Graph& graph, int topn) {
+  typedef typename Graph::node_data_reference node_data_reference;
+  typedef TopPair<GNode> Pair;
+  typedef std::map<Pair, GNode> Top;
+
+  Top top;
+
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src             = *ii;
+    node_data_reference n = graph.getData(src);
+    PRTy value            = n.value;
+    Pair key(value, src);
+
+    if ((int)top.size() < topn) {
+      top.insert(std::make_pair(key, src));
+      continue;
+    }
+
+    if (top.begin()->first < key) {
+      top.erase(top.begin());
+      top.insert(std::make_pair(key, src));
+    }
+  }
+
+  int rank = 1;
+  std::cout << "Rank PageRank Id\n";
+  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend();
+       ii != ei; ++ii, ++rank) {
+    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
+  }
+}
+
+void initNodeData(Graph& g, galois::LargeArray<PRTy>& delta,
+                  galois::LargeArray<std::atomic<PRTy>>& residual) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
                    auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
@@ -83,7 +114,8 @@ void initNodeData(Graph& g) {
                  galois::no_stats(), galois::loopname("initNodeData"));
 }
 
-void computeOutDeg(Graph& graph) {
+void computeOutDeg(Graph& graph, galois::LargeArray<PRTy>& delta,
+                   galois::LargeArray<std::atomic<PRTy>>& residual) {
   galois::StatTimer t("computeOutDeg");
   t.start();
 
@@ -124,12 +156,12 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   return old;
 }
 
-void computePageRankResidual(Graph& graph) {
+void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
+                             galois::LargeArray<std::atomic<PRTy>>& residual) {
   unsigned int iterations = 0;
   galois::GAccumulator<unsigned int> accum;
 
   while (true) {
-    std::cout << "Iteration: " << iterations << "\n";
     galois::do_all(galois::iterate(graph),
                    [&](const GNode& src) {
                      auto& sdata = graph.getData(src);
@@ -282,7 +314,9 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
+  galois::LargeArray<PRTy> delta;
   delta.allocateInterleaved(transposeGraph.size());
+  galois::LargeArray<std::atomic<PRTy>> residual;
   residual.allocateInterleaved(transposeGraph.size());
 
   galois::preAlloc(numThreads + (3 * transposeGraph.size() *
@@ -293,8 +327,8 @@ int main(int argc, char** argv) {
   std::cout << "Running Pull residual version, tolerance:" << tolerance
             << ", maxIterations:" << maxIterations << "\n";
 
-  initNodeData(transposeGraph);
-  computeOutDeg(transposeGraph);
+  initNodeData(transposeGraph, delta, residual);
+  computeOutDeg(transposeGraph, delta, residual);
 
   galois::GAccumulator<unsigned int> PageRank_accum;
   galois::GAccumulator<float> DGA_sum;
@@ -307,10 +341,15 @@ int main(int argc, char** argv) {
 
   galois::StatTimer prTimer("PageRank");
   prTimer.start();
-  computePageRankResidual(transposeGraph);
+  computePageRankResidual(transposeGraph, delta, residual);
   prTimer.stop();
 
   galois::reportPageAlloc("MeminfoPost");
+
+  if (!skipVerify) {
+    printTop(transposeGraph, 10);
+  }
+
   // // sanity check
   // PageRankSanity::go(*hg, DGA_sum, DGA_sum_residual,
   //                    DGA_residual_over_tolerance, max_value, min_value,
