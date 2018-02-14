@@ -462,7 +462,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    printTop(transposeGraph, 20);
+    printTop(transposeGraph, PRINT_TOP);
   }
 
   T.stop();

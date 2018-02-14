@@ -101,8 +101,10 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
-void initNodeData(Graph& g, galois::LargeArray<PRTy>& delta,
-                  galois::LargeArray<std::atomic<PRTy>>& residual) {
+using DeltaArray    = galois::LargeArray<PRTy>;
+using ResidualArray = galois::LargeArray<std::atomic<PRTy>>;
+
+void initNodeData(Graph& g, DeltaArray& delta, ResidualArray& residual) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
                    auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
@@ -114,10 +116,11 @@ void initNodeData(Graph& g, galois::LargeArray<PRTy>& delta,
                  galois::no_stats(), galois::loopname("initNodeData"));
 }
 
-void computeOutDeg(Graph& graph, galois::LargeArray<PRTy>& delta,
-                   galois::LargeArray<std::atomic<PRTy>>& residual) {
-  galois::StatTimer t("computeOutDeg");
-  t.start();
+// Computing outdegrees in the tranpose graph is equivalent to computing the
+// indegrees in the original graph
+void computeOutDeg(Graph& graph) {
+  galois::StatTimer outDegreeTimer("computeOutDeg");
+  outDegreeTimer.start();
 
   galois::LargeArray<std::atomic<size_t>> vec;
   vec.allocateInterleaved(graph.size());
@@ -145,11 +148,11 @@ void computeOutDeg(Graph& graph, galois::LargeArray<PRTy>& delta,
                  },
                  galois::no_stats(), galois::loopname("CopyDeg"));
 
-  t.stop();
+  outDegreeTimer.stop();
 }
 
-void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
-                             galois::LargeArray<std::atomic<PRTy>>& residual) {
+void computePageRankResidual(Graph& graph, DeltaArray& delta,
+                             ResidualArray& residual) {
   unsigned int iterations = 0;
   galois::GAccumulator<unsigned int> accum;
 
@@ -204,100 +207,6 @@ void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
   }
 }
 
-// Gets various values from the pageranks values/residuals of the graph
-// struct PageRankSanity {
-//   cll::opt<float>& local_tolerance;
-//   Graph* graph;
-
-//   galois::GAccumulator<float>& GAccumulator_sum;
-//   galois::GAccumulator<float>& GAccumulator_sum_residual;
-//   galois::GAccumulator<uint64_t>& GAccumulator_residual_over_tolerance;
-
-//   galois::GReduceMax<float>& max_value;
-//   galois::GReduceMin<float>& min_value;
-//   galois::GReduceMax<float>& max_residual;
-//   galois::GReduceMin<float>& min_residual;
-
-//   PageRankSanity(
-//       cll::opt<float>& _local_tolerance, Graph* _graph,
-//       galois::GAccumulator<float>& _GAccumulator_sum,
-//       galois::GAccumulator<float>& _GAccumulator_sum_residual,
-//       galois::GAccumulator<uint64_t>& _GAccumulator_residual_over_tolerance,
-//       galois::GReduceMax<float>& _max_value,
-//       galois::GReduceMin<float>& _min_value,
-//       galois::GReduceMax<float>& _max_residual,
-//       galois::GReduceMin<float>& _min_residual)
-//       : local_tolerance(_local_tolerance), graph(_graph),
-//         GAccumulator_sum(_GAccumulator_sum),
-//         GAccumulator_sum_residual(_GAccumulator_sum_residual),
-//         GAccumulator_residual_over_tolerance(
-//             _GAccumulator_residual_over_tolerance),
-//         max_value(_max_value), min_value(_min_value),
-//         max_residual(_max_residual), min_residual(_min_residual) {}
-
-//   void static go(Graph& _graph, galois::GAccumulator<float>& DGA_sum,
-//                  galois::GAccumulator<float>& DGA_sum_residual,
-//                  galois::GAccumulator<uint64_t>& DGA_residual_over_tolerance,
-//                  galois::GReduceMax<float>& max_value,
-//                  galois::GReduceMin<float>& min_value,
-//                  galois::GReduceMax<float>& max_residual,
-//                  galois::GReduceMin<float>& min_residual) {
-//     DGA_sum.reset();
-//     DGA_sum_residual.reset();
-//     max_value.reset();
-//     max_residual.reset();
-//     min_value.reset();
-//     min_residual.reset();
-//     DGA_residual_over_tolerance.reset();
-
-//     {
-//       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
-//                                      _graph.masterNodesRange().end()),
-//                      PageRankSanity(tolerance, &_graph, DGA_sum,
-//                                     DGA_sum_residual,
-//                                     DGA_residual_over_tolerance, max_value,
-//                                     min_value, max_residual, min_residual),
-//                      galois::no_stats(), galois::loopname("PageRankSanity"));
-//     }
-
-//     float max_rank          = max_value.reduce();
-//     float min_rank          = min_value.reduce();
-//     float rank_sum          = DGA_sum.reduce();
-//     float residual_sum      = DGA_sum_residual.reduce();
-//     uint64_t over_tolerance = DGA_residual_over_tolerance.reduce();
-//     float max_res           = max_residual.reduce();
-//     float min_res           = min_residual.reduce();
-
-//     galois::gPrint("Max rank is ", max_rank, "\n");
-//     galois::gPrint("Min rank is ", min_rank, "\n");
-//     galois::gPrint("Rank sum is ", rank_sum, "\n");
-//     galois::gPrint("Residual sum is ", residual_sum, "\n");
-//     galois::gPrint("# nodes with residual over ", tolerance, " (tolerance) is
-//     ",
-//                    over_tolerance, "\n");
-//     galois::gPrint("Max residual is ", max_res, "\n");
-//     galois::gPrint("Min residual is ", min_res, "\n");
-//   }
-
-//   /* Gets the max, min rank from all owned nodes and
-//    * also the sum of ranks */
-//   void operator()(GNode src) const {
-//     NodeData& sdata = graph->getData(src);
-
-//     max_value.update(sdata.value);
-//     min_value.update(sdata.value);
-//     max_residual.update(residual[src]);
-//     min_residual.update(residual[src]);
-
-//     GAccumulator_sum += sdata.value;
-//     GAccumulator_sum_residual += residual[src];
-
-//     if (residual[src] > local_tolerance) {
-//       GAccumulator_residual_over_tolerance += 1;
-//     }
-//   }
-// };
-
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -311,9 +220,9 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
-  galois::LargeArray<PRTy> delta;
+  DeltaArray delta;
   delta.allocateInterleaved(transposeGraph.size());
-  galois::LargeArray<std::atomic<PRTy>> residual;
+  ResidualArray residual;
   residual.allocateInterleaved(transposeGraph.size());
 
   galois::preAlloc(numThreads + (3 * transposeGraph.size() *
@@ -325,16 +234,7 @@ int main(int argc, char** argv) {
             << ", maxIterations:" << maxIterations << "\n";
 
   initNodeData(transposeGraph, delta, residual);
-  computeOutDeg(transposeGraph, delta, residual);
-
-  galois::GAccumulator<unsigned int> PageRank_accum;
-  galois::GAccumulator<float> DGA_sum;
-  galois::GAccumulator<float> DGA_sum_residual;
-  galois::GAccumulator<uint64_t> DGA_residual_over_tolerance;
-  galois::GReduceMax<float> max_value;
-  galois::GReduceMin<float> min_value;
-  galois::GReduceMax<float> max_residual;
-  galois::GReduceMin<float> min_residual;
+  computeOutDeg(transposeGraph);
 
   galois::StatTimer prTimer("PageRank");
   prTimer.start();
@@ -344,22 +244,8 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    printTop(transposeGraph, 10);
+    printTop(transposeGraph, PRINT_TOP);
   }
-
-  // // sanity check
-  // PageRankSanity::go(*hg, DGA_sum, DGA_sum_residual,
-  //                    DGA_residual_over_tolerance, max_value, min_value,
-  //                    max_residual, min_residual);
-
-  // // Verify
-  // if (verify) {
-  //   for (auto ii = (*hg).masterNodesRange().begin();
-  //        ii != (*hg).masterNodesRange().end(); ++ii) {
-  //     galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
-  //                                  (*hg).getData(*ii).value);
-  //   }
-  // }
 
   overheadTime.stop();
   return 0;
