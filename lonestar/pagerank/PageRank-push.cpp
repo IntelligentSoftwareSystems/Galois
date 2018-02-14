@@ -113,14 +113,6 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
-PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
-  PRTy old;
-  do {
-    old = v;
-  } while (!v.compare_exchange_strong(old, old + delta));
-  return old;
-}
-
 void initResidual(Graph& graph) {
   // use residual for the partial, scaled initial residual
   galois::do_all(galois::iterate(graph),
@@ -134,14 +126,14 @@ void initResidual(Graph& graph) {
                      atomicAdd(ddata.residual, PR_INIT_VAL / nout);
                    }
                  },
-                 galois::loopname("init-res-0"), galois::steal());
-  // scale residual
+                 galois::loopname("initResidual"), galois::steal());
+
   galois::do_all(galois::iterate(graph),
                  [&graph](const GNode& src) {
                    auto& data    = graph.getData(src);
                    data.residual = data.residual * ALPHA + (1.0 - ALPHA);
                  },
-                 galois::loopname("init-res-1"), galois::steal());
+                 galois::loopname("scaleResidual"), galois::steal());
 }
 
 void asyncPageRank(Graph& graph) {
@@ -168,11 +160,9 @@ void asyncPageRank(Graph& graph) {
                            ctx.push(dst);
                          }
                        }
-                     } else { // might need to reschedule self. But why?
-                              // ctx.push(src);
                      }
                    },
-                   galois::loopname("Async"), galois::no_conflicts(),
+                   galois::loopname("AsyncPageRank"), galois::no_conflicts(),
                    galois::wl<WL>());
 }
 
@@ -229,31 +219,30 @@ void syncPageRank(Graph& graph) {
                      }
                    },
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("IterActive"));
+                   galois::loopname("CreateEdgeTiles"));
 
     activeNodes.clear_parallel();
 
-    galois::do_all(
-        galois::iterate(updates),
-        [&](const Update& up) {
-          constexpr const galois::MethodFlag flag =
-              galois::MethodFlag::UNPROTECTED;
-          // for each out-going neighbors
-          for (auto jj = up.beg; jj != up.end; ++jj) {
-            GNode dst    = graph.getEdgeDst(jj);
-            LNode& ddata = graph.getData(dst, flag);
-            auto old     = atomicAdd(ddata.residual, up.delta);
-            if (std::fabs(old) <=
-                    tolerance /* if fabs(old) is greater than tolerance,
-                                 then it would already have been processed
-                                 in the previous do_all loop*/
-                && std::fabs(old + up.delta) >= tolerance) {
-              activeNodes.push(dst);
-            }
-          }
-        },
-        galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("PushRes"));
+    galois::do_all(galois::iterate(updates),
+                   [&](const Update& up) {
+                     constexpr const galois::MethodFlag flag =
+                         galois::MethodFlag::UNPROTECTED;
+                     // for each out-going neighbors
+                     for (auto jj = up.beg; jj != up.end; ++jj) {
+                       GNode dst    = graph.getEdgeDst(jj);
+                       LNode& ddata = graph.getData(dst, flag);
+                       auto old     = atomicAdd(ddata.residual, up.delta);
+                       // if fabs(old) is greater than tolerance, then it would
+                       // already have been processed in the previous do_all
+                       // loop
+                       if (std::fabs(old) <= tolerance &&
+                           std::fabs(old + up.delta) >= tolerance) {
+                         activeNodes.push(dst);
+                       }
+                     }
+                   },
+                   galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+                   galois::loopname("PushResidual"));
 
     updates.clear_parallel();
   }

@@ -148,14 +148,6 @@ void computeOutDeg(Graph& graph, galois::LargeArray<PRTy>& delta,
   t.stop();
 }
 
-PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
-  PRTy old;
-  do {
-    old = v;
-  } while (!v.compare_exchange_strong(old, old + delta));
-  return old;
-}
-
 void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
                              galois::LargeArray<std::atomic<PRTy>>& residual) {
   unsigned int iterations = 0;
@@ -194,6 +186,10 @@ void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
                    galois::steal(), galois::no_stats(),
                    galois::loopname("PageRank"));
 
+#if DEBUG
+    std::cout << "iteration: " << iterations << "\n";
+#endif
+
     iterations++;
 
     if (iterations >= maxIterations || !accum.reduce()) {
@@ -203,7 +199,8 @@ void computePageRankResidual(Graph& graph, galois::LargeArray<PRTy>& delta,
   } // end while(true)
 
   if (iterations >= maxIterations) {
-    std::cout << "Failed to converge\n";
+    std::cerr << "ERROR: failed to converge in " << iterations << " iterations"
+              << std::endl;
   }
 }
 
