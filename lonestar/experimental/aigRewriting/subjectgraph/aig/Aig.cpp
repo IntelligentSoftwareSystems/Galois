@@ -50,6 +50,24 @@ int Aig::getNumAnds() {
 	return ( nNodes - ( getNumInputs() + getNumLatches() + getNumOutputs() + 1 ) ); // +1 is to disconsider the constant node.
 }
 
+int Aig::getDepth() {
+
+	resetAllIds();
+
+	int max = -1;
+
+	for ( auto po : this->outputNodes ) {
+		NodeData & poData = this->graph.getData( po, galois::MethodFlag::READ );
+		if ( max < poData.level ) {
+			max = poData.level;
+		}
+	}
+
+	assert( max > -1 );
+
+	return max;
+}
+
 std::vector< std::string > & Aig::getInputNames() {
 	return this->inputNames;
 }
@@ -341,6 +359,7 @@ void Aig::resetAllIds() {
 	for ( GNode pi : this->inputNodes ) {
 		NodeData & piData = this->graph.getData( pi, galois::MethodFlag::WRITE );
 		piData.id = currentId++;
+		piData.level = 0;
 	}
 
 	while ( !stack.empty() ) {
@@ -348,12 +367,28 @@ void Aig::resetAllIds() {
 		stack.pop();
 		NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );
 		nodeData.id = currentId++;
+
+		auto inEdge = this->graph.in_edge_begin( node );
+		GNode lhsNode = this->graph.getEdgeDst( inEdge );
+		NodeData lhsData = this->graph.getData( lhsNode, galois::MethodFlag::READ );
+		inEdge++;
+		GNode rhsNode = this->graph.getEdgeDst( inEdge );
+		NodeData rhsData = this->graph.getData( rhsNode, galois::MethodFlag::READ );
+	
+		nodeData.level = 1 + std::max( lhsData.level, rhsData.level );
+
 		this->nodes[ nodeData.id ] = node;
 	}
 
 	for ( GNode po : this->outputNodes ) {
 		NodeData & poData = this->graph.getData( po, galois::MethodFlag::WRITE );
 		poData.id = currentId++;
+
+		auto inEdge = this->graph.in_edge_begin( po );
+		GNode inNode = this->graph.getEdgeDst( inEdge );
+		NodeData inData = this->graph.getData( inNode, galois::MethodFlag::READ );
+
+		poData.level = inData.level;
 	}
 
 	//std::cout << std::endl << "All AND node IDs were reseted!" << std::endl;
@@ -431,6 +466,14 @@ void Aig::topologicalSortAnds( GNode node, std::vector< bool > & visited, std::s
  	}
     
 	stack.push( node );
+}
+
+void Aig::resetAllNodeCounters() {
+
+	for( GNode node : this->graph ) {
+		NodeData & nodeData = this->graph.getData( node, galois::MethodFlag::WRITE );
+		nodeData.counter = 0;
+	}
 }
 
 std::string Aig::toDot() {
