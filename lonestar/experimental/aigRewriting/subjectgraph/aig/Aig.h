@@ -78,6 +78,7 @@ public:
 	int getNumLatches();
 	int getNumOutputs();
 	int getNumAnds();
+	int getDepth();
 
 	std::string getDesignName();
 	void setDesignName( std::string designName );
@@ -92,6 +93,8 @@ public:
 	void resetAndPIsIds();
 	void resetAndPOsIds();
 	void resetAllIds();
+
+	void resetAllNodeCounters();
 
 	void computeTopologicalSortForAll( std::stack< GNode > & stack );
 	void computeTopologicalSortForAnds( std::stack< GNode > & stack );

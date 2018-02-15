@@ -122,7 +122,7 @@ public:
 	void setRewriteTime( long double time );
 };
 
-void runRewriteOperator( RewriteManager & rwtMan, std::vector< int > & levelHistogram );
+void runRewriteOperator( RewriteManager & rwtMan );
 
 } /* namespace algorithm */
 

@@ -266,7 +266,7 @@ private:
   const char* loopname;
   FILE* m_statsFile;
   FixedSizeAllocator<IterationContext> m_iterAlloc;
-  galois::GReduceLogicalOR m_broken = false;
+  galois::GReduceLogicalOR m_broken;
 
   IterationContext* newIteration(const T& item) {
     IterationContext* it = m_iterAlloc.allocate(1);

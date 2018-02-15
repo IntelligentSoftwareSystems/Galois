@@ -50,9 +50,11 @@
  * the data operation that causes problems. Use a uint8_t instead.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
-#ifndef SYNC_STRUCT_MACROS
-#define SYNC_STRUCT_MACROS
+#ifndef _SYNC_STRUCT_MACROS_
+#define _SYNC_STRUCT_MACROS_
 
 #include <cstdint> // for uint types used below
 #include <galois/gIO.h> // for GALOIS DIE
@@ -60,7 +62,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 // Field flag class
 ////////////////////////////////////////////////////////////////////////////////
-
 
 namespace galois {
 namespace runtime {
@@ -760,6 +761,8 @@ struct Reduce_min_##fieldname {\
 }
 #endif
 
+// Sync structure used for reduce via min of all pairwise elements in an 
+// array/vector type.
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype) \
@@ -872,6 +875,8 @@ struct Reduce_min_##fieldname {\
 }
 #endif
 
+// Sync structure used for reduce via average of all pairwise elements in an 
+// array/vector type.
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
@@ -987,6 +992,8 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
 }
 #endif
 
+// Sync structure used for reduce via add of all pairwise elements in an 
+// array/vector type.
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1030,6 +1037,8 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 }
 
+// Sync structure used for reduce via average of a single element in an 
+// array/vector type (requires an index).
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_single_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1171,6 +1180,9 @@ struct Broadcast_##fieldname {\
 }
 #endif
 
+// Sync structure used for broadcast synchronization of a single element in a 
+// vector. The GALOIS_DIE functions are defined due a template path needing them
+// defined (they shouldn't ever go down that path, however)
 #define GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(fieldname, fieldtype)\
 struct Broadcast_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1181,7 +1193,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {\
-    GALOIS_DIE("Execution shouldn't get here\n");\
+    GALOIS_DIE("Execution shouldn't get here this function needs an index arg\n");\
     return node.fieldname[0];\
   }\
 \
@@ -1200,7 +1212,7 @@ struct Broadcast_##fieldname {\
   }\
 \
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {\
-    GALOIS_DIE("Execution shouldn't get here\n");\
+    GALOIS_DIE("Execution shouldn't get here; needs index arg\n");\
   }\
 \
   static bool setVal_batch(unsigned, unsigned long int*, unsigned int*,\
@@ -1210,6 +1222,8 @@ struct Broadcast_##fieldname {\
 }
 
 
+// Used in a "struct of arrays" construction of data (i.e. for some field,
+// index into it with the node id to get data)
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BROADCAST_ARRAY(fieldname, fieldtype)\
@@ -1364,6 +1378,8 @@ struct Bitset_##fieldname {\
 }
 #endif
 
+// Used for a vector of bitsets: function signatures now allow indexing into
+// this vector to get the correct bitset
 #define GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(fieldname)\
 struct Bitset_##fieldname {\
   static unsigned numBitsets() {\

@@ -10,6 +10,8 @@
 
 #include "galois/worklists/WorkListAlt.h"
 
+//#include "galois/runtime/profile.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -63,8 +65,16 @@ aig::GNode RewriteManager::rewriteNode( ThreadContextData * threadCtx, aig::GNod
 	DecGraph * currentGraph = nullptr;
 	DecGraph * bestGraph = nullptr;
 
-	// Get the required times
-    //requiredLevel = rwtMan.updateLevel ? Abc_ObjRequiredLevel( node ) : ABC_INFINITY; // FIXME
+	
+    // Go through the cuts to rewrite
+    for ( cut = cutsBegin; cut != nullptr; cut = cut->nextCut ) {
+ 		// Consider only 4-input cuts
+        if ( cut->nLeaves != 4 ) {
+        	continue;
+        }
+		lockFaninCone( aigGraph, node, cut );
+	}
+	
 
     // Go through the cuts to rewrite
     for ( cut = cutsBegin; cut != nullptr; cut = cut->nextCut ) {
@@ -105,7 +115,7 @@ aig::GNode RewriteManager::rewriteNode( ThreadContextData * threadCtx, aig::GNod
 			continue;
         }
 
-		lockFaninCone( aigGraph, node, cut );
+		//lockFaninCone( aigGraph, node, cut );
 	
         // mark the fanin boundary 
         for ( aig::GNode faninNode : threadCtx->currentFanins ) {
@@ -852,17 +862,14 @@ struct RewriteOperator {
 	}
 };
 
-void runRewriteOperator( RewriteManager & rwtMan, std::vector< int > & levelHistogram ) {
+void runRewriteOperator( RewriteManager & rwtMan ) {
 
 	//high_resolution_clock::time_point t1 = high_resolution_clock::now();
    
 	CutManager & cutMan = rwtMan.getCutMan();
 	aig::Graph & aigGraph = rwtMan.getAig().getGraph();
  
-	// compute the reverse levels if level update is requested
-	//if ( rwtMan.getUpdateLevelFlag() ) {
-        //Abc_NtkStartReverseLevels( pNtk, 0 ); // FIXME
-    //}
+//galois::runtime::profileVtune(
 
 	galois::InsertBag< aig::GNode > workList;
 	typedef galois::worklists::dChunkedBag< 5000 > DC_BAG;
@@ -897,12 +904,8 @@ void runRewriteOperator( RewriteManager & rwtMan, std::vector< int > & levelHist
 		}
 	}
 
-	/*
-	int i = 0;
-	for( int value : levelHistogram ) {
-		std::cout << i++ << ": " << value << std::endl;
-	}
-	*/
+//,"REWRITING" );
+
 	
 	// Galois Parallel Foreach
 	galois::for_each( galois::iterate( workList.begin(), workList.end() ), RewriteOperator( rwtMan ), galois::wl< DC_BAG >(), galois::loopname( "RewriteOperator" ), galois::per_iter_alloc() );
