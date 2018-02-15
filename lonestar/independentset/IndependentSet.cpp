@@ -279,7 +279,7 @@ struct DefaultAlgo {
 
     switch (algo) {
       case nondet: 
-        // galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
+        //galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
         galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<galois::worklists::ParaMeter<> >());
         break;
       case detBase:
@@ -638,7 +638,8 @@ struct PrioAlgo2 {
 
   struct Execute{
     Graph& graph;
-    bool& unmatched;
+    galois::GReduceLogicalOR& unmatched;
+    //bool& unmatched;
     void operator()(GNode src) const{
       prioNode2& nodedata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
@@ -653,7 +654,8 @@ struct PrioAlgo2 {
         if(other.flag == (unsigned char)0xfe) //matched, highest prio
         {
           nodedata.flag = (unsigned char)0x00;
-          unmatched = true;
+          unmatched.update(true);
+          //unmatched = true;
           return;
         }
 
@@ -668,12 +670,14 @@ struct PrioAlgo2 {
                 return;
             }
             else {
-                unmatched = true;
+                unmatched.update(true);
+                //unmatched = true;
                 return;
             }
         }
         else{
-            unmatched = true;
+            unmatched.update(true);
+            //unmatched = true;
             return;
         }
 
@@ -710,7 +714,8 @@ struct PrioAlgo2 {
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<float> nedges;
-    bool unmatched = true;
+    galois::GReduceLogicalOR unmatched;
+    //bool unmatched = true;
     galois::substrate::PerThreadStorage<std::mt19937* > generator;
 
     Cal_degree cal_degree { graph, nedges };
@@ -730,13 +735,14 @@ struct PrioAlgo2 {
 
     galois::do_all(galois::iterate(graph), init_prio, galois::loopname("init-prio"));
 
-    while (unmatched) {
-      unmatched = false;
-
+    do {
+      unmatched.reset();
+      //unmatched = false;
       galois::do_all(galois::iterate(graph), execute, galois::loopname("execute"));
 
       rounds += 1;
-    }
+    }while (unmatched.reduce());
+
     galois::do_all(galois::iterate(graph), verify_change, galois::loopname("verify_change"));
 
     galois::runtime::reportStat_Single("IndependentSet-prioAlgo", "rounds", rounds.reduce());
