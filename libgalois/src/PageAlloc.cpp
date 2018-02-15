@@ -21,7 +21,7 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * Copyright (C) 2018, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
@@ -91,7 +91,7 @@ void* galois::substrate::allocPages(unsigned num, bool preFault) {
     void* ptr = trymmap(num * hugePageSize,
                         preFault ? _MAP_HUGE_POP : _MAP_HUGE);
     if (!ptr) {
-      gWarn("Huge page alloc failed, falling back");
+      gDebug("Huge page alloc failed, falling back");
       ptr = trymmap(num*hugePageSize, preFault ? _MAP_POP : _MAP);
     }
 
