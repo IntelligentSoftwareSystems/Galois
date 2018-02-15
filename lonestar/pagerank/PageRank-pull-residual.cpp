@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Compute pageRank Pull version using residual on distributed Galois.
+ * Compute pageRank Pull version using residual.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
@@ -102,7 +102,7 @@ static void printTop(Graph& graph, int topn) {
 }
 
 using DeltaArray    = galois::LargeArray<PRTy>;
-using ResidualArray = galois::LargeArray<std::atomic<PRTy>>;
+using ResidualArray = galois::LargeArray<PRTy>;
 
 void initNodeData(Graph& g, DeltaArray& delta, ResidualArray& residual) {
   galois::do_all(galois::iterate(g),
@@ -162,8 +162,9 @@ void computePageRankResidual(Graph& graph, DeltaArray& delta,
                      auto& sdata = graph.getData(src);
                      delta[src]  = 0;
 
-                     if (std::fabs(residual[src]) > tolerance) {
-                       PRTy oldResidual = residual[src].exchange(0.0);
+                     if (residual[src] > tolerance) {
+                       PRTy oldResidual = residual[src];
+                       residual[src]    = 0.0;
                        sdata.value += oldResidual;
                        if (sdata.nout > 0) {
                          delta[src] = oldResidual * ALPHA / sdata.nout;
@@ -183,7 +184,7 @@ void computePageRankResidual(Graph& graph, DeltaArray& delta,
                        }
                      }
                      if (sum > 0) {
-                       atomicAdd(residual[src], sum);
+                       residual[src] = sum;
                      }
                    },
                    galois::steal(), galois::no_stats(),
@@ -194,7 +195,6 @@ void computePageRankResidual(Graph& graph, DeltaArray& delta,
 #endif
 
     iterations++;
-
     if (iterations >= maxIterations || !accum.reduce()) {
       break;
     }
@@ -236,7 +236,7 @@ int main(int argc, char** argv) {
   initNodeData(transposeGraph, delta, residual);
   computeOutDeg(transposeGraph);
 
-  galois::StatTimer prTimer("PageRank");
+  galois::StatTimer prTimer("PageRankResidual");
   prTimer.start();
   computePageRankResidual(transposeGraph, delta, residual);
   prTimer.stop();
