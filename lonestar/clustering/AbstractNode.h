@@ -21,14 +21,12 @@
 #define ABSTRACTNODE_H_
 
 #include "Point3.h"
-#include "galois/gstl.h"
+
 #include <assert.h>
 #include <iostream>
 #include <limits>
 #include <stdlib.h>
 
-template <typename T>
-using GVector = galois::gstl::Vector<T>;
 
 class AbstractNode {
 public:
@@ -46,20 +44,25 @@ public:
   AbstractNode(double x, double y, double z) : myLoc(x, y, z), intensity(0) {
     startTime = -1;
   }
+
   AbstractNode() : myLoc(0), intensity(0) { startTime = -1; }
+
   virtual ~AbstractNode() {}
 
-  double getScalarTotalIntensity() {
+  double getScalarTotalIntensity() const {
     return (1.0f / 3.0f) * intensity.getSum();
   }
-  double getRelativeIntensity(int time) {
+
+  double getRelativeIntensity(int time) const {
     if (time < startTime || time > endTime)
       return 0;
     return timeVector[time - startTime];
   }
 
   void setIntensity(double inScaleFactor, int inTime) {
+
     intensity.set(inScaleFactor);
+
     if (inTime == -1) {
       inTime = 0;
     }
@@ -72,11 +75,12 @@ public:
       // negative value used as signal that should be uniform across all time
       int len   = -inTime;
       startTime = 0;
-      endTime   = (int)(len - 1);
+      endTime   = (len - 1);
       timeVector.clear();
       timeVector.resize(len);
-      for (int i = 0; i < len; i++)
+      for (int i = 0; i < len; i++) {
         timeVector[i] = 1.0f / len;
+      }
       scaleIntensity(len);
     }
   }

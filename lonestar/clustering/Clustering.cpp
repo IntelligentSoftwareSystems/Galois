@@ -65,6 +65,7 @@ void loopBody(NodeWrapper* cluster, KdTree* kdTree, GVector<NodeWrapper*>* wl,
               GVector<ClusterNode*>* clusterArr, GVector<double>* floatArr);
 
 void getRandomPoints(GVector<LeafNode*>& lights, int numPoints) {
+
   double dirX = 0;
   double dirY = 0;
   double dirZ = 1;
@@ -108,6 +109,7 @@ int findMatch(KdTree* tree, NodeWrapper* nodeA,
             newNodes->push(newNode);
             allocs.push(newNode);
             addCounter++;
+
           }
         } else {
           addCounter++;
@@ -135,6 +137,7 @@ void clusterGalois(GVector<LeafNode*>& lights) {
   for (unsigned int i = 0; i < lights.size(); i++) {
     NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
     initialWorklist[i] = nw;
+
   }
   KdTree* tree = (KdTree::createTree(initialWorklist));
 
@@ -150,6 +153,7 @@ void clusterGalois(GVector<LeafNode*>& lights) {
 
   galois::GAccumulator<size_t> addedNodes;
   galois::InsertBag<NodeWrapper*>* newNodes =
+
       new galois::InsertBag<NodeWrapper*>();
   galois::InsertBag<NodeWrapper*> allocs;
 
