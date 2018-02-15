@@ -42,6 +42,15 @@ distAppNoGPU(sgd_pull)
 
 distAppNoGPU(pr_bc)
 
+# inefficient version of prbc where entire vector is synchronized
+app(pr_bc_vecsync pr_bc/gen.cpp DISTSAFE)
+target_link_libraries(pr_bc_vecsync distbench)
+target_include_directories(pr_bc_vecsync PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+target_compile_definitions(pr_bc_vecsync PRIVATE _VECTOR_SYNC_)
+if(USE_BARE_MPI)
+  target_compile_definitions(pr_bc_vecsync PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+endif()
+
 distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)
 

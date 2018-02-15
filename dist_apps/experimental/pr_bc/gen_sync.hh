@@ -35,14 +35,24 @@
  * distance.
  */
 struct ReducePairwiseMinAndResetDist {
+  #ifndef _VECTOR_SYNC_
   using ValTy = uint32_t;
+  #else
+  using ValTy = galois::gstl::Vector<uint32_t>;
+  #endif
 
+  #ifndef _VECTOR_SYNC_
   static ValTy extract(uint32_t node_id, const struct NodeData& node, 
                        unsigned vecIndex) {
     return node.minDistances[vecIndex];
   }
+  #else
+  static ValTy extract(uint32_t node_id, const struct NodeData& node) {
+    return node.minDistances;
+  }
+  #endif
 
-  static bool extract_reset_batch(unsigned, unsigned long long int*,
+  static bool extract_reset_batch(unsigned, unsigned long int*,
                                   unsigned int*, ValTy*, size_t*,
                                   DataCommMode*) {
     return false;
@@ -59,6 +69,7 @@ struct ReducePairwiseMinAndResetDist {
    * distance changes, then shortestPathToAdd must be set to 0 as it is
    * now invalid.
    */
+  #ifndef _VECTOR_SYNC_
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y,
                      unsigned vecIndex) {
     bool returnVar = false;
@@ -75,8 +86,26 @@ struct ReducePairwiseMinAndResetDist {
 
     return returnVar;
   }
+  #else
+  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
+    bool returnVar = false;
 
-  static bool reduce_batch(unsigned, unsigned long long int*, unsigned int *,
+    auto& myDistances = node.minDistances;
+
+    for (unsigned i = 0; i < myDistances.size(); i++) {
+      uint32_t oldDist = galois::min(myDistances[i], y[i]);
+      if (oldDist > myDistances[i]) {
+        node.shortestPathToAdd[i] = 0;
+        returnVar = true;
+      }
+    }
+
+    return returnVar;
+  }
+  #endif
+
+
+  static bool reduce_batch(unsigned, unsigned long int*, unsigned int *,
                            ValTy*, size_t, DataCommMode) {
     return false;
   }
@@ -84,29 +113,64 @@ struct ReducePairwiseMinAndResetDist {
   /**
    * do nothing for reset
    */
+  #ifndef _VECTOR_SYNC_
   static void reset(uint32_t node_id, struct NodeData &node, unsigned vecIndex) {
     return;
   }
+  #else
+  static void reset(uint32_t node_id, struct NodeData &node) {
+    return;
+  }
+  #endif
 };
 
+#ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
+#else
+GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, galois::gstl::Vector<uint32_t>);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shortest Path
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
                                                         uint64_t);
 GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint64_t);
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
+#else
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd, 
+                                                 galois::gstl::Vector<uint64_t>);
+GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, 
+                                galois::gstl::Vector<uint64_t>);
+#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Dependency
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
                                                         galois::CopyableAtomic<float>);
 GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
                                               galois::CopyableAtomic<float>);
+#else
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(dependencyToAdd,
+  galois::gstl::Vector<galois::CopyableAtomic<float>>);
+GALOIS_SYNC_STRUCTURE_BROADCAST(dependencyToAdd, 
+                           galois::gstl::Vector<galois::CopyableAtomic<float>>);
+#endif
+
+////////////////////////////////////////////////////////////////////////////////
+// Bitsets
+////////////////////////////////////////////////////////////////////////////////
+
+#ifndef _VECTOR_SYNC_
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
 GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
+#else
+GALOIS_SYNC_STRUCTURE_BITSET(minDistances);
+GALOIS_SYNC_STRUCTURE_BITSET(shortestPathToAdd);
+GALOIS_SYNC_STRUCTURE_BITSET(dependencyToAdd);
+#endif

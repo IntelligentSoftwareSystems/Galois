@@ -29,10 +29,8 @@
 constexpr static const char* const REGION_NAME = "PR_BC";
 
 #include <iostream>
-#include <limits>
 
 #include "galois/DistGalois.h"
-#include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
@@ -95,9 +93,15 @@ struct NodeData {
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a 
 // particular field
+#ifndef _VECTOR_SYNC_
 std::vector<galois::DynamicBitSet> vbitset_minDistances;
 std::vector<galois::DynamicBitSet> vbitset_shortestPathToAdd;
 std::vector<galois::DynamicBitSet> vbitset_dependencyToAdd;
+#else
+galois::DynamicBitSet bitset_minDistances;
+galois::DynamicBitSet bitset_shortestPathToAdd;
+galois::DynamicBitSet bitset_dependencyToAdd;
+#endif
 
 // Dist Graph using a bidirectional CSR graph (3rd argument set to true does 
 // this)
@@ -452,8 +456,13 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
           }
 
           dga += 1;
+          #ifndef _VECTOR_SYNC_
           vbitset_minDistances[indexToSend].set(dst);
           vbitset_shortestPathToAdd[indexToSend].set(dst);
+          #else
+          bitset_minDistances.set(dst);
+          bitset_shortestPathToAdd.set(dst);
+          #endif
         }
       }
     },
@@ -500,11 +509,19 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     MetadataUpdate(graph); 
 
     // sync shortPathAdd
+    #ifndef _VECTOR_SYNC_
     graph.sync<writeDestination, readAny, 
                Reduce_pair_wise_add_array_single_shortestPathToAdd, 
                Broadcast_shortestPathToAdd, 
                Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
                                          std::to_string(macroRound));
+    #else
+    graph.sync<writeDestination, readAny, 
+               Reduce_pair_wise_add_array_shortestPathToAdd, 
+               Broadcast_shortestPathToAdd, 
+               Bitset_shortestPathToAdd>(std::string("ShortPathSync") + "_" +
+                                         std::to_string(macroRound));
+    #endif
 
     // update short path count with sync'd accumulator
     ShortPathUpdate(graph);
@@ -629,7 +646,11 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
               // add to dependency of predecessor using our finalized one
               galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
 
+              #ifndef _VECTOR_SYNC_
               vbitset_dependencyToAdd[i].set(src); 
+              #else
+              bitset_dependencyToAdd.set(src); 
+              #endif
             }
           }
         }
@@ -640,12 +661,21 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
       galois::no_stats()
     );
 
-    // TODO can be optimized (see comment below)
+    // TODO can be possibly optimized? (see comment below)
+    #ifndef _VECTOR_SYNC_
     graph.sync<writeSource, readAny, 
                Reduce_pair_wise_add_array_single_dependencyToAdd, 
                Broadcast_dependencyToAdd, 
                Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
                                        std::to_string(macroRound));
+    #else
+    graph.sync<writeSource, readAny, 
+               Reduce_pair_wise_add_array_dependencyToAdd, 
+               Broadcast_dependencyToAdd, 
+               Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
+                                       std::to_string(macroRound));
+    #endif
+
     // dependency written to source
     // dep needs to be on dst nodes, but final round needs them on all nodes
 
@@ -689,7 +719,40 @@ void BC(Graph& graph, uint64_t offset) {
 /* Sanity check */
 /******************************************************************************/
 
-// TODO
+void Sanity(Graph& graph) {
+  galois::DGReduceMax<float> DGA_max;
+  galois::DGReduceMin<float> DGA_min;
+  galois::DGAccumulator<float> DGA_sum;
+
+  DGA_max.reset();
+  DGA_min.reset();
+  DGA_sum.reset();
+
+  galois::do_all(
+    galois::iterate(graph.masterNodesRange().begin(), 
+                    graph.masterNodesRange().end()),
+    [&] (auto src) {
+      NodeData& sdata = graph.getData(src);
+
+      DGA_max.update(sdata.bc);
+      DGA_min.update(sdata.bc);
+      DGA_sum += sdata.bc;
+    },
+    galois::no_stats(),
+    galois::loopname("Sanity")
+  );
+
+  float max_bc = DGA_max.reduce();
+  float min_bc = DGA_min.reduce();
+  float bc_sum = DGA_sum.reduce();
+
+  // Only node 0 will print data
+  if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+    galois::gPrint("Max BC is ", max_bc, "\n");
+    galois::gPrint("Min BC is ", min_bc, "\n");
+    galois::gPrint("BC sum is ", bc_sum, "\n");
+  }
+};
 
 /******************************************************************************/
 /* Main method for running */
@@ -736,6 +799,7 @@ int main(int argc, char** argv) {
   }
 
   // bitset initialization
+  #ifndef _VECTOR_SYNC_
   vbitset_minDistances.resize(numSourcesPerRound);
   vbitset_shortestPathToAdd.resize(numSourcesPerRound);
   vbitset_dependencyToAdd.resize(numSourcesPerRound);
@@ -745,6 +809,11 @@ int main(int argc, char** argv) {
     vbitset_shortestPathToAdd[i].resize(hg->size());
     vbitset_dependencyToAdd[i].resize(hg->size());
   }
+  #else
+  bitset_minDistances.resize(hg->size());
+  bitset_shortestPathToAdd.resize(hg->size());
+  bitset_dependencyToAdd.resize(hg->size());
+  #endif
 
   uint64_t origNumRoundSources = numSourcesPerRound;
 
@@ -788,6 +857,9 @@ int main(int argc, char** argv) {
 
     StatTimer_main.stop();
 
+    // sanity 
+    Sanity(*hg);
+
     // re-init graph for next run
     if ((run + 1) != numRuns) {
       galois::runtime::getHostBarrier().wait();
@@ -797,11 +869,17 @@ int main(int argc, char** argv) {
       macroRound = 0;
       numSourcesPerRound = origNumRoundSources;
 
+      #ifndef _VECTOR_SYNC_
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         vbitset_minDistances[i].reset();
         vbitset_shortestPathToAdd[i].reset();
         vbitset_dependencyToAdd[i].reset();
       }
+      #else
+      bitset_minDistances.reset();
+      bitset_shortestPathToAdd.reset();
+      bitset_dependencyToAdd.reset();
+      #endif
 
       InitializeGraph(*hg);
       galois::runtime::getHostBarrier().wait();
@@ -824,7 +902,7 @@ int main(int argc, char** argv) {
                                      (*hg).getData(*ii).bc);
       } else {
         // outputs min distance and short path numbers
-        sprintf(v_out, "%lu %u %u\n", (*hg).getGID(*ii),
+        sprintf(v_out, "%lu %u %lu\n", (*hg).getGID(*ii),
                                       (*hg).getData(*ii).minDistances[vIndex],
                                       (*hg).getData(*ii).shortestPathNumbers[vIndex]);
       }
