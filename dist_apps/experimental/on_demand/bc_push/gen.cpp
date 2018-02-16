@@ -172,7 +172,7 @@ struct InitializeGraph {
       galois::no_stats(),
       galois::loopname("InitializeGraph"));
 
-    #if __OPT_VERSION__ == 5
+    #if __OPT_VERSION__ == 15
       Flags_betweeness_centrality.set_write_src();
       
       Flags_num_shortest_paths.set_write_src();
@@ -249,7 +249,7 @@ struct InitializeIteration {
       //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
       galois::no_stats()
     );
-  #if __OPT_VERSION__ == 5
+  #if __OPT_VERSION__ == 15
     Flags_current_length.set_write_src();
     
     Flags_old_length.set_write_src();
@@ -328,7 +328,7 @@ struct FirstIterationSSSP {
     #endif
       {
   #if __OPT_VERSION__ == 5
-    	  _graph.sync_on_demand<readSource , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "FirstIterationSSSP");
+    	_graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "SSSP");
   #endif
     
     galois::do_all(
@@ -354,7 +354,7 @@ struct FirstIterationSSSP {
     #endif
       }
     //// Next op will read src, current length
-    //_graph.sync<writeDestination, readSource, Reduce_min_current_length, 
+    //_graph.sync<writeDestination, readAny, Reduce_min_current_length, 
     //            Broadcast_current_length, Bitset_current_length>(
     //            "SSSP");
   }
@@ -398,7 +398,7 @@ struct SSSP {
     uint32_t iterations = 1;
     uint32_t accum_result;
 
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -438,7 +438,7 @@ struct SSSP {
   #if __OPT_VERSION__ == 5
       Flags_current_length.set_write_dst();
       
-      Flags_old_length.set_write_src();
+      //Flags_old_length.set_write_src();
   #endif
       
 
@@ -459,7 +459,7 @@ struct SSSP {
 
       }
       //if (accum_result) {
-      //  _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
+      //  _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
       //              Broadcast_current_length, Bitset_current_length>("SSSP");
       //} else {
       //  // write destination, read any, fails.....
@@ -469,7 +469,7 @@ struct SSSP {
       //    // syncs cause the bit to be reset prematurely, so using the bitset
       //    // will lead to incorrect results as it will not sync what is
       //    // necessary
-      //    _graph.sync<writeDestination, readSource, Reduce_min_current_length, 
+      //    _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
       //                 Broadcast_current_length, Bitset_current_length>("SSSP");
       //    _graph.sync<writeDestination, readDestination, Reduce_min_current_length, 
       //                 Broadcast_current_length>("SSSP");
@@ -523,7 +523,7 @@ struct PredAndSucc {
       local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph){
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -584,11 +584,11 @@ struct PredAndSucc {
 
     }
     //// sync for use in NumShortPath calculation
-    //_graph.sync<writeDestination, readSource, Reduce_add_num_predecessors, 
+    //_graph.sync<writeDestination, readAny, Reduce_add_num_predecessors, 
     //            Broadcast_num_predecessors, 
     //            Bitset_num_predecessors>("PredAndSucc");
     //// sync now for later DependencyPropagation use 
-    //_graph.sync<writeSource, readSource, Reduce_add_num_successors, 
+    //_graph.sync<writeSource, readAny, Reduce_add_num_successors, 
     //            Broadcast_num_successors, 
     //            Bitset_num_successors>("PredAndSucc");
   }
@@ -642,7 +642,7 @@ struct NumShortestPathsChanges {
   void static go(Graph& _graph) {
     // DO NOT DO A BITSET RESET HERE BECAUSE IT WILL BE REUSED BY THE NEXT STEP
     // (updates to trim and pred are on the same nodes)
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -665,11 +665,11 @@ struct NumShortestPathsChanges {
     #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPathsChanges");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
+    	_graph.sync_on_demand<readAny , Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
 
-     	_graph.sync_on_demand<readSource , Reduce_add_to_add,Broadcast_to_add ,Bitset_to_add>(Flags_to_add, "NumShortestPathsChanges");
+     	_graph.sync_on_demand<readAny , Reduce_add_to_add,Broadcast_to_add ,Bitset_to_add>(Flags_to_add, "NumShortestPathsChanges");
       
-     	_graph.sync_on_demand<readSource , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
+     	_graph.sync_on_demand<readAny , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
     #endif
     
     galois::do_all(
@@ -680,17 +680,6 @@ struct NumShortestPathsChanges {
       galois::no_stats()
     );
 
-  #if __OPT_VERSION__ == 5
-    Flags_num_predecessors.set_write_src();
-    
-    Flags_trim.set_write_src();
-    
-    Flags_propagation_flag.set_write_src();
-    
-    Flags_num_shortest_paths.set_write_src();
-    
-    Flags_to_add.set_write_src();
-  #endif
       } 
 
     // predecessors does not require syncing as syncing trim accomplishes the
@@ -762,7 +751,7 @@ struct NumShortestPaths {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -791,7 +780,7 @@ struct NumShortestPaths {
         #if __OPT_VERSION__ == 5
             _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPaths");
 
-            _graph.sync_on_demand<readSource , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "NumShortestPaths");
+            //_graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "NumShortestPaths");
         #endif
 
         galois::do_all(
@@ -805,8 +794,7 @@ struct NumShortestPaths {
         Flags_to_add.set_write_dst();
         
         Flags_trim.set_write_dst();
-        
-        Flags_propagation_flag.set_write_src();
+        //Flags_propagation_flag.set_write_src();
         #endif
         
       }
@@ -829,9 +817,9 @@ struct NumShortestPaths {
       #endif
 
       // sync to_adds and trim on source
-      //_graph.sync<writeDestination, readSource, Reduce_add_trim, 
+      //_graph.sync<writeDestination, readAny, Reduce_add_trim, 
       //            Broadcast_trim, Bitset_trim>("NumShortestPaths");
-      //_graph.sync<writeDestination, readSource, Reduce_add_to_add, 
+      //_graph.sync<writeDestination, readAny, Reduce_add_to_add, 
       //            Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
 
       // do predecessor decrementing using trim + dependency changes with
@@ -931,7 +919,7 @@ struct PropagationFlagUpdate {
     local_infinity(_local_infinity), graph(_graph) { }
 
   void static go(Graph& _graph) {
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -952,10 +940,12 @@ struct PropagationFlagUpdate {
   #endif
     {
 
+    // FINE
     #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readSource , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "PropagationFlagUpdate");
+      _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "PropagationFlagUpdate");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "PropagationFlagUpdate");
+    	_graph.sync_on_demand<readAny , 
+      Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "PropagationFlagUpdate");
     #endif
 
     galois::do_all(
@@ -966,7 +956,7 @@ struct PropagationFlagUpdate {
     );
 
     #if __OPT_VERSION__ == 5
-    Flags_propagation_flag.set_write_src();
+   // Flags_propagation_flag.set_write_src();
     #endif
 
     }
@@ -985,6 +975,7 @@ struct PropagationFlagUpdate {
 
     #ifdef BCDEBUG
     GALOIS_ASSERT(src_data.num_predecessors == 0);
+    GALOIS_ASSERT(src_data.trim.load() == 0, src_data.trim.load(), " ", graph->L2G(src));
     #endif
 
     if (src_data.current_length != local_infinity) {
@@ -1013,7 +1004,7 @@ struct DependencyPropChanges {
                Graph* _graph) : local_infinity(_local_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    #if __OPT_VERSION__ > 4
+    #if __OPT_VERSION__ > 5
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -1035,13 +1026,13 @@ struct DependencyPropChanges {
       {
 
     #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readSource , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
+      _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
+    	_graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
+    	_graph.sync_on_demand<readAny , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
+    	_graph.sync_on_demand<readAny , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
     #endif
 
     galois::do_all(
@@ -1051,18 +1042,6 @@ struct DependencyPropChanges {
       //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
       galois::no_stats()
     );
-
-    #if __OPT_VERSION__ == 5
-    Flags_num_successors.set_write_src();
-    
-    Flags_dependency.set_write_src();
-    
-    Flags_to_add_float.set_write_src();
-    
-    Flags_propagation_flag.set_write_src();
-    
-    Flags_trim.set_write_src();
-    #endif
 
       }
     
@@ -1092,7 +1071,7 @@ struct DependencyPropChanges {
       if (src_data.num_successors == 0 && src_data.propagation_flag) {
         // has had dependency back-propagated; reset the flag
         #ifdef BCDEBUG
-        GALOIS_ASSERT(src_data.trim == 0);
+        GALOIS_ASSERT(src_data.trim == 0, src_data.trim.load(), " ",  graph->L2G(src));
         #endif
         src_data.propagation_flag = false;
         #if __OPT_VERSION__ >= 3
@@ -1150,7 +1129,9 @@ struct DependencyPropagation {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      #if __OPT_VERSION__ > 4
+      galois::gPrint(iterations, "\n");
+
+      #if __OPT_VERSION__ > 5
       const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
       #else
       const auto& nodesWithEdges = _graph.allNodesRange();
@@ -1176,11 +1157,11 @@ struct DependencyPropagation {
       #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropagation");
 
-    	_graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
+    	_graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
 
-    	_graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
+    	//_graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
 
-    	_graph.sync_on_demand<readDestination , Reduce_add_dependency,Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
+    	//_graph.sync_on_demand<readDestination , Reduce_add_dependency,Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
     #endif
 
 
@@ -1192,7 +1173,7 @@ struct DependencyPropagation {
         galois::no_stats()
       );
       #if __OPT_VERSION__ == 5
-      Flags_num_successors.set_write_src();
+      //Flags_num_successors.set_write_src();
       
       Flags_trim.set_write_src();
       
@@ -1219,9 +1200,9 @@ struct DependencyPropagation {
                   Bitset_to_add_float>("DependencyPropagation");
       #endif
 
-      //_graph.sync<writeSource, readSource, Reduce_add_trim, 
+      //_graph.sync<writeSource, readAny, Reduce_add_trim, 
       //            Broadcast_trim, Bitset_trim>("DependencyPropagation");
-      //_graph.sync<writeSource, readSource, Reduce_add_to_add_float, 
+      //_graph.sync<writeSource, readAny, Reduce_add_to_add_float, 
       //            Broadcast_to_add_float, 
       //            Bitset_to_add_float>("DependencyPropagation");
 
@@ -1261,6 +1242,7 @@ struct DependencyPropagation {
           // so loop isn't entered again
           src_data.num_successors = 0;
         }
+
         if (graph->getGID(src) != local_current_src_node) {
           for (auto current_edge : graph->edges(src)) {
             GNode dst = graph->getEdgeDst(current_edge);
@@ -1278,8 +1260,13 @@ struct DependencyPropagation {
             if (dst_data.propagation_flag) {
               // dest on shortest path with this node as predecessor
               if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+                if (graph->L2G(src) == 1025) {
+                  galois::gPrint("sakdljfklsdajfl\n");
+                }
                 // increment my trim for later use to decrement successor
                 galois::atomicAdd(src_data.trim, (unsigned int)1);
+
+
 
                 #ifdef BCDEBUG
                 GALOIS_ASSERT(src_data.num_shortest_paths != 0);
@@ -1384,7 +1371,7 @@ struct BC {
 
       _graph.set_num_iter(0);
 
-      #if __OPT_VERSION__ > 4
+      #if __OPT_VERSION__ > 5
       const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
       #else
       const auto& nodesWithEdges = _graph.allNodesRange();
