@@ -548,11 +548,6 @@ struct PredAndSucc {
   #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "PredAndSucc");
   #endif
-       //DELETE thi 
-    	_graph.sync_on_demand<readAny , Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "PredAndSucc");
-    
-    
-    	_graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "PredAndSucc");
     
     galois::do_all(
       galois::iterate(nodesWithEdges),
