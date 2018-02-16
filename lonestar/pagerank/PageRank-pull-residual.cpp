@@ -22,9 +22,6 @@
  *
  * Compute pageRank Pull version using residual.
  *
- * @author Gurbinder Gill <gurbinder533@gmail.com>
- * @author Roshan Dathathri <roshan@cs.utexas.edu>
- * @author Loc Hoang <l_hoang@utexas.edu> (sanity check operators)
  */
 
 #include "Lonestar/BoilerPlate.h"
@@ -35,11 +32,6 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 #include "galois/gstl.h"
-
-#include <algorithm>
-#include <iostream>
-#include <limits>
-#include <vector>
 
 namespace cll = llvm::cl;
 const char* desc =

@@ -31,14 +31,6 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 
-#include <atomic>
-#include <fstream>
-#include <iostream>
-#include <limits>
-#include <set>
-#include <sstream>
-#include <string>
-
 namespace cll = llvm::cl;
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
