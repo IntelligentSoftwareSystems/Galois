@@ -144,7 +144,7 @@ void asyncPageRank(Graph& graph) {
                      constexpr const galois::MethodFlag flag =
                          galois::MethodFlag::UNPROTECTED;
 
-                     if (std::fabs(sdata.residual) > tolerance) {
+                     if (sdata.residual > tolerance) {
                        PRTy oldResidual = sdata.residual.exchange(0.0);
                        sdata.value += oldResidual;
                        int src_nout = std::distance(graph.edge_begin(src, flag),
@@ -155,8 +155,7 @@ void asyncPageRank(Graph& graph) {
                          GNode dst    = graph.getEdgeDst(jj);
                          LNode& ddata = graph.getData(dst, flag);
                          auto old     = atomicAdd(ddata.residual, delta);
-                         if (std::fabs(old) <= tolerance &&
-                             std::fabs(old + delta) >= tolerance) {
+                         if ((old <= tolerance) && (old + delta >= tolerance)) {
                            ctx.push(dst);
                          }
                        }
@@ -190,7 +189,7 @@ void syncPageRank(Graph& graph) {
                          galois::MethodFlag::UNPROTECTED;
                      LNode& sdata = graph.getData(src, flag);
 
-                     if (std::fabs(sdata.residual) > tolerance) {
+                     if (sdata.residual > tolerance) {
                        PRTy oldResidual = sdata.residual;
                        sdata.value += oldResidual;
                        sdata.residual = 0.0;
@@ -235,8 +234,8 @@ void syncPageRank(Graph& graph) {
                        // if fabs(old) is greater than tolerance, then it would
                        // already have been processed in the previous do_all
                        // loop
-                       if (std::fabs(old) <= tolerance &&
-                           std::fabs(old + up.delta) >= tolerance) {
+                       if ((old <= tolerance) &&
+                           (old + up.delta >= tolerance)) {
                          activeNodes.push(dst);
                        }
                      }
