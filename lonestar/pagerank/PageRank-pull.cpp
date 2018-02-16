@@ -18,7 +18,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Swarnendu Biswas <sbiswas@ices.utexas.edu>
  */
 
 #include "Lonestar/BoilerPlate.h"
@@ -30,9 +29,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
-#include "galois/runtime/Profile.h"
 
-#include <atomic>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -299,7 +296,7 @@ void computePageRankET(Graph& graph) {
 
     // TODO: We can merge this loop to the earlier one, the downside is there
     // will be additional stores in case it was the last iteration. But maybe
-    // the overhead of a Galois parallel loop is more than that.
+    // the overhead of a Galois parallel loop is more than that?
     galois::do_all(galois::iterate(graph),
                    [&](const GNode& src) {
                      nonAtomicVec[src] = 0;
@@ -324,56 +321,51 @@ void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
-  galois::runtime::profileVtune(
-      [&]() {
-        while (true) {
-          galois::do_all(
-              galois::iterate(graph),
-              [&](const GNode& src) {
-                constexpr const galois::MethodFlag flag =
-                    galois::MethodFlag::UNPROTECTED;
+  while (true) {
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
 
-                LNode& sdata = graph.getData(src, flag);
-                float sum    = 0.0;
+          LNode& sdata = graph.getData(src, flag);
+          float sum    = 0.0;
 
-                for (auto jj = graph.edge_begin(src, flag),
-                          ej = graph.edge_end(src, flag);
-                     jj != ej; ++jj) {
-                  GNode dst = graph.getEdgeDst(jj);
+          for (auto jj = graph.edge_begin(src, flag),
+                    ej = graph.edge_end(src, flag);
+               jj != ej; ++jj) {
+            GNode dst = graph.getEdgeDst(jj);
 
-                  LNode& ddata = graph.getData(dst, flag);
-                  sum += ddata.getPageRank(iteration) / ddata.nout;
-                }
+            LNode& ddata = graph.getData(dst, flag);
+            sum += ddata.getPageRank(iteration) / ddata.nout;
+          }
 
-                // New value of pagerank after computing contributions from
-                // incoming edges in the original graph
-                float value = sum * ALPHA + (1.0 - ALPHA);
-                // Find the delta in new and old pagerank values
-                float diff = std::fabs(value - sdata.getPageRank(iteration));
+          // New value of pagerank after computing contributions from
+          // incoming edges in the original graph
+          float value = sum * ALPHA + (1.0 - ALPHA);
+          // Find the delta in new and old pagerank values
+          float diff = std::fabs(value - sdata.getPageRank(iteration));
 
-                // Do not update pagerank before the diff is computed since
-                // there is a data dependence on the pagerank value
-                sdata.setPageRank(iteration, value);
-                max_delta.update(diff);
-              },
-              galois::no_stats(), galois::steal(),
-              galois::chunk_size<CHUNK_SIZE>(), galois::loopname("PageRank"));
+          // Do not update pagerank before the diff is computed since
+          // there is a data dependence on the pagerank value
+          sdata.setPageRank(iteration, value);
+          max_delta.update(diff);
+        },
+        galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("PageRank"));
 
-          float delta = max_delta.reduce();
+    float delta = max_delta.reduce();
 
 #if DEBUG
-          std::cout << "iteration: " << iteration << " max delta: " << delta
-                    << "\n";
+    std::cout << "iteration: " << iteration << " max delta: " << delta << "\n";
 #endif
 
-          iteration += 1;
-          if (delta <= tolerance || iteration >= maxIterations) {
-            break;
-          }
-          max_delta.reset();
-        } // end while(true)
-      },
-      "PageRankPullVTuneProfile");
+    iteration += 1;
+    if (delta <= tolerance || iteration >= maxIterations) {
+      break;
+    }
+    max_delta.reset();
+  } // end while(true)
 
   if (iteration >= maxIterations) {
     std::cerr << "ERROR: failed to converge in " << iteration << " iterations"

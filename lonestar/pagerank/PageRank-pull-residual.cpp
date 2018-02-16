@@ -61,7 +61,7 @@ static cll::opt<unsigned int>
 
 struct LNode {
   PRTy value;
-  std::atomic<uint32_t> nout;
+  uint32_t nout;
 };
 
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
@@ -133,8 +133,6 @@ void computeOutDeg(Graph& graph) {
                  [&](const GNode& src) {
                    for (auto nbr : graph.edges(src)) {
                      GNode dst = graph.getEdgeDst(nbr);
-                     // This is equivalent to computing the outdegree in the
-                     // original (not transpose) graph
                      vec[dst].fetch_add(1ul);
                    }
                  },
@@ -187,8 +185,8 @@ void computePageRankResidual(Graph& graph, DeltaArray& delta,
                        residual[src] = sum;
                      }
                    },
-                   galois::steal(), galois::no_stats(),
-                   galois::loopname("PageRank"));
+                   galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+                   galois::no_stats(), galois::loopname("PageRank"));
 
 #if DEBUG
     std::cout << "iteration: " << iterations << "\n";
