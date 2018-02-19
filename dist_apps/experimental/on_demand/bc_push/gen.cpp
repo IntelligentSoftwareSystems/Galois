@@ -171,18 +171,6 @@ struct InitializeGraph {
       galois::no_stats(),
       galois::loopname("InitializeGraph"));
 
-    #if __OPT_VERSION__ == 15
-    Flags_betweeness_centrality.set_write_src();
-    Flags_num_shortest_paths.set_write_src();
-    Flags_num_successors.set_write_src();
-    Flags_num_predecessors.set_write_src();
-    Flags_trim.set_write_src();
-    Flags_to_add.set_write_src();
-    Flags_to_add_float.set_write_src();
-    Flags_dependency.set_write_src();
-    Flags_propagation_flag.set_write_src();
-    #endif
-      
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -240,16 +228,7 @@ struct InitializeIteration {
       //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
       galois::no_stats()
     );
-    #if __OPT_VERSION__ == 15
-    Flags_current_length.set_write_src();
-    Flags_old_length.set_write_src();
-    Flags_num_shortest_paths.set_write_src();
-    Flags_propagation_flag.set_write_src();
-    Flags_num_predecessors.set_write_src();
-    Flags_num_successors.set_write_src();
-    Flags_dependency.set_write_src();
-    #endif
-      }
+   }
     
   }
 
@@ -299,6 +278,11 @@ struct FirstIterationSSSP {
       __end = 0;
     }
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readSource, Reduce_min_current_length,
+                        Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "SSSP");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
@@ -312,10 +296,6 @@ struct FirstIterationSSSP {
       } else if (personality == CPU)
     #endif
       {
-  #if __OPT_VERSION__ == 5
-  _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                        Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "SSSP");
-  #endif
     
     galois::do_all(
       galois::iterate(__begin, __end), 
@@ -394,6 +374,12 @@ struct SSSP {
       _graph.set_num_iter(iterations);
       dga.reset();
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, Reduce_min_current_length,
+                             Broadcast_current_length,
+                             Bitset_current_length>(Flags_current_length, "SSSP");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_0");
@@ -410,11 +396,6 @@ struct SSSP {
       } else if (personality == CPU)
     #endif
       {
-      #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readAny, Reduce_min_current_length,
-                             Broadcast_current_length,
-                             Bitset_current_length>(Flags_current_length, "SSSP");
-      #endif
       
       galois::do_all(
         galois::iterate(nodesWithEdges),
@@ -516,7 +497,14 @@ struct PredAndSucc {
     const auto& nodesWithEdges = _graph.allNodesRange();
     #endif
 
-    
+     #if __OPT_VERSION__ == 5
+      _graph.sync_on_demand<readAny, 
+                            Reduce_min_current_length,
+                            Broadcast_current_length,
+                            Bitset_current_length>(Flags_current_length, 
+                                                   "PredAndSucc");
+    #endif
+   
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc");
@@ -532,13 +520,6 @@ struct PredAndSucc {
     #endif
     {
 
-  #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, 
-                          Reduce_min_current_length,
-                          Broadcast_current_length,
-                          Bitset_current_length>(Flags_current_length, 
-                                                 "PredAndSucc");
-  #endif
     
     galois::do_all(
       galois::iterate(nodesWithEdges),
@@ -639,6 +620,18 @@ struct NumShortestPathsChanges {
     const auto& nodesWithEdges = _graph.allNodesRange();
     #endif
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny, 
+                          Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPathsChanges");
+    _graph.sync_on_demand<readAny, 
+                          Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
+    _graph.sync_on_demand<readAny, 
+                          Reduce_add_to_add,Broadcast_to_add ,Bitset_to_add>(Flags_to_add, "NumShortestPathsChanges");
+    _graph.sync_on_demand<readAny,
+                          Reduce_add_trim,Broadcast_trim,
+                          Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPathsChanges");
@@ -653,17 +646,6 @@ struct NumShortestPathsChanges {
       } else if (personality == CPU)
     #endif
       {
-    #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, 
-                          Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny, 
-                          Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny, 
-                          Reduce_add_to_add,Broadcast_to_add ,Bitset_to_add>(Flags_to_add, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny,
-                          Reduce_add_trim,Broadcast_trim,
-                          Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
-    #endif
     
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
@@ -754,6 +736,12 @@ struct NumShortestPaths {
       _graph.set_num_iter(iterations);
       dga.reset();
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPaths");
+    _graph.sync_on_demand<readSource, Reduce_add_num_shortest_paths,
+                          Broadcast_num_shortest_paths,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "NumShortestPaths");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths");
@@ -770,11 +758,6 @@ struct NumShortestPaths {
       } else if (personality == CPU)
     #endif
       { 
-        #if __OPT_VERSION__ == 5
-        _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPaths");
-        _graph.sync_on_demand<readSource, Reduce_add_num_shortest_paths,
-                              Broadcast_num_shortest_paths,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "NumShortestPaths");
-        #endif
 
         galois::do_all(
           galois::iterate(nodesWithEdges),
@@ -917,6 +900,18 @@ struct PropagationFlagUpdate {
     const auto& nodesWithEdges = _graph.allNodesRange();
     #endif
 
+  // FINE; needs to be read any due to all nodes loop
+  #if __OPT_VERSION__ == 5
+  _graph.sync_on_demand<readAny, Reduce_min_current_length,
+                        Broadcast_current_length,
+                        Bitset_current_length>(Flags_current_length, 
+                                               "PropagationFlagUpdate");
+  _graph.sync_on_demand<readAny, Reduce_add_num_successors,
+                        Broadcast_num_successors,
+                        Bitset_num_successors>(Flags_num_successors, 
+                                               "PropagationFlagUpdate");
+  #endif
+
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       //std::string impl_str("CUDA_DO_ALL_IMPL_PropagationFlagUpdate");
@@ -932,17 +927,6 @@ struct PropagationFlagUpdate {
   #endif
     {
 
-    // FINE; needs to be read any due to all nodes loop
-    #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, Reduce_min_current_length,
-                          Broadcast_current_length,
-                          Bitset_current_length>(Flags_current_length, 
-                                                 "PropagationFlagUpdate");
-  	_graph.sync_on_demand<readAny, Reduce_add_num_successors,
-                          Broadcast_num_successors,
-                          Bitset_num_successors>(Flags_num_successors, 
-                                                 "PropagationFlagUpdate");
-    #endif
 
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
@@ -1006,6 +990,17 @@ struct DependencyPropChanges {
     const auto& nodesWithEdges = _graph.allNodesRange();
     #endif
 
+    // must all be read any, all nodes loop without edges
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
+
+    _graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
+
+    _graph.sync_on_demand<readAny , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
+
+    _graph.sync_on_demand<readAny , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropChanges");
@@ -1021,16 +1016,6 @@ struct DependencyPropChanges {
     #endif
       {
 
-    // must all be read any, all nodes loop without edges
-    #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
-
-    	_graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
-
-    	_graph.sync_on_demand<readAny , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
-
-    	_graph.sync_on_demand<readAny , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
-    #endif
 
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
@@ -1132,6 +1117,13 @@ struct DependencyPropagation {
       const auto& nodesWithEdges = _graph.allNodesRange();
       #endif
 
+    #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropagation");
+    _graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
+    _graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
+    _graph.sync_on_demand<readDestination, Reduce_add_dependency, Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
+    #endif
+
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropagation");
@@ -1148,12 +1140,6 @@ struct DependencyPropagation {
       } else if (personality == CPU)
     #endif
     {
-      #if __OPT_VERSION__ == 5
-      _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropagation");
-    	_graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
-    	_graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
-    	_graph.sync_on_demand<readDestination, Reduce_add_dependency, Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
-      #endif
 
       galois::do_all(
         galois::iterate(nodesWithEdges),
