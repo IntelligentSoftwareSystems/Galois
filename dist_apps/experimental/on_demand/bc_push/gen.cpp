@@ -364,7 +364,7 @@ struct SSSP {
     uint32_t iterations = 1;
     uint32_t accum_result;
 
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -375,7 +375,7 @@ struct SSSP {
       dga.reset();
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, Reduce_min_current_length,
+    _graph.sync_on_demand<readSource, Reduce_min_current_length,
                              Broadcast_current_length,
                              Bitset_current_length>(Flags_current_length, "SSSP");
     #endif
@@ -491,7 +491,7 @@ struct PredAndSucc {
       local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph){
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -614,20 +614,20 @@ struct NumShortestPathsChanges {
   void static go(Graph& _graph) {
     // DO NOT DO A BITSET RESET HERE BECAUSE IT WILL BE REUSED BY THE NEXT STEP
     // (updates to trim and pred are on the same nodes)
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
     #endif
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny, 
+    _graph.sync_on_demand<readSource, 
                           Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny, 
+    _graph.sync_on_demand<readSource, 
                           Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny, 
+    _graph.sync_on_demand<readSource, 
                           Reduce_add_to_add,Broadcast_to_add ,Bitset_to_add>(Flags_to_add, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readAny,
+    _graph.sync_on_demand<readSource,
                           Reduce_add_trim,Broadcast_trim,
                           Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
     #endif
@@ -726,7 +726,7 @@ struct NumShortestPaths {
     uint32_t iterations = 0;
     uint32_t accum_result;
 
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -894,7 +894,7 @@ struct PropagationFlagUpdate {
     local_infinity(_local_infinity), graph(_graph) { }
 
   void static go(Graph& _graph) {
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -902,11 +902,11 @@ struct PropagationFlagUpdate {
 
   // FINE; needs to be read any due to all nodes loop
   #if __OPT_VERSION__ == 5
-  _graph.sync_on_demand<readAny, Reduce_min_current_length,
+  _graph.sync_on_demand<readSource, Reduce_min_current_length,
                         Broadcast_current_length,
                         Bitset_current_length>(Flags_current_length, 
                                                "PropagationFlagUpdate");
-  _graph.sync_on_demand<readAny, Reduce_add_num_successors,
+  _graph.sync_on_demand<readSource, Reduce_add_num_successors,
                         Broadcast_num_successors,
                         Bitset_num_successors>(Flags_num_successors, 
                                                "PropagationFlagUpdate");
@@ -984,7 +984,7 @@ struct DependencyPropChanges {
                Graph* _graph) : local_infinity(_local_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
-    #if __OPT_VERSION__ > 5
+    #if __OPT_VERSION__ > 4
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     #else
     const auto& nodesWithEdges = _graph.allNodesRange();
@@ -992,13 +992,13 @@ struct DependencyPropChanges {
 
     // must all be read any, all nodes loop without edges
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
+    _graph.sync_on_demand<readSource , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
 
-    _graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
+    _graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
 
-    _graph.sync_on_demand<readAny , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
+    _graph.sync_on_demand<readSource , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
 
-    _graph.sync_on_demand<readAny , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
+    _graph.sync_on_demand<readSource , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
     #endif
 
     #ifdef __GALOIS_HET_CUDA__
@@ -1111,7 +1111,7 @@ struct DependencyPropagation {
       _graph.set_num_iter(iterations);
       dga.reset();
 
-      #if __OPT_VERSION__ > 5
+      #if __OPT_VERSION__ > 4
       const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
       #else
       const auto& nodesWithEdges = _graph.allNodesRange();
@@ -1119,7 +1119,7 @@ struct DependencyPropagation {
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropagation");
-    _graph.sync_on_demand<readAny , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
+    _graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
     _graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
     _graph.sync_on_demand<readDestination, Reduce_add_dependency, Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
     #endif
@@ -1211,12 +1211,12 @@ struct DependencyPropagation {
     // + do not redo computation if src has no successors left
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors > 0) {
-        if (graph->getGID(src) == local_current_src_node) {
+        //if (graph->getGID(src) == local_current_src_node) {
           // this is source of this iteration's of sssp/bfs; reset num succ to 0
           // so loop isn't entered again (basically an optimization that can
           // be removed)
-          src_data.num_successors = 0;
-        }
+          //src_data.num_successors = 0;
+        //}
 
         if (graph->getGID(src) != local_current_src_node) {
           for (auto current_edge : graph->edges(src)) {
