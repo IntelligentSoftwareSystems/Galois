@@ -25,7 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#define BCDEBUG
+//#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -297,13 +297,14 @@ struct FirstIterationSSSP {
     #endif
       {
     
-    galois::do_all(
-      galois::iterate(__begin, __end), 
-      FirstIterationSSSP(&_graph),
-      galois::loopname("SSSP"),
-      //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
-      galois::no_stats()
-    );
+      galois::do_all(
+        galois::iterate(__begin, __end), 
+        FirstIterationSSSP(&_graph),
+        galois::loopname("SSSP"),
+        //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
+        galois::no_stats()
+      );
+      }
   #if __OPT_VERSION__ == 5
     Flags_current_length.set_write_dst();
   #endif
@@ -318,7 +319,6 @@ struct FirstIterationSSSP {
     _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
                 Broadcast_current_length, Bitset_current_length>("SSSP");
     #endif
-      }
     //// Next op will read src, current length
     //_graph.sync<writeDestination, readAny, Reduce_min_current_length, 
     //            Broadcast_current_length, Bitset_current_length>(
@@ -404,15 +404,18 @@ struct SSSP {
         //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
         galois::no_stats()
       );
+      
+      iterations++;
+
+      accum_result = dga.reduce();
+
+      }
+
       #if __OPT_VERSION__ == 5
       Flags_current_length.set_write_dst();
       Flags_old_length.set_write_src();
       #endif
       
-
-      iterations++;
-
-      accum_result = dga.reduce();
 
       #if __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_min_current_length, 
@@ -425,7 +428,6 @@ struct SSSP {
                   Broadcast_current_length, Bitset_current_length>("SSSP");
       #endif
 
-      }
       //if (accum_result) {
       //  _graph.sync<writeDestination, readAny, Reduce_min_current_length, 
       //              Broadcast_current_length, Bitset_current_length>("SSSP");
@@ -528,6 +530,8 @@ struct PredAndSucc {
       //galois::loopname(_graph.get_run_identifier("PredAndSucc").c_str()),
       galois::no_stats()
     );
+    }
+
   #if __OPT_VERSION__ == 5
     Flags_num_predecessors.set_write_dst();
     Flags_num_successors.set_write_src();
@@ -553,7 +557,6 @@ struct PredAndSucc {
                 Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
     #endif
 
-    }
     //// sync for use in NumShortPath calculation
     //_graph.sync<writeDestination, readAny, Reduce_add_num_predecessors, 
     //            Broadcast_num_predecessors, 
@@ -777,13 +780,13 @@ struct NumShortestPaths {
           //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
           galois::no_stats()
         );
+      }
         #if __OPT_VERSION__ == 5
         Flags_to_add.set_write_dst();
         Flags_trim.set_write_dst();
         Flags_propagation_flag.set_write_src();
         #endif
         
-      }
 
       #if __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
@@ -946,10 +949,10 @@ struct PropagationFlagUpdate {
       galois::no_stats()
     );
 
+    }
     #if __OPT_VERSION__ == 5
     Flags_propagation_flag.set_write_src();
     #endif
-    }
 
 
     // note that only nodes with succ == 0 will have their flags sync'd
@@ -1162,12 +1165,13 @@ struct DependencyPropagation {
         galois::no_stats()
       );
 
+    }
       #if __OPT_VERSION__ == 5
       //Flags_num_successors.set_write_src();
       Flags_trim.set_write_src();
       Flags_to_add_float.set_write_src();
       #endif
-    }
+
       #if __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
                   Broadcast_trim>("DependencyPropagation");
