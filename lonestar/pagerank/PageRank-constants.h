@@ -24,17 +24,18 @@
 #define LONESTAR_PAGERANK_CONSTANTS_H
 
 const char* name = "Page Rank";
-const char* desc =
-    "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
-const char* url = 0;
+const char* url  = 0;
 
 constexpr static const float ALPHA       = 0.85;
+constexpr static const float PR_INIT_VAL = 1.0;
+
 constexpr static const float TOLERANCE   = 1.0e-5;
 constexpr static const unsigned MAX_ITER = 1000;
 
-constexpr static const float PR_INIT_VAL = 1.0;
-
 #define DEBUG 0
+constexpr static const unsigned PRINT_TOP = 20;
+
+// Type definitions
 
 typedef float PRTy;
 
@@ -51,5 +52,15 @@ struct TopPair {
     return value < b.value;
   }
 };
+
+// Helper functions
+
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
 
 #endif

@@ -1453,7 +1453,7 @@ private:
                       const std::vector<unsigned int> &offsets,
                       std::vector<typename FnTy::ValTy> &val_vec,
                       unsigned vecIndex, size_t start = 0) {
-    val_vec.resize(offsets.size()); // resive val vec for this vecIndex
+    val_vec.resize(size); // resive val vec for this vecIndex
 
     if (parallelize) {
       std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
@@ -2340,7 +2340,7 @@ private:
         get_bitset_and_offsets<SyncFnTy, syncType>(loopName, indices,
                    bit_set_compute, bit_set_comm, offsets, bit_set_count,
                    data_mode);
-        
+
         // note the extra template argument which specifies that this is a
         // vector extract, i.e. get element i of the vector (i passed in as 
         // argument as well)

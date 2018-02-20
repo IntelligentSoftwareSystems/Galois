@@ -129,6 +129,7 @@ namespace {
     string SYNC_TYPE;
     string READ_FLAG;
     string WRITE_FLAG;
+    string MODIFIED_IN_EDGE_LOOP;
   };
 
   struct Write_set_PULL {
@@ -179,7 +180,8 @@ namespace {
          "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
 
     //std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
-    std::string str_readFlags = " " + i.WRITE_FLAG + ", " + i.READ_FLAG;
+    //std::string str_readFlags = " " + i.WRITE_FLAG + ", " + i.READ_FLAG;
+    std::string str_readFlags = i.READ_FLAG + " ";
     std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" +
                                   i.FIELD_NAME;
     syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
@@ -881,6 +883,7 @@ namespace {
                     WR_entry.SYNC_TYPE = "sync_pull";
                     WR_entry.READ_FLAG = Temp_vec_PULL[8];
                     WR_entry.WRITE_FLAG = Temp_vec_PULL[9];
+                    WR_entry.MODIFIED_IN_EDGE_LOOP = Temp_vec_PULL[10];
 
                     write_set_vec_PULL.push_back(WR_entry);
                   }
@@ -950,7 +953,7 @@ namespace {
           for (auto& i : write_set_vec_PUSH) {
             /** For allNodes operator range, if only source is written, sync is not required **/
             //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-            if(rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
+            if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
               continue;
             SSSyncer << getSyncer(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
@@ -964,7 +967,7 @@ namespace {
             if (i.SYNC_TYPE == "sync_pull") {
               /** For allNodes operator range, if only source is written, sync is not required **/
               //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-              if(rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
+              if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
                 continue;
               SSSyncer_vertexCut << getSyncer(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
@@ -978,7 +981,7 @@ namespace {
           for(auto& i : write_set_vec_PULL) {
             /** For allNodes operator range, if only source is written, sync is not required **/
             //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-            if(rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
+            if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
               continue;
             SSSyncer_pull << getSyncerPull(i, syncCall_map);
             rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
@@ -992,7 +995,7 @@ namespace {
             if(i.SYNC_TYPE == "sync_push"){
               /** For allNodes operator range, if only source is written, sync is not required **/
               //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-              if(rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
+              if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
                 continue;
               SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
               rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
@@ -1071,7 +1074,7 @@ namespace {
           // Adding sync calls for write set
           stringstream SSAfter;
           for (auto& i : syncCall_map) {
-            SSAfter << "\n\t" << "_graph.sync<";
+            SSAfter << "\n\t" << "_graph.sync_on_demand<";
 
             uint32_t c = 0;
 
@@ -1093,8 +1096,8 @@ namespace {
 
             // TODO flags now an argument; add them
             // TODO originally \( instead of (
-            //SSAfter << ">(Flags_" << i.first << ", \"" << OperatorStructName << "\");\n\n";
-            SSAfter << ">(\"" << OperatorStructName << "\");\n\n";
+            SSAfter << ">(Flags_" << i.first << ", \"" << OperatorStructName << "\");\n\n";
+            //SSAfter << ">(\"" << OperatorStructName << "\");\n\n";
             rewriter.InsertText(ST_main, SSAfter.str(), true, true);
             SSAfter.str(string());
             SSAfter.clear();
@@ -1109,14 +1112,11 @@ namespace {
           // others?
           for (auto& i : write_set_vec_PUSH_PULL) {
 
-//NOTE: This is not required anymore:
-//TODO: Delete this.
-#if 0
             if (i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull") {
               if (i.WRITE_FLAG == "writeDestination") {
                 SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_dst();\n";
-              } else if (i.WRITE_FLAG == "writeSource") {
-                if(rangeType == "allNodes"){
+              } else if (i.WRITE_FLAG == "writeSource") { /**If modified inside egde loop only then, mark it dirty **/
+                if(rangeType == "allNodes" || i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE"){
                   continue;
                 }
                 SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_src();\n";
@@ -1130,7 +1130,6 @@ namespace {
               SSAfter.str(string());
               SSAfter.clear();
             }
-#endif
 
             if(!syncGlobal_exists(info->syncGlobals_vec, i.FIELD_NAME)){
               info->syncGlobals_vec.push_back(make_pair(false,i.FIELD_NAME));

@@ -59,6 +59,9 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             /** For making the read set at the source **/
             string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_galoisAdd = "galoisAdd_" + j.VAR_NAME + "_" + i.first;
+
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
             string str_min = "min_" + j.VAR_NAME + "_" + i.first;
@@ -77,6 +80,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
               auto minusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_minusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
+              auto galoisAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_galoisAdd);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
               auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
               auto min_op = Results.Nodes.getNodeAs<clang::Stmt>(str_min);
@@ -126,6 +130,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 field_entry.IS_VEC = is_vector;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
+                reduceOP_entry.READFLAG = "readSource";
 
                 auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
@@ -230,7 +235,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   }
                   break;
                 }
-                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op) {
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec) || atomicMin_op || min_op || galoisAdd_op) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull_maybe";
 
                   if(assignplusOP){
@@ -243,6 +248,11 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   }
                   else if(assignmentOP){
                     reduceOP_entry.OPERATION_EXPR = "set";
+                  }
+                  else if(galoisAdd_op){
+                    galoisAdd_op->dumpColor();
+                    reduceOP_entry.OPERATION_EXPR = "add";
+                    reduceOP_entry.RESETVAL_EXPR = "0";
                   }
                   else if(atomicAdd_op){
                     reduceOP_entry.OPERATION_EXPR = "add";

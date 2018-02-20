@@ -45,6 +45,7 @@ class CallExprHandler : public MatchFinder::MatchCallback {
         auto call = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName");
         auto record = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("callerInStruct");
 
+
         clang::LangOptions LangOpts;
         LangOpts.CPlusPlus = true;
         clang::PrintingPolicy Policy(LangOpts);
@@ -167,7 +168,6 @@ class CallExprHandler : public MatchFinder::MatchCallback {
                   DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
                   DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
                   DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
-
                 }
                 //call->dumpColor();
 

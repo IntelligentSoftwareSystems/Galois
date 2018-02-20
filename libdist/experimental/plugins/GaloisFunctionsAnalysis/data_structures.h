@@ -52,6 +52,7 @@
     string WRITEFLAG;
     bool IS_RESET;
     bool IS_REDUCTION;
+    string MODIFIED_IN_EDGE_LOOP; /** INSIDE or OUTSIDE **/
   };
 
   struct SyncFlag_entry {

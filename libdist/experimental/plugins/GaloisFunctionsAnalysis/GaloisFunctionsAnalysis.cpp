@@ -208,8 +208,8 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
             for(auto j : i.second){
               //llvm::outs() << "i : " << i.first << ", j : " << j.FIELD_NAME << "\n";
               stringstream SSAfter;
-              j.READFLAG = "";
-              j.WRITEFLAG = "";
+              //j.READFLAG = "";
+              //j.WRITEFLAG = "";
               j.IS_RESET = false;
               for(auto h : info->syncFlags_map[struct_name]){
                 if(h.FIELD_NAME == j.FIELD_NAME){
@@ -251,7 +251,7 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
                 SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\")";
               }
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG <<"\")";
+                SSAfter << ", galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\",  \"" << j.READFLAG << "\",  \"" << j.WRITEFLAG << "\",  \"" << j.MODIFIED_IN_EDGE_LOOP << "\")";
 
               llvm::outs() << "Printing SSAfter : " << SSAfter.str() << "\n";
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
@@ -380,6 +380,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.SRC_NAME,  width) << "|"
                        << center(j.IS_REFERENCE,  width) << "|"
+                       << center(j.IS_REFERENCED,  width) << "|"
                        << center(j.RW_STATUS,  width) << "|"
                        << center(j.GRAPH_NAME,  width) << "\n";
         }
@@ -397,6 +398,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl_nonRef = "varDeclNonRef_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_galoisAdd = "galoisAdd_" + j.VAR_NAME + "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
             string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
@@ -444,6 +447,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("="),
                                                                             hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
 
+                                                                      /** For ComplexType : NodeData.field = val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
 
                                                                       /** For ComplexType : NodeData.field += val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("+="),
@@ -469,6 +475,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       /** For vector with base types **/
                                                                       binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr))), hasAncestor(compoundStmt().bind("cmd"))).bind(str_assignment_vec),
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
+
+                                                                      /** Galois Add **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("add"))))), hasAnyArgument(LHS_memExpr)).bind(str_galoisAdd),
 
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
@@ -632,6 +641,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
+                                                                      //callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd")))))).bind(str_atomicAdd),
                                                                       /** Atomic min **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
                                                                       /** min **/
@@ -644,7 +654,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first))),
                                                                      /** Only if condition inside EdgeForLoop should be considered**/
-                                                                     unless(hasAncestor(ifStmt(hasCondition(anything()), hasAncestor(EdgeForLoopMatcher)))));
+                                                                     //unless(hasAncestor(ifStmt(hasCondition(anything()), hasAncestor(EdgeForLoopMatcher)))));
+                                                                     //TODO: Need to find all the variables updated even inside the if statement
+                                                                     //TODO: This is just a hack right now
+                                                                     unless(hasAncestor(ifStmt(hasCondition(hasDescendant(binaryOperator(hasOperatorName(">")))), hasAncestor(EdgeForLoopMatcher)))));
 
             /** Conditional modification within forEdgeLoop **/
             StatementMatcher f_3 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"),
@@ -918,7 +931,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
         }
       }
 
-      
+
       llvm::outs() << "\n\n Printing Read and Write sets \n\n";
       for (auto i : info.syncFlags_map)
       {
@@ -964,6 +977,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       Matchers_addNewVariable.matchAST(Context);
 
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
+      /** For on-demand communication, there is no need to look across operators to see if sync_pull is required. Just look at operator to which variable belongs and marks it dirty if modified. **/
       for (auto i : info.reductionOps_map) {
         for(auto j : i.second) {
           llvm::outs() << " INSIDE LOOP : j.NODE_NAME : " << j.NODE_NAME << " for : " << i.first <<"\n";
@@ -973,15 +987,20 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
           string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
           string str_atomicMin = "atomicMin_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_lhs_argument = "argument_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+
+          string str_modified_insideEdgeLoop = "insideEdgeLoop_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_modified_outsideEdgeLoop = "outsideEdgeLoop_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
           /** Only need sync_pull if modified **/
-          //TODO: See if writeSource is going over allNodes and if it is writing the same value to all nodes, then no sync is required.
           //If not going over allNodes or writing different things, then need to sync pull.
           llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
           if(j.SYNC_TYPE == "sync_pull_maybe"){
-            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+                StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
                 StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
-                StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
+                //StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
+                StatementMatcher RHS_memExpr = memberExpr(member(hasName(j.FIELD_NAME)));
+                StatementMatcher LHS_memExpr_argument = memberExpr(member(hasName(j.FIELD_NAME))).bind(str_lhs_argument);
                 StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
 
               /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
@@ -996,7 +1015,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
                 /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
                 DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
-                                                                                                    hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
+                                                                                                    hasDescendant(memberExpr(member(hasName(j.FIELD_NAME)), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr)),
                                                                                                     unless(stmt_reductionOp))),
                                                                                    hasAncestor(EdgeForLoopMatcher)
                                                                       ).bind(str_syncPull_var);
@@ -1006,7 +1025,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                         /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
                                                                         binaryOperator(hasOperatorName("="),
                                                                                        hasLHS(LHS_varDecl),
-                                                                                       hasRHS(RHS_memExpr)),
+                                                                                       hasRHS(RHS_memExpr)).bind("binaryOp"),
 
                                                                         /** For builtInType : varname += NodeData.fieldName **/
                                                                         binaryOperator(hasOperatorName("+="),
@@ -1018,12 +1037,46 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                         hasLHS(LHS_varDecl),
                                                                                         hasRHS(RHS_memExpr))
 
+                                                                        /** Galois Add **/
+                                                                        //callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("add"))))), hasAnyArgument(RHS_memExpr)),
+
+                                                                        /** Any ifStmt which is using the NodeData.fieldName **/
+                                                                        //ifStmt(hasCondition(anything()), hasDescendant(RHS_memExpr))
+                                                                        //binaryOperator(hasLHS(RHS_memExpr))
+
                                                                         ),
                                                                         hasAncestor(EdgeForLoopMatcher)
                                                     ).bind(str_plusOp);
 
+                /**Any operation that has NodeData.fieldName modified at the source inside edge loop, should be marked dirty and should be synchronized**/
+                StatementMatcher f_syncPull_modified_insideEdgeLoop = expr(isExpansionInMainFile(),
+                                                                        anyOf(
+                                                                        binaryOperator(hasOperatorName("="), hasLHS(LHS_memExpr)),
+
+                                                                        /** Galois Add **/
+                                                                        callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("add"))))), hasAnyArgument(LHS_memExpr_argument))
+                                                                        ),
+                                                                        hasAncestor(EdgeForLoopMatcher)
+                                                    ).bind(str_modified_insideEdgeLoop);
+
+                /**Any operation that has NodeData.fieldName modified at the source outside edge loop, should be just marked dirty, there is no need to synchronize for on_demand synchronization **/
+                StatementMatcher f_syncPull_modified_outsideEdgeLoop = expr(isExpansionInMainFile(),
+                                                                        anyOf(
+
+                                                                        /**Any binary operation that has NodeData.fieldName modified at the source, should be marked dirty **/
+                                                                        binaryOperator(hasLHS(LHS_memExpr)),
+
+                                                                        /** For ComplexType : NodeData.field = val **/
+                                                                        operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                               hasDescendant(LHS_memExpr))
+                                                                        )
+                                                    ).bind(str_modified_outsideEdgeLoop);
+
+
                 Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
-                Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+                //Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_modified_insideEdgeLoop, &syncPull_handler);
+                Matchers_syncpull_field.addMatcher(f_syncPull_modified_outsideEdgeLoop, &syncPull_handler);
           }
         }
       }
@@ -1074,7 +1127,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       for (auto i : info.reductionOps_map){
         llvm::outs() << "FOR >>>>> " << i.first << "\n";
         for(auto j : i.second) {
-          string write_set = "write_set( " + j.SYNC_TYPE + ", " + j.NODE_TYPE + " , " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + ")";
+          string write_set = "write_set( " + j.SYNC_TYPE + ", " + j.NODE_TYPE + " , " + j.READFLAG + ", " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + " , " + j.MODIFIED_IN_EDGE_LOOP + ")";
           llvm::outs() << write_set << "\n";
         }
       }

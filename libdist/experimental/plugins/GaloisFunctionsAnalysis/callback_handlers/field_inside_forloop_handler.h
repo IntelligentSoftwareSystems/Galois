@@ -335,7 +335,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(atomicAdd_op){
-                  //atomicAdd_op->dump();
+                  llvm::outs() << "*************************************************\n";
+                  llvm::outs() << i.first << "\n" << field_entry.FIELD_NAME << "\n";
+                  atomicAdd_op->dumpColor();
+
                   string reduceOP = "add";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetValExpr = "0";

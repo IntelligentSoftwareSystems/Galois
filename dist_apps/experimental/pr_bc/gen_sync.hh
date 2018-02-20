@@ -124,11 +124,79 @@ struct ReducePairwiseMinAndResetDist {
   #endif
 };
 
-#ifndef _VECTOR_SYNC_
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
-#else
-GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, galois::gstl::Vector<uint32_t>);
-#endif
+struct Broadcast_minDistances {
+  #ifndef _VECTOR_SYNC_
+  typedef uint32_t ValTy;
+  #else
+  typedef galois::gstl::Vector<uint32_t> ValTy;
+  #endif
+
+  #ifndef _VECTOR_SYNC_
+  static ValTy extract(uint32_t node_id, const struct NodeData& node,
+                       unsigned vecIndex) {
+    return node.minDistances[vecIndex];
+  }
+
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
+    GALOIS_DIE("Execution shouldn't get here this function needs an index arg\n");
+    return node.minDistances[0];
+  }
+  #else
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
+    return node.minDistances;
+  }
+  #endif
+
+  static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
+                            DataCommMode*) {
+    return false;
+  }
+
+  static bool extract_batch(unsigned, ValTy*) {
+    return false;
+  }
+
+  // if min distance is changed by the broadcast, then shortest path to add
+  // becomes obsolete/incorrect, so it must be changed to 0
+  #ifndef _VECTOR_SYNC_
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y,
+                     unsigned vecIndex) {
+    assert(node.minDistances[vecIndex] >= y);
+
+    if (node.minDistances[vecIndex] != y) {
+      node.shortestPathToAdd[vecIndex] = 0;
+    }
+    node.minDistances[vecIndex] = y;
+  }
+
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
+    GALOIS_DIE("Execution shouldn't get here; needs index arg\n");
+  }
+  #else
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
+    for (unsigned vecIndex = 0; vecIndex < y.size(); vecIndex++) {
+      assert(node.minDistances[vecIndex] >= y[vecIndex]);
+
+      if (node.minDistances[vecIndex] != y[vecIndex]) {
+        node.minDistances[vecIndex] = y[vecIndex];
+        node.shortestPathToAdd[vecIndex] = 0;
+      }
+    }
+  }
+  #endif
+
+  static bool setVal_batch(unsigned, uint64_t*, unsigned int*, ValTy*,
+                           size_t, DataCommMode) {
+    return false;
+  }
+};
+
+// Incorrect sync structures
+//#ifndef _VECTOR_SYNC_
+//GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
+//#else
+//GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, galois::gstl::Vector<uint32_t>);
+//#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Shortest Path
