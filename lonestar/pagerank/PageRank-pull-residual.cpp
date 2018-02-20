@@ -100,10 +100,10 @@ void initNodeData(Graph& g, DeltaArray& delta, ResidualArray& residual) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
                    auto& sdata = g.getData(n, galois::MethodFlag::UNPROTECTED);
-                   sdata.value = PR_INIT_VAL;
+                   sdata.value = 0;
                    sdata.nout  = 0;
                    delta[n]    = 0;
-                   residual[n] = ALPHA;
+                   residual[n] = 1 - ALPHA;
                  },
                  galois::no_stats(), galois::loopname("initNodeData"));
 }

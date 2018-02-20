@@ -31,6 +31,9 @@
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
 
+// These implementations are based on the Push-based PageRank computation
+// (Algorithm 4) as described in the PageRank Europar 2015 paper.
+
 namespace cll = llvm::cl;
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
@@ -59,7 +62,7 @@ struct LNode {
 
   void init() {
     value    = 0.0;
-    residual = 0.0;
+    residual = 1 - ALPHA;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -106,26 +109,26 @@ static void printTop(Graph& graph, int topn) {
 }
 
 void initResidual(Graph& graph) {
-  // use residual for the partial, scaled initial residual
-  galois::do_all(galois::iterate(graph),
-                 [&graph](const GNode& src) {
-                   // contribute residual
-                   auto nout = std::distance(graph.edge_begin(src),
-                                             graph.edge_end(src));
-                   for (auto ii : graph.edges(src)) {
-                     auto dst    = graph.getEdgeDst(ii);
-                     auto& ddata = graph.getData(dst);
-                     atomicAdd(ddata.residual, PR_INIT_VAL / nout);
-                   }
-                 },
-                 galois::loopname("initResidual"), galois::steal());
+
+  galois::do_all(
+      galois::iterate(graph),
+      [&graph](const GNode& src) {
+        auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
+        for (auto ii : graph.edges(src)) {
+          auto dst    = graph.getEdgeDst(ii);
+          auto& ddata = graph.getData(dst);
+          atomicAdd(ddata.residual, 1 / nout);
+        }
+      },
+      galois::loopname("initResidual"), galois::steal(), galois::no_stats());
 
   galois::do_all(galois::iterate(graph),
                  [&graph](const GNode& src) {
                    auto& data    = graph.getData(src);
-                   data.residual = data.residual * ALPHA + (1.0 - ALPHA);
+                   data.residual = data.residual * ALPHA * (1.0 - ALPHA);
                  },
-                 galois::loopname("scaleResidual"), galois::steal());
+                 galois::loopname("scaleResidual"), galois::steal(),
+                 galois::no_stats());
 }
 
 void asyncPageRank(Graph& graph) {
@@ -141,20 +144,25 @@ void asyncPageRank(Graph& graph) {
                        sdata.value += oldResidual;
                        int src_nout = std::distance(graph.edge_begin(src, flag),
                                                     graph.edge_end(src, flag));
-                       PRTy delta   = oldResidual * ALPHA / src_nout;
-                       // for each out-going neighbors
-                       for (auto jj : graph.edges(src, flag)) {
-                         GNode dst    = graph.getEdgeDst(jj);
-                         LNode& ddata = graph.getData(dst, flag);
-                         auto old     = atomicAdd(ddata.residual, delta);
-                         if ((old <= tolerance) && (old + delta >= tolerance)) {
-                           ctx.push(dst);
+                       if (src_nout > 0) {
+                         PRTy delta = oldResidual * ALPHA / src_nout;
+                         // for each out-going neighbors
+                         for (auto jj : graph.edges(src, flag)) {
+                           GNode dst    = graph.getEdgeDst(jj);
+                           LNode& ddata = graph.getData(dst, flag);
+                           if (delta > 0) {
+                             auto old = atomicAdd(ddata.residual, delta);
+                             if ((old < tolerance) &&
+                                 (old + delta >= tolerance)) {
+                               ctx.push(dst);
+                             }
+                           }
                          }
                        }
                      }
                    },
                    galois::loopname("AsyncPageRank"), galois::no_conflicts(),
-                   galois::wl<WL>());
+                   galois::no_stats(), galois::wl<WL>());
 }
 
 void syncPageRank(Graph& graph) {
@@ -170,7 +178,8 @@ void syncPageRank(Graph& graph) {
   galois::InsertBag<GNode> activeNodes;
 
   galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) { activeNodes.push(src); });
+                 [&](const GNode& src) { activeNodes.push(src); },
+                 galois::no_stats());
 
   size_t iter = 0;
   for (; !activeNodes.empty() && iter < maxIterations; ++iter) {
@@ -210,7 +219,7 @@ void syncPageRank(Graph& graph) {
                      }
                    },
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("CreateEdgeTiles"));
+                   galois::loopname("CreateEdgeTiles"), galois::no_stats());
 
     activeNodes.clear_parallel();
 
@@ -233,7 +242,7 @@ void syncPageRank(Graph& graph) {
                      }
                    },
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("PushResidual"));
+                   galois::loopname("PushResidual"), galois::no_stats());
 
     updates.clear_parallel();
   }

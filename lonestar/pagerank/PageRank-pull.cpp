@@ -29,6 +29,7 @@
 #include "galois/Timer.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/graphs/TypeTraits.h"
+#include "galois/runtime/Profile.h"
 
 namespace cll = llvm::cl;
 const char* desc =
@@ -74,8 +75,8 @@ void initNodeData(Graph& g) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
                    auto& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
-                   data.value[0] = PR_INIT_VAL;
-                   data.value[1] = PR_INIT_VAL;
+                   data.value[0] = (1 - ALPHA);
+                   data.value[1] = (1 - ALPHA);
                    data.nout     = 0;
                  },
                  galois::no_stats(), galois::loopname("initNodeData"));
@@ -310,42 +311,50 @@ void computePageRankET(Graph& graph) {
   }
 }
 
+// FIXME: Remove this after debugging.
+GALOIS_ATTRIBUTE_NOINLINE
 void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
   while (true) {
-    galois::do_all(
-        galois::iterate(graph),
-        [&](const GNode& src) {
-          constexpr const galois::MethodFlag flag =
-              galois::MethodFlag::UNPROTECTED;
 
-          LNode& sdata = graph.getData(src, flag);
-          float sum    = 0.0;
+    galois::runtime::profileVtune(
+        [&]() {
 
-          for (auto jj = graph.edge_begin(src, flag),
-                    ej = graph.edge_end(src, flag);
-               jj != ej; ++jj) {
-            GNode dst = graph.getEdgeDst(jj);
+          galois::do_all(
+              galois::iterate(graph),
+              [&](const GNode& src) {
+                constexpr const galois::MethodFlag flag =
+                    galois::MethodFlag::UNPROTECTED;
 
-            LNode& ddata = graph.getData(dst, flag);
-            sum += ddata.getPageRank(iteration) / ddata.nout;
-          }
+                LNode& sdata = graph.getData(src, flag);
+                float sum    = 0.0;
 
-          // New value of pagerank after computing contributions from
-          // incoming edges in the original graph
-          float value = sum * ALPHA + (1.0 - ALPHA);
-          // Find the delta in new and old pagerank values
-          float diff = std::fabs(value - sdata.getPageRank(iteration));
+                for (auto jj = graph.edge_begin(src, flag),
+                          ej = graph.edge_end(src, flag);
+                     jj != ej; ++jj) {
+                  GNode dst = graph.getEdgeDst(jj);
 
-          // Do not update pagerank before the diff is computed since
-          // there is a data dependence on the pagerank value
-          sdata.setPageRank(iteration, value);
-          max_delta.update(diff);
+                  LNode& ddata = graph.getData(dst, flag);
+                  sum += ddata.getPageRank(iteration) / ddata.nout;
+                }
+
+                // New value of pagerank after computing contributions from
+                // incoming edges in the original graph
+                float value = sum * ALPHA + (1.0 - ALPHA);
+                // Find the delta in new and old pagerank values
+                float diff = std::fabs(value - sdata.getPageRank(iteration));
+
+                // Do not update pagerank before the diff is computed since
+                // there is a data dependence on the pagerank value
+                sdata.setPageRank(iteration, value);
+                max_delta.update(diff);
+              },
+              galois::no_stats(), galois::steal(),
+              galois::chunk_size<CHUNK_SIZE>(), galois::loopname("PageRank"));
         },
-        galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("PageRank"));
+        "computePageRankProfileVTune");
 
     float delta = max_delta.reduce();
 

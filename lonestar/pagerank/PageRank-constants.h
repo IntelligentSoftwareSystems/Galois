@@ -23,6 +23,10 @@
 #ifndef LONESTAR_PAGERANK_CONSTANTS_H
 #define LONESTAR_PAGERANK_CONSTANTS_H
 
+#include <iostream>
+
+#define DEBUG 0
+
 const char* name = "Page Rank";
 const char* url  = 0;
 
@@ -32,7 +36,6 @@ constexpr static const float PR_INIT_VAL = 1.0;
 constexpr static const float TOLERANCE   = 1.0e-5;
 constexpr static const unsigned MAX_ITER = 1000;
 
-#define DEBUG 0
 constexpr static const unsigned PRINT_TOP = 20;
 
 // Type definitions
