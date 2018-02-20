@@ -108,28 +108,27 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
-void initResidual(Graph& graph) {
+// void initResidual(Graph& graph) {
+//   galois::do_all(
+//       galois::iterate(graph),
+//       [&graph](const GNode& src) {
+//         auto nout = std::distance(graph.edge_begin(src),
+//         graph.edge_end(src)); for (auto ii : graph.edges(src)) {
+//           auto dst    = graph.getEdgeDst(ii);
+//           auto& ddata = graph.getData(dst);
+//           atomicAdd(ddata.residual, 1 / nout);
+//         }
+//       },
+//       galois::loopname("initResidual"), galois::steal(), galois::no_stats());
 
-  galois::do_all(
-      galois::iterate(graph),
-      [&graph](const GNode& src) {
-        auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
-        for (auto ii : graph.edges(src)) {
-          auto dst    = graph.getEdgeDst(ii);
-          auto& ddata = graph.getData(dst);
-          atomicAdd(ddata.residual, 1 / nout);
-        }
-      },
-      galois::loopname("initResidual"), galois::steal(), galois::no_stats());
-
-  galois::do_all(galois::iterate(graph),
-                 [&graph](const GNode& src) {
-                   auto& data    = graph.getData(src);
-                   data.residual = data.residual * ALPHA * (1.0 - ALPHA);
-                 },
-                 galois::loopname("scaleResidual"), galois::steal(),
-                 galois::no_stats());
-}
+//   galois::do_all(galois::iterate(graph),
+//                  [&graph](const GNode& src) {
+//                    auto& data    = graph.getData(src);
+//                    data.residual = data.residual * ALPHA * (1.0 - ALPHA);
+//                  },
+//                  galois::loopname("scaleResidual"), galois::steal(),
+//                  galois::no_stats());
+// }
 
 void asyncPageRank(Graph& graph) {
   typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
@@ -286,7 +285,7 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph),
                  [&graph](GNode n) { graph.getData(n).init(); },
                  galois::no_stats(), galois::loopname("Initialize"));
-  initResidual(graph);
+  // initResidual(graph);
 
   galois::StatTimer Tmain;
   Tmain.start();

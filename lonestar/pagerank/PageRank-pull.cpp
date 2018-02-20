@@ -310,8 +310,86 @@ void computePageRankET(Graph& graph) {
     finalizePR(graph);
   }
 }
+// FIXME: This is for debugging scalability and to avoid inlining.
+struct PageRankPull {
+  Graph& graph;
+  unsigned int iteration;
+  galois::GReduceMax<float>& max_delta;
 
-// FIXME: Remove this after debugging.
+  PageRankPull(Graph& _graph, unsigned int _it, galois::GReduceMax<float>& _mx)
+      : graph(_graph), iteration(_it), max_delta(_mx) {}
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  void static run(Graph& _graph) {
+    unsigned int iteration = 0;
+    galois::GReduceMax<float> max_delta;
+
+    while (true) {
+      galois::runtime::profileVtune(
+          [&]() {
+            galois::do_all(galois::iterate(_graph),
+                           PageRankPull{_graph, iteration, max_delta},
+                           galois::no_stats(), galois::steal(),
+                           galois::chunk_size<CHUNK_SIZE>(),
+                           galois::loopname("PageRank"));
+          },
+          "computePageRankProfileVTune");
+
+      float delta = max_delta.reduce();
+
+#if DEBUG
+      std::cout << "iteration: " << iteration << " max delta: " << delta
+                << "\n";
+#endif
+
+      iteration += 1;
+      if (delta <= tolerance || iteration >= maxIterations) {
+        break;
+      }
+      max_delta.reset();
+    } // end while(true)
+
+    if (iteration >= maxIterations) {
+      std::cerr << "ERROR: failed to converge in " << iteration << " iterations"
+                << std::endl;
+    }
+
+    if (iteration & 1) {
+      // Result already in right place
+    } else {
+      finalizePR(_graph);
+    }
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  void operator()(GNode src) const {
+    constexpr const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+
+    LNode& sdata = graph.getData(src, flag);
+    float sum    = 0.0;
+
+    for (auto jj = graph.edge_begin(src, flag), ej = graph.edge_end(src, flag);
+         jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+
+      LNode& ddata = graph.getData(dst, flag);
+      sum += ddata.getPageRank(iteration) / ddata.nout;
+    }
+
+    // New value of pagerank after computing contributions from
+    // incoming edges in the original graph
+    float value = sum * ALPHA + (1.0 - ALPHA);
+    // Find the delta in new and old pagerank values
+    float diff = std::fabs(value - sdata.getPageRank(iteration));
+
+    // Do not update pagerank before the diff is computed since
+    // there is a data dependence on the pagerank value
+    sdata.setPageRank(iteration, value);
+    max_delta.update(diff);
+  }
+};
+
+// FIXME: This is for debugging scalability and to avoid inlining.
 GALOIS_ATTRIBUTE_NOINLINE
 void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
@@ -443,7 +521,8 @@ int main(int argc, char** argv) {
 
   switch (algo) {
   case PR_Pull: {
-    computePageRank(transposeGraph);
+    // computePageRank(transposeGraph);
+    PageRankPull::run(transposeGraph);
     break;
   }
   case PR_Pull_ET: {
