@@ -459,6 +459,17 @@ void computePageRank(Graph& graph) {
   }
 }
 
+static void printPageRank(Graph& graph) {
+  std::cout << "Id\tPageRank\n";
+  int counter = 0;
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
+    GNode src                    = *ii;
+    Graph::node_data_reference n = graph.getData(src);
+    std::cout << counter << " " << n.getPageRank() << "\n";
+    counter++;
+  }
+}
+
 template <typename Graph>
 static void printTop(Graph& graph, int topn) {
   typedef typename Graph::node_data_reference node_data_reference;
@@ -534,9 +545,11 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify) {
-    printTop(transposeGraph, PRINT_TOP);
-  }
+  // if (!skipVerify) {
+  //   printTop(transposeGraph, PRINT_TOP);
+  // }
+
+  printPageRank(transposeGraph);
 
   T.stop();
 

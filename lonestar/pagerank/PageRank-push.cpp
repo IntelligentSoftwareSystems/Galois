@@ -252,6 +252,17 @@ void syncPageRank(Graph& graph) {
   }
 }
 
+static void printPageRank(Graph& graph) {
+  std::cout << "Id\tPageRank\n";
+  int counter = 0;
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
+    GNode src                    = *ii;
+    Graph::node_data_reference n = graph.getData(src);
+    std::cout << counter << " " << n.value << "\n";
+    counter++;
+  }
+}
+
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -304,9 +315,11 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify) {
-    printTop(graph, PRINT_TOP);
-  }
+  // if (!skipVerify) {
+  //   printTop(graph, PRINT_TOP);
+  // }
+
+  printPageRank(graph);
 
   T.stop();
 

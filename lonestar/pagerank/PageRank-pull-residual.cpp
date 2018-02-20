@@ -93,6 +93,17 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
+static void printPageRank(Graph& graph) {
+  std::cout << "Id\tPageRank\n";
+  int counter = 0;
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
+    GNode src                    = *ii;
+    Graph::node_data_reference n = graph.getData(src);
+    std::cout << counter << " " << n.value << "\n";
+    counter++;
+  }
+}
+
 using DeltaArray    = galois::LargeArray<PRTy>;
 using ResidualArray = galois::LargeArray<PRTy>;
 
@@ -233,9 +244,11 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify) {
-    printTop(transposeGraph, PRINT_TOP);
-  }
+  // if (!skipVerify) {
+  //   printTop(transposeGraph, PRINT_TOP);
+  // }
+
+  printPageRank(transposeGraph);
 
   overheadTime.stop();
   return 0;
