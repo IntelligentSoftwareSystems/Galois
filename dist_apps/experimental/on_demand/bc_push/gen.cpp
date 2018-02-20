@@ -25,7 +25,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-//#define BCDEBUG
+#define BCDEBUG
 
 constexpr static const char* const REGION_NAME = "BC";
 
@@ -530,7 +530,6 @@ struct PredAndSucc {
     );
   #if __OPT_VERSION__ == 5
     Flags_num_predecessors.set_write_dst();
-    
     Flags_num_successors.set_write_src();
   #endif
     
@@ -623,6 +622,9 @@ struct NumShortestPathsChanges {
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, 
                           Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPathsChanges");
+    // FIXME
+    // first time needs to be a reduce add; latter times must be reduce set
+    // doesn't matter now because bitset isn't being set
     _graph.sync_on_demand<readSource, 
                           Reduce_add_num_predecessors,Broadcast_num_predecessors ,Bitset_num_predecessors>(Flags_num_predecessors, "NumShortestPathsChanges");
     _graph.sync_on_demand<readSource, 
@@ -656,6 +658,14 @@ struct NumShortestPathsChanges {
     );
 
       } 
+
+    #if __OPT_VERSION__ == 5
+    //Flags_num_predecessors.set_write_src();
+    Flags_trim.set_write_src();
+    Flags_propagation_flag.set_write_src();
+    Flags_to_add.set_write_src();
+    Flags_num_shortest_paths.set_write_src();
+    #endif
 
     // predecessors does not require syncing as syncing trim accomplishes the
     // same effect; as a result, flags are synced as well on sources
@@ -737,8 +747,9 @@ struct NumShortestPaths {
       dga.reset();
 
     #if __OPT_VERSION__ == 5
+    _graph.sync_on_demand<readSource, Reduce_set_propagation_flag,Broadcast_propagation_flag ,Bitset_propagation_flag>(Flags_propagation_flag, "NumShortestPaths");
     _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "NumShortestPaths");
-    _graph.sync_on_demand<readSource, Reduce_add_num_shortest_paths,
+    _graph.sync_on_demand<readSource, Reduce_set_num_shortest_paths,
                           Broadcast_num_shortest_paths,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "NumShortestPaths");
     #endif
 
@@ -938,7 +949,6 @@ struct PropagationFlagUpdate {
     #if __OPT_VERSION__ == 5
     Flags_propagation_flag.set_write_src();
     #endif
-
     }
 
 
@@ -993,12 +1003,10 @@ struct DependencyPropChanges {
     // must all be read any, all nodes loop without edges
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropChanges");
-
-    _graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
-
+    _graph.sync_on_demand<readSource , Reduce_set_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropChanges");
     _graph.sync_on_demand<readSource , Reduce_add_to_add_float,Broadcast_to_add_float ,Bitset_to_add_float>(Flags_to_add_float, "DependencyPropChanges");
-
     _graph.sync_on_demand<readSource , Reduce_add_trim,Broadcast_trim ,Bitset_trim>(Flags_trim, "DependencyPropChanges");
+    _graph.sync_on_demand<readSource, Reduce_set_propagation_flag,Broadcast_propagation_flag ,Bitset_propagation_flag>(Flags_propagation_flag, "NumShortestPaths");
     #endif
 
     #ifdef __GALOIS_HET_CUDA__
@@ -1015,8 +1023,6 @@ struct DependencyPropChanges {
       } else if (personality == CPU)
     #endif
       {
-
-
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       DependencyPropChanges{infinity, &_graph}, 
@@ -1024,9 +1030,15 @@ struct DependencyPropChanges {
       //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
       galois::no_stats()
     );
-
       }
     
+    #if __OPT_VERSION__ == 5
+    Flags_dependency.set_write_src();
+    Flags_trim.set_write_src();
+    Flags_propagation_flag.set_write_src();
+    Flags_to_add_float.set_write_src();
+    Flags_num_successors.set_write_src();
+    #endif
 
     // need reduce set for flag
     //_graph.sync<writeSource, readDestination, Reduce_set_propagation_flag, 
@@ -1119,9 +1131,10 @@ struct DependencyPropagation {
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readAny , Reduce_min_current_length,Broadcast_current_length ,Bitset_current_length>(Flags_current_length, "DependencyPropagation");
-    _graph.sync_on_demand<readSource , Reduce_add_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
+    _graph.sync_on_demand<readSource , Reduce_set_num_successors,Broadcast_num_successors ,Bitset_num_successors>(Flags_num_successors, "DependencyPropagation");
     _graph.sync_on_demand<readAny , Reduce_add_num_shortest_paths,Broadcast_num_shortest_paths ,Bitset_num_shortest_paths>(Flags_num_shortest_paths, "DependencyPropagation");
-    _graph.sync_on_demand<readDestination, Reduce_add_dependency, Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
+    _graph.sync_on_demand<readDestination, Reduce_set_dependency, Broadcast_dependency ,Bitset_dependency>(Flags_dependency, "DependencyPropagation");
+    _graph.sync_on_demand<readDestination, Reduce_set_propagation_flag,Broadcast_propagation_flag ,Bitset_propagation_flag>(Flags_propagation_flag, "NumShortestPaths");
     #endif
 
     #ifdef __GALOIS_HET_CUDA__
