@@ -399,8 +399,10 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, void>();
   #endif
 
+  #if __OPT_VERSION__ >= 3
   // bitset comm setup
   bitset_dist_current.resize(hg->size());
+  #endif
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -429,12 +431,15 @@ int main(int argc, char** argv) {
     BFSSanityCheck::go(*hg, DGAccumulator_sum, m);
 
     if ((run + 1) != numRuns) {
+
+    #if __OPT_VERSION__ >= 3
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 
         bitset_dist_current_reset_cuda(cuda_ctx);
       } else
     #endif
       bitset_dist_current.reset();
+    #endif
 
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
