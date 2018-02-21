@@ -163,6 +163,7 @@ endfunction()
 
 versionGen(bc_push)
 versionGen(kcore_push)
+versionGen(bfs_push)
 versionGen(sgd)
 #versionGenNoGPU(bc_pull)
 
