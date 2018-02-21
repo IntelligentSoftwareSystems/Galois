@@ -70,4 +70,4 @@ distApp(kcore_pull)
 
 distApp(bc_push)
 
-distApp(sgd)
+distAppNoGPU(sgd)
