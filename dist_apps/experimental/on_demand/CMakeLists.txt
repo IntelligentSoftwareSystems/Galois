@@ -162,6 +162,7 @@ endfunction()
 ################################################################################
 
 versionGen(bc_push)
+versionGen(kcore_push)
 versionGen(sgd)
 #versionGenNoGPU(bc_pull)
 

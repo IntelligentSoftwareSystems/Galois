@@ -24,6 +24,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(trim);
 #endif
 
 #if __OPT_VERSION__ == 5
-FieldFlags Flags_current_degree;
-FieldFlags Flags_trim;
+galois::runtime::FieldFlags Flags_current_degree;
+galois::runtime::FieldFlags Flags_trim;
 #endif
