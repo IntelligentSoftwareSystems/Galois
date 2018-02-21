@@ -250,7 +250,7 @@ __global__ void KCoreStep2(CSRGraph graph, unsigned int __begin, unsigned int __
   }
   // FP: "12 -> 13;
 }
-__global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, DynamicBitset& bitset_trim, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t local_k_core_num, uint32_t * p_current_degree, uint8_t * p_flag, uint32_t * p_trim, HGAccumulator<unsigned int> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -377,7 +377,6 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __
           index_type dst;
           dst = graph.getAbsDestination(current_edge);
           atomicTestAdd(&p_trim[dst], (uint32_t)1);
-          bitset_trim.set(dst);
         }
       }
       // FP: "59 -> 60;
@@ -416,7 +415,6 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __
             index_type dst;
             dst = graph.getAbsDestination(current_edge);
             atomicTestAdd(&p_trim[dst], (uint32_t)1);
-            bitset_trim.set(dst);
           }
         }
       }
@@ -451,7 +449,6 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __
           index_type dst;
           dst = graph.getAbsDestination(current_edge);
           atomicTestAdd(&p_trim[dst], (uint32_t)1);
-          bitset_trim.set(dst);
         }
       }
       // FP: "100 -> 101;
@@ -607,7 +604,7 @@ void KCoreStep1_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & 
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), *(ctx->trim.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  KCoreStep1 <<<blocks, __tb_KCoreStep1>>>(ctx->gg, __begin, __end, local_k_core_num, ctx->current_degree.data.gpu_wr_ptr(), ctx->flag.data.gpu_wr_ptr(), ctx->trim.data.gpu_wr_ptr(), _DGAccumulator_accum);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
