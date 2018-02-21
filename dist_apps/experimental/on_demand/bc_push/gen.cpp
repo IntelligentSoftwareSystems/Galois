@@ -38,13 +38,13 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
-//#include "galois/CompilerHelpers.h"
 
 //#define __USE_BFS__ // also defined in gen_cuda.h
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
+
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -170,7 +170,6 @@ struct InitializeGraph {
       InitializeGraph{&_graph}, 
       galois::no_stats(),
       galois::loopname("InitializeGraph"));
-
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -220,7 +219,6 @@ struct InitializeIteration {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()), 
       InitializeIteration{infinity, current_src_node, &_graph},
@@ -228,8 +226,6 @@ struct InitializeIteration {
       //galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()), 
       galois::no_stats()
     );
-   }
-    
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -295,16 +291,13 @@ struct FirstIterationSSSP {
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
-    
-      galois::do_all(
-        galois::iterate(__begin, __end), 
-        FirstIterationSSSP(&_graph),
-        galois::loopname("SSSP"),
-        //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
-        galois::no_stats()
-      );
-      }
+    galois::do_all(
+      galois::iterate(__begin, __end), 
+      FirstIterationSSSP(&_graph),
+      galois::loopname("SSSP"),
+      //galois::loopname(_graph.get_run_identifier("FirstIterationSSSP").c_str()),
+      galois::no_stats()
+    );
   #if __OPT_VERSION__ == 5
     Flags_current_length.set_write_dst();
   #endif
@@ -390,13 +383,12 @@ struct SSSP {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
-        SSSP_allNodes_cuda(__retval, cuda_ctx);
+        SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       {
-      
       galois::do_all(
         galois::iterate(nodesWithEdges),
         SSSP(&_graph, dga), 
@@ -404,12 +396,12 @@ struct SSSP {
         //galois::loopname(_graph.get_run_identifier("SSSP").c_str()), 
         galois::no_stats()
       );
-      
+      }
+
       iterations++;
 
       accum_result = dga.reduce();
 
-      }
 
       #if __OPT_VERSION__ == 5
       Flags_current_length.set_write_dst();
@@ -516,13 +508,11 @@ struct PredAndSucc {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        PredAndSucc_allNodes_cuda(infinity, cuda_ctx);
+        PredAndSucc_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
-
-    
     galois::do_all(
       galois::iterate(nodesWithEdges),
       PredAndSucc(infinity, &_graph), 
@@ -646,12 +636,10 @@ struct NumShortestPathsChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        NumShortestPathsChanges_allNodes_cuda(infinity, cuda_ctx);
+        NumShortestPathsChanges_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
-    
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       NumShortestPathsChanges{infinity, &_graph}, 
@@ -659,8 +647,6 @@ struct NumShortestPathsChanges {
       //galois::loopname(_graph.get_run_identifier("NumShortestPathsChanges").c_str()), 
       galois::no_stats()
     );
-
-      } 
 
     #if __OPT_VERSION__ == 5
     //Flags_num_predecessors.set_write_src();
@@ -717,6 +703,7 @@ struct NumShortestPathsChanges {
         #endif
       }
     }
+
   }
 };
 
@@ -766,13 +753,12 @@ struct NumShortestPaths {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         uint32_t __retval = 0;
-        NumShortestPaths_allNodes_cuda(__retval, infinity, current_src_node, cuda_ctx);
+        NumShortestPaths_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
       { 
-
         galois::do_all(
           galois::iterate(nodesWithEdges),
           NumShortestPaths(infinity, current_src_node, &_graph, dga), 
@@ -935,13 +921,10 @@ struct PropagationFlagUpdate {
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      PropagationFlagUpdate_allNodes_cuda(infinity, cuda_ctx);
+      PropagationFlagUpdate_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), infinity, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
-    {
-
-
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       PropagationFlagUpdate(infinity, &_graph), 
@@ -949,7 +932,6 @@ struct PropagationFlagUpdate {
       galois::no_stats()
     );
 
-    }
     #if __OPT_VERSION__ == 5
     Flags_propagation_flag.set_write_src();
     #endif
@@ -1021,11 +1003,10 @@ struct DependencyPropChanges {
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        DependencyPropChanges_allNodes_cuda(infinity, cuda_ctx);
+        DependencyPropChanges_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), infinity, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
-      {
     galois::do_all(
       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       DependencyPropChanges{infinity, &_graph}, 
@@ -1033,7 +1014,6 @@ struct DependencyPropChanges {
       //galois::loopname(_graph.get_run_identifier("DependencyPropChanges").c_str()),
       galois::no_stats()
     );
-      }
     
     #if __OPT_VERSION__ == 5
     Flags_dependency.set_write_src();
@@ -1150,13 +1130,12 @@ struct DependencyPropagation {
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         uint32_t __retval = 0;
-        DependencyPropagation_allNodes_cuda(__retval, infinity, current_src_node, cuda_ctx);
+        DependencyPropagation_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), __retval, infinity, current_src_node, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
-
       galois::do_all(
         galois::iterate(nodesWithEdges),
         DependencyPropagation(infinity, current_src_node, &_graph, dga), 
@@ -1164,7 +1143,6 @@ struct DependencyPropagation {
         //galois::loopname(_graph.get_run_identifier("DependencyPropagation").c_str()),
         galois::no_stats()
       );
-
     }
       #if __OPT_VERSION__ == 5
       //Flags_num_successors.set_write_src();
@@ -1228,13 +1206,11 @@ struct DependencyPropagation {
     // + do not redo computation if src has no successors left
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors > 0) {
-        //if (graph->getGID(src) == local_current_src_node) {
+        if (graph->getGID(src) == local_current_src_node) {
           // this is source of this iteration's of sssp/bfs; reset num succ to 0
-          // so loop isn't entered again (basically an optimization that can
-          // be removed)
-          //src_data.num_successors = 0;
-        //}
-
+          // so loop isn't entered again
+          src_data.num_successors = 0;
+        }
         if (graph->getGID(src) != local_current_src_node) {
           for (auto current_edge : graph->edges(src)) {
             GNode dst = graph->getEdgeDst(current_edge);
@@ -1372,7 +1348,7 @@ struct BC {
         std::string impl_str("CUDA_DO_ALL_IMPL_BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        BC_allNodes_cuda(cuda_ctx);
+        BC_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -1584,7 +1560,6 @@ int main(int argc, char** argv) {
     #if __OPT_VERSION__ >= 3
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 
-
         bitset_to_add_reset_cuda(cuda_ctx);
         bitset_to_add_float_reset_cuda(cuda_ctx);
         bitset_num_shortest_paths_reset_cuda(cuda_ctx);

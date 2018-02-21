@@ -739,8 +739,6 @@ struct PropagationFlagUpdate {
   void static go(Graph& _graph) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    // TODO gpu code
-
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       //std::string impl_str("CUDA_DO_ALL_IMPL_PropagationFlagUpdate");
