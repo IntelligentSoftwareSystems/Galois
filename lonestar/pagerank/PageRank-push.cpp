@@ -108,6 +108,8 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
+// This method seems redundant.
+
 // void initResidual(Graph& graph) {
 //   galois::do_all(
 //       galois::iterate(graph),

@@ -37,7 +37,7 @@ const char* desc =
 
 constexpr static const unsigned CHUNK_SIZE = 32;
 
-enum Algo { PR_Pull, PR_Pull_ET };
+enum Algo { PR_Pull, PR_Pull_ET, PR_Pull_Profile };
 
 static cll::opt<Algo> algo(
     "algo", cll::desc("Choose an algorithm:"),
@@ -389,50 +389,43 @@ struct PageRankPull {
   }
 };
 
-// FIXME: This is for debugging scalability and to avoid inlining.
-GALOIS_ATTRIBUTE_NOINLINE
 void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
   while (true) {
 
-    galois::runtime::profileVtune(
-        [&]() {
+    galois::do_all(
+        galois::iterate(graph),
+        [&](const GNode& src) {
+          constexpr const galois::MethodFlag flag =
+              galois::MethodFlag::UNPROTECTED;
 
-          galois::do_all(
-              galois::iterate(graph),
-              [&](const GNode& src) {
-                constexpr const galois::MethodFlag flag =
-                    galois::MethodFlag::UNPROTECTED;
+          LNode& sdata = graph.getData(src, flag);
+          float sum    = 0.0;
 
-                LNode& sdata = graph.getData(src, flag);
-                float sum    = 0.0;
+          for (auto jj = graph.edge_begin(src, flag),
+                    ej = graph.edge_end(src, flag);
+               jj != ej; ++jj) {
+            GNode dst = graph.getEdgeDst(jj);
 
-                for (auto jj = graph.edge_begin(src, flag),
-                          ej = graph.edge_end(src, flag);
-                     jj != ej; ++jj) {
-                  GNode dst = graph.getEdgeDst(jj);
+            LNode& ddata = graph.getData(dst, flag);
+            sum += ddata.getPageRank(iteration) / ddata.nout;
+          }
 
-                  LNode& ddata = graph.getData(dst, flag);
-                  sum += ddata.getPageRank(iteration) / ddata.nout;
-                }
+          // New value of pagerank after computing contributions from
+          // incoming edges in the original graph
+          float value = sum * ALPHA + (1.0 - ALPHA);
+          // Find the delta in new and old pagerank values
+          float diff = std::fabs(value - sdata.getPageRank(iteration));
 
-                // New value of pagerank after computing contributions from
-                // incoming edges in the original graph
-                float value = sum * ALPHA + (1.0 - ALPHA);
-                // Find the delta in new and old pagerank values
-                float diff = std::fabs(value - sdata.getPageRank(iteration));
-
-                // Do not update pagerank before the diff is computed since
-                // there is a data dependence on the pagerank value
-                sdata.setPageRank(iteration, value);
-                max_delta.update(diff);
-              },
-              galois::no_stats(), galois::steal(),
-              galois::chunk_size<CHUNK_SIZE>(), galois::loopname("PageRank"));
+          // Do not update pagerank before the diff is computed since
+          // there is a data dependence on the pagerank value
+          sdata.setPageRank(iteration, value);
+          max_delta.update(diff);
         },
-        "computePageRankProfileVTune");
+        galois::no_stats(), galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
+        galois::loopname("PageRank"));
 
     float delta = max_delta.reduce();
 
@@ -445,6 +438,7 @@ void computePageRank(Graph& graph) {
       break;
     }
     max_delta.reset();
+
   } // end while(true)
 
   if (iteration >= maxIterations) {
@@ -532,7 +526,10 @@ int main(int argc, char** argv) {
 
   switch (algo) {
   case PR_Pull: {
-    // computePageRank(transposeGraph);
+    computePageRank(transposeGraph);
+    break;
+  }
+  case PR_Pull_Profile: {
     PageRankPull::run(transposeGraph);
     break;
   }
