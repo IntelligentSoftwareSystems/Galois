@@ -71,7 +71,9 @@ typedef typename Graph::GraphNode GNode;
 
 // bitset for tracking updates
 galois::DynamicBitSet bitset_current_degree;
+#if __OPT_VERSION__ >= 3
 galois::DynamicBitSet bitset_trim;
+#endif
 
 // add all sync/bitset structs (needs above declarations)
 #include "gen_sync.hh"
@@ -201,7 +203,11 @@ struct KCoreStep2 {
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
+      #if __OPT_VERSION__ > 4
       KCoreStep2_nodesWithEdges_cuda(cuda_ctx);
+      #else
+      KCoreStep2_allNodes_cuda(cuda_ctx);
+      #endif
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -271,10 +277,7 @@ struct KCoreStep1 {
       Flags_trim.set_write_dst();
       #endif
 
-      #if __OPT_VERSION__ == 1
-      _graph.sync<writeAny, readAny, Reduce_add_trim, 
-                  Broadcast_trim>("KCore");
-      #elif __OPT_VERSION__ == 2
+      #if __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, 
                   Broadcast_trim>("KCore");
       #elif __OPT_VERSION__ == 3
@@ -284,7 +287,6 @@ struct KCoreStep1 {
       _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
                   Bitset_trim>("KCore");
       #endif
-
 
       //Hand-Tuned
       // do the trim sync; readSource because in symmetric graph 
@@ -325,7 +327,9 @@ struct KCoreStep1 {
            auto& dst_data = graph->getData(dst);
 
            galois::atomicAdd(dst_data.trim, (uint32_t)1);
+           #if __OPT_VERSION__ >= 3
            bitset_trim.set(dst);
+           #endif
         }
       }
     }
@@ -411,7 +415,9 @@ int main(int argc, char** argv) {
   #endif
 
   bitset_current_degree.resize(h_graph->size());
+  #if __OPT_VERSION__ >= 3
   bitset_trim.resize(h_graph->size());
+  #endif
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go functions called\n");
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
@@ -442,11 +448,17 @@ int main(int argc, char** argv) {
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 
         bitset_current_degree_reset_cuda(cuda_ctx);
+        #if __OPT_VERSION__ >= 3
         bitset_trim_reset_cuda(cuda_ctx);
+        #endif
       } else
       #endif
-      { bitset_current_degree.reset();
-      bitset_trim.reset(); }
+      { 
+      bitset_current_degree.reset();
+      #if __OPT_VERSION__ >= 3
+      bitset_trim.reset(); 
+      #endif
+      }
 
       InitializeGraph1::go((*h_graph));
       galois::runtime::getHostBarrier().wait();

@@ -46,9 +46,9 @@ if (ENABLE_HETERO_GALOIS)
   ##############################
   # kcore
   ##############################
-  #cudaLibs(kcore_push)
   # TODO kcore pull version?
 
+  cudaLibs(kcore_push)
   cudaLibs(bc_push)
   # TODO bc
   # TODO sgd
