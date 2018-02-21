@@ -1436,15 +1436,6 @@ struct Sanity {
       StatTimer_cuda.stop();
     } else if (personality == CPU)
     #endif
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		std::string impl_str("CUDA_DO_ALL_IMPL_Sanity_" + (_graph.get_run_identifier()));
-    		galois::StatTimer StatTimer_cuda(impl_str.c_str());
-    		StatTimer_cuda.start();
-    		Sanity_all_cuda(cuda_ctx);
-    		StatTimer_cuda.stop();
-    	} else if (personality == CPU)
-    #endif
     galois::do_all(
       galois::iterate(_graph.masterNodesRange().begin(), 
                       _graph.masterNodesRange().end()),
