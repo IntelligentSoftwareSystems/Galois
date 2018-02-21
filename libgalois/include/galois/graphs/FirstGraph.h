@@ -51,6 +51,7 @@
 #include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+#include <boost/container/small_vector.hpp>
 
 #include <algorithm>
 #include <map>
@@ -281,7 +282,8 @@ private:
 
     //! The storage type for edges
     // typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
-    typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
+    // typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
+    typedef boost::container::small_vector<EdgeInfo, 3, galois::runtime::Pow_2_BlockAllocator<EdgeInfo>> EdgesTy;
 
     typedef typename EdgesTy::iterator iterator;
   };
