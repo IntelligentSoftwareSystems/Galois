@@ -32,89 +32,29 @@
 #include "galois/DistGalois.h"
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
-#include "galois/runtime/CompilerHelperFunctions.h"
-
-#include "galois/runtime/dGraph_edgeCut.h"
-#include "galois/runtime/dGraph_cartesianCut.h"
-#include "galois/runtime/dGraph_hybridCut.h"
-
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
-#include "galois/runtime/dGraphLoader.h"
-
 #ifdef __GALOIS_HET_CUDA__
-#include "galois/cuda/cuda_device.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
-
-enum Personality {
-   CPU, GPU_CUDA, GPU_OPENCL
-};
-std::string personality_str(Personality p) {
-   switch (p) {
-   case CPU:
-      return "CPU";
-   case GPU_CUDA:
-      return "GPU_CUDA";
-   case GPU_OPENCL:
-      return "GPU_OPENCL";
-   }
-   assert(false&& "Invalid personality");
-   return "";
-}
 #endif
 
-static const char* const name = "SSSP - Distributed Heterogeneous with worklist.";
-static const char* const desc = "Variant of Chaoitic relaxation SSSP on Distributed Galois.";
-static const char* const url = 0;
+constexpr static const char* const REGION_NAME = "SSSP";
 
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
 
 namespace cll = llvm::cl;
+
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                             cll::desc("Maximum iterations: "
                                                       "Default 1000"), 
                                             cll::init(1000));
-static cll::opt<unsigned long long> src_node("startNode", 
+static cll::opt<unsigned long long> src_node("startNode", // not uint64_t due to a bug in llvm cl 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
-static cll::opt<bool> verify("verify", 
-                             cll::desc("Verify results by outputting results "
-                                       "to file"), 
-                             cll::init(false));
-
-#ifdef __GALOIS_HET_CUDA__
-static cll::opt<int> gpudevice("gpu", 
-                                cll::desc("Select GPU to run on, "
-                                          "default is to choose automatically"), 
-                                cll::init(-1));
-static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
-                  clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
-                  clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), 
-                  clEnumValEnd),
-      cll::init(CPU));
-static cll::opt<unsigned> scalegpu("scalegpu", 
-      cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally "
-                "equal workload to CPU and GPU (1)"), 
-      cll::init(1));
-static cll::opt<unsigned> scalecpu("scalecpu", 
-      cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally "
-                "equal workload to CPU and GPU (1)"), 
-      cll::init(1));
-static cll::opt<int> num_nodes("num_nodes", 
-      cll::desc("Num of physical nodes with devices (default = num of hosts): " 
-                "detect GPU to use for each host automatically"), 
-      cll::init(-1));
-static cll::opt<std::string> personality_set("pset", 
-      cll::desc("String specifying personality for hosts on each physical "
-                "node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), 
-      cll::init("c"));
-#endif
-
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -150,24 +90,23 @@ struct InitializeGraph {
       local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
 
   void static go(Graph& _graph) {
-    auto& allNodes = _graph.allNodesRange();
+    const auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
                              (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
-                             infinity, src_node, cuda_ctx);
+        InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
     {
     galois::do_all(
-      allNodes.begin(), allNodes.end(),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       InitializeGraph{src_node, infinity, &_graph}, 
-      galois::no_stats(),
+      galois::no_stats(), 
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
   }
@@ -194,25 +133,28 @@ struct FirstItr_SSSP {
     }
 
     #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
-                          Broadcast_dist_current, 
+    _graph.sync_on_demand<readSource, Reduce_min_dist_current,
+                          Broadcast_dist_current,
                           Bitset_dist_current>(Flags_dist_current, "SSSP");
     #endif
+
+    _graph.set_num_iter(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       FirstItr_SSSP_cuda(__begin, __end, cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
     {
-    // one node, doesn't matter which do_all you use, so regular one suffices
-    galois::do_all(_graph.allNodesRange().begin() + __begin, _graph.allNodesRange().begin() + __end,
-                FirstItr_SSSP{&_graph}, 
-                galois::no_stats(),
-                galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
+    // one node
+    galois::do_all(
+      galois::iterate(__begin, __end),
+      FirstItr_SSSP{&_graph}, 
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
     }
 
     #if __OPT_VERSION__ == 5
@@ -237,21 +179,15 @@ struct FirstItr_SSSP {
                 Broadcast_dist_current, Bitset_dist_current>("SSSP");
     #endif
 
-    galois::runtime::reportStat("(NULL)", 
-      "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin, 0);
+    galois::runtime::reportStat_Tsum("SSSP", 
+      "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), __end - __begin);
   }
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
     snode.dist_old = snode.dist_current;
 
-    #if __OPT_VERSION__ >= 3
-    //bitset_dist_old.set(src);
-    #endif
-
-    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-         jj != ee;
-         ++jj) {
+    for (auto jj : graph->edges(src)) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
@@ -277,7 +213,7 @@ struct SSSP {
     
     unsigned _num_iterations = 1;
     
-    auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do { 
       _graph.set_num_iter(_num_iterations);
@@ -292,20 +228,19 @@ struct SSSP {
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str());
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                  __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
       #endif
       {
         galois::do_all(
-          nodesWithEdges,
+          galois::iterate(nodesWithEdges),
           SSSP{ &_graph, dga },
-          galois::no_stats(),
+          galois::no_stats(), 
           galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
           galois::steal());
       }
@@ -332,23 +267,18 @@ struct SSSP {
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
       #endif
 
-      //_graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-      //          Broadcast_dist_current, Bitset_dist_current>("SSSP");
-    
-      galois::runtime::reportStat("(NULL)", 
+      galois::runtime::reportStat_Tsum("SSSP", 
         "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
-        (unsigned long)dga.read_local(), 0);
+        (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat("(NULL)", 
+      galois::runtime::reportStat_Single("SSSP", 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations, 0);
+        (unsigned long)_num_iterations);
     }
   }
-
-  
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
@@ -356,9 +286,9 @@ struct SSSP {
     if (snode.dist_old > snode.dist_current) {
       snode.dist_old = snode.dist_current;
 
-      for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); 
-           jj != ee; 
-           ++jj) {
+      DGAccumulator_accum+= 1;
+
+      for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
         uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
@@ -367,8 +297,6 @@ struct SSSP {
         if (old_dist > new_dist) bitset_dist_current.set(dst);
         #endif
       }
-
-      DGAccumulator_accum+= 1;
     }
   }
 };
@@ -383,47 +311,46 @@ struct SSSPSanityCheck {
   Graph* graph;
 
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
-  galois::DGAccumulator<uint32_t>& DGAccumulator_max;
-  galois::GReduceMax<uint32_t>& current_max;
+  galois::DGReduceMax<uint32_t>& DGMax;
 
   SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph, 
                  galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam,
-                 galois::GReduceMax<uint32_t>& m) 
+                 galois::DGReduceMax<uint32_t>& dgm)
     : local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
-      DGAccumulator_max(dgam), current_max(m) {}
+      DGMax(dgm) { }
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGAccumulator<uint32_t>& dgam,
-                 galois::GReduceMax<uint32_t>& m) {
+                 galois::DGReduceMax<uint32_t>& dgm) {
     dgas.reset();
-    dgam.reset();
+    dgm.reset();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum, max;
-      SSSPSanityCheck_cuda(sum, max, infinity, cuda_ctx);
+      uint64_t sum;
+      uint32_t max;
+      SSSPSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
       dgas += sum;
-      dgam = max;
+      dgm.update(max);
     }
     else
   #endif
     {
-      m.reset();
-      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), _graph.masterNodesRange().end()),
-                     SSSPSanityCheck(infinity, &_graph, dgas, dgam, m),
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
+                                     _graph.masterNodesRange().end()),
+                     SSSPSanityCheck(infinity, &_graph, dgas, dgm),
                      galois::no_stats(),
                      galois::loopname("SSSPSanityCheck"));
-      dgam = m.reduce();
     }
 
     uint64_t num_visited = dgas.reduce();
-    uint32_t max_distance = dgam.reduce_max();
+    uint32_t max_distance = dgm.reduce();
 
     // Only host 0 will print the info
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::gPrint("Number of nodes visited from source ", src_node, " is ", num_visited, "\n");
-      galois::gPrint("Max distance from source ", src_node, " is ", max_distance, "\n");
+      galois::gPrint("Number of nodes visited from source ", src_node, " is ", 
+                     num_visited, "\n");
+      galois::gPrint("Max distance from source ", src_node, " is ", 
+                     max_distance, "\n");
     }
   }
 
@@ -432,7 +359,7 @@ struct SSSPSanityCheck {
 
     if (src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
-      current_max.update(src_data.dist_current);
+      DGMax.update(src_data.dist_current);
     }
   }
 };
@@ -441,173 +368,124 @@ struct SSSPSanityCheck {
 /* Main */
 /******************************************************************************/
 
+constexpr static const char* const name = "SSSP - Distributed Heterogeneous "
+                                          "with worklist.";
+constexpr static const char* const desc = "Variant of Chaotic relaxation SSSP "
+                                          "on Distributed Galois.";
+constexpr static const char* const url = 0;
+
 int main(int argc, char** argv) {
-  try {
-    galois::DistMemSys G(getStatsFile());
-    DistBenchStart(argc, argv, name, desc, url);
+  galois::DistMemSys G;
+  DistBenchStart(argc, argv, name, desc, url);
 
-    {
-    auto& net = galois::runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
 
-    if (net.ID == 0) {
-      galois::runtime::reportStat("(NULL)", "Max Iterations", 
-        (unsigned long)maxIterations, 0);
-      galois::runtime::reportStat("(NULL)", "Source Node ID", 
-        (unsigned long)src_node, 0);
+  if (net.ID == 0) {
+    galois::runtime::reportParam("SSSP", "Max Iterations", 
+      (unsigned long)maxIterations);
+    galois::runtime::reportParam("SSSP", "Source Node ID", 
+      (unsigned long)src_node);
 
-      #if __OPT_VERSION__ == 1
-      printf("Version 1 of optimization\n");
-      #elif __OPT_VERSION__ == 2
-      printf("Version 2 of optimization\n");
-      #elif __OPT_VERSION__ == 3
-      printf("Version 3 of optimization\n");
-      #elif __OPT_VERSION__ == 4
-      printf("Version 4 of optimization\n");
-      #elif __OPT_VERSION__ == 5
-      printf("Version 5 of optimization\n");
-      #endif
-    }
-
-    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), 
-                      StatTimer_total("TIMER_TOTAL"), 
-                      StatTimer_hg_init("TIMER_HG_INIT");
-
-    StatTimer_total.start();
-
-    std::vector<unsigned> scalefactor;
-#ifdef __GALOIS_HET_CUDA__
-    const unsigned my_host_id = galois::runtime::getHostID();
-    int gpu_device = gpudevice;
-    //Parse arg string when running on multiple hosts and update/override personality
-    //with corresponding value.
-    if (num_nodes == -1) num_nodes = net.Num;
-    assert((net.Num % num_nodes) == 0);
-    if (personality_set.length() == (net.Num / num_nodes)) {
-      switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
-      case 'g':
-        personality = GPU_CUDA;
-        break;
-      case 'o':
-        assert(0);
-        personality = GPU_OPENCL;
-        break;
-      case 'c':
-      default:
-        personality = CPU;
-        break;
-      }
-      if ((personality == GPU_CUDA) && (gpu_device == -1)) {
-        gpu_device = get_gpu_device_id(personality_set, num_nodes);
-      }
-      if ((scalecpu > 1) || (scalegpu > 1)) {
-        for (unsigned i=0; i<net.Num; ++i) {
-          if (personality_set.c_str()[i % num_nodes] == 'c') 
-            scalefactor.push_back(scalecpu);
-          else
-            scalefactor.push_back(scalegpu);
-        }
-      }
-    }
-#endif
-
-    StatTimer_hg_init.start();
-    Graph* hg = nullptr;
-
-    hg = constructGraph<NodeData, unsigned int>(scalefactor);
-
-#ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(my_host_id);
-      if (!init_CUDA_context(cuda_ctx, gpu_device))
-        return -1;
-      MarshalGraph m = (*hg).getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m, net.Num);
-    } else if (personality == GPU_OPENCL) {
-      //galois::opencl::cl_env.init(cldevice.Value);
-    }
-#endif
-    #if __OPT_VERSION__ >= 3
-    bitset_dist_current.resize(hg->size());
+    #if __OPT_VERSION__ == 1
+    printf("Version 1 of optimization\n");
+    #elif __OPT_VERSION__ == 2
+    printf("Version 2 of optimization\n");
+    #elif __OPT_VERSION__ == 3
+    printf("Version 3 of optimization\n");
+    #elif __OPT_VERSION__ == 4
+    printf("Version 4 of optimization\n");
+    #elif __OPT_VERSION__ == 5
+    printf("Version 5 of optimization\n");
     #endif
 
-    StatTimer_hg_init.stop();
-
-    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-    StatTimer_init.start();
-      InitializeGraph::go((*hg));
-    StatTimer_init.stop();
-    galois::runtime::getHostBarrier().wait();
-
-    // accumulators for use in operators
-    galois::DGAccumulator<unsigned int> DGAccumulator_accum;
-    galois::DGAccumulator<uint64_t> DGAccumulator_sum;
-    galois::DGAccumulator<uint32_t> DGAccumulator_max;
-    galois::GReduceMax<uint32_t> m;
-
-    for(auto run = 0; run < numRuns; ++run){
-      std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
-      std::string timer_str("TIMER_" + std::to_string(run));
-      galois::StatTimer StatTimer_main(timer_str.c_str());
-
-      StatTimer_main.start();
-        SSSP::go(*hg, DGAccumulator_accum);
-      StatTimer_main.stop();
-
-      SSSPSanityCheck::go(*hg, DGAccumulator_sum, DGAccumulator_max, m);
-
-      if ((run + 1) != numRuns) {
-      #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) { 
-          #if __OPT_VERSION__ >= 3
-          bitset_dist_current_reset_cuda(cuda_ctx);
-          #endif
-        } else
-      #endif
-        #if __OPT_VERSION__ >= 3
-        bitset_dist_current.reset();
-        #endif
-
-        #if __OPT_VERSION__ == 5
-        Flags_dist_current.clear_all();
-        #endif
-
-        (*hg).set_num_run(run+1);
-        InitializeGraph::go(*hg);
-        galois::runtime::getHostBarrier().wait();
-      }
-    }
-
-   StatTimer_total.stop();
-
-    // Verify
-    if (verify) {
-#ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-#endif
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) 
-            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
-                                         (*hg).getData(*ii).dist_current);
-        }
-#ifdef __GALOIS_HET_CUDA__
-      } else if(personality == GPU_CUDA)  {
-        for(auto ii = (*hg).begin(); ii != (*hg).end(); ++ii) {
-          if ((*hg).isOwned((*hg).getGID(*ii))) 
-            galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
-                                         get_node_dist_current_cuda(cuda_ctx, *ii));
-        }
-      }
-#endif
-    }
-
-    }
-    galois::runtime::getHostBarrier().wait();
-    G.printDistStats();
-    galois::runtime::getHostBarrier().wait();
-
-    return 0;
-  } catch(const char* c) {
-    std::cerr << "Error: " << c << "\n";
-      return 1;
   }
+
+  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
+
+  StatTimer_total.start();
+
+  #ifdef __GALOIS_HET_CUDA__
+  Graph* hg = distGraphInitialization<NodeData, unsigned int>(&cuda_ctx);
+  #else
+  Graph* hg = distGraphInitialization<NodeData, unsigned int>();
+  #endif
+
+  #if __OPT_VERSION__ >= 3
+  bitset_dist_current.resize(hg->size());
+  #endif
+
+  galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
+
+  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
+
+  StatTimer_init.start();
+    InitializeGraph::go((*hg));
+  StatTimer_init.stop();
+  galois::runtime::getHostBarrier().wait();
+
+  // accumulators for use in operators
+  galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+  galois::DGAccumulator<uint64_t> DGAccumulator_sum;
+  galois::DGReduceMax<uint32_t> m;
+
+  for(auto run = 0; run < numRuns; ++run){
+    galois::gPrint("[", net.ID, "] SSSP::go run ", run, " called\n");
+    std::string timer_str("TIMER_" + std::to_string(run));
+    galois::StatTimer StatTimer_main(timer_str.c_str(), REGION_NAME);
+
+    StatTimer_main.start();
+      SSSP::go(*hg, DGAccumulator_accum);
+    StatTimer_main.stop();
+
+    SSSPSanityCheck::go(*hg, DGAccumulator_sum, m);
+
+    if ((run + 1) != numRuns) {
+      #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) { 
+        #if __OPT_VERSION__ >= 3
+        bitset_dist_current_reset_cuda(cuda_ctx);
+        #endif
+      } else
+      #endif
+      #if __OPT_VERSION__ >= 3
+      bitset_dist_current.reset();
+      #endif
+
+      #if __OPT_VERSION__ == 5
+      Flags_dist_current.clear_all();
+      #endif
+
+
+      (*hg).set_num_run(run+1);
+      InitializeGraph::go(*hg);
+      galois::runtime::getHostBarrier().wait();
+    }
+  }
+
+  StatTimer_total.stop();
+
+  // Verify
+  if (verify) {
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == CPU) { 
+    #endif
+      for (auto ii = (*hg).masterNodesRange().begin(); 
+                ii != (*hg).masterNodesRange().end(); 
+                ++ii) {
+        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+                                     (*hg).getData(*ii).dist_current);
+      }
+    #ifdef __GALOIS_HET_CUDA__
+    } else if(personality == GPU_CUDA)  {
+      for (auto ii = (*hg).masterNodesRange().begin(); 
+                ii != (*hg).masterNodesRange().end(); 
+                ++ii) {
+        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+                                     get_node_dist_current_cuda(cuda_ctx, *ii));
+      }
+    }
+    #endif
+  }
+
+  return 0;
 }
