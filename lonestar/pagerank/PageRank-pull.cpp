@@ -297,6 +297,7 @@ void computePageRankET(Graph& graph) {
                      atomicVec[src]    = 0;
                    },
                    galois::no_stats(), galois::loopname("ClearVectors"));
+
   } // end while(true)
 
   if (iteration >= maxIterations) {
@@ -310,7 +311,8 @@ void computePageRankET(Graph& graph) {
     finalizePR(graph);
   }
 }
-// FIXME: This is for debugging scalability and to avoid inlining.
+
+// FIXME: This structure is for debugging scalability by avoiding inlining.
 struct PageRankPull {
   Graph& graph;
   unsigned int iteration;
@@ -542,11 +544,13 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  // if (!skipVerify) {
-  //   printTop(transposeGraph, PRINT_TOP);
-  // }
+  if (!skipVerify) {
+    printTop(transposeGraph, PRINT_TOP);
+  }
 
+#if DEBUG
   printPageRank(transposeGraph);
+#endif
 
   T.stop();
 

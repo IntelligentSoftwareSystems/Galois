@@ -244,11 +244,13 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  // if (!skipVerify) {
-  //   printTop(transposeGraph, PRINT_TOP);
-  // }
+  if (!skipVerify) {
+    printTop(transposeGraph, PRINT_TOP);
+  }
 
+#if DEBUG
   printPageRank(transposeGraph);
+#endif
 
   overheadTime.stop();
   return 0;

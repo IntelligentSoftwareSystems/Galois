@@ -162,7 +162,7 @@ void asyncPageRank(Graph& graph) {
                        }
                      }
                    },
-                   galois::loopname("AsyncPageRank"), galois::no_conflicts(),
+                   galois::loopname("PushResidualAsync"), galois::no_conflicts(),
                    galois::no_stats(), galois::wl<WL>());
 }
 
@@ -243,7 +243,7 @@ void syncPageRank(Graph& graph) {
                      }
                    },
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                   galois::loopname("PushResidual"), galois::no_stats());
+                   galois::loopname("PushResidualSync"), galois::no_stats());
 
     updates.clear_parallel();
   }
@@ -317,11 +317,13 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MeminfoPost");
 
-  // if (!skipVerify) {
-  //   printTop(graph, PRINT_TOP);
-  // }
+  if (!skipVerify) {
+    printTop(graph, PRINT_TOP);
+  }
 
+#if DEBUG
   printPageRank(graph);
+#endif
 
   T.stop();
 
