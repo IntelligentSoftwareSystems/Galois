@@ -195,7 +195,7 @@ struct PageRank_delta {
     //_graph.sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout,
     //                      Bitset_nout>(Flags_nout, "PRdelta");
     _graph.sync_on_demand<readAny, Reduce_add_residual, Broadcast_residual,
-                          Bitset_residual>(Flags_residual, "PRdelta");
+                          Bitset_residual>(Flags_residual, "PageRank");
     #endif
 
     #ifdef __GALOIS_HET_CUDA__

@@ -52,6 +52,7 @@ if (ENABLE_HETERO_GALOIS)
   cudaLibs(cc_push)
   cudaLibs(sssp_push)
   cudaLibs(kcore_push)
+  cudaLibs(pagerank_pull)
   cudaLibs(bc_push)
   # TODO bc
   # TODO sgd
