@@ -13,6 +13,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(residual);
 #endif
 
 #if __OPT_VERSION__ == 5
-FieldFlags Flags_nout;
-FieldFlags Flags_residual;
+galois::runtime::FieldFlags Flags_nout;
+galois::runtime::FieldFlags Flags_residual;
 #endif

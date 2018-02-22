@@ -169,6 +169,7 @@ versionGen(kcore_push)
 versionGen(bfs_push)
 versionGen(sssp_push)
 versionGen(cc_push)
+versionGen(pagerank_pull)
 versionGen(sgd)
 #versionGenNoGPU(bc_pull)
 
