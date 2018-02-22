@@ -5,13 +5,11 @@
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
-unsigned long long * P_COMP_CURRENT;
-unsigned long long * P_COMP_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_ConnectedComp = TB_SIZE;
 static const int __tb_FirstItr_ConnectedComp = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -31,7 +29,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __nowned, unsigned 
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -139,25 +137,24 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
         jj = ns +_np_j;
         {
           index_type dst;
-          unsigned long long new_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          if (p_comp_current[dst] > new_dist) {
-            unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          }
+          old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "53 -> 54;
+      // FP: "57 -> 58;
       __syncthreads();
     }
-    // FP: "55 -> 56;
+    // FP: "59 -> 60;
 
-    // FP: "56 -> 57;
+    // FP: "60 -> 61;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "57 -> 58;
+      // FP: "61 -> 62;
       const int _np_laneid = cub::LaneId();
-      // FP: "58 -> 59;
+      // FP: "62 -> 63;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -182,37 +179,36 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            unsigned long long new_dist;
+            uint32_t new_dist;
+            uint32_t old_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = p_comp_current[src];
-            if (p_comp_current[dst] > new_dist) {
-              unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-            }
+            old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
           }
         }
       }
-      // FP: "77 -> 78;
+      // FP: "85 -> 86;
       __syncthreads();
-      // FP: "78 -> 79;
+      // FP: "86 -> 87;
     }
 
-    // FP: "79 -> 80;
+    // FP: "87 -> 88;
     __syncthreads();
-    // FP: "80 -> 81;
+    // FP: "88 -> 89;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "81 -> 82;
+    // FP: "89 -> 90;
     while (_np.work())
     {
-      // FP: "82 -> 83;
+      // FP: "90 -> 91;
       int _np_i =0;
-      // FP: "83 -> 84;
+      // FP: "91 -> 92;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "84 -> 85;
+      // FP: "92 -> 93;
       __syncthreads();
-      // FP: "85 -> 86;
+      // FP: "93 -> 94;
 
-      // FP: "86 -> 87;
+      // FP: "94 -> 95;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -221,34 +217,31 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __nowned, un
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          unsigned long long new_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          if (p_comp_current[dst] > new_dist) {
-            unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          }
+          old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "96 -> 97;
+      // FP: "108 -> 109;
       _np.execute_round_done(ITSIZE);
-      // FP: "97 -> 98;
+      // FP: "109 -> 110;
       __syncthreads();
     }
-    // FP: "99 -> 100;
+    // FP: "111 -> 112;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "101 -> 102;
+  // FP: "113 -> 114;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, unsigned long long * p_comp_old, HGAccumulator<int> ret_val)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old, HGAccumulator<unsigned int> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_ConnectedComp;
-  typedef cub::BlockReduce<int, TB_SIZE> _br;
-  __shared__ _br::TempStorage _ts;
-  ret_val.thread_entry();
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -265,72 +258,75 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  DGAccumulator_accum.thread_entry();
+  // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
   for (index_type src = __begin + tid; src < src_rup; src += nthreads)
   {
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
-    // FP: "6 -> 7;
+    // FP: "8 -> 9;
     bool pop  = src < __end;
-    // FP: "7 -> 8;
+    // FP: "9 -> 10;
     if (pop)
     {
       if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
-        ret_val.reduce( 1);
+        DGAccumulator_accum.reduce( 1);
       }
       else
       {
         pop = false;
       }
     }
-    // FP: "12 -> 13;
     // FP: "15 -> 16;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "16 -> 17;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "17 -> 18;
-    _np_closure[threadIdx.x].src = src;
     // FP: "18 -> 19;
+    struct NPInspector1 _np = {0,0,0,0,0,0};
+    // FP: "19 -> 20;
+    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
+    // FP: "20 -> 21;
+    _np_closure[threadIdx.x].src = src;
+    // FP: "21 -> 22;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "21 -> 22;
-    // FP: "22 -> 23;
+    // FP: "24 -> 25;
+    // FP: "25 -> 26;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "23 -> 24;
+    // FP: "26 -> 27;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "24 -> 25;
+    // FP: "27 -> 28;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "27 -> 28;
+    // FP: "30 -> 31;
     __syncthreads();
-    // FP: "28 -> 29;
+    // FP: "31 -> 32;
     while (true)
     {
-      // FP: "29 -> 30;
+      // FP: "32 -> 33;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "32 -> 33;
+      // FP: "35 -> 36;
       __syncthreads();
-      // FP: "33 -> 34;
+      // FP: "36 -> 37;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "34 -> 35;
+        // FP: "37 -> 38;
         __syncthreads();
-        // FP: "35 -> 36;
+        // FP: "38 -> 39;
         break;
       }
-      // FP: "37 -> 38;
+      // FP: "40 -> 41;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -339,45 +335,44 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "40 -> 41;
+      // FP: "43 -> 44;
       __syncthreads();
-      // FP: "41 -> 42;
+      // FP: "44 -> 45;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "42 -> 43;
+      // FP: "45 -> 46;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "45 -> 46;
+      // FP: "48 -> 49;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "46 -> 47;
+      // FP: "49 -> 50;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
         jj = ns +_np_j;
         {
           index_type dst;
-          unsigned long long new_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          if (p_comp_current[dst] > new_dist) {
-            unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          }
+          old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "55 -> 56;
+      // FP: "62 -> 63;
       __syncthreads();
     }
-    // FP: "57 -> 58;
+    // FP: "64 -> 65;
 
-    // FP: "58 -> 59;
+    // FP: "65 -> 66;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "59 -> 60;
+      // FP: "66 -> 67;
       const int _np_laneid = cub::LaneId();
-      // FP: "60 -> 61;
+      // FP: "67 -> 68;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -402,37 +397,36 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
           jj = _np_w_start +_np_ii;
           {
             index_type dst;
-            unsigned long long new_dist;
+            uint32_t new_dist;
+            uint32_t old_dist;
             dst = graph.getAbsDestination(jj);
             new_dist = p_comp_current[src];
-            if (p_comp_current[dst] > new_dist) {
-              unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-            }
+            old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
           }
         }
       }
-      // FP: "79 -> 80;
+      // FP: "90 -> 91;
       __syncthreads();
-      // FP: "80 -> 81;
+      // FP: "91 -> 92;
     }
 
-    // FP: "81 -> 82;
+    // FP: "92 -> 93;
     __syncthreads();
-    // FP: "82 -> 83;
+    // FP: "93 -> 94;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "83 -> 84;
+    // FP: "94 -> 95;
     while (_np.work())
     {
-      // FP: "84 -> 85;
+      // FP: "95 -> 96;
       int _np_i =0;
-      // FP: "85 -> 86;
+      // FP: "96 -> 97;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "86 -> 87;
+      // FP: "97 -> 98;
       __syncthreads();
-      // FP: "87 -> 88;
+      // FP: "98 -> 99;
 
-      // FP: "88 -> 89;
+      // FP: "99 -> 100;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -441,43 +435,55 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __nowned, unsigned in
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
-          unsigned long long new_dist;
+          uint32_t new_dist;
+          uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
           new_dist = p_comp_current[src];
-          if (p_comp_current[dst] > new_dist) {
-            unsigned long long old_dist = atomicMin(&p_comp_current[dst], new_dist);
-          }
+          old_dist = atomicTestMin(&p_comp_current[dst], new_dist);
         }
       }
-      // FP: "98 -> 99;
+      // FP: "113 -> 114;
       _np.execute_round_done(ITSIZE);
-      // FP: "99 -> 100;
+      // FP: "114 -> 115;
       __syncthreads();
     }
-    // FP: "101 -> 102;
+    // FP: "116 -> 117;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
-    // FP: "102 -> 103;
-    // FP: "103 -> 104;
   }
-  ret_val.thread_exit<_br>(_ts);
+  // FP: "119 -> 120;
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  // FP: "120 -> 121;
 }
-__global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, unsigned long long * p_comp_current, HGAccumulator<unsigned int> sum)
+__global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, HGAccumulator<uint64_t> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
-  typedef cub::BlockReduce<unsigned int, TB_SIZE> _br;
-  __shared__ _br::TempStorage _ts;
-  sum.thread_entry();
-  for (index_type src = __begin + tid; src < __end; src += nthreads)
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  __shared__ cub::BlockReduce<uint64_t, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  index_type src_end;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  DGAccumulator_accum.thread_entry();
+  // FP: "3 -> 4;
+  src_end = __end;
+  for (index_type src = __begin + tid; src < src_end; src += nthreads)
   {
-    if (p_comp_current[src] == graph.node_data[src]) {
-      sum.reduce(1);
+    bool pop  = src < __end;
+    if (pop)
+    {
+      if (p_comp_current[src] == graph.node_data[src])
+      {
+        DGAccumulator_accum.reduce( 1);
+      }
     }
   }
-  sum.thread_exit<_br>(_ts);
+  // FP: "11 -> 12;
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  // FP: "12 -> 13;
 }
-void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -486,18 +492,30 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUD
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void InitializeGraph_all_cuda(struct CUDA_Context * ctx)
+void InitializeGraph_allNodes_cuda(struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(0, ctx->gg.nnodes, ctx);
+  // FP: "2 -> 3;
+}
+void InitializeGraph_masterNodes_cuda(struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  InitializeGraph_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ctx);
+  // FP: "2 -> 3;
+}
+void InitializeGraph_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context * ctx)
+void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -506,53 +524,110 @@ void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, str
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
+  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
 }
-void FirstItr_ConnectedComp_all_cuda(struct CUDA_Context * ctx)
+void FirstItr_ConnectedComp_allNodes_cuda(struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  FirstItr_ConnectedComp_cuda(0, ctx->gg.nnodes, ctx);
+  // FP: "2 -> 3;
+}
+void FirstItr_ConnectedComp_masterNodes_cuda(struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  FirstItr_ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ctx);
+  // FP: "2 -> 3;
+}
+void FirstItr_ConnectedComp_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
   FirstItr_ConnectedComp_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, int & __retval, struct CUDA_Context * ctx)
+void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
+  HGAccumulator<unsigned int> _DGAccumulator_accum;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  Shared<int> retval = Shared<int>(1);
-  HGAccumulator<int> _rv;
-  *(retval.cpu_wr_ptr()) = 0;
-  _rv.rv = retval.gpu_wr_ptr();
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->numNodesWithEdges, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _rv);
+  Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
-  check_cuda_kernel;
   // FP: "6 -> 7;
-  __retval = *(retval.cpu_rd_ptr());
+  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
   // FP: "7 -> 8;
+  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  // FP: "8 -> 9;
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  // FP: "9 -> 10;
+  check_cuda_kernel;
+  // FP: "10 -> 11;
+  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  // FP: "11 -> 12;
 }
-void ConnectedComp_all_cuda(int & __retval, struct CUDA_Context * ctx)
+void ConnectedComp_allNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  ConnectedComp_cuda(0, ctx->numNodesWithEdges, __retval, ctx);
+  ConnectedComp_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
   // FP: "2 -> 3;
 }
-void ConnectedCompSanityCheck_cuda(unsigned int & sum, struct CUDA_Context * ctx)
+void ConnectedComp_masterNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  // FP: "2 -> 3;
+}
+void ConnectedComp_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedComp_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  // FP: "2 -> 3;
+}
+void ConnectedCompSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
+  HGAccumulator<uint64_t> _DGAccumulator_accum;
+  // FP: "1 -> 2;
+  // FP: "2 -> 3;
+  // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
-  Shared<unsigned int> sumval = Shared<unsigned int>(1);
-  HGAccumulator<unsigned int> _sum;
-  *(sumval.cpu_wr_ptr()) = 0;
-  _sum.rv = sumval.gpu_wr_ptr();
-  ConnectedCompSanityCheck <<<blocks, __tb_ConnectedComp>>>(ctx->gg, ctx->beginMaster, ctx->beginMaster+ctx->numOwned, ctx->comp_current.data.gpu_rd_ptr(), _sum);
+  // FP: "4 -> 5;
+  Shared<uint64_t> DGAccumulator_accumval  = Shared<uint64_t>(1);
+  // FP: "5 -> 6;
+  // FP: "6 -> 7;
+  *(DGAccumulator_accumval.cpu_wr_ptr()) = 0;
+  // FP: "7 -> 8;
+  _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
+  // FP: "8 -> 9;
+  ConnectedCompSanityCheck <<<blocks, threads>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  // FP: "9 -> 10;
   check_cuda_kernel;
-  sum = *(sumval.cpu_rd_ptr());
+  // FP: "10 -> 11;
+  DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
+  // FP: "11 -> 12;
+}
+void ConnectedCompSanityCheck_allNodes_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedCompSanityCheck_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  // FP: "2 -> 3;
+}
+void ConnectedCompSanityCheck_masterNodes_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedCompSanityCheck_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  // FP: "2 -> 3;
+}
+void ConnectedCompSanityCheck_nodesWithEdges_cuda(uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)
+{
+  // FP: "1 -> 2;
+  ConnectedCompSanityCheck_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  // FP: "2 -> 3;
 }
