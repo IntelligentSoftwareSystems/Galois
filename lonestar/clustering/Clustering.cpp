@@ -59,320 +59,328 @@ static cll::opt<bool> parallel("parallel",
 
 #define DEBUG_CONSOLE 0
 
-using namespace std;
+struct Clustering {
 
-void loopBody(NodeWrapper* cluster, KdTree* kdTree, GVector<NodeWrapper*>* wl,
-              GVector<ClusterNode*>* clusterArr, GVector<double>* floatArr);
+  std::vector<NodeWrapper*> lights;
+  std::vector<double> coordinatesArray;
 
-void getRandomPoints(GVector<LeafNode*>& lights, int numPoints) {
+  std::vector<ClusterNode*> clusterArray;
 
-  double dirX = 0;
-  double dirY = 0;
-  double dirZ = 1;
-  AbstractNode::setGlobalMultitime();
-  AbstractNode::setGlobalNumReps();
-  // generating random lights
-  for (int i = 0; i < numPoints; i++) {
-    double x = ((double)rand()) / (numeric_limits<int>::max());
-    double y = ((double)rand()) / (numeric_limits<int>::max());
-    double z = ((double)rand()) / (numeric_limits<int>::max());
+  void genRandomLights(int numPoints) {
 
-    LeafNode* l = new LeafNode(x, y, z, dirX, dirY, dirZ);
-#if DEBUG_CONSOLE
-    cout << "Created " << *l << endl;
-#endif
-    lights[i] = l;
-  }
-  return;
-}
+    double dirX = 0;
+    double dirY = 0;
+    double dirZ = 1;
+    AbstractNode::setGlobalMultitime();
+    AbstractNode::setGlobalNumReps();
 
-int findMatch(KdTree* tree, NodeWrapper* nodeA,
-              galois::InsertBag<NodeWrapper*>*& newNodes,
-              galois::InsertBag<NodeWrapper*>& allocs,
-              GVector<double>* coordinatesArray,
-              GVector<ClusterNode*>& clusterArray) {
-  int addCounter = 0;
-  if (tree->contains(*nodeA)) {
-    NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
-    if (nodeB != NULL && tree->contains(*nodeB)) {
-      NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
-      if (nodeBMatch != NULL) {
-        // cout<<" Match found "<<*nodeA<<" AND " << *nodeB<<endl;
-        if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
-          //   cout << " A   is " << *nodeA << " A-Closest=B::" << *nodeB
-          //        << " B-Closest " << *nodeBMatch << endl;
+    lights.reserve(numPoints);
 
-          // Create a new node here.
-          if (nodeA < nodeB) {
-            NodeWrapper* newNode =
-                new NodeWrapper(*nodeA, *nodeB, coordinatesArray, clusterArray);
-            newNodes->push(newNode);
-            allocs.push(newNode);
-            addCounter++;
+    // generating random lights
+    // TODO: use C++ random number generators
+    for (int i = 0; i < numPoints; i++) {
+      double x = ((double)rand()) / (numeric_limits<int>::max());
+      double y = ((double)rand()) / (numeric_limits<int>::max());
+      double z = ((double)rand()) / (numeric_limits<int>::max());
 
-          }
-        } else {
-          addCounter++;
-          newNodes->push(nodeA);
-          //   cout << " A   is " << *nodeA << " A-Closes=B:: " << *nodeB << " B
-          //   - Closest " << *nodeBMatch << endl;
-        }
-      }
-    } else {
-      addCounter++;
-      newNodes->push(nodeA);
+      Light l = LeafNode(x, y, z, dirX, dirY, dirZ);
+      NodeWrapper* nw = new NodeWrapper(l);
+      lights.push_back(nw);
     }
   }
-  return addCounter;
-}
 
-void clusterGalois(GVector<LeafNode*>& lights) {
-  int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
-  cout << "Temp size is " << tempSize << " coord. arr size should be "
-       << tempSize * 3 << endl;
-  GVector<double>* coordinatesArray = new GVector<double>(tempSize * 3);
-  GVector<ClusterNode*> clusterArray(tempSize);
+  Clustering(int numPoints) {
 
-  GVector<NodeWrapper*> initialWorklist(lights.size());
-  for (unsigned int i = 0; i < lights.size(); i++) {
-    NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
-    initialWorklist[i] = nw;
+    genRandomLights(numPoints);
+
+    size_t tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    coordinatesArray.resize(tempSize * 3);
+    clusterArray.resize(tempSize);
 
   }
-  KdTree* tree = (KdTree::createTree(initialWorklist));
+
+  ~Clustering(void) {
+    for (auto* l: lights) {
+      delete l;
+    }
+    lights.clear();
+  }
+
+
+
+  int findMatch(KdTree* tree, NodeWrapper* nodeA,
+                galois::InsertBag<NodeWrapper*>*& newNodes,
+                galois::InsertBag<NodeWrapper*>& allocs,
+                GVector<double>* coordinatesArray,
+                GVector<ClusterNode*>& clusterArray) {
+    int addCounter = 0;
+    if (tree->contains(*nodeA)) {
+
+      NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
+      if (nodeB != NULL && tree->contains(*nodeB)) {
+        NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
+        if (nodeBMatch != NULL) {
+          // cout<<" Match found "<<*nodeA<<" AND " << *nodeB<<endl;
+          if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
+            //   cout << " A   is " << *nodeA << " A-Closest=B::" << *nodeB
+            //        << " B-Closest " << *nodeBMatch << endl;
+
+            // Create a new node here.
+            if (nodeA < nodeB) {
+              NodeWrapper* newNode =
+                  new NodeWrapper(*nodeA, *nodeB, coordinatesArray, clusterArray);
+              newNodes->push(newNode);
+              allocs.push(newNode);
+              addCounter++;
+
+            }
+          } else {
+            addCounter++;
+            newNodes->push(nodeA);
+            //   cout << " A   is " << *nodeA << " A-Closes=B:: " << *nodeB << " B
+            //   - Closest " << *nodeBMatch << endl;
+          }
+        }
+      } else {
+        addCounter++;
+        newNodes->push(nodeA);
+      }
+    }
+    return addCounter;
+  }
+  template <typename V>
+  void clusterGalois(V& lights) {
+
+    int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    cout << "Temp size is " << tempSize << " coord. arr size should be "
+         << tempSize * 3 << endl;
+    std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
+    std::vector<ClusterNode*> clusterArray(tempSize);
 
 #if DEBUG_CONSOLE
-  cout << "Tree created " << *tree << endl;
-  cout << "================================================================"
-       << endl;
+
+    cout << "Tree created " << *tree << endl;
+    cout << "================================================================"
+         << endl;
 #endif
 
-  GVector<NodeWrapper*> workList(0);
-  KdTree::getAll(*tree, workList);
-  size_t size = 0;
+    GVector<NodeWrapper*> workList(0);
+    KdTree::getAll(*tree, workList);
+    size_t size = 0;
 
-  galois::GAccumulator<size_t> addedNodes;
-  galois::InsertBag<NodeWrapper*>* newNodes =
+    galois::GAccumulator<size_t> addedNodes;
+    galois::InsertBag<NodeWrapper*>* newNodes =
 
-      new galois::InsertBag<NodeWrapper*>();
-  galois::InsertBag<NodeWrapper*> allocs;
+        new galois::InsertBag<NodeWrapper*>();
+    galois::InsertBag<NodeWrapper*> allocs;
 
-  galois::StatTimer T;
-  T.start();
-  while (true) {
-    addedNodes.reset();
+    galois::StatTimer T;
+    T.start();
+    while (true) {
 
-    using WL = galois::worklists::dChunkedFIFO<16>;
+      addedNodes.reset();
 
-    // find matching
-    galois::for_each(
-        galois::iterate(workList),
-        [&](NodeWrapper* nodeA, auto& lwl) {
-          if (tree->contains(*nodeA)) {
-            NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
-            if (nodeB != NULL && tree->contains(*nodeB)) {
-              NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
-              if (nodeBMatch != NULL) {
-                if (nodeA->equals(*nodeBMatch) &&
-                    nodeA->equals(*nodeB) == false) {
-                  // Create a new node here.
-                  if (nodeA < nodeB) {
-                    // galois::Allocator::
-                    NodeWrapper* newNode = new NodeWrapper(
-                        *nodeA, *nodeB, coordinatesArray, clusterArray);
-                    newNodes->push(newNode);
-                    allocs.push(newNode);
+      using WL = galois::worklists::dChunkedFIFO<16>;
+
+      // find matching
+      galois::for_each(
+          galois::iterate(workList),
+          [&](NodeWrapper* nodeA, auto& lwl) {
+            if (tree->contains(*nodeA)) {
+              NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
+              if (nodeB != NULL && tree->contains(*nodeB)) {
+                NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
+                if (nodeBMatch != NULL) {
+                  if (nodeA->equals(*nodeBMatch) &&
+                      nodeA->equals(*nodeB) == false) {
+                    // Create a new node here.
+                    if (nodeA < nodeB) {
+                      // galois::Allocator::
+                      NodeWrapper* newNode = new NodeWrapper(
+                          *nodeA, *nodeB, coordinatesArray, clusterArray);
+                      newNodes->push(newNode);
+                      allocs.push(newNode);
+                      addedNodes += 1;
+                    }
+                  } else {
                     addedNodes += 1;
+                    newNodes->push(nodeA);
                   }
-                } else {
-                  addedNodes += 1;
-                  newNodes->push(nodeA);
                 }
+              } else {
+                addedNodes += 1;
+                newNodes->push(nodeA);
               }
-            } else {
-              addedNodes += 1;
-              newNodes->push(nodeA);
             }
-          }
-        },
-        galois::wl<WL>(), galois::loopname("Main"));
+          },
+          galois::wl<WL>(), galois::loopname("Main"));
 
-    size += addedNodes.reduce();
+      size += addedNodes.reduce();
 
-    workList.clear();
-    for (galois::InsertBag<NodeWrapper*>::iterator it    = newNodes->begin(),
-                                                   itEnd = newNodes->end();
-         it != itEnd; it++)
-      workList.push_back(*it);
-    if (size < 2)
-      break;
-    size = 0;
+      workList.clear();
 
-    galois::StatTimer Tcleanup("cleanup-time");
-    Tcleanup.start();
-    KdCell::cleanupTree(tree);
-    Tcleanup.stop();
+      for (galois::InsertBag<NodeWrapper*>::iterator it    = newNodes->begin(),
+                                                     itEnd = newNodes->end();
+           it != itEnd; it++)
+        workList.push_back(*it);
+      if (size < 2)
+        break;
+      size = 0;
 
-    galois::StatTimer TcreateTree("create-tree-time");
-    TcreateTree.start();
-    tree = (KdTree::createTree(workList));
-    TcreateTree.stop();
+      galois::StatTimer Tcleanup("cleanup-time");
+      Tcleanup.start();
+      KdCell::cleanupTree(tree);
+      Tcleanup.stop();
 
     newNodes->clear();
   }
   T.stop();
-#if DEBUG_CONSOLE
-  cout << "================================================================"
-       << endl
-       << *tree << endl;
-#endif
 
-  //!!!!!!!!!!!!!!!!!!!Cleanup
-  delete newNodes;
-  KdCell::cleanupTree(tree);
-  AbstractNode::cleanup();
-  for (unsigned int i = 0; i < lights.size(); i++) {
-    NodeWrapper* nw = initialWorklist[i];
-    delete nw;
-  }
-  for (galois::InsertBag<NodeWrapper*>::iterator it    = allocs.begin(),
-                                                 itEnd = allocs.end();
-       it != itEnd; it++)
-    delete *it;
-  delete coordinatesArray;
-  return;
-}
+      galois::StatTimer TcreateTree("create-tree-time");
+      TcreateTree.start();
+      tree = (KdTree::createTree(workList));
+      TcreateTree.stop();
 
-void clusterSerial(GVector<LeafNode*>& lights) {
-
-  int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
-  cout << "Temp size is " << tempSize << " coord. arr size should be "
-       << tempSize * 3 << endl;
-
-  std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
-  std::vector<NodeWrapper*> initialWorklist(lights.size());
-  std::vector<ClusterNode*> clusterArray(tempSize);
-
-  for (unsigned int i = 0; i < lights.size(); i++) {
-    NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
-    initialWorklist[i] = nw;
+      newNodes->clear_parallel();
+    }
+    T.stop();
   }
 
-  KdTree* tree = (KdTree::createTree(initialWorklist));
-  //#if DEBUG_CONSOLE
-  cout << "Tree created " << *tree << endl;
-  cout << "================================================================"
-       << endl;
-  //#endif
+  void clusterSerial(GVector<LeafNode*>& lights) {
 
-  std::vector<NodeWrapper*> workList(0);
-  KdTree::getAll(*tree, workList);
+    int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    cout << "Temp size is " << tempSize << " coord. arr size should be "
+         << tempSize * 3 << endl;
 
-  // TODO: remove
-  // for (unsigned int i = 0; i < workListOld.size(); i++) {
-    // workList.push_back(workListOld[i]);
-  // }
+    std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
+    std::vector<NodeWrapper*> initialWorklist(lights.size());
+    std::vector<ClusterNode*> clusterArray(tempSize);
 
-  std::vector<NodeWrapper*> newNodes;
-  std::vector<NodeWrapper*> allocs;
+    for (unsigned int i = 0; i < lights.size(); i++) {
+      NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
+      initialWorklist[i] = nw;
+    }
 
-  while (true) {
-    while (workList.size() > 1) {
-      cout << "===================Worklist size :: " << workList.size()
-           << "===============" << endl;
+    KdTree* tree = (KdTree::createTree(initialWorklist));
+    //#if DEBUG_CONSOLE
+    cout << "Tree created " << *tree << endl;
+    cout << "================================================================"
+         << endl;
+    //#endif
 
-      NodeWrapper* nodeA = workList.back();
-      workList.pop_back();
+    std::vector<NodeWrapper*> workList(0);
+    KdTree::getAll(*tree, workList);
 
-      assert(tree->contains(*nodeA) && "Node not in tree?");
-      auto* match = tree->findBestMatch(*nodeA);
+    // TODO: remove
+    // for (unsigned int i = 0; i < workListOld.size(); i++) {
+      // workList.push_back(workListOld[i]);
+    // }
 
-      if (match != nullptr) {
-        assert(tree->contains(*match) && "match not in tree?");
+    std::vector<NodeWrapper*> newNodes;
+    std::vector<NodeWrapper*> allocs;
 
-        auto* counterMatch = tree->findBestMatch(*match);
+    while (true) {
+      while (workList.size() > 1) {
+        cout << "===================Worklist size :: " << workList.size()
+             << "===============" << endl;
 
-        if (counterMatch != nullptr) {
-          assert(tree->contains(*counterMatch) && "counterMatch not in tree?");
+        NodeWrapper* nodeA = workList.back();
+        workList.pop_back();
 
-          if (counterMatch->equals(*nodeA)) {
-            auto* ccMatch = tree->findBestMatch(counterMatch);
-            assert(ccMatch && ccMatch->equals(*match) && "mismatch in best matches");
+        assert(tree->contains(*nodeA) && "Node not in tree?");
+        auto* match = tree->findBestMatch(*nodeA);
 
-            NodeWrapper* clust  = new NodeWrapper(*nodeA, *nodeB, coordinatesArray, clusterArray);
-            newNodes.push_back(clust);
-            allocs.push_back(clust);
+        if (match != nullptr) {
+          assert(tree->contains(*match) && "match not in tree?");
 
-          } else {
-            newNodes.push_back(nodeA);
+          auto* counterMatch = tree->findBestMatch(*match);
+  GVector
+          if (counterMatch != nullptr) {
+            assert(tree->contains(*counterMatch) && "counterMatch not in tree?");
+
+            if (counterMatch->equals(*nodeA)) {
+              auto* ccMatch = tree->findBestMatch(counterMatch);
+              assert(ccMatch && ccMatch->equals(*match) && "mismatch in best matches");
+
+              NodeWrapper* clust  = new NodeWrapper(*nodeA, *nodeB, coordinatesArray, clusterArray);
+              newNodes.push_back(clust);
+              allocs.push_back(clust);
+
+            } else {GVector
+              newNodes.push_back(nodeA);
+            }
           }
+        } else {
+          newNodes.push_back(nodeA);
         }
-      } else {
-        newNodes.push_back(nodeA);
+
+        // if (tree->contains(*nodeA)) {
+          // NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
+          // if (nodeB != NULL && tree->contains(*nodeB)) {
+            // NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
+            // if (nodeBMatch != NULL) {
+              // if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
+                // if (nodeA < nodeB) {
+                  // NodeWrapper* newNode = new NodeWrapper(
+                      // *nodeA, *nodeB, coordinatesArray, clusterArray);
+                  // newNodes.push_back(newNode);
+                  // allocs.push_back(newNode);
+                // }
+              // } else {
+                // newNodes.push_back(nodeA);
+              // }
+            // }
+          // } else {
+            // newNodes.push_back(nodeA);
+          // }
+        // }
       }
 
-      // if (tree->contains(*nodeA)) {
-        // NodeWrapper* nodeB = tree->findBestMatch((*nodeA));
-        // if (nodeB != NULL && tree->contains(*nodeB)) {
-          // NodeWrapper* nodeBMatch = tree->findBestMatch((*nodeB));
-          // if (nodeBMatch != NULL) {
-            // if (nodeA->equals(*nodeBMatch) && nodeA->equals(*nodeB) == false) {
-              // if (nodeA < nodeB) {
-                // NodeWrapper* newNode = new NodeWrapper(
-                    // *nodeA, *nodeB, coordinatesArray, clusterArray);
-                // newNodes.push_back(newNode);
-                // allocs.push_back(newNode);
-              // }
-            // } else {
-              // newNodes.push_back(nodeA);
-            // }
-          // }
-        // } else {
-          // newNodes.push_back(nodeA);
-        // }
-      // }
+      if (newNodes.size() < 2) {
+        break;
+      }
+
+      workList.clear();
+      for (NodeWrapper* nw: newNodes) {
+        workList.push_back(nw);
+      }
+
+      cout << "Newly added" << newNodes.size() << endl;
+
+      KdCell::cleanupTree(tree);
+      tree = (KdTree::createTree(workList));
+      newNodes.clear();
+      
     }
-
-    if (newNodes.size() < 2) {
-      break;
-    }
-
-    workList.clear();
-    for (NodeWrapper* nw: newNodes) {
-      workList.push_back(nw);
-    }
-
-    cout << "Newly added" << newNodes.size() << endl;
-
-    KdCell::cleanupTree(tree);
-    tree = (KdTree::createTree(workList));
-    newNodes.clear();
-    
-  }
 
 #if DEBUG_CONSOLE
-  cout << "================================================================"
-       << endl
-       << *tree << endl;
+    cout << "================================================================"
+         << endl
+         << *tree << endl;
 #endif
 
-  //!!!!!!!!!!!!!!!!!!!Cleanup
-  KdCell::cleanupTree(tree);
-  AbstractNode::cleanup();
+    //!!!!!!!!!!!!!!!!!!!Cleanup
+    KdCell::cleanupTree(tree);
+    AbstractNode::cleanup();
 
-  for (unsigned int i = 0; i < lights.size(); i++) {
-    NodeWrapper* nw = initialWorklist[i];
-    delete nw;
+    for (unsigned int i = 0; i < lights.size(); i++) {
+      NodeWrapper* nw = initialWorklist[i];
+      delete nw;
+    }
+
+    for (auto* a: allocs) {
+      delete a;
+    }
+
+    delete coordinatesArray;
+
+    return;
   }
 
-  for (auto* a: allocs) {
-    delete a;
-  }
 
-  delete coordinatesArray;
 
-  return;
-}
+};
+
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -380,25 +388,17 @@ int main(int argc, char** argv) {
   cout << "Starting Clustering app...[" << numPoints << "]" << endl;
   // Initializing...
 
-  GVector<LeafNode*>* lights = new GVector<LeafNode*>(numPoints);
-  getRandomPoints(*lights, numPoints);
+  std::vector<LeafNode> lights;
+  lights.reserve(numPoints);
+  genRandomLights(lights, numPoints);
 
   cout << "Running the " << (parallel ? "parallel" : "serial") << " version\n ";
   if (!parallel) {
-    clusterSerial(*lights);
+    clusterSerial(lights);
   } else {
-    clusterGalois(*lights);
+    clusterGalois(lights);
   }
 
-  // Cleaning up!
-  for (int i = 0; i < numPoints; i++) {
-    LeafNode* l = lights->at(i);
-#if DEBUG_CONSOLE
-    cout << "deleted :: " << *l << endl;
-#endif
-    delete l;
-  }
   cout << "Ending Clustering app...[" << lights->size() << "]" << endl;
-  delete lights;
   return 0;
 }

@@ -26,8 +26,30 @@
 #include "PotentialCluster.h"
 #include <limits>
 
+struct KdTreeFactory {
+
+  using Alloc = galois::FixedSizeAllocator<KdCell>;
+  Alloc m_alloc;
+
+  template <typename... Args>
+  KdCell* createCell(Args&& args...) {
+
+    KdCell* c = m_alloc.allocate(1);
+    assert(c && "alloc failed");
+    m_alloc.construct(c, std::forward<Args>(args)...);
+    return c;
+  }
+  
+  void destroyCell(KdCell* c) {
+    m_alloc.destruct(c);
+    m_alloc.deallocate(c, 1);
+  }
+};
+
 class KdTree : public KdCell {
-private:
+
+
+protected:
   double minLightIntensity;
   double maxConeCosine;
   Point3 minHalfSize;
@@ -41,6 +63,7 @@ private:
     maxConeCosine     = -1.0f;
   }
 
+      
 public:
   static KdTree* createTree(GVector<NodeWrapper*>& inPoints) {
     KdTree* factory = new KdTree();

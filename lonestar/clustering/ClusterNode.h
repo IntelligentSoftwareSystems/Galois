@@ -59,7 +59,7 @@ public:
     setSummedIntensity(*leftChild, *rightChild);
     // setCombinedFlags(leftChild, rightChild);
     // we only apply clamping to nodes that are low in the tree
-    std::vector<double>* ranVec =
+    std::vector<double>& ranVec =
         repRandomNums[(int)(repRandomNum * numRepRandomNums)];
     if (globalMultitime) {
       assert(false && "Should  not have time true!");
@@ -120,44 +120,47 @@ public:
     }
   }
 
-  static void chooseRepsNoTime(GVector<LeafNode*>& repArr, AbstractNode& parent,
-                               std::vector<double>* ranVec, LeafNode& left,
+  template <typename V1, typename V2>
+  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+                               V2& ranVec, LeafNode& left,
                                LeafNode& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
-    double nextTest   = (*ranVec)[0] * totalInten;
+    double nextTest   = ranVec[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
       double test = nextTest;
-      nextTest    = (*ranVec)[i + 1] * totalInten;
+      nextTest    = ranVec[i + 1] * totalInten;
       repArr[i]   = (test < leftInten) ? &left : &right;
     }
     repArr[repArr.size() - 1] = (nextTest < leftInten) ? &left : &right;
   }
 
-  static void chooseRepsNoTime(GVector<LeafNode*>& repArr, AbstractNode& parent,
-                               std::vector<double>* ranVec, ClusterNode& left,
+  template <typename V1, typename V2>
+  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+                               V2& ranVec, ClusterNode& left,
                                LeafNode& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
-    double nextTest   = (*ranVec)[0] * totalInten;
+    double nextTest   = ranVec[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
       double test = nextTest;
-      nextTest    = (*ranVec)[i + 1] * totalInten;
+      nextTest    = ranVec[i + 1] * totalInten;
       repArr[i]   = (test < leftInten) ? (left.reps[i]) : &right;
     }
     repArr[repArr.size() - 1] =
         (nextTest < leftInten) ? (left.reps[repArr.size() - 1]) : &right;
   }
 
-  static void chooseRepsNoTime(GVector<LeafNode*>& repArr, AbstractNode& parent,
-                               std::vector<double>* ranVec, ClusterNode& left,
+  template <typename V1, typename V2>
+  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+                               V2& ranVec, ClusterNode& left,
                                ClusterNode& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
-    double nextTest   = (*ranVec)[0] * totalInten;
+    double nextTest   = ranVec[0] * totalInten;
     for (unsigned int i = 0; i < repArr.size() - 1; i++) {
       double test = nextTest;
-      nextTest    = (*ranVec)[i + 1] * totalInten;
+      nextTest    = ranVec[i + 1] * totalInten;
       repArr[i]   = (test < leftInten) ? (left.reps[i]) : (right.reps[i]);
     }
     repArr[repArr.size() - 1] = (nextTest < leftInten)
@@ -173,15 +176,17 @@ public:
 
   float getConeCos() { return coneCos; }
 
-  void findConeDirsRecursive(GVector<double>* coordArr,
-                             GVector<ClusterNode*>& tempClusterArr) {
+  template <typename V1, typename V2>
+  void findConeDirsRecursive(V1& coordArr,
+                             V2& tempClusterArr) {
     // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
     findConeDirsRecursive(*leftChild, coordArr, 0, tempClusterArr, 3);
     findConeDirsRecursive(*rightChild, coordArr, 0, tempClusterArr, 3);
   }
 
-  static int findConeDirsRecursive(AbstractNode& node, GVector<double>* fArr,
-                                   int numDirs, GVector<ClusterNode*>& cArr,
+  template <typename V1, typename V2>
+  static int findConeDirsRecursive(AbstractNode& node, V1& fArr,
+                                   int numDirs, V2& cArr,
                                    int recurseDepth) {
     if (!node.isLeaf()) {
       ClusterNode& clus = (ClusterNode&)node;
@@ -214,18 +219,19 @@ public:
     return numDirs;
   }
 
-  static int addConeDir(GVector<double>* fArr, int numDirs, double x, double y,
+  template <typename V1>
+  static int addConeDir(V1& fArr, int numDirs, double x, double y,
                         double z) {
     // only add direction if it does not match any existing directions
     for (int i = 0; i < 3 * numDirs; i++) {
-      if (((*fArr)[i] == x) && ((*fArr)[i + 1] == y) && ((*fArr)[i + 2] == z)) {
+      if ((fArr[i] == x) && (fArr[i + 1] == y) && (fArr[i + 2] == z)) {
         return numDirs;
       }
     }
     int index          = 3 * numDirs;
-    (*fArr)[index]     = x;
-    (*fArr)[index + 1] = y;
-    (*fArr)[index + 2] = z;
+    fArr[index]     = x;
+    fArr[index + 1] = y;
+    fArr[index + 2] = z;
     return numDirs + 1;
   }
 
