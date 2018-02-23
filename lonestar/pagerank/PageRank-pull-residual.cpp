@@ -93,6 +93,7 @@ static void printTop(Graph& graph, int topn) {
   }
 }
 
+#if DEBUG
 static void printPageRank(Graph& graph) {
   std::cout << "Id\tPageRank\n";
   int counter = 0;
@@ -103,6 +104,7 @@ static void printPageRank(Graph& graph) {
     counter++;
   }
 }
+#endif
 
 using DeltaArray    = galois::LargeArray<PRTy>;
 using ResidualArray = galois::LargeArray<PRTy>;

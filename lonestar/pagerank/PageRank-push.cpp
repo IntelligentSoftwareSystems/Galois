@@ -134,36 +134,36 @@ static void printTop(Graph& graph, int topn) {
 
 void asyncPageRank(Graph& graph) {
   typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
-  galois::for_each(galois::iterate(graph),
-                   [&](GNode src, auto& ctx) {
-                     LNode& sdata = graph.getData(src);
-                     constexpr const galois::MethodFlag flag =
-                         galois::MethodFlag::UNPROTECTED;
+  galois::for_each(
+      galois::iterate(graph),
+      [&](GNode src, auto& ctx) {
+        LNode& sdata = graph.getData(src);
+        constexpr const galois::MethodFlag flag =
+            galois::MethodFlag::UNPROTECTED;
 
-                     if (sdata.residual > tolerance) {
-                       PRTy oldResidual = sdata.residual.exchange(0.0);
-                       sdata.value += oldResidual;
-                       int src_nout = std::distance(graph.edge_begin(src, flag),
-                                                    graph.edge_end(src, flag));
-                       if (src_nout > 0) {
-                         PRTy delta = oldResidual * ALPHA / src_nout;
-                         // for each out-going neighbors
-                         for (auto jj : graph.edges(src, flag)) {
-                           GNode dst    = graph.getEdgeDst(jj);
-                           LNode& ddata = graph.getData(dst, flag);
-                           if (delta > 0) {
-                             auto old = atomicAdd(ddata.residual, delta);
-                             if ((old < tolerance) &&
-                                 (old + delta >= tolerance)) {
-                               ctx.push(dst);
-                             }
-                           }
-                         }
-                       }
-                     }
-                   },
-                   galois::loopname("PushResidualAsync"), galois::no_conflicts(),
-                   galois::no_stats(), galois::wl<WL>());
+        if (sdata.residual > tolerance) {
+          PRTy oldResidual = sdata.residual.exchange(0.0);
+          sdata.value += oldResidual;
+          int src_nout = std::distance(graph.edge_begin(src, flag),
+                                       graph.edge_end(src, flag));
+          if (src_nout > 0) {
+            PRTy delta = oldResidual * ALPHA / src_nout;
+            // for each out-going neighbors
+            for (auto jj : graph.edges(src, flag)) {
+              GNode dst    = graph.getEdgeDst(jj);
+              LNode& ddata = graph.getData(dst, flag);
+              if (delta > 0) {
+                auto old = atomicAdd(ddata.residual, delta);
+                if ((old < tolerance) && (old + delta >= tolerance)) {
+                  ctx.push(dst);
+                }
+              }
+            }
+          }
+        }
+      },
+      galois::loopname("PushResidualAsync"), galois::no_conflicts(),
+      galois::no_stats(), galois::wl<WL>());
 }
 
 void syncPageRank(Graph& graph) {
@@ -254,6 +254,7 @@ void syncPageRank(Graph& graph) {
   }
 }
 
+#if DEBUG
 static void printPageRank(Graph& graph) {
   std::cout << "Id\tPageRank\n";
   int counter = 0;
@@ -264,6 +265,7 @@ static void printPageRank(Graph& graph) {
     counter++;
   }
 }
+#endif
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;

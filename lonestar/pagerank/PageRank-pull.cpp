@@ -39,11 +39,13 @@ constexpr static const unsigned CHUNK_SIZE = 32;
 
 enum Algo { PR_Pull, PR_Pull_ET, PR_Pull_Profile };
 
-static cll::opt<Algo> algo(
-    "algo", cll::desc("Choose an algorithm:"),
-    cll::values(clEnumVal(PR_Pull, "PUll"),
-                clEnumVal(PR_Pull_ET, "Pull with edge tiling"), clEnumValEnd),
-    cll::init(PR_Pull));
+static cll::opt<Algo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(clEnumVal(PR_Pull, "Pull"),
+                     clEnumVal(PR_Pull_ET, "Pull with edge tiling"),
+                     clEnumVal(PR_Pull_Profile, "Pull with profiling enabled"),
+                     clEnumValEnd),
+         cll::init(PR_Pull));
 
 // We require a transpose graph since this is a pull-style algorithm
 static cll::opt<std::string> filename(cll::Positional,
@@ -455,6 +457,7 @@ void computePageRank(Graph& graph) {
   }
 }
 
+#if DEBUG
 static void printPageRank(Graph& graph) {
   std::cout << "Id\tPageRank\n";
   int counter = 0;
@@ -465,6 +468,7 @@ static void printPageRank(Graph& graph) {
     counter++;
   }
 }
+#endif
 
 template <typename Graph>
 static void printTop(Graph& graph, int topn) {
