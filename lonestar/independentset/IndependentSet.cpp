@@ -97,7 +97,7 @@ struct prioNode {
 };
 
 struct prioNode2 {
-  unsigned char flag; // 1 bit matched, 3 bits prio of degree, 3 bits random prio, 1 bit undecided
+  unsigned char flag; // 1 bit matched,6 bits prio, 1 bit undecided
   prioNode2() : flag((unsigned char)0x01) { }
 };
 
@@ -831,6 +831,7 @@ struct edgetiledPrioAlgo2 {
 
   struct Execute{
     Graph& graph;
+    galois::GAccumulator<size_t>& rounds;
     galois::GReduceLogicalOR& unmatched;
     galois::InsertBag<EdgeTile>& works;
     //bool& unmatched;
@@ -846,12 +847,12 @@ struct edgetiledPrioAlgo2 {
 
           prioNode2& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-          /*if(other.flag == (unsigned char)0xff) //temporary-matched, highest prio
+          if(other.flag == (unsigned char)0xfe) //permanent matched, highest prio
           {
             nodedata.flag = (unsigned char)0x00;
-            unmatched.update(true);
+            //unmatched.update(true);
             return;
-          }*/
+          }
 
           if(nodedata.flag > other.flag)
               continue;
@@ -867,12 +868,15 @@ struct edgetiledPrioAlgo2 {
               else {
                   tile.flag = false;
                   unmatched.update(true);
+                  //std::cout<<"here0"<<std::endl;
                   return;
               }
           }
           else{
               tile.flag = false;
               unmatched.update(true);
+              if(rounds.reduce() > 5)
+                std::cout<<"here1 this flag"<<std::hex<< (unsigned)nodedata.flag<< "other flag " <<std::hex<<(unsigned)other.flag <<std::endl;
               return;
           }
         }
@@ -951,7 +955,7 @@ struct edgetiledPrioAlgo2 {
     float scale_avg = ((in / 2 ) - 1) * avg_degree;
     Init_prio init_prio { graph, avg_degree, scale_avg, generator, works };
     
-    Execute execute { graph, unmatched, works };
+    Execute execute { graph, rounds, unmatched, works };
     VerifyChange verify_change { graph };
     MatchReduce match_reduce { graph };
     MatchUpdate match_update { graph };
@@ -967,7 +971,7 @@ struct edgetiledPrioAlgo2 {
       galois::do_all(galois::iterate(works), match_reduce, galois::loopname("match_reduce"));
       
       galois::do_all(galois::iterate(graph), match_update, galois::loopname("match_update"));
-
+      std::cout << "round:"<< rounds.reduce()<< std::endl;
       rounds += 1;
     }while (unmatched.reduce());
 
