@@ -276,6 +276,38 @@ class LC_CSR_Graph :
   }
 
   /**
+   * Serializes graph using Boost.
+   *
+   * @param ar Boost archive to serialize to.
+   */
+  void serializeGraph(boost::archive::binary_oarchive& ar) const {
+    ar << numNodes;
+    ar << numEdges;
+ 
+    // Large Arrays
+    ar << nodeData;
+    ar << edgeIndData;
+    ar << edgeDst;
+    ar << edgeData;
+  }
+
+  /**
+   * Deserializes a Boost archive to the local graph.
+   *
+   * @param ar Boost archive to deserialize from.
+   */
+  void deSerializeGraph(boost::archive::binary_iarchive& ar) {
+    ar >> numNodes;
+    ar >> numEdges;
+
+    // Large Arrays
+    ar >> nodeData;
+    ar >> edgeIndData;
+    ar >> edgeDst;
+    ar >> edgeData;
+  }
+
+  /**
    * Accesses the "prefix sum" of this graph; takes advantage of the fact
    * that edge_end(n) is basically prefix_sum[n] (if a prefix sum existed +
    * if prefix_sum[0] = number of edges in node 0).
