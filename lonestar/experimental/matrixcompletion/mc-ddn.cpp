@@ -466,72 +466,6 @@ private:
     int maxUpdates;
     galois::GAccumulator<double>* errorAccum;
 
-#if 0
-    void updateBlock(Task& task) {
-      const int innerCount = std::numeric_limits<int>::max(); // XXX
-      const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
-      GetDst fn { &g };
-      no_deref_iterator xxx;
-      std::array<no_deref_iterator,1024> starts;
-      double error = 0.0;
-
-      // TODO add round blocking -- Added by not very useful
-      // TODO modify edge data to support agnostic edge blocking
-      for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        galois::MethodFlag flag = phase == 0 ? galois::MethodFlag::ALL : galois::MethodFlag::UNPROTECTED;
-        int numWorking;
-        int round = 0;
-        int limit = 0;
-        do {
-          numWorking = 0;
-          int index = 0;
-          for (auto ii = task.start1; ii != task.end1; ++ii, ++index) {
-            Node& nn = g.getData(*ii, round == 0 ? flag : galois::MethodFlag::UNPROTECTED);
-            Graph::edge_iterator begin = g.edge_begin(*ii, galois::MethodFlag::UNPROTECTED);
-            no_deref_iterator nbegin(round == 0 ? no_deref_iterator(begin) : starts[index]);
-            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, galois::MethodFlag::UNPROTECTED)));
-            edge_dst_iterator dbegin(nbegin, fn);
-            edge_dst_iterator dend(nend, fn);
-            edge_dst_iterator jj = round == 0 ? std::lower_bound(dbegin, dend, task.start2) : dbegin;
-            int i = 0;
-            bool done = false;
-            //for (i = 0; jj != dend && i < innerCount; ++jj, ++i) { // XXX
-            for (i = 0; jj != dend; ++jj, ++i) {
-              Graph::edge_iterator edge = *jj.base();
-
-              if (g.getEdgeDst(edge) > task.end2) {
-                done = true;
-                break;
-              }
-              if (g.getEdgeDst(edge) > task.start2 + limit)
-                break;
-
-              Node& mm = g.getData(g.getEdgeDst(edge), flag);
-              if (phase == 1) {
-                LatentValue e = doGradientUpdate(nn.latentVector, mm.latentVector, static_cast<LatentValue>(g.getEdgeData(edge)), stepSize);
-                error += e * e;
-                edgesVisited += 1;
-              }
-            }
-            if (done)
-              starts[index] = nend;
-            else
-              starts[index] = jj.base();
-
-            //if (!done && jj != dend && i == innerCount)
-            if (!done && jj != dend)
-              numWorking += 1;
-          }
-          round += 1;
-          limit += innerCount;
-        } while (numWorking > 0);
-      }
-      task.updates += 1;
-      errorAccum += (error - task.error);
-      task.error = error;
-    }
-#endif
-
     void updateBlock(Task& task) {
 //      const int innerCount = std::numeric_limits<int>::max(); // XXX
       const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
@@ -1103,8 +1037,8 @@ void run() {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  galois::StatManager statManager;
 
   switch (algo) {
 #ifdef HAS_EIGEN
