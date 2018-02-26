@@ -50,7 +50,6 @@ static const char* url = "delaunay_mesh_refinement";
 
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-Graph* graph;
 
 enum DetAlgo {
   nondet,
@@ -67,75 +66,84 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
       clEnumVal(detDisjoint, "Disjoint execution"),
       clEnumValEnd), cll::init(nondet));
 
-template<int Version=detBase>
-struct Process {
+
+template <typename WL, int Version=detBase>
+void refine(galois::InsertBag<GNode>& initialBad, Graph& graph) {
+
+  
   struct LocalState {
     Cavity cav;
-    LocalState(Process<Version>& self, galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
+    LocalState(Graph& graph, galois::PerIterAllocTy& alloc): cav(&graph, alloc) { }
   };
 
-  //! [Enabling Per Iteration Allocator in DMR]
-  typedef std::tuple<
-    galois::local_state<LocalState>,
-    galois::per_iter_alloc
-  > function_traits;
-  //! [Enabling Per Iteration Allocator in DMR]
+  //! [for_each example]
+  galois::for_each( galois::iterate(initialBad),
+      [&] (GNode item, auto& ctx) {
+        if (!graph.containsNode(item, galois::MethodFlag::WRITE))
+          return;
+        
+        if (Version == detDisjoint) {
 
-  void operator()(GNode item, galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, galois::MethodFlag::WRITE))
-      return;
-    
-    if (Version == detDisjoint) {
+          LocalState* localState = (LocalState*) ctx.getLocalState();
 
-      LocalState* localState = (LocalState*) ctx.getLocalState();
+          if (ctx.isFirstPass()) {
+            localState->cav.initialize(item);
+            localState->cav.build();
+            localState->cav.computePost();
+          } else {
+            localState->cav.update(item,ctx);
+          }
 
-      if (ctx.isFirstPass()) {
-        localState->cav.initialize(item);
-        localState->cav.build();
-        localState->cav.computePost();
-      } else {
-        localState->cav.update(item,ctx);
-      }
+          return;
+        } else {
+          //! [Accessing Per Iteration Allocator in DMR]
+          Cavity cav(&graph, ctx.getPerIterAlloc());
+          //! [Accessing Per Iteration Allocator in DMR]
+          cav.initialize(item);
+          cav.build();
+          cav.computePost();
+          if (Version == detPrefix)
+            return;
+          ctx.cautiousPoint();
+          cav.update(item, ctx);
+        }
+      },
+      galois::loopname("refine"),
+      galois::wl<WL>(),
+      galois::per_iter_alloc(),
+      galois::local_state<LocalState>());
 
-      return;
-    } else {
-      //! [Accessing Per Iteration Allocator in DMR]
-      Cavity cav(graph, ctx.getPerIterAlloc());
-      //! [Accessing Per Iteration Allocator in DMR]
-      cav.initialize(item);
-      cav.build();
-      cav.computePost();
-      if (Version == detPrefix)
-        return;
-      ctx.cautiousPoint();
-      cav.update(item, ctx);
-    }
-  }
-};
+  //! [for_each example]
 
-struct Preprocess {
-  galois::InsertBag<GNode>& wl;
-  Preprocess(galois::InsertBag<GNode>& w): wl(w) { }
-  void operator()(GNode item) const {
-    if (graph->getData(item, galois::MethodFlag::UNPROTECTED).isBad())
-      wl.push(item);
-  }
-};
+}
 
+template <typename Loop>
+void findBad(Graph& graph, galois::InsertBag<GNode>& initialBad, const Loop& loop) {
+  loop( galois::iterate(graph),
+      [&] (GNode item) {
+        if (graph.getData(item, galois::MethodFlag::UNPROTECTED).isBad()) {
+          initialBad.push(item);
+        }
+      }, galois::loopname("findBad"));
+
+}
+
+/*
 struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, galois::MethodFlag::UNPROTECTED).getId();
-    int idB = graph->getData(b, galois::MethodFlag::UNPROTECTED).getId();
+    int idA = graph.getData(a, galois::MethodFlag::UNPROTECTED).getId();
+    int idB = graph.getData(b, galois::MethodFlag::UNPROTECTED).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }
 };
+*/
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  graph = new Graph();
+  Graph graph;
   {
     Mesh m;
     m.read(graph, filename.c_str(), detAlgo == nondet);
@@ -144,28 +152,28 @@ int main(int argc, char** argv) {
       GALOIS_DIE("bad input mesh");
     }
   }
-  std::cout << "configuration: " << std::distance(graph->begin(), graph->end())
-	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
+  std::cout << "configuration: " << std::distance(graph.begin(), graph.end())
+	    << " total triangles, " << std::count_if(graph.begin(), graph.end(), is_bad(graph)) << " bad triangles\n";
 
   galois::reportPageAlloc("MeminfoPre1");
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
-  const size_t NODE_SIZE = sizeof(**graph->begin());
-  galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / galois::runtime::pagePoolSize());
+  const size_t NODE_SIZE = sizeof(**graph.begin());
+  galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 32 * graph.size () / galois::runtime::pagePoolSize());
 
   galois::reportPageAlloc("MeminfoPre2");
 
   galois::StatTimer T;
   T.start();
 
-  //! [do_all example]
   galois::InsertBag<GNode> initialBad;
 
-  if (detAlgo == nondet)
-    galois::do_all(galois::iterate(*graph), Preprocess(initialBad), galois::loopname("findbad"));
-  //! [do_all example]
-  else
-    std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
+  if (detAlgo == nondet) {
+    findBad(graph, initialBad, galois::DoAll());
+  }
+  else {
+    findBad(graph, initialBad, galois::StdForEach());
+  }
 
   galois::reportPageAlloc("MeminfoMid");
   
@@ -174,24 +182,21 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
-  //! [for_each example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {
     case nondet: 
-      galois::for_each(galois::iterate(initialBad), Process<>(), galois::loopname("refine"), galois::wl<Chunked>());
+      refine<Chunked>(initialBad, graph);
       break;
-      //! [for_each example]
     case detBase:
-      galois::for_each(galois::iterate(initialBad), Process<>(), galois::wl<DWL>());
+      // refine<DWL>(initialBad, graph);
       break;
     case detPrefix:
-      galois::for_each(galois::iterate(initialBad), Process<>(),
-          galois::wl<DWL>(), galois::neighborhood_visitor<Process<detPrefix>>());
+      // refine<DWL, detPrefix>(initialBad, graph);
       break;
     case detDisjoint:
-      galois::for_each(galois::iterate(initialBad), Process<detDisjoint>(), galois::wl<DWL>());
+      // refine<DWL, detDisjoint>(initialBad, graph);
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
@@ -201,7 +206,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPost");
   
   if (!skipVerify) {
-    int size = galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
+    int size = galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_bad(graph));
     if (size != 0) {
       GALOIS_DIE("Bad triangles remaining");
     }
@@ -209,7 +214,7 @@ int main(int argc, char** argv) {
     if (!v.verify(graph)) {
       GALOIS_DIE("Refinement failed");
     }
-    std::cout << std::distance(graph->begin(), graph->end()) << " total triangles\n";
+    std::cout << std::distance(graph.begin(), graph.end()) << " total triangles\n";
     std::cout << "Refinement OK\n";
   }
 

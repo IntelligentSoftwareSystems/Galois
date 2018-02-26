@@ -35,13 +35,13 @@
 
 class Verifier {
   struct inconsistent: public std::unary_function<GNode,bool> {
-    Graph* graph;
-    inconsistent(Graph* g): graph(g) { }
+    Graph& graph;
+    inconsistent(Graph& g): graph(g) { }
 
     bool operator()(const GNode& node) const {
-      Element& e = graph->getData(node);
+      Element& e = graph.getData(node);
 
-      size_t dist = std::distance(graph->edge_begin(node), graph->edge_end(node));
+      size_t dist = std::distance(graph.edge_begin(node), graph.edge_end(node));
       if (e.dim() == 2) {
         if (dist != 1) {
           std::cerr << "Error: Segment " << e << " has " << dist << " relation(s)\n";
@@ -61,16 +61,16 @@ class Verifier {
   };
 
   struct not_delaunay: public std::unary_function<GNode,bool> {
-    Graph* graph;
-    not_delaunay(Graph* g): graph(g) { }
+    Graph& graph;
+    not_delaunay(Graph& g): graph(g) { }
 
     bool operator()(const GNode& node) {
-      Element& e1 = graph->getData(node);
+      Element& e1 = graph.getData(node);
 
-      for (Graph::edge_iterator jj = graph->edge_begin(node),
-          ej = graph->edge_end(node); jj != ej; ++jj) {
-        const GNode& n = graph->getEdgeDst(jj);
-        Element& e2 = graph->getData(n);
+      for (Graph::edge_iterator jj = graph.edge_begin(node),
+          ej = graph.edge_end(node); jj != ej; ++jj) {
+        const GNode& n = graph.getEdgeDst(jj);
+        Element& e2 = graph.getData(n);
         if (e1.dim() == 3 && e2.dim() == 3) {
           Tuple t2;
           if (!getTupleT2OfRelatedEdge(e1, e2, t2)) {
@@ -115,25 +115,25 @@ class Verifier {
     }
   };
 
-  bool checkReachability(Graph* graph) {
+  bool checkReachability(Graph& graph) {
     std::stack<GNode> remaining;
     std::set<GNode> found;
-    remaining.push(*(graph->begin()));
+    remaining.push(*(graph.begin()));
 
     while (!remaining.empty()) {
       GNode node = remaining.top();
       remaining.pop();
       if (!found.count(node)) {
-        if (!graph->containsNode(node)) {
+        if (!graph.containsNode(node)) {
           std::cerr << "Reachable node was removed from graph\n";
         }
         found.insert(node);
         int i = 0;
-        for (Graph::edge_iterator ii = graph->edge_begin(node),
-            ei = graph->edge_end(node); ii != ei; ++ii) {
-          GNode n = graph->getEdgeDst(ii);
+        for (Graph::edge_iterator ii = graph.edge_begin(node),
+            ei = graph.edge_end(node); ii != ei; ++ii) {
+          GNode n = graph.getEdgeDst(ii);
           assert(i < 3);
-          assert(graph->containsNode(n));
+          assert(graph.containsNode(n));
           assert(node != n);
           ++i;
           remaining.push(n);
@@ -141,18 +141,18 @@ class Verifier {
       }
     }
 
-    if (found.size() != graph->size()) {
+    if (found.size() != graph.size()) {
       std::cerr << "Error: Not all elements are reachable. ";
-      std::cerr << "Found: " << found.size() << " needed: " << graph->size() << ".\n";
+      std::cerr << "Found: " << found.size() << " needed: " << graph.size() << ".\n";
       return false;
     }
     return true;
   }
 
 public:
-  bool verify(Graph* g) {
-    return galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
-      && galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
+  bool verify(Graph& g) {
+    return galois::ParallelSTL::find_if(g.begin(), g.end(), inconsistent(g)) == g.end()
+      && galois::ParallelSTL::find_if(g.begin(), g.end(), not_delaunay(g)) == g.end()
       && checkReachability(g);
   }
 };
