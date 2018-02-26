@@ -38,14 +38,18 @@ int getNumThreads();
 
 AttributedGraph *createGraph();
 void deleteGraph(AttributedGraph *g);
+void saveGraph(AttributedGraph *g, char* filename);
+void loadGraph(AttributedGraph *g, char* filename);
 void printGraph(AttributedGraph *g);
 
 void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t numNodeLabels, size_t numEdgeLabels);
 void fixEndEdge(AttributedGraph *g, uint32_t nodeIndex, uint64_t edgeIndex);
-void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t label, char* name);
+void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t uuid, uint32_t label, char* name);
 void setNodeLabel(AttributedGraph *g, uint32_t label, char* name);
 void setEdgeLabel(AttributedGraph *g, uint32_t label, char* name);
+void setNodeAttribute(AttributedGraph *g, uint32_t nodeIndex, char* key, char* value);
 void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp);
+void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char* key, char* value);
 
 size_t getNumNodes(AttributedGraph* g);
 size_t getNumEdges(AttributedGraph* g);
