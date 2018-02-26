@@ -127,6 +127,7 @@ void readGraph(Graph& g, const std::string& name) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
   llvm::cl::ParseCommandLineOptions(argc, argv);
 
   Graph g;

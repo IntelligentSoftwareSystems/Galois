@@ -2,7 +2,6 @@
 #define _BCGRAPH_H_
 
 #include "galois/Bag.h"
-#include "galois/substrate/CacheLineStorage.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -10,302 +9,203 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cassert>
+
 #ifdef __linux__
 #include <linux/mman.h>
 #endif
 
 #include <cerrno>
-
 #include <cassert>
 #include <iomanip>
 #include <iostream>
 #include <list>
-#include <map>
-#include <set>
-#include <sstream>
-#include <string>
-#include <vector>
 
 #undef STOREOUTNBRS 
 
-
 //
-//  XXX Important assumption about the graphs read: Node id's start at 0 and go up to nnodes - 1
+//  XXX Important assumption about the graphs read: Node id's start at 0 and 
+//  go up to nnodes - 1
 //
 class BCGraph {
-    public:
-//	private:
-      galois::substrate::CacheLineStorage<ND> * nodes;
-		ED * edgeData;
-		int * inIdx;
-		int * ins;
-		int * outIdx;
-#ifdef STOREOUTNBRS
-		int * outs;
-		int nouts;
-#endif
-		int nnodes;
-		int nedges;
-		int ninIdx;
-		int nins;
-		int noutIdx;
+ public:
+ //private:
+  galois::substrate::CacheLineStorage<ND>* nodes;
+  ED* edgeData;
+  int* inIdx;
+  int* ins;
+  int* outIdx;
+  #ifdef STOREOUTNBRS
+  int* outs;
+  int nouts;
+  #endif
+  int nnodes;
+  int nedges;
+  int ninIdx;
+  int nins;
+  int noutIdx;
 
-    void* masterMapping;
-    size_t masterLength;
-    int masterFD;
+  void* masterMapping;
+  size_t masterLength;
+  int masterFD;
 
-    boost::tuple<void*, int, int> 
-      mapFile(const char *filename) {
+  /**
+   * mmaps the provided file.
+   *
+   * @param filename file to mmap
+   * @returns a tuple containing a pointer to the mmapped file, the filesize,
+   * and the file descriptor (or a nullptr if mmap failed
+   */
+  boost::tuple<void*, int, int> mapFile(const char *filename) {
+    int fileFD = open(filename, O_RDONLY);
+    struct stat buf;
+    fstat(fileFD, &buf);
+    size_t fileLength = buf.st_size;
 
-        int fileFD = open(filename, O_RDONLY);
-        struct stat buf;
-        fstat(fileFD, &buf);
-        size_t fileLength = buf.st_size;
+    int _MAP_BASE = MAP_PRIVATE /*| MAP_HUGETLB*/;
 
-        int _MAP_BASE = MAP_PRIVATE /*| MAP_HUGETLB*/;
-#ifdef MAP_POPULATE
-				std::cerr << "We have map_populate" << std::endl;
-        _MAP_BASE  |= MAP_POPULATE;
-#endif
+    #ifdef MAP_POPULATE
+    galois::gInfo("We have map_populate");
+    _MAP_BASE  |= MAP_POPULATE;
+    #endif
 
-        void* m = mmap(0, fileLength, PROT_READ,_MAP_BASE, fileFD, 0);
-        if (m == MAP_FAILED) {
-          m = 0;
-          std::cerr << "Problem with mmap " << filename << std::endl;
-          perror("ERROR: ");
-        }
-        std::cerr << "mmaped file " << filename << " of size " << fileLength << std::endl;
-        return boost::make_tuple(m, fileLength, fileFD);
+    void* m = mmap(0, fileLength, PROT_READ,_MAP_BASE, fileFD, 0);
 
-#if defined (__SVR4) && defined (__sun)
-
-#endif
-
-      }
-
-//  public:
-
-    ~BCGraph() {
-      if (masterMapping)
-        munmap(masterMapping, masterLength);
-      if (masterFD)
-        close(masterFD);
+    if (m == MAP_FAILED) {
+      m = 0;
+      galois::gError("Problem with mmap ", filename);
+      perror("ERROR: ");
     }
 
-    BCGraph(const char * filename)  {
-      std::cout << "Node Size " << sizeof(ND) << " uses " << sizeof(galois::substrate::CacheLineStorage<ND>) << "\n";
-      std::cout << "Edge Size " << sizeof(ED) << "\n";
-      std::string tmp(filename);
-      std::string fname1 = tmp + "1.gr";
-      std::string fname2 = tmp + "2.gr"; 
-      boost::tuple<void*,int,int> ft1 = mapFile(fname1.c_str());
-     
-      void *m = ft1.get<0>();
-      masterMapping = m;
-      masterLength = ft1.get<1>();
-      masterFD = ft1.get<2>();
+    galois::gInfo("mmaped file ", filename, " of size ", fileLength);
 
-      uint64_t* fptr = (uint64_t*)m;
-      uint64_t version = *fptr++;
-      assert(version == 2);
-      uint64_t numNodes = *fptr++;
-      uint64_t numEdges = *fptr++;
-      std::cerr << "Read numNodes " << numNodes << " numEdges: " << numEdges << std::endl; 
-      
-      nnodes = numNodes;
-      DEF_DISTANCE = 2*nnodes;
-      nedges = numEdges;
-      ninIdx = nnodes+1;
-      nins = nedges;
-      noutIdx = ninIdx;
-      
-      int idxArraysLen = numNodes+1;
+    return boost::make_tuple(m, fileLength, fileFD);
+  }
 
-      uint32_t *fptr32 = (uint32_t *)fptr;
-      inIdx = (int *)fptr32;
-      fptr32 += idxArraysLen;
-      if (idxArraysLen % 2)
-        fptr32++;
-      ins = (int *)fptr32; 
-      fptr32 += numEdges;
-      if (numEdges % 2)
-        fptr32 += 1;
-      outIdx = (int *)fptr32;
-      fptr32 += idxArraysLen;
-      if (idxArraysLen % 2)
-        fptr32++;
+ public:
+  BCGraph(const char* filename) {
+    galois::gInfo("Node Size ", sizeof(ND), " uses ", 
+                  sizeof(galois::substrate::CacheLineStorage<ND>));
+    galois::gInfo("Edge Size ", sizeof(ED));
+    std::string tmp(filename);
+    std::string fname1 = tmp + "1.gr";
+    std::string fname2 = tmp + "2.gr"; 
 
-      boost::tuple<void*,int,int> ft2 = mapFile(fname2.c_str());
-      void *m2 = ft2.get<0>();
-      fptr = (uint64_t*)m2;
-      version = *fptr++;
-      assert(version == 2);
-      fptr32 = (uint32_t *)fptr;
-      int * outs = (int *)fptr32; 
-      fptr32 += numEdges;
-      if (numEdges % 2)
-        fptr32 += 1;
-      
-      nodes = new galois::substrate::CacheLineStorage<ND>[nnodes];
-      for (int i =0; i<nnodes; ++i) {
-        nodes[i].data.id = i;
-      }
+    boost::tuple<void*, int, int> ft1 = mapFile(fname1.c_str());
+   
+    void *m = ft1.get<0>();
+    masterMapping = m;
+    masterLength = ft1.get<1>();
+    masterFD = ft1.get<2>();
 
-      edgeData = new ED[nedges];
-      for (int i=0; i<nnodes; ++i) {
-        int start = outIdx[i];
-        int end = outIdx[i+1];
-        for (int j = start; j < end; j++) {
-          int nbr = outs[j];
-			    ED & e = edgeData[j];
-          e.src = &(nodes[i].data);
-          e.dst = &(nodes[nbr].data);
-        }	
-      }
+    uint64_t* fptr = (uint64_t*)m;
+    uint64_t version = *fptr++;
+    assert(version == 2);
+    uint64_t numNodes = *fptr++;
+    uint64_t numEdges = *fptr++;
+    galois::gInfo("Read numNodes ", numNodes, " numEdges: ", numEdges); 
+    
+    nnodes = numNodes;
+    nedges = numEdges;
+    ninIdx = nnodes+1;
+    nins = nedges;
+    noutIdx = ninIdx;
+    
+    int idxArraysLen = numNodes + 1;
 
-      munmap(m2, ft2.get<1>());
-      close(ft2.get<2>());
-      
-#if defined (__SVR4) && defined (__sun)
-      int sum = 0;
-      std::cerr << "BEFORE DUMMY: " << sum << std::endl;
-      for (int k=0; k<nins; ++k) {
-        sum += ins[k];
-      }
-      for (int k=0; k<ninIdx; ++k) {
-        sum += inIdx[k];
-      }
-      std::cerr << "DUMMY: " << sum << std::endl;
-#endif
+    uint32_t* fptr32 = (uint32_t*)fptr;
+
+    inIdx = (int*)fptr32;
+    fptr32 += idxArraysLen;
+    if (idxArraysLen % 2) fptr32++;
+    ins = (int *)fptr32; 
+    fptr32 += numEdges;
+    if (numEdges % 2) fptr32 += 1;
+    outIdx = (int *)fptr32;
+    fptr32 += idxArraysLen;
+    if (idxArraysLen % 2) fptr32++;
+
+    boost::tuple<void*,int,int> ft2 = mapFile(fname2.c_str());
+    void *m2 = ft2.get<0>();
+    fptr = (uint64_t*)m2;
+    version = *fptr++;
+    assert(version == 2);
+    fptr32 = (uint32_t*)fptr;
+
+    int* outs = (int *)fptr32; 
+    fptr32 += numEdges;
+    if (numEdges % 2) fptr32 += 1;
+    
+    nodes = new galois::substrate::CacheLineStorage<ND>[nnodes];
+    for (int i =0; i<nnodes; ++i) {
+      nodes[i].data.id = i;
     }
 
-#define CONSTR_DBG 0
+    edgeData = new ED[nedges];
+    for (int i=0; i<nnodes; ++i) {
+      int start = outIdx[i];
+      int end = outIdx[i+1];
 
-    BCGraph(int _nnodes, int _nedges, const std::map<int, std::set<int>*> & _succs, const std::map<int, std::set<int>*> & _preds)
+      for (int j = start; j < end; j++) {
+        int nbr = outs[j];
+        ED & e = edgeData[j];
+        e.src = &(nodes[i].data);
+        e.dst = &(nodes[nbr].data);
+      } 
+    }
 
-      : nodes(new galois::substrate::CacheLineStorage<ND>[_nnodes]), edgeData(new ED[_nedges]), inIdx(new int[_nnodes+1]), 
-        ins(new int[_nedges]), outIdx(new int[_nnodes+1]), nnodes(_nnodes), 
-        nedges(_nedges), ninIdx(_nnodes+1), nins(_nedges), noutIdx(_nnodes+1), masterMapping(0), masterLength(0), masterFD(0) {
-        
-          std::cerr << "_nedges " << _nedges << std::endl; 
-          for (int i =0; i<_nnodes; ++i) {
-            nodes[i].data.id = i;
-          }
-#ifdef STOREOUTNBRS
-        std::vector<int> _outs;
-#endif
-        int outIdxCnt = 0;
-        outIdx[outIdxCnt++] = 0;
-        int edCnt = 0;
-        for (int nc=0; nc<nnodes; ++nc) {
-          if (CONSTR_DBG) { std::cerr << "Processing succs of " << nc << std::endl; }
-          std::map<int, std::set<int>*>::const_iterator it1 = _succs.find(nc);
-          if (it1 != _succs.end()) {
-            int n = it1->first;
-            assert(n == nc);
-            ND *nNode = &(nodes[n].data);
-            std::set<int> *succsOfN = it1->second;
-            for (std::set<int>::const_iterator it2 = succsOfN->begin(); it2 != succsOfN->end(); ++it2) {
-#ifdef STOREOUTNBRS
-              _outs.push_back(*it2);
-#endif
-              assert (*it2 <= nnodes-1);
-              ED &e = edgeData[edCnt];
-              e.src = nNode;
-              e.dst = &(nodes[*it2].data);
-              if (CONSTR_DBG) { std::cerr << "Patched edge " << edCnt << " " << e.toString() << std::endl; }
-              edCnt++;
-            }
-          }
-          assert(edCnt <= _nedges);
-          assert(outIdxCnt <= nnodes);
-          outIdx[outIdxCnt++] = edCnt;
-          //std::cerr << "Succs of " << n->id << " end at offset " << _outs.size() << std::endl;
-        }
-        int insCnt = 0;
-        int inIdxCnt = 0;
-        inIdx[inIdxCnt++] = 0;
-        for (int nc=0; nc<nnodes; ++nc) {
-          if (CONSTR_DBG) { std::cerr << "Processing preds of " << nc << std::endl; }
-          std::map<int, std::set<int>*>::const_iterator it1 = _preds.find(nc);
-          if (it1 != _preds.end()) {
-            int nid = it1->first;
-            assert(nid == nc);
-            std::set<int> *predsOfN = it1->second;
-            for (std::set<int>::const_iterator it2 = predsOfN->begin(); it2 != predsOfN->end(); ++it2) {
-              int predId = *it2;
-              assert(predId<=nnodes-1);
-              int start = outIdx[predId];
-              int end = outIdx[predId + 1];
-              //std::cerr << " Scanning edges from " << start << " to " << end << " for pred " << predId << std::endl;
-              bool found = false;
-              for (int i = start; i < end; i++) {
-                assert(i<_nedges);
-                const ED & e = edgeData[i];
-                /*if (e->src != (*it2)) {
-                  std::cerr << "BUG " << e->toString() << " VV " << (*it2)->id << " " << n->id << std::endl;
-                  for (std::set<ND*>::const_iterator it66 = predsOfN->begin(); it66 != predsOfN->end(); ++it66) {
-                  std::cerr << " AP " << (*it66)->id << std::endl;
-                  }
-                  }*/
-                assert (e.src->id == predId);
-                if (e.dst->id == nid) {
-                  assert(insCnt<=_nedges-1);
-                  ins[insCnt++] = i;
-                  if (CONSTR_DBG) { std::cerr << "Recorded " << predId << " as pred of " << nid << std::endl; }
-                  found = true;
-                  break;
-                }
-              }
-              if (!found) {
-                std::cerr << "Problem trying to find predecessor edge bw " << predId << " and " << nid << std::endl;
-                for (std::set<int>::const_iterator it3 = predsOfN->begin(); it3 != predsOfN->end(); ++it3) {
-                  int predId = (*it3);
-                  std::cerr << predId << std::endl;
-                }
-              }
-              assert (found);
-            }
-          }
-          assert(inIdxCnt<=nnodes);
-          assert(insCnt<=nedges);
-          inIdx[inIdxCnt++] = insCnt;
-        }
-        std::cerr << "_outIdx " << outIdxCnt << " nnodes " << nnodes << " _inIdx " << inIdxCnt << " _ins " << insCnt << std::endl;
-#ifdef STOREOUTNBRS
-        nouts = _outs.size();
-        outs = new int[nouts];
-        std::copy(_outs.begin(), _outs.end(), outs);
-#endif
-      }
+    munmap(m2, ft2.get<1>());
+    close(ft2.get<2>());
+    
+    #if defined (__SVR4) && defined (__sun)
+    int sum = 0;
+    std::cerr << "BEFORE DUMMY: " << sum << std::endl;
+    for (int k=0; k<nins; ++k) {
+      sum += ins[k];
+    }
+    for (int k=0; k<ninIdx; ++k) {
+      sum += inIdx[k];
+    }
+    std::cerr << "DUMMY: " << sum << std::endl;
+    #endif
+  }
 
-	int size() const {
-		return nnodes;
-	}
+  ~BCGraph() {
+    if (masterMapping) munmap(masterMapping, masterLength);
+    if (masterFD) close(masterFD);
+  }
+
+  #define CONSTR_DBG 0
+
+  int size() const {
+    return nnodes;
+  }
 
   int getNedges() const {
     return nedges;
   }
-	
-  ND * getNode(int id) {
-	return &nodes[id].data;
+  
+  ND* getNode(int id) {
+    return &nodes[id].data;
   }
-  galois::substrate::CacheLineStorage<ND> * getNodes() const {
-		return nodes;
-	}
+
+  galois::substrate::CacheLineStorage<ND>* getNodes() const {
+    return nodes;
+  }
  
-	template<typename Context>
-	void /*__attribute__((noinline))*/ inline addOutEdgesToWL(ND *n, /*int ndist,*/ Context & ctx) {
-		int idx = n->id;
+  template<typename Context>
+  void /*__attribute__((noinline))*/ inline addOutEdgesToWL(ND *n, 
+                                                            /*int ndist,*/ 
+                                                            Context & ctx) {
+    int idx = n->id;
     assert(idx <= nnodes-1);
-		int start = outIdx[idx];
-		int end = outIdx[idx + 1];
-		for (int i = start; i < end; i++) {
+    int start = outIdx[idx];
+    int end = outIdx[idx + 1];
+    for (int i = start; i < end; i++) {
       assert(i<=nedges-1);
       ED & e = edgeData[i];
-			assert (e.src == n);
-			if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
-//				if (!e.isAlreadyIn())
+      assert (e.src == n);
+      if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
+//        if (!e.isAlreadyIn())
           ND *outNbr = e.dst;
           ND * aL;
           ND *aW;
@@ -313,25 +213,27 @@ class BCGraph {
           else { aL = outNbr; aW = n; }
           aL->lock(); aW->lock();
           if (outNbr->distance > n->distance) {
-					  ctx.push(&e);
+            ctx.push(&e);
           }
           aL->unlock(); aW->unlock();
-			}
-		}
-	}
+      }
+    }
+  }
 
   template<typename Context>
-	void /*__attribute__((noinline))*/ inline addOutEdgesToWL2(ND *n, int ndist, Context & ctx) {
-		int idx = n->id;
+  void /*__attribute__((noinline))*/ inline addOutEdgesToWL2(ND *n, 
+                                                             int ndist, 
+                                                             Context& ctx) {
+    int idx = n->id;
     assert(idx <= nnodes-1);
-		int start = outIdx[idx];
-		int end = outIdx[idx + 1];
-		for (int i = start; i < end; i++) {
+    int start = outIdx[idx];
+    int end = outIdx[idx + 1];
+    for (int i = start; i < end; i++) {
       assert(i<=nedges-1);
       ED & e = edgeData[i];
-			assert (e.src == n);
-			if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
-				if (!e.isAlreadyIn()) ctx.push(&e);
+      assert (e.src == n);
+      if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
+        if (!e.isAlreadyIn()) ctx.push(&e);
 /*          ND *outNbr = e.dst;
           ND * aL;
           ND *aW;
@@ -343,21 +245,22 @@ class BCGraph {
             break;
           }
           if (outNbr->distance > n->distance) {
-					  ctx.push(&e);
+            ctx.push(&e);
           }
           aL->unlock(); aW->unlock();*/
-			}
-		}
-	}
+      }
+    }
+  }
 
 
 
-	template<typename Context>
-	void /* __attribute__((noinline))*/ inline addInEdgesToWL(ND *n, /*int ndist,*/ Context & ctx, ED* exception) {
-		int idx = n->id;
-		int start = inIdx[idx];
-		int end = inIdx[idx + 1];
-		for (int i = start; i < end; i++) {
+  template<typename Context>
+  void /* __attribute__((noinline))*/ inline addInEdgesToWL(ND *n, 
+      /*int ndist,*/ Context & ctx, ED* exception) {
+    int idx = n->id;
+    int start = inIdx[idx];
+    int end = inIdx[idx + 1];
+    for (int i = start; i < end; i++) {
       //if (i>= nedges) {
       //  std::cerr << "i=" << i << " idx: " << idx << " start: " << start << " end: " << end << std::endl;
       //}
@@ -367,108 +270,104 @@ class BCGraph {
       /*if (e->dst != n) {
         std::cerr << "Problem: " << e->dst->toString() << " ||| " << n->toString() << " || " << e->toString() << std::endl;
       }*/
-			assert (e.dst == n);
-			if (/*e.level <= ndist && */ &e != exception && e.src != n/*e.dst*/) {
-				if (!e.isAlreadyIn())
-					ctx.push(&e);
-			}
-		}
-	}
+      assert (e.dst == n);
+      if (/*e.level <= ndist && */ &e != exception && e.src != n/*e.dst*/) {
+        if (!e.isAlreadyIn())
+          ctx.push(&e);
+      }
+    }
+  }
 
-	//void initWLToOutEdges(ND *n, std::list<ED*> & wl) {
-	//void initWLToOutEdges(ND *n, std::vector<ED*> & wl) {
-	void initWLToOutEdges(ND *n, galois::InsertBag<ED*> & wl) {
-		int idx = n->id;
-		int start = outIdx[idx];
-		int end = outIdx[idx + 1];
-		for (int i = start; i < end; i++) {
+  //void initWLToOutEdges(ND *n, std::list<ED*> & wl) {
+  //void initWLToOutEdges(ND *n, std::vector<ED*> & wl) {
+  void initWLToOutEdges(ND *n, galois::InsertBag<ED*> & wl) {
+    int idx = n->id;
+    int start = outIdx[idx];
+    int end = outIdx[idx + 1];
+    for (int i = start; i < end; i++) {
       assert(i<nedges);
-			ED & e = edgeData[i];
-			if (n != e.dst) {
-				wl.push_back(&e);
-			}
-		}
-	}
+      ED & e = edgeData[i];
+      if (n != e.dst) {
+        wl.push_back(&e);
+      }
+    }
+  }
 
   void resetOutEdges(ND *n) {
-		int idx = n->id;
-		int start = outIdx[idx];
-		int end = outIdx[idx + 1];
-		for (int i = start; i < end; i++) {
+    int idx = n->id;
+    int start = outIdx[idx];
+    int end = outIdx[idx + 1];
+    for (int i = start; i < end; i++) {
       assert(i<nedges);
-			ED & e = edgeData[i];
+      ED & e = edgeData[i];
       e.reset();
-		}
-	}
+    }
+  }
 
-
-
-	int neighborsSize(const ND *src, const int* const adjIdx) const {
-		int idx = src->id;
+  int neighborsSize(const ND *src, const int* const adjIdx) const {
+    int idx = src->id;
     assert(idx<nnodes);
-		int start = adjIdx[idx];
-		int end = adjIdx[idx + 1];
-		return end - start;
-	}
+    int start = adjIdx[idx];
+    int end = adjIdx[idx + 1];
+    return end - start;
+  }
 
-	void fixNodePredsCapacities() {
-//		int maxInNbrs = 0;
-//    int maxId;
-//    int sumInNbrs = 0;
-      //int maxOutNbrs = 0;
-#if 0
-    for (int i=0; i<nnodes; ++i) {
-			ND & n = nodes[i].data;
-			int nOutNbrs = inNeighborsSize(&n);
-			//n.preds.reserve(std::min(2, nOutNbrs));
-/*      if (maxInNbrs < nOutNbrs) {
-        maxInNbrs = nOutNbrs;
-        maxId = n.id;
-      }
-      sumInNbrs += nOutNbrs;*/
-/*      int oos = outNeighborsSize(&n);
-      if (maxOutNbrs < oos) {
-        maxOutNbrs = oos;
-      }*/
-		}
-#endif
-//    std::cerr << "Node " << maxId << " has " << maxInNbrs << " in-nbrs Sum is " << sumInNbrs << "\n";
-//    std::cerr << " Max " << maxOutNbrs << " out-nbrs \n";
-	}
+  void fixNodePredsCapacities() {
+    //int maxInNbrs = 0;
+    //int maxId;
+    //int sumInNbrs = 0;
+    //int maxOutNbrs = 0;
+    ////#if 0
+    //for (int i=0; i<nnodes; ++i) {
+    //  ND & n = nodes[i].data;
+    //  int nOutNbrs = inNeighborsSize(&n);
+    //  //n.preds.reserve(std::min(2, nOutNbrs));
+    //  if (maxInNbrs < nOutNbrs) {
+    //    maxInNbrs = nOutNbrs;
+    //    maxId = n.id;
+    //  }
+    //  sumInNbrs += nOutNbrs;
+    //  int oos = outNeighborsSize(&n);
+    //  if (maxOutNbrs < oos) {
+    //    maxOutNbrs = oos;
+    //  }
+    //}
+    ////#endif
+    //std::cerr << "Node " << maxId << " has " << maxInNbrs << " in-nbrs Sum is " << sumInNbrs << "\n";
+    //std::cerr << " Max " << maxOutNbrs << " out-nbrs \n";
+  }
 
-	void fixNodepredsCapacities(int start, int end) {
-#if 0
-		for (int i=start; i<end; ++i) {
-			ND & n = nodes[i].data;
-			int nOutNbrs = inNeighborsSize(&n);
-			//n.preds.reserve(std::min(2, nOutNbrs));
-		}
-#endif
-	}
+  void fixNodepredsCapacities(int start, int end) {
+    #if 0
+    for (int i=start; i<end; ++i) {
+      ND & n = nodes[i].data;
+      int nOutNbrs = inNeighborsSize(&n);
+      //n.preds.reserve(std::min(2, nOutNbrs));
+    }
+    #endif
+  }
 
-	int inline inNeighborsSize(const ND *src) {
-		return neighborsSize(src, inIdx);
-	}
+  int inline inNeighborsSize(const ND *src) {
+    return neighborsSize(src, inIdx);
+  }
 
-	int outNeighborsSize(const ND *src) {
-		return neighborsSize(src, outIdx);
-	}
+  int outNeighborsSize(const ND *src) {
+    return neighborsSize(src, outIdx);
+  }
 
-	void inline cleanupData(/*int nstart, int nend, */int edgStart, int edgEnd) {
- /*    for (int j=nstart; j<nend; j++) {   
+  void inline cleanupData(/*int nstart, int nend, */int edgStart, int edgEnd) {
+  /*    for (int j=nstart; j<nend; j++) {   
        assert(j<nnodes);
        nodes[j].data.reset();
      }*/
     for (int j=edgStart; j<edgEnd; ++j) {
       assert(j<nedges);
-			edgeData[j].reset();
+      edgeData[j].reset();
     }
   }
  
-
   void checkClearEdges() {
-	for (int j=0; j<nedges; ++j) 
-      edgeData[j].checkClear(j);
+    for (int j=0; j<nedges; ++j) edgeData[j].checkClear(j);
   }
 
   void cleanupData() {
@@ -482,32 +381,34 @@ class BCGraph {
       edgeData[j].reset();
     }
   }
-/*
-	void cleanupDataOMP() {
-		#pragma omp parallel 
-		{
-			int nthreads = omp_get_num_threads();
-			std::cerr << "OMP Threads: " << nthreads << std::endl;
-			int end = nnodes;
-			int chunk = nnodes/nthreads;
-			#pragma omp for schedule(static, chunk) private(end)
-			for (int j=0; j<end; j++) { 
-				assert(j<nnodes);
-				nodes[j].data.reset();
-			}
-			int end2 = nedges;
-			int chunk1 = nedges/nthreads;
-			#pragma omp for schedule(static, chunk1) private(end2)
-			for (int k=0; k<end2; ++k) {
-				assert(k<nedges);
-				edgeData[k].reset();
-			}
-		}
-	}
-*/
+
+  /*
+  void cleanupDataOMP() {
+    #pragma omp parallel 
+    {
+      int nthreads = omp_get_num_threads();
+      std::cerr << "OMP Threads: " << nthreads << std::endl;
+      int end = nnodes;
+      int chunk = nnodes/nthreads;
+      #pragma omp for schedule(static, chunk) private(end)
+      for (int j=0; j<end; j++) { 
+        assert(j<nnodes);
+        nodes[j].data.reset();
+      }
+      int end2 = nedges;
+      int chunk1 = nedges/nthreads;
+      #pragma omp for schedule(static, chunk1) private(end2)
+      for (int k=0; k<end2; ++k) {
+        assert(k<nedges);
+        edgeData[k].reset();
+      }
+    }
+  }
+  */
+
   void toucDistGraph() {
-	int sum = 0;
-	for (int j=0; j<nnodes; j++) { 
+    int sum = 0;
+    for (int j=0; j<nnodes; j++) { 
       sum += nodes[j].data.id;
     }
 
@@ -517,57 +418,57 @@ class BCGraph {
   }
 
   void verify() {
-		double sampleBC = 0.0;
-		bool firstTime = true;
-		for (int i=0; i<nnodes; ++i) {
-			const ND & n = nodes[i].data;
-			if (firstTime) {
-				sampleBC = n.bc;
+    double sampleBC = 0.0;
+    bool firstTime = true;
+    for (int i=0; i<nnodes; ++i) {
+      const ND & n = nodes[i].data;
+      if (firstTime) {
+        sampleBC = n.bc;
         std::cerr << "BC: " << sampleBC << std::endl;
-				firstTime = false;
-			} else {
+        firstTime = false;
+      } else {
         if (!((n.bc - sampleBC) <= 0.0001)) 
           std::cerr << "Verification failed! " << (n.bc - sampleBC) << std::endl;
-				assert ((n.bc - sampleBC) <= 0.0001);
-			}
-		}
+        assert ((n.bc - sampleBC) <= 0.0001);
+      }
+    }
     std::cerr << "Verification ok!" << std::endl;
-	}
+  }
 
   void printBCs() {
     //for (int i=0; i<nnodes; ++i) {
-		int n = std::min(nnodes,10);
-		for (int i=0; i<n; ++i) {
+    int n = std::min(nnodes,10);
+    for (int i=0; i<n; ++i) {
       std::cerr << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
     }
   }
 
-	void printAllBCs(int numThreads, char *filename) {
-		std::cerr << "Writting out bc values...\n";
-		std::stringstream outfname;
-		outfname << filename << "_" << numThreads << ".txt";
-		std::string fname = outfname.str();
-		std::ofstream outfile(fname.c_str());
-		for (int i=0; i<nnodes; ++i) {
-			outfile << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
-		}
-		outfile.close();
-	}
+  void printAllBCs(int numThreads, char *filename) {
+    std::cerr << "Writting out bc values...\n";
+    std::stringstream outfname;
+    outfname << filename << "_" << numThreads << ".txt";
+    std::string fname = outfname.str();
+    std::ofstream outfile(fname.c_str());
+    for (int i=0; i<nnodes; ++i) {
+      outfile << i << " " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
+    }
+    outfile.close();
+  }
 
-	void printGraph() {
-		std::cerr << "Nodes: " << std::endl;
-		for (int i=0; i<nnodes; ++i) {
-			std::cerr << nodes[i].data.toString() << std::endl;
-		}
-		/*for (int i=0; i<nedges; ++i) {
+  void printGraph() {
+    std::cerr << "Nodes: " << std::endl;
+    for (int i=0; i<nnodes; ++i) {
+      std::cerr << nodes[i].data.toString() << std::endl;
+    }
+    /*for (int i=0; i<nedges; ++i) {
       std::cerr << i << " " ;
-			std::cerr << edgeData[i].toString() << std::endl;
-		}*/
-		/*for (int i=0; i<ninIdx; ++i) {
-			std::cerr << i << " " << inIdx[i] << std::endl;
-		}*/
+      std::cerr << edgeData[i].toString() << std::endl;
+    }*/
+    /*for (int i=0; i<ninIdx; ++i) {
+      std::cerr << i << " " << inIdx[i] << std::endl;
+    }*/
 
-	}
+  }
 
   void checkSteadyState2() {
     std::cerr << "Doing second set of checks on graph...\n";
@@ -623,19 +524,19 @@ class BCGraph {
       const ED & e = edgeData[ins[i]];
       const ND *nbr = e.src;
       if (nbr->distance + 1 == n->distance) {
-	      if (!n->predsContain(nbr)) {	
-        	std::cerr << "Preds Problem: " << n->id << " " << nbr->toString() << std::endl;
-		      assert (false);
-	      }
+        if (!n->predsContain(nbr)) {  
+          std::cerr << "Preds Problem: " << n->id << " " << nbr->toString() << std::endl;
+          assert (false);
+        }
         sigma += nbr->sigma;
       }
     }
     if (n != source) {
       if (sigma != n->sigma) {
-	  	std::cerr << "Problem with sigma " << n->toString() << " vs. " << sigma << std::endl;
-	  }	
-	  assert (sigma == n->sigma);// : "Sigma problem " + n + " " + sigma;
-	}
+        std::cerr << "Problem with sigma " << n->toString() << " vs. " << sigma << std::endl;
+      } 
+      assert (sigma == n->sigma);// : "Sigma problem " + n + " " + sigma;
+    }
   }
 };
 #endif

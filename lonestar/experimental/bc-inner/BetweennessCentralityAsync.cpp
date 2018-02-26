@@ -1,21 +1,37 @@
+/** Async Betweenness centrality Node  -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * Node for asynchrounous betweeness-centrality. 
+ *
+ * @author Dimitrios Prountzos <dprountz@cs.utexas.edu> (Main code writer)
+ * @author Loc Hoang <l_hoang@utexas.edu> (Cleanup)
+ */
+
 #include "galois/Galois.h"
-#include "galois/Timer.h"
-#include "galois/Timer.h"
-#include "galois/Bag.h"
-#include "galois/substrate/CacheLineStorage.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/tuple/tuple.hpp>
 
-#include <vector>
 #include <iostream>
 #include <fstream>
 #include <sstream>
-#include <map>
-#include <set>
-#include <list>
-#include <algorithm>
-#include <utility>
 
 #include "control.h"
 #include "ND.h"
@@ -23,13 +39,38 @@
 #include "BCGraph.h"
 #include "util.h"
 
-#define BUCKETSZ 1 
-#define GENERATE_CERTIFICATE 0
+////////////////////////////////////////////////////////////////////////////////
+// Command line parameters
+////////////////////////////////////////////////////////////////////////////////
 
-#define DBG_FRINGECNT 0
+namespace cll = llvm::cl;
 
-#define USE_NODE_BASED 1
-//#define INLINE_US 1
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input graph in Galois bin "
+                                                "format>"),
+                                      cll::Required);
+
+static cll::opt<unsigned int> startNode("startNode", 
+                                        cll::desc("Node to start search from"),
+                                        cll::init(0));
+
+// TODO better description
+static cll::opt<unsigned> buckets("buckets",
+                                  cll::desc("Number of buckets to use"),
+                                  cll::init(1));
+static cll::opt<bool> generateCert("generateCertificate",
+                                   cll::desc("Prints certificate at end of "
+                                             "execution"),
+                                   cll::init(false));
+// TODO better description
+static cll::opt<bool> useNodeBased("useNodeBased",
+                                  cll::desc("Use node based execution"),
+                                  cll::init(true));
+
+//#define DBG_FRINGECNT
+#define USE_NODE_BASED
+#define INLINE_US
+//#define COUNT_ACTIONS
 
 using namespace std;
 
@@ -37,19 +78,19 @@ using namespace std;
 
 int DEF_DISTANCE;
 
-BCGraph *  graph;
-ND * currSrcNode;
+BCGraph* graph;
+ND* currSrcNode;
 
-//#define COUNT_ACTIONS 1
 #ifdef COUNT_ACTIONS
-PerCPU<unsigned long> action1cnt ;
-PerCPU<unsigned long> action2cnt ;
-PerCPU<unsigned long> action2Excnt ;
-PerCPU<unsigned long> action3cnt ;
-PerCPU<unsigned long > action4cnt ;
-PerCPU<unsigned long> action555 ;
-PerCPU<unsigned long> actionNone;
-PerCPU<unsigned int> largestNodeDist;
+// TODO PerCPU doesn't exist anymore; fix it
+//PerCPU<unsigned long> action1cnt ;
+//PerCPU<unsigned long> action2cnt ;
+//PerCPU<unsigned long> action2Excnt ;
+//PerCPU<unsigned long> action3cnt ;
+//PerCPU<unsigned long > action4cnt ;
+//PerCPU<unsigned long> action555 ;
+//PerCPU<unsigned long> actionNone;
+//PerCPU<unsigned int> largestNodeDist;
 #endif
 
 #if MERGE_LOOPS
@@ -57,127 +98,133 @@ int curr_round = 0;
 #endif
 
 struct f2Item {
-//  public:
   bool isCleanup;
   ND *node;
   double d;
-
-//  f2Item(bool is, ND *nd, double _d) : isCleanup(is), node(nd), d(_d) {}
+  //f2Item(bool is, ND *nd, double _d) : isCleanup(is), node(nd), d(_d) {}
 };
 
 struct firstForEachNodeBased {
-
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_aborts;
-
   template<typename Context>
-    void  inline /*__attribute__((noinline))*/ operator()(ND* srcD, Context& ctx) {
+  void inline /*__attribute__((noinline))*/ operator()(ND* srcD, Context& ctx) {
+    int idx = srcD->id;
+    #if USE_MARKING
+    srcD->markOut();
+    #endif
+    //assert(idx <= nnodes-1);
 
-      int idx = srcD->id;
-#if USE_MARKING
-      srcD->markOut();
-#endif
-//      assert(idx <= nnodes-1);
-      int * outIdx = graph->outIdx;
-      int startE = outIdx[idx];
-      int endE = outIdx[idx + 1];
-      ED * edgeData = graph->edgeData;
-      for (int i = startE; i < endE; i++) {
-        ED & ed = edgeData[i];
-        ND * dstD = ed.dst;
-        
-        if (srcD == dstD) continue;
+    int* outIdx = graph->outIdx;
+    int startE = outIdx[idx];
+    int endE = outIdx[idx + 1];
+    ED* edgeData = graph->edgeData;
 
-        if (CONCURRENT) {
-          ND *loser, *winner;
-          if (srcD < dstD) { loser = srcD; winner = dstD;} 
-          else { loser = dstD; winner = srcD; }
-          loser->lock();
-          winner->lock();
+    // loop through all edges
+    for (int i = startE; i < endE; i++) {
+      ED& ed = edgeData[i];
+      ND* dstD = ed.dst;
+      
+      if (srcD == dstD) continue; // ignore self loops
+
+      // lock in set order to prevent deadlock (lower id first)
+      if (CONCURRENT) {
+        ND* loser;
+        ND* winner;
+
+        if (srcD < dstD) { 
+          loser = srcD; winner = dstD;
+        } else { 
+          loser = dstD; winner = srcD;
         }
-        const int elevel = ed.level;
-        ND * A = srcD; const int ADist = srcD->distance;
-        ND * B = dstD; const int BDist = dstD->distance;
 
-        if (BDist - ADist > 1) { // Rule 1 + Rule 3 combined
-#if COUNT_ACTIONS
-          action1cnt.get()++;
-#endif
-          if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
-          A->nsuccs++;
-          const double ASigma = A->sigma;
-          if (CONCURRENT) { A->unlock(); }
-          ND::predTY & Bpreds = B->preds;
-          bool bpredsNotEmpty = !Bpreds.empty();
-          //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::endl;
-          Bpreds.clear();
-          Bpreds.push_back(A);
-          B->distance = ADist + 1;
-          //int newBDist = ADist + 1;
-          B->nsuccs = 0;
-          B->sigma = ASigma;
-          ed.val = ASigma;
-          ed.level = ADist;
-          if (CONCURRENT) { B->unlock(); }
-#if USE_MARKING          
-          if (!B->isAlreadyIn()) 
-#endif
-            ctx.push(B);
-          if (bpredsNotEmpty) {
-            int idx = B->id;
-            int *inIdx = graph->inIdx;
-            int *ins = graph->ins; 
-            int startInE = inIdx[idx];
-            int endInE = inIdx[idx + 1];
-            for (int j = startInE; j < endInE; j++) {
-              ED & inE = edgeData[ins[j]];
-              ND *inNbr = inE.src;
-              if (inNbr == B) continue;
-              ND * aL;
-              ND *aW;
-              if (B < inNbr) { aL = B; aW = inNbr;} 
-              else { aL = inNbr; aW = B; }
-              aL->lock(); aW->lock();
-              const int elev = inE.level; 
-#if COUNT_ACTIONS
-              action4cnt.get()++;
-#endif
-              if (inNbr->distance >= B->distance) { // Rule 4
-                if (CONCURRENT) { B->unlock(); }
-                if (DBG) cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << endl;
-                if (elev != DEF_DISTANCE) {
-                  inE.level = DEF_DISTANCE;
-                  if (elev == inNbr->distance) {
-#if COUNT_ACTIONS
-                    action555.get()++;
-#endif
-                    inNbr->nsuccs--;
-                  }
+        loser->lock();
+        winner->lock();
+      }
+
+      const int elevel = ed.level;
+      ND *A = srcD;
+      const int ADist = srcD->distance;
+      ND *B = dstD;
+      const int BDist = dstD->distance;
+
+      if (BDist - ADist > 1) { // Rule 1 + Rule 3 combined
+        #if COUNT_ACTIONS
+        action1cnt.get()++;
+        #endif
+        if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+        A->nsuccs++;
+        const double ASigma = A->sigma;
+        if (CONCURRENT) { A->unlock(); }
+        ND::predTY & Bpreds = B->preds;
+        bool bpredsNotEmpty = !Bpreds.empty();
+        //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::endl;
+        Bpreds.clear();
+        Bpreds.push_back(A);
+        B->distance = ADist + 1;
+        //int newBDist = ADist + 1;
+        B->nsuccs = 0;
+        B->sigma = ASigma;
+        ed.val = ASigma;
+        ed.level = ADist;
+        if (CONCURRENT) { B->unlock(); }
+        #if USE_MARKING          
+        if (!B->isAlreadyIn()) 
+        #endif
+          ctx.push(B);
+        if (bpredsNotEmpty) {
+          int idx = B->id;
+          int *inIdx = graph->inIdx;
+          int *ins = graph->ins; 
+          int startInE = inIdx[idx];
+          int endInE = inIdx[idx + 1];
+          for (int j = startInE; j < endInE; j++) {
+            ED & inE = edgeData[ins[j]];
+            ND *inNbr = inE.src;
+            if (inNbr == B) continue;
+            ND * aL;
+            ND *aW;
+            if (B < inNbr) { aL = B; aW = inNbr;} 
+            else { aL = inNbr; aW = B; }
+            aL->lock(); aW->lock();
+            const int elev = inE.level; 
+            #if COUNT_ACTIONS
+            action4cnt.get()++;
+            #endif
+            if (inNbr->distance >= B->distance) { // Rule 4
+              if (CONCURRENT) { B->unlock(); }
+              if (DBG) cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << endl;
+              if (elev != DEF_DISTANCE) {
+                inE.level = DEF_DISTANCE;
+                if (elev == inNbr->distance) {
+                  #if COUNT_ACTIONS
+                  action555.get()++;
+                  #endif
+                  inNbr->nsuccs--;
                 }
-                if (CONCURRENT) { inNbr->unlock(); }
-              } else { aL->unlock(); aW->unlock(); }
-            }
+              }
+              if (CONCURRENT) { inNbr->unlock(); }
+            } else { aL->unlock(); aW->unlock(); }
           }
-        } else if (elevel == ADist && BDist == ADist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-#if COUNT_ACTIONS
-          action2cnt.get()++;
-#endif
-          if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
-          const double ASigma = A->sigma;
-          const double eval = ed.val;
-          const double diff = ASigma - eval;
-          bool BSigmaChanged = diff >= 0.00001;
-          if (CONCURRENT) { A->unlock(); }
-          if (BSigmaChanged) {
-#if COUNT_ACTIONS
-          action2Excnt.get()++;
-#endif
-            ed.val = ASigma;
-            B->sigma += diff;
-            int nbsuccs = B->nsuccs;
-            if (CONCURRENT) { B->unlock(); }
-            if (nbsuccs > 0) {
-#ifdef INLINE_US
+        }
+      } else if (elevel == ADist && BDist == ADist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
+        #if COUNT_ACTIONS
+        action2cnt.get()++;
+        #endif
+        if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+        const double ASigma = A->sigma;
+        const double eval = ed.val;
+        const double diff = ASigma - eval;
+        bool BSigmaChanged = diff >= 0.00001;
+        if (CONCURRENT) { A->unlock(); }
+        if (BSigmaChanged) {
+        #if COUNT_ACTIONS
+        action2Excnt.get()++;
+        #endif
+          ed.val = ASigma;
+          B->sigma += diff;
+          int nbsuccs = B->nsuccs;
+          if (CONCURRENT) { B->unlock(); }
+          if (nbsuccs > 0) {
+              #ifdef INLINE_US
               int idx = B->id;
               int startE = outIdx[idx];
               int endE = outIdx[idx + 1];
@@ -211,9 +258,9 @@ struct firstForEachNodeBased {
                   int ncsuccs = C->nsuccs;
                   if (CONCURRENT) { C->unlock(); }
                   if (ncsuccs > 0)
-#if USE_MARKING
+                    #if USE_MARKING
                     if (!C->isAlreadyIn()) 
-#endif
+                    #endif
                       ctx.push(C);
                 } else {
                   B->unlock(); C->unlock();
@@ -236,7 +283,7 @@ struct firstForEachNodeBased {
           // Test taking it out
           //const bool AnotPredOfB = !B->predsContain(A);
           //if (!AnotPredOfB) {
-          //	cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
+          //  cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
           //}
           //if (AnotPredOfB) {
           A->nsuccs++;
@@ -333,53 +380,53 @@ struct firstForEachNodeBased {
 };
 
 struct firstForEach {
-	template<typename Context>
-	void  inline /*__attribute__((noinline))*/ operator()(ED* ed, Context& ctx) {
+  template<typename Context>
+  void inline /*__attribute__((noinline))*/ operator()(ED* ed, Context& ctx) {
     //itersOfFirstBody++;
-		ND * srcD = ed->src;
-		ND * dstD = ed->dst;
-//		ed->markOut();
-		
+    ND * srcD = ed->src;
+    ND * dstD = ed->dst;
+//    ed->markOut();
+    
     
     assert(srcD->id >= 0 && srcD->id < graph->size());
     assert(dstD->id >= 0 && dstD->id < graph->size());
 
     if (CONCURRENT) {
-			ND *loser, *winner;
-			if (srcD/*->id*/ < dstD/*->id*/) {
-				//srcD->lock();
-				//dstD->lock();
-				loser = srcD;
-				winner = dstD;
-			} else {
-				loser = dstD;
-				winner = srcD;
-				//dstD->lock();
-				//srcD->lock();
-			}
-			loser->lock();
-			winner->lock();
-		}
-		//if (DBG) System.err.println("Extracted " + srcD + "bbbbb " + dstD);
-		const int srcdist = srcD->distance;
-		const int dstdist = dstD->distance;
-		const int elevel = ed->level;
+      ND *loser, *winner;
+      if (srcD/*->id*/ < dstD/*->id*/) {
+        //srcD->lock();
+        //dstD->lock();
+        loser = srcD;
+        winner = dstD;
+      } else {
+        loser = dstD;
+        winner = srcD;
+        //dstD->lock();
+        //srcD->lock();
+      }
+      loser->lock();
+      winner->lock();
+    }
+    //if (DBG) System.err.println("Extracted " + srcD + "bbbbb " + dstD);
+    const int srcdist = srcD->distance;
+    const int dstdist = dstD->distance;
+    const int elevel = ed->level;
     
-		//System.err.println(srcD + " |||| " + dstD );
+    //System.err.println(srcD + " |||| " + dstD );
 
     if (srcdist >= dstdist) { // Rule 4
       if (CONCURRENT) { dstD->unlock(); }
 #ifdef COUNT_ACTIONS
-		action4cnt.get()++;
+    action4cnt.get()++;
 #endif
       if (DBG) cerr << "Rule 4 (" << srcD->toString() << " ||| " << dstD->toString() << ")" << elevel << endl;
       if (elevel != DEF_DISTANCE /*&& elevel == srcdist*/) {
         ed->level = DEF_DISTANCE;
         if (elevel == srcdist 
 #if MERGE_LOOPS 
-						&& ed->cnt == curr_round
+            && ed->cnt == curr_round
 #endif
-						) { 
+            ) { 
           srcD->nsuccs--;
 #ifdef COUNT_ACTIONS
 //        std::cerr << "Got one \n";
@@ -387,61 +434,61 @@ struct firstForEach {
 #endif
 
 #if MERGE_LOOPS
-					ed->cnt = curr_round;
+          ed->cnt = curr_round;
 #endif
-				}
+        }
       }
       //ed->level = DEF_DISTANCE;
       if (CONCURRENT) { srcD->unlock(); }
       return;
     }
 
-		// From this point on srcdist < dstdist, set A to be the
-		// lower level node and B to be the higher level node
-		ND * A = srcD; const int ADist = srcdist;
-		ND * B = dstD; const int BDist = dstdist;
-		// That is BDist >= ADist + 1
+    // From this point on srcdist < dstdist, set A to be the
+    // lower level node and B to be the higher level node
+    ND * A = srcD; const int ADist = srcdist;
+    ND * B = dstD; const int BDist = dstdist;
+    // That is BDist >= ADist + 1
 
     if (BDist - ADist >= 2) { // Rule 1 + Rule 3 combined
 #ifdef COUNT_ACTIONS
-		action1cnt.get()++;
+    action1cnt.get()++;
 #endif
       if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
       A->nsuccs++;
       const double ASigma = A->sigma;
       if (CONCURRENT) { A->unlock(); }
-			
-	  		ND::predTY & Bpreds = B->preds;
-	  		bool bpredsNotEmpty = !Bpreds.empty();
-			//Bpreds.clear();
-			Bpreds.clear();//resize(0);
-			Bpreds.push_back(A);
-			B->distance = ADist + 1;
-			//int newBDist = ADist + 1;
+      
+        ND::predTY & Bpreds = B->preds;
+        bool bpredsNotEmpty = !Bpreds.empty();
+      //Bpreds.clear();
+      Bpreds.clear();//resize(0);
+      Bpreds.push_back(A);
+      B->distance = ADist + 1;
+      //int newBDist = ADist + 1;
 #ifdef COUNT_ACTIONS
-			if (BDist > largestNodeDist.get())
-				largestNodeDist.get() = B->distance;
+      if (BDist > largestNodeDist.get())
+        largestNodeDist.get() = B->distance;
 #endif
-			B->nsuccs = 0;
-			B->sigma = ASigma;
-			ed->val = ASigma;
-			ed->level = ADist;
+      B->nsuccs = 0;
+      B->sigma = ASigma;
+      ed->val = ASigma;
+      ed->level = ADist;
 #if MERGE_LOOPS
-			ed->cnt = curr_round;
+      ed->cnt = curr_round;
 #endif
-			if (CONCURRENT) { B->unlock(); }
-			//if (BDist != Util.infinity)
-			if (bpredsNotEmpty) 
-				graph->addInEdgesToWL(B,/* BDist,*/ ctx, ed);
-			//addInEdgesToWL(B, ed, ctx);
-			//addInNeighborsToWL(B, A, ctx);
-			graph->addOutEdgesToWL(B, /*newBDist,*/ ctx);
-			return;
+      if (CONCURRENT) { B->unlock(); }
+      //if (BDist != Util.infinity)
+      if (bpredsNotEmpty) 
+        graph->addInEdgesToWL(B,/* BDist,*/ ctx, ed);
+      //addInEdgesToWL(B, ed, ctx);
+      //addInNeighborsToWL(B, A, ctx);
+      graph->addOutEdgesToWL(B, /*newBDist,*/ ctx);
+      return;
     } else if (elevel == ADist
 #if MERGE_LOOPS
-				&& ed->cnt == curr_round
+        && ed->cnt == curr_round
 #endif
-				) { // Rule 2: BDist = ADist + 1 and elevel = ADist
+        ) { // Rule 2: BDist = ADist + 1 and elevel = ADist
 #ifdef COUNT_ACTIONS
       action2cnt.get()++;
 #endif
@@ -449,58 +496,58 @@ struct firstForEach {
       const double ASigma = A->sigma;
       const double eval = ed->val;
       const double diff = ASigma - eval;
-			bool BSigmaChanged = diff >= 0.00001;
-			if (CONCURRENT) { A->unlock(); }
-			if (BSigmaChanged) {
-				ed->val = ASigma;
+      bool BSigmaChanged = diff >= 0.00001;
+      if (CONCURRENT) { A->unlock(); }
+      if (BSigmaChanged) {
+        ed->val = ASigma;
 #if MERGE_LOOPS
-			  ed->cnt = curr_round;
+        ed->cnt = curr_round;
 #endif
-				B->sigma += diff;
-				int nbsuccs = B->nsuccs;
-				if (CONCURRENT) { B->unlock(); }
-				if (nbsuccs > 0)
-					graph->addOutEdgesToWL(B, /*BDist,*/ ctx);
-			} else {
-				//if (CONCURRENT) { A->unlock(); }
-				if (CONCURRENT) { B->unlock(); }
-			}
-			return;
-		} else {  // Rule 3 // BDist = ADist + 1 and elevel != ADist
+        B->sigma += diff;
+        int nbsuccs = B->nsuccs;
+        if (CONCURRENT) { B->unlock(); }
+        if (nbsuccs > 0)
+          graph->addOutEdgesToWL(B, /*BDist,*/ ctx);
+      } else {
+        //if (CONCURRENT) { A->unlock(); }
+        if (CONCURRENT) { B->unlock(); }
+      }
+      return;
+    } else {  // Rule 3 // BDist = ADist + 1 and elevel != ADist
 #ifdef COUNT_ACTIONS
-			action3cnt.get()++;
+      action3cnt.get()++;
 #endif
-			// Test taking it out
-			//const bool AnotPredOfB = !B->predsContain(A);
-			//if (!AnotPredOfB) {
-			//	cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
-			//}
-			//if (AnotPredOfB) {
-				A->nsuccs++;
-			//}
-			const double ASigma = A->sigma;
-			if (CONCURRENT) { A->unlock(); }
+      // Test taking it out
+      //const bool AnotPredOfB = !B->predsContain(A);
+      //if (!AnotPredOfB) {
+      //  cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
+      //}
+      //if (AnotPredOfB) {
+        A->nsuccs++;
+      //}
+      const double ASigma = A->sigma;
+      if (CONCURRENT) { A->unlock(); }
 
-			//if (AnotPredOfB) {
-				B->preds.push_back(A);
-			//}
-			const double BSigma = B->sigma;
+      //if (AnotPredOfB) {
+        B->preds.push_back(A);
+      //}
+      const double BSigma = B->sigma;
       if (DBG) { cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
       B->sigma = BSigma + ASigma;
-			ed->val = ASigma;
-			ed->level = ADist;
+      ed->val = ASigma;
+      ed->level = ADist;
 #if MERGE_LOOPS
-			ed->cnt = curr_round;
+      ed->cnt = curr_round;
 #endif
-			int nbsuccs = B->nsuccs;
-			if (CONCURRENT) { B->unlock(); }
-			const bool BSigmaChanged = ASigma >= 0.00001;
-			if (nbsuccs > 0 && BSigmaChanged) {
-				graph->addOutEdgesToWL(B, /*BDist,*/ ctx);
-			}
-			return;
-		}
-	}
+      int nbsuccs = B->nsuccs;
+      if (CONCURRENT) { B->unlock(); }
+      const bool BSigmaChanged = ASigma >= 0.00001;
+      if (nbsuccs > 0 && BSigmaChanged) {
+        graph->addOutEdgesToWL(B, /*BDist,*/ ctx);
+      }
+      return;
+    }
+  }
 };
 
 //namespace galois {
@@ -509,9 +556,8 @@ struct firstForEach {
 //}
 
 struct secondForEach {
-
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_aborts;
+  //typedef int tt_does_not_need_stats;
+  //typedef int tt_does_not_need_aborts;
 
   template<typename Context>
     void inline /*__attribute__((noinline))*/ operator()(ND *A, Context& ctx) {
@@ -548,7 +594,7 @@ struct secondForEach {
             if (CONCURRENT) { pd->unlock(); }
           }
         }
-				A->reset();
+        A->reset();
         graph->resetOutEdges(A);
 //        if (A == currSrcNode) {
 //          std::cerr << "Clean src\n";
@@ -562,9 +608,8 @@ struct secondForEach {
 };
 
 struct secondForEachWithInline {
-
-  typedef int tt_does_not_need_stats;
-  typedef int tt_does_not_need_aborts;
+  //typedef int tt_does_not_need_stats;
+  //typedef int tt_does_not_need_aborts;
 
   template<typename Context>
     void inline operator()(f2Item tt, Context& ctx) {
@@ -624,7 +669,7 @@ struct secondForEachWithInline {
                     ctx.push(f);
                   } 
                 }
-				        pd2->reset();
+                pd2->reset();
                 //ctx.push(f2Item(true,pd2,0));
                 f2Item f = {true,pd2,0};
                 ctx.push(f);
@@ -634,7 +679,7 @@ struct secondForEachWithInline {
                 if (CONCURRENT) { pd2->unlock(); }
               }
             }
-				    pd->reset();
+            pd->reset();
             //ctx.push(f2Item(true,pd,0));
             f2Item f = {true,pd,0};
             ctx.push(f);
@@ -644,7 +689,7 @@ struct secondForEachWithInline {
             if (CONCURRENT) { pd->unlock(); }
           }
         }
-				A->reset();
+        A->reset();
         graph->resetOutEdges(A);
 
 //      } else {
@@ -672,7 +717,7 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
   int eChunkSize = nedges / (numThreads);
 
   //if (DBG) {
-  	cerr << "nChunkSize: " << nChunkSize << " EChunkSize: " << eChunkSize << " nnodes: " << nnodes << " nedges: " << nedges << " numThreads: " << numThreads << endl;
+    cerr << "nChunkSize: " << nChunkSize << " EChunkSize: " << eChunkSize << " nnodes: " << nnodes << " nedges: " << nedges << " numThreads: " << numThreads << endl;
   //}
   for (int i=0; i<numThreads; ++i) {
     int start = nChunkSize * i;
@@ -681,7 +726,7 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
       end = max(start+nChunkSize, nnodes);
     else
       end = min(start+nChunkSize, nnodes);
-	if (DBG) { cerr << "Node cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
+  if (DBG) { cerr << "Node cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
     nodeArrayRanges.push_back(std::make_pair(start, end));
     start = eChunkSize * i;
     if (i==numThreads-1)
@@ -689,18 +734,18 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
     else
       end = min(start+eChunkSize, nedges);
     edgeArrayRanges.push_back(std::make_pair(start, end));
-	if (DBG) { cerr << "Edge cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
+  if (DBG) { cerr << "Edge cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
     workChunks.push_back(i);
   }
 }
 
 struct RevNodeIndexer : std::binary_function<ND*, int, int> {
-	int operator() (const ND *val) const {
-		return 20-val->distance;
-	}
+  int operator() (const ND *val) const {
+    return 20-val->distance;
+  }
 };
 
-#if DBG_FRINGECNT
+#ifdef DBG_FRINGECNT
 PerCPU<int> fringeCnts;
 #endif
 
@@ -718,83 +763,83 @@ galois::substrate::CacheLineStorage<ND> *gnodes;
 //    #pragma omp for schedule(guided, 5)
 //    for (lcnt=0; lcnt<gsize; ++lcnt) {
 //      ND *n = graph->getNode(lcnt);
-//			if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-//#if DBG_FRINGECNT
-//				fringeCnts.get()++;
+//      if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
+//#ifdef DBG_FRINGECNT
+//        fringeCnts.get()++;
 //#endif
 //        f2Item f = {false,n,n->delta};
-//				fringeBuffs[_tid_].push_back(f);
+//        fringeBuffs[_tid_].push_back(f);
 ////        fringewl->push(f2Item(false,n,n->delta));
-//			}
+//      }
 //    }
 //  }
 //}
 
 struct fringeFindDOALL {
-	void inline operator()(int i,int) {
+  void inline operator()(int i,int) {
     std::pair<int,int> p1 = nodeArrayRanges[i];
-		int start = p1.first;
-		int end = p1.second;
-		for (int j=start; j<end; ++j) {
-			ND * n = &(gnodes[j].data);
-			if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#if DBG_FRINGECNT
-				fringeCnts.get()++;
+    int start = p1.first;
+    int end = p1.second;
+    for (int j=start; j<end; ++j) {
+      ND * n = &(gnodes[j].data);
+      if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
+#ifdef DBG_FRINGECNT
+        fringeCnts.get()++;
 #endif
-//				fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
+//        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
 //        fringewl->push(f2Item(false,n,n->delta));
 
 //        f2Item f = {false, n, n->delta};
 //        fringewl->push(f);//2Item(false,n,n->delta));
-			}
-		}
-	}
+      }
+    }
+  }
 };
 
 struct fringeFindDOALL2 {
-	void inline operator()(int i,int) {
+  void inline operator()(int i,int) {
     std::pair<int,int> p1 = nodeArrayRanges[i];
-		int start = p1.first;
-		int end = p1.second;
-		for (int j=start; j<end; ++j)
+    int start = p1.first;
+    int end = p1.second;
+    for (int j=start; j<end; ++j)
     operator()(j);
   }
 
   void operator()(int j)
     {
-			ND * n = &(gnodes[j].data);
-			if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#if DBG_FRINGECNT
-				fringeCnts.get()++;
+      ND * n = &(gnodes[j].data);
+      if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
+#ifdef DBG_FRINGECNT
+        fringeCnts.get()++;
 #endif
-//				fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
+//        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
 //f2Item f = {false, n, n->delta};
 //        fringewl->push(f);//2Item(false,n,n->delta));
-			}
-		}
+      }
+    }
 };
 
 struct fringeFindDOALL2NoInline {
   void operator()(int i,int) const {
     std::pair<int,int> p1 = nodeArrayRanges[i];
-		int start = p1.first;
-		int end = p1.second;
-		for (int j=start; j<end; ++j)
+    int start = p1.first;
+    int end = p1.second;
+    for (int j=start; j<end; ++j)
     operator()(j);
   }
 
   void operator()(int j) const
     {
-			ND * n = &(gnodes[j].data);
-			if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#if DBG_FRINGECNT
-				fringeCnts.get()++;
+      ND * n = &(gnodes[j].data);
+      if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
+#ifdef DBG_FRINGECNT
+        fringeCnts.get()++;
 #endif
-//				fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
-    				
+//        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
+            
         fringewl->push(n);
-			}
-		}
+      }
+    }
 };
 
 
@@ -835,104 +880,70 @@ struct cleanupGraphDOALL {
 };
 
 struct EdgeIndexer : std::binary_function<ED*, int, int> {
-	int operator() (const ED *val) const {
-	//	return val->level / BUCKETSZ;
-		return val->src->distance /*/ BUCKETSZ*/;
-	}
+  int operator() (const ED *val) const {
+  //  return val->level / buckets;
+    return val->src->distance /*/ buckets*/;
+  }
 };
 
 struct NodeIndexer : std::binary_function<ND*, int, int> {
-	int operator() (const ND *val) const {
-	//	return val->level / BUCKETSZ;
-		return val->distance /*/ BUCKETSZ*/;
-	}
+  int operator() (const ND *val) const {
+  //  return val->level / buckets;
+    return val->distance /*/ buckets*/;
+  }
 };
 /*
 struct f2ItemIndexer : std::binary_function<f2Item, int, int> {
-	int operator() (const f2Item tt) const {
+  int operator() (const f2Item tt) const {
     return tt.pr;
-	//	return val->level / BUCKETSZ;
-	//	return val->distance / BUCKETSZ;
-	}
+  //  return val->level / buckets;
+  //  return val->distance / buckets;
+  }
 };
 */
 
 struct EdgeIndexer22 : std::binary_function<ED*, int, int> {
-	int operator() (const ED *val) const {
-		//return val->level / BUCKETSZ;
-		return val->src->id / BUCKETSZ;
-	}
+  int operator() (const ED *val) const {
+    //return val->level / buckets;
+    return val->src->id / buckets;
+  }
 };
 
 struct EdgeIndexer2 : std::binary_function<ED*, int, int> {
-	int operator() (const ED *val) const {
-		//return -graph->inNeighborsSize(val->src);
-		return val->src->distance < val->dst->distance ? 0 : 1;// / BUCKETSZ;
-	}
+  int operator() (const ED *val) const {
+    //return -graph->inNeighborsSize(val->src);
+    return val->src->distance < val->dst->distance ? 0 : 1;// / buckets;
+  }
 };
 
 
-// input: ("rmat"|"snap") <filename>
-
-namespace cll = llvm::cl;
- 
-static cll::opt<std::string> mode(
-    cll::Positional,
-    cll::desc("Choose a graph type:"),
-    cll::Required);
-   
-
-static cll::opt<std::string> filename(cll::Positional,
-    cll::desc("<input file>"),
-    cll::Required);
-
-static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
-
-
 static const char* name = "Betweenness Centrality";
-static const char* desc = "Computes betwenness centrality in an unweighted graph";
-
+static const char* desc = "Computes betwenness centrality in an unweighted "
+                          "graph";
 
 int main(int argc, char** argv) {
-   galois::StatManager statManager;
-   LonestarStart(argc, argv, name, desc, NULL);
+  galois::SharedMemSys G;
+  LonestarStart(argc, argv, name, desc, NULL);
 
-#if CONCURRENT
-  cerr << "Running in concurrent mode " << numThreads << endl;
-#else
-  cerr << "Running in serial mode" << endl;
-#endif
-//	std::vector<const char*> args = parse_command_line(argc, argv, help);
-  int nnodes, nedges; 
-  if (std::string("bin").compare(mode) == 0) {
-    graph = new BCGraph(filename.c_str());
-    nnodes = graph->size();
-    nedges = graph->getNedges();
-    cerr << "NNODES " << nnodes << " NEDGES " << nedges << endl;
+  if (CONCURRENT) {
+    galois::gInfo("Running in concurrent mode with ", numThreads);
   } else {
-    boost::tuple<int, int, map<int, set<int>*>*, map<int, set<int>*>*> p;
-    if (std::string("rmat").compare(mode) == 0) {
-      p = readGraph(filename.c_str());
-    } else if (std::string("snap").compare(mode) == 0) {
-      p = readSnapDirectedGraph(filename.c_str());
-    } else if (std::string("rand").compare(mode) == 0) {
-      p = readRandomGraph(filename.c_str());
-    }
-    map<int, set<int>*>* outnbrs = p.get<2>();
-    map<int, set<int>*>* innbrs = p.get<3>();
-    nnodes = p.get<0>();
-    nedges = p.get<1>();
-    graph = new BCGraph(nnodes, nedges, *outnbrs, *innbrs);
-    freeData(outnbrs, innbrs);
+    galois::gInfo("Running in serial mode");
   }
-	
-  cerr << "Bucket size: " << BUCKETSZ << endl;
-//  galois::setMaxThreads(numThreads);
- 	cerr << "numThreads " << numThreads << endl; 
-	//omp_set_num_threads(numThreads);
+
+  graph = new BCGraph(filename.c_str());
+  unsigned nnodes = graph->size();
+  unsigned nedges = graph->getNedges();
+  galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
+
+  DEF_DISTANCE = nnodes * 2;
+  
+  galois::gInfo("Bucket size ", buckets);
+  galois::gInfo("Num threads is ", numThreads);
+
   createCleanupChunks(nnodes, nedges, numThreads);
 
-	gnodes = graph->getNodes();
+  gnodes = graph->getNodes();
   //firstForEach feach1;
   firstForEachNodeBased feach1NodeBased;
   //secondForEachWithInline feach2;
@@ -950,17 +961,14 @@ int main(int argc, char** argv) {
   galois::TimeAccumulator fourthLoopTimer;
   galois::TimeAccumulator totalTimer;
   
-	galois::TimeAccumulator intCapTimer;	
+  galois::TimeAccumulator intCapTimer;  
   intCapTimer.start();
-	//#if CONCURRENT
-	//	Galoisruntime::for_all_parallel(setPredCapacitiesloop);
-	//#else
-	graph->fixNodePredsCapacities();
-	//#endif	
-	intCapTimer.stop();
-	std::cerr << " INIT CAP : " << intCapTimer.get() << endl;
+  graph->fixNodePredsCapacities();
+  intCapTimer.stop();
 
-#ifdef COUNT_ACTIONS
+  std::cerr << " INIT CAP : " << intCapTimer.get() << endl;
+
+  #ifdef COUNT_ACTIONS
   action1cnt.get() = 0; 
   action2cnt.get() = 0; 
   action2Excnt.get() = 0; 
@@ -969,38 +977,40 @@ int main(int argc, char** argv) {
   action555.get() = 0;
   actionNone.get() = 0;
   largestNodeDist.get() = 0;
-#endif
+  #endif
 
-#if CONCURRENT
+  #if CONCURRENT
   //Galoisruntime::worklists::OrderByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::worklists::ChunkedFIFO<ED*, 16, true>, true> wl2;
   
   // FOR RMAT25, RAND26 55
-#if USE_NODE_BASED
+  #ifdef USE_NODE_BASED
   // for rmat25 chz = 4, dcl, back : cdl16
   // new regime: rmat25 dcf4, dcl8  //same dcl8, dcl16
   // new regime: rand26 dcl4, dcl16, ///better dcl32, dcl16
   const int chunksize = 8;
   std::cerr << "Using chunk size : " << chunksize << std::endl;
-  typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
+  typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
+                                                    galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
   //typedef Galoisruntime::worklists::ChunkedFIFO<chunksize, ND*, true> wl2ty;
   galois::InsertBag<ND*> wl2;
-#else
-//  const int chunksize = 64;
-//  std::cerr << "Using chunk size : " << chunksize << std::endl;
-//  typedef Galoisruntime::worklists::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::worklists::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
-//  Galoisruntime::galois_insert_bag<ED*> wl2;
-#endif
+  #else
+  //const int chunksize = 64;
+  //std::cerr << "Using chunk size : " << chunksize << std::endl;
+  //typedef Galoisruntime::worklists::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::worklists::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
+  //Galoisruntime::galois_insert_bag<ED*> wl2;
+  #endif
   //Galoisruntime::worklists::OrderedByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::worklists::dChunkedFIFO<ED*, 64, true>, true> wl2;
   typedef galois::worklists::dChunkedLIFO<16> wl4ty;  
   //typedef Galoisruntime::worklists::dChunkedLIFO<16, ND*,  true> wl4ty;  
   //typedef Galoisruntime::worklists::OrderedByIntegerMetric<f2ItemIndexer, Galoisruntime::worklists::dChunkedLIFO<32, f2Item, true>, true, f2Item, true> wl4ty;
   galois::InsertBag<ND*> wl4;
-	fringewl = &wl4;
-//  Galoisruntime::worklists::FIFO<int,  true> wl5;
-#else
+  fringewl = &wl4;
+  //Galoisruntime::worklists::FIFO<int,  true> wl5;
+  #else 
+  // not CONCURRENT
   galois::worklists::GFIFO<ED*, false> wl2;
   galois::worklists::GFIFO<ND*, false> wl4;
-#endif
+  #endif 
 
 //  for (int kk=0; kk<numThreads; ++kk) {
 //    std::vector<f2Item> & abuff = fringeBuffs.get(kk);
@@ -1009,58 +1019,70 @@ int main(int argc, char** argv) {
 //  galois::Statistic("Mem1", Galoisruntime::MM::pageAllocInfo());
 //  galois::preAlloc(6000);
 //  galois::Statistic("Mem2", Galoisruntime::MM::pageAllocInfo());
-	//cerr << "OMP Threads: " << omp_get_num_threads() << endl;
+  //cerr << "OMP Threads: " << omp_get_num_threads() << endl;
   galois::StatTimer T;
   T.start();
   totalTimer.start();
-	for (int i=startNode; i<nnodes; ++i) {
+  for (int i=startNode; i<nnodes; ++i) {
 //    galois::Statistic("Mem3", Galoisruntime::MM::pageAllocInfo());
   
-		ND * active = &(gnodes[i].data);
+    ND* active = &(gnodes[i].data);
     currSrcNode = active;
-		int nnbrs = graph->outNeighborsSize(active);
-		if (nnbrs == 0) {
-			continue;
-		}
+    int nnbrs = graph->outNeighborsSize(active);
+    if (nnbrs == 0) {
+      continue;
+    }
+
+    galois::do_all(
+      galois::iterate(0u, nnodes),
+      [&] (auto j) {
+        if (j != i) {
+          (gnodes[j].data).reset();
+        }
+      }
+    );
     
     stepCnt++;
-   if (stepCnt >= 2) break;
+    //if (stepCnt >= 2) break;  // ie only do 1 source
 
-#if MERGE_LOOPS		
-	 curr_round++;
+#if MERGE_LOOPS   
+   curr_round++;
 #endif
 
-		//std::list<ED*> wl;
-#if USE_NODE_BASED
+    //std::list<ED*> wl;
+#ifdef USE_NODE_BASED
          std::vector<ND*>  wl;
     wl2.push_back(active);
 #else
-		std::vector<ED*> wl;
-		graph->initWLToOutEdges(active, wl2);
+    std::vector<ED*> wl;
+    graph->initWLToOutEdges(active, wl2);
 #endif
-//		wl2.fill_initial(wl.begin(), wl.end());
+//    wl2.fill_initial(wl.begin(), wl.end());
     active->initAsSource();
     { cerr << "Source is " << active->toString() << endl; } 
     if (DBG) { cerr << "Source is " << active->toString() << endl; } 
     //graph->checkClearEdges();
 //__itt_resume();
     firstLoopTimer.start();
-#if USE_NODE_BASED
+#ifdef USE_NODE_BASED
 
 #if CONCURRENT
-    galois::for_each(wl2.begin(), wl2.end(), feach1NodeBased, galois::wl<wl2ty>());
+    galois::for_each(galois::iterate(wl2.begin(), wl2.end()), 
+                     feach1NodeBased, galois::wl<wl2ty>());
+    //galois::for_each(galois::iterate(wl2.begin(), wl2.end()), 
+    //                 feach1NodeBased, galois::wl<wl2ty>());
     wl2.clear();
-//		galois::for_each<wl2ty>(active, feach1NodeBased);
+//    galois::for_each<wl2ty>(active, feach1NodeBased);
 #else
-	Timer tt;
-		tt.start();
+  Timer tt;
+    tt.start();
 
-	while (!wl2.empty()) {
+  while (!wl2.empty()) {
       Nd *nn = wl2.pop().second;
       feach1NodeBased(nn, wl2);
     }
-	tt.stop();
-	cerr << "tt " << tt.get() << endl;
+  tt.stop();
+  cerr << "tt " << tt.get() << endl;
 
 #endif
 
@@ -1073,87 +1095,88 @@ int main(int argc, char** argv) {
     firstLT.stop();
     std::cerr << "FLTime: " << firstLT.get() << std::endl;
 #else
-	Timer tt;
-		tt.start();
+  Timer tt;
+    tt.start();
 
-	while (!wl2.empty()) {
+  while (!wl2.empty()) {
       ED *ee = wl2.pop().second;
       feach1(ee, wl2);
     }
-	tt.stop();
-	cerr << "tt " << tt.get() << endl;
+  tt.stop();
+  cerr << "tt " << tt.get() << endl;
 
 #endif
 
 #endif
     firstLoopTimer.stop();
 //__itt_pause();
-		if (DOCHECKS) graph->checkGraph(active);
+    if (DOCHECKS) graph->checkGraph(active);
 
     secondLoopTimer.start();
-#if DBG_FRINGECNT
-		int fringeCnt = 0;
+#ifdef DBG_FRINGECNT
+    int fringeCnt = 0;
 #endif
 #if CONCURRENT
 
-#if DBG_FRINGECNT
-	for (int kk=0; kk<numThreads; ++kk) {
-		fringeCnts.get(kk) = 0;
-	}
+#ifdef DBG_FRINGECNT
+  for (int kk=0; kk<numThreads; ++kk) {
+    fringeCnts.get(kk) = 0;
+  }
 #endif
-	//Galoisruntime::for_all_parallel(findFringe);
+  //Galoisruntime::for_all_parallel(findFringe);
 //  fringeFindOMP();
 //  galois::on_each(findFringe);
 //__itt_resume();
-  galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nnodes), findFringe);
+  galois::do_all(galois::iterate(0u, nnodes), findFringe);
 //  __itt_pause();
-//	for (int kk=0; kk<numThreads; ++kk) {
+//  for (int kk=0; kk<numThreads; ++kk) {
 //    std::vector<f2Item> & abuff = fringeBuffs.get(kk);
 //    std::vector<f2Item>::const_iterator it = abuff.begin();
 //    std::vector<f2Item>::const_iterator itend = abuff.end();
 //    while (it != itend) {
-//		  fringewl->push_back(*it);
+//      fringewl->push_back(*it);
 //      it++;
 //    }
 //    std::cerr << "buff " << kk << " size " << abuff.size() << "\n";
 //    abuff.clear();
 //  }
-#if DBG_FRINGECNT
-	for (int kk=0; kk<numThreads; ++kk) {
-		int tmp = fringeCnts.get(kk);
-		fringeCnts.get(kk) = 0;
-		fringeCnt += tmp;
-	}
+#ifdef DBG_FRINGECNT
+  for (int kk=0; kk<numThreads; ++kk) {
+    int tmp = fringeCnts.get(kk);
+    fringeCnts.get(kk) = 0;
+    fringeCnt += tmp;
+  }
 #endif
 
 #else
-		//std::list<ND*> wl3;
-		for (int j=0; j<nnodes; ++j) {
-			ND * n = &(gnodes[j].data);
-			if (n->nsuccs == 0) {
-#if DBG_FRINGECNT
-				fringeCnt++;
+    //std::list<ND*> wl3;
+    for (int j=0; j<nnodes; ++j) {
+      ND * n = &(gnodes[j].data);
+      if (n->nsuccs == 0) {
+#ifdef DBG_FRINGECNT
+        fringeCnt++;
 #endif
-				wl4.push_back(n);
-			}
-		}
-		//wl4.fill_initial(wl3.begin(), wl3.end());
+        wl4.push_back(n);
+      }
+    }
+    //wl4.fill_initial(wl3.begin(), wl3.end());
 #endif
-		secondLoopTimer.stop();
-#if DBG_FRINGECNT
-		cerr << fringeCnt << " nodes in fringe " << endl;
+    secondLoopTimer.stop();
+#ifdef DBG_FRINGECNT
+    cerr << fringeCnt << " nodes in fringe " << endl;
 #endif
-		thirdLoopTimer.start();
-		double backupSrcBC = currSrcNode->bc;
-#if CONCURRENT	 
-                galois::for_each(wl4, feach2, galois::wl<wl4ty>());
-#else
+    thirdLoopTimer.start();
+    double backupSrcBC = currSrcNode->bc;
+    #if CONCURRENT   
+    //galois::for_each(galois::iterate(wl4), feach2, galois::wl<wl4ty>());
+    galois::for_each(galois::iterate(wl4), feach2);
+    #else
     while (!wl4.empty()) {
       ND *nn = wl4.pop().second;
       feach2(nn, wl4);
     }
 #endif
-		currSrcNode->bc = backupSrcBC;
+    currSrcNode->bc = backupSrcBC;
     thirdLoopTimer.stop();
     //std::cerr << "Is wl empty ? " << wl4.empty() << std::endl;
     wl4.clear();
@@ -1162,19 +1185,21 @@ int main(int argc, char** argv) {
     //graph->printGraph();
     fourthLoopTimer.start();
 #if CONCURRENT
-// 		wl5.fill_initial(workChunks.begin(), workChunks.end());
+//    wl5.fill_initial(workChunks.begin(), workChunks.end());
 //    galois::for_each(wl5, feach4);
 #if MERGE_LOOPS
 #else
 //    galois::on_each(cleanupGloop);
-	//	Galoisruntime::for_all_parallel(cleanupGloop);
+  //  Galoisruntime::for_all_parallel(cleanupGloop);
 #endif
-		//graph->cleanupDataOMP();
+    //graph->cleanupDataOMP();
 #else
+
     graph->cleanupData();
 #endif
     fourthLoopTimer.stop();
-	}
+
+  }
   totalTimer.stop();
   T.stop();
 //  galois::Statistic("Mem4", Galoisruntime::MM::pageAllocInfo());
@@ -1183,22 +1208,23 @@ int main(int argc, char** argv) {
   std::cout<< "Second Loop: " << secondLoopTimer.get() << std::endl;
   std::cout<< "Third Loop: " << thirdLoopTimer.get() << std::endl;
   std::cout<< "Fourth Loop: " << fourthLoopTimer.get() << std::endl;
+
  
 #ifdef COUNT_ACTIONS
   unsigned long sum1 = 0, sum2 = 0, sum2ex = 0, sum3 = 0, sum4 = 0, sum555 = 0, sumNone = 0;
   for (int i=0; i<numThreads; ++i) {
-  	sum1 += action1cnt.get(i);
-	sum2 += action2cnt.get(i);
-	sum2ex += action2Excnt.get(i);
-	sum3 += action3cnt.get(i);
-	sum4 += action4cnt.get(i);
-	sum555 += action555.get(i);
+    sum1 += action1cnt.get(i);
+  sum2 += action2cnt.get(i);
+  sum2ex += action2Excnt.get(i);
+  sum3 += action3cnt.get(i);
+  sum4 += action4cnt.get(i);
+  sum555 += action555.get(i);
   sumNone += actionNone.get(i);
   }
   std::cout << "Action 1 " << sum1 << "\nAction 2 " << sum2  << "\nRealActionUS " << sum2ex << "\nAction 3 " << sum3 << "\nAction 4 " << sum4 << "\nAction4_mut " << sum555 << "\nActionNone " << sumNone << endl;
 //  for (int i=0; i<numThreads; ++i) 
-//  	std::cout << "Largest Node distance is " << largestNodeDist.get(i) << endl;
-	
+//    std::cout << "Largest Node distance is " << largestNodeDist.get(i) << endl;
+  
 #endif
 
   //if (!skipVerify)
@@ -1214,8 +1240,10 @@ int main(int argc, char** argv) {
   }
 
   graph->printBCs();
-#if GENERATE_CERTIFICATE
-  graph->printAllBCs(numThreads, "certificate_");
-#endif
+
+  if (generateCert) {
+    graph->printAllBCs(numThreads, "certificate_");
+  }
+
   return 0;
 }
