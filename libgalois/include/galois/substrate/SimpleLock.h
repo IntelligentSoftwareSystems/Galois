@@ -111,7 +111,7 @@ public:
 
 
 template <bool Enabled>
-using CondLock = std::conditional<Enabled, SimpleLock, internal::DummyLock>::type;
+using CondLock = typename std::conditional<Enabled, SimpleLock, internal::DummyLock>::type;
 
 
 using lock_guard_galois =  std::lock_guard<SimpleLock>;
