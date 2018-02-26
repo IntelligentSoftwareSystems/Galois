@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPre1");
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
-  const size_t NODE_SIZE = sizeof(**graph.begin());
+  constexpr size_t NODE_SIZE = sizeof(**graph.begin());
   galois::preAlloc (5 * galois::getActiveThreads () + NODE_SIZE * 32 * graph.size () / galois::runtime::pagePoolSize());
 
   galois::reportPageAlloc("MeminfoPre2");
