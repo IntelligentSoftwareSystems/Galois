@@ -27,7 +27,6 @@
  */
 
 #include "galois/Galois.h"
-#include "Invokers.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include <iostream>
@@ -676,9 +675,9 @@ class PTASerial : public PTABase<false> {
     galois::gDebug("no of nodes = ", numNodes);
 
     std::deque<unsigned> updates;
-    updates = processAddressOfCopy<galois::InvokeStdForEach, 
+    updates = processAddressOfCopy<galois::StdForEach, 
                                    std::deque<unsigned>>(addressCopyConstraints);
-    processLoadStore<galois::InvokeStdForEach>(loadStoreConstraints, updates);
+    processLoadStore<galois::StdForEach>(loadStoreConstraints, updates);
 
     unsigned numUps = 0;
 
@@ -705,7 +704,7 @@ class PTASerial : public PTABase<false> {
 
         // After propagating all constraints, see if load/store
         // constraints need to be added in since graph was potentially updated
-        processLoadStore<galois::InvokeStdForEach>(loadStoreConstraints, updates);
+        processLoadStore<galois::StdForEach>(loadStoreConstraints, updates);
 
         // do cycle squashing
         ocd.process(updates);
@@ -730,10 +729,10 @@ class PTAConcurrent : public PTABase<true> {
     galois::gDebug("no of nodes = ", numNodes);
 
     galois::InsertBag<unsigned> updates;
-    updates = processAddressOfCopy<galois::InvokeDoAll, galois::InsertBag<unsigned>>(
+    updates = processAddressOfCopy<galois::DoAll, galois::InsertBag<unsigned>>(
       addressCopyConstraints
     );
-    processLoadStore<galois::InvokeDoAll>(loadStoreConstraints, updates);
+    processLoadStore<galois::DoAll>(loadStoreConstraints, updates);
 
     while (!updates.empty()) {
       galois::for_each(
@@ -758,7 +757,7 @@ class PTAConcurrent : public PTABase<true> {
 
       // After propagating all constraints, see if load/store constraints need 
       // to be added in since graph was potentially updated
-      processLoadStore<galois::InvokeDoAll>(loadStoreConstraints, updates);
+      processLoadStore<galois::DoAll>(loadStoreConstraints, updates);
 
       // do cycle squashing
       //ocd.process(updates); // TODO have parallel version, if possible
