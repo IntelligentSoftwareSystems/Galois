@@ -161,7 +161,15 @@ public:
   void abort() { galois::runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
-  void* getLocalState(void) { return localState; }
+  template <typename LS>
+  LS* getLocalState(void) { return reinterpret_cast<LS*>(localState); }
+
+  template <typename LS, typename... Args>
+  LS* createLocalState(Args&&... args) {
+    new (localState) LS(std::forward<Args>(args)...);
+    return getLocalState<LS>();
+  }
+
  
 #ifdef GALOIS_USE_EXP
   void addUndoAction(const Closure& f) {

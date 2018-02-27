@@ -84,13 +84,13 @@ void refine(galois::InsertBag<GNode>& initialBad, Graph& graph) {
         
         if (Version == detDisjoint) {
 
-          LocalState* localState = (LocalState*) ctx.getLocalState();
-
           if (ctx.isFirstPass()) {
+            LocalState* localState = ctx.template createLocalState<LocalState>(graph, ctx.getPerIterAlloc());
             localState->cav.initialize(item);
             localState->cav.build();
             localState->cav.computePost();
           } else {
+            LocalState* localState = ctx.template getLocalState<LocalState>();
             localState->cav.update(item,ctx);
           }
 
@@ -182,7 +182,6 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
-  typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {
@@ -190,13 +189,13 @@ int main(int argc, char** argv) {
       refine<Chunked>(initialBad, graph);
       break;
     case detBase:
-      // refine<DWL>(initialBad, graph);
+      refine<DWL>(initialBad, graph);
       break;
     case detPrefix:
-      // refine<DWL, detPrefix>(initialBad, graph);
+      refine<DWL, detPrefix>(initialBad, graph);
       break;
     case detDisjoint:
-      // refine<DWL, detDisjoint>(initialBad, graph);
+      refine<DWL, detDisjoint>(initialBad, graph);
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
