@@ -33,6 +33,8 @@
 #include <fstream>
 #include <sstream>
 
+#include "galois/ConditionalReduction.h"
+
 #include "control.h"
 #include "ND.h"
 #include "ED.h"
@@ -70,7 +72,6 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 //#define DBG_FRINGECNT
 #define USE_NODE_BASED
 #define INLINE_US
-//#define COUNT_ACTIONS
 
 using namespace std;
 
@@ -81,17 +82,19 @@ int DEF_DISTANCE;
 BCGraph* graph;
 ND* currSrcNode;
 
-#ifdef COUNT_ACTIONS
-// TODO PerCPU doesn't exist anymore; fix it
-//PerCPU<unsigned long> action1cnt ;
-//PerCPU<unsigned long> action2cnt ;
-//PerCPU<unsigned long> action2Excnt ;
-//PerCPU<unsigned long> action3cnt ;
-//PerCPU<unsigned long > action4cnt ;
-//PerCPU<unsigned long> action555 ;
-//PerCPU<unsigned long> actionNone;
-//PerCPU<unsigned int> largestNodeDist;
-#endif
+using Counter = 
+  ConditionalAccumulator<galois::GAccumulator<unsigned long>, COUNT_ACTIONS>;
+using MaxCounter = 
+  ConditionalAccumulator<galois::GReduceMax<unsigned long>, COUNT_ACTIONS>;
+
+Counter action1cnt;
+Counter action2cnt;
+Counter action2Excnt;
+Counter action3cnt;
+Counter action4cnt;
+Counter action555;
+Counter actionNone;
+MaxCounter largestNodeDist;
 
 #if MERGE_LOOPS
 int curr_round = 0;
@@ -147,9 +150,8 @@ struct firstForEachNodeBased {
       const int BDist = dstD->distance;
 
       if (BDist - ADist > 1) { // Rule 1 + Rule 3 combined
-        #if COUNT_ACTIONS
-        action1cnt.get()++;
-        #endif
+        action1cnt.update(1);
+
         if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
         A->nsuccs++;
         const double ASigma = A->sigma;
@@ -186,18 +188,14 @@ struct firstForEachNodeBased {
             else { aL = inNbr; aW = B; }
             aL->lock(); aW->lock();
             const int elev = inE.level; 
-            #if COUNT_ACTIONS
-            action4cnt.get()++;
-            #endif
+            action4cnt.update(1);
             if (inNbr->distance >= B->distance) { // Rule 4
               if (CONCURRENT) { B->unlock(); }
               if (DBG) cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << endl;
               if (elev != DEF_DISTANCE) {
                 inE.level = DEF_DISTANCE;
                 if (elev == inNbr->distance) {
-                  #if COUNT_ACTIONS
-                  action555.get()++;
-                  #endif
+                  action555.update(1);
                   inNbr->nsuccs--;
                 }
               }
@@ -206,9 +204,7 @@ struct firstForEachNodeBased {
           }
         }
       } else if (elevel == ADist && BDist == ADist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-        #if COUNT_ACTIONS
-        action2cnt.get()++;
-        #endif
+        action2cnt.update(1);
         if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
         const double ASigma = A->sigma;
         const double eval = ed.val;
@@ -216,9 +212,7 @@ struct firstForEachNodeBased {
         bool BSigmaChanged = diff >= 0.00001;
         if (CONCURRENT) { A->unlock(); }
         if (BSigmaChanged) {
-        #if COUNT_ACTIONS
-        action2Excnt.get()++;
-        #endif
+        action2Excnt.update(1);
           ed.val = ASigma;
           B->sigma += diff;
           int nbsuccs = B->nsuccs;
@@ -277,9 +271,7 @@ struct firstForEachNodeBased {
             if (CONCURRENT) { B->unlock(); }
           }
         } else if (BDist == ADist + 1 && elevel != ADist) {  // Rule 3 // BDist = ADist + 1 and elevel != ADist
-#if COUNT_ACTIONS
-          action3cnt.get()++;
-#endif 
+          action3cnt.update(1);
           // Test taking it out
           //const bool AnotPredOfB = !B->predsContain(A);
           //if (!AnotPredOfB) {
@@ -370,9 +362,7 @@ struct firstForEachNodeBased {
           }      
           if (CONCURRENT) { A->unlock(); }              
         }*/ else {
-#if COUNT_ACTIONS
-          actionNone.get()++;
-#endif
+          actionNone.update(1);
           A->unlock(); B->unlock();
         }
       }
@@ -416,9 +406,7 @@ struct firstForEach {
 
     if (srcdist >= dstdist) { // Rule 4
       if (CONCURRENT) { dstD->unlock(); }
-#ifdef COUNT_ACTIONS
-    action4cnt.get()++;
-#endif
+    action4cnt.update(1);
       if (DBG) cerr << "Rule 4 (" << srcD->toString() << " ||| " << dstD->toString() << ")" << elevel << endl;
       if (elevel != DEF_DISTANCE /*&& elevel == srcdist*/) {
         ed->level = DEF_DISTANCE;
@@ -428,10 +416,7 @@ struct firstForEach {
 #endif
             ) { 
           srcD->nsuccs--;
-#ifdef COUNT_ACTIONS
-//        std::cerr << "Got one \n";
-        action555.get()++;
-#endif
+        action555.update(1);
 
 #if MERGE_LOOPS
           ed->cnt = curr_round;
@@ -450,9 +435,7 @@ struct firstForEach {
     // That is BDist >= ADist + 1
 
     if (BDist - ADist >= 2) { // Rule 1 + Rule 3 combined
-#ifdef COUNT_ACTIONS
-    action1cnt.get()++;
-#endif
+    action1cnt.update(1);
       if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
       A->nsuccs++;
       const double ASigma = A->sigma;
@@ -465,10 +448,9 @@ struct firstForEach {
       Bpreds.push_back(A);
       B->distance = ADist + 1;
       //int newBDist = ADist + 1;
-#ifdef COUNT_ACTIONS
-      if (BDist > largestNodeDist.get())
-        largestNodeDist.get() = B->distance;
-#endif
+
+      largestNodeDist.update(B->distance);
+
       B->nsuccs = 0;
       B->sigma = ASigma;
       ed->val = ASigma;
@@ -489,9 +471,7 @@ struct firstForEach {
         && ed->cnt == curr_round
 #endif
         ) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-#ifdef COUNT_ACTIONS
-      action2cnt.get()++;
-#endif
+      action2cnt.update(1);
       if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
       const double ASigma = A->sigma;
       const double eval = ed->val;
@@ -514,9 +494,7 @@ struct firstForEach {
       }
       return;
     } else {  // Rule 3 // BDist = ADist + 1 and elevel != ADist
-#ifdef COUNT_ACTIONS
-      action3cnt.get()++;
-#endif
+      action3cnt.update(1);
       // Test taking it out
       //const bool AnotPredOfB = !B->predsContain(A);
       //if (!AnotPredOfB) {
@@ -968,16 +946,14 @@ int main(int argc, char** argv) {
 
   std::cerr << " INIT CAP : " << intCapTimer.get() << endl;
 
-  #ifdef COUNT_ACTIONS
-  action1cnt.get() = 0; 
-  action2cnt.get() = 0; 
-  action2Excnt.get() = 0; 
-  action3cnt.get() = 0; 
-  action4cnt.get() = 0; 
-  action555.get() = 0;
-  actionNone.get() = 0;
-  largestNodeDist.get() = 0;
-  #endif
+  action1cnt.reset();
+  action2cnt.reset();
+  action2Excnt.reset();
+  action3cnt.reset();
+  action4cnt.reset();
+  action555.reset();
+  actionNone.reset();
+  largestNodeDist.reset();
 
   #if CONCURRENT
   //Galoisruntime::worklists::OrderByIntegerMetric<ED*, EdgeIndexer, Galoisruntime::worklists::ChunkedFIFO<ED*, 16, true>, true> wl2;
@@ -1210,22 +1186,22 @@ int main(int argc, char** argv) {
   std::cout<< "Fourth Loop: " << fourthLoopTimer.get() << std::endl;
 
  
-#ifdef COUNT_ACTIONS
-  unsigned long sum1 = 0, sum2 = 0, sum2ex = 0, sum3 = 0, sum4 = 0, sum555 = 0, sumNone = 0;
-  for (int i=0; i<numThreads; ++i) {
-    sum1 += action1cnt.get(i);
-  sum2 += action2cnt.get(i);
-  sum2ex += action2Excnt.get(i);
-  sum3 += action3cnt.get(i);
-  sum4 += action4cnt.get(i);
-  sum555 += action555.get(i);
-  sumNone += actionNone.get(i);
+  // one counter active -> all of them are active
+  if (action1cnt.isActive()) {
+    unsigned long sum1 = action1cnt.reduce();
+    unsigned long sum2 = action2cnt.reduce();
+    unsigned long sum2ex = action2Excnt.reduce();
+    unsigned long sum3 = action3cnt.reduce();
+    unsigned long sum4 = action4cnt.reduce();
+    unsigned long sum555 = action555.reduce();
+    unsigned long sumNone = actionNone.reduce();
+
+    galois::gPrint("Action 1 ", sum1, "\nAction 2 ", sum2, 
+                   "\nRealActionUS ", sum2ex, "\nAction 3 ", sum3, 
+                   "\nAction 4 ", sum4, "\nAction4_mut ", sum555, 
+                   "\nActionNone ", sumNone, "\n");
+    galois::gPrint("Largest node distance is ", largestNodeDist.reduce(), "\n");
   }
-  std::cout << "Action 1 " << sum1 << "\nAction 2 " << sum2  << "\nRealActionUS " << sum2ex << "\nAction 3 " << sum3 << "\nAction 4 " << sum4 << "\nAction4_mut " << sum555 << "\nActionNone " << sumNone << endl;
-//  for (int i=0; i<numThreads; ++i) 
-//    std::cout << "Largest Node distance is " << largestNodeDist.get(i) << endl;
-  
-#endif
 
   //if (!skipVerify)
   //  graph->verify();
