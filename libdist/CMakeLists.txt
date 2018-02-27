@@ -22,7 +22,7 @@ if (USE_BARE_MPI)
   target_compile_definitions(galois_dist PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
 endif()
 
-if (USE_LWCI)
+if (USE_LCI)
   target_link_libraries(galois_dist ${LWCI_LIBRARY} -lpsm2)
 endif()
 target_link_libraries(galois_dist ${MPI_CXX_LIBRARIES})
@@ -32,7 +32,7 @@ target_include_directories(galois_dist PUBLIC
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include 
 )
-if (USE_LWCI)
+if (USE_LCI)
   target_include_directories(galois_dist PUBLIC ${LWCI_INCLUDE})
 endif()
 
