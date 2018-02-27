@@ -178,9 +178,9 @@ if(ENABLE_DIST_GALOIS)
     set(LWCI_LIBRARY "${LWCI_ROOT}/liblwci.a")
     add_custom_command(
       OUTPUT ${LWCI_LIBRARY}
-      WORKING_DIR ${LWCI_ROOT}
-      COMMAND make
+      COMMAND make -C ${LWCI_ROOT}
     )
+    add_custom_target(lci DEPENDS ${LWCI_LIBRARY})
   endif(USE_LCI)
 
   if(ENABLE_HETERO_GALOIS)

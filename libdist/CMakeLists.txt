@@ -23,6 +23,7 @@ if (USE_BARE_MPI)
 endif()
 
 if (USE_LCI)
+  add_dependencies(galois_dist lci)
   target_link_libraries(galois_dist ${LWCI_LIBRARY} -lpsm2)
 endif()
 target_link_libraries(galois_dist ${MPI_CXX_LIBRARIES})
