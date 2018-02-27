@@ -42,7 +42,7 @@ const char* desc =
     "Finds the maximum flow in a network using the preflow push technique";
 const char* url = "preflow_push";
 
-enum DetAlgo { nondet, detBase, detDisjoint };
+enum DetAlgo { nondet=0, detBase, detDisjoint };
 
 static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input file>"), cll::Required);
@@ -107,6 +107,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 
 using Graph = galois::graphs::LC_CSR_Graph<Node, int32_t>::with_numa_alloc<true>::type;
 using GNode =  Graph::GraphNode;
+using Counter = galois::GAccumulator<int>;
 
 
 struct PreflowPush {
@@ -116,128 +117,6 @@ struct PreflowPush {
   GNode source;
   int global_relabel_interval;
   bool should_global_relabel = false;
-
-  void checkSorting(void) {
-    for (auto n : graph) {
-      galois::optional<GNode> prevDst;
-      for (auto e : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
-        GNode dst = graph.getEdgeDst(e);
-        if (prevDst.is_initialized()) {
-          Node& prevNode = graph.getData(*prevDst, galois::MethodFlag::UNPROTECTED);
-          Node& currNode = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-          GALOIS_ASSERT(prevNode.id != currNode.id, "Adjacency list cannot have duplicates");
-          GALOIS_ASSERT(prevNode.id <= currNode.id, "Adjacency list unsorted");
-        }
-        prevDst = dst;
-      }
-    }
-  }
-
-  void checkAugmentingPath() {
-    // Use id field as visited flag
-    for (Graph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-      GNode src             = *ii;
-      graph.getData(src).id = 0;
-    }
-
-    std::deque<GNode> queue;
-
-    graph.getData(source).id = 1;
-    queue.push_back(source);
-
-    while (!queue.empty()) {
-      GNode& src = queue.front();
-      queue.pop_front();
-      for (auto ii : graph.edges(src)) {
-        GNode dst = graph.getEdgeDst(ii);
-        if (graph.getData(dst).id == 0 && graph.getEdgeData(ii) > 0) {
-          graph.getData(dst).id = 1;
-          queue.push_back(dst);
-        }
-      }
-    }
-
-    if (graph.getData(sink).id != 0) {
-      assert(false && "Augmenting path exisits");
-      abort();
-    }
-  }
-
-  void checkHeights() {
-    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      GNode src = *ii;
-      int sh    = graph.getData(src).height;
-      for (auto jj : graph.edges(src)) {
-        GNode dst   = graph.getEdgeDst(jj);
-        int64_t cap = graph.getEdgeData(jj);
-        int dh      = graph.getData(dst).height;
-        if (cap > 0 && sh > dh + 1) {
-          std::cerr << "height violated at " << graph.getData(src) << "\n";
-          abort();
-        }
-      }
-    }
-  }
-
-  void checkConservation(PreflowPush& orig) {
-    std::vector<GNode> map;
-    map.resize(graph.size());
-
-    // Setup ids assuming same iteration order in both graphs
-    uint32_t id = 0;
-    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei;
-        ++ii, ++id) {
-      graph.getData(*ii).id = id;
-    }
-    id = 0;
-    for (Graph::iterator ii = orig.graph.begin(), ei = orig.graph.end();
-        ii != ei; ++ii, ++id) {
-      orig.graph.getData(*ii).id = id;
-      map[id]                    = *ii;
-    }
-
-    // Now do some checking
-    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      GNode src        = *ii;
-      const Node& node = graph.getData(src);
-      uint32_t srcId   = node.id;
-
-      if (src == source || src == sink)
-        continue;
-
-      if (node.excess != 0 && node.height != (int)graph.size()) {
-        std::cerr << "Non-zero excess at " << node << "\n";
-        abort();
-      }
-
-      int64_t sum = 0;
-      for (auto jj : graph.edges(src)) {
-        GNode dst      = graph.getEdgeDst(jj);
-        uint32_t dstId = graph.getData(dst).id;
-        int64_t ocap   = orig.graph.getEdgeData(
-            orig.findEdge(map[srcId], map[dstId]));
-        int64_t delta = 0;
-        if (ocap > 0)
-          delta -= (ocap - graph.getEdgeData(jj));
-        else
-          delta += graph.getEdgeData(jj);
-        sum += delta;
-      }
-
-      if (node.excess != sum) {
-        std::cerr << "Not pseudoflow: " << node.excess << " != " << sum
-          << " at " << node << "\n";
-        abort();
-      }
-    }
-  }
-
-  void verify(PreflowPush& orig) {
-    // FIXME: doesn't fully check result
-    checkHeights();
-    checkConservation(orig);
-    checkAugmentingPath();
-  }
 
   void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int64_t amount) {
     Graph::edge_data_type& cap1 = graph.getEdgeData(ii);
@@ -423,74 +302,153 @@ struct PreflowPush {
     return relabeled;
   }
 
-  template <DetAlgo version, bool useCAS = true>
-  struct UpdateHeights {
-    PreflowPush& app;
-    UpdateHeights(PreflowPush& a) : app(a) {}
+  
+  template <DetAlgo version>
+  void detDischarge(galois::InsertBag<GNode>& initial, Counter& counter) {
+    typedef galois::worklists::Deterministic<> DWL;
 
-    /**
-     * Do reverse BFS on residual graph.
-     */
-    template <typename C>
-    void operator()(const GNode& src, C& ctx) {
-      if (version != nondet) {
 
-        if (ctx.isFirstPass()) {
-          for (auto ii : app.graph.edges(src, galois::MethodFlag::WRITE)) {
-            GNode dst = app.graph.getEdgeDst(ii);
-            int64_t rdata =
-              app.graph.getEdgeData(app.findEdge(dst, src));
-            if (rdata > 0) {
-              app.graph.getData(dst, galois::MethodFlag::WRITE);
+    auto detIDfn = [this] (const GNode& item) -> uint32_t {
+      return graph.getData(item, galois::MethodFlag::UNPROTECTED).id;
+    };
+
+    const int relabel_interval = global_relabel_interval / galois::getActiveThreads();
+
+    auto detBreakFn = [&, this] (void) -> bool {
+
+      if (this->global_relabel_interval > 0 && counter.peekLocal() >= relabel_interval) {
+        this->should_global_relabel = true;
+        return true;
+      } else {
+        return false;
+      }
+    };
+
+    galois::for_each(galois::iterate(initial),
+        [&, this] (GNode& src, auto& ctx) {
+          if (version != nondet) {
+            if (ctx.isFirstPass()) {
+              this->acquire(src);
+            }
+            if (version == detDisjoint && ctx.isFirstPass()) {
+              return;
+            } else {
+              this->graph.getData(src, galois::MethodFlag::WRITE);
+              ctx.cautiousPoint();
             }
           }
-        }
 
-        if (version == detDisjoint && ctx.isFirstPass()) {
-          return;
-        } else {
-          app.graph.getData(src, galois::MethodFlag::WRITE);
-          ctx.cautiousPoint();
-        }
-      }
+          int increment = 1;
+          if (this->discharge(src, ctx)) {
+            increment += BETA;
+          }
 
-      for (auto ii : app.graph.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED
-            : galois::MethodFlag::WRITE)) {
-        GNode dst     = app.graph.getEdgeDst(ii);
-        int64_t rdata = app.graph.getEdgeData(app.findEdge(dst, src));
-        if (rdata > 0) {
-          Node& node = app.graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-          int newHeight =
-            app.graph.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
-          if (useCAS) {
-            int oldHeight;
-            while (newHeight < (oldHeight = node.height)) {
-              if (__sync_bool_compare_and_swap(&node.height, oldHeight,
-                    newHeight)) {
-                ctx.push(dst);
-                break;
+          counter += increment;
+        },
+        galois::loopname("detDischarge"),
+        galois::wl<DWL>(),
+        galois::per_iter_alloc(),
+        galois::det_id< decltype(detIDfn) >(detIDfn),
+        galois::det_parallel_break< decltype(detBreakFn) >(detBreakFn));
+
+
+
+  }
+
+  template <typename W>
+  void nonDetDischarge(galois::InsertBag<GNode>& initial, Counter& counter, const W& wl_opt) {
+
+    // per thread
+    const int relabel_interval = global_relabel_interval / galois::getActiveThreads();
+
+    galois::for_each(galois::iterate(initial),
+        [&, this] (GNode& src, auto& ctx) {
+          int increment = 1;
+          this->acquire(src);
+          if (this->discharge(src, ctx)) {
+            increment += BETA;
+          }
+
+          counter += increment;
+          if (this->global_relabel_interval > 0 &&
+              counter.peekLocal() >= relabel_interval) { // local check
+
+            this->should_global_relabel = true;
+            ctx.breakLoop();
+            return;
+          }
+        },
+        galois::loopname("nonDetDischarge"),
+        galois::parallel_break(),
+        wl_opt);
+
+  }
+
+
+  /**
+   * Do reverse BFS on residual graph.
+   */
+  template <DetAlgo version, typename WL, bool useCAS = true>
+  void updateHeights() {
+
+    galois::for_each(galois::iterate( { sink } ), 
+        [&, this] (const GNode& src, auto& ctx) {
+          if (version != nondet) {
+
+            if (ctx.isFirstPass()) {
+              for (auto ii : this->graph.edges(src, galois::MethodFlag::WRITE)) {
+                GNode dst = this->graph.getEdgeDst(ii);
+                int64_t rdata =
+                  this->graph.getEdgeData(this->findEdge(dst, src));
+                if (rdata > 0) {
+                  this->graph.getData(dst, galois::MethodFlag::WRITE);
+                }
               }
             }
-          } else {
-            if (newHeight < node.height) {
-              node.height = newHeight;
-              ctx.push(dst);
+
+            if (version == detDisjoint && ctx.isFirstPass()) {
+              return;
+            } else {
+              this->graph.getData(src, galois::MethodFlag::WRITE);
+              ctx.cautiousPoint();
             }
           }
-        }
-      } // end for
-    } // end operator
 
-
-  };
+          for (auto ii : this->graph.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED
+                : galois::MethodFlag::WRITE)) {
+            GNode dst     = this->graph.getEdgeDst(ii);
+            int64_t rdata = this->graph.getEdgeData(this->findEdge(dst, src));
+            if (rdata > 0) {
+              Node& node = this->graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+              int newHeight =
+                this->graph.getData(src, galois::MethodFlag::UNPROTECTED).height + 1;
+              if (useCAS) {
+                int oldHeight;
+                while (newHeight < (oldHeight = node.height)) {
+                  if (__sync_bool_compare_and_swap(&node.height, oldHeight,
+                        newHeight)) {
+                    ctx.push(dst);
+                    break;
+                  }
+                }
+              } else {
+                if (newHeight < node.height) {
+                  node.height = newHeight;
+                  ctx.push(dst);
+                }
+              }
+            }
+          } // end for
+        },
+        galois::wl<WL>(),
+        galois::no_conflicts(),
+        galois::loopname("updateHeights"));
+  }
 
 
   template <typename IncomingWL>
   void globalRelabel(IncomingWL& incoming) {
-    typedef galois::worklists::Deterministic<> DWL;
 
-    galois::StatTimer T1("ResetHeightsTime");
-    T1.start();
     galois::do_all(galois::iterate(graph),
         [&] (const GNode& src) {
           Node& node   = graph.getData(src, galois::MethodFlag::UNPROTECTED);
@@ -500,38 +458,25 @@ struct PreflowPush {
             node.height = 0;
         },
         galois::loopname("ResetHeights"));
-    T1.stop();
 
-    galois::StatTimer T("UpdateHeightsTime");
-    T.start();
 
+    using BSWL = galois::worklists::BulkSynchronous<>;
+    using DWL =  galois::worklists::Deterministic<>;
     switch (detAlgo) {
       case nondet:
-        galois::for_each(galois::iterate( { sink } ), UpdateHeights<nondet>(*this),
-            galois::wl<galois::worklists::BulkSynchronous<>>(),
-            galois::no_conflicts(),
-            galois::loopname("UpdateHeights"));
+        updateHeights<nondet, BSWL>();
         break;
       case detBase:
-        galois::for_each(galois::iterate( { sink } ), UpdateHeights<detBase>(*this),
-            galois::wl<DWL>(),
-            galois::no_conflicts(),
-            galois::loopname("UpdateHeights"));
+        updateHeights<detBase, DWL>();
         break;
       case detDisjoint:
-        galois::for_each(galois::iterate( { sink } ), UpdateHeights<detDisjoint>(*this),
-            galois::wl<DWL>(),
-            galois::no_conflicts(),
-            galois::loopname("UpdateHeights"));
+        updateHeights<detDisjoint, DWL>();
         break;
       default:
         std::cerr << "Unknown algorithm" << detAlgo << "\n";
         abort();
     }
-    T.stop();
 
-    galois::StatTimer T2("FindWorkTime");
-    T2.start();
     galois::do_all(galois::iterate(graph),
         [&incoming, this] (const GNode& src) {
           Node& node = this->graph.getData(src, galois::MethodFlag::UNPROTECTED);
@@ -542,98 +487,94 @@ struct PreflowPush {
             incoming.push_back(src);
         },
         galois::loopname("FindWork"));
-    T2.stop();
   }
 
-
-  using Counter = galois::GAccumulator<int>;
-
-  template <DetAlgo version>
-    struct Process {
-
-      Counter& counter;
-      PreflowPush& app;
-
-      struct LocalState {
-        LocalState(Process<version>& self, galois::PerIterAllocTy& alloc) {}
-      };
-
-      struct DeterministicId {
-        Process<version>* self;
-        uint32_t operator()(const GNode& item) const {
-          return self->app.graph.getData(item, galois::MethodFlag::UNPROTECTED).id;
-        }
-      };
-
-      DeterministicId getDetermisticId() { return DeterministicId{this}; }
-
-      struct ParallelBreak {
-        Process<version>* self;
-        bool operator()() {
-          if (self->app.global_relabel_interval > 0 &&
-              self->counter.reduce() >= self->app.global_relabel_interval) {
-            self->app.should_global_relabel = true;
-            return true;
-          }
-          return false;
-        }
-      };
-
-      ParallelBreak getParallelBreak() { return ParallelBreak{this}; }
-
-      Process(Counter& c, PreflowPush& a) : counter(c), app(a) {}
-
   template <typename C>
-      void operator()(GNode& src, C& ctx) {
-        if (version != nondet) {
-          if (ctx.isFirstPass()) {
-            app.acquire(src);
-          }
-          if (version == detDisjoint && ctx.isFirstPass()) {
-            return;
-          } else {
-            app.graph.getData(src, galois::MethodFlag::WRITE);
-            ctx.cautiousPoint();
-          }
-        }
+  void initializePreflow(C& initial) {
+    for (auto ii : graph.edges(source)) {
+      GNode dst   = graph.getEdgeDst(ii);
+      int64_t cap = graph.getEdgeData(ii);
+      reduceCapacity(ii, source, dst, cap);
+      Node& node = graph.getData(dst);
+      node.excess += cap;
+      if (cap > 0)
+        initial.push_back(dst);
+    }
+  }
 
-        int increment = 1;
-        if (app.discharge(src, ctx)) {
-          increment += BETA;
-        }
+  void run() {
 
-        counter += increment;
-      }
+    auto obimIndexer = [this] (const GNode& n) {
+      return -this->graph.getData(n, galois::MethodFlag::UNPROTECTED).height;
     };
 
-  struct ProcessNonDet {
-    Counter& counter;
-    PreflowPush& app;
-    const int relabel_interval; // per thread
-    ProcessNonDet(Counter& c, PreflowPush& a) :
-      counter(c), app(a),
-      relabel_interval(app.global_relabel_interval / galois::getActiveThreads())
-    {
-    }
+    typedef galois::worklists::dChunkedFIFO<16> Chunk;
+    typedef galois::worklists::OrderedByIntegerMetric<decltype(obimIndexer), Chunk> OBIM;
 
-    template <typename C>
-      void operator()(GNode& src, C& ctx) {
-        int increment = 1;
-        app.acquire(src);
-        if (app.discharge(src, ctx)) {
-          increment += BETA;
-        }
+    galois::InsertBag<GNode> initial;
+    initializePreflow(initial);
 
-        counter += increment;
-        if (app.global_relabel_interval > 0 &&
-            counter.peekLocal() >= relabel_interval) { // local check
-
-          app.should_global_relabel = true;
-          ctx.breakLoop();
-          return;
-        }
+    while (initial.begin() != initial.end()) {
+      galois::StatTimer T_discharge("DischargeTime");
+      T_discharge.start();
+      Counter counter;
+      switch (detAlgo) {
+        case nondet:
+          if (useHLOrder) {
+            nonDetDischarge(initial, counter, galois::wl<OBIM>(obimIndexer));
+            // galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
+                // galois::loopname("Discharge"),
+                // galois::parallel_break(),
+                // galois::wl<OBIM>(obimIndexer));
+          } else {
+            nonDetDischarge(initial, counter, galois::wl<Chunk>());
+            // galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
+                // galois::loopname("Discharge"),
+                // galois::parallel_break());
+          }
+          break;
+        case detBase: 
+          detDischarge<detBase>(initial, counter);
+              // {
+                        // Process<detBase> fn(counter, *this);
+                        // galois::for_each(
+                            // galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
+                            // galois::per_iter_alloc(),
+                            // galois::det_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak()),
+                            // galois::det_id<Process<detBase>::DeterministicId>(fn.getDetermisticId()));
+                      // } 
+              break;
+        case detDisjoint: 
+          detDischarge<detDisjoint>(initial, counter);
+              // {
+                        // Process<detDisjoint> fn(counter, *this);
+                        // galois::for_each(
+                            // galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
+                            // galois::per_iter_alloc(),
+                            // galois::det_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak()),
+                            // galois::det_id<Process<detDisjoint>::DeterministicId>(fn.getDetermisticId()));
+                      // } 
+              break;
+        default:
+                          std::cerr << "Unknown algorithm" << detAlgo << "\n";
+                          abort();
       }
-  };
+      T_discharge.stop();
+
+      if (should_global_relabel) {
+        galois::StatTimer T_global_relabel("GlobalRelabelTime");
+        T_global_relabel.start();
+        initial.clear();
+        globalRelabel(initial);
+        should_global_relabel = false;
+        std::cout << " Flow after global relabel: "
+          << graph.getData(sink).excess << "\n";
+        T_global_relabel.stop();
+      } else {
+        break;
+      }
+    }
+  }
 
   template <typename EdgeTy>
   static void writePfpGraph(const std::string& inputFile,
@@ -774,85 +715,128 @@ struct PreflowPush {
     }
   }
 
-  template <typename C>
-  void initializePreflow(C& initial) {
-    for (auto ii : graph.edges(source)) {
-      GNode dst   = graph.getEdgeDst(ii);
-      int64_t cap = graph.getEdgeData(ii);
-      reduceCapacity(ii, source, dst, cap);
-      Node& node = graph.getData(dst);
-      node.excess += cap;
-      if (cap > 0)
-        initial.push_back(dst);
-    }
-  }
-
-  void run() {
-
-    auto obimIndexer = [this] (const GNode& n) {
-      return -this->graph.getData(n, galois::MethodFlag::UNPROTECTED).height;
-    };
-
-    typedef galois::worklists::Deterministic<> DWL;
-    typedef galois::worklists::dChunkedFIFO<16> Chunk;
-    typedef galois::worklists::OrderedByIntegerMetric<decltype(obimIndexer), Chunk> OBIM;
-
-    galois::InsertBag<GNode> initial;
-    initializePreflow(initial);
-
-    while (initial.begin() != initial.end()) {
-      galois::StatTimer T_discharge("DischargeTime");
-      T_discharge.start();
-      Counter counter;
-      switch (detAlgo) {
-        case nondet:
-          if (useHLOrder) {
-            galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
-                galois::loopname("Discharge"),
-                galois::parallel_break(),
-                galois::wl<OBIM>(obimIndexer));
-          } else {
-            galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
-                galois::loopname("Discharge"),
-                galois::parallel_break());
-          }
-          break;
-        case detBase: {
-                        Process<detBase> fn(counter, *this);
-                        galois::for_each(
-                            galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
-                            galois::per_iter_alloc(),
-                            galois::det_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak()),
-                            galois::det_id<Process<detBase>::DeterministicId>(fn.getDetermisticId()));
-                      } break;
-        case detDisjoint: {
-                        Process<detDisjoint> fn(counter, *this);
-                        galois::for_each(
-                            galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
-                            galois::per_iter_alloc(),
-                            galois::det_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak()),
-                            galois::det_id<Process<detDisjoint>::DeterministicId>(fn.getDetermisticId()));
-                      } break;
-        default:
-                          std::cerr << "Unknown algorithm" << detAlgo << "\n";
-                          abort();
-      }
-      T_discharge.stop();
-
-      if (should_global_relabel) {
-        galois::StatTimer T_global_relabel("GlobalRelabelTime");
-        T_global_relabel.start();
-        initial.clear();
-        globalRelabel(initial);
-        should_global_relabel = false;
-        std::cout << " Flow after global relabel: "
-          << graph.getData(sink).excess << "\n";
-        T_global_relabel.stop();
-      } else {
-        break;
+  void checkSorting(void) {
+    for (auto n : graph) {
+      galois::optional<GNode> prevDst;
+      for (auto e : graph.edges(n, galois::MethodFlag::UNPROTECTED)) {
+        GNode dst = graph.getEdgeDst(e);
+        if (prevDst.is_initialized()) {
+          Node& prevNode = graph.getData(*prevDst, galois::MethodFlag::UNPROTECTED);
+          Node& currNode = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+          GALOIS_ASSERT(prevNode.id != currNode.id, "Adjacency list cannot have duplicates");
+          GALOIS_ASSERT(prevNode.id <= currNode.id, "Adjacency list unsorted");
+        }
+        prevDst = dst;
       }
     }
   }
+
+  void checkAugmentingPath() {
+    // Use id field as visited flag
+    for (Graph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+      GNode src             = *ii;
+      graph.getData(src).id = 0;
+    }
+
+    std::deque<GNode> queue;
+
+    graph.getData(source).id = 1;
+    queue.push_back(source);
+
+    while (!queue.empty()) {
+      GNode& src = queue.front();
+      queue.pop_front();
+      for (auto ii : graph.edges(src)) {
+        GNode dst = graph.getEdgeDst(ii);
+        if (graph.getData(dst).id == 0 && graph.getEdgeData(ii) > 0) {
+          graph.getData(dst).id = 1;
+          queue.push_back(dst);
+        }
+      }
+    }
+
+    if (graph.getData(sink).id != 0) {
+      assert(false && "Augmenting path exisits");
+      abort();
+    }
+  }
+
+  void checkHeights() {
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      int sh    = graph.getData(src).height;
+      for (auto jj : graph.edges(src)) {
+        GNode dst   = graph.getEdgeDst(jj);
+        int64_t cap = graph.getEdgeData(jj);
+        int dh      = graph.getData(dst).height;
+        if (cap > 0 && sh > dh + 1) {
+          std::cerr << "height violated at " << graph.getData(src) << "\n";
+          abort();
+        }
+      }
+    }
+  }
+
+  void checkConservation(PreflowPush& orig) {
+    std::vector<GNode> map;
+    map.resize(graph.size());
+
+    // Setup ids assuming same iteration order in both graphs
+    uint32_t id = 0;
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei;
+        ++ii, ++id) {
+      graph.getData(*ii).id = id;
+    }
+    id = 0;
+    for (Graph::iterator ii = orig.graph.begin(), ei = orig.graph.end();
+        ii != ei; ++ii, ++id) {
+      orig.graph.getData(*ii).id = id;
+      map[id]                    = *ii;
+    }
+
+    // Now do some checking
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src        = *ii;
+      const Node& node = graph.getData(src);
+      uint32_t srcId   = node.id;
+
+      if (src == source || src == sink)
+        continue;
+
+      if (node.excess != 0 && node.height != (int)graph.size()) {
+        std::cerr << "Non-zero excess at " << node << "\n";
+        abort();
+      }
+
+      int64_t sum = 0;
+      for (auto jj : graph.edges(src)) {
+        GNode dst      = graph.getEdgeDst(jj);
+        uint32_t dstId = graph.getData(dst).id;
+        int64_t ocap   = orig.graph.getEdgeData(
+            orig.findEdge(map[srcId], map[dstId]));
+        int64_t delta = 0;
+        if (ocap > 0)
+          delta -= (ocap - graph.getEdgeData(jj));
+        else
+          delta += graph.getEdgeData(jj);
+        sum += delta;
+      }
+
+      if (node.excess != sum) {
+        std::cerr << "Not pseudoflow: " << node.excess << " != " << sum
+          << " at " << node << "\n";
+        abort();
+      }
+    }
+  }
+
+  void verify(PreflowPush& orig) {
+    // FIXME: doesn't fully check result
+    checkHeights();
+    checkConservation(orig);
+    checkAugmentingPath();
+  }
+
 };
 
 
