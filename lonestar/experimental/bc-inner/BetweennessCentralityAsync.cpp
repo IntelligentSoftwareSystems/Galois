@@ -26,9 +26,8 @@
 
 #define NDEBUG // Used in Debug build to prevent things from printing
 
-#include "galois/Galois.h"
-#include "galois/ConditionalReduction.h"
 #include "Lonestar/BoilerPlate.h"
+#include "galois/ConditionalReduction.h"
 
 #include <boost/tuple/tuple.hpp>
 
@@ -98,10 +97,6 @@ using FringeCounter =
   ConditionalAccumulator<galois::GAccumulator<unsigned long>, DBG_FRINGECNT>;
 FringeCounter fringeCnts;
 
-
-#if MERGE_LOOPS
-int curr_round = 0;
-#endif
 
 struct f2Item {
   bool isCleanup;
@@ -564,10 +559,6 @@ int main(int argc, char** argv) {
     stepCnt++;
     //if (stepCnt >= 2) break;  // ie only do 1 source
 
-#if MERGE_LOOPS   
-   curr_round++;
-#endif
-
     //std::list<ED*> wl;
 #ifdef USE_NODE_BASED
          std::vector<ND*>  wl;
@@ -672,20 +663,9 @@ int main(int argc, char** argv) {
     wl4.clear();
     if (DOCHECKS) graph->checkSteadyState2();
     //graph->printGraph();
-    fourthLoopTimer.start();
-#if CONCURRENT
-//    wl5.fill_initial(workChunks.begin(), workChunks.end());
-//    galois::for_each(wl5, feach4);
-#if MERGE_LOOPS
-#else
-//    galois::on_each(cleanupGloop);
-  //  Galoisruntime::for_all_parallel(cleanupGloop);
-#endif
-    //graph->cleanupDataOMP();
-#else
 
+    fourthLoopTimer.start();
     graph->cleanupData();
-#endif
     fourthLoopTimer.stop();
 
   }

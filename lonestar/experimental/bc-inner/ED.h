@@ -9,9 +9,6 @@ struct ED {
   ND * dst;
   double val;
   int level;
-#if MERGE_LOOPS
-	int cnt;
-#endif
 #if CONCURRENT
   //volatile char b;
 //  char b;
@@ -20,17 +17,9 @@ struct ED {
 #endif
   
   ED(ND * _src, ND * _dst) : src(_src), dst(_dst), val(0), level(DEF_DISTANCE)/*, b(0)*/ 
-#if MERGE_LOOPS
-         ,cnt(0)
-#endif
-  { 
-  }
+  { }
   ED() : src(0), dst(0), val(0), level(DEF_DISTANCE)/*, b(0)*/
-#if MERGE_LOOPS
-         ,cnt(0)
-#endif
-  {
-  }
+  { }
 
   ED& operator= (ED const& from) {
     if (this != &from) {
@@ -40,9 +29,6 @@ struct ED {
       level = from.level;
       std::cerr << "Hell";
       //b = from.b;
-#if MERGE_LOOPS
-			cnt = 0;
-#endif
     }
     return *this;
   }
