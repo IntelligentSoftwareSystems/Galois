@@ -148,13 +148,15 @@ struct firstForEachNodeBased {
       if (BDist - ADist > 1) { // Rule 1 + Rule 3 combined
         action1cnt.update(1);
 
-        if (DBG) { std::cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+        galois::gDebug("Rule 1+3 (", A->toString(), " ||| ", B->toString(), 
+                       ") ", elevel);
+
         A->nsuccs++;
         const double ASigma = A->sigma;
         if (CONCURRENT) { A->unlock(); }
         ND::predTY & Bpreds = B->preds;
         bool bpredsNotEmpty = !Bpreds.empty();
-        //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::"\n";
+        //if (bpredsNotEmpty) galois::gDebug(Bpreds.size());
         Bpreds.clear();
         Bpreds.push_back(A);
         B->distance = ADist + 1;
@@ -187,7 +189,10 @@ struct firstForEachNodeBased {
             action4cnt.update(1);
             if (inNbr->distance >= B->distance) { // Rule 4
               if (CONCURRENT) { B->unlock(); }
-              if (DBG) std::cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << "\n";
+
+              galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
+                             B->toString(), ")", elevel);
+
               if (elev != DEF_DISTANCE) {
                 inE.level = DEF_DISTANCE;
                 if (elev == inNbr->distance) {
@@ -201,7 +206,8 @@ struct firstForEachNodeBased {
         }
       } else if (elevel == ADist && BDist == ADist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
         action2cnt.update(1);
-        if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+        galois::gDebug("Rule 2 (", A->toString(), " ||| ", B->toString(), ") ",
+                       elevel);
         const double ASigma = A->sigma;
         const double eval = ed.val;
         const double diff = ASigma - eval;
@@ -238,7 +244,8 @@ struct firstForEachNodeBased {
                 const int BDist = srcdist;
                 ND * C = dstD; const int CDist = dstdist;
                 if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                  if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+                  galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
+                                 B->toString(), ") ", elevel);
                   const double BSigma = B->sigma;
                   const double eval = ed.val;
                   const double diff = BSigma - eval;
@@ -283,7 +290,8 @@ struct firstForEachNodeBased {
           B->preds.push_back(A);
           //}
           const double BSigma = B->sigma;
-          if (DBG) { std::cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+          galois::gDebug("Rule 3 (", A->toString(), " ||| ", B->toString(), 
+                         ") ", elevel);
           B->sigma = BSigma + ASigma;
           ed.val = ASigma;
           ed.level = ADist;
@@ -315,7 +323,8 @@ struct firstForEachNodeBased {
                 const int BDist = srcdist;
                 ND * C = dstD; const int CDist = dstdist;
                 if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                  if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+                  galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
+                                 B->toString(), ") ", elevel);
                   const double BSigma = B->sigma;
                   const double eval = ed.val;
                   const double diff = BSigma - eval;
@@ -342,7 +351,8 @@ struct firstForEachNodeBased {
           }
         } /*else if (ADist >= BDist) { // Rule 4
           if (CONCURRENT) { B->unlock(); }
-          if (DBG) std::cerr << "Rule 4 (" << A->toString() << " ||| " << B->toString() << ")" << elevel << "\n";
+          galois::gDebug("Rule 4 (", A->toString(), " ||| ", B->toString(), ")",
+                         elevel);
           if (elevel != DEF_DISTANCE) { 
             ed.level = DEF_DISTANCE;                 
             if (elevel == ADist
@@ -393,7 +403,6 @@ struct firstForEach {
       loser->lock();
       winner->lock();
     }
-    //if (DBG) System.err.println("Extracted " + srcD + "bbbbb " + dstD);
     const int srcdist = srcD->distance;
     const int dstdist = dstD->distance;
     const int elevel = ed->level;
@@ -403,7 +412,8 @@ struct firstForEach {
     if (srcdist >= dstdist) { // Rule 4
       if (CONCURRENT) { dstD->unlock(); }
     action4cnt.update(1);
-      if (DBG) std::cerr << "Rule 4 (" << srcD->toString() << " ||| " << dstD->toString() << ")" << elevel << "\n";
+      galois::gDebug("Rule 4 (", srcD->toString(), " ||| ", dstD->toString(), 
+                     ")", elevel);
       if (elevel != DEF_DISTANCE /*&& elevel == srcdist*/) {
         ed->level = DEF_DISTANCE;
         if (elevel == srcdist 
@@ -432,7 +442,8 @@ struct firstForEach {
 
     if (BDist - ADist >= 2) { // Rule 1 + Rule 3 combined
     action1cnt.update(1);
-      if (DBG) { std::cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+      galois::gDebug("Rule 1+3 (", A->toString(), " ||| ", B->toString(), 
+                     ") ", elevel);
       A->nsuccs++;
       const double ASigma = A->sigma;
       if (CONCURRENT) { A->unlock(); }
@@ -468,7 +479,8 @@ struct firstForEach {
 #endif
         ) { // Rule 2: BDist = ADist + 1 and elevel = ADist
       action2cnt.update(1);
-      if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+      galois::gDebug("Rule 2 (", A->toString(), " ||| ", B->toString(), ") ",
+                     elevel);
       const double ASigma = A->sigma;
       const double eval = ed->val;
       const double diff = ASigma - eval;
@@ -506,7 +518,8 @@ struct firstForEach {
         B->preds.push_back(A);
       //}
       const double BSigma = B->sigma;
-      if (DBG) { std::cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
+      galois::gDebug("Rule 3 (", A->toString(), " ||| ", B->toString(), ") ",
+                     elevel);
       B->sigma = BSigma + ASigma;
       ed->val = ASigma;
       ed->level = ADist;
@@ -539,7 +552,7 @@ struct secondForEach {
       if (A->nsuccs == 0 /*&& !A->deltaDone()*/) {
         //...A->nsuccs = -1;
         //A->setDeltaDoneT();//A.deltaDone = true;
-        if (DBG) { std::cerr << "RULE 1 " << A->toString() << "\n"; }
+        galois::gDebug("RULE 1 ", A->toString());
         const double Adelta = A->delta;
 //        if (A != currSrcNode) {
           A->bc += Adelta;
@@ -575,7 +588,7 @@ struct secondForEach {
 //        }
 
       } else {
-        /*if (DBG)*/ { std::cerr << "Skipped " << A->toString() << "\n"; }
+        galois::gDebug("Skipped ", A->toString());
         if (CONCURRENT) { A->unlock(); }
       }
     }
@@ -595,7 +608,7 @@ struct secondForEachWithInline {
       const double Adelta = tt.d;
 //      if (CONCURRENT) { A->lock(); }
 //      if (A->nsuccs == 0) {
-        if (DBG) { std::cerr << "RULE 1 " << A->toString() << "\n"; }
+        galois::gDebug("RULE 1 ", A->toString());
 //        const double Adelta = A->delta;
         A->bc += Adelta;
 //        if (CONCURRENT) { A->unlock(); }
@@ -690,9 +703,10 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
   int nChunkSize = nnodes / numThreads;
   int eChunkSize = nedges / (numThreads);
 
-  //if (DBG) {
-    std::cerr << "nChunkSize: " << nChunkSize << " EChunkSize: " << eChunkSize << " nnodes: " << nnodes << " nedges: " << nedges << " numThreads: " << numThreads << "\n";
-  //}
+  galois::gDebug("nChunkSize: ", nChunkSize, " eChunkSize: ", eChunkSize, 
+                 " nnodes: ", nnodes, " nedges: ", nedges, " numThreads: ", 
+                 numThreads);
+
   for (int i=0; i<numThreads; ++i) {
     int start = nChunkSize * i;
     int end = -1;
@@ -700,7 +714,7 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
       end = std::max(start+nChunkSize, nnodes);
     else
       end = std::min(start+nChunkSize, nnodes);
-  if (DBG) { std::cerr << "Node cleanup chunk: " << i << " start: " << start << " end: " << end << "\n"; }
+    galois::gDebug("Node cleanup chunk: ", i, " start: ", start, " end: ", end);
     nodeArrayRanges.push_back(std::make_pair(start, end));
     start = eChunkSize * i;
     if (i==numThreads-1)
@@ -708,7 +722,7 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
     else
       end = std::min(start+eChunkSize, nedges);
     edgeArrayRanges.push_back(std::make_pair(start, end));
-  if (DBG) { std::cerr << "Edge cleanup chunk: " << i << " start: " << start << " end: " << end << "\n"; }
+    galois::gDebug("Edge cleanup chunk: ", i, " start: ", start, " end: ", end);
     workChunks.push_back(i);
   }
 }
@@ -940,7 +954,7 @@ int main(int argc, char** argv) {
   graph->fixNodePredsCapacities();
   intCapTimer.stop();
 
-  std::cerr << " INIT CAP : " << intCapTimer.get() << "\n";
+  galois::gInfo("INIT CAP : ", intCapTimer.get());
 
   action1cnt.reset();
   action2cnt.reset();
@@ -960,7 +974,7 @@ int main(int argc, char** argv) {
   // new regime: rmat25 dcf4, dcl8  //same dcl8, dcl16
   // new regime: rand26 dcl4, dcl16, ///better dcl32, dcl16
   const int chunksize = 8;
-  std::cerr << "Using chunk size : " << chunksize << "\n";
+  galois::gInfo("Using chunk size : ", chunksize);
   typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
                                                     galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
   //typedef Galoisruntime::worklists::ChunkedFIFO<chunksize, ND*, true> wl2ty;
@@ -991,7 +1005,6 @@ int main(int argc, char** argv) {
 //  galois::Statistic("Mem1", Galoisruntime::MM::pageAllocInfo());
 //  galois::preAlloc(6000);
 //  galois::Statistic("Mem2", Galoisruntime::MM::pageAllocInfo());
-  //cerr << "OMP Threads: " << omp_get_num_threads() << "\n";
   galois::StatTimer T;
   T.start();
   totalTimer.start();
@@ -1031,8 +1044,7 @@ int main(int argc, char** argv) {
 #endif
 //    wl2.fill_initial(wl.begin(), wl.end());
     active->initAsSource();
-    { std::cerr << "Source is " << active->toString() << "\n"; } 
-    if (DBG) { std::cerr << "Source is " << active->toString() << "\n"; } 
+    galois::gDebug("Source is ", active->toString());
     //graph->checkClearEdges();
 //__itt_resume();
     firstLoopTimer.start();
@@ -1054,7 +1066,7 @@ int main(int argc, char** argv) {
       feach1NodeBased(nn, wl2);
     }
   tt.stop();
-  std::cerr << "tt " << tt.get() << "\n";
+  galois::gInfo("tt ", tt.get());
 
 #endif
 
@@ -1065,7 +1077,7 @@ int main(int argc, char** argv) {
     firstLT.start();
     galois::for_each(wl2.begin(), wl2.end(), feach1, galois::wl<wl2ty>());
     firstLT.stop();
-    std::cerr << "FLTime: " << firstLT.get() << std::endl;
+    galois::gInfo("FLTime: ", firstLT.get());
 #else
   Timer tt;
     tt.start();
@@ -1075,7 +1087,7 @@ int main(int argc, char** argv) {
       feach1(ee, wl2);
     }
   tt.stop();
-  std::cerr << "tt " << tt.get() << "\n";
+  galois::gInfo("tt ", tt.get());
 
 #endif
 
@@ -1135,7 +1147,7 @@ int main(int argc, char** argv) {
 #endif
     secondLoopTimer.stop();
 #ifdef DBG_FRINGECNT
-    std::cerr << fringeCnt << " nodes in fringe " << "\n";
+    galois::gDebug(fringeCnt, " nodes in fringe");
 #endif
     thirdLoopTimer.start();
     double backupSrcBC = currSrcNode->bc;
@@ -1150,9 +1162,7 @@ int main(int argc, char** argv) {
 #endif
     currSrcNode->bc = backupSrcBC;
     thirdLoopTimer.stop();
-    //std::cerr << "Is wl empty ? " << wl4.empty() << std::endl;
     wl4.clear();
-    //std::cerr << "Is wl empty ? " << wl4.empty() << std::endl;
     if (DOCHECKS) graph->checkSteadyState2();
     //graph->printGraph();
     fourthLoopTimer.start();

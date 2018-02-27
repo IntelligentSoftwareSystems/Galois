@@ -7,7 +7,6 @@
 
 #define COUNT_ACTIONS 0
 
-#define DBG 0
 #define VERBOSE_GRAPH_READ 0 
 #define DOCHECKS 0
 
