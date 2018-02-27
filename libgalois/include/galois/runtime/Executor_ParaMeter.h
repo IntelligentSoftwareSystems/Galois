@@ -55,8 +55,6 @@
 #include <vector>
 #include <random>
 
-#include "llvm/Support/CommandLine.h"
-
 namespace galois {
 namespace runtime {
 
