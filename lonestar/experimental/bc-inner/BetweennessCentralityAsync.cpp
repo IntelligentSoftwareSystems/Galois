@@ -21,10 +21,13 @@
  * Node for asynchrounous betweeness-centrality. 
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu> (Main code writer)
- * @author Loc Hoang <l_hoang@utexas.edu> (Cleanup)
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
+#define NDEBUG
+
 #include "galois/Galois.h"
+#include "galois/ConditionalReduction.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/tuple/tuple.hpp>
@@ -32,8 +35,6 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
-
-#include "galois/ConditionalReduction.h"
 
 #include "control.h"
 #include "ND.h"
@@ -66,18 +67,20 @@ static cll::opt<bool> generateCert("generateCertificate",
                                    cll::init(false));
 // TODO better description
 static cll::opt<bool> useNodeBased("useNodeBased",
-                                  cll::desc("Use node based execution"),
-                                  cll::init(true));
+                                   cll::desc("Use node based execution"),
+                                   cll::init(true));
 
 //#define DBG_FRINGECNT
 #define USE_NODE_BASED
 #define INLINE_US
 
+// TODO move BC stuff into a struct instead of having them be globals
 int DEF_DISTANCE;
 
 BCGraph* graph;
 ND* currSrcNode;
 
+// TODO define in a struct so that they can actually be initialized
 using Counter = 
   ConditionalAccumulator<galois::GAccumulator<unsigned long>, COUNT_ACTIONS>;
 using MaxCounter = 
@@ -1008,7 +1011,7 @@ int main(int argc, char** argv) {
   galois::StatTimer T;
   T.start();
   totalTimer.start();
-  for (int i=startNode; i<nnodes; ++i) {
+  for (int i = startNode; i < nnodes; ++i) {
 //    galois::Statistic("Mem3", Galoisruntime::MM::pageAllocInfo());
   
     ND* active = &(gnodes[i].data);
@@ -1185,14 +1188,14 @@ int main(int argc, char** argv) {
   totalTimer.stop();
   T.stop();
 //  galois::Statistic("Mem4", Galoisruntime::MM::pageAllocInfo());
-  std::cout << "Total Time " << totalTimer.get() << std::endl;
-  std::cout<< "First Loop: " << firstLoopTimer.get() << std::endl;
-  std::cout<< "Second Loop: " << secondLoopTimer.get() << std::endl;
-  std::cout<< "Third Loop: " << thirdLoopTimer.get() << std::endl;
-  std::cout<< "Fourth Loop: " << fourthLoopTimer.get() << std::endl;
-
+  galois::gPrint("Total Time ", totalTimer.get());
+  galois::gPrint( "First Loop: ", firstLoopTimer.get());
+  galois::gPrint( "Second Loop: ", secondLoopTimer.get());
+  galois::gPrint( "Third Loop: ", thirdLoopTimer.get());
+  galois::gPrint( "Fourth Loop: ", fourthLoopTimer.get());
  
-  // one counter active -> all of them are active
+  // one counter active -> all of them are active (since all controlled by same
+  // ifdef)
   if (action1cnt.isActive()) {
     unsigned long sum1 = action1cnt.reduce();
     unsigned long sum2 = action2cnt.reduce();
@@ -1209,19 +1212,15 @@ int main(int argc, char** argv) {
     galois::gPrint("Largest node distance is ", largestNodeDist.reduce(), "\n");
   }
 
-  //if (!skipVerify)
-  //  graph->verify();
+  // prints out first 10 node BC values
   if (!skipVerify) {
+    //graph->verify(); // TODO see what this does
     int count = 0;
-    for (int i = 0; i << nnodes && count < 10; ++i, ++count) {
-      std::cout << count << ": "
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6)
-        << gnodes[i].data.bc
-        << "\n";
+    for (int i = 0; i < nnodes && count < 10; ++i, ++count) {
+      galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
+                     std::setprecision(6), gnodes[i].data.bc, "\n");
     }
   }
-
-  graph->printBCs();
 
   if (generateCert) {
     graph->printAllBCs(numThreads, "certificate_");
