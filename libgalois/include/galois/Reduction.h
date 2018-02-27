@@ -66,6 +66,7 @@ protected:
   }
 
 public:
+  using AccumType = T; // for outside access if necessary
 
   /**
    * @param f the binary functor acting as the reduction operator
