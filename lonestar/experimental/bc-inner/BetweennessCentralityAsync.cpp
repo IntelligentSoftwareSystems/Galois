@@ -73,10 +73,6 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 #define USE_NODE_BASED
 #define INLINE_US
 
-using namespace std;
-
-//static const char* help = "<input file>";
-
 int DEF_DISTANCE;
 
 BCGraph* graph;
@@ -152,13 +148,13 @@ struct firstForEachNodeBased {
       if (BDist - ADist > 1) { // Rule 1 + Rule 3 combined
         action1cnt.update(1);
 
-        if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+        if (DBG) { std::cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
         A->nsuccs++;
         const double ASigma = A->sigma;
         if (CONCURRENT) { A->unlock(); }
         ND::predTY & Bpreds = B->preds;
         bool bpredsNotEmpty = !Bpreds.empty();
-        //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::endl;
+        //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::"\n";
         Bpreds.clear();
         Bpreds.push_back(A);
         B->distance = ADist + 1;
@@ -191,7 +187,7 @@ struct firstForEachNodeBased {
             action4cnt.update(1);
             if (inNbr->distance >= B->distance) { // Rule 4
               if (CONCURRENT) { B->unlock(); }
-              if (DBG) cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << endl;
+              if (DBG) std::cerr << "Rule 4 (" << inNbr->toString() << " ||| " << B->toString() << ")" << elevel << "\n";
               if (elev != DEF_DISTANCE) {
                 inE.level = DEF_DISTANCE;
                 if (elev == inNbr->distance) {
@@ -205,7 +201,7 @@ struct firstForEachNodeBased {
         }
       } else if (elevel == ADist && BDist == ADist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
         action2cnt.update(1);
-        if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+        if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
         const double ASigma = A->sigma;
         const double eval = ed.val;
         const double diff = ASigma - eval;
@@ -242,7 +238,7 @@ struct firstForEachNodeBased {
                 const int BDist = srcdist;
                 ND * C = dstD; const int CDist = dstdist;
                 if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                  if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+                  if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
                   const double BSigma = B->sigma;
                   const double eval = ed.val;
                   const double diff = BSigma - eval;
@@ -275,7 +271,7 @@ struct firstForEachNodeBased {
           // Test taking it out
           //const bool AnotPredOfB = !B->predsContain(A);
           //if (!AnotPredOfB) {
-          //  cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
+          //  std::cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << "\n";
           //}
           //if (AnotPredOfB) {
           A->nsuccs++;
@@ -287,7 +283,7 @@ struct firstForEachNodeBased {
           B->preds.push_back(A);
           //}
           const double BSigma = B->sigma;
-          if (DBG) { cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+          if (DBG) { std::cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
           B->sigma = BSigma + ASigma;
           ed.val = ASigma;
           ed.level = ADist;
@@ -319,7 +315,7 @@ struct firstForEachNodeBased {
                 const int BDist = srcdist;
                 ND * C = dstD; const int CDist = dstdist;
                 if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                  if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+                  if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
                   const double BSigma = B->sigma;
                   const double eval = ed.val;
                   const double diff = BSigma - eval;
@@ -346,7 +342,7 @@ struct firstForEachNodeBased {
           }
         } /*else if (ADist >= BDist) { // Rule 4
           if (CONCURRENT) { B->unlock(); }
-          if (DBG) cerr << "Rule 4 (" << A->toString() << " ||| " << B->toString() << ")" << elevel << endl;
+          if (DBG) std::cerr << "Rule 4 (" << A->toString() << " ||| " << B->toString() << ")" << elevel << "\n";
           if (elevel != DEF_DISTANCE) { 
             ed.level = DEF_DISTANCE;                 
             if (elevel == ADist
@@ -407,7 +403,7 @@ struct firstForEach {
     if (srcdist >= dstdist) { // Rule 4
       if (CONCURRENT) { dstD->unlock(); }
     action4cnt.update(1);
-      if (DBG) cerr << "Rule 4 (" << srcD->toString() << " ||| " << dstD->toString() << ")" << elevel << endl;
+      if (DBG) std::cerr << "Rule 4 (" << srcD->toString() << " ||| " << dstD->toString() << ")" << elevel << "\n";
       if (elevel != DEF_DISTANCE /*&& elevel == srcdist*/) {
         ed->level = DEF_DISTANCE;
         if (elevel == srcdist 
@@ -436,7 +432,7 @@ struct firstForEach {
 
     if (BDist - ADist >= 2) { // Rule 1 + Rule 3 combined
     action1cnt.update(1);
-      if (DBG) { cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+      if (DBG) { std::cerr << "Rule 1+3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
       A->nsuccs++;
       const double ASigma = A->sigma;
       if (CONCURRENT) { A->unlock(); }
@@ -472,7 +468,7 @@ struct firstForEach {
 #endif
         ) { // Rule 2: BDist = ADist + 1 and elevel = ADist
       action2cnt.update(1);
-      if (DBG) { cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+      if (DBG) { std::cerr << "Rule 2 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
       const double ASigma = A->sigma;
       const double eval = ed->val;
       const double diff = ASigma - eval;
@@ -498,7 +494,7 @@ struct firstForEach {
       // Test taking it out
       //const bool AnotPredOfB = !B->predsContain(A);
       //if (!AnotPredOfB) {
-      //  cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << endl;
+      //  std::cerr << "I DONT UNDERSTANT" << A->toString() << " " << B->toString() << "\n";
       //}
       //if (AnotPredOfB) {
         A->nsuccs++;
@@ -510,7 +506,7 @@ struct firstForEach {
         B->preds.push_back(A);
       //}
       const double BSigma = B->sigma;
-      if (DBG) { cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << endl; }
+      if (DBG) { std::cerr << "Rule 3 (" << A->toString() << " ||| " << B->toString() << ") " << elevel << "\n"; }
       B->sigma = BSigma + ASigma;
       ed->val = ASigma;
       ed->level = ADist;
@@ -543,7 +539,7 @@ struct secondForEach {
       if (A->nsuccs == 0 /*&& !A->deltaDone()*/) {
         //...A->nsuccs = -1;
         //A->setDeltaDoneT();//A.deltaDone = true;
-        if (DBG) { std::cerr << "RULE 1 " << A->toString() << std::endl; }
+        if (DBG) { std::cerr << "RULE 1 " << A->toString() << "\n"; }
         const double Adelta = A->delta;
 //        if (A != currSrcNode) {
           A->bc += Adelta;
@@ -579,7 +575,7 @@ struct secondForEach {
 //        }
 
       } else {
-        /*if (DBG)*/ { std::cerr << "Skipped " << A->toString() << endl; }
+        /*if (DBG)*/ { std::cerr << "Skipped " << A->toString() << "\n"; }
         if (CONCURRENT) { A->unlock(); }
       }
     }
@@ -599,7 +595,7 @@ struct secondForEachWithInline {
       const double Adelta = tt.d;
 //      if (CONCURRENT) { A->lock(); }
 //      if (A->nsuccs == 0) {
-        if (DBG) { std::cerr << "RULE 1 " << A->toString() << std::endl; }
+        if (DBG) { std::cerr << "RULE 1 " << A->toString() << "\n"; }
 //        const double Adelta = A->delta;
         A->bc += Adelta;
 //        if (CONCURRENT) { A->unlock(); }
@@ -671,7 +667,7 @@ struct secondForEachWithInline {
         graph->resetOutEdges(A);
 
 //      } else {
-//        /*if (DBG)*/ { std::cerr << "Skipped " << A->toString() << endl; }
+//        /*if (DBG)*/ { std::cerr << "Skipped " << A->toString() << "\n"; }
 //        if (CONCURRENT) { A->unlock(); }
 //      }
     }
@@ -695,24 +691,24 @@ void createCleanupChunks(int nnodes, int nedges, int numThreads) {
   int eChunkSize = nedges / (numThreads);
 
   //if (DBG) {
-    cerr << "nChunkSize: " << nChunkSize << " EChunkSize: " << eChunkSize << " nnodes: " << nnodes << " nedges: " << nedges << " numThreads: " << numThreads << endl;
+    std::cerr << "nChunkSize: " << nChunkSize << " EChunkSize: " << eChunkSize << " nnodes: " << nnodes << " nedges: " << nedges << " numThreads: " << numThreads << "\n";
   //}
   for (int i=0; i<numThreads; ++i) {
     int start = nChunkSize * i;
     int end = -1;
     if (i==numThreads-1)
-      end = max(start+nChunkSize, nnodes);
+      end = std::max(start+nChunkSize, nnodes);
     else
-      end = min(start+nChunkSize, nnodes);
-  if (DBG) { cerr << "Node cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
+      end = std::min(start+nChunkSize, nnodes);
+  if (DBG) { std::cerr << "Node cleanup chunk: " << i << " start: " << start << " end: " << end << "\n"; }
     nodeArrayRanges.push_back(std::make_pair(start, end));
     start = eChunkSize * i;
     if (i==numThreads-1)
-      end = max(start+eChunkSize, nedges);
+      end = std::max(start+eChunkSize, nedges);
     else
-      end = min(start+eChunkSize, nedges);
+      end = std::min(start+eChunkSize, nedges);
     edgeArrayRanges.push_back(std::make_pair(start, end));
-  if (DBG) { cerr << "Edge cleanup chunk: " << i << " start: " << start << " end: " << end << endl; }
+  if (DBG) { std::cerr << "Edge cleanup chunk: " << i << " start: " << start << " end: " << end << "\n"; }
     workChunks.push_back(i);
   }
 }
@@ -841,7 +837,7 @@ struct fourthForEach {
 //      std::pair<int,int> p1 = nodeArrayRanges[i];
       assert(i<edgeArrayRanges.size());
       std::pair<int,int> p2 = edgeArrayRanges[i];
-      //if (DBG) { cerr << "Cleaning up: nodes[" << p1.first << "," << p1.second << "] Edges[" << p2.first << "," << p2.second << "]" << endl; }
+      //if (DBG) { std::cerr << "Cleaning up: nodes[" << p1.first << "," << p1.second << "] Edges[" << p2.first << "," << p2.second << "]" << "\n"; }
       graph->cleanupData(/*p1.first, p1.second,*/ p2.first, p2.second);
     }
 };
@@ -852,7 +848,7 @@ struct cleanupGraphDOALL {
 //      std::pair<int,int> p1 = nodeArrayRanges[i];
       assert(i<(int)edgeArrayRanges.size());
       std::pair<int,int> p2 = edgeArrayRanges[i];
-      //if (DBG) { cerr << "Cleaning up: nodes[" << p1.first << "," << p1.second << "] Edges[" << p2.first << "," << p2.second << "]" << endl; }
+      //if (DBG) { std::cerr << "Cleaning up: nodes[" << p1.first << "," << p1.second << "] Edges[" << p2.first << "," << p2.second << "]" << "\n"; }
       graph->cleanupData(/*p1.first, p1.second,*/ p2.first, p2.second);
     }
 };
@@ -944,7 +940,7 @@ int main(int argc, char** argv) {
   graph->fixNodePredsCapacities();
   intCapTimer.stop();
 
-  std::cerr << " INIT CAP : " << intCapTimer.get() << endl;
+  std::cerr << " INIT CAP : " << intCapTimer.get() << "\n";
 
   action1cnt.reset();
   action2cnt.reset();
@@ -964,14 +960,14 @@ int main(int argc, char** argv) {
   // new regime: rmat25 dcf4, dcl8  //same dcl8, dcl16
   // new regime: rand26 dcl4, dcl16, ///better dcl32, dcl16
   const int chunksize = 8;
-  std::cerr << "Using chunk size : " << chunksize << std::endl;
+  std::cerr << "Using chunk size : " << chunksize << "\n";
   typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
                                                     galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
   //typedef Galoisruntime::worklists::ChunkedFIFO<chunksize, ND*, true> wl2ty;
   galois::InsertBag<ND*> wl2;
   #else
   //const int chunksize = 64;
-  //std::cerr << "Using chunk size : " << chunksize << std::endl;
+  //std::cerr << "Using chunk size : " << chunksize << "\n";
   //typedef Galoisruntime::worklists::SimpleOrderedByIntegerMetric<EdgeIndexer, Galoisruntime::worklists::dChunkedLIFO<chunksize, ED*, true>, true, ED*, true> wl2ty;
   //Galoisruntime::galois_insert_bag<ED*> wl2;
   #endif
@@ -995,7 +991,7 @@ int main(int argc, char** argv) {
 //  galois::Statistic("Mem1", Galoisruntime::MM::pageAllocInfo());
 //  galois::preAlloc(6000);
 //  galois::Statistic("Mem2", Galoisruntime::MM::pageAllocInfo());
-  //cerr << "OMP Threads: " << omp_get_num_threads() << endl;
+  //cerr << "OMP Threads: " << omp_get_num_threads() << "\n";
   galois::StatTimer T;
   T.start();
   totalTimer.start();
@@ -1035,8 +1031,8 @@ int main(int argc, char** argv) {
 #endif
 //    wl2.fill_initial(wl.begin(), wl.end());
     active->initAsSource();
-    { cerr << "Source is " << active->toString() << endl; } 
-    if (DBG) { cerr << "Source is " << active->toString() << endl; } 
+    { std::cerr << "Source is " << active->toString() << "\n"; } 
+    if (DBG) { std::cerr << "Source is " << active->toString() << "\n"; } 
     //graph->checkClearEdges();
 //__itt_resume();
     firstLoopTimer.start();
@@ -1058,7 +1054,7 @@ int main(int argc, char** argv) {
       feach1NodeBased(nn, wl2);
     }
   tt.stop();
-  cerr << "tt " << tt.get() << endl;
+  std::cerr << "tt " << tt.get() << "\n";
 
 #endif
 
@@ -1079,7 +1075,7 @@ int main(int argc, char** argv) {
       feach1(ee, wl2);
     }
   tt.stop();
-  cerr << "tt " << tt.get() << endl;
+  std::cerr << "tt " << tt.get() << "\n";
 
 #endif
 
@@ -1139,7 +1135,7 @@ int main(int argc, char** argv) {
 #endif
     secondLoopTimer.stop();
 #ifdef DBG_FRINGECNT
-    cerr << fringeCnt << " nodes in fringe " << endl;
+    std::cerr << fringeCnt << " nodes in fringe " << "\n";
 #endif
     thirdLoopTimer.start();
     double backupSrcBC = currSrcNode->bc;
