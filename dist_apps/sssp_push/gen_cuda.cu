@@ -476,7 +476,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "119 -> 120;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "120 -> 121;
 }
 __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGReduceMax<uint32_t> DGMax)
@@ -509,9 +509,9 @@ __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned i
     }
   }
   // FP: "14 -> 15;
-  DGAccumulator_sum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_sum_ts);
+  DGAccumulator_sum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_sum_ts);
   // FP: "15 -> 16;
-  DGMax.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGMax_ts);
+  DGMax.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGMax_ts);
   // FP: "16 -> 17;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint32_t & local_infinity, unsigned long long local_src_node, struct CUDA_Context*  ctx)

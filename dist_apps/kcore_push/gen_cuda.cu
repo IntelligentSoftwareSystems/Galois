@@ -463,7 +463,7 @@ __global__ void KCoreStep1(CSRGraph graph, unsigned int __begin, unsigned int __
     assert(threadIdx.x < __kernel_tb_size);
   }
   // FP: "107 -> 108;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "108 -> 109;
 }
 __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, HGAccumulator<uint64_t> DGAccumulator_accum)
@@ -491,7 +491,7 @@ __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned 
     }
   }
   // FP: "11 -> 12;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "12 -> 13;
 }
 void InitializeGraph2_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)

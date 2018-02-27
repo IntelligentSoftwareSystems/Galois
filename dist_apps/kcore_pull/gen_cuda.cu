@@ -92,7 +92,7 @@ __global__ void LiveUpdate(CSRGraph graph, unsigned int __begin, unsigned int __
     }
   }
   // FP: "22 -> 23;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "23 -> 24;
 }
 __global__ void KCore(CSRGraph graph, unsigned int __begin, unsigned int __end, uint8_t * p_flag, uint8_t * p_pull_flag, uint32_t * p_trim, DynamicBitset& bitset_trim)
@@ -335,7 +335,7 @@ __global__ void KCoreSanityCheck(CSRGraph graph, unsigned int __begin, unsigned 
     }
   }
   // FP: "11 -> 12;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "12 -> 13;
 }
 void DegreeCounting_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
