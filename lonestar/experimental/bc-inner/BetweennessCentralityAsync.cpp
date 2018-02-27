@@ -70,7 +70,6 @@ static cll::opt<bool> useNodeBased("useNodeBased",
                                    cll::desc("Use node based execution"),
                                    cll::init(true));
 
-//#define DBG_FRINGECNT
 #define USE_NODE_BASED
 #define INLINE_US
 
@@ -83,9 +82,6 @@ ND* currSrcNode;
 // TODO define in a struct so that they can actually be initialized
 using Counter = 
   ConditionalAccumulator<galois::GAccumulator<unsigned long>, COUNT_ACTIONS>;
-using MaxCounter = 
-  ConditionalAccumulator<galois::GReduceMax<unsigned long>, COUNT_ACTIONS>;
-
 Counter action1cnt;
 Counter action2cnt;
 Counter action2Excnt;
@@ -93,7 +89,15 @@ Counter action3cnt;
 Counter action4cnt;
 Counter action555;
 Counter actionNone;
+
+using MaxCounter = 
+  ConditionalAccumulator<galois::GReduceMax<unsigned long>, COUNT_ACTIONS>;
 MaxCounter largestNodeDist;
+
+using FringeCounter = 
+  ConditionalAccumulator<galois::GAccumulator<unsigned long>, DBG_FRINGECNT>;
+FringeCounter fringeCnts;
+
 
 #if MERGE_LOOPS
 int curr_round = 0;
@@ -736,35 +740,11 @@ struct RevNodeIndexer : std::binary_function<ND*, int, int> {
   }
 };
 
-#ifdef DBG_FRINGECNT
-PerCPU<int> fringeCnts;
-#endif
 
 //std::vector<f2Item> *fringeBuffs;
 galois::InsertBag<ND*>* fringewl;
 //Galoisruntime::worklists::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, Galoisruntime::worklists::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
 galois::substrate::CacheLineStorage<ND> *gnodes;
-
-//void fringeFindOMP() {
-//  int gsize = graph->size();
-//#pragma omp parallel 
-//  {
-//    int lcnt = 0; 
-//    int _tid_ = omp_get_thread_num();
-//    #pragma omp for schedule(guided, 5)
-//    for (lcnt=0; lcnt<gsize; ++lcnt) {
-//      ND *n = graph->getNode(lcnt);
-//      if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-//#ifdef DBG_FRINGECNT
-//        fringeCnts.get()++;
-//#endif
-//        f2Item f = {false,n,n->delta};
-//        fringeBuffs[_tid_].push_back(f);
-////        fringewl->push(f2Item(false,n,n->delta));
-//      }
-//    }
-//  }
-//}
 
 struct fringeFindDOALL {
   void inline operator()(int i,int) {
@@ -774,9 +754,7 @@ struct fringeFindDOALL {
     for (int j=start; j<end; ++j) {
       ND * n = &(gnodes[j].data);
       if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#ifdef DBG_FRINGECNT
-        fringeCnts.get()++;
-#endif
+        fringeCnts.update(1);
 //        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
 //        fringewl->push(f2Item(false,n,n->delta));
 
@@ -800,9 +778,7 @@ struct fringeFindDOALL2 {
     {
       ND * n = &(gnodes[j].data);
       if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#ifdef DBG_FRINGECNT
-        fringeCnts.get()++;
-#endif
+        fringeCnts.update(1);
 //        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
 //f2Item f = {false, n, n->delta};
 //        fringewl->push(f);//2Item(false,n,n->delta));
@@ -823,9 +799,7 @@ struct fringeFindDOALL2NoInline {
     {
       ND * n = &(gnodes[j].data);
       if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
-#ifdef DBG_FRINGECNT
-        fringeCnts.get()++;
-#endif
+        fringeCnts.update(1);
 //        fringeBuffs.get(i).push_back(f2Item(false,n,n->delta));
             
         fringewl->push(n);
@@ -1100,16 +1074,10 @@ int main(int argc, char** argv) {
     if (DOCHECKS) graph->checkGraph(active);
 
     secondLoopTimer.start();
-#ifdef DBG_FRINGECNT
-    int fringeCnt = 0;
-#endif
 #if CONCURRENT
 
-#ifdef DBG_FRINGECNT
-  for (int kk=0; kk<numThreads; ++kk) {
-    fringeCnts.get(kk) = 0;
-  }
-#endif
+  fringeCnts.reset();
+
   //Galoisruntime::for_all_parallel(findFringe);
 //  fringeFindOMP();
 //  galois::on_each(findFringe);
@@ -1127,31 +1095,27 @@ int main(int argc, char** argv) {
 //    std::cerr << "buff " << kk << " size " << abuff.size() << "\n";
 //    abuff.clear();
 //  }
-#ifdef DBG_FRINGECNT
-  for (int kk=0; kk<numThreads; ++kk) {
-    int tmp = fringeCnts.get(kk);
-    fringeCnts.get(kk) = 0;
-    fringeCnt += tmp;
-  }
-#endif
-
+  unsigned int fringeCnt = fringeCnts.reduce();
+  fringeCnts.reset();
 #else
     //std::list<ND*> wl3;
     for (int j=0; j<nnodes; ++j) {
       ND * n = &(gnodes[j].data);
       if (n->nsuccs == 0) {
-#ifdef DBG_FRINGECNT
-        fringeCnt++;
-#endif
+        if (fringeCnts.isActive()) {
+          fringeCnt++;
+        }
         wl4.push_back(n);
       }
     }
     //wl4.fill_initial(wl3.begin(), wl3.end());
 #endif
     secondLoopTimer.stop();
-#ifdef DBG_FRINGECNT
-    galois::gDebug(fringeCnt, " nodes in fringe");
-#endif
+
+    if (fringeCnts.isActive()) {
+      galois::gPrint(fringeCnt, " nodes in fringe");
+    }
+
     thirdLoopTimer.start();
     double backupSrcBC = currSrcNode->bc;
     #if CONCURRENT   
