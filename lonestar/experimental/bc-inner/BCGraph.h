@@ -435,18 +435,21 @@ class BCGraph {
     std::cerr << "Verification ok!" << std::endl;
   }
 
+  /**
+   * Prints first 10 BC values
+   */
   void printBCs() {
-    //for (int i=0; i<nnodes; ++i) {
-    int n = std::min(nnodes,10);
-    for (int i=0; i<n; ++i) {
-      std::cerr << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
+    int n = std::min(nnodes, 10);
+    for (int i = 0; i < n; ++i) {
+      std::cerr << i << ": " << std::setiosflags(std::ios::fixed) 
+                << std::setprecision(6) << nodes[i].data.bc << "\n";
     }
   }
 
-  void printAllBCs(int numThreads, char *filename) {
+  void printAllBCs(int numThreads, const std::string filename) {
     std::cerr << "Writting out bc values...\n";
     std::stringstream outfname;
-    outfname << filename << "_" << numThreads << ".txt";
+    outfname << filename.c_str() << "_" << numThreads << ".txt";
     std::string fname = outfname.str();
     std::ofstream outfile(fname.c_str());
     for (int i=0; i<nnodes; ++i) {

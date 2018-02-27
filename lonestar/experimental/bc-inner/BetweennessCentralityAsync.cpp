@@ -491,18 +491,11 @@ int main(int argc, char** argv) {
   secondForEach feach2;
   fringeFindDOALL2NoInline findFringe;
 
-  galois::TimeAccumulator firstLoopTimer;
-  galois::TimeAccumulator secondLoopTimer;
-  galois::TimeAccumulator thirdLoopTimer;
-  galois::TimeAccumulator fourthLoopTimer;
-  galois::TimeAccumulator totalTimer;
   
-  galois::TimeAccumulator intCapTimer;  
-  intCapTimer.start();
+  galois::StatTimer initCapTimer("InitCapacities");
+  initCapTimer.start();
   graph->fixNodePredsCapacities();
-  intCapTimer.stop();
-
-  galois::gInfo("INIT CAP : ", intCapTimer.get());
+  initCapTimer.stop();
 
   action1cnt.reset();
   action2cnt.reset();
@@ -530,7 +523,6 @@ int main(int argc, char** argv) {
   //std::cerr << "Using chunk size : " << chunksize << "\n";
   //Galoisruntime::galois_insert_bag<ED*> wl2;
   #endif
-  typedef galois::worklists::dChunkedLIFO<16> wl4ty;  
   galois::InsertBag<ND*> wl4;
   fringewl = &wl4;
   //Galoisruntime::worklists::FIFO<int,  true> wl5;
@@ -542,12 +534,16 @@ int main(int argc, char** argv) {
 
   galois::reportPageAlloc("MemAllocPre");
 
-  int stepCnt = 0; // number of sources done
+  unsigned stepCnt = 0; // number of sources done
 
   galois::StatTimer executionTimer;
+  galois::StatTimer firstLoopTimer("First Loop");
+  galois::StatTimer secondLoopTimer("Second Loop");
+  galois::StatTimer thirdLoopTimer("Third Loop");
+  galois::StatTimer fourthLoopTimer("Fourth Loop");
+
   executionTimer.start();
-  totalTimer.start();
-  for (int i = startNode; i < nnodes; ++i) {
+  for (unsigned i = startNode; i < nnodes; ++i) {
     ND* active = &(gnodes[i].data);
     currSrcNode = active;
     // ignore nodes with no neighbors
@@ -664,7 +660,6 @@ int main(int argc, char** argv) {
     thirdLoopTimer.start();
     double backupSrcBC = currSrcNode->bc;
     #if CONCURRENT   
-    //galois::for_each(galois::iterate(wl4), feach2, galois::wl<wl4ty>());
     galois::for_each(galois::iterate(wl4), feach2);
     #else
     while (!wl4.empty()) {
@@ -694,17 +689,10 @@ int main(int argc, char** argv) {
     fourthLoopTimer.stop();
 
   }
-  totalTimer.stop();
   executionTimer.stop();
 
   galois::reportPageAlloc("MemAllocPost");
 
-  galois::gInfo("Total Time ", totalTimer.get());
-  galois::gInfo("First Loop: ", firstLoopTimer.get());
-  galois::gInfo("Second Loop: ", secondLoopTimer.get());
-  galois::gInfo("Third Loop: ", thirdLoopTimer.get());
-  galois::gInfo("Fourth Loop: ", fourthLoopTimer.get());
- 
   // one counter active -> all of them are active (since all controlled by same
   // ifdef)
   if (action1cnt.isActive()) {
@@ -727,7 +715,7 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     //graph->verify(); // TODO see what this does
     int count = 0;
-    for (int i = 0; i < nnodes && count < 10; ++i, ++count) {
+    for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
                      std::setprecision(6), gnodes[i].data.bc, "\n");
     }
