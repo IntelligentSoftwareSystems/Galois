@@ -685,7 +685,7 @@ static void run(Rounds& rounds, Graph& graph) {
           auto nv = [&dt] (Point* p, auto& ctx) {
             dt.processPoint<detPrefix>(p, ctx);
           };
-          dt.generateMesh<detPrefix, DWL>(pptrs, galois::neighborhood_visitor<decltype(nv)>(nv));
+          dt.generateMesh<detBase, DWL>(pptrs, galois::neighborhood_visitor<decltype(nv)>(nv));
           break;
         }
       case detDisjoint:
