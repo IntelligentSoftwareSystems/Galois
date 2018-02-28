@@ -76,8 +76,10 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 int DEF_DISTANCE;
 
 struct BetweenessCentralityAsync {
-  BCGraph* graph;
+  BCGraph& graph;
   ND* currSrcNode;
+
+  BetweenessCentralityAsync(BCGraph& _graph) : graph(_graph) { }
   
   using Counter = 
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
@@ -107,10 +109,10 @@ struct BetweenessCentralityAsync {
         srcD->markOut();
         #endif
   
-        int* outIdx = graph->outIdx;
+        int* outIdx = graph.outIdx;
         int startE = outIdx[idx];
         int endE = outIdx[idx + 1];
-        ED* edgeData = graph->edgeData;
+        ED* edgeData = graph.edgeData;
   
         // loop through all edges
         for (int i = startE; i < endE; i++) {
@@ -170,8 +172,8 @@ struct BetweenessCentralityAsync {
             // Part of Correct Node
             if (bpredsNotEmpty) {
               int idx = B->id;
-              int* inIdx = graph->inIdx;
-              int* ins = graph->ins; 
+              int* inIdx = graph.inIdx;
+              int* ins = graph.ins; 
               int startInE = inIdx[idx];
               int endInE = inIdx[idx + 1];
   
@@ -232,7 +234,7 @@ struct BetweenessCentralityAsync {
                   int idx = B->id;
                   int startE = outIdx[idx];
                   int endE = outIdx[idx + 1];
-                  ED * edgeData = graph->edgeData;
+                  ED * edgeData = graph.edgeData;
                   for (int i = startE; i < endE; i++) {
                     ED & ed = edgeData[i];
                     ND * dstD = ed.dst;
@@ -305,7 +307,7 @@ struct BetweenessCentralityAsync {
                 int idx = B->id;
                 int startE = outIdx[idx];
                 int endE = outIdx[idx + 1];
-                ED * edgeData = graph->edgeData;
+                ED * edgeData = graph.edgeData;
                 for (int i = startE; i < endE; i++) {
                   ED & ed = edgeData[i];
                   ND * dstD = ed.dst;
@@ -394,7 +396,7 @@ struct BetweenessCentralityAsync {
             }
           }
           A->reset();
-          graph->resetOutEdges(A);
+          graph.resetOutEdges(A);
         } else {
           galois::gDebug("Skipped ", A->toString());
           if (CONCURRENT) { A->unlock(); }
@@ -473,12 +475,12 @@ int main(int argc, char** argv) {
   } else {
     galois::gInfo("Running in serial mode");
   }
+  BCGraph graph(filename.c_str());
 
-  BetweenessCentralityAsync bcExecutor;
+  BetweenessCentralityAsync bcExecutor(graph);
 
-  bcExecutor.graph = new BCGraph(filename.c_str());
-  unsigned nnodes = bcExecutor.graph->size();
-  unsigned nedges = bcExecutor.graph->getNedges();
+  unsigned nnodes = graph.size();
+  unsigned nedges = graph.getNedges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
 
   DEF_DISTANCE = nnodes * 2;
@@ -487,13 +489,11 @@ int main(int argc, char** argv) {
   galois::gInfo("Bucket size ", buckets);
   galois::gInfo("Num threads is ", numThreads);
 
-  //createCleanupChunks(nnodes, nedges, numThreads);
-
-  bcExecutor.gnodes = bcExecutor.graph->getNodes();
+  bcExecutor.gnodes = graph.getNodes();
   
   galois::StatTimer initCapTimer("InitCapacities");
   initCapTimer.start();
-  bcExecutor.graph->fixNodePredsCapacities();
+  graph.fixNodePredsCapacities();
   initCapTimer.stop();
 
   bcExecutor.spfuCount.reset();
@@ -525,6 +525,8 @@ int main(int argc, char** argv) {
   #endif 
 
   galois::reportPageAlloc("MemAllocPre");
+  galois::preAlloc(galois::getActiveThreads() * nnodes / 1650);
+  galois::reportPageAlloc("MemAllocMid");
 
   unsigned stepCnt = 0; // number of sources done
 
@@ -539,7 +541,7 @@ int main(int argc, char** argv) {
     ND* active = &(bcExecutor.gnodes[i].data);
     bcExecutor.currSrcNode = active;
     // ignore nodes with no neighbors
-    int nnbrs = bcExecutor.graph->outNeighborsSize(active);
+    int nnbrs = graph.outNeighborsSize(active);
     if (nnbrs == 0) {
       continue;
     }
@@ -562,11 +564,11 @@ int main(int argc, char** argv) {
     wl2.push_back(active);
 #else
     std::vector<ED*> wl;
-    bcExecutor.graph->initWLToOutEdges(active, wl2);
+    graph.initWLToOutEdges(active, wl2);
 #endif
     active->initAsSource();
     galois::gDebug("Source is ", active->toString());
-    //graph->checkClearEdges();
+    //graph.checkClearEdges();
 //__itt_resume();
     forwardPassTimer.start();
 #ifdef USE_NODE_BASED
@@ -605,8 +607,7 @@ int main(int argc, char** argv) {
 #endif
 #endif
     forwardPassTimer.stop();
-//__itt_pause();
-    if (DOCHECKS) bcExecutor.graph->checkGraph(active);
+    if (DOCHECKS) graph.checkGraph(active);
 
     leafFinderTimer.start();
 #if CONCURRENT
@@ -643,11 +644,11 @@ int main(int argc, char** argv) {
     bcExecutor.currSrcNode->bc = backupSrcBC; // current source BC should not get updated
     backwardPassTimer.stop();
     wl4.clear();
-    if (DOCHECKS) bcExecutor.graph->checkSteadyState2();
-    //graph->printGraph();
+    if (DOCHECKS) graph.checkSteadyState2();
+    //graph.printGraph();
 
     cleanupTimer.start();
-    bcExecutor.graph->cleanupData();
+    graph.cleanupData();
     cleanupTimer.stop();
   }
   executionTimer.stop();
@@ -669,7 +670,7 @@ int main(int argc, char** argv) {
 
   // prints out first 10 node BC values
   if (!skipVerify) {
-    //graph->verify(); // TODO see what this does
+    //graph.verify(); // TODO see what this does
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
@@ -678,7 +679,7 @@ int main(int argc, char** argv) {
   }
 
   if (generateCert) {
-    bcExecutor.graph->printAllBCs(numThreads, "certificate_");
+    graph.printAllBCs(numThreads, "certificate_");
   }
 
   return 0;
