@@ -8,7 +8,6 @@ PSET=$5
 THREADS=$6
 
 execname=$1
-#execdir=/pylon5/ci560jp/roshand/Galois-build/dist_apps/experimental/apps/cgo
 #execdir=/pylon5/ci560jp/roshand/Galois-build/dist_apps
 execdir=`pwd`
 EXEC=${execdir}/${execname}
@@ -19,24 +18,19 @@ extension=gr
 
 statname=${execname}_${inputname}_${PART}_${SLURM_NNODES}_${PSET}_${SLURM_JOB_ID}.stats
 
-FLAGS=
-FLAGS+=" -statFile=${execdir}/${statname}"
+FLAGS=" -statFile=${execdir}/${statname}"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
   # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
-if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
+if [[ ($execname == *"bc"*) || ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
     FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
-# bc: if rmat15 is not used, specify single source flags else do
-# all sources for rmat15
-# TODO currently uses rmat16 (doesn't exist) so everything does single source
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+if [[ ($execname == *"bc"*) ]]; then
   FLAGS+=" -singleSource"
-  FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
 fi
 
 source_file=${inputdirname}/source
@@ -53,7 +47,7 @@ grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
 if [[ ($execname == *"pagerank"*) ]]; then
-  FLAGS+=" -maxIterations=125"
+  FLAGS+=" -maxIterations=100"
 fi
 FLAGS+=" -partition=${PART}"
 #if [[ ($PART == "cvc") ]]; then
