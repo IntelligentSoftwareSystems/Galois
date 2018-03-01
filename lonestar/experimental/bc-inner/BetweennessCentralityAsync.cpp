@@ -310,37 +310,6 @@ struct BetweenessCentralityAsync {
     );
   }
   
-  std::vector<std::pair<int, int>> nodeArrayRanges;
-  std::vector<std::pair<int, int>> edgeArrayRanges;
-  std::vector<int> workChunks;
-  void createCleanupChunks(int nnodes, int nedges, int numThreads) {
-    int nChunkSize = nnodes / numThreads;
-    int eChunkSize = nedges / (numThreads);
-  
-    galois::gDebug("nChunkSize: ", nChunkSize, " eChunkSize: ", eChunkSize, 
-                   " nnodes: ", nnodes, " nedges: ", nedges, " numThreads: ", 
-                   numThreads);
-  
-    for (int i=0; i<numThreads; ++i) {
-      int start = nChunkSize * i;
-      int end = -1;
-      if (i==numThreads-1)
-        end = std::max(start+nChunkSize, nnodes);
-      else
-        end = std::min(start+nChunkSize, nnodes);
-      galois::gDebug("Node cleanup chunk: ", i, " start: ", start, " end: ", end);
-      nodeArrayRanges.push_back(std::make_pair(start, end));
-      start = eChunkSize * i;
-      if (i==numThreads-1)
-        end = std::max(start+eChunkSize, nedges);
-      else
-        end = std::min(start+eChunkSize, nedges);
-      edgeArrayRanges.push_back(std::make_pair(start, end));
-      galois::gDebug("Edge cleanup chunk: ", i, " start: ", start, " end: ", end);
-      workChunks.push_back(i);
-    }
-  }
-  
   galois::InsertBag<NodeType*>* fringewl;
   
   void findLeaves(unsigned nnodes) {
@@ -374,7 +343,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, NULL);
 
   if (BC_CONCURRENT) {
-    galois::gInfo("Running in concurrent mode with ", numThreads);
+    galois::gInfo("Running in concurrent mode with ", numThreads, "threads");
   } else {
     galois::gInfo("Running in serial mode");
   }
@@ -386,15 +355,6 @@ int main(int argc, char** argv) {
   unsigned nnodes = graph.size();
   unsigned nedges = graph.getNedges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
-
-  bcExecutor.createCleanupChunks(nnodes, nedges, numThreads);
-  
-  galois::gInfo("Num threads is ", numThreads);
-
-  galois::StatTimer initCapTimer("InitCapacities");
-  initCapTimer.start();
-  graph.fixNodePredsCapacities();
-  initCapTimer.stop();
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();

@@ -342,41 +342,6 @@ class BCGraph {
     return end - start;
   }
 
-  void fixNodePredsCapacities() {
-    //int maxInNbrs = 0;
-    //int maxId;
-    //int sumInNbrs = 0;
-    //int maxOutNbrs = 0;
-    ////#if 0
-    //for (int i=0; i<nnodes; ++i) {
-    //  NodeType & n = nodes[i].data;
-    //  int nOutNbrs = inNeighborsSize(&n);
-    //  //n.preds.reserve(std::min(2, nOutNbrs));
-    //  if (maxInNbrs < nOutNbrs) {
-    //    maxInNbrs = nOutNbrs;
-    //    maxId = n.id;
-    //  }
-    //  sumInNbrs += nOutNbrs;
-    //  int oos = outNeighborsSize(&n);
-    //  if (maxOutNbrs < oos) {
-    //    maxOutNbrs = oos;
-    //  }
-    //}
-    ////#endif
-    //std::cerr << "Node " << maxId << " has " << maxInNbrs << " in-nbrs Sum is " << sumInNbrs << "\n";
-    //std::cerr << " Max " << maxOutNbrs << " out-nbrs \n";
-  }
-
-  void fixNodepredsCapacities(int start, int end) {
-    #if 0
-    for (int i=start; i<end; ++i) {
-      NodeType & n = nodes[i].data;
-      int nOutNbrs = inNeighborsSize(&n);
-      //n.preds.reserve(std::min(2, nOutNbrs));
-    }
-    #endif
-  }
-
   int inline inNeighborsSize(const NodeType *src) {
     return neighborsSize(src, inIdx);
   }
