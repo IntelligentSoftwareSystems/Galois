@@ -1,4 +1,4 @@
-/** Async Betweenness centrality Node  -*- C++ -*-
+/** Async Betweenness centrality -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Node for asynchrounous betweeness-centrality. 
+ * Asynchrounous betweeness-centrality. 
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu> (Main code writer)
  * @author Loc Hoang <l_hoang@utexas.edu>
@@ -69,7 +69,6 @@ static cll::opt<bool> useNodeBased("useNodeBased",
                                    cll::desc("Use node based execution"),
                                    cll::init(true));
 
-#define USE_NODE_BASED
 //#define INLINE_US
 
 // global used in other places TODO make it not global
@@ -99,6 +98,7 @@ struct BetweenessCentralityAsync {
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
   LeafCounter leafCount;
   
+  // TODO make the lambda more readable instead of a wall of text
   template <typename WLForEach, typename WorkListType>
   void dagConstruction(WorkListType& wl) {
     galois::for_each(
@@ -437,7 +437,7 @@ struct BetweenessCentralityAsync {
   }
   
   galois::InsertBag<ND*>* fringewl;
-  galois::substrate::CacheLineStorage<ND> *gnodes;
+  galois::substrate::CacheLineStorage<ND>*gnodes;
   
   void findLeaves(unsigned nnodes) {
     galois::do_all(
@@ -475,6 +475,7 @@ int main(int argc, char** argv) {
   } else {
     galois::gInfo("Running in serial mode");
   }
+
   BCGraph graph(filename.c_str());
 
   BetweenessCentralityAsync bcExecutor(graph);
@@ -505,24 +506,14 @@ int main(int argc, char** argv) {
   bcExecutor.noActionCount.reset();
   bcExecutor.largestNodeDist.reset();
 
-  #if CONCURRENT
-  #ifdef USE_NODE_BASED
   const int chunksize = 8;
   galois::gInfo("Using chunk size : ", chunksize);
   typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
                            galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
   galois::InsertBag<ND*> wl2;
-  #else
-  // TODO edge based
-  #endif
 
   galois::InsertBag<ND*> wl4;
   bcExecutor.fringewl = &wl4;
-  #else 
-  // not CONCURRENT
-  galois::worklists::GFIFO<ED*, false> wl2;
-  galois::worklists::GFIFO<ND*, false> wl4;
-  #endif 
 
   galois::reportPageAlloc("MemAllocPre");
   galois::preAlloc(galois::getActiveThreads() * nnodes / 1650);
@@ -546,6 +537,7 @@ int main(int argc, char** argv) {
       continue;
     }
 
+    galois::gInfo("Source is ", active->toString());
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto j) {
@@ -559,72 +551,23 @@ int main(int argc, char** argv) {
     //if (stepCnt >= 2) break;  // ie only do 1 source
 
     //std::list<ED*> wl;
-#ifdef USE_NODE_BASED
     std::vector<ND*>  wl;
     wl2.push_back(active);
-#else
-    std::vector<ED*> wl;
-    graph.initWLToOutEdges(active, wl2);
-#endif
     active->initAsSource();
-    galois::gDebug("Source is ", active->toString());
+    galois::gInfo("Source is ", active->toString());
     //graph.checkClearEdges();
 //__itt_resume();
     forwardPassTimer.start();
-#ifdef USE_NODE_BASED
-#if CONCURRENT
+
     bcExecutor.dagConstruction<wl2ty>(wl2);
     wl2.clear();
-#else
-  Timer tt;
-  tt.start();
 
-  while (!wl2.empty()) {
-    Nd *nn = wl2.pop().second;
-    //dagConstruction(nn, wl2); // TODO serial version
-  }
-  tt.stop();
-  galois::gInfo("tt ", tt.get());
-#endif
-#else 
-// TODO EDGE BASED
-#if CONCURRENT
-    galois::Timer firstLT;
-    firstLT.start();
-    galois::for_each(wl2.begin(), wl2.end(), feach1, galois::wl<wl2ty>());
-    firstLT.stop();
-    galois::gInfo("FLTime: ", firstLT.get());
-#else
-  Timer tt;
-  tt.start();
-
-  while (!wl2.empty()) {
-    ED *ee = wl2.pop().second;
-    feach1(ee, wl2);
-  }
-  tt.stop();
-  galois::gInfo("tt ", tt.get());
-#endif
-#endif
     forwardPassTimer.stop();
     if (DOCHECKS) graph.checkGraph(active);
 
     leafFinderTimer.start();
-#if CONCURRENT
-  bcExecutor.leafCount.reset();
-  bcExecutor.findLeaves(nnodes);
-#else
-    //std::list<ND*> wl3;
-    for (int j=0; j<nnodes; ++j) {
-      ND * n = &(bcExecutor.gnodes[j].data);
-      if (n->nsuccs == 0) {
-        // TODO technically to not use galois struct use regular counter
-        bcExecutor.leafCount.update(1);
-        wl4.push_back(n);
-      }
-    }
-    //wl4.fill_initial(wl3.begin(), wl3.end());
-#endif
+    bcExecutor.leafCount.reset();
+    bcExecutor.findLeaves(nnodes);
     leafFinderTimer.stop();
 
     if (bcExecutor.leafCount.isActive()) {
@@ -633,14 +576,11 @@ int main(int argc, char** argv) {
 
     backwardPassTimer.start();
     double backupSrcBC = bcExecutor.currSrcNode->bc;
-    #if CONCURRENT   
     bcExecutor.dependencyBackProp(wl4);
-    #else
-    while (!wl4.empty()) {
-      ND *nn = wl4.pop().second;
-      //dependencyBackProp(nn, wl4); //TODO
+
+    if (bcExecutor.currSrcNode->bc && backupSrcBC == 0) {
+      galois::gPrint(bcExecutor.currSrcNode->id, " ", bcExecutor.currSrcNode->bc, "\n");
     }
-    #endif
     bcExecutor.currSrcNode->bc = backupSrcBC; // current source BC should not get updated
     backwardPassTimer.stop();
     wl4.clear();
