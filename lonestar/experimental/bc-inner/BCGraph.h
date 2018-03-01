@@ -69,8 +69,8 @@ class BCGraph {
   int* outs;
   int nouts;
   #endif
-  int nnodes;
-  int nedges;
+  uint32_t nnodes;
+  uint64_t nedges;
   int ninIdx;
   int nins;
   int noutIdx;
@@ -166,12 +166,12 @@ class BCGraph {
     if (numEdges % 2) fptr32 += 1;
     
     nodes.allocateInterleaved(nnodes);
-    for (int i =0; i<nnodes; ++i) {
+    for (unsigned i =0; i<nnodes; ++i) {
       nodes[i].id = i;
     }
 
     edgeData = new BCEdge[nedges];
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       int start = outIdx[i];
       int end = outIdx[i+1];
 
@@ -350,64 +350,35 @@ class BCGraph {
     return neighborsSize(src, outIdx);
   }
 
-  void inline cleanupData(/*int nstart, int nend, */int edgStart, int edgEnd) {
-  /*    for (int j=nstart; j<nend; j++) {   
-       assert(j<nnodes);
-       nodes[j].data.reset();
-     }*/
-    for (int j=edgStart; j<edgEnd; ++j) {
-      assert(j<nedges);
-      edgeData[j].reset();
-    }
-  }
- 
   void checkClearEdges() {
-    for (int j=0; j<nedges; ++j) edgeData[j].checkClear(j);
+    for (uint64_t j=0; j<nedges; ++j) edgeData[j].checkClear(j);
   }
 
   void cleanupData() {
-    for (int j=0; j<nnodes; j++) { 
-      assert(j<nnodes);
-      nodes[j].reset();
-    }
-
-    for (int j=0; j<nedges; ++j) {
-      assert(j<nedges);
-      edgeData[j].reset();
-    }
-  }
-
-  /*
-  void cleanupDataOMP() {
-    #pragma omp parallel 
-    {
-      int nthreads = omp_get_num_threads();
-      std::cerr << "OMP Threads: " << nthreads << std::endl;
-      int end = nnodes;
-      int chunk = nnodes/nthreads;
-      #pragma omp for schedule(static, chunk) private(end)
-      for (int j=0; j<end; j++) { 
-        assert(j<nnodes);
-        nodes[j].data.reset();
+    galois::do_all(
+      galois::iterate(0u, nnodes),
+      [&] (auto j) {
+        assert(j < nnodes);
+        nodes[j].reset();
       }
-      int end2 = nedges;
-      int chunk1 = nedges/nthreads;
-      #pragma omp for schedule(static, chunk1) private(end2)
-      for (int k=0; k<end2; ++k) {
-        assert(k<nedges);
-        edgeData[k].reset();
+    );
+
+    galois::do_all(
+      galois::iterate((uint64_t)0, nedges),
+      [&] (auto j) {
+        assert(j < nedges);
+        edgeData[j].reset();
       }
-    }
+    );
   }
-  */
 
   void toucDistGraph() {
     int sum = 0;
-    for (int j=0; j<nnodes; j++) { 
+    for (unsigned j=0; j<nnodes; j++) { 
       sum += nodes[j].id;
     }
 
-    for (int j=0; j<nedges; ++j) {
+    for (uint64_t j=0; j<nedges; ++j) {
       sum += edgeData[j].level;
     }
   }
@@ -415,7 +386,7 @@ class BCGraph {
   void verify() {
     double sampleBC = 0.0;
     bool firstTime = true;
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       const NodeType & n = nodes[i];
       if (firstTime) {
         sampleBC = n.bc;
@@ -434,7 +405,7 @@ class BCGraph {
    * Prints first 10 BC values
    */
   void printBCs() {
-    int n = std::min(nnodes, 10);
+    int n = std::min(nnodes, 10u);
     for (int i = 0; i < n; ++i) {
       std::cerr << i << ": " << std::setiosflags(std::ios::fixed) 
                 << std::setprecision(6) << nodes[i].bc << "\n";
@@ -447,7 +418,7 @@ class BCGraph {
     outfname << filename.c_str() << "_" << numThreads << ".txt";
     std::string fname = outfname.str();
     std::ofstream outfile(fname.c_str());
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       outfile << i << " " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].bc << std::endl;
     }
     outfile.close();
@@ -455,7 +426,7 @@ class BCGraph {
 
   void printGraph() {
     std::cerr << "Nodes: " << std::endl;
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       std::cerr << nodes[i].toString() << std::endl;
     }
     /*for (int i=0; i<nedges; ++i) {
@@ -470,7 +441,7 @@ class BCGraph {
 
   void checkSteadyState2() {
     std::cerr << "Doing second set of checks on graph...\n";
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       const NodeType & nodeD = nodes[i];
       if (nodeD.nsuccs != 0) 
         std::cerr << "Problem with nsuccs " << nodeD.nsuccs << std::endl;
@@ -481,7 +452,7 @@ class BCGraph {
 
   void checkGraph(const NodeType * start) const {
     std::cerr << "Doing checks on graph...\n";
-    for (int i=0; i<nnodes; ++i) {
+    for (unsigned i=0; i<nnodes; ++i) {
       checkNode(&(nodes[i]), start);
     }
   }
