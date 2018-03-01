@@ -865,7 +865,7 @@ public:
     if (commitRatio >= target)
       local.delta += local.delta;
     else if (allcommitted == 0) {
-      assert(0 && "someone should have committed");
+      assert((alliterations == 0) && "someone should have committed");
       local.delta += local.delta;
     } else
       local.delta = commitRatio / target * local.delta;
