@@ -1,18 +1,45 @@
+/** Async Betweenness centrality edge  -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY ABCNode ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT ABCNode WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * Edge for asynchrounous betweeness-centrality. 
+ *
+ * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu>
+ */
+
 #ifndef _ED_H_
 #define _ED_H_
 
 #include "BCNode.h"
 #include "control.h"
+#include "util.h"
 
 struct BCEdge {
   BCNode<>* src;
   BCNode<>* dst;
   double val;
-  int level;
+  unsigned level;
   
   BCEdge(BCNode<>* _src, BCNode<>* _dst) 
-    : src(_src), dst(_dst), val(0), level(DEF_DISTANCE) { }
-  BCEdge() : src(0), dst(0), val(0), level(DEF_DISTANCE) { }
+    : src(_src), dst(_dst), val(0), level(infinity) { }
+  BCEdge() : src(0), dst(0), val(0), level(infinity) { }
 
   BCEdge& operator= (BCEdge const& from) {
     if (this != &from) {
@@ -25,13 +52,13 @@ struct BCEdge {
   }
 
   inline void reset() {
-		if (level != DEF_DISTANCE) {
-			level = DEF_DISTANCE;
+		if (level != infinity) {
+			level = infinity;
 		}
   }
 
   void checkClear(int j) {
-	  if (level != DEF_DISTANCE) {
+	  if (level != infinity) {
       galois::gError(j, " PROBLEM WITH LEVEL OF ", toString()); 
 	  }
 	  if (val != 0) {

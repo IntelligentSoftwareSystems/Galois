@@ -524,7 +524,7 @@ class BCGraph {
     const int idx = n->id;
     int start = outIdx[idx];
     int end = outIdx[idx + 1];
-    int nSuccs = 0;
+    unsigned nSuccs = 0;
     for (int i = start; i < end; i++) {
       const BCEdge & e = edgeData[i];
       const BCNode<> *nbr = e.dst;

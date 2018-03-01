@@ -7,9 +7,9 @@
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY ABCNode ALL WARRANTIES CONCERNING THIS
- * SOFTWARE ABCNode DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT ABCNode WARRANTIES OF
- * PERFORMANCE, ABCNode ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
  * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
  * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
  * shall University be liable for incidental, special, indirect, direct or
@@ -21,6 +21,7 @@
  * Node for asynchrounous betweeness-centrality. 
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
+ * @author Loc Hoang <l_hoang@utexas.edu>
  */
 #ifndef _BCNODE_H_
 #define _BCNODE_H_
@@ -33,8 +34,7 @@
 #include "galois/substrate/SimpleLock.h"
 #include "llvm/ADT/SmallVector.h"
 #include "control.h"
-
-extern int DEF_DISTANCE;
+#include "util.h"
 
 template <bool UseMarking=false, bool Concurrent=true>
 struct BCNode {
@@ -51,18 +51,18 @@ struct BCNode {
 
   unsigned distance;
   unsigned nsuccs;
-  char mark;
 
   double sigma; 
   double delta;
   double bc;
+  char mark;
 
   BCNode(const int _id)
-    : id(_id), spinLock(), preds(), distance(DEF_DISTANCE), nsuccs(0), 
+    : id(_id), spinLock(), preds(), distance(infinity), nsuccs(0), 
       sigma(0), delta(0), bc(0), mark(0) {}
   
   BCNode() 
-    : id(DEF_DISTANCE), spinLock(), preds(), distance(DEF_DISTANCE), nsuccs(0),
+    : id(infinity), spinLock(), preds(), distance(infinity), nsuccs(0),
       sigma(0), delta(0), bc(0), mark(0) {}
   
   /**
@@ -117,7 +117,7 @@ struct BCNode {
    */
   void reset() {
     preds.clear();
-    distance = DEF_DISTANCE;
+    distance = infinity;
     nsuccs = 0;
     sigma = 0;
     delta = 0;
@@ -132,7 +132,7 @@ struct BCNode {
       galois::gWarn("Problem, node not clear");
 
     assert(preds.empty());
-    assert(distance == DEF_DISTANCE);
+    assert(distance == infinity);
     assert(nsuccs == 0 && sigma == 0 && delta == 0);
   }  
 

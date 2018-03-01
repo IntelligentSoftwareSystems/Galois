@@ -35,9 +35,7 @@
 #include <fstream>
 #include <sstream>
 
-#include "control.h"
 #include "BCGraph.h"
-#include "util.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -54,10 +52,6 @@ static cll::opt<unsigned int> startNode("startNode",
                                         cll::desc("Node to start search from"),
                                         cll::init(0));
 
-// TODO better description
-static cll::opt<unsigned> buckets("buckets",
-                                  cll::desc("Number of buckets to use"),
-                                  cll::init(1));
 static cll::opt<bool> generateCert("generateCertificate",
                                    cll::desc("Prints certificate at end of "
                                              "execution"),
@@ -68,9 +62,6 @@ static cll::opt<bool> useNodeBased("useNodeBased",
                                    cll::init(true));
 
 //#define INLINE_US
-
-// global used in other places TODO make it not global
-int DEF_DISTANCE;
 
 struct BetweenessCentralityAsync {
   BCGraph& graph;
@@ -189,7 +180,7 @@ struct BetweenessCentralityAsync {
                 else { aL = inNbr; aW = B; }
                 aL->lock(); aW->lock();
   
-                const int elev = inE.level; 
+                const unsigned elev = inE.level; 
                 // Correct Node
                 if (inNbr->distance >= B->distance) { 
                   correctNodeP1Count.update(1);
@@ -198,8 +189,8 @@ struct BetweenessCentralityAsync {
                   galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
                                  B->toString(), ")", elevel);
   
-                  if (elev != DEF_DISTANCE) {
-                    inE.level = DEF_DISTANCE;
+                  if (elev != infinity) {
+                    inE.level = infinity;
                     if (elev == inNbr->distance) {
                       correctNodeP2Count.update(1);
                       inNbr->nsuccs--;
@@ -442,7 +433,7 @@ struct BetweenessCentralityAsync {
       galois::iterate(0u, nnodes),
       [&] (auto i) {
         BCNode<>* n = &(gnodes[i].data);
-        if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
+        if (n->nsuccs == 0 && n->distance < infinity) {
           leafCount.update(1);
               
           fringewl->push(n);
@@ -455,8 +446,7 @@ struct BetweenessCentralityAsync {
 
 struct NodeIndexer : std::binary_function<BCNode<>*, int, int> {
   int operator() (const BCNode<> *val) const {
-    //return val->level / buckets;
-    return val->distance /*/ buckets*/;
+    return val->distance;
   }
 };
 
@@ -482,10 +472,8 @@ int main(int argc, char** argv) {
   unsigned nedges = graph.getNedges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
 
-  DEF_DISTANCE = nnodes * 2;
   bcExecutor.createCleanupChunks(nnodes, nedges, numThreads);
   
-  galois::gInfo("Bucket size ", buckets);
   galois::gInfo("Num threads is ", numThreads);
 
   bcExecutor.gnodes = graph.getNodes();
