@@ -57,9 +57,9 @@ static cll::opt<bool> generateCert("generateCertificate",
                                              "execution"),
                                    cll::init(false));
 // TODO better description
-static cll::opt<bool> useNodeBased("useNodeBased",
-                                   cll::desc("Use node based execution"),
-                                   cll::init(true));
+//static cll::opt<bool> useNodeBased("useNodeBased",
+//                                   cll::desc("Use node based execution"),
+//                                   cll::init(true));
 
 //#define INLINE_US
 
@@ -89,8 +89,78 @@ struct BetweenessCentralityAsync {
   using LeafCounter = 
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
   LeafCounter leafCount;
+
+
+  template<typename CTXType>
+  void SPAndFU(NodeType* A, NodeType* B, const unsigned ADist, BCEdge& ed, 
+               BCEdge* edgeData, CTXType& ctx) {
+    spfuCount.update(1);
+
+    // make B a successor of A, A predecessor of B
+    A->nsuccs++;
+    const double ASigma = A->sigma;
+    A->unlock();
+    NodeType::predTY& Bpreds = B->preds;
+    bool bpredsNotEmpty = !Bpreds.empty();
+    Bpreds.clear();
+    Bpreds.push_back(A);
+    B->distance = ADist + 1;
+
+    largestNodeDist.update(B->distance);
+
+    B->nsuccs = 0; // SP
+    B->sigma = ASigma; // FU
+    ed.val = ASigma;
+    ed.level = ADist;
+    B->unlock();
+
+    if (!B->isAlreadyIn()) ctx.push(B);
+
+    // Part of Correct Node
+    if (bpredsNotEmpty) {
+      int idx = B->id;
+      int* inIdx = graph.inIdx;
+      int* ins = graph.ins; 
+      int startInE = inIdx[idx];
+      int endInE = inIdx[idx + 1];
+
+      // loop through in edges
+      for (int j = startInE; j < endInE; j++) {
+        BCEdge & inE = edgeData[ins[j]];
+        NodeType *inNbr = inE.src;
+        if (inNbr == B) continue;
+
+        // lock in right order
+        NodeType* aL;
+        NodeType* aW;
+        if (B < inNbr) { aL = B; aW = inNbr;} 
+        else { aL = inNbr; aW = B; }
+        aL->lock(); aW->lock();
+
+        const unsigned elev = inE.level; 
+        // Correct Node
+        if (inNbr->distance >= B->distance) { 
+          correctNodeP1Count.update(1);
+          B->unlock();
+
+          galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
+                         B->toString(), ")", ed.level);
+
+          if (elev != infinity) {
+            inE.level = infinity;
+            if (elev == inNbr->distance) {
+              correctNodeP2Count.update(1);
+              inNbr->nsuccs--;
+            }
+          }
+          inNbr->unlock();
+        } else {
+          aL->unlock(); aW->unlock();
+        }
+      }
+    }
+  }
   
-  // TODO make the lambda more readable instead of a wall of text
   template <typename WLForEach, typename WorkListType>
   void dagConstruction(WorkListType& wl) {
     galois::for_each(
@@ -131,74 +201,9 @@ struct BetweenessCentralityAsync {
           NodeType* B = dstD;
           const int BDist = dstD->distance;
   
-          // Shortest Path + First Update
           if (BDist - ADist > 1) {
-            spfuCount.update(1);
-  
-            // make B a successor of A, A predecessor of B
-            A->nsuccs++;
-            const double ASigma = A->sigma;
-            A->unlock();
-            NodeType::predTY & Bpreds = B->preds;
-            bool bpredsNotEmpty = !Bpreds.empty();
-            Bpreds.clear();
-            Bpreds.push_back(A);
-            B->distance = ADist + 1;
-
-            largestNodeDist.update(B->distance);
-  
-            B->nsuccs = 0; // SP
-            B->sigma = ASigma; // FU
-            ed.val = ASigma;
-            ed.level = ADist;
-            B->unlock();
-  
-            if (!B->isAlreadyIn()) ctx.push(B);
-  
-            // Part of Correct Node
-            if (bpredsNotEmpty) {
-              int idx = B->id;
-              int* inIdx = graph.inIdx;
-              int* ins = graph.ins; 
-              int startInE = inIdx[idx];
-              int endInE = inIdx[idx + 1];
-  
-              // loop through in edges
-              for (int j = startInE; j < endInE; j++) {
-                BCEdge & inE = edgeData[ins[j]];
-                NodeType *inNbr = inE.src;
-                if (inNbr == B) continue;
-  
-                // TODO wrap in concurrent
-                // lock in right order
-                NodeType* aL;
-                NodeType* aW;
-                if (B < inNbr) { aL = B; aW = inNbr;} 
-                else { aL = inNbr; aW = B; }
-                aL->lock(); aW->lock();
-  
-                const unsigned elev = inE.level; 
-                // Correct Node
-                if (inNbr->distance >= B->distance) { 
-                  correctNodeP1Count.update(1);
-                  B->unlock();
-  
-                  galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
-                                 B->toString(), ")", elevel);
-  
-                  if (elev != infinity) {
-                    inE.level = infinity;
-                    if (elev == inNbr->distance) {
-                      correctNodeP2Count.update(1);
-                      inNbr->nsuccs--;
-                    }
-                  }
-                  inNbr->unlock();
-                } else {
-                  aL->unlock(); aW->unlock();
-                }
-              }
-            }
+            // Shortest Path + First Update (and Correct Node)
+            this->SPAndFU(A, B, ADist, ed, edgeData, ctx);
           // Update Sigma
           } else if (elevel == ADist && BDist == ADist + 1) {
             updateSigmaP1Count.update(1);
