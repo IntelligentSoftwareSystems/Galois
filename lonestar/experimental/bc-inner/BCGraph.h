@@ -27,6 +27,9 @@
 #ifndef _BCGRAPH_H_
 #define _BCGRAPH_H_
 
+#include "BCNode.h"
+#include "ED.h"
+
 #include "galois/Bag.h"
 
 #include <sys/mman.h>

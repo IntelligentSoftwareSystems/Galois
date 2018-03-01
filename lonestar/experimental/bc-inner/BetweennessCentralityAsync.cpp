@@ -36,8 +36,6 @@
 #include <sstream>
 
 #include "control.h"
-#include "ND.h"
-#include "ED.h"
 #include "BCGraph.h"
 #include "util.h"
 

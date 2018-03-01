@@ -1,6 +1,7 @@
 #ifndef _ED_H_
 #define _ED_H_
 
+#include "BCNode.h"
 #include "control.h"
 
 struct ED {
