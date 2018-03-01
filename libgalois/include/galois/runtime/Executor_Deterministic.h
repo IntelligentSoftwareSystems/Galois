@@ -1432,8 +1432,6 @@ void Executor<OptionsTy>::go() {
     if (this->checkBreak())
       break;
 
-    this->calculateWindow(false);
-
     barrier.wait();
 
     if (outerDone.get()) {
@@ -1446,6 +1444,8 @@ void Executor<OptionsTy>::go() {
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.get() = false;
     } else {
+      this->calculateWindow(false);
+
       this->pushNextWindow(tld.wlnext, local.nextWindow());
     }
   }
