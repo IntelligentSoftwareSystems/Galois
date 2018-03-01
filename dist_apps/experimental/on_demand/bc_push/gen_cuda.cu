@@ -537,7 +537,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "130 -> 131;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "131 -> 132;
 }
 __global__ void PredAndSucc(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_predecessors, uint32_t * p_num_successors)
@@ -1055,7 +1055,7 @@ __global__ void NumShortestPaths(CSRGraph graph, unsigned int __begin, unsigned 
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "136 -> 137;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "137 -> 138;
 }
 __global__ void PropagationFlagUpdate(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_current_length, uint32_t * p_num_successors, uint8_t * p_propagation_flag)
@@ -1400,7 +1400,7 @@ __global__ void DependencyPropagation(CSRGraph graph, unsigned int __begin, unsi
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "153 -> 154;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint32_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "154 -> 155;
 }
 __global__ void BC(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_betweeness_centrality, float * p_dependency)
@@ -1457,11 +1457,11 @@ __global__ void Sanity(CSRGraph graph, unsigned int __begin, unsigned int __end,
     }
   }
   // FP: "15 -> 16;
-  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_sum_ts);
+  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_sum_ts);
   // FP: "16 -> 17;
-  DGAccumulator_max.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_max_ts);
+  DGAccumulator_max.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_max_ts);
   // FP: "17 -> 18;
-  DGAccumulator_min.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_min_ts);
+  DGAccumulator_min.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_min_ts);
   // FP: "18 -> 19;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)

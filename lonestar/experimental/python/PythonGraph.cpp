@@ -1,6 +1,11 @@
 #include "PythonGraph.h"
 
 #include <iostream>
+#include <fstream>
+#include <boost/serialization/map.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
 
 /*************************************
  * APIs for GaloisRuntime
@@ -29,6 +34,53 @@ AttributedGraph *createGraph() {
 
 void deleteGraph(AttributedGraph *g) {
   delete g;
+}
+
+void saveGraph(AttributedGraph *g, char* filename) {
+  std::ofstream file(filename, std::ios::out | std::ios::binary);
+  boost::archive::binary_oarchive oarch(file);
+  g->graph.serializeGraph(oarch);
+  oarch << g->nodeLabels;
+  oarch << g->edgeLabels;
+  oarch << g->nodeNames;
+  size_t size = g->nodeAttributes.size();
+  oarch << size;
+  for (auto& pair : g->nodeAttributes) {
+    oarch << pair.first;
+    oarch << pair.second;
+  }
+  size = g->edgeAttributes.size();
+  oarch << size;
+  for (auto& pair : g->edgeAttributes) {
+    oarch << pair.first;
+    oarch << pair.second;
+  }
+  file.close();
+}
+
+void loadGraph(AttributedGraph *g, char* filename) {
+  std::ifstream file(filename, std::ios::in | std::ios::binary);
+  boost::archive::binary_iarchive iarch(file);
+  g->graph.deSerializeGraph(iarch);
+  iarch >> g->nodeLabels;
+  iarch >> g->edgeLabels;
+  iarch >> g->nodeNames;
+  size_t size;
+  iarch >> size;
+  for (size_t i = 0; i < size; ++i) {
+    std::string key;
+    iarch >> key;
+    g->nodeAttributes[key] = galois::LargeArray<std::string>();
+    iarch >> g->nodeAttributes[key];
+  }
+  iarch >> size;
+  for (size_t i = 0; i < size; ++i) {
+    std::string key;
+    iarch >> key;
+    g->edgeAttributes[key] = galois::LargeArray<std::string>();
+    iarch >> g->edgeAttributes[key];
+  }
+  file.close();
 }
 
 void printGraph(AttributedGraph* g) {
@@ -61,17 +113,17 @@ void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t 
   g->nodeLabels.resize(numNodeLabels);
   assert(numEdgeLabels <= 32);
   g->edgeLabels.resize(numEdgeLabels);
-  g->nodeNames.resize(numNodes);
+  g->nodeNames.allocateInterleaved(numNodes);
 }
 
 void fixEndEdge(AttributedGraph *g, uint32_t nodeIndex, uint64_t edgeIndex) {
   g->graph.fixEndEdge(nodeIndex, edgeIndex);
 }
 
-void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t label, char *nodeName) {
+void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t uuid, uint32_t label, char *nodeName) {
   auto& nd = g->graph.getData(nodeIndex);
   nd.label = label;
-  nd.id = nodeIndex;
+  nd.id = uuid;
   g->nodeNames[nodeIndex] = nodeName;
 }
 
@@ -83,11 +135,29 @@ void setEdgeLabel(AttributedGraph *g, uint32_t label, char *name) {
   g->edgeLabels[label] = name;
 }
 
+void setNodeAttribute(AttributedGraph *g, uint32_t nodeIndex, char *key, char *value) {
+  auto& attributes = g->nodeAttributes;
+  if (attributes.find(key) == attributes.end()) {
+    attributes[key] = galois::LargeArray<std::string>();
+    attributes[key].allocateInterleaved(g->graph.size());
+  }
+  attributes[key][nodeIndex] = value;
+}
+
 void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp) {
   EdgeData ed;
   ed.label = label;
   ed.timestamp = timestamp;
   g->graph.constructEdge(edgeIndex, dstNodeIndex, ed);
+}
+
+void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char *key, char *value) {
+  auto& attributes = g->edgeAttributes;
+  if (attributes.find(key) == attributes.end()) {
+    attributes[key] = galois::LargeArray<std::string>();
+    attributes[key].allocateInterleaved(g->graph.sizeEdges());
+  }
+  attributes[key][edgeIndex] = value;
 }
 
 size_t getNumNodes(AttributedGraph *g) {

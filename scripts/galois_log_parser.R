@@ -21,6 +21,15 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
 
   cmdLineSplit = strsplit(cmdLine, "\\s+")[[1]]
 
+  ## To check the device kind
+  pos = regexpr('-pset', cmdLineSplit)
+  deviceKind = ""
+  if(sum(pos>0) > 0){
+    deviceKind = "GPU"
+  } else {
+    deviceKind = "CPU"
+  }
+
   ## First postitional argument is always name of the executable
   ### WORKING: split the exePath name found at the position 1 of the argument list and split on "/".
   exePathSplit <- strsplit(cmdLineSplit[1], "/")[[1]]
@@ -40,7 +49,7 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
   }
 
  if(isTRUE(isSharedMemGaloisLog)){
-   returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads)
+   returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads, "deviceKind" = deviceKind)
    return(returnList)
  }
 
@@ -58,7 +67,7 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
  }
 
  ## returnList for distributed galois log
- returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations)
+ returnList <- list("runID" = runID, "benchmark" = benchmark, "input" = input, "partitionScheme" = partitionScheme, "hosts" = numHosts , "numThreads" = numThreads, "iterations" = numIterations, "deviceKind" = deviceKind)
  return(returnList)
 }
 #### END: @function to parse commadline ##################

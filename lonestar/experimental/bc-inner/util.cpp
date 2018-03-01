@@ -5,8 +5,6 @@
 #include "util.h"
 #include "control.h"
 
-extern int DEF_DISTANCE;
-
 boost::tuple<int, int, std::map<int, std::set<int>*> *, std::map<int, std::set<int>*>*>
 readRandomGraph(const char *filename) {
   
@@ -28,7 +26,6 @@ readRandomGraph(const char *filename) {
       std::stringstream slb(linebuf);
       std::string tmp1, tmp2;
       slb >> tmp1 >> tmp2 >> nnodes >> nedges;
-      DEF_DISTANCE = 2*nnodes;
       continue;
     }	else if (linebuf[0] == 'a') {
       std::string tmp;
@@ -142,7 +139,6 @@ readSnapDirectedGraph(const char *filename) {
 	}
 
   int nnodes = maxNodeId+1;
-  DEF_DISTANCE = 2*nnodes;
 
   int actualEdgNum = 0;
   for (std::map<int, std::set<int>*>::const_iterator it = outnbrs->begin(); it != outnbrs->end(); ++it) {
@@ -192,7 +188,6 @@ readGraph(const char *filename) {
 		if (firstLineAfterComments) {
       std::stringstream(linebuf) >> nnodes >> nedges;
 			//cerr << nnodes << " " << nedges << endl;
-			DEF_DISTANCE = 2*nnodes;
 			for (int i=0; i<nnodes; ++i) {
 				outnbrs->insert(std::make_pair(i, new std::set<int>()));
 				innbrs->insert(std::make_pair(i, new std::set<int>()));

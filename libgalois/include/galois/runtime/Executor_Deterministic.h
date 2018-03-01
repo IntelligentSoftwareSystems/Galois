@@ -684,18 +684,18 @@ struct StateManagerBase<OptionsTy, true> {
 
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
-    new (p) LocalState(self, c.data().getPerIterAlloc());
+    // new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p);
   }
 
   void deallocLocalState(UserContextAccess<value_type>& c) {
-    LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState());
+    LocalState *p = c.data().template getLocalState<LocalState>();
     if (p)
       p->~LocalState();
   }
 
   void saveLocalState(UserContextAccess<value_type>& c, DItem<OptionsTy>& item) {
-    item.setLocalState(c.data().getLocalState());
+    item.setLocalState(c.data().template getLocalState<LocalState>());
   }
 
   void restoreLocalState(UserContextAccess<value_type>& c, const DItem<OptionsTy>& item) {
@@ -865,7 +865,7 @@ public:
     if (commitRatio >= target)
       local.delta += local.delta;
     else if (allcommitted == 0) {
-      assert(0 && "someone should have committed");
+      assert((alliterations == 0) && "someone should have committed");
       local.delta += local.delta;
     } else
       local.delta = commitRatio / target * local.delta;
@@ -1432,8 +1432,6 @@ void Executor<OptionsTy>::go() {
     if (this->checkBreak())
       break;
 
-    this->calculateWindow(false);
-
     barrier.wait();
 
     if (outerDone.get()) {
@@ -1446,6 +1444,8 @@ void Executor<OptionsTy>::go() {
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
       hasNewWork.get() = false;
     } else {
+      this->calculateWindow(false);
+
       this->pushNextWindow(tld.wlnext, local.nextWindow());
     }
   }

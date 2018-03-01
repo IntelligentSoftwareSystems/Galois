@@ -298,7 +298,7 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     _delta = _np_closure[threadIdx.x]._delta;
   }
   // FP: "106 -> 107;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "107 -> 108;
 }
 __global__ void PageRankSanity(CSRGraph graph, unsigned int __begin, unsigned int __end, float local_tolerance, float * p_residual, float * p_value, HGAccumulator<uint64_t> DGAccumulator_residual_over_tolerance, HGAccumulator<float> DGAccumulator_sum, HGAccumulator<float> DGAccumulator_sum_residual, HGReduceMax<float> max_residual, HGReduceMax<float> max_value, HGReduceMin<float> min_residual, HGReduceMin<float> min_value)
@@ -356,19 +356,19 @@ __global__ void PageRankSanity(CSRGraph graph, unsigned int __begin, unsigned in
     }
   }
   // FP: "29 -> 30;
-  DGAccumulator_residual_over_tolerance.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_residual_over_tolerance_ts);
+  DGAccumulator_residual_over_tolerance.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_residual_over_tolerance_ts);
   // FP: "30 -> 31;
-  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_sum_ts);
+  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_sum_ts);
   // FP: "31 -> 32;
-  DGAccumulator_sum_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_sum_residual_ts);
+  DGAccumulator_sum_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_sum_residual_ts);
   // FP: "32 -> 33;
-  max_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(max_residual_ts);
+  max_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(max_residual_ts);
   // FP: "33 -> 34;
-  max_value.thread_exit<cub::BlockReduce<float, TB_SIZE>>(max_value_ts);
+  max_value.thread_exit<cub::BlockReduce<float, TB_SIZE> >(max_value_ts);
   // FP: "34 -> 35;
-  min_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(min_residual_ts);
+  min_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(min_residual_ts);
   // FP: "35 -> 36;
-  min_value.thread_exit<cub::BlockReduce<float, TB_SIZE>>(min_value_ts);
+  min_value.thread_exit<cub::BlockReduce<float, TB_SIZE> >(min_value_ts);
   // FP: "36 -> 37;
 }
 void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)

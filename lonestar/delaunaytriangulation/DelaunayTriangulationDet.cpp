@@ -86,199 +86,6 @@ struct GetPointer: public std::unary_function<Point&,Point*> {
   Point* operator()(Point& p) const { return &p; }
 };
 
-//! Our main functor
-template<int Version=detBase>
-struct Process {
-  typedef galois::PerIterAllocTy Alloc;
-
-  QuadTree* tree;
-  Graph& graph;
-
-  struct ContainsTuple {
-    const Graph& graph;
-    Tuple tuple;
-    ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
-    bool operator()(const GNode& n) const {
-      assert(!graph.getData(n, galois::MethodFlag::UNPROTECTED).boundary());
-      return graph.getData(n, galois::MethodFlag::UNPROTECTED).inTriangle(tuple);
-    }
-  };
-
-  Process(QuadTree* t, Graph& g): tree(t), graph(g) { }
-
-  void computeCenter(const Element& e, Tuple& t) const {
-    for (int i = 0; i < 3; ++i) {
-      const Tuple& o = e.getPoint(i)->t();
-      for (int j = 0; j < 2; ++j) {
-        t[j] += o[j];
-      }
-    }
-    for (int j = 0; j < 2; ++j) {
-      t[j] *= 1/3.0;
-    }
-  }
-
-  void findBestNormal(const Element& element, const Point* p, const Point*& bestP1, const Point*& bestP2) {
-    Tuple center(0);
-    computeCenter(element, center);
-    int scale = element.clockwise() ? 1 : -1;
-
-    Tuple origin = p->t() - center;
-//        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
-    bestP1 = bestP2 = NULL;
-    double bestVal = 0.0;
-    for (int i = 0; i < 3; ++i) {
-      int next = i + 1;
-      if (next > 2) next -= 3;
-
-      const Point* p1 = element.getPoint(i);
-      const Point* p2 = element.getPoint(next);
-      double dx = p2->t().x() - p1->t().x();
-      double dy = p2->t().y() - p1->t().y();
-      Tuple normal(scale * -dy, scale * dx);
-      double val = normal.dot(origin); // / length2;
-      if (bestP1 == NULL || val > bestVal) {
-        bestVal = val;
-        bestP1 = p1;
-        bestP2 = p2;
-      }
-    }
-    assert(bestP1 != NULL && bestP2 != NULL && bestVal > 0);
-  }
-
-  GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (auto ii: graph.edges(start)) {
-      GNode dst = graph.getEdgeDst(ii);
-      Element& e = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-      int count = 0;
-      for (int i = 0; i < e.dim(); ++i) {
-        if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
-          if (++count == 2)
-            return dst;
-        }
-      }
-    }
-    GALOIS_DIE("unreachable");
-    return start;
-  }
-
-  bool planarSearch(const Point* p, GNode start, GNode& node) {
-    // Try simple hill climbing instead
-    ContainsTuple contains(graph, p->t());
-    while (!contains(start)) {
-      Element& element = graph.getData(start, galois::MethodFlag::WRITE);
-      if (element.boundary()) {
-        // Should only happen when quad tree returns a boundary point which is rare
-        // There's only one way to go from here
-        assert(std::distance(graph.edge_begin(start), graph.edge_end(start)) == 1);
-        start = graph.getEdgeDst(graph.edge_begin(start, galois::MethodFlag::WRITE));
-      } else {
-        // Find which neighbor will get us to point fastest by computing normal
-        // vectors
-        const Point *p1, *p2;
-        findBestNormal(element, p, p1, p2);
-        start = findCorrespondingNode(start, p1, p2);
-      }
-    }
-
-    node = start;
-    return true;
-  }
-
-  bool findContainingElement(const Point* p, GNode& node) {
-    Point* result;
-    if (!tree->find(p, result)) {
-      return false;
-    }
-
-    result->get(galois::MethodFlag::WRITE);
-
-    GNode someNode = result->someElement();
-
-    // Not in mesh yet
-    if (!someNode) {
-      return false;
-    }
-
-    return planarSearch(p, someNode, node);
-  }
-
-  struct LocalState {
-    Cavity<Alloc> cav;
-    LocalState(Process<Version>& self, galois::PerIterAllocTy& alloc): cav(self.graph, alloc) { }
-  };
-
-  typedef std::tuple<
-    galois::local_state<LocalState>,
-    galois::per_iter_alloc,
-    galois::no_pushes
-    > function_traits;
-
-  //! Parallel operator
-  void operator()(Point* p, galois::UserContext<Point*>& ctx) {
-    Cavity<Alloc>* cavp = NULL;
-
-    if (Version == detDisjoint) {
-      LocalState* localState = (LocalState*) ctx.getLocalState();
-      if (!ctx.isFirstPass()) {
-        localState->cav.update();
-        return;
-      } else {
-        cavp = &localState->cav;
-      }
-    }
-
-    p->get(galois::MethodFlag::WRITE);
-    assert(!p->inMesh());
-
-    GNode node;
-    if (!findContainingElement(p, node)) {
-      // Someone updated an element while we were searching, producing
-      // a semi-consistent state
-      //ctx.push(p);
-      // Current version is safe with locking so this shouldn't happen
-      GALOIS_DIE("unreachable");
-      return;
-    }
-  
-    assert(graph.getData(node).inTriangle(p->t()));
-    assert(graph.containsNode(node));
-
-    if (Version == detDisjoint && ctx.isFirstPass()) {
-      cavp->init(node, p);
-      cavp->build();
-    } else {
-      Cavity<Alloc> cav(graph, ctx.getPerIterAlloc());
-      cav.init(node, p);
-      cav.build();
-      if (Version == detPrefix)
-        return;
-      ctx.cautiousPoint();
-      cav.update();
-    }
-  }
-
-  //! Serial operator
-  void operator()(Point* p) {
-    p->get(galois::MethodFlag::WRITE);
-    assert(!p->inMesh());
-
-    GNode node;
-    if (!findContainingElement(p, node)) {
-      GALOIS_DIE("Could not find triangle containing point");
-      return;
-    }
-  
-    assert(graph.getData(node).inTriangle(p->t()));
-    assert(graph.containsNode(node));
-
-    Cavity<> cav(graph);
-    cav.init(node, p);
-    cav.build();
-    cav.update();
-  }
-};
-
 typedef std::vector<Point> PointList;
 
 class ReadPoints {
@@ -453,32 +260,27 @@ struct ReadInput {
     graph.getEdgeData(graph.addEdge(border_node3, large_node)) = 0;
   }
 
-  //! Streaming point distribution 
-  struct GenerateRounds {
-    typedef galois::substrate::PerThreadStorage<unsigned> CounterTy;
+  template <typename L>
+  void generateRoundsImpl(const L& loop, size_t size, PointList& points, size_t log2) {
+    loop(galois::iterate(0ul, size),
+          [&, this] (size_t index) {
+            const Point& p = points[index];
 
-    ReadInput& super;
-    const PointList& points;
-    size_t log2;
-  
-    GenerateRounds(ReadInput& s, const PointList& p, size_t l): super(s), points(p), log2(l) { }
+            Point* ptr = &(basePoints.push(p));
+            int r = 0;
+            for (size_t i = 0; i < log2; ++i) {
+              size_t mask = (1UL << (i + 1)) - 1;
+              if ((index & mask) == (1UL << i)) {
+                r = i;
+                break;
+              }
+            }
+          
+            rounds[r / roundShift]->push(ptr);
 
-    void operator()(size_t index) const {
-      const Point& p = points[index];
-
-      Point* ptr = &(super.basePoints.push(p));
-      int r = 0;
-      for (size_t i = 0; i < log2; ++i) {
-        size_t mask = (1UL << (i + 1)) - 1;
-        if ((index & mask) == (1UL << i)) {
-          r = i;
-          break;
-        }
-      }
-    
-      super.rounds[r / roundShift]->push(ptr);
-    }
-  };
+          },
+          galois::loopname("generateRoundsImpl"));
+  }
 
   //! Blocked point distribution (exponentially increasing block size) with points randomized
   //! within a round
@@ -531,15 +333,10 @@ struct ReadInput {
 
       if (true) {
         if (detAlgo == nondet) {
-          galois::do_all(
-              galois::iterate(0ul, size),
-              GenerateRounds(*this, ordered, log2), 
-              galois::loopname("GenerateRounds"));
+          generateRoundsImpl(galois::DoAll(),  size, ordered, log2);
+
         } else {
-          std::for_each(
-              boost::counting_iterator<size_t>(0),
-              boost::counting_iterator<size_t>(size),
-              GenerateRounds(*this, ordered, log2));
+          generateRoundsImpl(galois::StdForEach(), size, ordered, log2);
         }
       } else {
         generateRoundsOld(ordered, true);
@@ -642,11 +439,226 @@ static void writeMesh(const std::string& filename, Graph& graph) {
   pout.close();
 }
 
-static void generateMesh(Rounds& rounds, Graph& graph) {
+struct DelaunayTriangulation {
+
+  QuadTree* tree;
+  Graph& graph;
+
+  struct ContainsTuple {
+    const Graph& graph;
+    Tuple tuple;
+    ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
+    bool operator()(const GNode& n) const {
+      assert(!graph.getData(n, galois::MethodFlag::UNPROTECTED).boundary());
+      return graph.getData(n, galois::MethodFlag::UNPROTECTED).inTriangle(tuple);
+    }
+  };
+
+  void computeCenter(const Element& e, Tuple& t) const {
+    for (int i = 0; i < 3; ++i) {
+      const Tuple& o = e.getPoint(i)->t();
+      for (int j = 0; j < 2; ++j) {
+        t[j] += o[j];
+      }
+    }
+    for (int j = 0; j < 2; ++j) {
+      t[j] *= 1/3.0;
+    }
+  }
+
+  void findBestNormal(const Element& element, const Point* p, const Point*& bestP1, const Point*& bestP2) {
+    Tuple center(0);
+    computeCenter(element, center);
+    int scale = element.clockwise() ? 1 : -1;
+
+    Tuple origin = p->t() - center;
+  //        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
+    bestP1 = bestP2 = NULL;
+    double bestVal = 0.0;
+    for (int i = 0; i < 3; ++i) {
+      int next = i + 1;
+      if (next > 2) next -= 3;
+
+      const Point* p1 = element.getPoint(i);
+      const Point* p2 = element.getPoint(next);
+      double dx = p2->t().x() - p1->t().x();
+      double dy = p2->t().y() - p1->t().y();
+      Tuple normal(scale * -dy, scale * dx);
+      double val = normal.dot(origin); // / length2;
+      if (bestP1 == NULL || val > bestVal) {
+        bestVal = val;
+        bestP1 = p1;
+        bestP2 = p2;
+      }
+    }
+    assert(bestP1 != NULL && bestP2 != NULL && bestVal > 0);
+  }
+
+  GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
+    for (auto ii: graph.edges(start)) {
+      GNode dst = graph.getEdgeDst(ii);
+      Element& e = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+      int count = 0;
+      for (int i = 0; i < e.dim(); ++i) {
+        if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
+          if (++count == 2)
+            return dst;
+        }
+      }
+    }
+    GALOIS_DIE("unreachable");
+    return start;
+  }
+
+  bool planarSearch(const Point* p, GNode start, GNode& node) {
+    // Try simple hill climbing instead
+    ContainsTuple contains(graph, p->t());
+    while (!contains(start)) {
+      Element& element = graph.getData(start, galois::MethodFlag::WRITE);
+      if (element.boundary()) {
+        // Should only happen when quad tree returns a boundary point which is rare
+        // There's only one way to go from here
+        assert(std::distance(graph.edge_begin(start), graph.edge_end(start)) == 1);
+        start = graph.getEdgeDst(graph.edge_begin(start, galois::MethodFlag::WRITE));
+      } else {
+        // Find which neighbor will get us to point fastest by computing normal
+        // vectors
+        const Point *p1, *p2;
+        findBestNormal(element, p, p1, p2);
+        start = findCorrespondingNode(start, p1, p2);
+      }
+    }
+
+    node = start;
+    return true;
+  }
+
+  bool findContainingElement(const Point* p, GNode& node) {
+    Point* result;
+    if (!tree->find(p, result)) {
+      return false;
+    }
+
+    result->get(galois::MethodFlag::WRITE);
+
+    GNode someNode = result->someElement();
+
+    // Not in mesh yet
+    if (!someNode) {
+      return false;
+    }
+
+    return planarSearch(p, someNode, node);
+  }
+
+  using Alloc =  galois::PerIterAllocTy;
+
+  struct LocalState {
+    Cavity<Alloc> cav;
+    LocalState(Graph& graph, Alloc& alloc): cav(graph, alloc) { }
+  };
+
+  template <int Version, typename C>
+  void processPoint(Point* p, C& ctx) {
+    Cavity<Alloc>* cavp = NULL;
+
+    if (Version == detDisjoint) {
+
+      if (ctx.isFirstPass()) {
+        LocalState* localState = ctx.template createLocalState<LocalState> (graph, ctx.getPerIterAlloc());
+        cavp = &localState->cav;
+
+      } else {
+
+        LocalState* localState =  ctx.template getLocalState<LocalState>();
+        localState->cav.update();
+        return;
+      } 
+    }
+
+    p->get(galois::MethodFlag::WRITE);
+    assert(!p->inMesh());
+
+    GNode node;
+    if (!findContainingElement(p, node)) {
+      // Someone updated an element while we were searching, producing
+      // a semi-consistent state
+      //ctx.push(p);
+      // Current version is safe with locking so this shouldn't happen
+      GALOIS_DIE("unreachable");
+      return;
+    }
+
+    assert(graph.getData(node).inTriangle(p->t()));
+    assert(graph.containsNode(node));
+
+    if (Version == detDisjoint && ctx.isFirstPass()) {
+      cavp->init(node, p);
+      cavp->build();
+    } else {
+      Cavity<Alloc> cav(graph, ctx.getPerIterAlloc());
+      cav.init(node, p);
+      cav.build();
+      if (Version == detPrefix)
+        return;
+      ctx.cautiousPoint();
+      cav.update();
+    }
+  }
+
+  template <int Version, typename WL, typename B, typename... Args>
+  void generateMesh(B& pptrs, Args&&... args) {
+
+
+    galois::for_each(galois::iterate(pptrs),
+        [&, this] (Point* p, auto& ctx) {
+          this->processPoint<Version>(p, ctx); 
+        },
+        galois::wl<WL>(),
+        galois::loopname("generateMesh"),
+        galois::local_state<LocalState>(),
+        galois::per_iter_alloc(),
+        galois::no_pushes(),
+        std::forward<Args>(args)...);
+
+  }
+};
+
+
+/*
+template<int Version=detBase>
+struct Process {
+
+
+
+  //! Serial operator
+  void operator()(Point* p) {
+    p->get(galois::MethodFlag::WRITE);
+    assert(!p->inMesh());
+
+    GNode node;
+    if (!findContainingElement(p, node)) {
+      GALOIS_DIE("Could not find triangle containing point");
+      return;
+    }
+  
+    assert(graph.getData(node).inTriangle(p->t()));
+    assert(graph.containsNode(node));
+
+    Cavity<> cav(graph);
+    cav.init(node, p);
+    cav.build();
+    cav.update();
+  }
+};
+*/
+
+static void run(Rounds& rounds, Graph& graph) {
   typedef galois::worklists::AltChunkedLIFO<32> Chunked;
   typedef galois::worklists::Deterministic<> DWL;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
+
     galois::StatTimer BT("buildtree");
     BT.start();
     assert(rounds[i+1]);
@@ -656,27 +668,32 @@ static void generateMesh(Rounds& rounds, Graph& graph) {
 
     galois::StatTimer PT("ParallelTime");
     PT.start();
+
     assert(rounds[i]);
     galois::InsertBag<Point*>& pptrs = *(rounds[i]);
+
+    DelaunayTriangulation dt {&tree, graph};
     switch (detAlgo) {
       case nondet:
-        galois::for_each(galois::iterate(pptrs), Process<>(&tree, graph), galois::wl<Chunked>()); break;
-      case detBase:
-        galois::for_each(galois::iterate(pptrs), Process<>(&tree, graph), galois::wl<DWL>()); break;
-      case detPrefix:
-        galois::for_each(galois::iterate(pptrs), Process<>(&tree, graph), galois::wl<DWL>(),
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-            galois::neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree, graph))
-#else
-            galois::make_trait_with_args<galois::neighborhood_visitor>(Process<detPrefix>(&tree, graph))
-#endif
-              );
+        dt.generateMesh<detBase, Chunked>(pptrs);
         break;
+      case detBase:
+        dt.generateMesh<detBase, DWL>(pptrs);
+        break;
+      case detPrefix: 
+        {
+          auto nv = [&dt] (Point* p, auto& ctx) {
+            dt.processPoint<detPrefix>(p, ctx);
+          };
+          dt.generateMesh<detBase, DWL>(pptrs, galois::neighborhood_visitor<decltype(nv)>(nv));
+          break;
+        }
       case detDisjoint:
-        galois::for_each(galois::iterate(pptrs), Process<detDisjoint>(&tree, graph), galois::wl<DWL>());
+        dt.generateMesh<detDisjoint, DWL>(pptrs);
         break;
       default: GALOIS_DIE("Unknown algorithm: ", detAlgo);
     }
+
     PT.stop();
   }
 }
@@ -722,7 +739,7 @@ int main(int argc, char** argv) {
   
   galois::StatTimer T;
   T.start();
-  generateMesh(rounds, graph);
+  run(rounds, graph);
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";
 

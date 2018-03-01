@@ -104,7 +104,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
   if (enableFT && recoveryScheme == CP) {
     if (_num_iterations % checkpointInterval == 0) {
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-        galois::gDebug("Checkpoint for iteration: ", _num_iterations, "\n");    
+        galois::gPrint("Checkpoint for iteration: ", _num_iterations, "\n");    
       }
 
       _graph.checkpointSaveNodeData(checkpointFileName);
@@ -269,7 +269,7 @@ void crashSite(GraphTy& _graph) {
  * @param _graph Graph to operate on
  */
 template<typename RecoveryAdjustTy, typename GraphTy>
-void crashSiteAdjust(GraphTy& _graph){
+void crashSiteAdjust(GraphTy& _graph) {
   if (recoveryScheme == RS) {
     const auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer TimerRecoveryCrashedAdjust(

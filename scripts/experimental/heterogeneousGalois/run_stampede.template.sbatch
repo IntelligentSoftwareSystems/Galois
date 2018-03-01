@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --mail-user=gill@cs.utexas.edu
+#SBATCH --mail-user=roshan@cs.utexas.edu
 #SBATCH --mail-type=fail
 #SBATCH --mail-type=end
 #SBATCH -A Galois
@@ -10,7 +10,7 @@ THREADS=$5
 
 execname=$1
 #execdir=$WORK/Galois-build/dist_apps
-execdir=/scratch/02681/gsg466/build_Galois_master/release_lwci/dist_apps
+execdir=`pwd`
 EXEC=${execdir}/${execname}
 
 inputname=$2
@@ -25,17 +25,13 @@ if [[ $execname == *"kcore"* ]]; then
   # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
-if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
+if [[ ($execname == *"bc"*) ||  ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
   if [[ -f "${inputdirname}/${inputname}.source" ]]; then
     FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
   fi
 fi
-# bc: if rmat15 is not used, specify single source flags else do
-# all sources for rmat15
-# TODO currently uses rmat16 (doesn't exist) so everything does single source
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+if [[ ($execname == *"bc"*) ]]; then
   FLAGS+=" -singleSource"
-  FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
 fi
 
 source_file=${inputdirname}/source
@@ -48,7 +44,7 @@ else
   # needed for non-symmetric graphs
   FLAGS+=" -graphTranspose=${inputdirname}/transpose/${inputname}.tgr"
 fi
-grep "${inputname}.${extension}" ${source_file} >>$LOG
+grep "${inputname}.${extension}" ${source_file}
 INPUT=${inputdirname}/${inputname}.${extension}
 
 if [[ ($execname == *"pagerank"*) ]]; then
@@ -75,7 +71,8 @@ WORK_DIR=$SCRATCH/Galois
 cd $WORK_DIR
 
 set -x #echo on
-PRINT_PER_HOST_STATS=1 GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -t=$THREADS $FLAGS
+#I_MPI_FABRICS=shm:ofa
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUT} -t=$THREADS $FLAGS
 set +x #echo off
 
 echo "Algorithm: " $execname

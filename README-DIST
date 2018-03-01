@@ -1,0 +1,114 @@
+==== Supported Compilers ====
+
+This Galois release is compatible with the following compilers:
+
+gcc 6.1
+
+It may also work with other compilers.
+
+==== Organization ====
+Lonestar benchmark applications are in 'lonestar'.
+Distributed applications are in 'dist-apps'.
+'libgalois' contains the main Galois libraries proper.
+'libdist' contains code necessary for running distributed Galois.
+'libgpu' includes GPU libraries.
+'libllvm' contains a couple pieces of llvm used by Galois.
+'tools' contain various tools that may be helpful in running Galois.
+
+==== Basic Compiling Through CMake (Shared Memory Galois) ====
+We use cmake. Run the following commands to set up a basic build configuration:
+
+  export GALOIS_ROOT=`pwd`
+  (mkdir -p build/default; cd build/default; cmake ${GALOIS_ROOT})
+
+or, for a Debug build,
+
+  (mkdir -p build/debug; cd build/debug; cmake -DCMAKE_BUILD_TYPE=Debug ${GALOIS_ROOT})
+
+More esoteric systems may require a toolchain file; check ../cmake/Toolchain
+if there is a file corresponding to your system. If so, use the following
+cmake command:
+
+  cmake -C ${GALOIS_ROOT}/cmake/Toolchain/${platform}-tryrunresults.cmake \
+    -DCMAKE_TOOLCHAIN_FILE=${GALOIS_ROOT}/cmake/Toolchain/${platform}.cmake ${GALOIS_ROOT}
+
+CMake will automatically use the default gcc and g++ that it finds. To 
+specify a particular compiler for C and C++ code, prepend the following to the
+CMake command:
+
+CC=<C compiler> CXX=<C++ compiler> cmake .....
+  
+==== Basic Compiling Through CMake (Distributed and Heterogeneous Galois) ====
+
+To build distributed/heterogeneous Galois, certain CMake flags must be 
+specified.
+
+For distributed Galois:
+
+cmake ${GALOIS_ROOT} -DENABLE_DIST_GALOIS=1
+
+For heterogeneous Galois:
+
+cmake ${GALOIS_ROOT} -DENABLE_HETERO_GALOIS=1
+
+Compiling with distributed Galois will add the 'dist_apps' directory to the
+build folder. Compiling with heterogeneous Galois enabled with enable
+certain options in 'dist_apps'.
+
+==== Compiling Provided Apps ====
+
+Once CMake is successfully completed, you can build the provided apps by 
+moving into the apps directory and running make. For example, if you wanted
+to build Lonestar's bfs, you would do the following:
+
+cd lonestar/bfs; make
+
+==== Running Provided Apps ====
+
+You can learn how to run compiled applications by running them with the -help
+command line option:
+
+./bfs -help
+
+Most of the provided graph applications take graphs in a .gr format, which
+is a Galois graph format that stores the graph in a CSR or CSC format. We 
+provide a graph converter tool under 'tools/graph-convert' that can take
+various graph formats and convert them to the Galois format.
+
+==== Running Provided Apps (Distributed Apps) ====
+
+The distributed applications have a few common command line flags that are
+worth noting. More details can be found by running a distributed application
+with the -help flag.
+
+-partition=<partitioning policy>
+
+Specifies the partitioning that you would like to use when splitting the graph
+among multiple hosts.
+
+-graphTranspose
+
+Specifies the transpose of the provided input graph. This is used to 
+create certain partitions of the graph (and is required for some of the 
+partitioning policies).
+
+-runs
+
+Number of times to run an application.
+
+-statFile
+
+Specify the file in which to output run statistics to.
+
+-verify
+
+Outputs a file with the result of running the application. For example, 
+specifying this flag on a bfs application will output the shortest distances
+to each node.
+
+==== Basic Use (Creating Your Own Applications) ====
+
+You can run the sample applications and make your own Galois programs directly
+in the build tree without installing anything. Just add a subdirectory under
+lonestar, copy a CMakeLists.txt file from another application to your new
+application, and add the subdirectory to the CMakeLists in lonestar.

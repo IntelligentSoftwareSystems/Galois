@@ -476,7 +476,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
     src = _np_closure[threadIdx.x].src;
   }
   // FP: "119 -> 120;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "120 -> 121;
 }
 __global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, HGAccumulator<uint64_t> DGAccumulator_accum)
@@ -504,7 +504,7 @@ __global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, u
     }
   }
   // FP: "11 -> 12;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "12 -> 13;
 }
 void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)

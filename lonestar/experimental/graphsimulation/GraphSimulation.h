@@ -38,16 +38,14 @@
 
 struct Node {
   uint32_t label; // maximum of 32 node labels
-  uint32_t id; // specific to the label
+  uint32_t id;
   uint64_t matched; // maximum of 64 nodes in the query graph
   // TODO: make matched a dynamic bitset
-  // TODO: add custom attributes
 };
 
 struct EdgeData {
   uint32_t label; // maximum  of 32 edge labels
   uint64_t timestamp; // range of timestamp is limited
-  // TODO: add custom attributes
 };
 
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
@@ -60,7 +58,10 @@ struct AttributedGraph {
   Graph graph;
   std::vector<std::string> nodeLabels;
   std::vector<std::string> edgeLabels;
-  std::vector<std::string> nodeNames;
+  galois::LargeArray<std::string> nodeNames;
+  // custom attributes
+  std::map<std::string, galois::LargeArray<std::string>> nodeAttributes;
+  std::map<std::string, galois::LargeArray<std::string>> edgeAttributes;
 };
 
 unsigned rightmostSetBitPos(uint32_t n);

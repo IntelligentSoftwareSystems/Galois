@@ -35,19 +35,10 @@
 
 
 struct is_bad {
-  Graph* g;
-  is_bad(Graph* _g): g(_g) {}
+  Graph& g;
+  is_bad(Graph& _g): g(_g) {}
   bool operator()(const GNode& n) const {
-    return g->getData(n, galois::MethodFlag::UNPROTECTED).isBad();
-  }
-};
-
-struct create_nodes {
-  Graph* g;
-  create_nodes(Graph* _g): g(_g) {}
-  void operator()(const Element& item) const {
-    GNode n = g->createNode(item);
-    g->addNode(n);
+    return g.getData(n, galois::MethodFlag::UNPROTECTED).isBad();
   }
 };
 
@@ -350,14 +341,14 @@ private:
     fclose(oFile);
   }
   
-  void addElement(Graph* mesh, GNode node, std::map<Edge, GNode>& edge_map) {
-    Element& element = mesh->getData(node);
+  void addElement(Graph& mesh, GNode node, std::map<Edge, GNode>& edge_map) {
+    Element& element = mesh.getData(node);
     for (int i = 0; i < element.numEdges(); i++) {
       Edge edge = element.getEdge(i);
       if (edge_map.find(edge) == edge_map.end()) {
         edge_map[edge] = node;
       } else {
-        mesh->addEdge(node, edge_map[edge], galois::MethodFlag::UNPROTECTED);
+        mesh.addEdge(node, edge_map[edge], galois::MethodFlag::UNPROTECTED);
         edge_map.erase(edge);
       }
     }
@@ -377,25 +368,35 @@ private:
     }
   }
 
-  void makeGraph(Graph* mesh, bool parallelAllocate) {
+  template <typename L>
+  void createNodes(Graph& g, const L& loop) {
+
+    loop(galois::iterate(elements), 
+        [&] (const Element& item) {
+          GNode n = g.createNode(item);
+          g.addNode(n);
+        }
+        , galois::loopname("allocate"));
+
+  }
+  void makeGraph(Graph& mesh, bool parallelAllocate) {
     //std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
     if (parallelAllocate) 
-      galois::do_all(galois::iterate(elements), create_nodes(mesh), galois::loopname("allocate"));
+      createNodes(mesh, galois::DoAll());
     else
-      std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
+      createNodes(mesh, galois::StdForEach());
 
     std::map<Edge, GNode> edge_map;
-    for (Graph::iterator ii = mesh->begin(), ee = mesh->end();
-	 ii != ee; ++ii)
+    for (auto ii = mesh.begin(), ee = mesh.end(); ii != ee; ++ii)
       addElement(mesh, *ii, edge_map);
   }
 
 public:
   Mesh(): id(0) { }
 
-  void read(Graph* mesh, std::string basename, bool parallelAllocate) {
+  void read(Graph& mesh, std::string basename, bool parallelAllocate) {
     std::vector<Tuple> tuples;
     readNodes(basename, tuples);
     readElements(basename, tuples);

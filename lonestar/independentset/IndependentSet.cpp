@@ -53,7 +53,6 @@ enum Algo {
   detBase,
   detPrefix,
   detDisjoint,
-  orderedBase,
   prio,
   prio2,
   edgetiledprio2
@@ -69,7 +68,6 @@ static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(detBase, "Base deterministic execution"),
       clEnumVal(detPrefix, "Prefix deterministic execution"),
       clEnumVal(detDisjoint, "Disjoint deterministic execution"),
-      clEnumVal(orderedBase, "Base ordered execution"),
       clEnumVal(prio, "prio algo with priority based on degree"),
       clEnumVal(prio2, "prio algo based on Martin's GPU ECL-MIS algorithm"),
       clEnumVal(edgetiledprio2, "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm"),
@@ -142,9 +140,10 @@ struct SerialAlgo {
   }
 };
 
-//! Basic operator for default and deterministic scheduling
-template<int Version=detBase>
-struct Process {
+
+template<Algo algo>
+struct DefaultAlgo {
+
   typedef typename galois::graphs::LC_CSR_Graph<Node,void>
     ::template with_numa_alloc<true>::type Graph;
 
@@ -152,28 +151,11 @@ struct Process {
 
   struct LocalState {
     bool mod;
-    LocalState(Process<Version>& self, galois::PerIterAllocTy& alloc): mod(false) { }
+    explicit LocalState(): mod(false) { }
   };
-
-  struct DeterministicId {
-    uintptr_t operator()(const GNode& x) const {
-      return x;
-    }
-  };
-
-  typedef std::tuple<
-    galois::no_pushes,
-    galois::per_iter_alloc,
-    galois::det_id<DeterministicId>,
-    galois::local_state<LocalState>
-  > function_traits;
-
-  Graph& graph;
-
-  Process(Graph& g): graph(g) { }
 
   template<galois::MethodFlag Flag>
-  bool build(GNode src) {
+  bool build(Graph& graph, GNode src) {
     Node& me = graph.getData(src, Flag);
     if (me.flag != UNMATCHED)
       return false;
@@ -188,7 +170,7 @@ struct Process {
     return true;
   }
 
-  void modify(GNode src) {
+  void modify(Graph& graph, GNode src) {
     Node& me = graph.getData(src, galois::MethodFlag::UNPROTECTED);
     for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(ii);
@@ -199,106 +181,77 @@ struct Process {
     me.flag = MATCHED;
   }
 
-  void operator()(GNode src, galois::UserContext<GNode>& ctx) {
-    bool* modp;
-    if (Version == detDisjoint) {
-      LocalState* localState = (LocalState*) ctx.getLocalState();
-      modp = &localState->mod;
-      if (!ctx.isFirstPass()) {
-        if (*modp)
-          modify(src);
-        return;
-      }
-    }
+  template <int Version, typename C>
+  void processNode(Graph& graph, const GNode& src, C& ctx) {
+    bool mod;
+    if (Version != detDisjoint || ctx.isFirstPass()) {
+      mod = build<galois::MethodFlag::WRITE>(graph, src);
 
-    if (Version == detDisjoint && ctx.isFirstPass ()) {
-      *modp = build<galois::MethodFlag::WRITE>(src);
-    } else {
-      bool mod = build<galois::MethodFlag::WRITE>(src);
-      if (Version == detPrefix) {
+      if (Version == detPrefix) { 
+        return;
+      } else if (Version == detDisjoint) {
+        LocalState* localState = ctx.template createLocalState<LocalState>();
+        localState->mod = mod;
         return;
       } else {
         graph.getData(src, galois::MethodFlag::WRITE);
         ctx.cautiousPoint(); // Failsafe point
       }
-      if (mod)
-      {
-        modify(src);
-      }
+    } else { // Version == detDisjoint && !ctx.isFirstPass
+      LocalState* localState = ctx.template getLocalState<LocalState>();
+      mod = localState->mod;
+    }
+
+    if (mod) {
+      modify(graph, src);
     }
   }
-};
 
-template<bool prefix>
-struct OrderedProcess {
-  // typedef int tt_does_not_need_push;
+  template <int Version, typename WL, typename... Args>
+  void run(Graph& graph, Args&&... args) {
 
-  typedef typename Process<>::Graph Graph;
-  typedef typename Graph::GraphNode GNode;
+    auto detID = [] (const GNode& x) { 
+      return x;
+    };
 
-  Graph& graph;
-  Process<> process;
+    galois::for_each(galois::iterate(graph), 
+        [&, this] (const GNode& src, auto& ctx) {
+          this->processNode<Version>(graph, src, ctx);
+        },
+        galois::no_pushes(),
+        galois::wl<WL>(),
+        galois::loopname("DefaultAlgo"),
+        galois::det_id< decltype(detID) >(detID),
+        galois::local_state<LocalState>(),
+        std::forward<Args>(args)...);
 
-  OrderedProcess(Graph& g): graph(g), process(g) { }
-
-  template<typename C>
-  void operator()(GNode src, C& ctx) {
-    (*this)(src);
   }
 
-  void operator()(GNode src) {
-    if (prefix) {
-      graph.edge_begin(src, galois::MethodFlag::WRITE);
-    } else {
-      if (process.build<galois::MethodFlag::UNPROTECTED>(src))
-        process.modify(src);
-    }
-  }
-};
 
-template<typename Graph>
-struct Compare {
-  typedef typename Graph::GraphNode GNode;
-  Graph& graph;
-
-  Compare(Graph& g): graph(g) { }
-  
-  bool operator()(const GNode& a, const GNode& b) const {
-    return &graph.getData(a, galois::MethodFlag::UNPROTECTED)< &graph.getData(b, galois::MethodFlag::UNPROTECTED);
-  }
-};
-
-
-template<Algo algo>
-struct DefaultAlgo {
-  typedef typename Process<>::Graph Graph;
 
   void operator()(Graph& graph) {
     typedef galois::worklists::Deterministic<> DWL;
 
-    typedef galois::worklists::BulkSynchronous<typename galois::worklists::dChunkedFIFO<256> > WL;
+    typedef galois::worklists::BulkSynchronous<typename galois::worklists::dChunkedFIFO<64> > BSWL;
         //typedef galois::worklists::dChunkedFIFO<256> WL;
 
     switch (algo) {
       case nondet: 
-        //galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<WL>());
-        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<galois::worklists::ParaMeter<> >());
+        run<nondet, BSWL>(graph);
         break;
       case detBase:
-        galois::for_each(galois::iterate(graph), Process<>(graph), galois::loopname("Main"), galois::wl<DWL>());
+        run<detBase, DWL>(graph);
         break;
       case detPrefix:
-        galois::for_each(galois::iterate(graph), Process<>(graph),
-            galois::loopname("Main"), galois::wl<DWL>(),
-            galois::make_trait_with_args<galois::neighborhood_visitor>(Process<detPrefix>(graph))
-            );
+        {
+          auto nv = [&, this] (const GNode& src, auto& ctx) {
+            this->processNode<detPrefix>(graph, src, ctx);
+          };
+          run<detBase, DWL>(graph, galois::neighborhood_visitor< decltype(nv) >(nv));
+        }
         break;
       case detDisjoint:
-        galois::for_each(galois::iterate(graph), Process<detDisjoint>(graph), galois::wl<DWL>());
-        break;
-      case orderedBase:
-        galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
-            OrderedProcess<true>(graph), OrderedProcess<false>(graph));
+        run<detDisjoint, DWL>(graph);
         break;
       default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
     }
@@ -306,79 +259,77 @@ struct DefaultAlgo {
 };
 
 struct PullAlgo {
+
   typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     Graph;
+
   typedef Graph::GraphNode GNode;
+  typedef galois::InsertBag<GNode> Bag;
 
-  struct Pull {
-    typedef int tt_does_not_need_push;
-    typedef int tt_does_not_need_aborts;
+  using Counter = galois::GAccumulator<size_t>;
 
-    typedef galois::InsertBag<GNode> Bag;
+  template <typename R>
+  void pull(const R& range, Graph& graph, Bag& matched, Bag& otherMatched, Bag& next, Counter& numProcessed) {
 
-    Graph& graph;
-    Bag& matched;
-    Bag& otherMatched;
-    Bag& next;
-    galois::GAccumulator<size_t>& numProcessed;
+    galois::do_all(range, 
+        [&] (const GNode& src) {
+          numProcessed += 1;
+          Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          if(n.flag == OTHER_MATCHED)
+            return;
 
-    void operator()(GNode src, galois::UserContext<GNode>&) const {
-      operator()(src);
-    }
+          MatchFlag f = MATCHED;
+          for (auto edge : graph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst = graph.getEdgeDst(edge);
+            if (dst >= src) {
+              continue; 
+            } 
+            
+            Node& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+            if (other.flag == MATCHED) {
+              f = OTHER_MATCHED;
+              break;
+            } else if (other.flag == UNMATCHED) {
+              f = UNMATCHED;
+            }
+          }
 
-    void operator()(GNode src) const {
-      numProcessed += 1;
-      Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      if(n.flag == OTHER_MATCHED)
-        return;
+          if (f == UNMATCHED) {
+            next.push_back(src);
+          } else if (f == MATCHED) {
+            matched.push_back(src);
+          } else {
+            otherMatched.push_back(src);
+          }
+          //std::cout<<src<< " " << f <<std::endl;
+          
+        },
+        galois::loopname("pull"));
 
-      MatchFlag f = MATCHED;
-      for (auto edge : graph.out_edges(src, galois::MethodFlag::UNPROTECTED)) {
-        GNode dst = graph.getEdgeDst(edge);
-        if (dst >= src) {
-          continue; 
-        } 
-        
-        Node& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-        if (other.flag == MATCHED) {
-          f = OTHER_MATCHED;
-          break;
-        } else if (other.flag == UNMATCHED) {
-          f = UNMATCHED;
-        }
-      }
 
-      if (f == UNMATCHED) {
-        next.push_back(src);
-      } else if (f == MATCHED) {
-        matched.push_back(src);
-      } else {
-        otherMatched.push_back(src);
-      }
-      //std::cout<<src<< " " << f <<std::endl;
-    }
-  };
+  }
 
-  template<MatchFlag F>
-  struct Take {
-    Graph& graph;
-    galois::GAccumulator<size_t>& numTaken;
+  template <MatchFlag F>
+  void take(Bag& bag, Graph& graph, Counter& numTaken) {
 
-    void operator()(GNode src) const {
-      Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      numTaken += 1;
-      n.flag = F;
-    }
-  };
+    galois::do_all(galois::iterate(bag), 
+        [&] (const GNode& src) {
+          Node& n = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+          numTaken += 1;
+          n.flag = F;
+        },
+        galois::loopname("take"));
+
+  }
+
 
   void operator()(Graph& graph) {
-    galois::GAccumulator<size_t> rounds;
-    galois::GAccumulator<size_t> numProcessed;
-    galois::GAccumulator<size_t> numTaken;
+    size_t rounds = 0;
+    Counter numProcessed;
+    Counter numTaken;
 
-    typedef galois::InsertBag<GNode> Bag;
     Bag bags[2];
     Bag* cur = &bags[0];
     Bag* next = &bags[1];
@@ -391,41 +342,38 @@ struct PullAlgo {
     Graph::iterator ei = graph.begin();
 
     while (size > 0) {
-      Pull pull { graph, matched, otherMatched, *next, numProcessed };
-      Take<MATCHED> takeMatched { graph, numTaken };
-      Take<OTHER_MATCHED> takeOtherMatched { graph, numTaken };
-
       numProcessed.reset();
 
       if (!cur->empty()) {
-        // typedef galois::worklists::StableIterator<> WL;
-        //galois::for_each(*cur, pull, galois::wl<WL>());
-        galois::do_all(galois::iterate(*cur), pull, galois::loopname("pull-0"));
+        pull(galois::iterate(*cur), graph, matched, otherMatched, *next, numProcessed);
       }
 
       size_t numCur = numProcessed.reduce();
       std::advance(ei, std::min(size, delta) - numCur);
 
-      if (ii != ei)
-        galois::do_all(galois::iterate(ii, ei), pull, galois::loopname("pull-1"));
+      if (ii != ei) {
+        pull(galois::iterate(ii, ei), graph, matched, otherMatched, *next, numProcessed);
+      }
+
       ii = ei;
 
       numTaken.reset();
 
-      galois::do_all(galois::iterate(matched), takeMatched, galois::loopname("takeMatched"));
-      galois::do_all(galois::iterate(otherMatched), takeOtherMatched, galois::loopname("takeOtherMatched"));
+      take<MATCHED>(matched, graph, numTaken);
+      take<OTHER_MATCHED>(otherMatched, graph, numTaken);
 
       cur->clear();
       matched.clear();
       otherMatched.clear();
       std::swap(cur, next);
       rounds += 1;
+      assert(size >= numTaken.reduce());
       size -= numTaken.reduce();
       //std::cout<<size<<std::endl;
       //break;
     }
 
-    galois::runtime::reportStat_Single("IndependentSet-PullAlgo", "rounds", rounds.reduce());
+    galois::runtime::reportStat_Single("IndependentSet-PullAlgo", "rounds", rounds);
   }
 };
 
@@ -1090,7 +1038,6 @@ int main(int argc, char** argv) {
     case detBase: run<DefaultAlgo<detBase> >(); break;
     case detPrefix: run<DefaultAlgo<detPrefix> >(); break;
     case detDisjoint: run<DefaultAlgo<detDisjoint> >(); break;
-    case orderedBase: run<DefaultAlgo<orderedBase> >(); break;
     case pull: run<PullAlgo>(); break;
     case prio: run<PrioAlgo>(); break;
     case prio2: run<PrioAlgo2>(); break;

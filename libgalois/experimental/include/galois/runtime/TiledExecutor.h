@@ -424,14 +424,30 @@ class Fixed2DGraphTiledExecutor {
   }
 
 
-  // TODO examine this
-  // bulk synchronous diagonals: static work assignment
+  /**
+   * Bulk Synchronous Diagonals: Static work assignment
+   *
+   * From the start point assigned to each thread, loop across the grid
+   * diagonally, moving a step in the direction of the longer of the X or Y
+   * direction every round and working along the diagonal there.
+   *
+   * @tparam UseDense dense update (all nodes in block update with all other 
+   * nodes) or sparse update (update only if edge exists)
+   * @tparam Type of function specifying how to do update between nodes
+   *
+   * @param fn Function used to update nodes
+   * @param tid Thread id
+   * @param total Total number of threads
+   */
   template<bool UseDense, typename Function>
   void executeLoopExp(Function fn, unsigned tid, unsigned total) {
     Point numBlocks { locks[0].size(), locks[1].size() };
     Point block;
     Point start;
 
+    // TODO this assigns each thread a block along the diagonal, which is 
+    // probably NOT what you want in this executor since each block will go 
+    // along the diagonal; fix this
     for (int i = 0; i < numDims; ++i) {
       block[i] = (numBlocks[i] + total - 1) / total; // blocks per thread
       start[i] = std::min(block[i] * tid, numBlocks[i] - 1); // block to start
@@ -450,7 +466,7 @@ class Fixed2DGraphTiledExecutor {
 
       size_t ntries = std::min(block[odim] * (tid + 1), numBlocks[odim]) - start[odim];
       for (size_t tries = 0; tries < ntries; ++tries) {
-        Task *t = probeBlock(p, 0, 1);
+        Task *t = probeBlock(p, 0, 1); // probe block I am currently on
         if (t) {
           executeBlock<UseDense>(fn, *t);
 
@@ -511,8 +527,11 @@ class Fixed2DGraphTiledExecutor {
     }
   }
 
+  // TODO this function is imprecise by virtue of nextBlock being a bad
+  // function
   /**
-   * Execute a function over the grid.
+   * Execute a function over the grid. Dynamic work: a thread can potentially
+   * get any block.
    *
    * @tparam UseDense dense update (all nodes in block update with all other 
    * nodes) or sparse update (update only if edge exists)
@@ -617,6 +636,7 @@ class Fixed2DGraphTiledExecutor {
     locks[1].resize(numYBlocks);
     tasks.resize(numBlocks);
 
+    // TODO parallelize this?
     // assign each block the X and Y that it is responsible for
     for (size_t i = 0; i < numBlocks; ++i) {
       Task& task = tasks[i];
@@ -624,7 +644,6 @@ class Fixed2DGraphTiledExecutor {
       std::tie(task.startX, task.endX) = galois::block_range(firstX, lastX, 
                                                              task.coord[0],
                                                              numXBlocks);
-
       iterator s;
       iterator e;
       std::tie(s, e) = galois::block_range(firstY, lastY, task.coord[1],

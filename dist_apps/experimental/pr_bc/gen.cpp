@@ -157,7 +157,8 @@ void InitializeGraph(Graph& graph) {
  * @param graph Local graph to operate on
  * @param offset Offset into sources (i.e. number of sources already done)
  **/
-void InitializeIteration(Graph& graph, const uint64_t offset) {
+void InitializeIteration(Graph& graph,
+                         const std::vector<uint64_t>& nodesToConsider) {
   const auto& allNodes = graph.allNodesRange();
 
   galois::do_all(
@@ -167,7 +168,7 @@ void InitializeIteration(Graph& graph, const uint64_t offset) {
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         // min distance and short path count setup
-        if ((offset + i) == graph.getGID(curNode)) {
+        if (nodesToConsider[i] == graph.getGID(curNode)) {
           cur_data.minDistances[i] = 0;
           cur_data.shortestPathNumbers[i] = 1;
         } else {
@@ -693,7 +694,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
  * @param graph Local graph to operate on
  * @param offset Offset into sources (i.e. number of sources already done)
  */
-void BC(Graph& graph, uint64_t offset) {
+void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
   const auto& masterNodes = graph.masterNodesRange();
   graph.set_num_iter(0);
 
@@ -704,7 +705,7 @@ void BC(Graph& graph, uint64_t offset) {
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         // exclude sources themselves from BC calculation
-        if (graph.getGID(node) != (i + offset)) {
+        if (graph.getGID(node) != nodesToConsider[i]) {
           cur_data.bc += cur_data.dependencyValues[i];
         }
 
@@ -817,6 +818,9 @@ int main(int argc, char** argv) {
 
   uint64_t origNumRoundSources = numSourcesPerRound;
 
+  std::vector<uint64_t> nodesToConsider;
+  nodesToConsider.resize(numSourcesPerRound);
+
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
     std::string timer_str("TIMER_" + std::to_string(run));
@@ -825,23 +829,56 @@ int main(int argc, char** argv) {
     // offset into sources to operate on
     uint64_t offset = 0;
 
-    StatTimer_main.start();
-
+    galois::DGAccumulator<unsigned> hasEdges;
     while (offset < totalNumSources) {
-      galois::gDebug("[", net.ID, "] Offset ", offset, " started");
+      unsigned sourcesFound = 0;
+      
+      while (sourcesFound < numSourcesPerRound && offset < totalNumSources) {
+        hasEdges.reset();
 
-      // correct in case numSources overflows total num of sources
-      if (offset + numSourcesPerRound > totalNumSources) {
-        numSourcesPerRound = totalNumSources - offset;
-        galois::gDebug("Num sources for this final round will be ", 
-                       numSourcesPerRound);
+        // find out if this node is local + has an outgoing edge
+        if (hg->isLocal(offset)) {
+          unsigned localID = hg->G2L(offset);
+
+          if (std::distance(hg->edge_begin(localID), hg->edge_end(localID))) {
+            hasEdges += 1;
+          }
+        }
+
+        // if this node has an outgoing edge on any node, add it to vector of 
+        // sources to consider
+        if (hasEdges.reduce()) {
+          nodesToConsider[sourcesFound] = offset;
+          sourcesFound++;
+        } else {
+          if (net.ID == 0) {
+            galois::gInfo("Skipping node ", offset, " (no outgoing)");
+          }
+        }
+
+        offset++;
+      }
+
+      if (sourcesFound == 0) {
+        assert(offset == totalNumSources);
+        break;
+      }
+
+      // correct numSourcesPerRound if not enough sources found
+      if (offset < totalNumSources) {
+        assert(numSourcesPerRound == sourcesFound);
+      } else {
+        galois::gDebug("Not enough sources found (only found ", sourcesFound, 
+                       ")");
+        numSourcesPerRound = sourcesFound;
       }
 
       if (useSingleSource) {
-        offset = startNode;
+        nodesToConsider[0] = startNode;
       }
 
-      InitializeIteration(*hg, offset);
+      StatTimer_main.start();
+      InitializeIteration(*hg, nodesToConsider);
 
       // APSP returns total number of rounds taken
       // subtract 1 to get to terminating round; i.e. last round 
@@ -849,13 +886,11 @@ int main(int argc, char** argv) {
 
       RoundUpdate(*hg, lastRoundNumber);
       BackProp(*hg, lastRoundNumber);
-      BC(*hg, offset);
+      BC(*hg, nodesToConsider);
+      StatTimer_main.stop();
 
-      offset += numSourcesPerRound;
       macroRound++;
     }
-
-    StatTimer_main.stop();
 
     // sanity 
     Sanity(*hg);

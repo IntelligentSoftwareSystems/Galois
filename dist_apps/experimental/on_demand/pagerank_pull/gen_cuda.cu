@@ -257,7 +257,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
     }
   }
   // FP: "17 -> 18;
-  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE>>(DGAccumulator_accum_ts);
+  DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "18 -> 19;
 }
 __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual)
@@ -520,19 +520,19 @@ __global__ void PageRankSanity(CSRGraph graph, unsigned int __begin, unsigned in
     }
   }
   // FP: "29 -> 30;
-  DGAccumulator_residual_over_tolerance.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE>>(DGAccumulator_residual_over_tolerance_ts);
+  DGAccumulator_residual_over_tolerance.thread_exit<cub::BlockReduce<uint64_t, TB_SIZE> >(DGAccumulator_residual_over_tolerance_ts);
   // FP: "30 -> 31;
-  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_sum_ts);
+  DGAccumulator_sum.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_sum_ts);
   // FP: "31 -> 32;
-  DGAccumulator_sum_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(DGAccumulator_sum_residual_ts);
+  DGAccumulator_sum_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(DGAccumulator_sum_residual_ts);
   // FP: "32 -> 33;
-  max_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(max_residual_ts);
+  max_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(max_residual_ts);
   // FP: "33 -> 34;
-  max_value.thread_exit<cub::BlockReduce<float, TB_SIZE>>(max_value_ts);
+  max_value.thread_exit<cub::BlockReduce<float, TB_SIZE> >(max_value_ts);
   // FP: "34 -> 35;
-  min_residual.thread_exit<cub::BlockReduce<float, TB_SIZE>>(min_residual_ts);
+  min_residual.thread_exit<cub::BlockReduce<float, TB_SIZE> >(min_residual_ts);
   // FP: "35 -> 36;
-  min_value.thread_exit<cub::BlockReduce<float, TB_SIZE>>(min_value_ts);
+  min_value.thread_exit<cub::BlockReduce<float, TB_SIZE> >(min_value_ts);
   // FP: "36 -> 37;
 }
 void ResetGraph_cuda(unsigned int  __begin, unsigned int  __end, const float & local_alpha, struct CUDA_Context*  ctx)

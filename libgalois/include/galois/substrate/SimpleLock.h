@@ -97,17 +97,24 @@ public:
   }
 };
 
-  //Dummy Lock implements the lock interface without a lock
+//! Dummy Lock implements the lock interface without a lock for serial code
 
+namespace internal {
 class DummyLock {
 public:
   inline void lock() const {}
   inline void unlock() const {}
-  //  inline bool try_lock() const { return true; }
-  //inline bool is_locked() const { }
+  inline bool try_lock() const { return true; }
+  inline bool is_locked() const { return false; }
 };
+}
 
-typedef std::lock_guard<SimpleLock> lock_guard_galois;
+
+template <bool Enabled>
+using CondLock = typename std::conditional<Enabled, SimpleLock, internal::DummyLock>::type;
+
+
+using lock_guard_galois =  std::lock_guard<SimpleLock>;
 
 #define MAKE_LOCK_GUARD(__x) galois::substrate::lock_guard_galois locker##___COUNTER__(__x)
 

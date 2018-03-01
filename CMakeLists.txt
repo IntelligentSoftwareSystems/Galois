@@ -25,7 +25,7 @@ endif()
 ###### Distributed-heterogeneous features ######
 set(ENABLE_DIST_GALOIS OFF CACHE BOOL "Enable distributed features")
 set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
-set(USE_LWCI OFF CACHE BOOL "Use LWCI network runtime instead of MPI")
+set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
 ###### General features ######
@@ -166,21 +166,22 @@ if(ENABLE_HETERO_GALOIS)
   set(ENABLE_DIST_GALOIS ON)
 endif()
 if(ENABLE_DIST_GALOIS)
-  find_package(MPI REQUIRED) # required even if USE_LWCI
+  find_package(MPI REQUIRED) # required even if USE_LCI
   set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
   set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
   include_directories(${MPI_INCLUDE_PATH})
 
-  if (USE_LWCI)
+  if (USE_LCI)
     add_definitions(-DGALOIS_USE_LWCI)
-    set(LWCI_ROOT $ENV{LWCI_ROOT})
-    if (EXISTS ${LWCI_ROOT})
-    else()
-      message(FATAL_ERROR "LWCI_ROOT=${LWCI_ROOT} does not exist; set environment variable LWCI_ROOT to override")
-    endif()
+    set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
     set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-    set(LWCI_LIBRARY "${LWCI_ROOT}/lib/liblwci.a")
-  endif(USE_LWCI)
+    set(LWCI_LIBRARY "${LWCI_ROOT}/liblwci.a")
+    add_custom_command(
+      OUTPUT ${LWCI_LIBRARY}
+      COMMAND make -C ${LWCI_ROOT}
+    )
+    add_custom_target(lci DEPENDS ${LWCI_LIBRARY})
+  endif(USE_LCI)
 
   if(ENABLE_HETERO_GALOIS)
     find_package(CUDA REQUIRED)

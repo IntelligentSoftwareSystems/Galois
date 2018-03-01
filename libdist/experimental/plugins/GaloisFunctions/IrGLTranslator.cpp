@@ -338,19 +338,19 @@ public:
         auto name = it.first;
         auto type = it.second;
         auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
-        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << " >(" << name << "_ts)\"], parse = False),\n";
       }
       for (auto& it : reducemaxToTypeMap) {
         auto name = it.first;
         auto type = it.second;
         auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
-        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << " >(" << name << "_ts)\"], parse = False),\n";
       }
       for (auto& it : reduceminToTypeMap) {
         auto name = it.first;
         auto type = it.second;
         auto br = "cub::BlockReduce<" + type + ", TB_SIZE>";
-        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << ">(" << name << "_ts)\"], parse = False),\n";
+        bodyString << "CBlock([\"" << name << ".thread_exit<" << br << " >(" << name << "_ts)\"], parse = False),\n";
       }
       bodyString << "]),\n"; // end Kernel
       std::vector<std::string> globalArguments, arguments, bitsetArguments;
