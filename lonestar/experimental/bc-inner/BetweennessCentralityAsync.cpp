@@ -61,8 +61,6 @@ static cll::opt<bool> generateCert("generateCertificate",
 //                                   cll::desc("Use node based execution"),
 //                                   cll::init(true));
 
-//#define INLINE_US
-
 using NodeType = typename BCGraph::NodeType;
 struct BetweenessCentralityAsync {
   BCGraph& graph;
@@ -90,10 +88,52 @@ struct BetweenessCentralityAsync {
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
   LeafCounter leafCount;
 
+  void CorrectNode(NodeType* B, BCEdge& ed, BCEdge* edgeData) {
+    int idx = B->id;
+    int* inIdx = graph.inIdx;
+    int* ins = graph.ins; 
+    int startInE = inIdx[idx];
+    int endInE = inIdx[idx + 1];
+
+    // loop through in edges
+    for (int j = startInE; j < endInE; j++) {
+      BCEdge & inE = edgeData[ins[j]];
+      NodeType *inNbr = inE.src;
+      if (inNbr == B) continue;
+
+      // lock in right order
+      NodeType* aL;
+      NodeType* aW;
+      if (B < inNbr) { aL = B; aW = inNbr;} 
+      else { aL = inNbr; aW = B; }
+      aL->lock(); aW->lock();
+
+      const unsigned elev = inE.level; 
+      // Correct Node
+      if (inNbr->distance >= B->distance) { 
+        correctNodeP1Count.update(1);
+        B->unlock();
+
+        galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
+                       B->toString(), ")", ed.level);
+
+        if (elev != infinity) {
+          inE.level = infinity;
+          if (elev == inNbr->distance) {
+            correctNodeP2Count.update(1);
+            inNbr->nsuccs--;
+          }
+        }
+        inNbr->unlock();
+      } else {
+        aL->unlock(); aW->unlock();
+      }
+    }
+  }
 
   template<typename CTXType>
-  void SPAndFU(NodeType* A, NodeType* B, const unsigned ADist, BCEdge& ed, 
-               BCEdge* edgeData, CTXType& ctx) {
+  void spAndFU(NodeType* A, NodeType* B, BCEdge& ed, BCEdge* edgeData, 
+               CTXType& ctx) {
     spfuCount.update(1);
 
     // make B a successor of A, A predecessor of B
@@ -104,60 +144,68 @@ struct BetweenessCentralityAsync {
     bool bpredsNotEmpty = !Bpreds.empty();
     Bpreds.clear();
     Bpreds.push_back(A);
-    B->distance = ADist + 1;
+    B->distance = A->distance + 1;
 
     largestNodeDist.update(B->distance);
 
     B->nsuccs = 0; // SP
     B->sigma = ASigma; // FU
     ed.val = ASigma;
-    ed.level = ADist;
+    ed.level = A->distance;
     B->unlock();
 
     if (!B->isAlreadyIn()) ctx.push(B);
 
-    // Part of Correct Node
     if (bpredsNotEmpty) {
-      int idx = B->id;
-      int* inIdx = graph.inIdx;
-      int* ins = graph.ins; 
-      int startInE = inIdx[idx];
-      int endInE = inIdx[idx + 1];
+      CorrectNode(B, ed, edgeData);
+    }
+  }
 
-      // loop through in edges
-      for (int j = startInE; j < endInE; j++) {
-        BCEdge & inE = edgeData[ins[j]];
-        NodeType *inNbr = inE.src;
-        if (inNbr == B) continue;
-
-        // lock in right order
-        NodeType* aL;
-        NodeType* aW;
-        if (B < inNbr) { aL = B; aW = inNbr;} 
-        else { aL = inNbr; aW = B; }
-        aL->lock(); aW->lock();
-
-        const unsigned elev = inE.level; 
-        // Correct Node
-        if (inNbr->distance >= B->distance) { 
-          correctNodeP1Count.update(1);
-          B->unlock();
-
-          galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
-                         B->toString(), ")", ed.level);
-
-          if (elev != infinity) {
-            inE.level = infinity;
-            if (elev == inNbr->distance) {
-              correctNodeP2Count.update(1);
-              inNbr->nsuccs--;
-            }
-          }
-          inNbr->unlock();
-        } else {
-          aL->unlock(); aW->unlock();
-        }
+  template<typename CTXType>
+  void updateSigma(NodeType* A, NodeType* B, BCEdge& ed, CTXType& ctx) {
+    updateSigmaP1Count.update(1);
+    galois::gDebug("Rule 2 (", A->toString(), " ||| ", B->toString(), ") ",
+                   ed.level);
+    const double ASigma = A->sigma;
+    const double eval = ed.val;
+    const double diff = ASigma - eval;
+    bool BSigmaChanged = diff >= 0.00001;
+    A->unlock();
+    if (BSigmaChanged) {
+      updateSigmaP2Count.update(1);
+      ed.val = ASigma;
+      B->sigma += diff;
+      int nbsuccs = B->nsuccs;
+      B->unlock();
+      if (nbsuccs > 0) {
+        if (!B->isAlreadyIn()) ctx.push(B);
       }
+    } else {
+      B->unlock();
+    }
+  }
+
+  template<typename CTXType>
+  void FirstUpdate(NodeType* A, NodeType* B, BCEdge& ed, CTXType& ctx) {
+    firstUpdateCount.update(1);
+    A->nsuccs++;
+    const double ASigma = A->sigma;
+    A->unlock();
+  
+    //if (AnotPredOfB) {
+    B->preds.push_back(A);
+    //}
+    const double BSigma = B->sigma;
+    galois::gDebug("Rule 3 (", A->toString(), " ||| ", B->toString(), 
+                   ") ", ed.level);
+    B->sigma = BSigma + ASigma;
+    ed.val = ASigma;
+    ed.level = A->distance;
+    int nbsuccs = B->nsuccs;
+    B->unlock();
+    //const bool BSigmaChanged = ASigma >= 0.00001;
+    if (nbsuccs > 0 /*&& BSigmaChanged*/) {
+      if (!B->isAlreadyIn()) ctx.push(B);
     }
   }
   
@@ -203,135 +251,13 @@ struct BetweenessCentralityAsync {
   
           if (BDist - ADist > 1) {
             // Shortest Path + First Update (and Correct Node)
-            this->SPAndFU(A, B, ADist, ed, edgeData, ctx);
-          // Update Sigma
+            this->spAndFU(A, B, ed, edgeData, ctx);
           } else if (elevel == ADist && BDist == ADist + 1) {
-            updateSigmaP1Count.update(1);
-            galois::gDebug("Rule 2 (", A->toString(), " ||| ", B->toString(), ") ",
-                           elevel);
-            const double ASigma = A->sigma;
-            const double eval = ed.val;
-            const double diff = ASigma - eval;
-            bool BSigmaChanged = diff >= 0.00001;
-            A->unlock();
-            if (BSigmaChanged) {
-              updateSigmaP2Count.update(1);
-              ed.val = ASigma;
-              B->sigma += diff;
-              int nbsuccs = B->nsuccs;
-              B->unlock();
-              if (nbsuccs > 0) {
-                  #ifdef INLINE_US
-                  int idx = B->id;
-                  int startE = outIdx[idx];
-                  int endE = outIdx[idx + 1];
-                  BCEdge * edgeData = graph.edgeData;
-                  for (int i = startE; i < endE; i++) {
-                    BCEdge & ed = edgeData[i];
-                    NodeType * dstD = ed.dst;
-  
-                    if (B == dstD) continue;
-  
-                    // TODO dead code in serial version
-                    NodeType *loser, *winner;
-                    if (B < dstD) { loser = B; winner = dstD;} 
-                    else { loser = dstD; winner = B; }
-                    loser->lock();
-                    winner->lock();
-
-                    const int srcdist = B->distance;
-                    const int dstdist = dstD->distance;
-                    const int elevel = ed.level;
-                    const int BDist = srcdist;
-                    NodeType * C = dstD; const int CDist = dstdist;
-                    if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                      galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
-                                     B->toString(), ") ", elevel);
-                      const double BSigma = B->sigma;
-                      const double eval = ed.val;
-                      const double diff = BSigma - eval;
-                      B->unlock();
-                      ed.val = BSigma;
-                      C->sigma += diff;
-                      int ncsuccs = C->nsuccs;
-                      C->unlock();
-                      if (ncsuccs > 0)
-                        if (!C->isAlreadyIn()) ctx.push(C);
-                    } else {
-                      B->unlock(); C->unlock();
-                    }
-                  }
-                #else         
-                  if (!B->isAlreadyIn()) ctx.push(B);
-                #endif
-                }
-              } else {
-                B->unlock();
-              }
-          // First Update not combined with Shortest Path
+            // Update Sigma
+            this->updateSigma(A, B, ed, ctx);
           } else if (BDist == ADist + 1 && elevel != ADist) {
-            firstUpdateCount.update(1);
-            A->nsuccs++;
-            const double ASigma = A->sigma;
-            A->unlock();
-  
-            //if (AnotPredOfB) {
-            B->preds.push_back(A);
-            //}
-            const double BSigma = B->sigma;
-            galois::gDebug("Rule 3 (", A->toString(), " ||| ", B->toString(), 
-                           ") ", elevel);
-            B->sigma = BSigma + ASigma;
-            ed.val = ASigma;
-            ed.level = ADist;
-            int nbsuccs = B->nsuccs;
-            B->unlock();
-            //const bool BSigmaChanged = ASigma >= 0.00001;
-            if (nbsuccs > 0 /*&& BSigmaChanged*/) {
-              #ifdef INLINE_US
-                int idx = B->id;
-                int startE = outIdx[idx];
-                int endE = outIdx[idx + 1];
-                BCEdge * edgeData = graph.edgeData;
-                for (int i = startE; i < endE; i++) {
-                  BCEdge & ed = edgeData[i];
-                  NodeType * dstD = ed.dst;
-  
-                  if (B == dstD) continue;
-  
-                  // TODO dead code in serial
-                  NodeType *loser, *winner;
-                  if (B < dstD) { loser = B; winner = dstD;} 
-                  else { loser = dstD; winner = B; }
-                  loser->lock();
-                  winner->lock();
-
-                  const int srcdist = B->distance;
-                  const int dstdist = dstD->distance;
-                  const int elevel = ed.level;
-                  const int BDist = srcdist;
-                  NodeType * C = dstD; const int CDist = dstdist;
-                  if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                    galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
-                                   B->toString(), ") ", elevel);
-                    const double BSigma = B->sigma;
-                    const double eval = ed.val;
-                    const double diff = BSigma - eval;
-                    B->unlock();
-                    ed.val = BSigma;
-                    C->sigma += diff;
-                    int ncsuccs = C->nsuccs;
-                    C->unlock();
-                    if (ncsuccs > 0)
-                      if (!C->isAlreadyIn()) ctx.push(C);
-                  } else {
-                    B->unlock(); C->unlock();
-                  }
-                }
-              #else         
-              if (!B->isAlreadyIn()) ctx.push(B);
-              #endif
-            }
+            // First Update not combined with Shortest Path
+            this->FirstUpdate(A, B, ed, ctx);
           } else { // No Action
             noActionCount.update(1);
             A->unlock(); B->unlock();
