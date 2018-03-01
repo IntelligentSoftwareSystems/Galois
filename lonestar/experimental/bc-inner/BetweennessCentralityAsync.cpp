@@ -325,7 +325,6 @@ struct BetweenessCentralityAsync {
       }
     );
   }
-
 };
 
 struct NodeIndexer : std::binary_function<NodeType*, int, int> {
@@ -343,7 +342,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, NULL);
 
   if (BC_CONCURRENT) {
-    galois::gInfo("Running in concurrent mode with ", numThreads, "threads");
+    galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
   } else {
     galois::gInfo("Running in serial mode");
   }
@@ -381,11 +380,14 @@ int main(int argc, char** argv) {
   unsigned stepCnt = 0; // number of sources done
 
   galois::StatTimer executionTimer;
-  galois::StatTimer forwardPassTimer("ForwardPass");
-  galois::StatTimer leafFinderTimer("LeafFind");
-  galois::StatTimer backwardPassTimer("BackwardPass");
-  galois::StatTimer cleanupTimer("CleanupTimer");
+  galois::StatTimer forwardPassTimer("ForwardPass", "BC");
+  galois::StatTimer leafFinderTimer("LeafFind", "BC");
+  galois::StatTimer backwardPassTimer("BackwardPass", "BC");
+  galois::StatTimer cleanupTimer("CleanupTimer", "BC");
 
+  // reset everything in preparation for run
+  graph.cleanupData();
+    
   executionTimer.start();
   for (unsigned i = startNode; i < nnodes; ++i) {
     NodeType* active = &(bcExecutor.gnodes[i]);
@@ -396,17 +398,6 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    // TODO move this somehwere else/remove it (right now needed to initialize
-    // first iteration...)
-    galois::do_all(
-      galois::iterate(0u, nnodes),
-      [&] (auto j) {
-        if (j != i) {
-          (bcExecutor.gnodes[j]).reset();
-        }
-      }
-    );
-    
     stepCnt++;
     //if (stepCnt >= 2) break;  // ie only do 1 source
 
