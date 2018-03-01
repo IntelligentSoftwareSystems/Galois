@@ -112,19 +112,18 @@ struct BetweenessCentralityAsync {
           if (srcD == dstD) continue; // ignore self loops
   
           // lock in set order to prevent deadlock (lower id first)
-          if (CONCURRENT) {
-            NodeType* loser;
-            NodeType* winner;
+          // TODO run even in serial version; find way to not need to run
+          NodeType* loser;
+          NodeType* winner;
   
-            if (srcD < dstD) { 
-              loser = srcD; winner = dstD;
-            } else { 
-              loser = dstD; winner = srcD;
-            }
-  
-            loser->lock();
-            winner->lock();
+          if (srcD < dstD) { 
+            loser = srcD; winner = dstD;
+          } else { 
+            loser = dstD; winner = srcD;
           }
+  
+          loser->lock();
+          winner->lock();
   
           const int elevel = ed.level;
           NodeType* A = srcD;
@@ -139,7 +138,7 @@ struct BetweenessCentralityAsync {
             // make B a successor of A, A predecessor of B
             A->nsuccs++;
             const double ASigma = A->sigma;
-            if (CONCURRENT) { A->unlock(); }
+            A->unlock();
             NodeType::predTY & Bpreds = B->preds;
             bool bpredsNotEmpty = !Bpreds.empty();
             Bpreds.clear();
@@ -152,7 +151,7 @@ struct BetweenessCentralityAsync {
             B->sigma = ASigma; // FU
             ed.val = ASigma;
             ed.level = ADist;
-            if (CONCURRENT) { B->unlock(); }
+            B->unlock();
   
             if (!B->isAlreadyIn()) ctx.push(B);
   
@@ -182,7 +181,7 @@ struct BetweenessCentralityAsync {
                 // Correct Node
                 if (inNbr->distance >= B->distance) { 
                   correctNodeP1Count.update(1);
-                  if (CONCURRENT) { B->unlock(); }
+                  B->unlock();
   
                   galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
                                  B->toString(), ")", elevel);
@@ -194,7 +193,7 @@ struct BetweenessCentralityAsync {
                       inNbr->nsuccs--;
                     }
                   }
-                  if (CONCURRENT) { inNbr->unlock(); }
+                  inNbr->unlock();
                 } else {
                   aL->unlock(); aW->unlock();
                 }
@@ -209,13 +208,13 @@ struct BetweenessCentralityAsync {
             const double eval = ed.val;
             const double diff = ASigma - eval;
             bool BSigmaChanged = diff >= 0.00001;
-            if (CONCURRENT) { A->unlock(); }
+            A->unlock();
             if (BSigmaChanged) {
               updateSigmaP2Count.update(1);
               ed.val = ASigma;
               B->sigma += diff;
               int nbsuccs = B->nsuccs;
-              if (CONCURRENT) { B->unlock(); }
+              B->unlock();
               if (nbsuccs > 0) {
                   #ifdef INLINE_US
                   int idx = B->id;
@@ -228,13 +227,13 @@ struct BetweenessCentralityAsync {
   
                     if (B == dstD) continue;
   
-                    if (CONCURRENT) {
-                      NodeType *loser, *winner;
-                      if (B < dstD) { loser = B; winner = dstD;} 
-                      else { loser = dstD; winner = B; }
-                      loser->lock();
-                      winner->lock();
-                    }
+                    // TODO dead code in serial version
+                    NodeType *loser, *winner;
+                    if (B < dstD) { loser = B; winner = dstD;} 
+                    else { loser = dstD; winner = B; }
+                    loser->lock();
+                    winner->lock();
+
                     const int srcdist = B->distance;
                     const int dstdist = dstD->distance;
                     const int elevel = ed.level;
@@ -246,11 +245,11 @@ struct BetweenessCentralityAsync {
                       const double BSigma = B->sigma;
                       const double eval = ed.val;
                       const double diff = BSigma - eval;
-                      if (CONCURRENT) { B->unlock(); }
+                      B->unlock();
                       ed.val = BSigma;
                       C->sigma += diff;
                       int ncsuccs = C->nsuccs;
-                      if (CONCURRENT) { C->unlock(); }
+                      C->unlock();
                       if (ncsuccs > 0)
                         if (!C->isAlreadyIn()) ctx.push(C);
                     } else {
@@ -262,14 +261,14 @@ struct BetweenessCentralityAsync {
                 #endif
                 }
               } else {
-                if (CONCURRENT) { B->unlock(); }
+                B->unlock();
               }
           // First Update not combined with Shortest Path
           } else if (BDist == ADist + 1 && elevel != ADist) {
             firstUpdateCount.update(1);
             A->nsuccs++;
             const double ASigma = A->sigma;
-            if (CONCURRENT) { A->unlock(); }
+            A->unlock();
   
             //if (AnotPredOfB) {
             B->preds.push_back(A);
@@ -281,7 +280,7 @@ struct BetweenessCentralityAsync {
             ed.val = ASigma;
             ed.level = ADist;
             int nbsuccs = B->nsuccs;
-            if (CONCURRENT) { B->unlock(); }
+            B->unlock();
             //const bool BSigmaChanged = ASigma >= 0.00001;
             if (nbsuccs > 0 /*&& BSigmaChanged*/) {
               #ifdef INLINE_US
@@ -295,13 +294,13 @@ struct BetweenessCentralityAsync {
   
                   if (B == dstD) continue;
   
-                  if (CONCURRENT) {
-                    NodeType *loser, *winner;
-                    if (B < dstD) { loser = B; winner = dstD;} 
-                    else { loser = dstD; winner = B; }
-                    loser->lock();
-                    winner->lock();
-                  }
+                  // TODO dead code in serial
+                  NodeType *loser, *winner;
+                  if (B < dstD) { loser = B; winner = dstD;} 
+                  else { loser = dstD; winner = B; }
+                  loser->lock();
+                  winner->lock();
+
                   const int srcdist = B->distance;
                   const int dstdist = dstD->distance;
                   const int elevel = ed.level;
@@ -313,11 +312,11 @@ struct BetweenessCentralityAsync {
                     const double BSigma = B->sigma;
                     const double eval = ed.val;
                     const double diff = BSigma - eval;
-                    if (CONCURRENT) { B->unlock(); }
+                    B->unlock();
                     ed.val = BSigma;
                     C->sigma += diff;
                     int ncsuccs = C->nsuccs;
-                    if (CONCURRENT) { C->unlock(); }
+                    C->unlock();
                     if (ncsuccs > 0)
                       if (!C->isAlreadyIn()) ctx.push(C);
                   } else {
@@ -343,13 +342,13 @@ struct BetweenessCentralityAsync {
     galois::for_each(
       galois::iterate(wl),
       [&] (NodeType* A, auto& ctx) {
-        if (CONCURRENT) { A->lock(); }
+        A->lock();
   
         if (A->nsuccs == 0) {
           const double Adelta = A->delta;
           A->bc += Adelta;
   
-          if (CONCURRENT) { A->unlock(); }
+          A->unlock();
   
           NodeType::predTY& Apreds = A->preds;
           int sz = Apreds.size();
@@ -358,23 +357,23 @@ struct BetweenessCentralityAsync {
           for (int i = 0; i < sz; ++i) {
             NodeType* pd = Apreds[i];
             const double term = pd->sigma * (1.0 + Adelta) / A->sigma; 
-            if (CONCURRENT) { pd->lock(); }
+            pd->lock();
             pd->delta += term;
             const int prevPdNsuccs = pd->nsuccs;
             pd->nsuccs--;
   
             if (prevPdNsuccs == 1) {
-              if (CONCURRENT) { pd->unlock(); }
+              pd->unlock();
               ctx.push(pd);
             } else {
-              if (CONCURRENT) { pd->unlock(); }
+              pd->unlock();
             }
           }
           A->reset();
           graph.resetOutEdges(A);
         } else {
           galois::gDebug("Skipped ", A->toString());
-          if (CONCURRENT) { A->unlock(); }
+          A->unlock();
         }
       }
     );
@@ -443,7 +442,7 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, NULL);
 
-  if (CONCURRENT) {
+  if (BC_CONCURRENT) {
     galois::gInfo("Running in concurrent mode with ", numThreads);
   } else {
     galois::gInfo("Running in serial mode");
@@ -506,7 +505,8 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    galois::gInfo("Source is ", active->toString());
+    // TODO move this somehwere else/remove it (right now needed to initialize
+    // first iteration...)
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto j) {
@@ -522,7 +522,7 @@ int main(int argc, char** argv) {
     std::vector<NodeType*>  wl;
     wl2.push_back(active);
     active->initAsSource();
-    galois::gInfo("Source is ", active->toString());
+    galois::gDebug("Source is ", active->toString());
     forwardPassTimer.start();
 
     bcExecutor.dagConstruction<wl2ty>(wl2);
@@ -544,9 +544,6 @@ int main(int argc, char** argv) {
     double backupSrcBC = bcExecutor.currSrcNode->bc;
     bcExecutor.dependencyBackProp(wl4);
 
-    if (bcExecutor.currSrcNode->bc && backupSrcBC == 0) {
-      galois::gPrint(bcExecutor.currSrcNode->id, " ", bcExecutor.currSrcNode->bc, "\n");
-    }
     bcExecutor.currSrcNode->bc = backupSrcBC; // current source BC should not get updated
     backwardPassTimer.stop();
     wl4.clear();

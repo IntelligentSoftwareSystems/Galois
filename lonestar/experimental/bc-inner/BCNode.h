@@ -100,6 +100,12 @@ struct BCNode {
     return true;
   }
 
+  template<bool C = Concurrent, typename std::enable_if<!C>::type* = nullptr>
+  void unlock() {
+    // no-op
+  }
+
+
   /**
    * Return node as string.
    */

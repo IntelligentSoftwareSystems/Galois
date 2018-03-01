@@ -32,7 +32,7 @@
 #include "util.h"
 
 struct BCEdge {
-  using NodeType = BCNode<USE_MARKING, CONCURRENT>;
+  using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
   NodeType* src;
   NodeType* dst;
   double val;
