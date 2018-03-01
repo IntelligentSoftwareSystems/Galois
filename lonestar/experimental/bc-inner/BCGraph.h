@@ -56,12 +56,10 @@
 //  go up to nnodes - 1
 //
 class BCGraph {
-  using ND = BCNode<>;
-  using ED = BCEdge;
  public:
  //private:
-  galois::substrate::CacheLineStorage<ND>* nodes;
-  ED* edgeData;
+  galois::substrate::CacheLineStorage<BCNode<>>* nodes;
+  BCEdge* edgeData;
   int* inIdx;
   int* ins;
   int* outIdx;
@@ -114,9 +112,9 @@ class BCGraph {
 
  public:
   BCGraph(const char* filename) {
-    galois::gInfo("Node Size ", sizeof(ND), " uses ", 
-                  sizeof(galois::substrate::CacheLineStorage<ND>));
-    galois::gInfo("Edge Size ", sizeof(ED));
+    galois::gInfo("Node Size ", sizeof(BCNode<>), " uses ", 
+                  sizeof(galois::substrate::CacheLineStorage<BCNode<>>));
+    galois::gInfo("Edge Size ", sizeof(BCEdge));
     std::string tmp(filename);
     std::string fname1 = tmp + "1.gr";
     std::string fname2 = tmp + "2.gr"; 
@@ -166,19 +164,19 @@ class BCGraph {
     fptr32 += numEdges;
     if (numEdges % 2) fptr32 += 1;
     
-    nodes = new galois::substrate::CacheLineStorage<ND>[nnodes];
+    nodes = new galois::substrate::CacheLineStorage<BCNode<>>[nnodes];
     for (int i =0; i<nnodes; ++i) {
       nodes[i].data.id = i;
     }
 
-    edgeData = new ED[nedges];
+    edgeData = new BCEdge[nedges];
     for (int i=0; i<nnodes; ++i) {
       int start = outIdx[i];
       int end = outIdx[i+1];
 
       for (int j = start; j < end; j++) {
         int nbr = outs[j];
-        ED & e = edgeData[j];
+        BCEdge & e = edgeData[j];
         e.src = &(nodes[i].data);
         e.dst = &(nodes[nbr].data);
       } 
@@ -215,16 +213,16 @@ class BCGraph {
     return nedges;
   }
   
-  ND* getNode(int id) {
+  BCNode<>* getNode(int id) {
     return &nodes[id].data;
   }
 
-  galois::substrate::CacheLineStorage<ND>* getNodes() const {
+  galois::substrate::CacheLineStorage<BCNode<>>* getNodes() const {
     return nodes;
   }
  
   template<typename Context>
-  void /*__attribute__((noinline))*/ inline addOutEdgesToWL(ND *n, 
+  void /*__attribute__((noinline))*/ inline addOutEdgesToWL(BCNode<> *n, 
                                                             /*int ndist,*/ 
                                                             Context & ctx) {
     int idx = n->id;
@@ -233,13 +231,13 @@ class BCGraph {
     int end = outIdx[idx + 1];
     for (int i = start; i < end; i++) {
       assert(i<=nedges-1);
-      ED & e = edgeData[i];
+      BCEdge & e = edgeData[i];
       assert (e.src == n);
       if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
 //        if (!e.isAlreadyIn())
-          ND *outNbr = e.dst;
-          ND * aL;
-          ND *aW;
+          BCNode<> *outNbr = e.dst;
+          BCNode<> * aL;
+          BCNode<> *aW;
           if (n < outNbr) { aL = n; aW = outNbr;} 
           else { aL = outNbr; aW = n; }
           aL->lock(); aW->lock();
@@ -252,7 +250,7 @@ class BCGraph {
   }
 
   template<typename Context>
-  void /*__attribute__((noinline))*/ inline addOutEdgesToWL2(ND *n, 
+  void /*__attribute__((noinline))*/ inline addOutEdgesToWL2(BCNode<> *n, 
                                                              int ndist, 
                                                              Context& ctx) {
     int idx = n->id;
@@ -261,13 +259,13 @@ class BCGraph {
     int end = outIdx[idx + 1];
     for (int i = start; i < end; i++) {
       assert(i<=nedges-1);
-      ED & e = edgeData[i];
+      BCEdge & e = edgeData[i];
       assert (e.src == n);
       if (/*e.level >= ndist e.dst->distance >= ndist &&*/ n != e.dst) {
         if (!e.isAlreadyIn()) ctx.push(&e);
-/*          ND *outNbr = e.dst;
-          ND * aL;
-          ND *aW;
+/*          BCNode<> *outNbr = e.dst;
+          BCNode<> * aL;
+          BCNode<> *aW;
           if (n < outNbr) { aL = n; aW = outNbr;} 
           else { aL = outNbr; aW = n; }
           aL->lock(); aW->lock();
@@ -286,8 +284,8 @@ class BCGraph {
 
 
   template<typename Context>
-  void /* __attribute__((noinline))*/ inline addInEdgesToWL(ND *n, 
-      /*int ndist,*/ Context & ctx, ED* exception) {
+  void /* __attribute__((noinline))*/ inline addInEdgesToWL(BCNode<> *n, 
+      /*int ndist,*/ Context & ctx, BCEdge* exception) {
     int idx = n->id;
     int start = inIdx[idx];
     int end = inIdx[idx + 1];
@@ -297,7 +295,7 @@ class BCGraph {
       //}
       assert(i<nedges);
       assert(ins[i]<nedges);
-      ED & e = edgeData[ins[i]];
+      BCEdge & e = edgeData[ins[i]];
       /*if (e->dst != n) {
         std::cerr << "Problem: " << e->dst->toString() << " ||| " << n->toString() << " || " << e->toString() << std::endl;
       }*/
@@ -309,33 +307,33 @@ class BCGraph {
     }
   }
 
-  //void initWLToOutEdges(ND *n, std::list<ED*> & wl) {
-  //void initWLToOutEdges(ND *n, std::vector<ED*> & wl) {
-  void initWLToOutEdges(ND *n, galois::InsertBag<ED*> & wl) {
+  //void initWLToOutEdges(BCNode<> *n, std::list<BCEdge*> & wl) {
+  //void initWLToOutEdges(BCNode<> *n, std::vector<BCEdge*> & wl) {
+  void initWLToOutEdges(BCNode<> *n, galois::InsertBag<BCEdge*> & wl) {
     int idx = n->id;
     int start = outIdx[idx];
     int end = outIdx[idx + 1];
     for (int i = start; i < end; i++) {
       assert(i<nedges);
-      ED & e = edgeData[i];
+      BCEdge & e = edgeData[i];
       if (n != e.dst) {
         wl.push_back(&e);
       }
     }
   }
 
-  void resetOutEdges(ND *n) {
+  void resetOutEdges(BCNode<> *n) {
     int idx = n->id;
     int start = outIdx[idx];
     int end = outIdx[idx + 1];
     for (int i = start; i < end; i++) {
       assert(i<nedges);
-      ED & e = edgeData[i];
+      BCEdge & e = edgeData[i];
       e.reset();
     }
   }
 
-  int neighborsSize(const ND *src, const int* const adjIdx) const {
+  int neighborsSize(const BCNode<> *src, const int* const adjIdx) const {
     int idx = src->id;
     assert(idx<nnodes);
     int start = adjIdx[idx];
@@ -350,7 +348,7 @@ class BCGraph {
     //int maxOutNbrs = 0;
     ////#if 0
     //for (int i=0; i<nnodes; ++i) {
-    //  ND & n = nodes[i].data;
+    //  BCNode<> & n = nodes[i].data;
     //  int nOutNbrs = inNeighborsSize(&n);
     //  //n.preds.reserve(std::min(2, nOutNbrs));
     //  if (maxInNbrs < nOutNbrs) {
@@ -371,18 +369,18 @@ class BCGraph {
   void fixNodepredsCapacities(int start, int end) {
     #if 0
     for (int i=start; i<end; ++i) {
-      ND & n = nodes[i].data;
+      BCNode<> & n = nodes[i].data;
       int nOutNbrs = inNeighborsSize(&n);
       //n.preds.reserve(std::min(2, nOutNbrs));
     }
     #endif
   }
 
-  int inline inNeighborsSize(const ND *src) {
+  int inline inNeighborsSize(const BCNode<> *src) {
     return neighborsSize(src, inIdx);
   }
 
-  int outNeighborsSize(const ND *src) {
+  int outNeighborsSize(const BCNode<> *src) {
     return neighborsSize(src, outIdx);
   }
 
@@ -452,7 +450,7 @@ class BCGraph {
     double sampleBC = 0.0;
     bool firstTime = true;
     for (int i=0; i<nnodes; ++i) {
-      const ND & n = nodes[i].data;
+      const BCNode<> & n = nodes[i].data;
       if (firstTime) {
         sampleBC = n.bc;
         std::cerr << "BC: " << sampleBC << std::endl;
@@ -507,7 +505,7 @@ class BCGraph {
   void checkSteadyState2() {
     std::cerr << "Doing second set of checks on graph...\n";
     for (int i=0; i<nnodes; ++i) {
-      const ND & nodeD = nodes[i].data;
+      const BCNode<> & nodeD = nodes[i].data;
       if (nodeD.nsuccs != 0) 
         std::cerr << "Problem with nsuccs " << nodeD.nsuccs << std::endl;
       assert (nodeD.nsuccs == 0 || nodeD.nsuccs == -1);// : "Problem with nsuccs " + nodeD;
@@ -515,37 +513,37 @@ class BCGraph {
     }
   }
 
-  void checkGraph(const ND * start) const {
+  void checkGraph(const BCNode<> * start) const {
     std::cerr << "Doing checks on graph...\n";
     for (int i=0; i<nnodes; ++i) {
       checkNode(&(nodes[i].data), start);
     }
   }
   
-  void checkNode(const ND * n, const ND * source) const {
+  void checkNode(const BCNode<> * n, const BCNode<> * source) const {
     const int idx = n->id;
     int start = outIdx[idx];
     int end = outIdx[idx + 1];
     int nSuccs = 0;
     for (int i = start; i < end; i++) {
-      const ED & e = edgeData[i];
-      const ND *nbr = e.dst;
+      const BCEdge & e = edgeData[i];
+      const BCNode<> *nbr = e.dst;
       if (nbr->distance == n->distance + 1) {
         nSuccs++;
       }
     }
     if (nSuccs != n->nsuccs) {
-      std::list<const ND*> theSuccs;
+      std::list<const BCNode<>*> theSuccs;
       for (int i = start; i < end; i++) {
-        const ED & e = edgeData[i];
-        const ND *nbr = e.dst;
+        const BCEdge & e = edgeData[i];
+        const BCNode<> *nbr = e.dst;
         if (nbr->distance == n->distance + 1) {
           theSuccs.push_back(nbr);
         }
       }      
       std::cerr << "Successors problem : " << n->id << " " << n->nsuccs << " vs " << nSuccs << " " << std::endl;
       std::cerr << "Recorded successors are: ";
-      for (std::list<const ND*>::const_iterator it = theSuccs.begin(); it != theSuccs.end(); ++it)
+      for (std::list<const BCNode<>*>::const_iterator it = theSuccs.begin(); it != theSuccs.end(); ++it)
         std::cerr << (*it)->toString() << " ";
       std::cerr << std::endl;
       assert (false); 
@@ -555,8 +553,8 @@ class BCGraph {
     end = inIdx[idx + 1];
     double sigma = 0;
     for (int i = start; i < end; i++) {
-      const ED & e = edgeData[ins[i]];
-      const ND *nbr = e.src;
+      const BCEdge & e = edgeData[ins[i]];
+      const BCNode<> *nbr = e.src;
       if (nbr->distance + 1 == n->distance) {
         if (!n->predsContain(nbr)) {  
           std::cerr << "Preds Problem: " << n->id << " " << nbr->toString() << std::endl;
