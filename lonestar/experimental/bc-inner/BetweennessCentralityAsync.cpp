@@ -97,9 +97,7 @@ struct BetweenessCentralityAsync {
       galois::iterate(wl), 
       [&] (NodeType* srcD, auto& ctx) {
         int idx = srcD->id;
-        #if USE_MARKING
         srcD->markOut();
-        #endif
   
         int* outIdx = graph.outIdx;
         int startE = outIdx[idx];
@@ -156,10 +154,7 @@ struct BetweenessCentralityAsync {
             ed.level = ADist;
             if (CONCURRENT) { B->unlock(); }
   
-            #if USE_MARKING          
-            if (!B->isAlreadyIn())
-            #endif
-              ctx.push(B);
+            if (!B->isAlreadyIn()) ctx.push(B);
   
             // Part of Correct Node
             if (bpredsNotEmpty) {
@@ -257,19 +252,13 @@ struct BetweenessCentralityAsync {
                       int ncsuccs = C->nsuccs;
                       if (CONCURRENT) { C->unlock(); }
                       if (ncsuccs > 0)
-                        #if USE_MARKING
-                        if (!C->isAlreadyIn()) 
-                        #endif
-                          ctx.push(C);
+                        if (!C->isAlreadyIn()) ctx.push(C);
                     } else {
                       B->unlock(); C->unlock();
                     }
                   }
                 #else         
-                  #if USE_MARKING
-                  if (!B->isAlreadyIn()) 
-                  #endif
-                    ctx.push(B);
+                  if (!B->isAlreadyIn()) ctx.push(B);
                 #endif
                 }
               } else {
@@ -330,19 +319,13 @@ struct BetweenessCentralityAsync {
                     int ncsuccs = C->nsuccs;
                     if (CONCURRENT) { C->unlock(); }
                     if (ncsuccs > 0)
-                      #if USE_MARKING
-                      if (!C->isAlreadyIn()) 
-                      #endif
-                        ctx.push(C);
+                      if (!C->isAlreadyIn()) ctx.push(C);
                   } else {
                     B->unlock(); C->unlock();
                   }
                 }
               #else         
-              #if USE_MARKING
-              if (!B->isAlreadyIn()) 
-              #endif
-                ctx.push(B);
+              if (!B->isAlreadyIn()) ctx.push(B);
               #endif
             }
           } else { // No Action
