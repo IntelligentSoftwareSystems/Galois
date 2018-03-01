@@ -32,12 +32,13 @@
 #include "util.h"
 
 struct BCEdge {
-  BCNode<>* src;
-  BCNode<>* dst;
+  using NodeType = BCNode<USE_MARKING, CONCURRENT>;
+  NodeType* src;
+  NodeType* dst;
   double val;
   unsigned level;
   
-  BCEdge(BCNode<>* _src, BCNode<>* _dst) 
+  BCEdge(NodeType* _src, NodeType* _dst) 
     : src(_src), dst(_dst), val(0), level(infinity) { }
   BCEdge() : src(0), dst(0), val(0), level(infinity) { }
 
