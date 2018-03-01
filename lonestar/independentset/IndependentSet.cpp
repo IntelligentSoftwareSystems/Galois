@@ -380,8 +380,8 @@ struct PullAlgo {
 
     typedef galois::InsertBag<GNode> Bag;
     Bag bags[2];
-    Bag *cur = &bags[0];
-    Bag *next = &bags[1];
+    Bag* cur = &bags[0];
+    Bag* next = &bags[1];
     Bag matched;
     Bag otherMatched;
     uint64_t size = graph.size();
@@ -448,12 +448,12 @@ struct PrioAlgo {
     Graph& graph;
     galois::substrate::PerThreadStorage<std::mt19937* >& generator;
 
-    int IntRand(const int &min, const int &max, std::mt19937* generator) const {
+    int IntRand(const int& min, const int& max, std::mt19937* generator) const {
       std::uniform_int_distribution<int > dist(min, max);
       return dist(*generator);
     }
 
-    unsigned char charRand(const int &min, const int &max, std::mt19937* generator) const {
+    unsigned char charRand(const int& min, const int& max, std::mt19937* generator) const {
       std::uniform_int_distribution<unsigned char > dist(min, max);
       return dist(*generator);
     }
@@ -783,7 +783,7 @@ struct edgetiledPrioAlgo2 {
     galois::substrate::PerThreadStorage<std::mt19937* >& generator;
     galois::InsertBag<EdgeTile>& works;
 
-    const int EDGE_TILE_SIZE=512;
+    const int EDGE_TILE_SIZE=64;
     unsigned int hash(unsigned int val) const {
       val = ((val >> 16) ^ val) * 0x45d9f3b;
       val = ((val >> 16) ^ val) * 0x45d9f3b;
@@ -819,7 +819,7 @@ struct edgetiledPrioAlgo2 {
     }
   };
 
-  struct Cal_degree{
+  struct CalDegree{
     Graph& graph;
     galois::GAccumulator<float >& nedges;
 
@@ -875,8 +875,8 @@ struct edgetiledPrioAlgo2 {
           else{
               tile.flag = false;
               unmatched.update(true);
-              if(rounds.reduce() > 5)
-                std::cout<<"here1 this flag"<<std::hex<< (unsigned)nodedata.flag<< "other flag " <<std::hex<<(unsigned)other.flag <<std::endl;
+              //if(rounds.reduce() > 5)
+              //  std::cout<<"here1 this flag"<<std::hex<< (unsigned)nodedata.flag<< "other flag " <<std::hex<<(unsigned)other.flag <<std::endl;
               return;
           }
         }
@@ -945,7 +945,7 @@ struct edgetiledPrioAlgo2 {
     galois::substrate::PerThreadStorage<std::mt19937* > generator;
     galois::InsertBag<EdgeTile> works;
 
-    Cal_degree cal_degree { graph, nedges };
+    CalDegree cal_degree { graph, nedges };
     galois::do_all(galois::iterate(graph), cal_degree, galois::loopname("cal_degree"), galois::steal());
 
     Init_perthread init_perthread { generator };
@@ -953,7 +953,7 @@ struct edgetiledPrioAlgo2 {
     float avg_degree = nedges_tmp / (float)graph.size();
     unsigned char in = ~1;
     float scale_avg = ((in / 2 ) - 1) * avg_degree;
-    Init_prio init_prio { graph, avg_degree, scale_avg, generator, works };
+    InitPrio init_prio { graph, avg_degree, scale_avg, generator, works };
     
     Execute execute { graph, rounds, unmatched, works };
     VerifyChange verify_change { graph };
@@ -971,11 +971,11 @@ struct edgetiledPrioAlgo2 {
       galois::do_all(galois::iterate(works), match_reduce, galois::loopname("match_reduce"));
       
       galois::do_all(galois::iterate(graph), match_update, galois::loopname("match_update"));
-      std::cout << "round:"<< rounds.reduce()<< std::endl;
+      //std::cout << "round:"<< rounds.reduce()<< std::endl;
       rounds += 1;
     }while (unmatched.reduce());
 
-    galois::do_all(galois::iterate(graph), verify_change, galois::loopname("verify_change"));
+
 
     galois::runtime::reportStat_Single("IndependentSet-prioAlgo", "rounds", rounds.reduce());
   }
@@ -1033,6 +1033,8 @@ struct is_matched {
 
 template<typename Graph>
 bool verify(Graph& graph) {
+
+  galois::do_all(galois::iterate(graph), verify_change, galois::loopname("verify_change"));
   return galois::ParallelSTL::find_if(
       graph.begin(), graph.end(), is_bad<Graph>(graph))
     == graph.end();
