@@ -73,6 +73,7 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 int DEF_DISTANCE;
 
 using ND = BCNode<>;
+using ED = BCEdge;
 struct BetweenessCentralityAsync {
   BCGraph& graph;
   ND* currSrcNode;

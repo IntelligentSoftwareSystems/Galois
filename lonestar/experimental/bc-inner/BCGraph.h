@@ -28,7 +28,7 @@
 #define _BCGRAPH_H_
 
 #include "BCNode.h"
-#include "ED.h"
+#include "BCEdge.h"
 
 #include "galois/Bag.h"
 
@@ -57,6 +57,7 @@
 //
 class BCGraph {
   using ND = BCNode<>;
+  using ED = BCEdge;
  public:
  //private:
   galois::substrate::CacheLineStorage<ND>* nodes;
