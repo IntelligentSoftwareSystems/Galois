@@ -63,11 +63,14 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 
 //#define INLINE_US
 
+using NodeType = typename BCGraph::NodeType;
 struct BetweenessCentralityAsync {
   BCGraph& graph;
-  BCNode<>* currSrcNode;
+  galois::LargeArray<NodeType>& gnodes;
+  NodeType* currSrcNode;
 
-  BetweenessCentralityAsync(BCGraph& _graph) : graph(_graph) { }
+  BetweenessCentralityAsync(BCGraph& _graph) 
+      : graph(_graph), gnodes(_graph.getNodes()) { }
   
   using Counter = 
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
@@ -92,7 +95,7 @@ struct BetweenessCentralityAsync {
   void dagConstruction(WorkListType& wl) {
     galois::for_each(
       galois::iterate(wl), 
-      [&] (BCNode<>* srcD, auto& ctx) {
+      [&] (NodeType* srcD, auto& ctx) {
         int idx = srcD->id;
         #if USE_MARKING
         srcD->markOut();
@@ -106,14 +109,14 @@ struct BetweenessCentralityAsync {
         // loop through all edges
         for (int i = startE; i < endE; i++) {
           BCEdge& ed = edgeData[i];
-          BCNode<>* dstD = ed.dst;
+          NodeType* dstD = ed.dst;
           
           if (srcD == dstD) continue; // ignore self loops
   
           // lock in set order to prevent deadlock (lower id first)
           if (CONCURRENT) {
-            BCNode<>* loser;
-            BCNode<>* winner;
+            NodeType* loser;
+            NodeType* winner;
   
             if (srcD < dstD) { 
               loser = srcD; winner = dstD;
@@ -126,9 +129,9 @@ struct BetweenessCentralityAsync {
           }
   
           const int elevel = ed.level;
-          BCNode<>* A = srcD;
+          NodeType* A = srcD;
           const int ADist = srcD->distance;
-          BCNode<>* B = dstD;
+          NodeType* B = dstD;
           const int BDist = dstD->distance;
   
           // Shortest Path + First Update
@@ -139,7 +142,7 @@ struct BetweenessCentralityAsync {
             A->nsuccs++;
             const double ASigma = A->sigma;
             if (CONCURRENT) { A->unlock(); }
-            BCNode<>::predTY & Bpreds = B->preds;
+            NodeType::predTY & Bpreds = B->preds;
             bool bpredsNotEmpty = !Bpreds.empty();
             Bpreds.clear();
             Bpreds.push_back(A);
@@ -169,13 +172,13 @@ struct BetweenessCentralityAsync {
               // loop through in edges
               for (int j = startInE; j < endInE; j++) {
                 BCEdge & inE = edgeData[ins[j]];
-                BCNode<> *inNbr = inE.src;
+                NodeType *inNbr = inE.src;
                 if (inNbr == B) continue;
   
                 // TODO wrap in concurrent
                 // lock in right order
-                BCNode<>* aL;
-                BCNode<>* aW;
+                NodeType* aL;
+                NodeType* aW;
                 if (B < inNbr) { aL = B; aW = inNbr;} 
                 else { aL = inNbr; aW = B; }
                 aL->lock(); aW->lock();
@@ -226,12 +229,12 @@ struct BetweenessCentralityAsync {
                   BCEdge * edgeData = graph.edgeData;
                   for (int i = startE; i < endE; i++) {
                     BCEdge & ed = edgeData[i];
-                    BCNode<> * dstD = ed.dst;
+                    NodeType * dstD = ed.dst;
   
                     if (B == dstD) continue;
   
                     if (CONCURRENT) {
-                      BCNode<> *loser, *winner;
+                      NodeType *loser, *winner;
                       if (B < dstD) { loser = B; winner = dstD;} 
                       else { loser = dstD; winner = B; }
                       loser->lock();
@@ -241,7 +244,7 @@ struct BetweenessCentralityAsync {
                     const int dstdist = dstD->distance;
                     const int elevel = ed.level;
                     const int BDist = srcdist;
-                    BCNode<> * C = dstD; const int CDist = dstdist;
+                    NodeType * C = dstD; const int CDist = dstdist;
                     if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
                       galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
                                      B->toString(), ") ", elevel);
@@ -299,12 +302,12 @@ struct BetweenessCentralityAsync {
                 BCEdge * edgeData = graph.edgeData;
                 for (int i = startE; i < endE; i++) {
                   BCEdge & ed = edgeData[i];
-                  BCNode<> * dstD = ed.dst;
+                  NodeType * dstD = ed.dst;
   
                   if (B == dstD) continue;
   
                   if (CONCURRENT) {
-                    BCNode<> *loser, *winner;
+                    NodeType *loser, *winner;
                     if (B < dstD) { loser = B; winner = dstD;} 
                     else { loser = dstD; winner = B; }
                     loser->lock();
@@ -314,7 +317,7 @@ struct BetweenessCentralityAsync {
                   const int dstdist = dstD->distance;
                   const int elevel = ed.level;
                   const int BDist = srcdist;
-                  BCNode<> * C = dstD; const int CDist = dstdist;
+                  NodeType * C = dstD; const int CDist = dstdist;
                   if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
                     galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
                                    B->toString(), ") ", elevel);
@@ -356,7 +359,7 @@ struct BetweenessCentralityAsync {
   void dependencyBackProp(WorkListType& wl) {
     galois::for_each(
       galois::iterate(wl),
-      [&] (BCNode<>* A, auto& ctx) {
+      [&] (NodeType* A, auto& ctx) {
         if (CONCURRENT) { A->lock(); }
   
         if (A->nsuccs == 0) {
@@ -365,12 +368,12 @@ struct BetweenessCentralityAsync {
   
           if (CONCURRENT) { A->unlock(); }
   
-          BCNode<>::predTY& Apreds = A->preds;
+          NodeType::predTY& Apreds = A->preds;
           int sz = Apreds.size();
   
           // loop through A's predecessors
           for (int i = 0; i < sz; ++i) {
-            BCNode<>* pd = Apreds[i];
+            NodeType* pd = Apreds[i];
             const double term = pd->sigma * (1.0 + Adelta) / A->sigma; 
             if (CONCURRENT) { pd->lock(); }
             pd->delta += term;
@@ -425,14 +428,13 @@ struct BetweenessCentralityAsync {
     }
   }
   
-  galois::InsertBag<BCNode<>*>* fringewl;
-  galois::substrate::CacheLineStorage<BCNode<>>*gnodes;
+  galois::InsertBag<NodeType*>* fringewl;
   
   void findLeaves(unsigned nnodes) {
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto i) {
-        BCNode<>* n = &(gnodes[i].data);
+        NodeType* n = &(gnodes[i]);
         if (n->nsuccs == 0 && n->distance < infinity) {
           leafCount.update(1);
               
@@ -444,8 +446,8 @@ struct BetweenessCentralityAsync {
 
 };
 
-struct NodeIndexer : std::binary_function<BCNode<>*, int, int> {
-  int operator() (const BCNode<> *val) const {
+struct NodeIndexer : std::binary_function<NodeType*, int, int> {
+  int operator() (const NodeType *val) const {
     return val->distance;
   }
 };
@@ -476,8 +478,6 @@ int main(int argc, char** argv) {
   
   galois::gInfo("Num threads is ", numThreads);
 
-  bcExecutor.gnodes = graph.getNodes();
-  
   galois::StatTimer initCapTimer("InitCapacities");
   initCapTimer.start();
   graph.fixNodePredsCapacities();
@@ -496,9 +496,9 @@ int main(int argc, char** argv) {
   galois::gInfo("Using chunk size : ", chunksize);
   typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
                            galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
-  galois::InsertBag<BCNode<>*> wl2;
+  galois::InsertBag<NodeType*> wl2;
 
-  galois::InsertBag<BCNode<>*> wl4;
+  galois::InsertBag<NodeType*> wl4;
   bcExecutor.fringewl = &wl4;
 
   galois::reportPageAlloc("MemAllocPre");
@@ -515,7 +515,7 @@ int main(int argc, char** argv) {
 
   executionTimer.start();
   for (unsigned i = startNode; i < nnodes; ++i) {
-    BCNode<>* active = &(bcExecutor.gnodes[i].data);
+    NodeType* active = &(bcExecutor.gnodes[i]);
     bcExecutor.currSrcNode = active;
     // ignore nodes with no neighbors
     int nnbrs = graph.outNeighborsSize(active);
@@ -528,7 +528,7 @@ int main(int argc, char** argv) {
       galois::iterate(0u, nnodes),
       [&] (auto j) {
         if (j != i) {
-          (bcExecutor.gnodes[j].data).reset();
+          (bcExecutor.gnodes[j]).reset();
         }
       }
     );
@@ -536,13 +536,10 @@ int main(int argc, char** argv) {
     stepCnt++;
     //if (stepCnt >= 2) break;  // ie only do 1 source
 
-    //std::list<BCEdge*> wl;
-    std::vector<BCNode<>*>  wl;
+    std::vector<NodeType*>  wl;
     wl2.push_back(active);
     active->initAsSource();
     galois::gInfo("Source is ", active->toString());
-    //graph.checkClearEdges();
-//__itt_resume();
     forwardPassTimer.start();
 
     bcExecutor.dagConstruction<wl2ty>(wl2);
@@ -571,7 +568,6 @@ int main(int argc, char** argv) {
     backwardPassTimer.stop();
     wl4.clear();
     if (DOCHECKS) graph.checkSteadyState2();
-    //graph.printGraph();
 
     cleanupTimer.start();
     graph.cleanupData();
@@ -600,7 +596,7 @@ int main(int argc, char** argv) {
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
-                     std::setprecision(6), bcExecutor.gnodes[i].data.bc, "\n");
+                     std::setprecision(6), bcExecutor.gnodes[i].bc, "\n");
     }
   }
 
