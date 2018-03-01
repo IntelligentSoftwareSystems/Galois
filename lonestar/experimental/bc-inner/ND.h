@@ -6,10 +6,10 @@
  * programs.
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY ABCNode ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE ABCNode DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT ABCNode WARRANTIES OF
+ * PERFORMANCE, ABCNode ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
  * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
  * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
  * shall University be liable for incidental, special, indirect, direct or
@@ -22,21 +22,13 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
-#ifndef _ND_H_
-#define _ND_H_
+#ifndef _BCNODE_H_
+#define _BCNODE_H_
 
-#define USEPTHREADSM 0
-
-#include <cassert>
 #include <vector>
-#include <list>
 #include <string>
 #include <sstream>
 #include <algorithm>
-
-#if USEPTHREADSM
-#include <pthread.h>
-#endif
 
 #include "galois/substrate/SimpleLock.h"
 #include "llvm/ADT/SmallVector.h"
@@ -44,114 +36,73 @@
 
 extern int DEF_DISTANCE;
 
-struct ND {
-  int id;
+template <bool UseMarking=false, bool Concurrent=true>
+struct BCNode {
+  unsigned id;
 
-  #if CONCURRENT
-  #if USEPTHREADSM
-  pthread_mutex_t spinLock;
-  #else 
-  galois::substrate::SimpleLock spinLock;
-  #endif
-  #else 
-  unsigned char spinLock;
-  #endif 
+  using LockType = typename std::conditional<Concurrent, 
+                                             galois::substrate::SimpleLock,
+                                             char>::type;
+  LockType spinLock;
 
-  //typedef std::vector<ND*> predTY;
-  typedef llvm::SmallVector<ND*, 2> predTY;
+  //typedef std::vector<BCNode*> predTY;
+  using predTY = llvm::SmallVector<BCNode*, 2>;
   predTY preds;
 
-  int distance;
-  int nsuccs;
-
-  #if USE_MARKING
-  char b;
-  #endif
+  unsigned distance;
+  unsigned nsuccs;
+  char mark;
 
   double sigma; 
   double delta;
   double bc;
 
-  #if USEPTHREADSM
-  ND(const int _id) 
-    : id(_id), preds(), distance(DEF_DISTANCE), nsuccs(0), sigma(0), delta(0),
-      bc(0)
-    #if USE_MARKING
-      , b(0) 
-    #endif
-  {
-    galois::gDebug("Using pthread-mutex");
-    pthread_mutex_init(&spinLock, 0);
-  }
-  
-  ND() 
-    : id(DEF_DISTANCE), preds(), distance(DEF_DISTANCE), nsuccs(0), sigma(0), 
-      delta(0), bc(0)
-    #if USE_MARKING
-      , b(0)
-    #endif
-  {
-    galois::gDebug("Using pthread-mutex");
-    pthread_mutex_init(&spinLock, 0);
-  }
-  #else // begin else from USEPTHREADSM
-  ND(const int _id) 
+  BCNode(const int _id)
     : id(_id), spinLock(), preds(), distance(DEF_DISTANCE), nsuccs(0), 
-      sigma(0), delta(0), bc(0)
-    #if USE_MARKING
-      , b(0) 
-    #endif
-  {}
+      sigma(0), delta(0), bc(0), mark(0) {}
   
-  ND() 
+  BCNode() 
     : id(DEF_DISTANCE), spinLock(), preds(), distance(DEF_DISTANCE), nsuccs(0),
-      sigma(0), delta(0), bc(0)
-    #if USE_MARKING
-      , b(0) 
-    #endif
-  {}
-  #endif // end if USEPTHREADSM
+      sigma(0), delta(0), bc(0), mark(0) {}
   
   /**
    * @param a Node to check if predecessor of this node
    * @returns true if node a is in predecessors of this node
    */
-  bool predsContain(const ND* a) const {
-    predTY::const_iterator it = preds.end();
+  bool predsContain(const BCNode* a) const {
+    typename predTY::const_iterator it = preds.end();
     return (std::find(preds.begin(), preds.end(), a) != it); 
   }
 
+  template<bool C = Concurrent, typename std::enable_if<C>::type* = nullptr>
   void lock() {
-    #if CONCURRENT
-    #if USEPTHREADSM
-    pthread_mutex_lock(&spinLock);
-    #else
     spinLock.lock();
-    #endif
-    #endif
   }
 
+  template<bool C = Concurrent, typename std::enable_if<C>::type* = nullptr>
   bool try_lock() {
-    #if CONCURRENT
-    #if USEPTHREADSM
-    pthread_mutex_lock(&spinLock);
-    return true;
-    #else
     return spinLock.try_lock();
-    #endif
-    #endif
   }
 
+  template<bool C = Concurrent, typename std::enable_if<C>::type* = nullptr>
   void unlock() {
-    #if CONCURRENT
-    #if USEPTHREADSM
-    pthread_mutex_unlock(&spinLock);
-    #else
     spinLock.unlock();
-    #endif
-    #endif
   }
-  
+
+  // below are no-ops for when concurrent is false
+  template<bool C = Concurrent, typename std::enable_if<!C>::type* = nullptr>
+  void lock() {
+    // no-op
+  }
+
+  template<bool C = Concurrent, typename std::enable_if<!C>::type* = nullptr>
+  bool try_lock() {
+    return true;
+  }
+
+  /**
+   * Return node as string.
+   */
   std::string toString() const {
     std::ostringstream s;
 
@@ -161,17 +112,21 @@ struct ND {
     return s.str();
   }
 
-  inline void reset() {
+  /**
+   * Reset everything but the BC value
+   */
+  void reset() {
     preds.clear();
     distance = DEF_DISTANCE;
-    nsuccs = 0; // Reset flags as follows: inFringe = false, deltaDone = false
+    nsuccs = 0;
     sigma = 0;
     delta = 0;
-    #if USE_MARKING
-    b = 0;
-    #endif
+    mark = 0;
   }
 
+  /**
+   * Sanity check to make sure node is reset
+   */
   void checkClear() const {
     if (!preds.empty() || nsuccs != 0 || sigma != 0 || delta != 0)
       galois::gWarn("Problem, node not clear");
@@ -181,34 +136,52 @@ struct ND {
     assert(nsuccs == 0 && sigma == 0 && delta == 0);
   }  
 
+  /**
+   * Initialize this node as the source
+   */
   void initAsSource() {
     distance = 0;
     sigma = 1;
   }
 
-  #if USE_MARKING
+  /**
+   * Mark this as 0.
+   */
+  template<bool M = UseMarking, typename std::enable_if<M>::type* = nullptr>
   void markOut() {
-    #if CONCURRENT
-    __sync_fetch_and_and(&b, 0);
-    //b = 0;
-    #else
-    //b = 0;
-    #endif
+    if (Concurrent) {
+    __sync_fetch_and_and(&mark, 0);
+    } else {
+      mark = 0;
+    }
   }
 
+  template<bool M = UseMarking, typename std::enable_if<!M>::type* = nullptr>
+  void markOut() {
+    // no-op
+  }
+
+  /**
+   * @returns true if mark is set to 1
+   */
+  template<bool M = UseMarking, typename std::enable_if<M>::type* = nullptr>
   char isAlreadyIn() {
-    #if CONCURRENT
-    return __sync_fetch_and_or(&b, 1);
-    //char retval = b;
-    //b = 1;
-    //return retval;
-    #else
-    char retval = b;
-    b = 1;
-    return retval;
-    #endif
+    if (Concurrent) {
+      return __sync_fetch_and_or(&mark, 1);
+    } else {
+      char retval = mark;
+      mark = 1;
+      return retval;
+    }
   }
-  #endif // end USE_MARKING
-};
 
-#endif // _ND_H_
+  /**
+   * @returns 0
+   */
+  template<bool M = UseMarking, typename std::enable_if<!M>::type* = nullptr>
+  char isAlreadyIn() {
+    return 0;
+  }
+
+};
+#endif // _BCNODE_H_

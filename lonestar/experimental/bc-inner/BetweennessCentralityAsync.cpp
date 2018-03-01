@@ -74,6 +74,7 @@ static cll::opt<bool> useNodeBased("useNodeBased",
 // global used in other places TODO make it not global
 int DEF_DISTANCE;
 
+using ND = BCNode<>;
 struct BetweenessCentralityAsync {
   BCGraph& graph;
   ND* currSrcNode;

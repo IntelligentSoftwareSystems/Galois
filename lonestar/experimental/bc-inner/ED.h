@@ -4,7 +4,7 @@
 #include "control.h"
 
 struct ED {
-
+  using ND = BCNode<>;
   ND * src;
   ND * dst;
   double val;
