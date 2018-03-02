@@ -181,8 +181,8 @@ int main(int argc, char** argv) {
   graphStat(graph);
   std::cout << "\n";
 
-  galois::reportPageAlloc("MeminfoPre");
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
+  galois::reportPageAlloc("MeminfoPre");
   Partition(&metisGraph, numPartitions);
   galois::reportPageAlloc("MeminfoPost");
 
