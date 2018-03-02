@@ -52,6 +52,10 @@ static cll::opt<bool> useSingleSource("singleSource",
 static cll::opt<unsigned long long> startNode("startNode", 
                                       cll::desc("Single source start node."),
                                       cll::init(0));
+static cll::opt<bool> noSkipSources("noSkipSources", 
+                                   cll::desc("Do not skip sources without " 
+                                             "outgoing edges (default skips)."),
+                                   cll::init(false));
 static cll::opt<unsigned int> vIndex("index", 
                                 cll::desc("DEBUG: Index to print for dist/short "
                                           "paths"),
@@ -87,6 +91,8 @@ struct NodeData {
   galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyToAdd;
   // final dependency values
   galois::gstl::Vector<float> dependencyValues;
+
+  uint64_t numFinalizedSources;
 
   float bc;
 };
@@ -142,6 +148,8 @@ void InitializeGraph(Graph& graph) {
       cur_data.dependencyToAdd.resize(numSourcesPerRound);
       cur_data.dependencyValues.resize(numSourcesPerRound);
   
+      cur_data.numFinalizedSources = 0;
+
       cur_data.bc = 0.0;
     },
     galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()), 
@@ -180,7 +188,7 @@ void InitializeIteration(Graph& graph,
         cur_data.shortestPathToAdd[i] = 0;
         cur_data.sentFlag[i] = 0;
   
-        cur_data.APSPIndexToSend = numSourcesPerRound + 1;
+        cur_data.APSPIndexToSend = numSourcesPerRound;
         cur_data.shortPathValueToSend = 0;
   
         cur_data.savedRoundNumbers[i] = infinity;
@@ -188,6 +196,7 @@ void InitializeIteration(Graph& graph,
         cur_data.dependencyToAdd[i] = 0.0;
         cur_data.dependencyValues[i] = 0.0;
 
+        cur_data.numFinalizedSources = 0;
       }
     },
     galois::loopname(graph.get_run_identifier("InitializeIteration",
@@ -214,7 +223,7 @@ void MetadataUpdate(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (cur_data.oldMinDistances[i] != cur_data.minDistances[i]) {
           cur_data.shortestPathNumbers[i] = 0;
-          cur_data.sentFlag[i] = 0; // reset sent flag
+          //cur_data.sentFlag[i] = 0; // reset sent flag
         }
       }
     },
@@ -286,45 +295,6 @@ void OldDistUpdate(Graph& graph) {
 
 
 /**
- * Wrapper around the distance array for sorting purposes.
- *
- * TODO find a way to make this more efficient because this is NOT efficient
- * at all at scale
- */
-struct DWrapper {
-  uint32_t dist;
-  uint32_t index;
-  
-  DWrapper(uint32_t _dist, uint32_t _index) : dist(_dist), index(_index) { }
-
-  bool operator<(const DWrapper& b) const {
-    return dist < b.dist;
-  }
-};
-
-
-/**
- * Does the wrapping of a vector into a DWrapper for sorting.
- *
- * TODO find a way to make this more efficient because this is NOT efficient
- * at all at scale
- *
- * @param dVector vector to wrap in DWrapper
- * @returns Elements of dVector wrapped in a DWrapper
- */
-std::vector<DWrapper> wrapDistVector(const galois::gstl::Vector<uint32_t>& dVector) {
-  std::vector<DWrapper> wrappedVector;
-  wrappedVector.reserve(numSourcesPerRound);
-
-  for (unsigned i = 0; i < numSourcesPerRound; i++) {
-    wrappedVector.emplace_back(DWrapper(dVector[i], i));
-  }
-
-  return wrappedVector;
-}
-
-
-/**
  * Determine if a node needs to send out a shortest path message in this
  * round and saves it to the node data struct for later use.
  *
@@ -342,72 +312,32 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
     [&] (GNode curNode) {
       NodeData& cur_data = graph.getData(curNode);
 
-      // TODO determine if creating this sort timer actually adds overhead
-      // to execution time....
-      galois::StatTimer sortTimer(graph.get_run_identifier("SortOverhead", 
-                                                           macroRound).c_str(),
-                                  REGION_NAME);
-
-      sortTimer.start();
-      std::vector<DWrapper> toSort = wrapDistVector(cur_data.oldMinDistances);
-  
-      std::stable_sort(toSort.begin(), toSort.end());
-      sortTimer.stop();
-  
-      uint32_t indexToSend = numSourcesPerRound + 1;
-
-      // true if a shortest path message should be sent
-      bool shortFound = false; 
-      // true if a message is flipped from not sent to sent
-      bool sentMarked = false;
+      bool continueWork = false;
 
       cur_data.shortPathValueToSend = 0;
-      cur_data.APSPIndexToSend = indexToSend;
+      cur_data.APSPIndexToSend = numSourcesPerRound;
   
-      // TODO I can probably optimize this loop further
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        DWrapper& currentSource = toSort[i]; // safe
-        uint32_t currentIndex = currentSource.index; // safe
-        unsigned sumToConsider = i + currentSource.dist;
-  
-        // determine if we need to send out a message in this round
-        if (!shortFound && sumToConsider == roundNumber) {
-          // save round num
-          cur_data.savedRoundNumbers[currentIndex] = roundNumber; // safe
-  
-          // note that this index needs to have shortest path number sent out
-          // by saving it to another vector
-          cur_data.shortPathValueToSend = cur_data.shortestPathNumbers[currentIndex];
-          indexToSend = currentIndex;
-          cur_data.APSPIndexToSend = indexToSend;
-          cur_data.sentFlag[currentIndex] = true;
-  
-          shortFound = true;
-          sentMarked = true;
-        } else if (sumToConsider > roundNumber) {
-          // not going to be sending any short path message this round
-          // TODO reason if it is possible to break
-        }
-
-        // if we haven't found a message to mark ready yet, mark one (since
-        // we only terminate if all things are marked ready)
-        if (!sentMarked) {
-          if (!cur_data.sentFlag[currentIndex]) {
-            cur_data.sentFlag[currentIndex] = true;
-            sentMarked = true;
-          }
-        }
-
-        // TODO if we have marked a message ready, is it safe to bail and 
-        // break? (i.e. will there be a short path message to send?)
-        if (sentMarked && shortFound) {
+        if (((cur_data.numFinalizedSources + cur_data.oldMinDistances[i]) == 
+            roundNumber) && !cur_data.sentFlag[i]) {
+          cur_data.savedRoundNumbers[i] = roundNumber; // safe
+          cur_data.shortPathValueToSend = cur_data.shortestPathNumbers[i];
+          cur_data.APSPIndexToSend = i;
+          cur_data.numFinalizedSources++;
+          //galois::gPrint(cur_data.minDistances[i], " ", cur_data.numFinalizedSources, "\n");
+          cur_data.sentFlag[i] = 1; // reset sent flag
+          continueWork = true;
           break;
+        } else if (cur_data.oldMinDistances[i] != infinity && 
+                   !cur_data.sentFlag[i]) {
+          //galois::gPrint(i, " ", cur_data.minDistances[i],  "\n");
+          continueWork = true;
+        } else {
+          //galois::gPrint("b", i, " ", cur_data.oldMinDistances[i],  " ", (int)cur_data.sentFlag[i], "\n");
         }
       }
 
-      // if ready message was found, this node should not terminate this
-      // round
-      if (sentMarked) {
+      if (continueWork) {
         dga += 1;
       }
     },
@@ -442,7 +372,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         NodeData& src_data = graph.getData(graph.getInEdgeDst(inEdge));
         uint32_t indexToSend = src_data.APSPIndexToSend;
         
-        if (indexToSend != numSourcesPerRound + 1) {
+        if (indexToSend != numSourcesPerRound) {
           uint32_t distValue = src_data.oldMinDistances[indexToSend];
           uint32_t newValue = distValue + 1;
           uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
@@ -558,6 +488,11 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
         if (src_data.oldMinDistances[i] < infinity) {
           src_data.savedRoundNumbers[i] = 
               lastRoundNumber - src_data.savedRoundNumbers[i];
+          if (src_data.savedRoundNumbers[i] > lastRoundNumber) {
+            galois::gPrint(src_data.savedRoundNumbers[i], " ", lastRoundNumber,
+                           " ", i, " ", src_data.oldMinDistances[i], "\n");
+
+          }
           assert(src_data.savedRoundNumbers[i] <= lastRoundNumber);
         }
       }
@@ -828,39 +763,51 @@ int main(int argc, char** argv) {
 
     // offset into sources to operate on
     uint64_t offset = 0;
+    uint64_t numNodes = hg->globalSize();
+    uint64_t totalSourcesFound = 0;
 
     galois::DGAccumulator<unsigned> hasEdges;
-    while (offset < totalNumSources) {
+    while (offset < numNodes && totalSourcesFound < totalNumSources) {
       unsigned sourcesFound = 0;
       
-      while (sourcesFound < numSourcesPerRound && offset < totalNumSources) {
-        hasEdges.reset();
+      while (sourcesFound < numSourcesPerRound && offset < numNodes &&
+             totalSourcesFound < totalNumSources) {
+        if (!noSkipSources) {
+          hasEdges.reset();
 
-        // find out if this node is local + has an outgoing edge
-        if (hg->isLocal(offset)) {
-          unsigned localID = hg->G2L(offset);
+          // find out if this node is local + has an outgoing edge
+          if (hg->isLocal(offset)) {
+            unsigned localID = hg->G2L(offset);
 
-          if (std::distance(hg->edge_begin(localID), hg->edge_end(localID))) {
-            hasEdges += 1;
+            if (std::distance(hg->edge_begin(localID), hg->edge_end(localID))) {
+              hasEdges += 1;
+            }
           }
-        }
 
-        // if this node has an outgoing edge on any node, add it to vector of 
-        // sources to consider
-        if (hasEdges.reduce()) {
+          // if this node has an outgoing edge on any node, add it to vector of 
+          // sources to consider
+          if (hasEdges.reduce()) {
+            nodesToConsider[sourcesFound] = offset;
+            sourcesFound++;
+            totalSourcesFound++;
+          } else {
+            if (net.ID == 0) {
+              galois::gInfo("Skipping node ", offset, " (no outgoing)");
+            }
+          }
+        } else {
+          // no skip
           nodesToConsider[sourcesFound] = offset;
           sourcesFound++;
-        } else {
-          if (net.ID == 0) {
-            galois::gInfo("Skipping node ", offset, " (no outgoing)");
-          }
+          totalSourcesFound++;
         }
 
         offset++;
       }
 
       if (sourcesFound == 0) {
-        assert(offset == totalNumSources);
+        assert(offset == totalNumSources || 
+               totalSourcesFound == totalNumSources);
         break;
       }
 
