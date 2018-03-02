@@ -433,14 +433,14 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
   } else {
     switch (partMode) {
       case GGP:
-        std::cout <<"\n  Sarting initial partitioning using GGP:\n";
+        std::cout <<"\nSorting initial partitioning using GGP:\n";
         galois::for_each(galois::iterate( {&parts[0]} ), 
             parallelBisect<bisect_GGP>(mcg, numPartitions, parts), 
             galois::loopname("parallelBisect"),
             galois::wl<galois::worklists::ChunkedLIFO<1>>());
         break;
       case GGGP:
-        std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
+        std::cout <<"\nSorting initial partitioning using GGGP:\n";
         galois::for_each(galois::iterate( {&parts[0]} ), 
             parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), 
             galois::loopname("parallelBisect"),
@@ -449,12 +449,9 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
       default: abort();
     }
   }
-  std::cout<<computeEdgeCut(*(mcg->getGraph()))<<std::endl;
-  printPartStats(parts);
   // XXX(ddn): Leave commented out until we have balance() defined.
 #if 0
   if (!multiSeed) {
-    printPartStats(parts);
     unsigned maxWeight = 1.01 * mcg->getTotalWeight() / numPartitions;
     balance(mcg, parts, maxWeight);
   }
@@ -473,7 +470,7 @@ int edgeCount(GGraph& g) {
 }
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize)
 {
-  std::cout <<"\n  Sarting initial partitioning using MGGGP:\n";
+  std::cout <<"\nSorting initial partitioning using MGGGP:\n";
   auto flag = galois::MethodFlag::UNPROTECTED;
   GGraph& g = *mcg->getGraph();
 
