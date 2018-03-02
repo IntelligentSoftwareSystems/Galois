@@ -79,7 +79,8 @@ const double COARSEN_FRACTION = 0.9;
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer TM;
   TM.start();
-  unsigned meanWeight = ( (double)metisGraph->getTotalWeight()) / (double)nparts;
+  unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
+  unsigned meanWeight = ( (double)fineMetisGraphWeight) / (double)nparts;
   //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   unsigned coarsenTo = 20 * nparts;
 
@@ -93,7 +94,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer T2("Partition");
   T2.start();
   std::vector<partInfo> parts;
-  parts = partition(mcg, nparts, partMode);
+  parts = partition(mcg, fineMetisGraphWeight, nparts, partMode);
   T2.stop();
 
   if (verbose) std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";

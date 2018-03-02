@@ -214,7 +214,7 @@ unsigned computeCut(GGraph& g);
 MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo, bool verbose);
 
 //Partitioning
-std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions, InitialPartMode partMode);
+std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned fineMetisGraphWeight, unsigned numPartitions, InitialPartMode partMode);
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize);
 //Refinement
 void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minSize, unsigned maxSize, refinementMode refM, bool verbose);
