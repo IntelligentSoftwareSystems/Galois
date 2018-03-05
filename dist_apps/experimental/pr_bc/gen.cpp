@@ -82,7 +82,6 @@ struct NodeData {
   galois::gstl::Vector<char> sentFlag; // marks if message has been sent for a source
 
   uint32_t APSPIndexToSend; // index that needs to be sent in a round
-  uint64_t shortPathValueToSend; // short path value that is sent in a round
 
   // round numbers saved for determining when to send out back-prop messages
   galois::gstl::Vector<uint32_t> savedRoundNumbers; 
@@ -140,7 +139,6 @@ void InitializeGraph(Graph& graph) {
       cur_data.shortestPathNumbers.resize(numSourcesPerRound);
   
       cur_data.APSPIndexToSend = numSourcesPerRound + 1;
-      cur_data.shortPathValueToSend = 0;
   
       cur_data.savedRoundNumbers.resize(numSourcesPerRound);
       cur_data.sentFlag.resize(numSourcesPerRound);
@@ -189,7 +187,6 @@ void InitializeIteration(Graph& graph,
         cur_data.sentFlag[i] = 0;
   
         cur_data.APSPIndexToSend = numSourcesPerRound;
-        cur_data.shortPathValueToSend = 0;
   
         cur_data.savedRoundNumbers[i] = infinity;
 
@@ -253,12 +250,6 @@ void ShortPathUpdate(Graph& graph) {
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (cur_data.shortestPathToAdd[i] > 0) {
           cur_data.shortestPathNumbers[i] += cur_data.shortestPathToAdd[i];
-          if (cur_data.shortestPathNumbers[i] > 100000000) {
-            if (graph.isOwned(graph.L2G(curNode))) {
-              galois::gPrint("source ", graph.L2G(curNode), " path num ",
-                             cur_data.shortestPathNumbers[i], "\n");
-            }
-          }
         }
         cur_data.shortestPathToAdd[i] = 0;
       }
@@ -314,26 +305,21 @@ void FindMessageToSend(Graph& graph, const uint32_t roundNumber,
 
       bool continueWork = false;
 
-      cur_data.shortPathValueToSend = 0;
       cur_data.APSPIndexToSend = numSourcesPerRound;
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (((cur_data.numFinalizedSources + cur_data.oldMinDistances[i]) == 
             roundNumber) && !cur_data.sentFlag[i]) {
           cur_data.savedRoundNumbers[i] = roundNumber; // safe
-          cur_data.shortPathValueToSend = cur_data.shortestPathNumbers[i];
           cur_data.APSPIndexToSend = i;
+          assert(cur_data.shortestPathNumbers[i] != 0);
           cur_data.numFinalizedSources++;
-          //galois::gPrint(cur_data.minDistances[i], " ", cur_data.numFinalizedSources, "\n");
           cur_data.sentFlag[i] = 1; // reset sent flag
           continueWork = true;
           break;
         } else if (cur_data.oldMinDistances[i] != infinity && 
                    !cur_data.sentFlag[i]) {
-          //galois::gPrint(i, " ", cur_data.minDistances[i],  "\n");
           continueWork = true;
-        } else {
-          //galois::gPrint("b", i, " ", cur_data.oldMinDistances[i],  " ", (int)cur_data.sentFlag[i], "\n");
         }
       }
 
@@ -377,13 +363,17 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
           uint32_t newValue = distValue + 1;
           uint32_t oldValue = galois::min(dnode.minDistances[indexToSend],
                                           newValue);
-  
+
+          assert(src_data.shortestPathNumbers[indexToSend] != 0);
+
           if (oldValue > newValue) {
             // overwrite short path with this node's shortest path
-            dnode.shortestPathToAdd[indexToSend] = src_data.shortPathValueToSend;
+            dnode.shortestPathToAdd[indexToSend] = 
+              src_data.shortestPathNumbers[indexToSend];
           } else if (oldValue == newValue) {
             // add to short path
-            dnode.shortestPathToAdd[indexToSend] += src_data.shortPathValueToSend;
+            dnode.shortestPathToAdd[indexToSend] += 
+              src_data.shortestPathNumbers[indexToSend];
           }
 
           dga += 1;
@@ -420,8 +410,8 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
   do {
     dga.reset();
-    galois::gPrint("[", galois::runtime::getSystemNetworkInterface().ID, "]", 
-                   " Round ", roundNumber, "\n");
+    galois::gDebug("[", galois::runtime::getSystemNetworkInterface().ID, "]", 
+                   " Round ", roundNumber);
     graph.set_num_iter(roundNumber);
 
     // find the message a node needs to send (if any)
@@ -486,13 +476,8 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
   
       for (unsigned i = 0; i < numSourcesPerRound; i++) {
         if (src_data.oldMinDistances[i] < infinity) {
-          src_data.savedRoundNumbers[i] = 
-              lastRoundNumber - src_data.savedRoundNumbers[i];
-          if (src_data.savedRoundNumbers[i] > lastRoundNumber) {
-            galois::gPrint(src_data.savedRoundNumbers[i], " ", lastRoundNumber,
-                           " ", i, " ", src_data.oldMinDistances[i], "\n");
-
-          }
+          src_data.savedRoundNumbers[i] = lastRoundNumber - 
+                                          src_data.savedRoundNumbers[i];
           assert(src_data.savedRoundNumbers[i] <= lastRoundNumber);
         }
       }
@@ -792,7 +777,7 @@ int main(int argc, char** argv) {
             totalSourcesFound++;
           } else {
             if (net.ID == 0) {
-              galois::gInfo("Skipping node ", offset, " (no outgoing)");
+              galois::gDebug("Skipping node ", offset, " (no outgoing edges)");
             }
           }
         } else {
