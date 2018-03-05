@@ -243,7 +243,8 @@ void edgeIteratingAlgo(Graph& graph) {
       , galois::loopname("Initialize"));
 
 
-  galois::runtime::profileVtune(
+//  galois::runtime::profileVtune(
+  galois::runtime::profilePapi(
       [&] () {
          galois::do_all(galois::iterate(items),
              [&] (const WorkItem& w) {
