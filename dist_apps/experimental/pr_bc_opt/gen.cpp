@@ -106,7 +106,7 @@ std::vector<galois::DynamicBitSet> vbitset_dependencyToAdd;
 using Graph = galois::graphs::DistGraph<NodeData, void, true>;
 using GNode = typename Graph::GraphNode;
 
-//#include "gen_sync.hh"
+#include "gen_sync.hh"
 
 /******************************************************************************/
 /* Functions for running the algorithm */
@@ -167,7 +167,11 @@ void InitializeIteration(Graph& graph,
         // min distance and short path count setup
         if (nodesToConsider[i] == graph.getGID(curNode)) {
           cur_data.minDistances[i] = 0;
-          cur_data.shortestPathNumbers[i] = 1;
+          if (graph.isOwned(graph.L2G(curNode))) {
+            cur_data.shortestPathNumbers[i] = 1;
+          } else {
+            cur_data.shortestPathNumbers[i] = 0;
+          }
         } else {
           cur_data.minDistances[i] = infinity;
           cur_data.shortestPathNumbers[i] = 0;
@@ -337,11 +341,12 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     graph.set_num_iter(roundNumber);
     globalRoundNumber = roundNumber;
 
+    // you can think of this FindMessageToSync call being a part of the sync
     FindMessageToSync(graph, roundNumber, dga); 
 
-    //graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast, 
-    //           Bitset_minDistances>(std::string("APSP") + "_" + 
-    //                                std::to_string(macroRound));
+    graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast, 
+               Bitset_minDistances>(std::string("APSP") + "_" + 
+                                    std::to_string(macroRound));
 
     // confirm message to send
     ConfirmMessageToSend(graph, roundNumber, dga); 
@@ -478,11 +483,11 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     );
 
     // TODO can be possibly optimized? (see comment below)
-    //graph.sync<writeSource, readAny, 
-    //           Reduce_pair_wise_add_array_single_dependencyToAdd, 
-    //           Broadcast_dependencyToAdd, 
-    //           Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
-    //                                   std::to_string(macroRound));
+    graph.sync<writeSource, readAny, 
+               Reduce_pair_wise_add_array_single_dependencyToAdd, 
+               Broadcast_dependencyToAdd, 
+               Bitset_dependencyToAdd>(std::string("DependencySync") + "_" +
+                                       std::to_string(macroRound));
 
     // dependency written to source
     // dep needs to be on dst nodes, but final round needs them on all nodes
@@ -738,10 +743,43 @@ int main(int argc, char** argv) {
         sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii),
                                      (*hg).getData(*ii).bc);
       } else {
+        //sprintf(v_out, "%lu ", (*hg).getGID(*ii));
+        //galois::runtime::printOutput(v_out);
+        //for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        //  if ((*hg).getData(*ii).savedRoundNumbers[i] != infinity) {
+        //    sprintf(v_out, "%u", (*hg).getData(*ii).savedRoundNumbers[i]);
+        //    galois::runtime::printOutput(v_out);
+        //  }
+        //}
+        ////sprintf(v_out, " ");
+        ////galois::runtime::printOutput(v_out);
+
+        ////for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        ////  sprintf(v_out, "%lu", (*hg).getData(*ii).shortestPathNumbers[i]);
+        ////  galois::runtime::printOutput(v_out);
+        ////}
+        //sprintf(v_out, "\n");
+        //galois::runtime::printOutput(v_out);
+
+        uint64_t a = 0;
+        uint64_t b = 0;
+        uint64_t c = 0;
+        for (unsigned i = 0; i < numSourcesPerRound; i++) {
+          if ((*hg).getData(*ii).minDistances[i] != infinity) {
+            a += (*hg).getData(*ii).minDistances[i];
+          }
+          b += (*hg).getData(*ii).shortestPathNumbers[i];
+          if ((*hg).getData(*ii).savedRoundNumbers[i] != infinity) {
+            c += (*hg).getData(*ii).savedRoundNumbers[i];
+          }
+        }
         // outputs min distance and short path numbers
-        sprintf(v_out, "%lu %u %lu\n", (*hg).getGID(*ii),
-                                      (*hg).getData(*ii).minDistances[vIndex],
-                                      (*hg).getData(*ii).shortestPathNumbers[vIndex]);
+        //sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
+        //sprintf(v_out, "%lu %lu %lu\n", (*hg).getGID(*ii), a, c);
+        sprintf(v_out, "%lu %lu\n", (*hg).getGID(*ii), b);
+        //sprintf(v_out, "%lu %u %lu\n", (*hg).getGID(*ii),
+        //                              (*hg).getData(*ii).minDistances[vIndex],
+        //                              (*hg).getData(*ii).shortestPathNumbers[vIndex]);
       }
 
       galois::runtime::printOutput(v_out);

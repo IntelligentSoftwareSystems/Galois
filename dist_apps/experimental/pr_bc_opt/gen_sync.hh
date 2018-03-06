@@ -26,219 +26,148 @@
  */
 
 ////////////////////////////////////////////////////////////////////////////////
-// MinDistances
+// APSP synchronization
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * Manually defined sync structure for reducing minDistances. Needs to be manual
- * as there is a reset operation that is contingent on changes to the minimum
- * distance.
- */
-struct ReducePairwiseMinAndResetDist {
-  #ifndef _VECTOR_SYNC_
-  using ValTy = uint32_t;
-  #else
-  using ValTy = galois::gstl::Vector<uint32_t>;
-  #endif
+struct APSPReduce {
+  // TODO change to triple (constant size)
+  using ValTy = galois::gstl::Vector<uint64_t>;
 
-  #ifndef _VECTOR_SYNC_
-  static ValTy extract(uint32_t node_id, const struct NodeData& node, 
-                       unsigned vecIndex) {
-    return node.minDistances[vecIndex];
+  static ValTy extract(uint32_t node_id, struct NodeData& node) {
+    uint32_t indexToGet = node.APSPIndexToSend;
+
+    // declare vector to be sent
+    ValTy vecToSend;
+    vecToSend.emplace_back(indexToGet);
+    if (indexToGet != infinity) {
+      // get min distance and # shortest paths
+      vecToSend.emplace_back(node.minDistances[indexToGet]);
+      vecToSend.emplace_back(node.shortestPathNumbers[indexToGet]);
+      node.shortestPathNumbers[indexToGet] = 0;
+    } else {
+      // no-op
+      vecToSend.emplace_back(infinity);
+      vecToSend.emplace_back(0);
+    }
+
+    return vecToSend;
   }
-  #else
-  static ValTy extract(uint32_t node_id, const struct NodeData& node) {
-    return node.minDistances;
-  }
-  #endif
 
   static bool extract_reset_batch(unsigned, unsigned long int*,
                                   unsigned int*, ValTy*, size_t*,
-                                  DataCommMode*) {
-    return false;
-  }
+                                  DataCommMode*) { return false; }
 
-  static bool extract_reset_batch(unsigned, ValTy*) {
-    return false;
-  }
+  static bool extract_reset_batch(unsigned, ValTy*) { return false; }
 
-  /**
-   * Updates all distances with a min reduction.
-   *
-   * The important thing about this particular reduction is that if the
-   * distance changes, then shortestPathToAdd must be set to 0 as it is
-   * now invalid.
-   */
-  #ifndef _VECTOR_SYNC_
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y,
-                     unsigned vecIndex) {
-    bool returnVar = false;
-
-    auto& myDistances = node.minDistances;
-
-    uint32_t oldDist = galois::min(myDistances[vecIndex], y);
-
-    // if there's a change, reset the shortestPathsAdd var
-    if (oldDist > myDistances[vecIndex]) {
-      node.shortestPathToAdd[vecIndex] = 0;
-      returnVar = true;
-    }
-
-    return returnVar;
-  }
-  #else
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
-    bool returnVar = false;
+    uint32_t rIndex = y[0];
 
-    auto& myDistances = node.minDistances;
+    if (rIndex != infinity) {
+      uint32_t rDistance = y[1];
+      uint64_t rNumPaths = y[2];
 
-    for (unsigned i = 0; i < myDistances.size(); i++) {
-      uint32_t oldDist = galois::min(myDistances[i], y[i]);
-      if (oldDist > myDistances[i]) {
-        node.shortestPathToAdd[i] = 0;
-        returnVar = true;
+      // do updates based on received numbers
+      uint32_t old = galois::min(node.minDistances[rIndex], rDistance);
+
+      // reset shortest paths if min dist changed (i.e. don't add to it)
+      if (old > rDistance) {
+        assert(rNumPaths != 0);
+        node.shortestPathNumbers[rIndex] = rNumPaths;
+      } else if (old == rDistance) {
+        node.shortestPathNumbers[rIndex] += rNumPaths;
       }
+
+      // if received distance is smaller than current candidate for sending, send
+      // it out instead (if tie breaker wins i.e. lower in position)
+      if (node.APSPIndexToSend == infinity || 
+            (node.minDistances[rIndex] < node.minDistances[node.APSPIndexToSend])) {
+          assert(!node.sentFlag[rIndex]);
+          node.APSPIndexToSend = rIndex;
+      } else if (node.minDistances[rIndex] == 
+                 node.minDistances[node.APSPIndexToSend]) {
+        if (rIndex < node.APSPIndexToSend) {
+          assert(!node.sentFlag[rIndex]);
+          node.APSPIndexToSend = rIndex;
+        }
+      }
+
+      // return true: if it received a message for some node, then that
+      // node on a mirror needs to get the most updated value (i.e. value on
+      // master)
+      return true;
     }
 
-    return returnVar;
+    return false;
   }
-  #endif
-
 
   static bool reduce_batch(unsigned, unsigned long int*, unsigned int *,
-                           ValTy*, size_t, DataCommMode) {
-    return false;
-  }
+                           ValTy*, size_t, DataCommMode) { return false; }
 
-  /**
-   * do nothing for reset
-   */
-  #ifndef _VECTOR_SYNC_
-  static void reset(uint32_t node_id, struct NodeData &node, unsigned vecIndex) {
-    return;
+  // reset the number of shortest paths (the master will now have it)
+  static void reset(uint32_t node_id, struct NodeData &node) { 
+    if (node.APSPIndexToSend != infinity) {
+      node.shortestPathNumbers[node.APSPIndexToSend] = 0;
+    }
   }
-  #else
-  static void reset(uint32_t node_id, struct NodeData &node) {
-    return;
-  }
-  #endif
 };
 
-struct Broadcast_minDistances {
-  #ifndef _VECTOR_SYNC_
-  typedef uint32_t ValTy;
-  #else
-  typedef galois::gstl::Vector<uint32_t> ValTy;
-  #endif
-
-  #ifndef _VECTOR_SYNC_
-  static ValTy extract(uint32_t node_id, const struct NodeData& node,
-                       unsigned vecIndex) {
-    return node.minDistances[vecIndex];
-  }
+struct APSPBroadcast {
+  using ValTy = galois::gstl::Vector<uint64_t>;
 
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {
-    GALOIS_DIE("Execution shouldn't get here this function needs an index arg\n");
-    return node.minDistances[0];
+    uint32_t indexToGet = node.APSPIndexToSend;
+
+    // declare vector to be sent
+    ValTy vecToSend;
+    vecToSend.emplace_back(indexToGet);
+
+    if (indexToGet != infinity) {
+      // get min distance and # shortest paths
+      vecToSend.emplace_back(node.minDistances[indexToGet]);
+      vecToSend.emplace_back(node.shortestPathNumbers[indexToGet]);
+      assert(vecToSend[2] != 0); // should not send out 0 for # paths
+    } else {
+      vecToSend.emplace_back(infinity);
+      vecToSend.emplace_back(0);
+    }
+
+    return vecToSend;
   }
-  #else
-  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
-    return node.minDistances;
-  }
-  #endif
 
   static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
-                            DataCommMode*) {
-    return false;
-  }
+                            DataCommMode*) { return false; }
 
-  static bool extract_batch(unsigned, ValTy*) {
-    return false;
-  }
-
-  // if min distance is changed by the broadcast, then shortest path to add
-  // becomes obsolete/incorrect, so it must be changed to 0
-  #ifndef _VECTOR_SYNC_
-  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y,
-                     unsigned vecIndex) {
-    assert(node.minDistances[vecIndex] >= y);
-
-    if (node.minDistances[vecIndex] != y) {
-      node.shortestPathToAdd[vecIndex] = 0;
-    }
-    node.minDistances[vecIndex] = y;
-  }
+  static bool extract_batch(unsigned, ValTy*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
-    GALOIS_DIE("Execution shouldn't get here; needs index arg\n");
-  }
-  #else
-  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
-    for (unsigned vecIndex = 0; vecIndex < y.size(); vecIndex++) {
-      assert(node.minDistances[vecIndex] >= y[vecIndex]);
+    uint32_t rIndex = y[0];
+    if (rIndex != infinity) {
+      uint32_t rDistance = y[1];
+      uint32_t rNumPaths = y[2];
 
-      if (node.minDistances[vecIndex] != y[vecIndex]) {
-        node.minDistances[vecIndex] = y[vecIndex];
-        node.shortestPathToAdd[vecIndex] = 0;
-      }
+      // values from master are canonical ones for this round
+      node.APSPIndexToSend = rIndex;
+      node.minDistances[rIndex] = rDistance;
+      node.shortestPathNumbers[rIndex] = rNumPaths;
     }
   }
-  #endif
 
   static bool setVal_batch(unsigned, uint64_t*, unsigned int*, ValTy*,
-                           size_t, DataCommMode) {
-    return false;
-  }
+                           size_t, DataCommMode) { return false; }
 };
-
-// Incorrect sync structures
-//#ifndef _VECTOR_SYNC_
-//GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
-//#else
-//GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, galois::gstl::Vector<uint32_t>);
-//#endif
-
-////////////////////////////////////////////////////////////////////////////////
-// Shortest Path
-////////////////////////////////////////////////////////////////////////////////
-
-#ifndef _VECTOR_SYNC_
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
-                                                        uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint64_t);
-#else
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd, 
-                                                 galois::gstl::Vector<uint64_t>);
-GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, 
-                                galois::gstl::Vector<uint64_t>);
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Dependency
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
                                                         galois::CopyableAtomic<float>);
 GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
                                               galois::CopyableAtomic<float>);
-#else
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(dependencyToAdd,
-  galois::gstl::Vector<galois::CopyableAtomic<float>>);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependencyToAdd, 
-                           galois::gstl::Vector<galois::CopyableAtomic<float>>);
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 // Bitsets
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef _VECTOR_SYNC_
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
-#else
 GALOIS_SYNC_STRUCTURE_BITSET(minDistances);
-GALOIS_SYNC_STRUCTURE_BITSET(shortestPathToAdd);
-GALOIS_SYNC_STRUCTURE_BITSET(dependencyToAdd);
-#endif
+GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
