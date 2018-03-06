@@ -86,10 +86,8 @@ struct NodeData {
   // round numbers saved for determining when to send out back-prop messages
   galois::gstl::Vector<uint32_t> savedRoundNumbers; 
 
-  // accumulator for adding to dependency values
-  //galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyToAdd;
-  // final dependency values
-  galois::gstl::Vector<float> dependencyValues;
+  // dependency values
+  galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyValues;
 
   uint64_t numFinalizedSources;
 
@@ -393,32 +391,6 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
 }
 
 
-/**
- * Add dependency accumulator to final dependency value.
- *
- * @param graph Local graph to operate on
- */
-//void UpdateDependency(Graph& graph) {
-//  const auto& allNodes = graph.allNodesRange();
-//
-//  galois::do_all(
-//    galois::iterate(allNodes.begin(), allNodes.end()), 
-//    [&] (GNode curNode) {
-//      NodeData& cur_data = graph.getData(curNode);
-//  
-//      for (unsigned i = 0; i < numSourcesPerRound; i++) {
-//        if (cur_data.dependencyToAdd[i] > 0) {
-//          cur_data.dependencyValues[i] += cur_data.dependencyToAdd[i].load();
-//        }
-//        cur_data.dependencyToAdd[i] = 0;
-//      }
-//    },
-//    galois::loopname(graph.get_run_identifier("UpdateDependency",
-//                                              macroRound).c_str()),
-//    galois::no_stats()
-//  );
-//}
-
 void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
   const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
 
@@ -451,8 +423,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
  * @param lastRoundNumber last round number in the APSP phase
  */
 void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
-  const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
-  //const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
+  const auto& allNodesWithEdgesIn = graph.allNodesWithEdgesRangeIn();
 
   uint32_t currentRound = 0;
 
@@ -467,63 +438,39 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
                std::to_string(macroRound));
 
     galois::do_all(
-      galois::iterate(allNodesWithEdges),
-      [&] (GNode src) {
-        NodeData& src_data = graph.getData(src);
-
-        for (auto outEdge : graph.edges(src)) {
-          GNode dst = graph.getEdgeDst(outEdge);
-          auto& dst_data = graph.getData(dst);
-
-          uint32_t i = dst_data.roundIndexToSend;
-
-          if (i != infinity) {
-            uint32_t myDistance = src_data.minDistances[i];
-
-            if ((myDistance + 1) == dst_data.minDistances[i]) {
-              float contrib = src_data.shortestPathNumbers[i];
-              contrib /= dst_data.shortestPathNumbers[i];
-              contrib *= (1.0 + dst_data.dependencyValues[i]);
-              galois::add(src_data.dependencyValues[i], contrib);
+      galois::iterate(allNodesWithEdgesIn),
+      [&] (GNode dst) {
+        NodeData& dst_data = graph.getData(dst);
+        unsigned i = dst_data.roundIndexToSend;
+    
+        if (i != infinity) {
+          uint32_t myDistance = dst_data.minDistances[i];
+    
+          // calculate final dependency value
+          dst_data.dependencyValues[i] = dst_data.dependencyValues[i] * 
+                                         dst_data.shortestPathNumbers[i];
+    
+          // get the value to add to predecessors
+          float toAdd = ((float)1 + dst_data.dependencyValues[i]) / 
+                          dst_data.shortestPathNumbers[i];
+    
+          for (auto inEdge : graph.in_edges(dst)) {
+            GNode src = graph.getInEdgeDst(inEdge);
+            auto& src_data = graph.getData(src);
+    
+            // determine if this source is a predecessor
+            if (myDistance == (src_data.minDistances[i] + 1)) {
+              // add to dependency of predecessor using our finalized one
+              galois::atomicAdd(src_data.dependencyValues[i], toAdd);
             }
           }
         }
       },
-      //[&] (GNode dst) {
-      //  NodeData& dst_data = graph.getData(dst);
-
-      //  unsigned i = dst_data.roundIndexToSend;
-    
-      //  if (i != infinity) {
-      //    uint32_t myDistance = dst_data.minDistances[i];
-    
-      //    // calculate final dependency value
-      //    dst_data.dependencyValues[i] = dst_data.dependencyValues[i] * 
-      //                                   dst_data.shortestPathNumbers[i];
-    
-      //    // get the value to add to predecessors
-      //    float toAdd = ((float)1 + dst_data.dependencyValues[i]) / 
-      //                    dst_data.shortestPathNumbers[i];
-    
-      //    for (auto inEdge : graph.in_edges(dst)) {
-      //      GNode src = graph.getInEdgeDst(inEdge);
-      //      auto& src_data = graph.getData(src);
-    
-      //      // determine if this source is a predecessor
-      //      if (myDistance == (src_data.minDistances[i] + 1)) {
-      //        // add to dependency of predecessor using our finalized one
-      //        galois::atomicAdd(src_data.dependencyToAdd[i], toAdd);
-      //      }
-      //    }
-      //  }
-      //},
       galois::loopname(graph.get_run_identifier("BackProp",
                                                 macroRound).c_str()),
       galois::steal(),
       galois::no_stats()
     );
-
-    //UpdateDependency(graph);
 
     currentRound++;
   }

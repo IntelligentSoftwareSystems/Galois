@@ -188,7 +188,7 @@ struct DependencyReduce {
       assert(node.roundIndexToSend == rIndex);
 
       float rToAdd = y.second;
-      node.dependencyValues[rIndex] += rToAdd;
+      galois::atomicAdd(node.dependencyValues[rIndex], rToAdd);
       return true;
     }
 
