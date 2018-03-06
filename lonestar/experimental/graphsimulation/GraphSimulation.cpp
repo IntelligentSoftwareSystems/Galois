@@ -294,3 +294,145 @@ void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string
   }
 }
 
+void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action) {
+  // initialize matched
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      data.matched = 0; // matches to none
+    },
+    galois::loopname("InitMatched"));
+
+  // match nodes
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.label == nodeLabel) {
+        unsigned numActions = 0;
+        Graph::GraphNode prev = 0;
+        for (auto e: graph.edges(n)) {
+          auto& eData = graph.getEdgeData(e);
+          if (eData.label == action) {
+            ++numActions;
+            if (numActions == 1) {
+              prev = graph.getEdgeDst(e);
+            } else {
+              if (prev != graph.getEdgeDst(e)) {
+                data.matched = 1;
+                break;
+              }
+            }
+          }
+        }
+      }
+    },
+    galois::loopname("MatchNodes"));
+
+  // match destination of matched nodes
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.matched & 1) {
+        for (auto e: graph.edges(n)) {
+          auto& eData = graph.getEdgeData(e);
+          if (eData.label == action) {
+            auto dst = graph.getEdgeDst(e);
+            auto& dstData = graph.getData(dst);
+            dstData.matched |= 2; // atomicity not required
+          }
+        }
+      }
+    },
+    galois::loopname("MatchNodesDsts"));
+}
+
+void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2) {
+  // initialize matched
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      data.matched = 0; // matches to none
+    },
+    galois::loopname("InitMatched"));
+
+  // match nodes
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.label == nodeLabel) {
+        bool foundAction1 = false;
+        bool foundAction2 = false;
+        for (auto e: graph.edges(n)) {
+          auto& eData = graph.getEdgeData(e);
+          bool mayAction1 = (eData.label == action1);
+          bool mayAction2 = (eData.label == action2);
+          if (mayAction1 || mayAction2) {
+            auto dst = graph.getEdgeDst(e);
+            auto& dstData = graph.getData(dst);
+            if (mayAction1 && (dstData.label == dstNodeLabel1)) {
+              foundAction1 = true;
+            } else if (mayAction2 && (dstData.label == dstNodeLabel2)) {
+              foundAction2 = true;
+            }
+          }
+        }
+        if (foundAction1 && foundAction2) {
+          data.matched = 1;
+        }
+      }
+    },
+    galois::loopname("MatchNodes"));
+
+  // match destination of matched nodes
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.matched & 1) {
+        for (auto e: graph.edges(n)) {
+          auto& eData = graph.getEdgeData(e);
+          bool mayAction1 = (eData.label == action1);
+          bool mayAction2 = (eData.label == action2);
+          if (mayAction1 || mayAction2) {
+            auto dst = graph.getEdgeDst(e);
+            auto& dstData = graph.getData(dst);
+            if (mayAction1 && (dstData.label == dstNodeLabel1)) {
+              dstData.matched |= 2; // atomicity not required
+            } else if (mayAction2 && (dstData.label == dstNodeLabel2)) {
+              dstData.matched |= 4; // atomicity not required
+            }
+          }
+        }
+      }
+    },
+    galois::loopname("MatchNodesDsts"));
+}
+
+void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
+  Graph& graph = dataGraph.graph;
+  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeNames = dataGraph.nodeNames;
+
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if (outputFile.size()) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  os << "Matched nodes:\n";
+  for (auto n: graph) {
+    auto& data = graph.getData(n);
+    if (data.matched) {
+      os << nodeLabels[data.label] << " " << nodeNames[n] << std::endl;
+    }
+  }
+
+  if (outputFile.size()) {
+    ofs.close();
+  }
+}

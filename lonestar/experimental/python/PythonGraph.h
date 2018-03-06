@@ -64,6 +64,9 @@ size_t getNumEdges(AttributedGraph* g);
 
 void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile);
 
+void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile);
+void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* outputFile);
+
 } // extern "C"
 
 #endif // GALOIS_PYTHON_GRAPH_H

@@ -4,6 +4,7 @@
 #include <fstream>
 #include <boost/serialization/map.hpp>
 #include <boost/serialization/vector.hpp>
+#include <boost/serialization/string.hpp>
 #include <boost/archive/binary_oarchive.hpp>
 #include <boost/archive/binary_iarchive.hpp>
 
@@ -41,7 +42,9 @@ void saveGraph(AttributedGraph *g, char* filename) {
   boost::archive::binary_oarchive oarch(file);
   g->graph.serializeGraph(oarch);
   oarch << g->nodeLabels;
+  oarch << g->nodeIDs;
   oarch << g->edgeLabels;
+  oarch << g->edgeIDs;
   oarch << g->nodeNames;
   size_t size = g->nodeAttributes.size();
   oarch << size;
@@ -63,21 +66,23 @@ void loadGraph(AttributedGraph *g, char* filename) {
   boost::archive::binary_iarchive iarch(file);
   g->graph.deSerializeGraph(iarch);
   iarch >> g->nodeLabels;
+  iarch >> g->nodeIDs;
   iarch >> g->edgeLabels;
+  iarch >> g->edgeIDs;
   iarch >> g->nodeNames;
   size_t size;
   iarch >> size;
   for (size_t i = 0; i < size; ++i) {
     std::string key;
     iarch >> key;
-    g->nodeAttributes[key] = galois::LargeArray<std::string>();
+    g->nodeAttributes[key] = std::vector<std::string>();
     iarch >> g->nodeAttributes[key];
   }
   iarch >> size;
   for (size_t i = 0; i < size; ++i) {
     std::string key;
     iarch >> key;
-    g->edgeAttributes[key] = galois::LargeArray<std::string>();
+    g->edgeAttributes[key] = std::vector<std::string>();
     iarch >> g->edgeAttributes[key];
   }
   file.close();
@@ -113,7 +118,7 @@ void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t 
   g->nodeLabels.resize(numNodeLabels);
   assert(numEdgeLabels <= 32);
   g->edgeLabels.resize(numEdgeLabels);
-  g->nodeNames.allocateInterleaved(numNodes);
+  g->nodeNames.resize(numNodes);
 }
 
 void fixEndEdge(AttributedGraph *g, uint32_t nodeIndex, uint64_t edgeIndex) {
@@ -129,17 +134,19 @@ void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t uuid, uint32_t lab
 
 void setNodeLabel(AttributedGraph *g, uint32_t label, char *name) {
   g->nodeLabels[label] = name;
+  g->nodeIDs[name] = label;
 }
 
 void setEdgeLabel(AttributedGraph *g, uint32_t label, char *name) {
   g->edgeLabels[label] = name;
+  g->edgeIDs[name] = label;
 }
 
 void setNodeAttribute(AttributedGraph *g, uint32_t nodeIndex, char *key, char *value) {
   auto& attributes = g->nodeAttributes;
   if (attributes.find(key) == attributes.end()) {
-    attributes[key] = galois::LargeArray<std::string>();
-    attributes[key].allocateInterleaved(g->graph.size());
+    attributes[key] = std::vector<std::string>();
+    attributes[key].resize(g->graph.size());
   }
   attributes[key][nodeIndex] = value;
 }
@@ -154,8 +161,8 @@ void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex
 void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char *key, char *value) {
   auto& attributes = g->edgeAttributes;
   if (attributes.find(key) == attributes.end()) {
-    attributes[key] = galois::LargeArray<std::string>();
-    attributes[key].allocateInterleaved(g->graph.sizeEdges());
+    attributes[key] = std::vector<std::string>();
+    attributes[key].resize(g->graph.sizeEdges());
   }
   attributes[key][edgeIndex] = value;
 }
@@ -202,6 +209,27 @@ void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* 
   runGraphSimulation(queryGraph->graph, dataGraph->graph);
   if (outputFile != NULL) {
     reportGraphSimulation(*queryGraph, *dataGraph, outputFile);
+  }
+}
+
+void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile) {
+  matchNodeWithRepeatedActions(dataGraph->graph,
+      dataGraph->nodeIDs["file"],
+      dataGraph->edgeIDs["write"]);
+  if (outputFile != NULL) {
+    reportMatchedNodes(*dataGraph, outputFile);
+  }
+}
+
+void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* outputFile) {
+  matchNodeWithTwoActions(dataGraph->graph,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["file"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["netflow"]);
+  if (outputFile != NULL) {
+    reportMatchedNodes(*dataGraph, outputFile);
   }
 }
 
