@@ -34,7 +34,7 @@ struct APSPReduce {
   using ValTy = galois::gstl::Vector<uint64_t>;
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
-    uint32_t indexToGet = node.APSPIndexToSend;
+    uint32_t indexToGet = node.roundIndexToSend;
 
     // declare vector to be sent
     ValTy vecToSend;
@@ -79,15 +79,15 @@ struct APSPReduce {
 
       // if received distance is smaller than current candidate for sending, send
       // it out instead (if tie breaker wins i.e. lower in position)
-      if (node.APSPIndexToSend == infinity || 
-            (node.minDistances[rIndex] < node.minDistances[node.APSPIndexToSend])) {
+      if (node.roundIndexToSend == infinity || 
+            (node.minDistances[rIndex] < node.minDistances[node.roundIndexToSend])) {
           assert(!node.sentFlag[rIndex]);
-          node.APSPIndexToSend = rIndex;
+          node.roundIndexToSend = rIndex;
       } else if (node.minDistances[rIndex] == 
-                 node.minDistances[node.APSPIndexToSend]) {
-        if (rIndex < node.APSPIndexToSend) {
+                 node.minDistances[node.roundIndexToSend]) {
+        if (rIndex < node.roundIndexToSend) {
           assert(!node.sentFlag[rIndex]);
-          node.APSPIndexToSend = rIndex;
+          node.roundIndexToSend = rIndex;
         }
       }
 
@@ -105,8 +105,8 @@ struct APSPReduce {
 
   // reset the number of shortest paths (the master will now have it)
   static void reset(uint32_t node_id, struct NodeData &node) { 
-    if (node.APSPIndexToSend != infinity) {
-      node.shortestPathNumbers[node.APSPIndexToSend] = 0;
+    if (node.roundIndexToSend != infinity) {
+      node.shortestPathNumbers[node.roundIndexToSend] = 0;
     }
   }
 };
@@ -115,7 +115,7 @@ struct APSPBroadcast {
   using ValTy = galois::gstl::Vector<uint64_t>;
 
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {
-    uint32_t indexToGet = node.APSPIndexToSend;
+    uint32_t indexToGet = node.roundIndexToSend;
 
     // declare vector to be sent
     ValTy vecToSend;
@@ -146,7 +146,7 @@ struct APSPBroadcast {
       uint32_t rNumPaths = y[2];
 
       // values from master are canonical ones for this round
-      node.APSPIndexToSend = rIndex;
+      node.roundIndexToSend = rIndex;
       node.minDistances[rIndex] = rDistance;
       node.shortestPathNumbers[rIndex] = rNumPaths;
     }
@@ -156,18 +156,93 @@ struct APSPBroadcast {
                            size_t, DataCommMode) { return false; }
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// Dependency
-////////////////////////////////////////////////////////////////////////////////
+struct DependencyReduce {
+  // TODO change to pair (constant size)
+  using ValTy = std::pair<uint32_t, float>;
 
-GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
-                                                        galois::CopyableAtomic<float>);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
-                                              galois::CopyableAtomic<float>);
+  static ValTy extract(uint32_t node_id, struct NodeData& node) {
+    uint32_t indexToGet = node.roundIndexToSend;
+    float thing;
+    if (indexToGet != infinity) {
+      thing = node.dependencyValues[indexToGet];
+    } else {
+      thing = 0;
+    }
+
+    return ValTy(indexToGet, thing);
+  }
+
+  static bool extract_reset_batch(unsigned, unsigned long int*,
+                                  unsigned int*, ValTy*, size_t*,
+                                  DataCommMode*) { return false; }
+
+  static bool extract_reset_batch(unsigned, ValTy*) { return false; }
+
+  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
+    uint32_t rIndex = y.first;
+
+    if (rIndex != infinity) {
+      if (node.roundIndexToSend != rIndex) {
+        galois::gPrint(node.roundIndexToSend, " ", rIndex, "\n");
+      }
+      assert(node.roundIndexToSend == rIndex);
+
+      float rToAdd = y.second;
+      node.dependencyValues[rIndex] += rToAdd;
+      return true;
+    }
+
+    return false;
+  }
+
+  static bool reduce_batch(unsigned, unsigned long int*, unsigned int *,
+                           ValTy*, size_t, DataCommMode) { return false; }
+
+  // reset the number of shortest paths (the master will now have it)
+  static void reset(uint32_t node_id, struct NodeData &node) { 
+    if (node.roundIndexToSend != infinity) {
+      node.dependencyValues[node.roundIndexToSend] = 0;
+    }
+  }
+};
+
+struct DependencyBroadcast {
+  using ValTy = std::pair<uint32_t, float>;
+
+  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
+    uint32_t indexToGet = node.roundIndexToSend;
+
+    float thing;
+    if (indexToGet != infinity) {
+      thing = node.dependencyValues[indexToGet];
+    } else {
+      thing = 0;
+    }
+
+    return ValTy(indexToGet, thing);
+  }
+
+  static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
+                            DataCommMode*) { return false; }
+
+  static bool extract_batch(unsigned, ValTy*) { return false; }
+
+  static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
+    uint32_t rIndex = y.first;
+    if (rIndex != infinity) {
+      float rDep = y.second;
+      assert(node.roundIndexToSend == rIndex);
+      node.dependencyValues[rIndex] = rDep;
+    }
+  }
+
+  static bool setVal_batch(unsigned, uint64_t*, unsigned int*, ValTy*,
+                           size_t, DataCommMode) { return false; }
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Bitsets
 ////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_BITSET(minDistances);
-GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
+GALOIS_SYNC_STRUCTURE_BITSET(dependency);
