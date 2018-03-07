@@ -152,10 +152,7 @@ void setNodeAttribute(AttributedGraph *g, uint32_t nodeIndex, char *key, char *v
 }
 
 void constructEdge(AttributedGraph *g, uint64_t edgeIndex, uint32_t dstNodeIndex, uint32_t label, uint64_t timestamp) {
-  EdgeData ed;
-  ed.label = label;
-  ed.timestamp = timestamp;
-  g->graph.constructEdge(edgeIndex, dstNodeIndex, ed);
+  g->graph.constructEdge(edgeIndex, dstNodeIndex, EdgeData(label, timestamp));
 }
 
 void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char *key, char *value) {
@@ -228,6 +225,39 @@ void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* out
       dataGraph->nodeIDs["file"],
       dataGraph->edgeIDs["write"],
       dataGraph->nodeIDs["netflow"]);
+  if (outputFile != NULL) {
+    reportMatchedNodes(*dataGraph, outputFile);
+  }
+}
+
+void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outputFile) {
+  Graph queryGraph;
+  queryGraph.allocateFrom(4, 6);
+  queryGraph.constructNodes();
+
+  queryGraph.getData(0).label = dataGraph->nodeIDs["netflow"];
+  queryGraph.getData(0).id = 0;
+  queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeIDs["read"], 0));
+  queryGraph.fixEndEdge(0, 1);
+
+  queryGraph.getData(1).label = dataGraph->nodeIDs["process"];
+  queryGraph.getData(1).id = 1;
+  queryGraph.constructEdge(1, 0, EdgeData(dataGraph->edgeIDs["read"], 0));
+  queryGraph.constructEdge(2, 2, EdgeData(dataGraph->edgeIDs["write"], 1));
+  queryGraph.fixEndEdge(1, 3);
+
+  queryGraph.getData(2).label = dataGraph->nodeIDs["file"];
+  queryGraph.getData(2).id = 2;
+  queryGraph.constructEdge(3, 1, EdgeData(dataGraph->edgeIDs["write"], 1));
+  queryGraph.constructEdge(4, 3, EdgeData(dataGraph->edgeIDs["execute"], 2));
+  queryGraph.fixEndEdge(2, 5);
+
+  queryGraph.getData(3).label = dataGraph->nodeIDs["process"];
+  queryGraph.getData(3).id = 3;
+  queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeIDs["execute"], 2));
+  queryGraph.fixEndEdge(3, 6);
+
+  runGraphSimulation(queryGraph, dataGraph->graph);
   if (outputFile != NULL) {
     reportMatchedNodes(*dataGraph, outputFile);
   }

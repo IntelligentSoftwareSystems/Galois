@@ -66,6 +66,7 @@ void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* 
 
 void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile);
 void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* outputFile);
+void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outputFile);
 
 } // extern "C"
 

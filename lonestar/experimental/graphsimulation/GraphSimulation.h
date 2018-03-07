@@ -46,6 +46,7 @@ struct Node {
 struct EdgeData {
   uint32_t label; // maximum  of 32 edge labels
   uint64_t timestamp; // range of timestamp is limited
+  EdgeData(uint32_t l, uint64_t t) : label(l), timestamp(t) {}
 };
 
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;

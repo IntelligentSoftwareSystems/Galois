@@ -153,10 +153,14 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
                             if (dDstData2.matched & (1 << qDst2)) {
                               assert(qeData.timestamp != qeData2.timestamp);
                               if ((qeData.timestamp <= qeData2.timestamp) == (deData.timestamp <= deData2.timestamp)) {
+#ifdef UNIQUE_QUERY_NODES
                                 if ((qDst != qDst2) == (dDst != dDst2)) {
+#endif
                                   matched = true;
                                   break;
+#ifdef UNIQUE_QUERY_NODES
                                 }
+#endif
                               }
                             }
                           }
