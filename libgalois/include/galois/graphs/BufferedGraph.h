@@ -275,7 +275,6 @@ public:
    * nodes)
    */
   const uint32_t size() const {
-    galois::gPrint(globalSize, "\n");
     return globalSize;
   }
 
@@ -284,7 +283,6 @@ public:
    * edges)
    */
   const uint32_t sizeEdges() const {
-    galois::gPrint(globalEdgeSize, "\n");
     return globalEdgeSize;
   }
 
@@ -305,8 +303,6 @@ public:
 
     numLocalNodes = globalSize = header[2];
     numLocalEdges = globalEdgeSize = header[3];
-
-    galois::gPrint("load", globalSize, " ", globalEdgeSize, "\n");
 
     loadOutIndex(graphFile, 0, globalSize);
     loadEdgeDest(graphFile, 0, globalEdgeSize, globalSize);
