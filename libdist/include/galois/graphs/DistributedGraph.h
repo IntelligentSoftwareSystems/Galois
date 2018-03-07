@@ -2022,6 +2022,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2031,8 +2034,10 @@ private:
       data_mode = onlyData;
       val_vec.resize(num);
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                                        val_vec);
+      Textractbatch.stop();
 
       if (!batch_succeeded) {
         gSerialize(b, onlyData);
@@ -2086,6 +2091,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2099,8 +2107,10 @@ private:
       data_mode = onlyData;
       val_vec.resize(num);
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                                        val_vec);
+      Textractbatch.stop();
 
       if (!batch_succeeded) {
         // get everything (note I pass in "indices" as offsets as it won't
@@ -2229,6 +2239,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2240,9 +2253,11 @@ private:
       val_vec.resize(num);
       size_t bit_set_count = 0;
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(
         from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode
       );
+      Textractbatch.stop();
 
       // GPUs have a batch function they can use; CPUs do not; therefore, 
       // CPUS always enter this if block
@@ -2652,6 +2667,9 @@ private:
     std::string set_timer_str(syncTypeStr + "_SET_" + 
                               get_run_identifier(loopName));
     galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+    std::string set_batch_timer_str(syncTypeStr + "_SET_BATCH_" +
+                              get_run_identifier(loopName));
+    galois::StatTimer Tsetbatch(set_batch_timer_str.c_str(), GRNAME);
 
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
@@ -2679,9 +2697,11 @@ private:
                                   val_vec);
 
         // GPU update call
+        Tsetbatch.start();
         bool batch_succeeded = set_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                  bit_set_comm, offsets, val_vec, 
                                                  bit_set_count, data_mode);
+        Tsetbatch.stop();
 
         // cpu always enters this block
         if (!batch_succeeded) {
