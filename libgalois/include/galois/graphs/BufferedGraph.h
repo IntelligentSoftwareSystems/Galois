@@ -46,7 +46,11 @@ private:
   uint32_t* edgeDestBuffer = nullptr;
   EdgeDataType* edgeDataBuffer = nullptr;
 
-  uint64_t numLocalNodes = 0;
+  // size of the entire graph (not just locallly loaded portion)
+  uint32_t globalSize = 0;
+  uint64_t globalEdgeSize = 0;
+
+  uint32_t numLocalNodes = 0;
   uint64_t numLocalEdges = 0;
 
   uint64_t nodeOffset = 0;
@@ -221,6 +225,8 @@ private:
    */
   void resetGraphStatus() {
     graphLoaded = false;
+    globalSize = 0;
+    globalEdgeSize = 0;
     nodeOffset = 0;
     edgeOffset = 0;
     numLocalNodes = 0;
@@ -265,6 +271,54 @@ public:
   BufferedGraph& operator=(BufferedGraph&&) = delete;
 
   /**
+   * @returns the total number of nodes in the graph (not just local loaded 
+   * nodes)
+   */
+  const uint32_t size() const {
+    galois::gPrint(globalSize, "\n");
+    return globalSize;
+  }
+
+  /**
+   * @returns the total number of edges in the graph (not just local loaded 
+   * edges)
+   */
+  const uint32_t sizeEdges() const {
+    galois::gPrint(globalEdgeSize, "\n");
+    return globalEdgeSize;
+  }
+
+  /**
+   * Loads given Galois CSR graph into memory.
+   *
+   * @param filename name of graph to load; should be in Galois binary graph
+   * format
+   */
+  void loadGraph(const std::string& filename) {
+    if (graphLoaded) {
+      GALOIS_DIE("Cannot load an buffered graph more than once.");
+    }
+
+    std::ifstream graphFile(filename.c_str());
+    uint64_t header[4];
+    graphFile.read(((char*)header), sizeof(uint64_t) * 4);
+
+    numLocalNodes = globalSize = header[2];
+    numLocalEdges = globalEdgeSize = header[3];
+
+    galois::gPrint("load", globalSize, " ", globalEdgeSize, "\n");
+
+    loadOutIndex(graphFile, 0, globalSize);
+    loadEdgeDest(graphFile, 0, globalEdgeSize, globalSize);
+    // may or may not do something depending on EdgeDataType
+    loadEdgeData<EdgeDataType>(graphFile, 0, globalEdgeSize, globalSize, 
+                               globalEdgeSize);
+    graphLoaded = true;
+
+    graphFile.close();
+  }
+
+  /**
    * Given a node/edge range to load, loads the specified portion of the graph 
    * into memory buffers using read.
    *
@@ -287,6 +341,9 @@ public:
     }
 
     std::ifstream graphFile(filename.c_str());
+
+    globalSize = numGlobalNodes;
+    globalEdgeSize = numGlobalEdges;
 
     assert(nodeEnd >= nodeStart);
     numLocalNodes = nodeEnd - nodeStart;
