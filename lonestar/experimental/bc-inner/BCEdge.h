@@ -76,7 +76,8 @@ struct BCEdge {
 
   std::string toString() const {
     std::ostringstream s;
-    s << src->id << " " << dst->id << " level: " << level << " val: " << val;
+    s << val << " " << level;
+    //s << src->id << " " << dst->id << " level: " << level << " val: " << val;
     return s.str();
   }
 };

@@ -38,15 +38,13 @@
 
 template <bool UseMarking=false, bool Concurrent=true>
 struct BCNode {
-  unsigned id;
-
   using LockType = typename std::conditional<Concurrent, 
                                              galois::substrate::SimpleLock,
                                              char>::type;
   LockType spinLock;
 
   //typedef std::vector<BCNode*> predTY;
-  using predTY = llvm::SmallVector<BCNode*, 2>;
+  using predTY = llvm::SmallVector<uint32_t, 2>;
   predTY preds;
 
   unsigned distance;
@@ -57,12 +55,8 @@ struct BCNode {
   double bc;
   char mark;
 
-  BCNode(const int _id)
-    : id(_id), spinLock(), preds(), distance(infinity), nsuccs(0), 
-      sigma(0), delta(0), bc(0), mark(0) {}
-  
   BCNode() 
-    : id(infinity), spinLock(), preds(), distance(infinity), nsuccs(0),
+    : spinLock(), preds(), distance(infinity), nsuccs(0),
       sigma(0), delta(0), bc(0), mark(0) {}
   
   /**
@@ -112,7 +106,7 @@ struct BCNode {
   std::string toString() const {
     std::ostringstream s;
 
-    s << id << " distance: " << distance << " sigma: " << sigma << " bc: " 
+    s << " distance: " << distance << " sigma: " << sigma << " bc: " 
       << bc << " nsuccs: " << nsuccs << " npreds: " << preds.size();
 
     return s.str();
