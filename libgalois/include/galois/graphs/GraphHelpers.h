@@ -21,13 +21,13 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights
+ * Copyright (C) 2018, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
  *
  * Contains functions that can be done on various graphs with a particular
- * interface.
+ * interface as well as functions that operate nodes/edges of a graph.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
@@ -35,12 +35,15 @@
 #ifndef __GALOIS_GRAPH_HELPERS__
 #define __GALOIS_GRAPH_HELPERS__
 
+#include <galois/gIO.h>
+
 #include <boost/iterator/counting_iterator.hpp>
 #include <cassert>
 #include <vector>
 
 namespace galois {
 namespace graphs {
+
 namespace internal {
 /**
  * Return a suitable index between an upper bound and a lower bound that
@@ -110,6 +113,9 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
 // inline required as GraphHelpers is included in multiple translation units
 uint32_t determine_block_division(uint32_t numDivisions,
                                   std::vector<unsigned>& scaleFactor);
+
+
+
 } // end namespace internal
 
 /**
@@ -226,6 +232,192 @@ auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
                               iterator(nodesUpper)),
                     EdgeRange(edge_iterator(edgesLower),
                               edge_iterator(edgesUpper)));
+}
+
+// second internal namespace
+namespace internal {
+/**
+ * Helper function used by determineGraphRanges that consists of the main
+ * loop over all units and calls to divide by node to determine the
+ * division of nodes to units.
+ *
+ * Saves the ranges to an argument vector provided by the caller.
+ *
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @param returnRanges Vector to store thread offsets for ranges in
+ * @param nodeAlpha The higher the number, the more weight nodes have in
+ * determining division of nodes (edges have weight 1).
+ */
+template <typename GraphTy>
+void determineUnitRangesLoop(GraphTy& graph, uint32_t unitsToSplit,
+                             uint32_t beginNode, uint32_t endNode,
+                             std::vector<uint32_t>& returnRanges,
+                             uint32_t nodeAlpha) {
+  uint32_t numNodesInRange = endNode - beginNode;
+  uint64_t numEdgesInRange = graph.edge_end(endNode - 1) - 
+                             graph.edge_begin(beginNode);
+  uint64_t edgeOffset = *graph.edge_begin(beginNode);
+
+  returnRanges[0] = beginNode;
+  std::vector<unsigned int> dummyScaleFactor;
+
+  for (uint32_t i = 0; i < unitsToSplit; i++) {
+    // determine division for unit i
+    auto nodeSplits = 
+      divideNodesBinarySearch<GraphTy, uint32_t>(
+        numNodesInRange, numEdgesInRange, nodeAlpha, 1, i, unitsToSplit, 
+        graph, dummyScaleFactor, edgeOffset, beginNode
+      ).first;
+
+    // i.e. if there are actually assigned nodes
+    if (nodeSplits.first != nodeSplits.second) {
+      if (i != 0) {
+        assert(returnRanges[i] == *(nodeSplits.first));
+      } else { // i == 0
+        assert(returnRanges[i] == beginNode);
+      }
+      returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
+    } else {
+      // thread assinged no nodes
+      returnRanges[i + 1] = returnRanges[i];
+    }
+
+    galois::gDebug("Unit ", i, " gets nodes ", returnRanges[i], " to ", 
+                   returnRanges[i + 1], ", num edges is ", 
+                   graph.edge_end(returnRanges[i + 1] - 1) -
+                   graph.edge_begin(returnRanges[i]));
+  }
+}
+} // end second internal namespace
+
+/**
+ * Determines node division ranges for a given range of nodes and returns it 
+ * as an offset vector. (node ranges = assigned nodes that a particular unit
+ * of execution should work on)
+ *
+ * Checks for corner cases, then calls the main loop function.
+ *
+ * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
+ * the graph is already constructed.
+ *
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @param returnRanges Vector to store thread offsets for ranges in
+ * @param nodeAlpha The higher the number, the more weight nodes have in
+ * determining division of nodes (edges have weight 1).
+ */
+template<typename GraphTy>
+std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
+                                                   uint32_t unitsToSplit,
+                                                   uint32_t beginNode,
+                                                   uint32_t endNode,
+                                                   uint32_t nodeAlpha=0) {
+  uint32_t total_nodes = endNode - beginNode;
+
+  std::vector<uint32_t> returnRanges;
+  returnRanges.resize(unitsToSplit + 1);
+
+  // check corner cases
+  // no nodes = assign nothing to all units
+  if (beginNode == endNode) {
+    returnRanges[0] = beginNode;
+
+    for (uint32_t i = 0; i < unitsToSplit; i++) {
+      returnRanges[i+1] = beginNode;
+    }
+
+    return returnRanges;
+  }
+
+  // single thread case; 1 unit gets all
+  if (unitsToSplit == 1) {
+    returnRanges[0] = beginNode;
+    returnRanges[1] = endNode;
+    return returnRanges;
+  // more units than nodes
+  } else if (unitsToSplit > total_nodes) {
+    uint32_t current_node = beginNode;
+    returnRanges[0] = current_node;
+    // 1 node for units until out of threads
+    for (uint32_t i = 0; i < total_nodes; i++) {
+      returnRanges[i + 1] = ++current_node;
+    }
+    // deal with remainder units; they get nothing
+    for (uint32_t i = total_nodes; i < unitsToSplit; i++) {
+      returnRanges[i + 1] = total_nodes;
+    }
+
+    return returnRanges;
+  }
+
+  // no corner cases: onto main loop over nodes that determines
+  // node ranges
+  internal::determineUnitRangesLoop(graph, unitsToSplit, beginNode, endNode, 
+                                    returnRanges, nodeAlpha);
+
+  #ifndef NDEBUG
+  // sanity checks
+  assert(returnRanges[0] == beginNode &&
+         "return ranges begin not the begin node");
+  assert(returnRanges[unitsToSplit] == endNode &&
+         "return ranges end not end node");
+
+  for (uint32_t i = 1; i < unitsToSplit; i++) {
+    assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
+    assert(returnRanges[i] >= returnRanges[i - 1]);
+  }
+  #endif
+
+  return returnRanges;
+}
+
+/**
+ * Uses the divideByNode function (which is binary search based) to
+ * divide nodes among units.
+ *
+ * @param unitsToSplit number of units to split nodes among
+ * @param edgePrefixSum A prefix sum of edges
+ * @returns vector that indirectly specifies how nodes are split amongs units
+ * of execution
+ */
+template <typename VectorTy>
+std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,  
+                                                      VectorTy& edgePrefixSum) {
+  assert(unitsToSplit > 0);
+
+  std::vector<uint32_t> nodeRanges;
+  nodeRanges.resize(unitsToSplit + 1);
+
+  nodeRanges[0] = 0;
+
+  uint32_t numNodes = edgePrefixSum.size();
+  uint32_t numEdges = edgePrefixSum[numNodes - 1];
+
+  for (uint32_t i = 0; i < unitsToSplit; i++) {
+    auto nodeSplits = 
+      divideNodesBinarySearch<VectorTy, uint32_t>(
+        numNodes, numEdges, 0, 1, i, unitsToSplit, edgePrefixSum
+      ).first;
+
+    // i.e. if there are actually assigned nodes
+    if (nodeSplits.first != nodeSplits.second) {
+      if (i != 0) {
+        assert(nodeRanges[i] == *(nodeSplits.first));
+      } else { // i == 0
+        assert(nodeRanges[i] == 0);
+      }
+      nodeRanges[i + 1] = *(nodeSplits.second);
+    } else {
+      // thread assinged no nodes
+      nodeRanges[i + 1] = nodeRanges[i];
+    }
+
+    galois::gDebug("Unit ", i, " gets nodes ", nodeRanges[i], " to ",
+                   nodeRanges[i+1]);
+  }
+
+  return nodeRanges;
 }
 
 } // end namespace graphs
