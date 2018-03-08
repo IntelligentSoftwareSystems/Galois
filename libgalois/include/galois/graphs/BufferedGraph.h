@@ -35,6 +35,8 @@
 #include <galois/Reduction.h>
 #include <boost/iterator/counting_iterator.hpp>
 
+#include <fstream>
+
 namespace galois {
 namespace graphs {
 
