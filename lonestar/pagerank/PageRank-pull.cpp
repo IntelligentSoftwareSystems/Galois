@@ -329,15 +329,15 @@ struct PageRankPull {
     galois::GReduceMax<float> max_delta;
 
     while (true) {
-      galois::runtime::profileVtune(
+      // galois::runtime::profileVtune(
+      galois::runtime::profilePapi(
           [&]() {
             galois::do_all(galois::iterate(_graph),
                            PageRankPull{_graph, iteration, max_delta},
-                           galois::no_stats(), galois::steal(),
-                           galois::chunk_size<CHUNK_SIZE>(),
+                           galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
                            galois::loopname("PageRank"));
           },
-          "computePageRankProfileVTune");
+          "computePageRankProfile");
 
       float delta = max_delta.reduce();
 
