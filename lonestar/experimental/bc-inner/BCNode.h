@@ -30,11 +30,13 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <limits>
 
 #include "galois/substrate/SimpleLock.h"
 #include "llvm/ADT/SmallVector.h"
 #include "control.h"
-#include "util.h"
+
+constexpr unsigned infinity = std::numeric_limits<unsigned>::max() / 2;
 
 template <bool UseMarking=false, bool Concurrent=true>
 struct BCNode {

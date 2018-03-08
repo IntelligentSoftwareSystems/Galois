@@ -29,7 +29,6 @@
 
 #include "BCNode.h"
 #include "control.h"
-#include "util.h"
 
 struct BCEdge {
   using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
