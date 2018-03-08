@@ -263,3 +263,48 @@ void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outpu
   }
 }
 
+void listProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph, char* outputFile) {
+  Graph queryGraph;
+  queryGraph.allocateFrom(6, 10);
+  queryGraph.constructNodes();
+
+  queryGraph.getData(0).label = dataGraph->nodeIDs["netflow"];
+  queryGraph.getData(0).id = 0;
+  queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeIDs["read"], 0));
+  queryGraph.fixEndEdge(0, 1);
+
+  queryGraph.getData(1).label = dataGraph->nodeIDs["process"];
+  queryGraph.getData(1).id = 1;
+  queryGraph.constructEdge(1, 0, EdgeData(dataGraph->edgeIDs["read"], 0));
+  queryGraph.constructEdge(2, 2, EdgeData(dataGraph->edgeIDs["write"], 1));
+  queryGraph.fixEndEdge(1, 3);
+
+  queryGraph.getData(2).label = dataGraph->nodeIDs["file"];
+  queryGraph.getData(2).id = 2;
+  queryGraph.constructEdge(3, 1, EdgeData(dataGraph->edgeIDs["write"], 1));
+  queryGraph.constructEdge(4, 3, EdgeData(dataGraph->edgeIDs["read"], 2));
+  queryGraph.fixEndEdge(2, 5);
+
+  queryGraph.getData(3).label = dataGraph->nodeIDs["process"];
+  queryGraph.getData(3).id = 3;
+  queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeIDs["read"], 2));
+  queryGraph.constructEdge(6, 4, EdgeData(dataGraph->edgeIDs["write"], 3));
+  queryGraph.fixEndEdge(3, 7);
+
+  queryGraph.getData(4).label = dataGraph->nodeIDs["file"];
+  queryGraph.getData(4).id = 4;
+  queryGraph.constructEdge(7, 3, EdgeData(dataGraph->edgeIDs["write"], 3));
+  queryGraph.constructEdge(8, 5, EdgeData(dataGraph->edgeIDs["execute"], 4));
+  queryGraph.fixEndEdge(4, 9);
+
+  queryGraph.getData(5).label = dataGraph->nodeIDs["process"];
+  queryGraph.getData(5).id = 5;
+  queryGraph.constructEdge(9, 4, EdgeData(dataGraph->edgeIDs["execute"], 4));
+  queryGraph.fixEndEdge(5, 10);
+
+  runGraphSimulation(queryGraph, dataGraph->graph);
+  if (outputFile != NULL) {
+    reportMatchedNodes(*dataGraph, outputFile);
+  }
+}
+
