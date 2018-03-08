@@ -332,13 +332,12 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       if (transpose && (numNodes > 0)) {
         base_DistGraph::graph.transpose();
         base_DistGraph::transposed = true;
-      } else {
-        // else because transpose will find thread ranges for you
-        galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
-        Tthread_ranges.start();
-        base_DistGraph::determineThreadRanges(prefixSumOfEdges);
-        Tthread_ranges.stop();
-      }
+      } 
+
+      galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+      Tthread_ranges.start();
+      base_DistGraph::determineThreadRanges(prefixSumOfEdges);
+      Tthread_ranges.stop();
 
       base_DistGraph::determineThreadRangesMaster();
       base_DistGraph::determineThreadRangesWithEdges();

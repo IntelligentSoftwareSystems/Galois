@@ -283,21 +283,10 @@ class DistGraph_edgeCut
 
       fill_mirrorNodes(base_DistGraph::mirrorNodes);
 
-      // !transpose because tranpose finds thread ranges for you
-      if (!transpose) {
-        galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", 
-                                                  GRNAME);
-
-        Tthread_ranges.start();
-
-        base_DistGraph::determineThreadRanges(prefixSumOfEdges);
-
-        // experimental test of new thread ranges
-        //base_DistGraph::determine_thread_ranges(0, _numNodes, 
-        //                              base_DistGraph::graph.getThreadRangesVector());
-
-        Tthread_ranges.stop();
-      }
+      galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+      Tthread_ranges.start();
+      base_DistGraph::determineThreadRanges(prefixSumOfEdges);
+      Tthread_ranges.stop();
 
       // find ranges for master + nodes with edges
       base_DistGraph::determineThreadRangesMaster();
