@@ -20,7 +20,7 @@
  *
  * Asynchrounous betweeness-centrality. 
  *
- * @author Dimitrios Prountzos <dprountz@cs.utexas.edu> (Main code writer)
+ * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
@@ -29,13 +29,14 @@
 #include "Lonestar/BoilerPlate.h"
 #include "galois/ConditionalReduction.h"
 
-#include <boost/tuple/tuple.hpp>
+#include "galois/graphs/BufferedGraph.h"
+#include "galois/graphs/B_LC_CSR_Graph.h"
+#include "galois/Bag.h"
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "BCNode.h"
+#include "BCEdge.h"
 
-#include "BCGraph.h"
+#include <iomanip>
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -52,22 +53,29 @@ static cll::opt<unsigned int> startNode("startNode",
                                         cll::desc("Node to start search from"),
                                         cll::init(0));
 
+static cll::opt<unsigned int> numOfSources("numOfSources", 
+                                        cll::desc("Number of sources to compute"
+                                                  " BC on"),
+                                        cll::init(0));
+
 static cll::opt<bool> generateCert("generateCertificate",
                                    cll::desc("Prints certificate at end of "
                                              "execution"),
                                    cll::init(false));
 // TODO better description
-static cll::opt<bool> useNodeBased("useNodeBased",
-                                   cll::desc("Use node based execution"),
-                                   cll::init(true));
+//static cll::opt<bool> useNodeBased("useNodeBased",
+//                                   cll::desc("Use node based execution"),
+//                                   cll::init(true));
 
-//#define INLINE_US
+using Graph = galois::graphs::B_LC_CSR_Graph<BCNode<BC_USE_MARKING, 
+                                                    BC_CONCURRENT>, 
+                                             BCEdge, false, true>;
+using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
 
 struct BetweenessCentralityAsync {
-  BCGraph& graph;
-  BCNode<>* currSrcNode;
+  Graph& graph;
 
-  BetweenessCentralityAsync(BCGraph& _graph) : graph(_graph) { }
+  BetweenessCentralityAsync(Graph& _graph) : graph(_graph) { }
   
   using Counter = 
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_ACTIONS>;
@@ -86,269 +94,186 @@ struct BetweenessCentralityAsync {
   using LeafCounter = 
     ConditionalAccumulator<galois::GAccumulator<unsigned long>, BC_COUNT_LEAVES>;
   LeafCounter leafCount;
+
+  void correctNode(uint32_t dstID, BCEdge& ed) {
+    NodeType& dstData = graph.getData(dstID);
+
+    // loop through in edges
+    for (auto e : graph.in_edges(dstID)) {
+      BCEdge& inEdgeData = graph.getInEdgeData(e);
+
+      uint32_t srcID = graph.getInEdgeDst(e);
+      if (srcID == dstID) continue;
+
+      NodeType& srcData = graph.getData(srcID);
+
+      // lock in right order
+      if (srcID < dstID) { 
+        srcData.lock();
+        dstData.lock();
+      } else { 
+        dstData.lock();
+        srcData.lock();
+      }
+
+      const unsigned edgeLevel = inEdgeData.level; 
+
+      // Correct Node
+      if (srcData.distance >= dstData.distance) { 
+        correctNodeP1Count.update(1);
+        dstData.unlock();
+
+        galois::gDebug("Rule 4 (", srcData.toString(), " ||| ", 
+                       dstData.toString(), ")", ed.level);
+
+        if (edgeLevel != infinity) {
+          inEdgeData.level = infinity;
+          if (edgeLevel == srcData.distance) {
+            correctNodeP2Count.update(1);
+            srcData.nsuccs--;
+          }
+        }
+        srcData.unlock();
+      } else {
+        srcData.unlock();
+        dstData.unlock();
+      }
+    }
+  }
+
+  template<typename CTXType>
+  void spAndFU(uint32_t srcID, uint32_t dstID, BCEdge& ed, CTXType& ctx) {
+    spfuCount.update(1);
+
+    NodeType& srcData = graph.getData(srcID);
+    NodeType& dstData = graph.getData(dstID);
+
+    // make dst a successor of src, src predecessor of dst
+    srcData.nsuccs++;
+    const double srcSigma = srcData.sigma;
+    srcData.unlock();
+    NodeType::predTY& dstPreds = dstData.preds;
+    bool dstPredsNotEmpty = !dstPreds.empty();
+    dstPreds.clear();
+    dstPreds.push_back(srcID);
+    dstData.distance = srcData.distance + 1;
+
+    largestNodeDist.update(dstData.distance);
+
+    dstData.nsuccs = 0; // SP
+    dstData.sigma = srcSigma; // FU
+    ed.val = srcSigma;
+    ed.level = srcData.distance;
+    dstData.unlock();
+
+    if (!dstData.isAlreadyIn()) ctx.push(dstID);
+    if (dstPredsNotEmpty) { correctNode(dstID, ed); }
+  }
+
+  template<typename CTXType>
+  void updateSigma(uint32_t srcID, uint32_t dstID, BCEdge& ed, CTXType& ctx) {
+    updateSigmaP1Count.update(1);
+
+    NodeType& srcData = graph.getData(srcID);
+    NodeType& dstData = graph.getData(dstID);
+
+    galois::gDebug("Rule 2 (", srcData.toString(), " ||| ", 
+                   dstData.toString(), ") ", ed.level);
+
+    const double srcSigma = srcData.sigma;
+    const double eval = ed.val;
+    const double diff = srcSigma - eval;
+    bool dstSigmaChanged = diff >= 0.00001;
+
+    srcData.unlock();
+    if (dstSigmaChanged) {
+      updateSigmaP2Count.update(1);
+      ed.val = srcSigma;
+      dstData.sigma += diff;
+      int nbsuccs = dstData.nsuccs;
+      dstData.unlock();
+
+      if (nbsuccs > 0) {
+        if (!dstData.isAlreadyIn()) ctx.push(dstID);
+      }
+    } else {
+      dstData.unlock();
+    }
+  }
+
+  template<typename CTXType>
+  void firstUpdate(uint32_t srcID, uint32_t dstID, BCEdge& ed, CTXType& ctx) {
+    firstUpdateCount.update(1);
+
+    NodeType& srcData = graph.getData(srcID);
+    srcData.nsuccs++;
+    const double srcSigma = srcData.sigma;
+    srcData.unlock();
+
+    NodeType& dstData = graph.getData(dstID);
+    dstData.preds.push_back(srcID);
+
+    galois::gDebug("Rule 3 (", srcData.toString(), " ||| ", dstData.toString(), 
+                   ") ", ed.level);
+
+    const double dstSigma = dstData.sigma;
+    dstData.sigma = dstSigma + srcSigma;
+    ed.val = srcSigma;
+    ed.level = srcData.distance;
+    int nbsuccs = dstData.nsuccs;
+    dstData.unlock();
+    if (nbsuccs > 0) {
+      if (!dstData.isAlreadyIn()) ctx.push(dstID);
+    }
+  }
   
-  // TODO make the lambda more readable instead of a wall of text
-  template <typename WLForEach, typename WorkListType>
+  //template <typename WLForEach, typename WorkListType>
+  template <typename WorkListType>
   void dagConstruction(WorkListType& wl) {
     galois::for_each(
       galois::iterate(wl), 
-      [&] (BCNode<>* srcD, auto& ctx) {
-        int idx = srcD->id;
-        #if USE_MARKING
-        srcD->markOut();
-        #endif
-  
-        int* outIdx = graph.outIdx;
-        int startE = outIdx[idx];
-        int endE = outIdx[idx + 1];
-        BCEdge* edgeData = graph.edgeData;
+      [&] (uint32_t srcID, auto& ctx) {
+        NodeType& srcData = graph.getData(srcID);
+        srcData.markOut();
   
         // loop through all edges
-        for (int i = startE; i < endE; i++) {
-          BCEdge& ed = edgeData[i];
-          BCNode<>* dstD = ed.dst;
+        for (auto e : graph.edges(srcID)) {
+          BCEdge& edgeData = graph.getEdgeData(e);
+          uint32_t dstID = graph.getEdgeDst(e);
+          NodeType& dstData = graph.getData(dstID);
           
-          if (srcD == dstD) continue; // ignore self loops
+          if (srcID == dstID) continue; // ignore self loops
   
           // lock in set order to prevent deadlock (lower id first)
-          if (CONCURRENT) {
-            BCNode<>* loser;
-            BCNode<>* winner;
-  
-            if (srcD < dstD) { 
-              loser = srcD; winner = dstD;
-            } else { 
-              loser = dstD; winner = srcD;
-            }
-  
-            loser->lock();
-            winner->lock();
+          // TODO run even in serial version; find way to not need to run
+          if (srcID < dstID) { 
+            srcData.lock();
+            dstData.lock();
+          } else { 
+            dstData.lock();
+            srcData.lock();
           }
   
-          const int elevel = ed.level;
-          BCNode<>* A = srcD;
-          const int ADist = srcD->distance;
-          BCNode<>* B = dstD;
-          const int BDist = dstD->distance;
+          const int elevel = edgeData.level;
+          const int ADist = srcData.distance;
+          const int BDist = dstData.distance;
   
-          // Shortest Path + First Update
           if (BDist - ADist > 1) {
-            spfuCount.update(1);
-  
-            // make B a successor of A, A predecessor of B
-            A->nsuccs++;
-            const double ASigma = A->sigma;
-            if (CONCURRENT) { A->unlock(); }
-            BCNode<>::predTY & Bpreds = B->preds;
-            bool bpredsNotEmpty = !Bpreds.empty();
-            Bpreds.clear();
-            Bpreds.push_back(A);
-            B->distance = ADist + 1;
-
-            largestNodeDist.update(B->distance);
-  
-            B->nsuccs = 0; // SP
-            B->sigma = ASigma; // FU
-            ed.val = ASigma;
-            ed.level = ADist;
-            if (CONCURRENT) { B->unlock(); }
-  
-            #if USE_MARKING          
-            if (!B->isAlreadyIn())
-            #endif
-              ctx.push(B);
-  
-            // Part of Correct Node
-            if (bpredsNotEmpty) {
-              int idx = B->id;
-              int* inIdx = graph.inIdx;
-              int* ins = graph.ins; 
-              int startInE = inIdx[idx];
-              int endInE = inIdx[idx + 1];
-  
-              // loop through in edges
-              for (int j = startInE; j < endInE; j++) {
-                BCEdge & inE = edgeData[ins[j]];
-                BCNode<> *inNbr = inE.src;
-                if (inNbr == B) continue;
-  
-                // TODO wrap in concurrent
-                // lock in right order
-                BCNode<>* aL;
-                BCNode<>* aW;
-                if (B < inNbr) { aL = B; aW = inNbr;} 
-                else { aL = inNbr; aW = B; }
-                aL->lock(); aW->lock();
-  
-                const unsigned elev = inE.level; 
-                // Correct Node
-                if (inNbr->distance >= B->distance) { 
-                  correctNodeP1Count.update(1);
-                  if (CONCURRENT) { B->unlock(); }
-  
-                  galois::gDebug("Rule 4 (", inNbr->toString(), " ||| ", 
-                                 B->toString(), ")", elevel);
-  
-                  if (elev != infinity) {
-                    inE.level = infinity;
-                    if (elev == inNbr->distance) {
-                      correctNodeP2Count.update(1);
-                      inNbr->nsuccs--;
-                    }
-                  }
-                  if (CONCURRENT) { inNbr->unlock(); }
-                } else {
-                  aL->unlock(); aW->unlock();
-                }
-              }
-            }
-          // Update Sigma
+            // Shortest Path + First Update (and Correct Node)
+            this->spAndFU(srcID, dstID, edgeData, ctx);
           } else if (elevel == ADist && BDist == ADist + 1) {
-            updateSigmaP1Count.update(1);
-            galois::gDebug("Rule 2 (", A->toString(), " ||| ", B->toString(), ") ",
-                           elevel);
-            const double ASigma = A->sigma;
-            const double eval = ed.val;
-            const double diff = ASigma - eval;
-            bool BSigmaChanged = diff >= 0.00001;
-            if (CONCURRENT) { A->unlock(); }
-            if (BSigmaChanged) {
-              updateSigmaP2Count.update(1);
-              ed.val = ASigma;
-              B->sigma += diff;
-              int nbsuccs = B->nsuccs;
-              if (CONCURRENT) { B->unlock(); }
-              if (nbsuccs > 0) {
-                  #ifdef INLINE_US
-                  int idx = B->id;
-                  int startE = outIdx[idx];
-                  int endE = outIdx[idx + 1];
-                  BCEdge * edgeData = graph.edgeData;
-                  for (int i = startE; i < endE; i++) {
-                    BCEdge & ed = edgeData[i];
-                    BCNode<> * dstD = ed.dst;
-  
-                    if (B == dstD) continue;
-  
-                    if (CONCURRENT) {
-                      BCNode<> *loser, *winner;
-                      if (B < dstD) { loser = B; winner = dstD;} 
-                      else { loser = dstD; winner = B; }
-                      loser->lock();
-                      winner->lock();
-                    }
-                    const int srcdist = B->distance;
-                    const int dstdist = dstD->distance;
-                    const int elevel = ed.level;
-                    const int BDist = srcdist;
-                    BCNode<> * C = dstD; const int CDist = dstdist;
-                    if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                      galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
-                                     B->toString(), ") ", elevel);
-                      const double BSigma = B->sigma;
-                      const double eval = ed.val;
-                      const double diff = BSigma - eval;
-                      if (CONCURRENT) { B->unlock(); }
-                      ed.val = BSigma;
-                      C->sigma += diff;
-                      int ncsuccs = C->nsuccs;
-                      if (CONCURRENT) { C->unlock(); }
-                      if (ncsuccs > 0)
-                        #if USE_MARKING
-                        if (!C->isAlreadyIn()) 
-                        #endif
-                          ctx.push(C);
-                    } else {
-                      B->unlock(); C->unlock();
-                    }
-                  }
-                #else         
-                  #if USE_MARKING
-                  if (!B->isAlreadyIn()) 
-                  #endif
-                    ctx.push(B);
-                #endif
-                }
-              } else {
-                if (CONCURRENT) { B->unlock(); }
-              }
-          // First Update not combined with Shortest Path
+            // Update Sigma
+            this->updateSigma(srcID, dstID, edgeData, ctx);
           } else if (BDist == ADist + 1 && elevel != ADist) {
-            firstUpdateCount.update(1);
-            A->nsuccs++;
-            const double ASigma = A->sigma;
-            if (CONCURRENT) { A->unlock(); }
-  
-            //if (AnotPredOfB) {
-            B->preds.push_back(A);
-            //}
-            const double BSigma = B->sigma;
-            galois::gDebug("Rule 3 (", A->toString(), " ||| ", B->toString(), 
-                           ") ", elevel);
-            B->sigma = BSigma + ASigma;
-            ed.val = ASigma;
-            ed.level = ADist;
-            int nbsuccs = B->nsuccs;
-            if (CONCURRENT) { B->unlock(); }
-            //const bool BSigmaChanged = ASigma >= 0.00001;
-            if (nbsuccs > 0 /*&& BSigmaChanged*/) {
-              #ifdef INLINE_US
-                int idx = B->id;
-                int startE = outIdx[idx];
-                int endE = outIdx[idx + 1];
-                BCEdge * edgeData = graph.edgeData;
-                for (int i = startE; i < endE; i++) {
-                  BCEdge & ed = edgeData[i];
-                  BCNode<> * dstD = ed.dst;
-  
-                  if (B == dstD) continue;
-  
-                  if (CONCURRENT) {
-                    BCNode<> *loser, *winner;
-                    if (B < dstD) { loser = B; winner = dstD;} 
-                    else { loser = dstD; winner = B; }
-                    loser->lock();
-                    winner->lock();
-                  }
-                  const int srcdist = B->distance;
-                  const int dstdist = dstD->distance;
-                  const int elevel = ed.level;
-                  const int BDist = srcdist;
-                  BCNode<> * C = dstD; const int CDist = dstdist;
-                  if (elevel == BDist && CDist == BDist + 1) { // Rule 2: BDist = ADist + 1 and elevel = ADist
-                    galois::gDebug("Rule 2 (", A->toString(), " ||| ", 
-                                   B->toString(), ") ", elevel);
-                    const double BSigma = B->sigma;
-                    const double eval = ed.val;
-                    const double diff = BSigma - eval;
-                    if (CONCURRENT) { B->unlock(); }
-                    ed.val = BSigma;
-                    C->sigma += diff;
-                    int ncsuccs = C->nsuccs;
-                    if (CONCURRENT) { C->unlock(); }
-                    if (ncsuccs > 0)
-                      #if USE_MARKING
-                      if (!C->isAlreadyIn()) 
-                      #endif
-                        ctx.push(C);
-                  } else {
-                    B->unlock(); C->unlock();
-                  }
-                }
-              #else         
-              #if USE_MARKING
-              if (!B->isAlreadyIn()) 
-              #endif
-                ctx.push(B);
-              #endif
-            }
+            // First Update not combined with Shortest Path
+            this->firstUpdate(srcID, dstID, edgeData, ctx);
           } else { // No Action
             noActionCount.update(1);
-            A->unlock(); B->unlock();
+            srcData.unlock(); dstData.unlock();
           }
         }
-      },      
-      galois::wl<WLForEach>()
+      }
+      //,galois::wl<WLForEach>()
     );
   }
   
@@ -356,99 +281,73 @@ struct BetweenessCentralityAsync {
   void dependencyBackProp(WorkListType& wl) {
     galois::for_each(
       galois::iterate(wl),
-      [&] (BCNode<>* A, auto& ctx) {
-        if (CONCURRENT) { A->lock(); }
+      [&] (uint32_t srcID, auto& ctx) {
+        NodeType& srcData = graph.getData(srcID);
+        srcData.lock();
   
-        if (A->nsuccs == 0) {
-          const double Adelta = A->delta;
-          A->bc += Adelta;
+        if (srcData.nsuccs == 0) {
+          const double srcDelta = srcData.delta;
+          srcData.bc += srcDelta;
   
-          if (CONCURRENT) { A->unlock(); }
+          srcData.unlock();
   
-          BCNode<>::predTY& Apreds = A->preds;
-          int sz = Apreds.size();
+          NodeType::predTY& srcPreds = srcData.preds;
   
-          // loop through A's predecessors
-          for (int i = 0; i < sz; ++i) {
-            BCNode<>* pd = Apreds[i];
-            const double term = pd->sigma * (1.0 + Adelta) / A->sigma; 
-            if (CONCURRENT) { pd->lock(); }
-            pd->delta += term;
-            const int prevPdNsuccs = pd->nsuccs;
-            pd->nsuccs--;
+          // loop through src's predecessors
+          for (unsigned i = 0; i < srcPreds.size(); i++) {
+            uint32_t predID = srcPreds[i];
+            NodeType& predData = graph.getData(predID);
+
+            const double term = predData.sigma * (1.0 + srcDelta) / 
+                                srcData.sigma; 
+            predData.lock();
+            predData.delta += term;
+            const int prevPdNsuccs = predData.nsuccs;
+            predData.nsuccs--;
   
             if (prevPdNsuccs == 1) {
-              if (CONCURRENT) { pd->unlock(); }
-              ctx.push(pd);
+              predData.unlock();
+              ctx.push(predID);
             } else {
-              if (CONCURRENT) { pd->unlock(); }
+              predData.unlock();
             }
           }
-          A->reset();
-          graph.resetOutEdges(A);
+          srcData.reset();
+
+          // reset edge data
+          for (auto e : graph.edges(srcID)) {
+            graph.getEdgeData(e).reset();
+          }
         } else {
-          galois::gDebug("Skipped ", A->toString());
-          if (CONCURRENT) { A->unlock(); }
+          galois::gDebug("Skipped ", srcData.toString());
+          srcData.unlock();
         }
       }
     );
   }
   
-  std::vector<std::pair<int, int>> nodeArrayRanges;
-  std::vector<std::pair<int, int>> edgeArrayRanges;
-  std::vector<int> workChunks;
-  void createCleanupChunks(int nnodes, int nedges, int numThreads) {
-    int nChunkSize = nnodes / numThreads;
-    int eChunkSize = nedges / (numThreads);
-  
-    galois::gDebug("nChunkSize: ", nChunkSize, " eChunkSize: ", eChunkSize, 
-                   " nnodes: ", nnodes, " nedges: ", nedges, " numThreads: ", 
-                   numThreads);
-  
-    for (int i=0; i<numThreads; ++i) {
-      int start = nChunkSize * i;
-      int end = -1;
-      if (i==numThreads-1)
-        end = std::max(start+nChunkSize, nnodes);
-      else
-        end = std::min(start+nChunkSize, nnodes);
-      galois::gDebug("Node cleanup chunk: ", i, " start: ", start, " end: ", end);
-      nodeArrayRanges.push_back(std::make_pair(start, end));
-      start = eChunkSize * i;
-      if (i==numThreads-1)
-        end = std::max(start+eChunkSize, nedges);
-      else
-        end = std::min(start+eChunkSize, nedges);
-      edgeArrayRanges.push_back(std::make_pair(start, end));
-      galois::gDebug("Edge cleanup chunk: ", i, " start: ", start, " end: ", end);
-      workChunks.push_back(i);
-    }
-  }
-  
-  galois::InsertBag<BCNode<>*>* fringewl;
-  galois::substrate::CacheLineStorage<BCNode<>>*gnodes;
+  galois::InsertBag<uint32_t>* fringewl;
   
   void findLeaves(unsigned nnodes) {
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto i) {
-        BCNode<>* n = &(gnodes[i].data);
-        if (n->nsuccs == 0 && n->distance < infinity) {
+        NodeType& n = graph.getData(i);
+
+        if (n.nsuccs == 0 && n.distance < infinity) {
           leafCount.update(1);
-              
-          fringewl->push(n);
+          fringewl->push(i);
         }
       }
     );
   }
-
 };
 
-struct NodeIndexer : std::binary_function<BCNode<>*, int, int> {
-  int operator() (const BCNode<> *val) const {
-    return val->distance;
-  }
-};
+//struct NodeIndexer : std::binary_function<NodeType*, int, int> {
+//  int operator() (const NodeType *val) const {
+//    return val->distance;
+//  }
+//};
 
 static const char* name = "Betweenness Centrality";
 static const char* desc = "Computes betwenness centrality in an unweighted "
@@ -458,30 +357,48 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, NULL);
 
-  if (CONCURRENT) {
-    galois::gInfo("Running in concurrent mode with ", numThreads);
+  if (BC_CONCURRENT) {
+    galois::gInfo("Running in concurrent mode with ", numThreads, " threads");
   } else {
     galois::gInfo("Running in serial mode");
   }
 
-  BCGraph graph(filename.c_str());
+  Graph bcGraph;
+  galois::graphs::BufferedGraph<void> fileReader;
+  fileReader.loadGraph(filename);
+  bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
 
-  BetweenessCentralityAsync bcExecutor(graph);
+  galois::do_all(
+    galois::iterate((uint32_t)0, fileReader.size()),
+    [&] (uint32_t i) {
+      auto b = fileReader.edgeBegin(i);
+      auto e = fileReader.edgeEnd(i);
 
-  unsigned nnodes = graph.size();
-  unsigned nedges = graph.getNedges();
+      bcGraph.fixEndEdge(i, *e);
+
+      while (b < e) {
+        bcGraph.constructEdge(*b, fileReader.edgeDestination(*b));
+        b++;
+      }
+    }
+  );
+  bcGraph.constructIncomingEdges();
+
+  //for (auto k : bcGraph.in_edges(0)) {
+  //  BCEdge& asdf = bcGraph.getInEdgeData(k);
+  //  asdf.reset();
+  //  printf("%s\n", asdf.toString().c_str());
+  //}
+
+  //exit(0);
+
+  //BCGraph graph(filename.c_str());
+
+  BetweenessCentralityAsync bcExecutor(bcGraph);
+
+  unsigned nnodes = bcGraph.size();
+  uint64_t nedges = bcGraph.sizeEdges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
-
-  bcExecutor.createCleanupChunks(nnodes, nedges, numThreads);
-  
-  galois::gInfo("Num threads is ", numThreads);
-
-  bcExecutor.gnodes = graph.getNodes();
-  
-  galois::StatTimer initCapTimer("InitCapacities");
-  initCapTimer.start();
-  graph.fixNodePredsCapacities();
-  initCapTimer.stop();
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();
@@ -494,62 +411,63 @@ int main(int argc, char** argv) {
 
   const int chunksize = 8;
   galois::gInfo("Using chunk size : ", chunksize);
-  typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
-                           galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
-  galois::InsertBag<BCNode<>*> wl2;
-
-  galois::InsertBag<BCNode<>*> wl4;
+  //typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
+  //                         galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
+  galois::InsertBag<uint32_t> wl2;
+  galois::InsertBag<uint32_t> wl4;
   bcExecutor.fringewl = &wl4;
 
   galois::reportPageAlloc("MemAllocPre");
   galois::preAlloc(galois::getActiveThreads() * nnodes / 1650);
   galois::reportPageAlloc("MemAllocMid");
 
-  unsigned stepCnt = 0; // number of sources done
 
   galois::StatTimer executionTimer;
-  galois::StatTimer forwardPassTimer("ForwardPass");
-  galois::StatTimer leafFinderTimer("LeafFind");
-  galois::StatTimer backwardPassTimer("BackwardPass");
-  galois::StatTimer cleanupTimer("CleanupTimer");
+  galois::StatTimer forwardPassTimer("ForwardPass", "BC");
+  galois::StatTimer leafFinderTimer("LeafFind", "BC");
+  galois::StatTimer backwardPassTimer("BackwardPass", "BC");
+  galois::StatTimer cleanupTimer("CleanupTimer", "BC");
+
+  // reset everything in preparation for run
+  // TODO refactor
+  galois::do_all(
+    galois::iterate(0u, nnodes),
+    [&] (auto i) {
+      bcGraph.getData(i).reset();
+    }
+  );
+
+  galois::do_all(
+    galois::iterate(0ul, nedges),
+    [&] (auto i) {
+      bcGraph.getEdgeData(i).reset();
+    }
+  );
+
+  if (numOfSources == 0) {
+    numOfSources = nnodes;
+  }
 
   executionTimer.start();
-  for (unsigned i = startNode; i < nnodes; ++i) {
-    BCNode<>* active = &(bcExecutor.gnodes[i].data);
-    bcExecutor.currSrcNode = active;
+  for (uint32_t i = startNode; i < numOfSources; ++i) {
     // ignore nodes with no neighbors
-    int nnbrs = graph.outNeighborsSize(active);
-    if (nnbrs == 0) {
+    if (!std::distance(bcGraph.edge_begin(i), bcGraph.edge_end(i))) {
       continue;
     }
 
-    galois::gInfo("Source is ", active->toString());
-    galois::do_all(
-      galois::iterate(0u, nnodes),
-      [&] (auto j) {
-        if (j != i) {
-          (bcExecutor.gnodes[j].data).reset();
-        }
-      }
-    );
-    
-    stepCnt++;
-    //if (stepCnt >= 2) break;  // ie only do 1 source
-
-    //std::list<BCEdge*> wl;
-    std::vector<BCNode<>*>  wl;
-    wl2.push_back(active);
-    active->initAsSource();
-    galois::gInfo("Source is ", active->toString());
-    //graph.checkClearEdges();
-//__itt_resume();
+    std::vector<uint32_t> wl;
+    wl2.push_back(i);
+    NodeType& active = bcGraph.getData(i);
+    active.initAsSource();
+    galois::gDebug("Source is ", i, active.toString(), "\n");
     forwardPassTimer.start();
 
-    bcExecutor.dagConstruction<wl2ty>(wl2);
+    //bcExecutor.dagConstruction<wl2ty>(wl2);
+    bcExecutor.dagConstruction(wl2);
     wl2.clear();
 
     forwardPassTimer.stop();
-    if (DOCHECKS) graph.checkGraph(active);
+    //if (DOCHECKS) graph.checkGraph(active);
 
     leafFinderTimer.start();
     bcExecutor.leafCount.reset();
@@ -561,20 +479,32 @@ int main(int argc, char** argv) {
     }
 
     backwardPassTimer.start();
-    double backupSrcBC = bcExecutor.currSrcNode->bc;
+    double backupSrcBC = active.bc;
     bcExecutor.dependencyBackProp(wl4);
 
-    if (bcExecutor.currSrcNode->bc && backupSrcBC == 0) {
-      galois::gPrint(bcExecutor.currSrcNode->id, " ", bcExecutor.currSrcNode->bc, "\n");
-    }
-    bcExecutor.currSrcNode->bc = backupSrcBC; // current source BC should not get updated
+    active.bc = backupSrcBC; // current source BC should not get updated
     backwardPassTimer.stop();
     wl4.clear();
-    if (DOCHECKS) graph.checkSteadyState2();
-    //graph.printGraph();
+    //if (DOCHECKS) graph.checkSteadyState2();
 
     cleanupTimer.start();
-    graph.cleanupData();
+
+    // TODO refactor
+    galois::do_all(
+      galois::iterate(0u, nnodes),
+      [&] (auto i) {
+        bcGraph.getData(i).reset();
+      }
+    );
+
+    galois::do_all(
+      galois::iterate(0ul, nedges),
+      [&] (auto i) {
+        bcGraph.getEdgeData(i).reset();
+      }
+    );
+
+    //graph.cleanupData(); TODO
     cleanupTimer.stop();
   }
   executionTimer.stop();
@@ -600,12 +530,21 @@ int main(int argc, char** argv) {
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
-                     std::setprecision(6), bcExecutor.gnodes[i].data.bc, "\n");
+                     std::setprecision(6), bcGraph.getData(i).bc, "\n");
     }
   }
 
   if (generateCert) {
-    graph.printAllBCs(numThreads, "certificate_");
+    std::cerr << "Writting out bc values...\n";
+    std::stringstream outfname;
+    outfname << "certificate" << "_" << numThreads << ".txt";
+    std::string fname = outfname.str();
+    std::ofstream outfile(fname.c_str());
+    for (unsigned i=0; i<nnodes; ++i) {
+      outfile << i << " " << std::setiosflags(std::ios::fixed) 
+              << std::setprecision(9) << bcGraph.getData(i).bc << "\n";
+    }
+    outfile.close();
   }
 
   return 0;

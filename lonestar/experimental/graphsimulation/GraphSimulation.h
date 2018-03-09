@@ -46,6 +46,7 @@ struct Node {
 struct EdgeData {
   uint32_t label; // maximum  of 32 edge labels
   uint64_t timestamp; // range of timestamp is limited
+  EdgeData(uint32_t l, uint64_t t) : label(l), timestamp(t) {}
 };
 
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
@@ -57,13 +58,19 @@ void reportGraphSimulation(Graph& queryGraph, Graph& dataGraph, std::string outp
 struct AttributedGraph {
   Graph graph;
   std::vector<std::string> nodeLabels;
+  std::map<std::string, uint32_t> nodeIDs;
   std::vector<std::string> edgeLabels;
-  galois::LargeArray<std::string> nodeNames;
+  std::map<std::string, uint32_t> edgeIDs;
+  std::vector<std::string> nodeNames; // cannot use LargeArray because serialize does not do deep-copy
   // custom attributes
-  std::map<std::string, galois::LargeArray<std::string>> nodeAttributes;
-  std::map<std::string, galois::LargeArray<std::string>> edgeAttributes;
+  std::map<std::string, std::vector<std::string>> nodeAttributes;
+  std::map<std::string, std::vector<std::string>> edgeAttributes;
 };
 
 unsigned rightmostSetBitPos(uint32_t n);
 void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGraph, std::string outputFile);
+
+void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
+void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
+void reportMatchedNodes(AttributedGraph &graph, std::string outputFile);
 

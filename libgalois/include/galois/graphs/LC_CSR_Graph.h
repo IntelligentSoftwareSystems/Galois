@@ -21,13 +21,15 @@
  *
  * @section Copyright
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights
+ * Copyright (C) 2018, The University of Texas at Austin. All rights
  * reserved.
  *
  * @section Description
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
@@ -35,9 +37,8 @@
 #define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
 #include "galois/Galois.h"
-#include "galois/LargeArray.h"
-#include "galois/graphs/FileGraph.h"
 #include "galois/graphs/Details.h"
+#include "galois/graphs/FileGraph.h"
 #include "galois/graphs/GraphHelpers.h"
 
 #include <type_traits>
@@ -133,8 +134,8 @@ class LC_CSR_Graph :
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
   typedef typename NodeInfoTypes::reference node_data_reference;
-  typedef boost::counting_iterator<typename EdgeIndData::value_type> edge_iterator;
-  typedef boost::counting_iterator<typename EdgeDst::value_type> iterator;
+  using edge_iterator = boost::counting_iterator<typename EdgeIndData::value_type>;
+  using iterator = boost::counting_iterator<typename EdgeDst::value_type>;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
@@ -147,13 +148,6 @@ class LC_CSR_Graph :
 
   uint64_t numNodes;
   uint64_t numEdges;
-
-  // used to track division of nodes among threads; for numa aware allocation
-  // + division of work among threads during do_all
-  std::vector<uint32_t> threadRanges;
-  // used to track division of edges among threads; mainly for numa aware
-  // allocation of edges
-  std::vector<uint64_t> threadRangesEdge;
 
   typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
 
@@ -320,14 +314,6 @@ class LC_CSR_Graph :
    */
   uint64_t operator[](uint64_t n) {
     return *(edge_end(n));
-  }
-
-  /**
-   * Clear thread ranges.
-   */
-  void clearRanges() {
-    threadRanges.clear();
-    threadRangesEdge.clear();
   }
 
   template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
@@ -510,281 +496,6 @@ class LC_CSR_Graph :
       galois::steal());
   }
 
-  typedef std::pair<iterator, iterator> NodeRange;
-  typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
-  typedef std::pair<NodeRange, EdgeRange> GraphRange;
-
-  /**
-   * Returns 2 ranges (one for nodes, one for edges) for a particular division.
-   * The ranges specify the nodes/edges that a division is responsible for. The
-   * function attempts to split them evenly among threads given some kind of
-   * weighting
-   *
-   * @param nodeWeight weight to give to a node in division
-   * @param edgeWeight weight to give to an edge in division
-   * @param id Division number you want the ranges for
-   * @param total Total number of divisions
-   * @param edgePrefixSum a prefix sum of edges of the graph
-   */
-  template <typename VectorTy>
-  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id,
-                    size_t total, VectorTy& edgePrefixSum)
-      -> GraphRange {
-    return
-      galois::graphs::divideNodesBinarySearch<VectorTy, uint32_t>(
-        numNodes, numEdges, nodeWeight, edgeWeight, id, total, edgePrefixSum);
-  }
-
-  /**
-   * Returns 2 ranges (one for nodes, one for edges) for a particular division.
-   * The ranges specify the nodes/edges that a division is responsible for. The
-   * function attempts to split them evenly among threads given some kind of
-   * weighting.
-   *
-   * Differs from above version as no prefix sum is passed in; however, you
-   * can use the graph itself as a prefix sum array. Additionally, this
-   * takes into account a node and edge offset since passing in the entire
-   * graph as the prefix sum doesn't work if you only want to divide
-   * a particular portion.
-   *
-   * @param nodeWeight weight to give to a node in division
-   * @param edgeWeight weight to give to an edge in division
-   * @param id Division number you want the ranges for
-   * @param total Total number of divisions
-   * @param nodesInRange Number of nodes in the range you want to divide
-   * up (specified by node offset)
-   * @param edgeInRange Number of edges in range you want to divide up
-   * (specified by node offset)
-   * @param nodeOffset Offset to the first node in the range you want
-   * to divide up
-   * @param edgeOffset Offset to the first edge in the range you want
-   * to divide up
-   */
-  auto divideByNode(size_t nodeWeight, size_t edgeWeight, size_t id,
-                    size_t total, uint32_t nodesInRange, uint64_t edgesInRange,
-                    uint32_t nodeOffset, uint64_t edgeOffset)
-      -> GraphRange {
-    std::vector<unsigned int> dummyScaleFactor;
-    return
-      galois::graphs::divideNodesBinarySearch<LC_CSR_Graph, uint32_t>(
-        nodesInRange, edgesInRange, nodeWeight, edgeWeight, id, total, *this,
-        dummyScaleFactor, edgeOffset, nodeOffset);
-  }
-
-  /**
-   * Returns the thread ranges array that specifies division of nodes among
-   * threads
-   *
-   * @returns An array of uint32_t that specifies which thread gets which nodes.
-   */
-  const uint32_t* getThreadRanges() const {
-    if (threadRanges.size() == 0) return nullptr;
-    return threadRanges.data();
-  }
-
-  /**
-   * Returns the thread ranges vector that specifies division of nodes among
-   * threads
-   *
-   * @returns An vector of uint32_t that specifies which thread gets which
-   * nodes.
-   */
-  std::vector<uint32_t>& getThreadRangesVector() {
-    return threadRanges;
-  }
-
-  /**
-   * Returns the reference to the edgeIndData LargeArray
-   *
-   * @returns reference to LargeArray edgeIndData
-   */
-  EdgeIndData& getEdgeInDataArray() {
-    return edgeIndData;
-  }
-
-
-  /**
-   * Helper function used by determineThreadRanges that consists of the main
-   * loop over all threads and calls to divide by node to determine the
-   * division of nodes to threads.
-   *
-   * Saves the ranges to an argument vector provided by the caller.
-   *
-   * @param beginNode Beginning of range
-   * @param endNode End of range, non-inclusive
-   * @param returnRanges Vector to store thread offsets for ranges in
-   * @param nodeAlpha The higher the number, the more weight nodes have in
-   * determining division of nodes (edges have weight 1).
-   */
-  void determineThreadRangesThreadLoop(uint32_t beginNode, uint32_t endNode,
-                                     std::vector<uint32_t>& returnRanges,
-                                     uint32_t nodeAlpha) {
-    uint32_t numNodesInRange = endNode - beginNode;
-    uint64_t numEdgesInRange = edge_end(endNode - 1) - edge_begin(beginNode);
-    uint32_t numThreads = galois::runtime::activeThreads;
-    uint64_t edgeOffset = *edge_begin(beginNode);
-
-    returnRanges[0] = beginNode;
-    for (uint32_t i = 0; i < numThreads; i++) {
-      // determine division for thread i
-      auto nodeEdgeSplits = divideByNode(nodeAlpha, 1, i, numThreads, 
-                                         numNodesInRange, numEdgesInRange, 
-                                         beginNode, edgeOffset);
-
-      auto nodeSplits = nodeEdgeSplits.first;
-
-      // i.e. if there are actually assigned nodes
-      if (nodeSplits.first != nodeSplits.second) {
-        if (i != 0) {
-          assert(returnRanges[i] == *(nodeSplits.first));
-        } else { // i == 0
-          assert(returnRanges[i] == beginNode);
-        }
-        returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
-      } else {
-        // thread assinged no nodes
-        returnRanges[i + 1] = returnRanges[i];
-      }
-
-      galois::gDebug("SaveVector: Thread ", i, " gets nodes ", returnRanges[i],
-                     " to ", returnRanges[i+1], ", num edges is ",
-                     edge_end(returnRanges[i + 1] - 1) -
-                         raw_begin(returnRanges[i]));
-    }
-  }
-
-  /**
-   * Determines thread ranges for a given range of nodes and returns it as
-   * an offset vector in the passed in vector. (thread ranges = assigned
-   * nodes that a thread should work on)
-   *
-   * Checks for corner cases, then calls the main loop function.
-   *
-   * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
-   * the graph is already constructed.
-   *
-   * @param beginNode Beginning of range
-   * @param endNode End of range, non-inclusive
-   * @param returnRanges Vector to store thread offsets for ranges in
-   * @param nodeAlpha The higher the number, the more weight nodes have in
-   * determining division of nodes (edges have weight 1).
-   */
-  void determineThreadRanges(uint32_t beginNode, uint32_t endNode,
-                             std::vector<uint32_t>& returnRanges,
-                             uint32_t nodeAlpha=0) {
-    uint32_t numThreads = galois::runtime::activeThreads;
-    uint32_t total_nodes = endNode - beginNode;
-
-    returnRanges.resize(numThreads + 1);
-
-    // check corner cases
-    // no nodes = assign nothing to all threads
-    if (beginNode == endNode) {
-      returnRanges[0] = beginNode;
-      for (uint32_t i = 0; i < numThreads; i++) {
-        returnRanges[i+1] = beginNode;
-      }
-      return;
-    }
-
-    // single thread case; 1 thread gets all
-    if (numThreads == 1) {
-      returnRanges[0] = beginNode;
-      returnRanges[1] = endNode;
-      return;
-    // more threads than nodes
-    } else if (numThreads > total_nodes) {
-      uint32_t current_node = beginNode;
-      returnRanges[0] = current_node;
-      // 1 node for threads until out of threads
-      for (uint32_t i = 0; i < total_nodes; i++) {
-        returnRanges[i+1] = ++current_node;
-      }
-      // deal with remainder threads; they get nothing
-      for (uint32_t i = total_nodes; i < numThreads; i++) {
-        returnRanges[i+1] = total_nodes;
-      }
-      return;
-    }
-
-    // no corner cases: onto main loop over nodes that determines
-    // node ranges
-    determineThreadRangesThreadLoop(beginNode, endNode, returnRanges, nodeAlpha);
-
-    #ifndef NDEBUG
-    // sanity checks
-    assert(returnRanges[0] == beginNode &&
-           "return ranges begin not the begin node");
-    assert(returnRanges[numThreads] == endNode &&
-           "return ranges end not end node");
-
-    for (uint32_t i = 1; i < numThreads; i++) {
-      assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
-      assert(returnRanges[i] >= returnRanges[i-1]);
-    }
-    #endif
-  }
-
-  /**
-   * Uses the divideByNode function (which is binary search based) to
-   * divide nodes/edges among threads.
-   *
-   * @param edgePrefixSum A prefix sum of edges
-   */
-  template <typename VectorTy>
-  void determineThreadRangesByNode(VectorTy& edgePrefixSum) {
-    uint32_t numThreads = galois::runtime::activeThreads;
-    assert(numThreads > 0);
-
-    if (threadRanges.size() != 0) {
-      galois::gDebug("Warning: Thread ranges already specified "
-                     "(in detThreadRangesByNode)");
-    }
-
-    if (threadRangesEdge.size() != 0) {
-      galois::gDebug("Warning: Thread ranges edge already specified "
-                     "(in detThreadRangesByNode)");
-    }
-
-    clearRanges();
-    threadRanges.resize(numThreads + 1);
-    threadRangesEdge.resize(numThreads + 1);
-
-    threadRanges[0] = 0;
-    threadRangesEdge[0] = 0;
-
-    for (uint32_t i = 0; i < numThreads; i++) {
-      auto nodeEdgeSplits = divideByNode(0, 1, i, numThreads, edgePrefixSum);
-      auto nodeSplits = nodeEdgeSplits.first;
-      auto edgeSplits = nodeEdgeSplits.second;
-
-      // i.e. if there are actually assigned nodes
-      if (nodeSplits.first != nodeSplits.second) {
-        if (i != 0) {
-          assert(threadRanges[i] == *(nodeSplits.first));
-          assert(threadRangesEdge[i] == *(edgeSplits.first));
-        } else { // i == 0
-          assert(threadRanges[i] == 0);
-          assert(threadRangesEdge[i] == 0);
-        }
-
-        threadRanges[i + 1] = *(nodeSplits.second);
-        threadRangesEdge[i + 1] = *(edgeSplits.second);
-      } else {
-        // thread assinged no nodes
-        assert(edgeSplits.first == edgeSplits.second);
-        threadRanges[i + 1] = threadRanges[i];
-        threadRangesEdge[i + 1] = threadRangesEdge[i];
-      }
-
-      galois::gDebug("Thread ", i, " gets nodes ", threadRanges[i], " to ",
-                     threadRanges[i+1]);
-      galois::gDebug("Thread ", i, " gets edges ", threadRangesEdge[i], " to ",
-                     threadRangesEdge[i+1]);
-    }
-  }
-
-
   template <typename F>
   ptrdiff_t partition_neighbors(GraphNode N, const F& func) {
     auto beg = &edgeDst[*raw_begin (N)];
@@ -828,34 +539,6 @@ class LC_CSR_Graph :
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-  }
-
-  /**
-   * A version of allocateFrom that takes into account node/edge distribution
-   * and tries to make the allocation of memory more numa aware.
-   * Based on divideByNode in Lonestar.
-   *
-   * @param nNodes Number to allocate for node data
-   * @param nEdges Number to allocate for edge data
-   * @param edgePrefixSum Vector with prefix sum of edges.
-   */
-  void allocateFromByNode(uint32_t nNodes, uint64_t nEdges,
-                          std::vector<uint64_t> edgePrefixSum) {
-    numNodes = nNodes;
-    numEdges = nEdges;
-
-    // gets both threadRanges + threadRangesEdge
-    determineThreadRangesByNode(edgePrefixSum);
-
-    // node based alloc
-    nodeData.allocateSpecified(numNodes, threadRanges);
-    edgeIndData.allocateSpecified(numNodes, threadRanges);
-
-    // edge based alloc
-    edgeDst.allocateSpecified(numEdges, threadRangesEdge);
-    edgeData.allocateSpecified(numEdges, threadRangesEdge);
-
-    this->outOfLineAllocateSpecified(numNodes, threadRanges);
   }
 
   void constructNodes() {
@@ -906,7 +589,7 @@ class LC_CSR_Graph :
    * Perform an in-memory transpose of the graph, replacing the original
    * CSR to CSC
    */
-  void transpose(const char *regionName = NULL, bool reallocate = false) {
+  void transpose(const char *regionName = NULL) {
     galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE", regionName); timer.start();
 
     EdgeDst edgeDst_old;
@@ -944,24 +627,6 @@ class LC_CSR_Graph :
       edgeIndData_temp[n] += edgeIndData_temp[n-1];
     }
 
-    // recalculate thread ranges for nodes and edges
-    clearRanges();
-    determineThreadRangesByNode(edgeIndData_temp);
-
-    // reallocate nodeData
-    if (reallocate) {
-      nodeData.destroy();
-      nodeData.deallocate();
-      nodeData.allocateSpecified(numNodes, threadRanges);
-    }
-
-    // reallocate edgeIndData
-    if (reallocate) {
-      edgeIndData.destroy();
-      edgeIndData.deallocate();
-      edgeIndData.allocateSpecified(numNodes, threadRanges);
-    }
-
     // copy over the new tranposed edge index data
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
                      edgeIndData[n] = edgeIndData_temp[n];
@@ -978,13 +643,6 @@ class LC_CSR_Graph :
                      },
                      galois::no_stats(),
                      galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
-    }
-
-    // reallocate edgeDst
-    if (reallocate) {
-      edgeDst.destroy();
-      edgeDst.deallocate();
-      edgeDst.allocateSpecified(numEdges, threadRangesEdge);
     }
 
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t src) {
@@ -1007,13 +665,6 @@ class LC_CSR_Graph :
                    },
                    galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEDST"));
-
-    // reallocate edgeData
-    if (reallocate) {
-      edgeData.destroy();
-      edgeData.deallocate();
-      edgeData.allocateSpecified(numEdges, threadRangesEdge);
-    }
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
@@ -1067,6 +718,18 @@ class LC_CSR_Graph :
         edgeDst[*nn] = graph.getEdgeDst(nn);
       }
     }
+  }
+
+  /**
+   * Returns the reference to the edgeIndData LargeArray
+   *
+   * DANGER: This shouldn't be exposed; it's for the use of checkpointing in
+   * DistGraph. FIXME find safer way to do it.
+   *
+   * @returns reference to LargeArray edgeIndData
+   */
+  EdgeIndData& getEdgeIndDataArray() {
+    return edgeIndData;
   }
 };
 } // end namespace

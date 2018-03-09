@@ -79,7 +79,8 @@ const double COARSEN_FRACTION = 0.9;
 void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer TM;
   TM.start();
-  unsigned meanWeight = ( (double)metisGraph->getTotalWeight()) / (double)nparts;
+  unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
+  unsigned meanWeight = ( (double)fineMetisGraphWeight) / (double)nparts;
   //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
   unsigned coarsenTo = 20 * nparts;
 
@@ -93,22 +94,23 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer T2("Partition");
   T2.start();
   std::vector<partInfo> parts;
-  parts = partition(mcg, nparts, partMode);
+  parts = partition(mcg, fineMetisGraphWeight, nparts, partMode);
   T2.stop();
 
   if (verbose) std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
 
   std::vector<partInfo> initParts = parts;
-  std::cout << "Time clustering:  "<<T2.get()<<'\n';
+  if (verbose) std::cout << "Time clustering:  "<<T2.get()<<'\n';
 
-  if (verbose)
+  if (verbose) {
     switch (refineMode) {
-      case BKL2:    std::cout<< "Sarting refinnement with BKL2\n";    break;
-      case BKL:     std::cout<< "Sarting refinnement with BKL\n";     break;
-      case ROBO:    std::cout<< "Sarting refinnement with ROBO\n";    break;
-      case GRACLUS: std::cout<< "Sarting refinnement with GRACLUS\n"; break;
+      case BKL2:    std::cout<< "Sorting refinnement with BKL2\n";    break;
+      case BKL:     std::cout<< "Sorting refinnement with BKL\n";     break;
+      case ROBO:    std::cout<< "Sorting refinnement with ROBO\n";    break;
+      case GRACLUS: std::cout<< "Sorting refinnement with GRACLUS\n"; break;
       default: abort();
     }
+  }
 
   galois::StatTimer T3("Refine");
   T3.start();
@@ -181,8 +183,8 @@ int main(int argc, char** argv) {
   graphStat(graph);
   std::cout << "\n";
 
-  galois::reportPageAlloc("MeminfoPre");
   galois::preAlloc(galois::runtime::numPagePoolAllocTotal() * 5);
+  galois::reportPageAlloc("MeminfoPre");
   Partition(&metisGraph, numPartitions);
   galois::reportPageAlloc("MeminfoPost");
 

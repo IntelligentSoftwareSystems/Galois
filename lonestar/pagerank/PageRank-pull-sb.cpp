@@ -219,9 +219,9 @@ int main(int argc, char** argv) {
   DegreeArray degree;
   degree.allocateInterleaved(transposeGraph.size());
 
-  galois::preAlloc(numThreads + (3 * transposeGraph.size() *
-                                 sizeof(typename Graph::node_data_type)) /
-                                    galois::runtime::pagePoolSize());
+  galois::preAlloc(3 * numThreads + (3 * transposeGraph.size() *
+                                     sizeof(typename Graph::node_data_type)) /
+                                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   std::cout << "Running synchronous Pull version, tolerance:" << tolerance
@@ -230,7 +230,7 @@ int main(int argc, char** argv) {
   initNodeData(transposeGraph, degree);
   computeOutDeg(transposeGraph, degree);
 
-  galois::StatTimer Tmain;
+  galois::StatTimer Tmain("computePageRankSB");
   Tmain.start();
   computePageRankSB(transposeGraph, degree);
   Tmain.stop();

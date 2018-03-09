@@ -236,19 +236,19 @@ static galois::graphs::DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
  *
  * @returns Pointer to the loaded 2-way graph
  */
-template <typename NodeData, typename EdgeData, bool HasNoLockable>
-static galois::graphs::DistGraph<NodeData, EdgeData, true, HasNoLockable>* 
+template <typename NodeData, typename EdgeData>
+static galois::graphs::DistGraph<NodeData, EdgeData, true>* 
 loadBDGraph(std::vector<unsigned>& scaleFactor,
             struct CUDA_Context** cuda_ctx = nullptr) {
   galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
   dGraphTimer.start();
 
-  galois::graphs::DistGraph<NodeData, EdgeData, true, HasNoLockable>* 
+  galois::graphs::DistGraph<NodeData, EdgeData, true>* 
       loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
-  loadedGraph = galois::graphs::constructTwoWayGraph<NodeData, EdgeData, 
-                                                     HasNoLockable>(scaleFactor);
+  loadedGraph = 
+    galois::graphs::constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
   assert(loadedGraph != nullptr);
 
   #ifdef __GALOIS_HET_CUDA__
@@ -318,15 +318,15 @@ symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
 /**
  * TODO
  */
-template <typename NodeData, typename EdgeData, bool HasNoLockable=true>
-galois::graphs::DistGraph<NodeData, EdgeData, true, HasNoLockable>* 
+template <typename NodeData, typename EdgeData>
+galois::graphs::DistGraph<NodeData, EdgeData, true>* 
 twoWayDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
   #ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
-  return loadBDGraph<NodeData, EdgeData, HasNoLockable>(scaleFactor, cuda_ctx);
+  return loadBDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
   #else
-  return loadBDGraph<NodeData, EdgeData, HasNoLockable>(scaleFactor);
+  return loadBDGraph<NodeData, EdgeData>(scaleFactor);
   #endif
 }
 

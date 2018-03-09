@@ -31,13 +31,13 @@
 namespace galois {
 namespace graphs {
 
-template<typename NodeTy, typename EdgeTy, bool WithInEdges=false,
-         bool HasNoLockable=true, bool isBipartite=false>
+template<typename NodeTy, typename EdgeTy, bool WithInEdges=false, 
+         bool isBipartite=false>
 class DistGraph_edgeCut 
-    : public DistGraph<NodeTy, EdgeTy, WithInEdges, HasNoLockable> {
+    : public DistGraph<NodeTy, EdgeTy, WithInEdges> {
   constexpr static const char* const GRNAME = "dGraph_edgeCut";
   public:
-    using base_DistGraph = DistGraph<NodeTy, EdgeTy, WithInEdges, HasNoLockable>;
+    using base_DistGraph = DistGraph<NodeTy, EdgeTy, WithInEdges>;
     // GID = ghostMap[LID - numOwned]
     std::vector<uint64_t> ghostMap;
     // LID = GlobalToLocalGhostMap[GID]
@@ -290,7 +290,7 @@ class DistGraph_edgeCut
 
         Tthread_ranges.start();
 
-        base_DistGraph::determine_thread_ranges(_numNodes, prefixSumOfEdges);
+        base_DistGraph::determineThreadRanges(prefixSumOfEdges);
 
         // experimental test of new thread ranges
         //base_DistGraph::determine_thread_ranges(0, _numNodes, 
@@ -300,9 +300,9 @@ class DistGraph_edgeCut
       }
 
       // find ranges for master + nodes with edges
-      base_DistGraph::determine_thread_ranges_master();
-      base_DistGraph::determine_thread_ranges_with_edges();
-      base_DistGraph::initialize_specific_ranges();
+      base_DistGraph::determineThreadRangesMaster();
+      base_DistGraph::determineThreadRangesWithEdges();
+      base_DistGraph::initializeSpecificRanges();
 
       base_DistGraph::constructIncomingEdges();
 

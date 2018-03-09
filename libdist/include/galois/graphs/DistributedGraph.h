@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -95,15 +95,14 @@ namespace graphs {
  * @tparam WithInEdges controls whether or not it is possible to store in-edges
  * in addition to outgoing edges in this graph
  */
-template<typename NodeTy, typename EdgeTy, bool WithInEdges=false, 
-         bool HasNoLockable=true>
+template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
 class DistGraph: public galois::runtime::GlobalObject {
 private:
   constexpr static const char* const GRNAME = "dGraph";
 
   using GraphTy = typename std::conditional<WithInEdges, 
-                   galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable>,
-                   galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable>>::type;
+                   galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, true>,
+                   galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>>::type;
 
   bool round;
 
@@ -149,6 +148,7 @@ protected:
 private:
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
+  std::vector<uint32_t> allNodesRanges;
   std::vector<uint32_t> masterRanges;
   std::vector<uint32_t> withEdgeRanges;
 
@@ -158,6 +158,8 @@ private:
   // vector of ranges that stores the 3 different range objects that a user is
   // able to access
   std::vector<NodeRangeType> specificRanges;
+  // for in edges
+  std::vector<NodeRangeType> specificRangesIn;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   std::vector<MPI_Group> mpi_identity_groups;
@@ -888,25 +890,8 @@ public:
 
 protected:
   /**
-   * A version of determine_thread_ranges that computes the range offsets
-   * for a specific range of the graph.
-   *
-   * Note threadRangesEdge is not determined for this variant, meaning
-   * allocateSpecified will not work if you choose to use this variant.
-   *
-   * @param beginNode Beginning of range
-   * @param endNode End of range, non-inclusive
-   * @param returnRanges Vector to store thread offsets for ranges in
-   */
-  inline void determine_thread_ranges(uint32_t beginNode, uint32_t endNode,
-                               std::vector<uint32_t>& returnRanges) {
-    graph.determineThreadRanges(beginNode, endNode, returnRanges,
-                                nodeAlphaRanges);
-  }
-
-  /**
-   * A version of determine_thread_ranges that uses a pre-computed prefix sum
-   * to determine division of nodes among threads.
+   * Uses a pre-computed prefix sum * to determine division of nodes among 
+   * threads.
    * 
    * The call uses binary search to determine the ranges.
    *
@@ -915,9 +900,10 @@ protected:
    * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
    */
   template<typename VectorTy>
-  inline void determine_thread_ranges(uint32_t total_nodes,
-                               VectorTy& edge_prefix_sum) {
-    graph.determineThreadRangesByNode(edge_prefix_sum);
+  inline void determineThreadRanges(VectorTy& edge_prefix_sum) {
+    allNodesRanges = galois::graphs::determineUnitRangesFromPrefixSum(
+                       galois::runtime::activeThreads, edge_prefix_sum
+                     );
   }
 
   /**
@@ -926,21 +912,23 @@ protected:
    *
    * Only call after graph is constructed + only call once
    */
-  inline void determine_thread_ranges_master() {
+  inline void determineThreadRangesMaster() {
     // make sure this hasn't been called before
     assert(masterRanges.size() == 0);
 
     // first check if we even need to do any work; if already calculated,
     // use already calculated vector
     if (beginMaster == 0 && (beginMaster + numOwned) == size()) {
-      masterRanges = graph.getThreadRangesVector();
+      masterRanges = allNodesRanges;
     } else if (beginMaster == 0 && (beginMaster + numOwned) == numNodesWithEdges &&
                withEdgeRanges.size() != 0) {
       masterRanges = withEdgeRanges;
     } else {
       galois::gDebug("Manually det. master thread ranges");
-      graph.determineThreadRanges(beginMaster, beginMaster + numOwned, masterRanges,
-                                  nodeAlphaRanges);
+      masterRanges = galois::graphs::determineUnitRangesFromGraph(
+                       graph, galois::runtime::activeThreads, beginMaster,
+                       beginMaster + numOwned, nodeAlphaRanges
+                     );
     }
   }
 
@@ -950,21 +938,23 @@ protected:
    *
    * Only call after graph is constructed + only call once
    */
-  inline void determine_thread_ranges_with_edges() {
+  inline void determineThreadRangesWithEdges() {
     // make sure not called before
     assert(withEdgeRanges.size() == 0);
 
     // first check if we even need to do any work; if already calculated,
     // use already calculated vector
     if (numNodesWithEdges == size()) {
-      withEdgeRanges = graph.getThreadRangesVector();
+      withEdgeRanges = allNodesRanges;
     } else if (beginMaster == 0 && (beginMaster + numOwned) == numNodesWithEdges &&
                masterRanges.size() != 0) {
       withEdgeRanges = masterRanges;
     } else {
       galois::gDebug("Manually det. with edges thread ranges");
-      graph.determineThreadRanges(0, numNodesWithEdges, withEdgeRanges,
-                                  nodeAlphaRanges);
+      withEdgeRanges = galois::graphs::determineUnitRangesFromGraph(
+                         graph, galois::runtime::activeThreads, 0, 
+                         numNodesWithEdges, nodeAlphaRanges
+                       );
     }
   }
 
@@ -972,13 +962,13 @@ protected:
    * Initializes the 3 range objects that a user can access to iterate
    * over the graph in different ways.
    */
-  void initialize_specific_ranges() {
+  void initializeSpecificRanges() {
     assert(specificRanges.size() == 0);
 
-    // TODO/FIXME is this assertion safe? (i.e. what if a host gets no nodes?)
+    // TODO/FIXME assertion likely not safe if a host gets no nodes
     // make sure the thread ranges have already been calculated
     // for the 3 ranges
-    assert(graph.getThreadRangesVector().size() != 0);
+    assert(allNodesRanges.size() != 0);
     assert(masterRanges.size() != 0);
     assert(withEdgeRanges.size() != 0);
 
@@ -987,9 +977,10 @@ protected:
       galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(size()),
-        graph.getThreadRanges()
+        allNodesRanges.data()
       )
     );
+    allNodesRanges.clear();
 
     // 1 is master nodes
     specificRanges.push_back(
@@ -999,6 +990,7 @@ protected:
         masterRanges.data()
       )
     );
+    masterRanges.clear();
 
     // 2 is with edge nodes
     specificRanges.push_back(
@@ -1008,6 +1000,7 @@ protected:
         withEdgeRanges.data()
       )
     );
+    withEdgeRanges.clear();
 
     assert(specificRanges.size() == 3);
   }
@@ -2022,6 +2015,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2031,8 +2027,10 @@ private:
       data_mode = onlyData;
       val_vec.resize(num);
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                                        val_vec);
+      Textractbatch.stop();
 
       if (!batch_succeeded) {
         gSerialize(b, onlyData);
@@ -2086,6 +2084,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2099,8 +2100,10 @@ private:
       data_mode = onlyData;
       val_vec.resize(num);
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                                        val_vec);
+      Textractbatch.stop();
 
       if (!batch_succeeded) {
         // get everything (note I pass in "indices" as offsets as it won't
@@ -2229,6 +2232,9 @@ private:
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
     galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
+                                  get_run_identifier(loopName));
+    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2240,9 +2246,11 @@ private:
       val_vec.resize(num);
       size_t bit_set_count = 0;
 
+      Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(
         from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode
       );
+      Textractbatch.stop();
 
       // GPUs have a batch function they can use; CPUs do not; therefore, 
       // CPUS always enter this if block
@@ -2652,6 +2660,9 @@ private:
     std::string set_timer_str(syncTypeStr + "_SET_" + 
                               get_run_identifier(loopName));
     galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+    std::string set_batch_timer_str(syncTypeStr + "_SET_BATCH_" +
+                              get_run_identifier(loopName));
+    galois::StatTimer Tsetbatch(set_batch_timer_str.c_str(), GRNAME);
 
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
@@ -2679,9 +2690,11 @@ private:
                                   val_vec);
 
         // GPU update call
+        Tsetbatch.start();
         bool batch_succeeded = set_batch_wrapper<SyncFnTy, syncType>(from_id, 
                                                  bit_set_comm, offsets, val_vec, 
                                                  bit_set_count, data_mode);
+        Tsetbatch.stop();
 
         // cpu always enters this block
         if (!batch_succeeded) {
@@ -4521,16 +4534,16 @@ public:
     //Serialize partitioning scheme specific data structures.
     boostDeSerializeLocalGraph(ar);
 
-    graph.clearRanges();
+    allNodesRanges.clear();
     masterRanges.clear();
     withEdgeRanges.clear();
     specificRanges.clear();
 
-    determine_thread_ranges(numNodesWithEdges, graph.getEdgeInDataArray());
-    // find ranges for master + nodes with edges
-    determine_thread_ranges_master();
-    determine_thread_ranges_with_edges();
-    initialize_specific_ranges();
+    // find ranges again
+    determineThreadRanges(graph.getEdgeIndDataArray());
+    determineThreadRangesMaster();
+    determineThreadRangesWithEdges();
+    initializeSpecificRanges();
 
     // Exchange information among hosts
     //send_info_to_host();
@@ -4566,9 +4579,9 @@ public:
   }
 };
 
-template<typename NodeTy, typename EdgeTy, bool WithInEdges, bool HasNoLockable>
+template<typename NodeTy, typename EdgeTy, bool WithInEdges>
 constexpr const char* const galois::graphs::DistGraph<NodeTy, EdgeTy, 
-                                                      WithInEdges, HasNoLockable>::GRNAME;
+                                                      WithInEdges>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 

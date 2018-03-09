@@ -29,15 +29,15 @@
 
 #include "BCNode.h"
 #include "control.h"
-#include "util.h"
 
 struct BCEdge {
-  BCNode<>* src;
-  BCNode<>* dst;
+  using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
+  NodeType* src;
+  NodeType* dst;
   double val;
   unsigned level;
   
-  BCEdge(BCNode<>* _src, BCNode<>* _dst) 
+  BCEdge(NodeType* _src, NodeType* _dst) 
     : src(_src), dst(_dst), val(0), level(infinity) { }
   BCEdge() : src(0), dst(0), val(0), level(infinity) { }
 
@@ -75,7 +75,8 @@ struct BCEdge {
 
   std::string toString() const {
     std::ostringstream s;
-    s << src->id << " " << dst->id << " level: " << level << " val: " << val;
+    s << val << " " << level;
+    //s << src->id << " " << dst->id << " level: " << level << " val: " << val;
     return s.str();
   }
 };

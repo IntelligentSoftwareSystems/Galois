@@ -39,7 +39,7 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
-//#define __USE_BFS__ // also defined in gen_cuda.h
+#define __USE_BFS__ // also defined in gen_cuda.h
 #ifdef __GALOIS_HET_CUDA__
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;

@@ -397,8 +397,8 @@ struct parallelBisect {
   bisector bisect;
   std::vector<partInfo>& parts;
 
-  parallelBisect(MetisGraph* mg, unsigned parts, std::vector<partInfo>& pb, bisector b = bisector())
-    :totalWeight(mg->getTotalWeight()), nparts(parts), graph(mg->getGraph()), bisect(b), parts(pb)
+  parallelBisect(MetisGraph* mg, unsigned fineMetisGraphWeight, unsigned parts, std::vector<partInfo>& pb, bisector b = bisector())
+    :totalWeight(fineMetisGraphWeight), nparts(parts), graph(mg->getGraph()), bisect(b), parts(pb)
   {}
   void operator()(partInfo* item, galois::UserContext<partInfo*> &cnx) {
     if (item->splitID() >= nparts) //when to stop
@@ -416,9 +416,10 @@ struct parallelBisect {
 } //anon namespace
 
 
-std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, InitialPartMode partMode) {
+std::vector<partInfo> partition(MetisGraph* mcg, unsigned fineMetisGraphWeight, unsigned numPartitions, InitialPartMode partMode) {
   std::vector<partInfo> parts(numPartitions);
-  parts[0] = partInfo(mcg->getTotalWeight());
+  assert(fineMetisGraphWeight == mcg->getTotalWeight());
+  parts[0] = partInfo(fineMetisGraphWeight);
 
   galois::do_all(galois::iterate(*mcg->getGraph()), 
       [g=mcg->getGraph()] (GNode item) {
@@ -433,28 +434,25 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
   } else {
     switch (partMode) {
       case GGP:
-        std::cout <<"\n  Sarting initial partitioning using GGP:\n";
+        std::cout <<"\nSorting initial partitioning using GGP:\n";
         galois::for_each(galois::iterate( {&parts[0]} ), 
-            parallelBisect<bisect_GGP>(mcg, numPartitions, parts), 
+            parallelBisect<bisect_GGP>(mcg, fineMetisGraphWeight, numPartitions, parts),
             galois::loopname("parallelBisect"),
             galois::wl<galois::worklists::ChunkedLIFO<1>>());
         break;
       case GGGP:
-        std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
+        std::cout <<"\nSorting initial partitioning using GGGP:\n";
         galois::for_each(galois::iterate( {&parts[0]} ), 
-            parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), 
+            parallelBisect<bisect_GGGP>(mcg, fineMetisGraphWeight, numPartitions, parts),
             galois::loopname("parallelBisect"),
             galois::wl<galois::worklists::ChunkedLIFO<1>>());
         break;
       default: abort();
     }
   }
-  std::cout<<computeEdgeCut(*(mcg->getGraph()))<<std::endl;
-  printPartStats(parts);
   // XXX(ddn): Leave commented out until we have balance() defined.
 #if 0
   if (!multiSeed) {
-    printPartStats(parts);
     unsigned maxWeight = 1.01 * mcg->getTotalWeight() / numPartitions;
     balance(mcg, parts, maxWeight);
   }
@@ -473,7 +471,7 @@ int edgeCount(GGraph& g) {
 }
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize)
 {
-  std::cout <<"\n  Sarting initial partitioning using MGGGP:\n";
+  std::cout <<"\nSorting initial partitioning using MGGGP:\n";
   auto flag = galois::MethodFlag::UNPROTECTED;
   GGraph& g = *mcg->getGraph();
 
