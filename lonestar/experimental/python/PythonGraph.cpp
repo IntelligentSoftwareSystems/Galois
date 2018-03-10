@@ -93,16 +93,17 @@ void printGraph(AttributedGraph* g) {
   auto& nodeLabels = g->nodeLabels;
   auto& edgeLabels = g->edgeLabels;
   auto& nodeNames = g->nodeNames;
-  for(auto n: graph) {
-    auto& nd = graph.getData(n);
-    auto& srcLabel = nodeLabels[rightmostSetBitPos(nd.label)];
-    auto& srcName = nodeNames[nd.id];
-    for(auto e: graph.edges(n)) {
-      auto& dst = graph.getData(graph.getEdgeDst(e));
-      auto& dstLabel = nodeLabels[rightmostSetBitPos(dst.label)];
-      auto& dstName = nodeNames[dst.id];
+  for(auto src: graph) {
+    auto& srcData = graph.getData(src);
+    auto& srcLabel = nodeLabels[srcData.label];
+    auto& srcName = nodeNames[src];
+    for(auto e: graph.edges(src)) {
+      auto dst = graph.getEdgeDst(e);
+      auto& dstData = graph.getData(dst);
+      auto& dstLabel = nodeLabels[dstData.label];
+      auto& dstName = nodeNames[dst];
       auto& ed = graph.getEdgeData(e);
-      auto& edgeLabel = edgeLabels[rightmostSetBitPos(ed.label)];
+      auto& edgeLabel = edgeLabels[ed.label];
       auto& edgeTimestamp = ed.timestamp;
       std::cout << srcLabel << " " << srcName << " " 
                 << edgeLabel << " " << dstLabel << " " 

@@ -54,14 +54,6 @@ void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char* key, char* v
 size_t getNumNodes(AttributedGraph* g);
 size_t getNumEdges(AttributedGraph* g);
 
-//void setNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key, const ValAltTy val);
-//const ValAltTy getNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key);
-//void removeNodeAttr(AttributedGraph *g, GNode n, const KeyAltTy key);
-
-//void setEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key, const ValAltTy val);
-//const ValAltTy getEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
-//void removeEdgeAttr(AttributedGraph *g, Edge e, const KeyAltTy key);
-
 void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile);
 
 void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile);
