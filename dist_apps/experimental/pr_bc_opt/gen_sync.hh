@@ -74,7 +74,17 @@ struct APSPReduce {
         assert(rNumPaths != 0);
         node.shortestPathNumbers[rIndex] = rNumPaths;
       } else if (old == rDistance) {
+        uint64_t old = node.shortestPathNumbers[rIndex];
+
+        // add to short path
         node.shortestPathNumbers[rIndex] += rNumPaths;
+
+        // overflow
+        if (old >= node.shortestPathNumbers[rIndex]) {
+          galois::gDebug("Overflow detected; capping at max uint64_t");
+          node.shortestPathNumbers[rIndex] = 
+            std::numeric_limits<uint64_t>::max();
+        }
       }
 
       // if received distance is smaller than current candidate for sending, send
