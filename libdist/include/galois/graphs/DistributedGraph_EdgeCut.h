@@ -285,7 +285,7 @@ class DistGraph_edgeCut
 
       galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
       Tthread_ranges.start();
-      base_DistGraph::determineThreadRanges(prefixSumOfEdges);
+      base_DistGraph::determineThreadRanges();
       Tthread_ranges.stop();
 
       // find ranges for master + nodes with edges

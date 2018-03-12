@@ -371,6 +371,13 @@ class B_LC_CSR_Graph
                                     MethodFlag = MethodFlag::UNPROTECTED) {
     return BaseGraph::edgeData[inEdgeData[*ni]];
   }
+
+  /**
+   * @returns the prefix sum of in-edges
+   */
+  const EdgeIndData& getInEdgePrefixSum() const {
+    return inEdgeIndData;
+  }
 };
 
 } // end graphs namespace

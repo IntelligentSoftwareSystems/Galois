@@ -721,14 +721,12 @@ class LC_CSR_Graph :
   }
 
   /**
-   * Returns the reference to the edgeIndData LargeArray
-   *
-   * DANGER: This shouldn't be exposed; it's for the use of checkpointing in
-   * DistGraph. FIXME find safer way to do it.
+   * Returns the reference to the edgeIndData LargeArray 
+   * (a prefix sum of edges)
    *
    * @returns reference to LargeArray edgeIndData
    */
-  EdgeIndData& getEdgeIndDataArray() {
+  const EdgeIndData& getEdgePrefixSum() const {
     return edgeIndData;
   }
 };

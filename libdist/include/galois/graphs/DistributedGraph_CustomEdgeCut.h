@@ -336,7 +336,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
       galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
       Tthread_ranges.start();
-      base_DistGraph::determineThreadRanges(prefixSumOfEdges);
+      base_DistGraph::determineThreadRanges();
       Tthread_ranges.stop();
 
       base_DistGraph::determineThreadRangesMaster();

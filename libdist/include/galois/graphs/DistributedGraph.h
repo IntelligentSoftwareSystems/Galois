@@ -28,8 +28,8 @@
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
-#ifndef _GALOIS_DIST_HGRAPH_H
-#define _GALOIS_DIST_HGRAPH_H
+#ifndef _GALOIS_DIST_HGRAPH_H_
+#define _GALOIS_DIST_HGRAPH_H_
 
 #include <unordered_map>
 #include <fstream>
@@ -151,6 +151,9 @@ private:
   std::vector<uint32_t> allNodesRanges;
   std::vector<uint32_t> masterRanges;
   std::vector<uint32_t> withEdgeRanges;
+
+  std::vector<uint32_t> allNodesRangesIn;
+  std::vector<uint32_t> masterRangesIn;
 
   using NodeRangeType = 
       galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
@@ -636,11 +639,9 @@ public:
   void constructIncomingEdges() {
     graph.constructIncomingEdges();
 
-    graph.findAllNodeThreadRangeIn();
-    graph.findMasterNodesThreadRangeIn(beginMaster, numOwned, 
-                                       numNodesWithEdges);
-
-    graph.finalizeThreadRangesIn(beginMaster, numOwned, numNodesWithEdges);
+    determineThreadRangesIn();
+    determineThreadRangesMasterIn();
+    initializeSpecificRangesIn();
   }
 
   /**
@@ -860,9 +861,9 @@ public:
    *
    * @returns A range object that contains all the nodes in this graph
    */
-  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
   inline const NodeRangeType& allNodesRangeIn() const {
-    return graph.allNodesRangeIn();
+    return specificRangesIn[0];
   }
 
   /**
@@ -871,9 +872,9 @@ public:
    *
    * @returns A range object that contains the master nodes in this graph
    */
-  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
   inline const NodeRangeType& masterNodesRangeIn() const {
-    return graph.masterNodesRangeIn();
+    return specificRangesIn[1];
   }
 
   /**
@@ -883,28 +884,24 @@ public:
    * @returns A range object that contains the master nodes and the nodes
    * with incoming edges in this graph (i.e. all nodes)
    */
-  template<bool T = WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
   inline const NodeRangeType& allNodesWithEdgesRangeIn() const {
-    return graph.allNodesWithEdgesRangeIn();
+    return specificRangesIn[0];
   }
 
 protected:
   /**
-   * Uses a pre-computed prefix sum * to determine division of nodes among 
+   * Uses a pre-computed prefix sum to determine division of nodes among 
    * threads.
    * 
    * The call uses binary search to determine the ranges.
-   *
-   * @param total_nodes The total number of nodes (masters + mirrors) on this
-   * partition.
-   * @param edge_prefix_sum The edge prefix sum of the nodes on this partition.
    */
-  template<typename VectorTy>
-  inline void determineThreadRanges(VectorTy& edge_prefix_sum) {
+  inline void determineThreadRanges() {
     allNodesRanges = galois::graphs::determineUnitRangesFromPrefixSum(
-                       galois::runtime::activeThreads, edge_prefix_sum
+                       galois::runtime::activeThreads, graph.getEdgePrefixSum()
                      );
   }
+
 
   /**
    * Determines the thread ranges for master nodes only and saves them to
@@ -1011,6 +1008,72 @@ protected:
    */
   void edgesEqualMasters() {
     specificRanges[2] = specificRanges[1];
+  }
+
+  /**
+   * Uses a pre-computed prefix sum to determine division of nodes among 
+   * threads using in-edges.
+   * 
+   * The call uses binary search to determine the ranges.
+   */
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline void determineThreadRangesIn() {
+    galois::gDebug("Determining thread ranges in");
+    allNodesRangesIn = galois::graphs::determineUnitRangesFromPrefixSum(
+                         galois::runtime::activeThreads, 
+                         graph.getInEdgePrefixSum()
+                       );
+  }
+
+  /**
+   * TODO
+   */
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  inline void determineThreadRangesMasterIn() {
+    assert(masterRangesIn.size() == 0);
+    galois::gDebug("Determining master thread ranges in");
+
+    // first check if we even need to do any work; if already calculated,
+    // use already calculated vector
+    if (beginMaster == 0 && (beginMaster + numOwned) == graph.size()) {
+      masterRangesIn = allNodesRangesIn;
+    } else {
+      galois::gDebug("Manually det. master thread in ranges");
+      masterRangesIn = galois::graphs::determineUnitRangesFromPrefixSum(
+                         galois::runtime::activeThreads, 
+                         graph.getInEdgePrefixSum(), beginMaster,
+                         beginMaster + numOwned, nodeAlphaRanges
+                       );
+    }
+  }
+
+  /**
+   * TODO
+   */
+  template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
+  void initializeSpecificRangesIn() {
+    assert(specificRangesIn.size() == 0);
+    galois::gDebug("Initialize specific ranges in");
+
+    // 0 is all nodes
+    specificRangesIn.push_back(
+      galois::runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(0),
+        boost::counting_iterator<size_t>(size()),
+        allNodesRangesIn.data()
+      )
+    );
+
+    // 1 is master nodes
+    specificRangesIn.push_back(
+      galois::runtime::makeSpecificRange(
+        boost::counting_iterator<size_t>(beginMaster),
+        boost::counting_iterator<size_t>(beginMaster + numOwned),
+        masterRangesIn.data()
+      )
+    );
+
+    assert(specificRangesIn.size() == 2);
   }
 
 private:
@@ -4540,7 +4603,7 @@ public:
     specificRanges.clear();
 
     // find ranges again
-    determineThreadRanges(graph.getEdgeIndDataArray());
+    determineThreadRanges();
     determineThreadRangesMaster();
     determineThreadRangesWithEdges();
     initializeSpecificRanges();
