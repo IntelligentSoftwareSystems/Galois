@@ -110,18 +110,15 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
  *
  * @returns The total number of blocks to split among all divisions
  */
-// inline required as GraphHelpers is included in multiple translation units
 uint32_t determine_block_division(uint32_t numDivisions,
                                   std::vector<unsigned>& scaleFactor);
-
-
 
 } // end namespace internal
 
 /**
  * Returns 2 ranges (one for nodes, one for edges) for a particular division.
  * The ranges specify the nodes/edges that a division is responsible for. The
- * function attempts to split them evenly among threads given some kind of
+ * function attempts to split them evenly among units given some kind of
  * weighting for both nodes and edges.
  *
  * Assumes the parameters passed in apply to a local portion of whatever
@@ -131,6 +128,8 @@ uint32_t determine_block_division(uint32_t numDivisions,
  * @tparam PrefixSumType type of the object that holds the edge prefix sum
  * @tparam NodeType size of the type representing the node
  *
+ * @param numNodes Total number of nodes included in prefix sum
+ * @param numEdges Total number of edges included in prefix sum
  * @param nodeWeight weight to give to a node in division
  * @param edgeWeight weight to give to an edge in division
  * @param id Division number you want the range for
@@ -236,24 +235,46 @@ auto divideNodesBinarySearch(NodeType numNodes, uint64_t numEdges,
 
 // second internal namespace
 namespace internal {
+
 /**
- * Helper function used by determineGraphRanges that consists of the main
+ * Checks the begin/end node and number of units to split to for corner cases
+ * (e.g. only one unit to split to, only 1 node, etc.).
+ *
+ * @param unitsToSplit number of units to split nodes among
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @param returnRanges vector to store result in
+ * @returns true if a corner case was found (indicates that returnRanges has
+ * been finalized)
+ */
+bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
+                               uint32_t endNode, 
+                               std::vector<uint32_t>& returnRanges);
+
+/**
+ * Helper function used by determineUnitRangesGraph that consists of the main
  * loop over all units and calls to divide by node to determine the
  * division of nodes to units.
  *
  * Saves the ranges to an argument vector provided by the caller.
  *
+ * @tparam GraphTy type of the graph object
+ *
+ * @param graph The graph object to get prefix sum information from
+ * @param unitsToSplit number of units to split nodes among
  * @param beginNode Beginning of range
  * @param endNode End of range, non-inclusive
- * @param returnRanges Vector to store thread offsets for ranges in
+ * @param returnRanges Vector to store unit offsets for ranges in
  * @param nodeAlpha The higher the number, the more weight nodes have in
  * determining division of nodes (edges have weight 1).
  */
 template <typename GraphTy>
-void determineUnitRangesLoop(GraphTy& graph, uint32_t unitsToSplit,
+void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
                              uint32_t beginNode, uint32_t endNode,
                              std::vector<uint32_t>& returnRanges,
                              uint32_t nodeAlpha) {
+  assert(beginNode != endNode);
+
   uint32_t numNodesInRange = endNode - beginNode;
   uint64_t numEdgesInRange = graph.edge_end(endNode - 1) - 
                              graph.edge_begin(beginNode);
@@ -279,7 +300,7 @@ void determineUnitRangesLoop(GraphTy& graph, uint32_t unitsToSplit,
       }
       returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
     } else {
-      // thread assinged no nodes
+      // unit assinged no nodes
       returnRanges[i + 1] = returnRanges[i];
     }
 
@@ -289,7 +310,129 @@ void determineUnitRangesLoop(GraphTy& graph, uint32_t unitsToSplit,
                    graph.edge_begin(returnRanges[i]));
   }
 }
+
+
+/**
+ * Helper function used by determineUnitRangesPrefixSum that consists of the 
+ * main loop over all units and calls to divide by node to determine the
+ * division of nodes to units.
+ *
+ * Saves the ranges to an argument vector provided by the caller.
+ *
+ * @tparam VectorTy type of the prefix sum object
+ *
+ * @param prefixSum Holds prefix sum information
+ * @param unitsToSplit number of units to split nodes among
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @param returnRanges Vector to store unit offsets for ranges in
+ * @param nodeAlpha The higher the number, the more weight nodes have in
+ * determining division of nodes (edges have weight 1).
+ */
+template <typename VectorTy>
+void determineUnitRangesLoopPrefixSum(VectorTy& prefixSum, 
+                                      uint32_t unitsToSplit,
+                                      uint32_t beginNode, uint32_t endNode,
+                                      std::vector<uint32_t>& returnRanges,
+                                      uint32_t nodeAlpha) {
+  assert(beginNode != endNode);
+
+  uint32_t numNodesInRange = endNode - beginNode;
+
+  uint64_t numEdgesInRange;
+  uint64_t edgeOffset;
+  if (beginNode != 0) {
+    numEdgesInRange = prefixSum[endNode - 1] - prefixSum[beginNode - 1];
+    edgeOffset = prefixSum[beginNode - 1];
+  } else {
+    numEdgesInRange = prefixSum[endNode - 1];
+    edgeOffset = 0;
+  }
+
+  returnRanges[0] = beginNode;
+  std::vector<unsigned int> dummyScaleFactor;
+
+  for (uint32_t i = 0; i < unitsToSplit; i++) {
+    // determine division for unit i
+    auto nodeSplits = 
+      divideNodesBinarySearch<VectorTy, uint32_t>(
+        numNodesInRange, numEdgesInRange, nodeAlpha, 1, i, unitsToSplit, 
+        prefixSum, dummyScaleFactor, edgeOffset, beginNode
+      ).first;
+
+    // i.e. if there are actually assigned nodes
+    if (nodeSplits.first != nodeSplits.second) {
+      if (i != 0) {
+        assert(returnRanges[i] == *(nodeSplits.first));
+      } else { // i == 0
+        assert(returnRanges[i] == beginNode);
+      }
+      returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
+    } else {
+      // unit assinged no nodes
+      returnRanges[i + 1] = returnRanges[i];
+    }
+
+    galois::gDebug("Unit ", i, " gets nodes ", returnRanges[i], " to ", 
+                   returnRanges[i + 1]);
+  }
+}
+
+/**
+ * Sanity checks a finalized unit range vector.
+ *
+ * @param unitsToSplit number of units to split nodes among
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @param returnRanges Ranges to sanity check
+ */
+void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode, 
+                     uint32_t endNode, std::vector<uint32_t>& returnRanges);
+
 } // end second internal namespace
+
+/**
+ * Determines node division ranges for all nodes in a graph and returns it in
+ * an offset vector. (node ranges = assigned nodes that a particular unit
+ * of execution should work on)
+ *
+ * Checks for corner cases, then calls the main loop function.
+ *
+ * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
+ * the graph is already constructed.
+ *
+ * @tparam GraphTy type of the graph object
+ *
+ * @param graph The graph object to get prefix sum information from
+ * @param unitsToSplit number of units to split nodes among
+ * @param nodeAlpha The higher the number, the more weight nodes have in
+ * determining division of nodes (edges have weight 1).
+ * @returns vector that indirectly specifies which units get which nodes
+ */
+template<typename GraphTy>
+std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
+                                                   uint32_t unitsToSplit,
+                                                   uint32_t nodeAlpha=0) {
+  uint32_t totalNodes = graph.size();
+
+  std::vector<uint32_t> returnRanges;
+  returnRanges.resize(unitsToSplit + 1);
+
+  // check corner cases
+  if (internal::unitRangeCornerCaseHandle(unitsToSplit, 0, totalNodes, 
+                                          returnRanges)) {
+    return returnRanges;
+  }
+
+  // no corner cases: onto main loop over nodes that determines
+  // node ranges
+  internal::determineUnitRangesLoopGraph(graph, unitsToSplit, 0, totalNodes, 
+                                    returnRanges, nodeAlpha);
+
+  internal::unitRangeSanity(unitsToSplit, 0, totalNodes, returnRanges);
+
+  return returnRanges;
+}
 
 /**
  * Determines node division ranges for a given range of nodes and returns it 
@@ -301,11 +444,15 @@ void determineUnitRangesLoop(GraphTy& graph, uint32_t unitsToSplit,
  * ONLY CALL AFTER GRAPH IS CONSTRUCTED as it uses functions that assume
  * the graph is already constructed.
  *
+ * @tparam GraphTy type of the graph object
+ *
+ * @param graph The graph object to get prefix sum information from
+ * @param unitsToSplit number of units to split nodes among
  * @param beginNode Beginning of range
  * @param endNode End of range, non-inclusive
- * @param returnRanges Vector to store thread offsets for ranges in
  * @param nodeAlpha The higher the number, the more weight nodes have in
  * determining division of nodes (edges have weight 1).
+ * @returns vector that indirectly specifies which units get which nodes
  */
 template<typename GraphTy>
 std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
@@ -313,68 +460,29 @@ std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
                                                    uint32_t beginNode,
                                                    uint32_t endNode,
                                                    uint32_t nodeAlpha=0) {
-  uint32_t total_nodes = endNode - beginNode;
-
   std::vector<uint32_t> returnRanges;
   returnRanges.resize(unitsToSplit + 1);
 
-  // check corner cases
-  // no nodes = assign nothing to all units
-  if (beginNode == endNode) {
-    returnRanges[0] = beginNode;
-
-    for (uint32_t i = 0; i < unitsToSplit; i++) {
-      returnRanges[i+1] = beginNode;
-    }
-
-    return returnRanges;
-  }
-
-  // single thread case; 1 unit gets all
-  if (unitsToSplit == 1) {
-    returnRanges[0] = beginNode;
-    returnRanges[1] = endNode;
-    return returnRanges;
-  // more units than nodes
-  } else if (unitsToSplit > total_nodes) {
-    uint32_t current_node = beginNode;
-    returnRanges[0] = current_node;
-    // 1 node for units until out of threads
-    for (uint32_t i = 0; i < total_nodes; i++) {
-      returnRanges[i + 1] = ++current_node;
-    }
-    // deal with remainder units; they get nothing
-    for (uint32_t i = total_nodes; i < unitsToSplit; i++) {
-      returnRanges[i + 1] = total_nodes;
-    }
-
+  if (internal::unitRangeCornerCaseHandle(unitsToSplit, beginNode, endNode,
+                                          returnRanges)) {
     return returnRanges;
   }
 
   // no corner cases: onto main loop over nodes that determines
   // node ranges
-  internal::determineUnitRangesLoop(graph, unitsToSplit, beginNode, endNode, 
+  internal::determineUnitRangesLoopGraph(graph, unitsToSplit, beginNode, endNode, 
                                     returnRanges, nodeAlpha);
 
-  #ifndef NDEBUG
-  // sanity checks
-  assert(returnRanges[0] == beginNode &&
-         "return ranges begin not the begin node");
-  assert(returnRanges[unitsToSplit] == endNode &&
-         "return ranges end not end node");
-
-  for (uint32_t i = 1; i < unitsToSplit; i++) {
-    assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
-    assert(returnRanges[i] >= returnRanges[i - 1]);
-  }
-  #endif
+  internal::unitRangeSanity(unitsToSplit, beginNode, endNode, returnRanges);
 
   return returnRanges;
 }
 
 /**
  * Uses the divideByNode function (which is binary search based) to
- * divide nodes among units.
+ * divide nodes among units using a provided prefix sum.
+ *
+ * @tparam VectorTy type of the prefix sum object
  *
  * @param unitsToSplit number of units to split nodes among
  * @param edgePrefixSum A prefix sum of edges
@@ -383,7 +491,8 @@ std::vector<uint32_t> determineUnitRangesFromGraph(GraphTy& graph,
  */
 template <typename VectorTy>
 std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,  
-                                                      VectorTy& edgePrefixSum) {
+                                                       VectorTy& edgePrefixSum,
+                                                       uint32_t nodeAlpha=0) {
   assert(unitsToSplit > 0);
 
   std::vector<uint32_t> nodeRanges;
@@ -397,7 +506,7 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
   for (uint32_t i = 0; i < unitsToSplit; i++) {
     auto nodeSplits = 
       divideNodesBinarySearch<VectorTy, uint32_t>(
-        numNodes, numEdges, 0, 1, i, unitsToSplit, edgePrefixSum
+        numNodes, numEdges, nodeAlpha, 1, i, unitsToSplit, edgePrefixSum
       ).first;
 
     // i.e. if there are actually assigned nodes
@@ -409,7 +518,7 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
       }
       nodeRanges[i + 1] = *(nodeSplits.second);
     } else {
-      // thread assinged no nodes
+      // unit assinged no nodes
       nodeRanges[i + 1] = nodeRanges[i];
     }
 
@@ -418,6 +527,46 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
   }
 
   return nodeRanges;
+}
+
+
+/**
+ * Uses the divideByNode function (which is binary search based) to
+ * divide nodes among units using a provided prefix sum. Provide a node range
+ * so that the prefix sum is only calculated using that range.
+ *
+ * @tparam VectorTy type of the prefix sum object
+ *
+ * @param unitsToSplit number of units to split nodes among
+ * @param edgePrefixSum A prefix sum of edges
+ * @param beginNode Beginning of range
+ * @param endNode End of range, non-inclusive
+ * @returns vector that indirectly specifies how nodes are split amongs units
+ * of execution
+ */
+template <typename VectorTy>
+std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,  
+                                                 VectorTy& edgePrefixSum,
+                                                 uint32_t beginNode,
+                                                 uint32_t endNode,
+                                                 uint32_t nodeAlpha=0) {
+  std::vector<uint32_t> returnRanges;
+  returnRanges.resize(unitsToSplit + 1);
+
+  if (internal::unitRangeCornerCaseHandle(unitsToSplit, beginNode, endNode,
+                                          returnRanges)) {
+    return returnRanges;
+  }
+
+  // no corner cases: onto main loop over nodes that determines
+  // node ranges
+  internal::determineUnitRangesLoopPrefixSum(edgePrefixSum, unitsToSplit, 
+                                             beginNode, endNode, 
+                                             returnRanges, nodeAlpha);
+
+  internal::unitRangeSanity(unitsToSplit, beginNode, endNode, returnRanges);
+
+  return returnRanges;
 }
 
 } // end namespace graphs

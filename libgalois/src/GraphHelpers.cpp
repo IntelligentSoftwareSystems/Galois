@@ -38,7 +38,7 @@ namespace graphs {
 namespace internal {
 
 uint32_t determine_block_division(uint32_t numDivisions,
-                                         std::vector<unsigned>& scaleFactor) {
+                                  std::vector<unsigned>& scaleFactor) {
   uint32_t numBlocks = 0;
 
   if (scaleFactor.empty()) {
@@ -64,6 +64,63 @@ uint32_t determine_block_division(uint32_t numDivisions,
   return numBlocks;
 }
 
+bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
+                               uint32_t endNode, 
+                               std::vector<uint32_t>& returnRanges) {
+  uint32_t totalNodes = endNode - beginNode;                                
+
+  // check corner cases
+  // no nodes = assign nothing to all units
+  if (beginNode == endNode) {
+    returnRanges[0] = beginNode;
+
+    for (uint32_t i = 0; i < unitsToSplit; i++) {
+      returnRanges[i + 1] = beginNode;
+    }
+
+    return true;
+  }
+
+  // single unit case; 1 unit gets all
+  if (unitsToSplit == 1) {
+    returnRanges[0] = beginNode;
+    returnRanges[1] = endNode;
+    return true;
+  // more units than nodes
+  } else if (unitsToSplit > totalNodes) {
+    uint32_t current_node = beginNode;
+    returnRanges[0] = current_node;
+    // 1 node for units until out of units
+    for (uint32_t i = 0; i < totalNodes; i++) {
+      returnRanges[i + 1] = ++current_node;
+    }
+    // deal with remainder units; they get nothing
+    for (uint32_t i = totalNodes; i < unitsToSplit; i++) {
+      returnRanges[i + 1] = totalNodes;
+    }
+
+    return true;
+  }
+
+  return false;
 }
+
+void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode, 
+                     uint32_t endNode, std::vector<uint32_t>& returnRanges) {
+  #ifndef NDEBUG
+  // sanity checks
+  assert(returnRanges[0] == beginNode &&
+         "return ranges begin not the begin node");
+  assert(returnRanges[unitsToSplit] == endNode &&
+         "return ranges end not end node");
+
+  for (uint32_t i = 1; i < unitsToSplit; i++) {
+    assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
+    assert(returnRanges[i] >= returnRanges[i - 1]);
+  }
+  #endif
 }
-}
+
+} // end internal namespace
+} // end graphs namespace
+} // end galois namespace
