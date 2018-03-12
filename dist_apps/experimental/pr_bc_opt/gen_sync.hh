@@ -74,14 +74,15 @@ struct APSPReduce {
         assert(rNumPaths != 0);
         node.shortestPathNumbers[rIndex] = rNumPaths;
       } else if (old == rDistance) {
-        uint64_t old = node.shortestPathNumbers[rIndex];
+        uint64_t oldS = node.shortestPathNumbers[rIndex];
 
         // add to short path
         node.shortestPathNumbers[rIndex] += rNumPaths;
 
         // overflow
-        if (old >= node.shortestPathNumbers[rIndex]) {
-          galois::gDebug("Overflow detected; capping at max uint64_t");
+        if (oldS > node.shortestPathNumbers[rIndex]) {
+          galois::gDebug("Overflow detected in sync; capping at max uint64_t");
+          galois::gDebug(oldS, " ", rNumPaths);
           node.shortestPathNumbers[rIndex] = 
             std::numeric_limits<uint64_t>::max();
         }

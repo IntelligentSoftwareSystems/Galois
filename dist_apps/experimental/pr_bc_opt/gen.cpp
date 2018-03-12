@@ -281,6 +281,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
             dnode.shortestPathNumbers[indexToSend] = 
               src_data.shortestPathNumbers[indexToSend];
           } else if (oldValue == newValue) {
+            assert(src_data.shortestPathNumbers[indexToSend] != 0);
             uint64_t old = dnode.shortestPathNumbers[indexToSend];
 
             // add to short path
@@ -288,7 +289,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
               src_data.shortestPathNumbers[indexToSend];
 
             // overflow
-            if (old >= dnode.shortestPathNumbers[indexToSend]) {
+            if (old > dnode.shortestPathNumbers[indexToSend]) {
               galois::gDebug("Overflow detected; capping at max uint64_t");
               dnode.shortestPathNumbers[indexToSend] =
                 std::numeric_limits<uint64_t>::max();
