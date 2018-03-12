@@ -34,7 +34,7 @@ struct BCEdge {
   using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
   NodeType* src;
   NodeType* dst;
-  double val;
+  uint64_t val;
   unsigned level;
   
   BCEdge(NodeType* _src, NodeType* _dst) 
@@ -69,14 +69,13 @@ struct BCEdge {
   /**
    * TODO actually implement this if needed
    */
-  char isAlreadyIn() {
-    return 0;
-  }
+  //char isAlreadyIn() {
+  //  return 0;
+  //}
 
   std::string toString() const {
     std::ostringstream s;
     s << val << " " << level;
-    //s << src->id << " " << dst->id << " level: " << level << " val: " << val;
     return s.str();
   }
 };

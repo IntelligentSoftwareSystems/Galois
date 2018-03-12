@@ -24,7 +24,7 @@
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
 
-#define NDEBUG // Used in Debug build to prevent things from printing
+//#define NDEBUG // Used in Debug build to prevent things from printing
 
 #include "Lonestar/BoilerPlate.h"
 #include "galois/ConditionalReduction.h"
@@ -35,6 +35,8 @@
 
 #include "BCNode.h"
 #include "BCEdge.h"
+
+#include "galois/runtime/Profile.h"
 
 #include <iomanip>
 
@@ -67,10 +69,8 @@ static cll::opt<bool> generateCert("generateCertificate",
 //                                   cll::desc("Use node based execution"),
 //                                   cll::init(true));
 
-using Graph = galois::graphs::B_LC_CSR_Graph<BCNode<BC_USE_MARKING, 
-                                                    BC_CONCURRENT>, 
-                                             BCEdge, false, true>;
-using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
+using NodeType = BCNode<false, true>;
+using Graph = galois::graphs::B_LC_CSR_Graph<NodeType, BCEdge, false, true>;
 
 struct BetweenessCentralityAsync {
   Graph& graph;
@@ -123,9 +123,6 @@ struct BetweenessCentralityAsync {
         correctNodeP1Count.update(1);
         dstData.unlock();
 
-        galois::gDebug("Rule 4 (", srcData.toString(), " ||| ", 
-                       dstData.toString(), ")", ed.level);
-
         if (edgeLevel != infinity) {
           inEdgeData.level = infinity;
           if (edgeLevel == srcData.distance) {
@@ -150,8 +147,7 @@ struct BetweenessCentralityAsync {
 
     // make dst a successor of src, src predecessor of dst
     srcData.nsuccs++;
-    const double srcSigma = srcData.sigma;
-    srcData.unlock();
+    const uint64_t srcSigma = srcData.sigma;
     NodeType::predTY& dstPreds = dstData.preds;
     bool dstPredsNotEmpty = !dstPreds.empty();
     dstPreds.clear();
@@ -164,6 +160,7 @@ struct BetweenessCentralityAsync {
     dstData.sigma = srcSigma; // FU
     ed.val = srcSigma;
     ed.level = srcData.distance;
+    srcData.unlock();
     dstData.unlock();
 
     if (!dstData.isAlreadyIn()) ctx.push(dstID);
@@ -177,19 +174,22 @@ struct BetweenessCentralityAsync {
     NodeType& srcData = graph.getData(srcID);
     NodeType& dstData = graph.getData(dstID);
 
-    galois::gDebug("Rule 2 (", srcData.toString(), " ||| ", 
-                   dstData.toString(), ") ", ed.level);
-
-    const double srcSigma = srcData.sigma;
-    const double eval = ed.val;
-    const double diff = srcSigma - eval;
-    bool dstSigmaChanged = diff >= 0.00001;
+    const uint64_t srcSigma = srcData.sigma;
+    const uint64_t eval = ed.val;
+    const uint64_t diff = srcSigma - eval;
 
     srcData.unlock();
-    if (dstSigmaChanged) {
+    if (diff > 0) {
       updateSigmaP2Count.update(1);
       ed.val = srcSigma;
+
+      uint64_t old = dstData.sigma;
       dstData.sigma += diff;
+      if (old >= dstData.sigma) {
+        galois::gDebug("Overflow detected; capping at max uint64_t");
+        dstData.sigma = std::numeric_limits<uint64_t>::max();
+      }
+
       int nbsuccs = dstData.nsuccs;
       dstData.unlock();
 
@@ -207,19 +207,23 @@ struct BetweenessCentralityAsync {
 
     NodeType& srcData = graph.getData(srcID);
     srcData.nsuccs++;
-    const double srcSigma = srcData.sigma;
-    srcData.unlock();
+    const uint64_t srcSigma = srcData.sigma;
 
     NodeType& dstData = graph.getData(dstID);
     dstData.preds.push_back(srcID);
 
-    galois::gDebug("Rule 3 (", srcData.toString(), " ||| ", dstData.toString(), 
-                   ") ", ed.level);
+    const uint64_t dstSigma = dstData.sigma;
 
-    const double dstSigma = dstData.sigma;
+    uint64_t old = dstData.sigma;
     dstData.sigma = dstSigma + srcSigma;
+    if (old >= dstData.sigma) {
+      galois::gDebug("Overflow detected; capping at max uint64_t");
+      dstData.sigma = std::numeric_limits<uint64_t>::max();
+    }
+
     ed.val = srcSigma;
     ed.level = srcData.distance;
+    srcData.unlock();
     int nbsuccs = dstData.nsuccs;
     dstData.unlock();
     if (nbsuccs > 0) {
@@ -230,6 +234,8 @@ struct BetweenessCentralityAsync {
   //template <typename WLForEach, typename WorkListType>
   template <typename WorkListType>
   void dagConstruction(WorkListType& wl) {
+    //galois::runtime::profileVtune(
+    //[&] () {
     galois::for_each(
       galois::iterate(wl), 
       [&] (uint32_t srcID, auto& ctx) {
@@ -246,10 +252,10 @@ struct BetweenessCentralityAsync {
   
           // lock in set order to prevent deadlock (lower id first)
           // TODO run even in serial version; find way to not need to run
-          if (srcID < dstID) { 
+          if (srcID < dstID) {
             srcData.lock();
             dstData.lock();
-          } else { 
+          } else {
             dstData.lock();
             srcData.lock();
           }
@@ -269,12 +275,15 @@ struct BetweenessCentralityAsync {
             this->firstUpdate(srcID, dstID, edgeData, ctx);
           } else { // No Action
             noActionCount.update(1);
-            srcData.unlock(); dstData.unlock();
+            srcData.unlock();
+            dstData.unlock();
           }
         }
-      }
+      },
+      galois::loopname("ForwardPhase")
       //,galois::wl<WLForEach>()
     );
+    //}, "dummy");
   }
   
   template <typename WorkListType>
@@ -298,11 +307,11 @@ struct BetweenessCentralityAsync {
             uint32_t predID = srcPreds[i];
             NodeType& predData = graph.getData(predID);
 
-            const double term = predData.sigma * (1.0 + srcDelta) / 
+            const double term = (double)predData.sigma * (1.0 + srcDelta) / 
                                 srcData.sigma; 
             predData.lock();
             predData.delta += term;
-            const int prevPdNsuccs = predData.nsuccs;
+            const unsigned prevPdNsuccs = predData.nsuccs;
             predData.nsuccs--;
   
             if (prevPdNsuccs == 1) {
@@ -319,10 +328,10 @@ struct BetweenessCentralityAsync {
             graph.getEdgeData(e).reset();
           }
         } else {
-          galois::gDebug("Skipped ", srcData.toString());
           srcData.unlock();
         }
-      }
+      },
+      galois::loopname("BackwardPhase")
     );
   }
   
@@ -338,7 +347,8 @@ struct BetweenessCentralityAsync {
           leafCount.update(1);
           fringewl->push(i);
         }
-      }
+      },
+      galois::loopname("LeafFind")
     );
   }
 };
@@ -418,15 +428,10 @@ int main(int argc, char** argv) {
   bcExecutor.fringewl = &wl4;
 
   galois::reportPageAlloc("MemAllocPre");
-  galois::preAlloc(galois::getActiveThreads() * nnodes / 1650);
+  galois::preAlloc(galois::getActiveThreads() * nnodes / 2000000);
   galois::reportPageAlloc("MemAllocMid");
 
-
   galois::StatTimer executionTimer;
-  galois::StatTimer forwardPassTimer("ForwardPass", "BC");
-  galois::StatTimer leafFinderTimer("LeafFind", "BC");
-  galois::StatTimer backwardPassTimer("BackwardPass", "BC");
-  galois::StatTimer cleanupTimer("CleanupTimer", "BC");
 
   // reset everything in preparation for run
   // TODO refactor
@@ -459,53 +464,45 @@ int main(int argc, char** argv) {
     wl2.push_back(i);
     NodeType& active = bcGraph.getData(i);
     active.initAsSource();
-    galois::gDebug("Source is ", i, active.toString(), "\n");
-    forwardPassTimer.start();
+    //galois::gDebug("Source is ", i);
 
     //bcExecutor.dagConstruction<wl2ty>(wl2);
     bcExecutor.dagConstruction(wl2);
     wl2.clear();
 
-    forwardPassTimer.stop();
     //if (DOCHECKS) graph.checkGraph(active);
 
-    leafFinderTimer.start();
     bcExecutor.leafCount.reset();
     bcExecutor.findLeaves(nnodes);
-    leafFinderTimer.stop();
 
     if (bcExecutor.leafCount.isActive()) {
       galois::gPrint(bcExecutor.leafCount.reduce(), " leaf nodes in DAG\n");
     }
 
-    backwardPassTimer.start();
     double backupSrcBC = active.bc;
     bcExecutor.dependencyBackProp(wl4);
 
     active.bc = backupSrcBC; // current source BC should not get updated
-    backwardPassTimer.stop();
+
     wl4.clear();
     //if (DOCHECKS) graph.checkSteadyState2();
-
-    cleanupTimer.start();
 
     // TODO refactor
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto i) {
         bcGraph.getData(i).reset();
-      }
+      },
+      galois::loopname("CleanupLoop")
     );
 
     galois::do_all(
       galois::iterate(0ul, nedges),
       [&] (auto i) {
         bcGraph.getEdgeData(i).reset();
-      }
+      },
+      galois::loopname("CleanupLoop")
     );
-
-    //graph.cleanupData(); TODO
-    cleanupTimer.stop();
   }
   executionTimer.stop();
 

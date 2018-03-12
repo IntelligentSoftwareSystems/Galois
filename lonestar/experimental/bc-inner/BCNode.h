@@ -46,13 +46,15 @@ struct BCNode {
   LockType spinLock;
 
   //typedef std::vector<BCNode*> predTY;
-  using predTY = llvm::SmallVector<uint32_t, 2>;
+  //using predTY = galois::gstl::Vector<uint32_t>;
+  using predTY = std::vector<uint32_t>;
+  //using predTY = llvm::SmallVector<uint32_t, 2>;
   predTY preds;
 
   unsigned distance;
   unsigned nsuccs;
 
-  double sigma; 
+  uint64_t sigma; 
   double delta;
   double bc;
   char mark;
@@ -104,6 +106,8 @@ struct BCNode {
 
   /**
    * Return node as string.
+   *
+   * WARNING NON SCALABLE FUNCTION
    */
   std::string toString() const {
     std::ostringstream s;
