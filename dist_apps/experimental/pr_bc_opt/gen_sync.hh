@@ -167,6 +167,8 @@ struct APSPBroadcast {
                            size_t, DataCommMode) { return false; }
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
 struct DependencyReduce {
   using ValTy = std::pair<uint32_t, float>;
 
@@ -193,7 +195,7 @@ struct DependencyReduce {
 
     if (rIndex != infinity) {
       if (node.roundIndexToSend != rIndex) {
-        galois::gPrint(node.roundIndexToSend, " ", rIndex, "\n");
+        galois::gError(node.roundIndexToSend, " ", rIndex);
       }
       assert(node.roundIndexToSend == rIndex);
 

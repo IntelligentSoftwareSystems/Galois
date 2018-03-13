@@ -420,7 +420,9 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
     BackFindMessageToSend(graph, currentRound);
 
-    graph.sync<writeSource, readAny, DependencyReduce, DependencyBroadcast, 
+    // write destination in this case being the source in the actual graph
+    // since we're using the tranpose graph
+    graph.sync<writeDestination, readAny, DependencyReduce, DependencyBroadcast, 
                Bitset_dependency>(std::string("DependencySync") + "_" + 
                                   std::to_string(macroRound));
 
