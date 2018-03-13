@@ -40,6 +40,8 @@
 
 #include <iomanip>
 
+constexpr static const unsigned CHUNK_SIZE = 8u;
+
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
 ////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +73,26 @@ static cll::opt<bool> generateCert("generateCertificate",
 
 using NodeType = BCNode<false, true>;
 using Graph = galois::graphs::B_LC_CSR_Graph<NodeType, BCEdge, false, true>;
+
+// Work items for the forward phase
+struct ForwardPhaseWorkItem {
+  uint32_t nodeID;
+  uint32_t distance;
+  ForwardPhaseWorkItem() : nodeID(infinity), distance(infinity) {};
+  ForwardPhaseWorkItem(uint32_t _n, uint32_t _d) : nodeID(_n), distance(_d) {};
+};
+
+// grabs distance from a forward phase work item
+struct FPWorkItemIndexer {
+  uint32_t operator()(const ForwardPhaseWorkItem& it) const {
+    return it.distance;
+  }
+};
+
+// obim worklist type declaration
+namespace gwl = galois::worklists;
+using dChunk = gwl::dChunkedFIFO<CHUNK_SIZE>;
+using OBIM = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, dChunk>;
 
 struct BetweenessCentralityAsync {
   Graph& graph;
@@ -148,6 +170,7 @@ struct BetweenessCentralityAsync {
     // make dst a successor of src, src predecessor of dst
     srcData.nsuccs++;
     const uint64_t srcSigma = srcData.sigma;
+    assert(srcSigma > 0);
     NodeType::predTY& dstPreds = dstData.preds;
     bool dstPredsNotEmpty = !dstPreds.empty();
     dstPreds.clear();
@@ -161,9 +184,9 @@ struct BetweenessCentralityAsync {
     ed.val = srcSigma;
     ed.level = srcData.distance;
     srcData.unlock();
+    if (!dstData.isAlreadyIn()) ctx.push(ForwardPhaseWorkItem(dstID, 
+                                           dstData.distance));
     dstData.unlock();
-
-    if (!dstData.isAlreadyIn()) ctx.push(dstID);
     if (dstPredsNotEmpty) { correctNode(dstID, ed); }
   }
 
@@ -191,11 +214,12 @@ struct BetweenessCentralityAsync {
       }
 
       int nbsuccs = dstData.nsuccs;
-      dstData.unlock();
 
       if (nbsuccs > 0) {
-        if (!dstData.isAlreadyIn()) ctx.push(dstID);
+        if (!dstData.isAlreadyIn()) ctx.push(ForwardPhaseWorkItem(dstID, 
+                                               dstData.distance));
       }
+      dstData.unlock();
     } else {
       dstData.unlock();
     }
@@ -225,20 +249,18 @@ struct BetweenessCentralityAsync {
     ed.level = srcData.distance;
     srcData.unlock();
     int nbsuccs = dstData.nsuccs;
-    dstData.unlock();
     if (nbsuccs > 0) {
-      if (!dstData.isAlreadyIn()) ctx.push(dstID);
+      if (!dstData.isAlreadyIn()) ctx.push(ForwardPhaseWorkItem(dstID, 
+                                             dstData.distance));
     }
+    dstData.unlock();
   }
   
-  //template <typename WLForEach, typename WorkListType>
-  template <typename WorkListType>
-  void dagConstruction(WorkListType& wl) {
-    //galois::runtime::profileVtune(
-    //[&] () {
+  void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
     galois::for_each(
       galois::iterate(wl), 
-      [&] (uint32_t srcID, auto& ctx) {
+      [&] (ForwardPhaseWorkItem& wi, auto& ctx) {
+        uint32_t srcID = wi.nodeID;
         NodeType& srcData = graph.getData(srcID);
         srcData.markOut();
   
@@ -280,14 +302,12 @@ struct BetweenessCentralityAsync {
           }
         }
       },
+      galois::wl<OBIM>(FPWorkItemIndexer()),
       galois::loopname("ForwardPhase")
-      //,galois::wl<WLForEach>()
     );
-    //}, "dummy");
   }
   
-  template <typename WorkListType>
-  void dependencyBackProp(WorkListType& wl) {
+  void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
     galois::for_each(
       galois::iterate(wl),
       [&] (uint32_t srcID, auto& ctx) {
@@ -335,9 +355,7 @@ struct BetweenessCentralityAsync {
     );
   }
   
-  galois::InsertBag<uint32_t>* fringewl;
-  
-  void findLeaves(unsigned nnodes) {
+  void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {
     galois::do_all(
       galois::iterate(0u, nnodes),
       [&] (auto i) {
@@ -345,19 +363,13 @@ struct BetweenessCentralityAsync {
 
         if (n.nsuccs == 0 && n.distance < infinity) {
           leafCount.update(1);
-          fringewl->push(i);
+          fringeWL.push(i);
         }
       },
       galois::loopname("LeafFind")
     );
   }
 };
-
-//struct NodeIndexer : std::binary_function<NodeType*, int, int> {
-//  int operator() (const NodeType *val) const {
-//    return val->distance;
-//  }
-//};
 
 static const char* name = "Betweenness Centrality";
 static const char* desc = "Computes betwenness centrality in an unweighted "
@@ -373,6 +385,7 @@ int main(int argc, char** argv) {
     galois::gInfo("Running in serial mode");
   }
 
+  // create bidirectional graph
   Graph bcGraph;
   galois::graphs::BufferedGraph<void> fileReader;
   fileReader.loadGraph(filename);
@@ -394,21 +407,12 @@ int main(int argc, char** argv) {
   );
   bcGraph.constructIncomingEdges();
 
-  //for (auto k : bcGraph.in_edges(0)) {
-  //  BCEdge& asdf = bcGraph.getInEdgeData(k);
-  //  asdf.reset();
-  //  printf("%s\n", asdf.toString().c_str());
-  //}
-
-  //exit(0);
-
-  //BCGraph graph(filename.c_str());
-
   BetweenessCentralityAsync bcExecutor(bcGraph);
 
   unsigned nnodes = bcGraph.size();
   uint64_t nedges = bcGraph.sizeEdges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
+  galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();
@@ -418,14 +422,6 @@ int main(int argc, char** argv) {
   bcExecutor.correctNodeP2Count.reset();
   bcExecutor.noActionCount.reset();
   bcExecutor.largestNodeDist.reset();
-
-  const int chunksize = 8;
-  galois::gInfo("Using chunk size : ", chunksize);
-  //typedef galois::worklists::OrderedByIntegerMetric<NodeIndexer, 
-  //                         galois::worklists::dChunkedLIFO<chunksize> > wl2ty;
-  galois::InsertBag<uint32_t> wl2;
-  galois::InsertBag<uint32_t> wl4;
-  bcExecutor.fringewl = &wl4;
 
   galois::reportPageAlloc("MemAllocPre");
   galois::preAlloc(galois::getActiveThreads() * nnodes / 2000000);
@@ -453,6 +449,9 @@ int main(int argc, char** argv) {
     numOfSources = nnodes;
   }
 
+  galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
+  galois::InsertBag<uint32_t> backwardPhaseWL;
+
   executionTimer.start();
   for (uint32_t i = startNode; i < numOfSources; ++i) {
     // ignore nodes with no neighbors
@@ -460,31 +459,30 @@ int main(int argc, char** argv) {
       continue;
     }
 
-    std::vector<uint32_t> wl;
-    wl2.push_back(i);
+    forwardPhaseWL.push_back(ForwardPhaseWorkItem(i, 0));
     NodeType& active = bcGraph.getData(i);
     active.initAsSource();
     //galois::gDebug("Source is ", i);
 
-    //bcExecutor.dagConstruction<wl2ty>(wl2);
-    bcExecutor.dagConstruction(wl2);
-    wl2.clear();
+    bcExecutor.dagConstruction(forwardPhaseWL);
+    forwardPhaseWL.clear();
 
     //if (DOCHECKS) graph.checkGraph(active);
 
     bcExecutor.leafCount.reset();
-    bcExecutor.findLeaves(nnodes);
+    bcExecutor.findLeaves(backwardPhaseWL, nnodes);
 
     if (bcExecutor.leafCount.isActive()) {
       galois::gPrint(bcExecutor.leafCount.reduce(), " leaf nodes in DAG\n");
     }
 
     double backupSrcBC = active.bc;
-    bcExecutor.dependencyBackProp(wl4);
+    bcExecutor.dependencyBackProp(backwardPhaseWL);
 
     active.bc = backupSrcBC; // current source BC should not get updated
 
-    wl4.clear();
+    backwardPhaseWL.clear();
+
     //if (DOCHECKS) graph.checkSteadyState2();
 
     // TODO refactor
@@ -523,7 +521,7 @@ int main(int argc, char** argv) {
 
   // prints out first 10 node BC values
   if (!skipVerify) {
-    //graph.verify(); // TODO see what this does
+    //graph.verify(); // TODO see what this does/what it is supposed to do
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
