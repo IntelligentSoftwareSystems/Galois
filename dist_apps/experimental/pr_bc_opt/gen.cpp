@@ -380,10 +380,12 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
 
 
 void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
-  const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
+  // has to be all nodes because even nodes without edges may have dependency
+  // that needs to be sync'd
+  const auto& allNodes = graph.allNodesRange();
 
   galois::do_all(
-    galois::iterate(allNodesWithEdges.begin(), allNodesWithEdges.end()),
+    galois::iterate(allNodes.begin(), allNodes.end()),
     [&] (GNode dst) {
       NodeData& dst_data = graph.getData(dst);
       dst_data.roundIndexToSend = infinity;
@@ -422,7 +424,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
     // write destination in this case being the source in the actual graph
     // since we're using the tranpose graph
-    graph.sync<writeDestination, readAny, DependencyReduce, DependencyBroadcast, 
+    graph.sync<writeDestination, readSource, DependencyReduce, DependencyBroadcast, 
                Bitset_dependency>(std::string("DependencySync") + "_" + 
                                   std::to_string(macroRound));
 
