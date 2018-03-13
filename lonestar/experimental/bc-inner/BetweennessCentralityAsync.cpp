@@ -62,6 +62,11 @@ static cll::opt<unsigned int> numOfSources("numOfSources",
                                                   " BC on"),
                                         cll::init(0));
 
+static cll::opt<unsigned int> numOfOutSources("numOfOutSources", 
+                                        cll::desc("Number of sources WITH EDGES "
+                                                  " to compute BC on"),
+                                        cll::init(0));
+
 static cll::opt<bool> generateCert("generateCertificate",
                                    cll::desc("Prints certificate at end of "
                                              "execution"),
@@ -449,6 +454,13 @@ int main(int argc, char** argv) {
     numOfSources = nnodes;
   }
 
+  // if user specifies a certain number of out sources (i.e. only sources with
+  // outgoing edges), then we must loop over all nodes
+  uint32_t goodSource = 0;
+  if (numOfOutSources != 0) {
+    numOfSources = nnodes;
+  }
+
   galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
   galois::InsertBag<uint32_t> backwardPhaseWL;
 
@@ -501,6 +513,11 @@ int main(int argc, char** argv) {
       },
       galois::loopname("CleanupLoop")
     );
+
+    // break out once number of sources user specified to do (if any) has been 
+    // reached
+    goodSource++;
+    if (numOfOutSources != 0 && goodSource >= numOfOutSources) break;
   }
   executionTimer.stop();
 
