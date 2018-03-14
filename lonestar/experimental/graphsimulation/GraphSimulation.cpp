@@ -411,6 +411,36 @@ void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1,
     galois::loopname("MatchNodesDsts"));
 }
 
+size_t countMatchedNodes(Graph& graph) {
+  galois::GAccumulator<size_t> numMatched;
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.matched) {
+        numMatched += 1;
+      }
+    },
+    galois::loopname("CountMatchedNodes"));
+  return numMatched.reduce();
+}
+
+void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
+  Graph& graph = dataGraph.graph;
+  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeNames = dataGraph.nodeNames;
+
+  size_t i = 0;
+  for (auto n: graph) {
+    auto& data = graph.getData(n);
+    if (data.matched) {
+      matchedNodes[i].id = data.id;
+      matchedNodes[i].label = nodeLabels[data.label].c_str();
+      matchedNodes[i].name = nodeNames[n].c_str();
+      ++i;
+    }
+  }
+}
+
 void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
   Graph& graph = dataGraph.graph;
   auto& nodeLabels = dataGraph.nodeLabels;

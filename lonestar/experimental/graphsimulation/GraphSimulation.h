@@ -49,6 +49,12 @@ struct EdgeData {
   EdgeData(uint32_t l, uint64_t t) : label(l), timestamp(t) {}
 };
 
+struct MatchedNode {
+  uint32_t id;
+  const char* label;
+  const char* name;
+};
+
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -72,5 +78,11 @@ void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGra
 
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
-void reportMatchedNodes(AttributedGraph &graph, std::string outputFile);
+
+size_t countMatchedNodes(Graph& graph);
+
+extern "C" {
+void returnMatchedNodes(AttributedGraph& graph, MatchedNode* matchedNodes);
+void reportMatchedNodes(AttributedGraph& graph, std::string outputFile);
+} // extern "C"
 

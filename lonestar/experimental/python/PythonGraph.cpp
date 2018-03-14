@@ -203,35 +203,29 @@ size_t getNumEdges(AttributedGraph *g) {
 //  g->getEdgeData(ei).erase(key);
 //}
 
-void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile) {
+size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph) {
   runGraphSimulation(queryGraph->graph, dataGraph->graph);
-  if (outputFile != NULL) {
-    reportGraphSimulation(*queryGraph, *dataGraph, outputFile);
-  }
+  return countMatchedNodes(dataGraph->graph);
 }
 
-void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile) {
+size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph) {
   matchNodeWithRepeatedActions(dataGraph->graph,
       dataGraph->nodeIDs["file"],
       dataGraph->edgeIDs["write"]);
-  if (outputFile != NULL) {
-    reportMatchedNodes(*dataGraph, outputFile);
-  }
+  return countMatchedNodes(dataGraph->graph);
 }
 
-void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* outputFile) {
+size_t findProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph) {
   matchNodeWithTwoActions(dataGraph->graph,
       dataGraph->nodeIDs["process"],
       dataGraph->edgeIDs["read"],
       dataGraph->nodeIDs["file"],
       dataGraph->edgeIDs["write"],
       dataGraph->nodeIDs["netflow"]);
-  if (outputFile != NULL) {
-    reportMatchedNodes(*dataGraph, outputFile);
-  }
+  return countMatchedNodes(dataGraph->graph);
 }
 
-void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outputFile) {
+size_t findProcessesOriginatingFromNetflow(AttributedGraph* dataGraph) {
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
@@ -259,12 +253,10 @@ void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outpu
   queryGraph.fixEndEdge(3, 6);
 
   runGraphSimulation(queryGraph, dataGraph->graph);
-  if (outputFile != NULL) {
-    reportMatchedNodes(*dataGraph, outputFile);
-  }
+  return countMatchedNodes(dataGraph->graph);
 }
 
-void listProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph, char* outputFile) {
+size_t findProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph) {
   Graph queryGraph;
   queryGraph.allocateFrom(6, 10);
   queryGraph.constructNodes();
@@ -304,8 +296,6 @@ void listProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph, c
   queryGraph.fixEndEdge(5, 10);
 
   runGraphSimulation(queryGraph, dataGraph->graph);
-  if (outputFile != NULL) {
-    reportMatchedNodes(*dataGraph, outputFile);
-  }
+  return countMatchedNodes(dataGraph->graph);
 }
 

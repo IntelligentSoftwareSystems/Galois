@@ -54,12 +54,12 @@ void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char* key, char* v
 size_t getNumNodes(AttributedGraph* g);
 size_t getNumEdges(AttributedGraph* g);
 
-void runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, char* outputFile);
+size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph);
 
-void listFilesWithMultipleWrites(AttributedGraph* dataGraph, char* outputFile);
-void listProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph, char* outputFile);
-void listProcessesOriginatingFromNetflow(AttributedGraph* dataGraph, char* outputFile);
-void listProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph, char* outputFile);
+size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph);
+size_t findProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph);
+size_t findProcessesOriginatingFromNetflow(AttributedGraph* dataGraph);
+size_t findProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph);
 
 } // extern "C"
 
