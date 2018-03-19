@@ -215,22 +215,22 @@ size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph) {
   return countMatchedNodes(dataGraph->graph);
 }
 
-size_t findProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph) {
+size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph) {
   matchNodeWithTwoActions(dataGraph->graph,
       dataGraph->nodeIDs["process"],
       dataGraph->edgeIDs["read"],
       dataGraph->nodeIDs["file"],
       dataGraph->edgeIDs["write"],
-      dataGraph->nodeIDs["netflow"]);
+      dataGraph->nodeIDs["network"]);
   return countMatchedNodes(dataGraph->graph);
 }
 
-size_t findProcessesOriginatingFromNetflow(AttributedGraph* dataGraph) {
+size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph) {
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
 
-  queryGraph.getData(0).label = dataGraph->nodeIDs["netflow"];
+  queryGraph.getData(0).label = dataGraph->nodeIDs["network"];
   queryGraph.getData(0).id = 0;
   queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeIDs["read"], 0));
   queryGraph.fixEndEdge(0, 1);
@@ -256,12 +256,12 @@ size_t findProcessesOriginatingFromNetflow(AttributedGraph* dataGraph) {
   return countMatchedNodes(dataGraph->graph);
 }
 
-size_t findProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph) {
+size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph) {
   Graph queryGraph;
   queryGraph.allocateFrom(6, 10);
   queryGraph.constructNodes();
 
-  queryGraph.getData(0).label = dataGraph->nodeIDs["netflow"];
+  queryGraph.getData(0).label = dataGraph->nodeIDs["network"];
   queryGraph.getData(0).id = 0;
   queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeIDs["read"], 0));
   queryGraph.fixEndEdge(0, 1);
@@ -317,22 +317,22 @@ size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
   return countMatchedNeighbors(dataGraph->graph, file_uuid);
 }
 
-size_t processesReadFromNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid) {
+size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
   matchNeighbors(dataGraph->graph,
-      netflow_uuid,
-      dataGraph->nodeIDs["netflow"],
+      network_uuid,
+      dataGraph->nodeIDs["network"],
       dataGraph->edgeIDs["read"],
       dataGraph->nodeIDs["process"]);
-  return countMatchedNeighbors(dataGraph->graph, netflow_uuid);
+  return countMatchedNeighbors(dataGraph->graph, network_uuid);
 }
 
-size_t processesWroteToNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid) {
+size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
   matchNeighbors(dataGraph->graph,
-      netflow_uuid,
-      dataGraph->nodeIDs["netflow"],
+      network_uuid,
+      dataGraph->nodeIDs["network"],
       dataGraph->edgeIDs["write"],
       dataGraph->nodeIDs["process"]);
-  return countMatchedNeighbors(dataGraph->graph, netflow_uuid);
+  return countMatchedNeighbors(dataGraph->graph, network_uuid);
 }
 
 size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
@@ -389,21 +389,21 @@ size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) 
   return countMatchedNeighbors(dataGraph->graph, process_uuid);
 }
 
-size_t netflowsReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
       process_uuid,
       dataGraph->nodeIDs["process"],
       dataGraph->edgeIDs["read"],
-      dataGraph->nodeIDs["netflow"]);
+      dataGraph->nodeIDs["network"]);
   return countMatchedNeighbors(dataGraph->graph, process_uuid);
 }
 
-size_t netflowsWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
       process_uuid,
       dataGraph->nodeIDs["process"],
       dataGraph->edgeIDs["write"],
-      dataGraph->nodeIDs["netflow"]);
+      dataGraph->nodeIDs["network"]);
   return countMatchedNeighbors(dataGraph->graph, process_uuid);
 }
 
