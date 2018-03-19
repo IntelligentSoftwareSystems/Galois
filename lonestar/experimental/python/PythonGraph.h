@@ -61,6 +61,24 @@ size_t findProcessesWithReadFileWriteNetflow(AttributedGraph* dataGraph);
 size_t findProcessesOriginatingFromNetflow(AttributedGraph* dataGraph);
 size_t findProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph);
 
+size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid);
+size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid);
+size_t processesReadFromNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid);
+size_t processesWroteToNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid);
+size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid);
+size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid);
+size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid);
+size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid);
+
+size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t netflowsReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t netflowsWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+
 } // extern "C"
 
 #endif // GALOIS_PYTHON_GRAPH_H

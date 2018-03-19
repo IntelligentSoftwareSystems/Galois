@@ -79,10 +79,15 @@ void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGra
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
 
+void matchNeighbors(Graph& graph, uint32_t uuid, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel);
+
 size_t countMatchedNodes(Graph& graph);
+size_t countMatchedNeighbors(Graph& graph, uint32_t uuid);
 
 extern "C" {
 void returnMatchedNodes(AttributedGraph& graph, MatchedNode* matchedNodes);
 void reportMatchedNodes(AttributedGraph& graph, std::string outputFile);
+void returnMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, MatchedNode* matchedNeighbors);
+void reportMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, std::string outputFile);
 } // extern "C"
 

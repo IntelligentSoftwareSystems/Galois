@@ -299,3 +299,147 @@ size_t findProcessesOriginatingFromNetflowIndirectly(AttributedGraph* dataGraph)
   return countMatchedNodes(dataGraph->graph);
 }
 
+size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
+  matchNeighbors(dataGraph->graph,
+      file_uuid,
+      dataGraph->nodeIDs["file"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, file_uuid);
+}
+
+size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
+  matchNeighbors(dataGraph->graph,
+      file_uuid,
+      dataGraph->nodeIDs["file"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, file_uuid);
+}
+
+size_t processesReadFromNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid) {
+  matchNeighbors(dataGraph->graph,
+      netflow_uuid,
+      dataGraph->nodeIDs["netflow"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, netflow_uuid);
+}
+
+size_t processesWroteToNetflow(AttributedGraph* dataGraph, uint32_t netflow_uuid) {
+  matchNeighbors(dataGraph->graph,
+      netflow_uuid,
+      dataGraph->nodeIDs["netflow"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, netflow_uuid);
+}
+
+size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
+  matchNeighbors(dataGraph->graph,
+      registry_uuid,
+      dataGraph->nodeIDs["registry"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, registry_uuid);
+}
+
+size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
+  matchNeighbors(dataGraph->graph,
+      registry_uuid,
+      dataGraph->nodeIDs["registry"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, registry_uuid);
+}
+
+size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
+  matchNeighbors(dataGraph->graph,
+      memory_uuid,
+      dataGraph->nodeIDs["memory"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, memory_uuid);
+}
+
+size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
+  matchNeighbors(dataGraph->graph,
+      memory_uuid,
+      dataGraph->nodeIDs["memory"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["process"]);
+  return countMatchedNeighbors(dataGraph->graph, memory_uuid);
+}
+
+size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["file"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["file"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t netflowsReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["netflow"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t netflowsWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["netflow"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["registry"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["registry"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["read"],
+      dataGraph->nodeIDs["memory"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+
+size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+  matchNeighbors(dataGraph->graph,
+      process_uuid,
+      dataGraph->nodeIDs["process"],
+      dataGraph->edgeIDs["write"],
+      dataGraph->nodeIDs["memory"]);
+  return countMatchedNeighbors(dataGraph->graph, process_uuid);
+}
+

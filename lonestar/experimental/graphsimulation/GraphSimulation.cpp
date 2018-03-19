@@ -470,3 +470,93 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
     ofs.close();
   }
 }
+
+void matchNeighbors(Graph& graph, uint32_t uuid, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel) {
+  // initialize matched
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      data.matched = 0; // matches to none
+    },
+    galois::loopname("InitMatched"));
+
+  // match destinations of node
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.id == uuid) {
+        assert(data.label == nodeLabel);
+        for (auto e: graph.edges(n)) {
+          auto& eData = graph.getEdgeData(e);
+          if (eData.label == action) {
+            auto dst = graph.getEdgeDst(e);
+            auto& dstData = graph.getData(dst);
+            if (dstData.label == neighborLabel) {
+              dstData.matched |= 1; // atomicity not required
+            }
+          }
+        }
+      }
+    },
+    galois::loopname("MatchNodesDsts"));
+}
+
+size_t countMatchedNeighbors(Graph& graph, uint32_t uuid) {
+  galois::GAccumulator<size_t> numMatched;
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (typename Graph::GraphNode n) {
+      auto& data = graph.getData(n);
+      if (data.matched) {
+        numMatched += 1;
+      }
+    },
+    galois::loopname("CountMatchedNeighbors"));
+  return numMatched.reduce();
+}
+
+void returnMatchedNeighbors(AttributedGraph& dataGraph, uint32_t uuid, MatchedNode* matchedNeighbors) {
+  Graph& graph = dataGraph.graph;
+  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeNames = dataGraph.nodeNames;
+
+  size_t i = 0;
+  for (auto n: graph) {
+    auto& data = graph.getData(n);
+    if (data.matched) {
+      matchedNeighbors[i].id = data.id;
+      matchedNeighbors[i].label = nodeLabels[data.label].c_str();
+      matchedNeighbors[i].name = nodeNames[n].c_str();
+      ++i;
+    }
+  }
+}
+
+void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::string outputFile) {
+  Graph& graph = dataGraph.graph;
+  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeNames = dataGraph.nodeNames;
+
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if (outputFile.size()) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  os << "Matched nodes:\n";
+  for (auto n: graph) {
+    auto& data = graph.getData(n);
+    if (data.matched) {
+      os << nodeLabels[data.label] << " " << nodeNames[n] << std::endl;
+    }
+  }
+
+  if (outputFile.size()) {
+    ofs.close();
+  }
+}
