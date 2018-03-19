@@ -80,10 +80,10 @@ void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGra
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
 
-void matchNeighbors(Graph& graph, uint32_t uuid, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel);
+void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel);
 
 size_t countMatchedNodes(Graph& graph);
-size_t countMatchedNeighbors(Graph& graph, uint32_t uuid);
+size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node);
 
 extern "C" {
 void returnMatchedNodes(AttributedGraph& graph, MatchedNode* matchedNodes);

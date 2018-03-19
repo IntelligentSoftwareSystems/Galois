@@ -471,7 +471,7 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
   }
 }
 
-void matchNeighbors(Graph& graph, uint32_t uuid, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel) {
+void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel) {
   // initialize matched
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
     [&] (typename Graph::GraphNode n) {
@@ -481,27 +481,22 @@ void matchNeighbors(Graph& graph, uint32_t uuid, uint32_t nodeLabel, uint32_t ac
     galois::loopname("InitMatched"));
 
   // match destinations of node
-  galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
-      auto& data = graph.getData(n);
-      if (data.id == uuid) {
-        assert(data.label == nodeLabel);
-        for (auto e: graph.edges(n)) {
-          auto& eData = graph.getEdgeData(e);
-          if (eData.label == action) {
-            auto dst = graph.getEdgeDst(e);
-            auto& dstData = graph.getData(dst);
-            if (dstData.label == neighborLabel) {
-              dstData.matched |= 1; // atomicity not required
-            }
-          }
+  assert(graph.getData(node).label == nodeLabel);
+  galois::do_all(galois::iterate(graph.edges(node).begin(), graph.edges(node).end()),
+    [&] (auto e) {
+      auto& eData = graph.getEdgeData(e);
+      if (eData.label == action) {
+        auto dst = graph.getEdgeDst(e);
+        auto& dstData = graph.getData(dst);
+        if (dstData.label == neighborLabel) {
+          dstData.matched |= 1; // atomicity not required
         }
       }
     },
     galois::loopname("MatchNodesDsts"));
 }
 
-size_t countMatchedNeighbors(Graph& graph, uint32_t uuid) {
+size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node) {
   galois::GAccumulator<size_t> numMatched;
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
     [&] (typename Graph::GraphNode n) {

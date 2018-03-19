@@ -304,7 +304,7 @@ size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph)
 
 size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
   matchNeighbors(dataGraph->graph,
-      file_uuid,
+      dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["process"]);
@@ -313,7 +313,7 @@ size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
 
 size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
   matchNeighbors(dataGraph->graph,
-      file_uuid,
+      dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["process"]);
@@ -322,7 +322,7 @@ size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
 
 size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
   matchNeighbors(dataGraph->graph,
-      network_uuid,
+      dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["process"]);
@@ -331,7 +331,7 @@ size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uui
 
 size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
   matchNeighbors(dataGraph->graph,
-      network_uuid,
+      dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["process"]);
@@ -340,7 +340,7 @@ size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid
 
 size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
   matchNeighbors(dataGraph->graph,
-      registry_uuid,
+      dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["process"]);
@@ -349,7 +349,7 @@ size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_u
 
 size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
   matchNeighbors(dataGraph->graph,
-      registry_uuid,
+      dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["process"]);
@@ -358,7 +358,7 @@ size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uu
 
 size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
   matchNeighbors(dataGraph->graph,
-      memory_uuid,
+      dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["process"]);
@@ -367,7 +367,7 @@ size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid)
 
 size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
   matchNeighbors(dataGraph->graph,
-      memory_uuid,
+      dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["process"]);
@@ -376,7 +376,7 @@ size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) 
 
 size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["file"]);
@@ -385,7 +385,7 @@ size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
 
 size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["file"]);
@@ -394,7 +394,7 @@ size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) 
 
 size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["network"]);
@@ -403,7 +403,7 @@ size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) 
 
 size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["network"]);
@@ -412,7 +412,7 @@ size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uui
 
 size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["registry"]);
@@ -421,7 +421,7 @@ size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid
 
 size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["registry"]);
@@ -430,7 +430,7 @@ size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_u
 
 size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["read"],
       dataGraph->nodeLabelIDs["memory"]);
@@ -439,7 +439,7 @@ size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) 
 
 size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
   matchNeighbors(dataGraph->graph,
-      process_uuid,
+      dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["write"],
       dataGraph->nodeLabelIDs["memory"]);
