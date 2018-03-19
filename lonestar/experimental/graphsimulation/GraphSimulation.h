@@ -63,10 +63,10 @@ void reportGraphSimulation(Graph& queryGraph, Graph& dataGraph, std::string outp
 
 struct AttributedGraph {
   Graph graph;
-  std::vector<std::string> nodeLabels;
-  std::map<std::string, uint32_t> nodeIDs;
-  std::vector<std::string> edgeLabels;
-  std::map<std::string, uint32_t> edgeIDs;
+  std::vector<std::string> nodeLabelNames; // maps ID to Name
+  std::map<std::string, uint32_t> nodeLabelIDs; // maps Name to ID
+  std::vector<std::string> edgeLabelNames; // maps ID to Name
+  std::map<std::string, uint32_t> edgeLabelIDs; // maps Name to ID
   std::vector<std::string> nodeNames; // cannot use LargeArray because serialize does not do deep-copy
   // custom attributes
   std::map<std::string, std::vector<std::string>> nodeAttributes;

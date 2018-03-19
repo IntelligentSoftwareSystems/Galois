@@ -255,19 +255,19 @@ void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string
   Graph& qgraph = qG.graph;
   auto& qnodeNames = qG.nodeNames;
   Graph& graph = dG.graph;
-  auto& nodeLabels = dG.nodeLabels;
-  auto& edgeLabels = dG.edgeLabels;
+  auto& nodeLabelNames = dG.nodeLabelNames;
+  auto& edgeLabelNames = dG.edgeLabelNames;
   auto& nodeNames = dG.nodeNames;
   for(auto n: graph) {
     auto& src = graph.getData(n);
-    auto& srcLabel = nodeLabels[rightmostSetBitPos(src.label)];
+    auto& srcLabel = nodeLabelNames[rightmostSetBitPos(src.label)];
     auto& srcName = nodeNames[src.id];
     for(auto e: graph.edges(n)) {
       auto& dst = graph.getData(graph.getEdgeDst(e));
-      auto& dstLabel = nodeLabels[rightmostSetBitPos(dst.label)];
+      auto& dstLabel = nodeLabelNames[rightmostSetBitPos(dst.label)];
       auto& dstName = nodeNames[dst.id];
       auto& ed = graph.getEdgeData(e);
-      auto& edgeLabel = edgeLabels[rightmostSetBitPos(ed.label)];
+      auto& edgeLabel = edgeLabelNames[rightmostSetBitPos(ed.label)];
       auto& edgeTimestamp = ed.timestamp;
       for(auto qn: qgraph) {
         uint64_t mask = (1 << qn);
@@ -426,7 +426,7 @@ size_t countMatchedNodes(Graph& graph) {
 
 void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   size_t i = 0;
@@ -434,7 +434,7 @@ void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
     auto& data = graph.getData(n);
     if (data.matched) {
       matchedNodes[i].id = data.id;
-      matchedNodes[i].label = nodeLabels[data.label].c_str();
+      matchedNodes[i].label = nodeLabelNames[data.label].c_str();
       matchedNodes[i].name = nodeNames[n].c_str();
       ++i;
     }
@@ -443,7 +443,7 @@ void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
 
 void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   std::streambuf* buf;
@@ -462,7 +462,7 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
   for (auto n: graph) {
     auto& data = graph.getData(n);
     if (data.matched) {
-      os << nodeLabels[data.label] << " " << nodeNames[n] << std::endl;
+      os << nodeLabelNames[data.label] << " " << nodeNames[n] << std::endl;
     }
   }
 
@@ -516,7 +516,7 @@ size_t countMatchedNeighbors(Graph& graph, uint32_t uuid) {
 
 void returnMatchedNeighbors(AttributedGraph& dataGraph, uint32_t uuid, MatchedNode* matchedNeighbors) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   size_t i = 0;
@@ -524,7 +524,7 @@ void returnMatchedNeighbors(AttributedGraph& dataGraph, uint32_t uuid, MatchedNo
     auto& data = graph.getData(n);
     if (data.matched) {
       matchedNeighbors[i].id = data.id;
-      matchedNeighbors[i].label = nodeLabels[data.label].c_str();
+      matchedNeighbors[i].label = nodeLabelNames[data.label].c_str();
       matchedNeighbors[i].name = nodeNames[n].c_str();
       ++i;
     }
@@ -533,7 +533,7 @@ void returnMatchedNeighbors(AttributedGraph& dataGraph, uint32_t uuid, MatchedNo
 
 void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::string outputFile) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabels = dataGraph.nodeLabels;
+  auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   std::streambuf* buf;
@@ -552,7 +552,7 @@ void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::stri
   for (auto n: graph) {
     auto& data = graph.getData(n);
     if (data.matched) {
-      os << nodeLabels[data.label] << " " << nodeNames[n] << std::endl;
+      os << nodeLabelNames[data.label] << " " << nodeNames[n] << std::endl;
     }
   }
 
