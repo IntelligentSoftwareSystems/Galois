@@ -29,178 +29,6 @@
 #include <iostream>
 #include <limits>
 
-template <typename P>
-class KdCell {
-
-public:
-  enum SplitType {
-    SPLIT_X=0, SPLIT_Y, SPLIT_Z, LEAF
-  };
-  constexpr static const MAX_POINTS_IN_CELL = 4;
-
-protected:
-  using PointList = std::vector<P*>;
-
-
-  Point3 m_min;
-  Point3 m_max;
-  const SplitType m_splitType;
-  const double m_splitValue;
-  KdCell* m_leftChild;
-  KdCell* m_rightChild;
-  PointList m_pointList;
-
-public:
-
-  KdCell()
-      : m_min(std::numeric_limits<double>::max()),
-        m_max(-1 * std::numeric_limits<double>::max()), 
-        m_splitType(LEAF),
-        m_splitValue(std::numeric_limits<double>::max()) 
-  {
-    m_pointList.resize(MAX_POINTS_IN_CELL);
-    m_leftChild      = NULL;
-    m_rightChild     = NULL;
-  }
-
-  KdCell(int inSplitType, double inSplitValue)
-      : min(0), max(0), m_splitType(inSplitType), m_splitValue(inSplitValue) {
-
-    if (m_splitType == LEAF) {
-      m_pointList.resize(MAX_POINTS_IN_CELL);
-    } else {
-      m_pointList.resize(0);
-    }
-
-    m_leftChild = m_rightChild = NULL;
-  }
-
-  bool equals(KdCell& other) const {
-    if (m_splitType != other.m_splitType) {
-      return false;
-    }
-    if (m_splitValue != other.m_splitValue) {
-      return false;
-    }
-    if (min.equals(other.min) == false) {
-      return false;
-    }
-    if (max.equals(other.max) == false) {
-      return false;
-    }
-    if (m_splitType == KdCell::LEAF) {
-
-      return m_leftChild->equals(*other.m_leftChild) && m_rightChild->equals(*m_rightChild);
-    }
-    if (m_points.size() != other.m_points.size()) {
-      return false;
-    }
-
-    for (unsigned int i = 0; i < m_points.size(); i++) {
-
-      if (m_points[i] != NULL && other.m_points[i] != NULL) {
-        if (m_points[i]->equals(*other.m_points[i]) == false) {
-          return false;
-        }
-      }
-      if (m_points[i] != other.m_points[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  static KdCell* subDivide(galois::gstl::Vector<NodeWrapper*>& list, int offset,
-                           const int size, galois::gstl::Vector<double>* arr,
-                           KdCell& factory) {
-    KdCell* toReturn;
-    if (size <= KdCell::MAX_POINTS_IN_CELL) {
-
-      toReturn     = factory.createNewBlankCell(KdCell::LEAF,
-                                            std::numeric_limits<double>::max());
-      KdCell& cell = *toReturn;
-      for (int i = 0; i < size; i++) {
-        cell.m_points[i] = list[offset + i];
-      }
-      for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-          if (i != j) {
-            if (cell.m_points[i]->equals(*cell.m_points[j]))
-              assert(false);
-          }
-        }
-      }
-      cell.computeBoundingBoxFromPoints(list, size);
-      cell.notifyContentsRebuilt(true);
-    } else {
-      bool shouldClean = false;
-      if (arr == NULL) {
-        arr         = new galois::gstl::Vector<double>(size);
-        shouldClean = true;
-      }
-      Point3 min(std::numeric_limits<float>::max());
-      Point3 max(-std::numeric_limits<float>::max());
-      for (int i = offset; i < size; i++) {
-        min.setIfMin(list[i]->getMin());
-        max.setIfMax(list[i]->getMax());
-      }
-      Point3 diff(max);
-      diff.sub(min);
-      int splitTypeUsed     = -1, splitType0, splitType1, splitType2;
-      double splitValueUsed = -1;
-      if (diff.getZ() > diff.getX() && diff.getZ() > diff.getY()) {
-        splitType0      = KdCell::SPLIT_Z;
-        bool comparCond = diff.getX() > diff.getY();
-        splitType1      = comparCond ? KdCell::SPLIT_X : KdCell::SPLIT_Y;
-        splitType2      = comparCond ? KdCell::SPLIT_Y : KdCell::SPLIT_X;
-      } else if (diff.getY() > diff.getX()) {
-        splitType0      = KdCell::SPLIT_Y;
-        bool comparCond = diff.getX() > diff.getZ();
-        splitType1      = comparCond ? KdCell::SPLIT_X : KdCell::SPLIT_Z;
-        splitType2      = comparCond ? KdCell::SPLIT_Z : KdCell::SPLIT_X;
-      } else {
-        splitType0      = KdCell::SPLIT_X;
-        bool comparCond = diff.getY() > diff.getZ();
-        splitType1      = comparCond ? KdCell::SPLIT_Y : KdCell::SPLIT_Z;
-        splitType2      = comparCond ? KdCell::SPLIT_Z : KdCell::SPLIT_Y;
-      }
-
-      splitTypeUsed  = splitType0;
-      splitValueUsed = computeSplitValue(list, offset, size, splitType0, arr);
-      if (splitValueUsed == std::numeric_limits<float>::max()) {
-        splitTypeUsed  = splitType1;
-        splitValueUsed = computeSplitValue(list, offset, size, splitType1, arr);
-        if (splitValueUsed == std::numeric_limits<float>::max()) {
-          splitTypeUsed = splitType2;
-          splitValueUsed =
-              computeSplitValue(list, offset, size, splitType2, arr);
-        }
-      }
-      // Unable to find a good split along any axis!
-      if (splitValueUsed == std::numeric_limits<float>::max()) {
-        assert(false && "Unable to find a valid split across any dimension!");
-      }
-      int leftCountForSplit =
-          splitList(list, offset, size, splitValueUsed, splitTypeUsed);
-      if (leftCountForSplit <= 1 || leftCountForSplit >= size - 1) {
-        assert(false && "Invalid split");
-      }
-      toReturn     = factory.createNewBlankCell(splitTypeUsed, splitValueUsed);
-      KdCell& cell = *toReturn;
-      cell.max.set(max);
-      cell.min.set(min);
-      cell.m_leftChild = subDivide(list, offset, leftCountForSplit, arr, factory);
-      cell.m_rightChild = subDivide(list, offset + leftCountForSplit,
-                                  size - leftCountForSplit, arr, factory);
-      // Clean up on exit.
-      if (shouldClean == true)
-        delete arr;
-    }
-    return toReturn;
-  }
-
-};
-
 class KdCell {
 public:
   const static int LEAF;
@@ -311,8 +139,8 @@ public:
         arr         = new galois::gstl::Vector<double>(size);
         shouldClean = true;
       }
-      Point3 min(std::numeric_limits<float>::max());
-      Point3 max(-std::numeric_limits<float>::max());
+      Point3 min(std::numeric_limits<double>::max());
+      Point3 max(-std::numeric_limits<double>::max());
       for (int i = offset; i < size; i++) {
         min.setIfMin(list[i]->getMin());
         max.setIfMax(list[i]->getMax());
@@ -340,17 +168,17 @@ public:
 
       splitTypeUsed  = splitType0;
       splitValueUsed = computeSplitValue(list, offset, size, splitType0, arr);
-      if (splitValueUsed == std::numeric_limits<float>::max()) {
+      if (splitValueUsed == std::numeric_limits<double>::max()) {
         splitTypeUsed  = splitType1;
         splitValueUsed = computeSplitValue(list, offset, size, splitType1, arr);
-        if (splitValueUsed == std::numeric_limits<float>::max()) {
+        if (splitValueUsed == std::numeric_limits<double>::max()) {
           splitTypeUsed = splitType2;
           splitValueUsed =
               computeSplitValue(list, offset, size, splitType2, arr);
         }
       }
       // Unable to find a good split along any axis!
-      if (splitValueUsed == std::numeric_limits<float>::max()) {
+      if (splitValueUsed == std::numeric_limits<double>::max()) {
         assert(false && "Unable to find a valid split across any dimension!");
       }
       int leftCountForSplit =
@@ -375,12 +203,14 @@ public:
   bool notifyContentsRebuilt(bool inChange) { return inChange; }
 
   static double computeSplitValue(galois::gstl::Vector<NodeWrapper*>& list,
+      //TODO: create leaf node
                                   int offset, int size, int pSplitType,
                                   galois::gstl::Vector<double>* arr) {
     for (int i = 0; i < size; i++) {
       (*arr)[i] = findSplitComponent(*(list[offset + i]), pSplitType);
     }
     return findMedianGapSplit(arr, size);
+      //TODO: create leaf node
   }
 
   static double findSplitComponent(NodeWrapper& n, int pSplitType) {
@@ -420,7 +250,7 @@ public:
     }
     if (largestGap <= 0) {
       // indicate that the attempt to find a good split value failed
-      m_splitValue = std::numeric_limits<float>::max();
+      m_splitValue = std::numeric_limits<double>::max();
     }
     return m_splitValue;
   }
@@ -472,7 +302,7 @@ public:
     } else {
       // otherwise its an interior node, so find which child should contain the
       // point
-      float val     = findSplitComponent(point, m_splitType);
+      double val     = findSplitComponent(point, m_splitType);
       KdCell* child = val <= m_splitValue ? m_leftChild : m_rightChild;
       if (child != NULL)
         return child->contains(point);
@@ -636,8 +466,8 @@ private:
   }
 
   bool recomputeLeafBoundingBoxIfChanges() {
-    Point3 newMin(std::numeric_limits<float>::max());
-    Point3 newMax(-std::numeric_limits<float>::max());
+    Point3 newMin(std::numeric_limits<double>::max());
+    Point3 newMax(-std::numeric_limits<double>::max());
     for (int i = 0; i < KdCell::MAX_POINTS_IN_CELL; i++) {
       if (m_points[i] != NULL) {
         newMin.setIfMin(m_points[i]->getMin());

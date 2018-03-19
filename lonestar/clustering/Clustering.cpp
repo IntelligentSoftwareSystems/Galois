@@ -163,6 +163,29 @@ struct Clustering {
     cout << "================================================================"
          << endl;
 #endif
+    /* 
+     * Tree building algorithm
+     *
+     * KdNode<NodeWrapper*> root;
+     *
+     * wl = { (root, lights.begin(), lights.end())
+     *
+     * for_each( (node, beg,end) in wl) {
+     *    node->buildRecursive(beg, end) {
+     *      init(beg, end);
+     *      if (end - beg < MAX_POINTS_IN_CELL) {
+     *        isLeaf = true;
+     *        copy points to local array
+     *      } else {
+     *        mid = split(beg, end);
+     *        l = node->createLeftChild();
+     *        r = node->createRightChild();
+     *        wl.push( (l, beg, mid) );
+     *        wl.push( (r, mid, end) );
+     *      }
+     *    }
+     * }
+     */
 
     GVector<NodeWrapper*> workList(0);
     KdTree::getAll(*tree, workList);
