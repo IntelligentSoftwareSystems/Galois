@@ -45,6 +45,7 @@ void saveGraph(AttributedGraph *g, char* filename) {
   oarch << g->nodeLabelIDs;
   oarch << g->edgeLabelNames;
   oarch << g->edgeLabelIDs;
+  oarch << g->nodeIndices;
   oarch << g->nodeNames;
   size_t size = g->nodeAttributes.size();
   oarch << size;
@@ -69,6 +70,7 @@ void loadGraph(AttributedGraph *g, char* filename) {
   iarch >> g->nodeLabelIDs;
   iarch >> g->edgeLabelNames;
   iarch >> g->edgeLabelIDs;
+  iarch >> g->nodeIndices;
   iarch >> g->nodeNames;
   size_t size;
   iarch >> size;
@@ -130,6 +132,7 @@ void setNode(AttributedGraph *g, uint32_t nodeIndex, uint32_t uuid, uint32_t lab
   auto& nd = g->graph.getData(nodeIndex);
   nd.label = label;
   nd.id = uuid;
+  g->nodeIndices[uuid] = nodeIndex;
   g->nodeNames[nodeIndex] = nodeName;
 }
 
