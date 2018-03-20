@@ -346,9 +346,9 @@ struct BetweenessCentralityAsync {
               predData.unlock();
             }
           }
-          srcData.reset();
 
-          // reset edge data
+          // reset data in preparation for next source
+          srcData.reset();
           for (auto e : graph.edges(srcID)) {
             graph.getEdgeData(e).reset();
           }
@@ -435,14 +435,12 @@ int main(int argc, char** argv) {
   galois::StatTimer executionTimer;
 
   // reset everything in preparation for run
-  // TODO refactor
   galois::do_all(
     galois::iterate(0u, nnodes),
     [&] (auto i) {
       bcGraph.getData(i).reset();
     }
   );
-
   galois::do_all(
     galois::iterate(0ul, nedges),
     [&] (auto i) {
@@ -496,23 +494,6 @@ int main(int argc, char** argv) {
     backwardPhaseWL.clear();
 
     //if (DOCHECKS) graph.checkSteadyState2();
-
-    // TODO refactor
-    galois::do_all(
-      galois::iterate(0u, nnodes),
-      [&] (auto i) {
-        bcGraph.getData(i).reset();
-      },
-      galois::loopname("CleanupLoop")
-    );
-
-    galois::do_all(
-      galois::iterate(0ul, nedges),
-      [&] (auto i) {
-        bcGraph.getEdgeData(i).reset();
-      },
-      galois::loopname("CleanupLoop")
-    );
 
     // break out once number of sources user specified to do (if any) has been 
     // reached
