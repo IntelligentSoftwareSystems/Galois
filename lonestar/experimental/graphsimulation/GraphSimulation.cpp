@@ -33,7 +33,7 @@
 template<typename QG, typename DG, typename W>
 void matchLabel(QG& qG, DG& dG, W& w) {
   galois::do_all(galois::iterate(dG.begin(), dG.end()),
-      [&qG, &dG, &w] (typename DG::GraphNode dn) {
+      [&qG, &dG, &w] (auto dn) {
         auto& dData = dG.getData(dn);
         dData.matched = 0; // matches to none
         for (auto qn: qG) {
@@ -58,7 +58,7 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
   for (auto qn: qG) {
     auto& qData = qG.getData(qn);
     if (!qData.matched) {
-      std::cout << "empty label match for query node " << qData.id << std::endl;
+      //std::cout << "No label matched for query node " << qData.id << std::endl;
       return true;
     }
   }
@@ -66,15 +66,19 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
 }
 
 void runGraphSimulation(Graph& qG, Graph& dG) {
-  using DGNode = Graph::GraphNode;
-
-  using WorkQueue = galois::InsertBag<DGNode>;
+  using WorkQueue = galois::InsertBag<Graph::GraphNode>;
   WorkQueue w[2];
   WorkQueue* cur = &w[0];
   WorkQueue* next = &w[1];
 
   matchLabel(qG, dG, *next);
   if (existEmptyLabelMatchQGNode(qG)) {
+    galois::do_all(galois::iterate(dG.begin(), dG.end()),
+        [&qG, &dG, &w] (auto dn) {
+          auto& dData = dG.getData(dn);
+          dData.matched = 0; // matches to none
+      },
+      galois::loopname("ResetMatched"));
     return;
   }
 
@@ -87,7 +91,7 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
     next->clear();
 
     galois::do_all(galois::iterate(*cur),
-        [&dG, &qG, cur, next] (DGNode dn) {
+        [&dG, &qG, cur, next] (auto dn) {
           auto& dData = dG.getData(dn);
 
           for (auto qn: qG) { // multiple matches
@@ -301,7 +305,7 @@ void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action) {
   // initialize matched
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       data.matched = 0; // matches to none
     },
@@ -309,7 +313,7 @@ void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t act
 
   // match nodes
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.label == nodeLabel) {
         unsigned numActions = 0;
@@ -334,7 +338,7 @@ void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t act
 
   // match destination of matched nodes
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.matched & 1) {
         for (auto e: graph.edges(n)) {
@@ -353,7 +357,7 @@ void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t act
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2) {
   // initialize matched
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       data.matched = 0; // matches to none
     },
@@ -361,7 +365,7 @@ void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1,
 
   // match nodes
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.label == nodeLabel) {
         bool foundAction1 = false;
@@ -389,7 +393,7 @@ void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1,
 
   // match destination of matched nodes
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.matched & 1) {
         for (auto e: graph.edges(n)) {
@@ -414,7 +418,7 @@ void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1,
 size_t countMatchedNodes(Graph& graph) {
   galois::GAccumulator<size_t> numMatched;
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.matched) {
         numMatched += 1;
@@ -474,7 +478,7 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
 void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel) {
   // initialize matched
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       data.matched = 0; // matches to none
     },
@@ -499,7 +503,7 @@ void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uin
 size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node) {
   galois::GAccumulator<size_t> numMatched;
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
-    [&] (typename Graph::GraphNode n) {
+    [&] (auto n) {
       auto& data = graph.getData(n);
       if (data.matched) {
         numMatched += 1;
