@@ -92,26 +92,31 @@ void loadGraph(AttributedGraph *g, char* filename) {
 
 void printGraph(AttributedGraph* g) {
   Graph& graph = g->graph;
-  auto& nodeLabelNames = g->nodeLabelNames;
+  //auto& nodeLabelNames = g->nodeLabelNames;
   auto& edgeLabelNames = g->edgeLabelNames;
   auto& nodeNames = g->nodeNames;
+  auto sourceLabelID = g->nodeLabelIDs["process"];
+  uint64_t numEdges = 0;
   for(auto src: graph) {
     auto& srcData = graph.getData(src);
-    auto& srcLabel = nodeLabelNames[srcData.label];
+    if (srcData.label != sourceLabelID) continue;
+    //auto& srcLabel = nodeLabelNames[srcData.label];
     auto& srcName = nodeNames[src];
     for(auto e: graph.edges(src)) {
       auto dst = graph.getEdgeDst(e);
       auto& dstData = graph.getData(dst);
-      auto& dstLabel = nodeLabelNames[dstData.label];
+      if ((dstData.label == sourceLabelID) && (dst < src)) continue;
+      //auto& dstLabel = nodeLabelNames[dstData.label];
       auto& dstName = nodeNames[dst];
       auto& ed = graph.getEdgeData(e);
       auto& edgeLabel = edgeLabelNames[ed.label];
       auto& edgeTimestamp = ed.timestamp;
-      std::cout << srcLabel << " " << srcName << " " 
-                << edgeLabel << " " << dstLabel << " " 
-                << dstName << " at " << edgeTimestamp << std::endl;
+      std::cout << edgeTimestamp << ", " << srcName << ", " 
+                << edgeLabel << ", " << dstName << std::endl;
+      ++numEdges;
     }
   }
+  assert((numEdges * 2) == graph.sizeEdges());
 }
 
 void allocateGraph(AttributedGraph *g, size_t numNodes, size_t numEdges, size_t numNodeLabels, size_t numEdgeLabels) {
