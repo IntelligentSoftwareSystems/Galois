@@ -191,18 +191,48 @@ void runGraphSimulation(Graph& qG, Graph& dG) {
             next->push_back(dn);
           }
         },
-        galois::loopname("CheckChildrenLink"));
+        galois::loopname("MatchNeighbors"));
 
     sizeCur = std::distance(cur->begin(), cur->end());
     sizeNext = std::distance(next->begin(), next->end());
   }
+
+  // match the edges
+  galois::do_all(galois::iterate(*cur),
+      [&dG, &qG, cur, next] (auto dn) {
+        auto& dData = dG.getData(dn);
+
+        for (auto qn: qG) { // multiple matches
+          uint64_t mask = (1 << qn);
+          if (dData.matched & mask) {
+            for (auto qe: qG.edges(qn)) {
+              auto qeData = qG.getEdgeData(qe);
+              auto qDst = qG.getEdgeDst(qe);
+
+              for (auto de: dG.edges(dn)) {
+                auto deData = dG.getEdgeData(de);
+                auto dDst = dG.getEdgeDst(de);
+                if (dn < dDst) { // match only one of the symmetric edges
+                  if (qeData.label & deData.label) { // query could be any or multiple labels
+                    auto& dDstData = dG.getData(dDst);
+                    if (dDstData.matched & (1 << qDst)) {
+                      deData.matched |= 1 << *qe;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      galois::loopname("MatchNeighborEdges"));
 }
 
-void reportGraphSimulation(Graph& qG, Graph& dG, std::string outputFile) {
+void reportGraphSimulation(Graph& qG, Graph& dG, char* outputFile) {
   std::streambuf* buf;
   std::ofstream ofs;
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.open(outputFile);
     buf = ofs.rdbuf();
   } else {
@@ -223,7 +253,7 @@ void reportGraphSimulation(Graph& qG, Graph& dG, std::string outputFile) {
     }
   }
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.close();
   }
 }
@@ -243,11 +273,11 @@ unsigned rightmostSetBitPos(uint32_t n) {
   return pos-1;
 }
 
-void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string outputFile) {
+void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, char* outputFile) {
   std::streambuf* buf;
   std::ofstream ofs;
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.open(outputFile);
     buf = ofs.rdbuf();
   } else {
@@ -297,7 +327,7 @@ void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, std::string
     }
   }
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.close();
   }
 }
@@ -344,6 +374,7 @@ void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t act
         for (auto e: graph.edges(n)) {
           auto& eData = graph.getEdgeData(e);
           if (eData.label == action) {
+            eData.matched = 1;
             auto dst = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst);
             dstData.matched |= 2; // atomicity not required
@@ -404,8 +435,10 @@ void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1,
             auto dst = graph.getEdgeDst(e);
             auto& dstData = graph.getData(dst);
             if (mayAction1 && (dstData.label == dstNodeLabel1)) {
+              eData.matched = 1;
               dstData.matched |= 2; // atomicity not required
             } else if (mayAction2 && (dstData.label == dstNodeLabel2)) {
+              eData.matched = 1;
               dstData.matched |= 4; // atomicity not required
             }
           }
@@ -430,7 +463,7 @@ size_t countMatchedNodes(Graph& graph) {
 
 void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabelNames = dataGraph.nodeLabelNames;
+  //auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   size_t i = 0;
@@ -438,14 +471,14 @@ void returnMatchedNodes(AttributedGraph& dataGraph, MatchedNode* matchedNodes) {
     auto& data = graph.getData(n);
     if (data.matched) {
       matchedNodes[i].id = data.id;
-      matchedNodes[i].label = nodeLabelNames[data.label].c_str();
+      //matchedNodes[i].label = nodeLabelNames[data.label].c_str();
       matchedNodes[i].name = nodeNames[n].c_str();
       ++i;
     }
   }
 }
 
-void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
+void reportMatchedNodes(AttributedGraph &dataGraph, char* outputFile) {
   Graph& graph = dataGraph.graph;
   auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
@@ -453,7 +486,7 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
   std::streambuf* buf;
   std::ofstream ofs;
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.open(outputFile);
     buf = ofs.rdbuf();
   } else {
@@ -462,7 +495,6 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
 
   std::ostream os(buf);
 
-  os << "Matched nodes:\n";
   for (auto n: graph) {
     auto& data = graph.getData(n);
     if (data.matched) {
@@ -470,7 +502,7 @@ void reportMatchedNodes(AttributedGraph &dataGraph, std::string outputFile) {
     }
   }
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.close();
   }
 }
@@ -490,6 +522,7 @@ void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uin
     [&] (auto e) {
       auto& eData = graph.getEdgeData(e);
       if (eData.label == action) {
+        eData.matched = 1;
         auto dst = graph.getEdgeDst(e);
         auto& dstData = graph.getData(dst);
         if (dstData.label == neighborLabel) {
@@ -502,6 +535,7 @@ void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uin
 
 size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node) {
   galois::GAccumulator<size_t> numMatched;
+  // do not count the same node twice (multiple edges to the same node)
   galois::do_all(galois::iterate(graph.begin(), graph.end()),
     [&] (auto n) {
       auto& data = graph.getData(n);
@@ -515,22 +549,23 @@ size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node) {
 
 void returnMatchedNeighbors(AttributedGraph& dataGraph, uint32_t uuid, MatchedNode* matchedNeighbors) {
   Graph& graph = dataGraph.graph;
-  auto& nodeLabelNames = dataGraph.nodeLabelNames;
+  //auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
 
   size_t i = 0;
+  // do not include the same node twice (multiple edges to the same node)
   for (auto n: graph) {
     auto& data = graph.getData(n);
     if (data.matched) {
       matchedNeighbors[i].id = data.id;
-      matchedNeighbors[i].label = nodeLabelNames[data.label].c_str();
+      //matchedNeighbors[i].label = nodeLabelNames[data.label].c_str();
       matchedNeighbors[i].name = nodeNames[n].c_str();
       ++i;
     }
   }
 }
 
-void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::string outputFile) {
+void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, char* outputFile) {
   Graph& graph = dataGraph.graph;
   auto& nodeLabelNames = dataGraph.nodeLabelNames;
   auto& nodeNames = dataGraph.nodeNames;
@@ -538,7 +573,7 @@ void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::stri
   std::streambuf* buf;
   std::ofstream ofs;
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.open(outputFile);
     buf = ofs.rdbuf();
   } else {
@@ -547,7 +582,7 @@ void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::stri
 
   std::ostream os(buf);
 
-  os << "Matched nodes:\n";
+  // do not include the same node twice (multiple edges to the same node)
   for (auto n: graph) {
     auto& data = graph.getData(n);
     if (data.matched) {
@@ -555,7 +590,210 @@ void reportMatchedNeighbors(AttributedGraph &dataGraph, uint32_t uuid, std::stri
     }
   }
 
-  if (outputFile.size()) {
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
+    ofs.close();
+  }
+}
+
+size_t countMatchedEdges(Graph& graph) {
+  galois::GAccumulator<size_t> numMatched;
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+    [&] (auto n) {
+      auto& data = graph.getData(n);
+      if (data.matched) {
+        for (auto e: graph.edges(n)) {
+          auto eData = graph.getEdgeData(e);
+          if (eData.matched) {
+            numMatched += 1;
+          }
+        }
+      }
+    },
+    galois::loopname("CountMatchedEdges"));
+  return numMatched.reduce();
+}
+
+void returnMatchedEdges(AttributedGraph& g, MatchedEdge* matchedEdges) {
+  Graph& graph = g.graph;
+  //auto& nodeLabelNames = g.nodeLabelNames;
+  auto& edgeLabelNames = g.edgeLabelNames;
+  auto& nodeNames = g.nodeNames;
+  auto sourceLabelID = g.nodeLabelIDs["process"];
+
+  size_t i = 0;
+  for(auto src: graph) {
+    auto& srcData = graph.getData(src);
+    if (!srcData.matched) continue;
+    //if ((srcData.label != sourceLabelID) || !srcData.matched) continue;
+    //auto& srcLabel = nodeLabelNames[srcData.label];
+    for(auto e: graph.edges(src)) {
+      auto eData = graph.getEdgeData(e);
+      if (eData.matched) {
+        auto dst = graph.getEdgeDst(e);
+        auto& dstData = graph.getData(dst);
+        //if ((dstData.label == sourceLabelID) && (dst < src)) continue;
+        //auto& dstLabel = nodeLabelNames[dstData.label];
+        matchedEdges[i].timestamp = eData.timestamp;
+        matchedEdges[i].label = edgeLabelNames[eData.label].c_str();
+        if ((dstData.label != sourceLabelID) || ((srcData.label == sourceLabelID) && (src < dst))) {
+          matchedEdges[i].caused_by.id = srcData.id;
+          matchedEdges[i].caused_by.name = nodeNames[src].c_str();
+          matchedEdges[i].acted_on.id = dstData.id;
+          matchedEdges[i].acted_on.name = nodeNames[dst].c_str();
+        } else {
+          matchedEdges[i].caused_by.id = dstData.id;
+          matchedEdges[i].caused_by.name = nodeNames[dst].c_str();
+          matchedEdges[i].acted_on.id = srcData.id;
+          matchedEdges[i].acted_on.name = nodeNames[src].c_str();
+        }
+        ++i;
+      }
+    }
+  }
+}
+
+void reportMatchedEdges(AttributedGraph& g, char* outputFile) {
+  Graph& graph = g.graph;
+  //auto& nodeLabelNames = g.nodeLabelNames;
+  auto& edgeLabelNames = g.edgeLabelNames;
+  auto& nodeNames = g.nodeNames;
+  auto sourceLabelID = g.nodeLabelIDs["process"];
+
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  for(auto src: graph) {
+    auto& srcData = graph.getData(src);
+    if (!srcData.matched) continue;
+    //if ((srcData.label != sourceLabelID) || !srcData.matched) continue;
+    //auto& srcLabel = nodeLabelNames[srcData.label];
+    auto& srcName = nodeNames[src];
+    for(auto e: graph.edges(src)) {
+      auto eData = graph.getEdgeData(e);
+      if (eData.matched) {
+        auto dst = graph.getEdgeDst(e);
+        auto& dstData = graph.getData(dst);
+        //if ((dstData.label == sourceLabelID) && (dst < src)) continue;
+        //auto& dstLabel = nodeLabelNames[dstData.label];
+        auto& dstName = nodeNames[dst];
+        auto& edgeLabel = edgeLabelNames[eData.label];
+        auto& edgeTimestamp = eData.timestamp;
+        if ((dstData.label != sourceLabelID) || ((srcData.label == sourceLabelID) && (src < dst))) {
+          os << edgeTimestamp << ", " << srcName << ", "
+                    << edgeLabel << ", " << dstName << std::endl;
+        } else {
+          os << edgeTimestamp << ", " << dstName << ", "
+                    << edgeLabel << ", " << srcName << std::endl;
+        }
+      }
+    }
+  }
+
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
+    ofs.close();
+  }
+}
+
+size_t countMatchedNeighborEdges(Graph& graph, Graph::GraphNode node) {
+  galois::GAccumulator<size_t> numMatched;
+  galois::do_all(galois::iterate(graph.edges(node).begin(), graph.edges(node).end()),
+    [&] (auto e) {
+      auto eData = graph.getEdgeData(e);
+      if (eData.matched) {
+        numMatched += 1; // count the same neighbor for each edge to it
+      }
+    },
+    galois::loopname("CountMatchedEdges"));
+  return numMatched.reduce();
+}
+
+void returnMatchedNeighborEdges(AttributedGraph& g, uint32_t uuid, MatchedEdge* matchedEdges) {
+  Graph& graph = g.graph;
+  //auto& nodeLabelNames = g.nodeLabelNames;
+  auto& edgeLabelNames = g.edgeLabelNames;
+  auto& nodeNames = g.nodeNames;
+  auto sourceLabelID = g.nodeLabelIDs["process"];
+  auto src = g.nodeIndices[uuid];
+
+  size_t i = 0;
+  auto& srcData = graph.getData(src);
+  //auto& srcLabel = nodeLabelNames[srcData.label];
+  for(auto e: graph.edges(src)) {
+    auto dst = graph.getEdgeDst(e);
+    auto& dstData = graph.getData(dst);
+    if (dstData.matched) {
+      //auto& dstLabel = nodeLabelNames[dstData.label];
+      auto& eData = graph.getEdgeData(e);
+      matchedEdges[i].timestamp = eData.timestamp;
+      matchedEdges[i].label = edgeLabelNames[eData.label].c_str();
+      if ((dstData.label != sourceLabelID) || ((srcData.label == sourceLabelID) && (src < dst))) {
+        matchedEdges[i].caused_by.id = srcData.id;
+        matchedEdges[i].caused_by.name = nodeNames[src].c_str();
+        matchedEdges[i].acted_on.id = dstData.id;
+        matchedEdges[i].acted_on.name = nodeNames[dst].c_str();
+      } else {
+        matchedEdges[i].caused_by.id = dstData.id;
+        matchedEdges[i].caused_by.name = nodeNames[dst].c_str();
+        matchedEdges[i].acted_on.id = srcData.id;
+        matchedEdges[i].acted_on.name = nodeNames[src].c_str();
+      }
+      ++i;
+    }
+  }
+}
+
+void reportMatchedNeighborEdges(AttributedGraph& g, uint32_t uuid, char* outputFile) {
+  Graph& graph = g.graph;
+  //auto& nodeLabelNames = g.nodeLabelNames;
+  auto& edgeLabelNames = g.edgeLabelNames;
+  auto& nodeNames = g.nodeNames;
+  auto sourceLabelID = g.nodeLabelIDs["process"];
+  auto src = g.nodeIndices[uuid];
+
+  std::streambuf* buf;
+  std::ofstream ofs;
+
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
+    ofs.open(outputFile);
+    buf = ofs.rdbuf();
+  } else {
+    buf = std::cout.rdbuf();
+  }
+
+  std::ostream os(buf);
+
+  auto& srcData = graph.getData(src);
+  //auto& srcLabel = nodeLabelNames[srcData.label];
+  auto& srcName = nodeNames[src];
+  for(auto e: graph.edges(src)) {
+    auto dst = graph.getEdgeDst(e);
+    auto& dstData = graph.getData(dst);
+    if (dstData.matched) {
+      //auto& dstLabel = nodeLabelNames[dstData.label];
+      auto& dstName = nodeNames[dst];
+      auto& ed = graph.getEdgeData(e);
+      auto& edgeLabel = edgeLabelNames[ed.label];
+      auto& edgeTimestamp = ed.timestamp;
+      if ((dstData.label != sourceLabelID) || ((srcData.label == sourceLabelID) && (src < dst))) {
+        os << edgeTimestamp << ", " << srcName << ", "
+                  << edgeLabel << ", " << dstName << std::endl;
+      } else {
+        os << edgeTimestamp << ", " << dstName << ", "
+                  << edgeLabel << ", " << srcName << std::endl;
+      }
+    }
+  }
+
+  if ((outputFile != NULL) && (strcmp(outputFile, "") != 0)) {
     ofs.close();
   }
 }
