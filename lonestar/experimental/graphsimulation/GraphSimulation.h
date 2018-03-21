@@ -66,9 +66,6 @@ struct MatchedEdge {
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
-void runGraphSimulation(Graph& queryGraph, Graph& dataGraph);
-void reportGraphSimulation(Graph& queryGraph, Graph& dataGraph, char* outputFile);
-
 struct AttributedGraph {
   Graph graph;
   std::vector<std::string> nodeLabelNames; // maps ID to Name
@@ -82,8 +79,7 @@ struct AttributedGraph {
   std::map<std::string, std::vector<std::string>> edgeAttributes;
 };
 
-unsigned rightmostSetBitPos(uint32_t n);
-void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGraph, char* outputFile);
+void runGraphSimulation(Graph& queryGraph, Graph& dataGraph);
 
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
@@ -94,15 +90,4 @@ size_t countMatchedNodes(Graph& graph);
 size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node);
 size_t countMatchedEdges(Graph& graph);
 size_t countMatchedNeighborEdges(Graph& graph, Graph::GraphNode node);
-
-extern "C" {
-void returnMatchedNodes(AttributedGraph& graph, MatchedNode* matchedNodes);
-void reportMatchedNodes(AttributedGraph& graph, char* outputFile);
-void returnMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, MatchedNode* matchedNeighbors);
-void reportMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, char* outputFile);
-void returnMatchedEdges(AttributedGraph& graph, MatchedEdge* matchedEdges);
-void reportMatchedEdges(AttributedGraph& graph, char* outputFile);
-void returnMatchedNeighborEdges(AttributedGraph& graph, uint32_t uuid, MatchedEdge* matchedEdges);
-void reportMatchedNeighborEdges(AttributedGraph& graph, uint32_t uuid, char* outputFile);
-} // extern "C"
 

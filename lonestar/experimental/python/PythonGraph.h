@@ -27,7 +27,6 @@
 
 #ifndef GALOIS_PYTHON_GRAPH_H
 #define GALOIS_PYTHON_GRAPH_H
-
 #include "../graphsimulation/GraphSimulation.h"
 
 extern "C" {
@@ -78,6 +77,17 @@ size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid
 size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
 size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
 size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+
+void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGraph, char* outputFile);
+
+void returnMatchedNodes(AttributedGraph& graph, MatchedNode* matchedNodes);
+void reportMatchedNodes(AttributedGraph& graph, char* outputFile);
+void returnMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, MatchedNode* matchedNeighbors);
+void reportMatchedNeighbors(AttributedGraph& graph, uint32_t uuid, char* outputFile);
+void returnMatchedEdges(AttributedGraph& graph, MatchedEdge* matchedEdges);
+void reportMatchedEdges(AttributedGraph& graph, char* outputFile);
+void returnMatchedNeighborEdges(AttributedGraph& graph, uint32_t uuid, MatchedEdge* matchedEdges);
+void reportMatchedNeighborEdges(AttributedGraph& graph, uint32_t uuid, char* outputFile);
 
 } // extern "C"
 
