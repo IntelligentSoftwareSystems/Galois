@@ -104,7 +104,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(Sync, "Sync"),
       clEnumVal(Sync2pTile, "Sync2pTile"),
       clEnumVal(Sync2p, "Sync2p"),
-      clEnumValEnd), cll::init(AsyncTile));
+      clEnumValEnd), cll::init(SyncTile));
 
 
 using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
@@ -123,6 +123,10 @@ using UpdateRequest = BFS::UpdateRequest;
 using Dist = BFS::Dist;
 using SrcEdgeTile = BFS::SrcEdgeTile;
 using SrcEdgeTileMaker = BFS::SrcEdgeTileMaker;
+using SrcEdgeTilePushWrap = BFS::SrcEdgeTilePushWrap;
+using ReqPushWrap = BFS::ReqPushWrap;
+using OutEdgeRangeFn = BFS::OutEdgeRangeFn;
+using TileRangeFn = BFS::TileRangeFn;
 
 struct EdgeTile {
   Graph::edge_iterator beg;
@@ -135,34 +139,8 @@ struct EdgeTileMaker {
   }
 };
 
-struct ReqPushWrap {
-  template <typename C>
-  void operator () (C& cont, const GNode& n, const Dist& dist, const char* const _parallel) const {
-    (*this)(cont, n, dist);
-  }
-
-  template <typename C>
-  void operator () (C& cont, const GNode& n, const Dist& dist) const {
-    cont.push( UpdateRequest(n, dist) );
-  }
-};
-
-struct SrcEdgeTilePushWrap {
-
-  Graph& graph;
-
-  template <typename C>
-  void operator () (C& cont, const GNode& n, const Dist& dist, const char* const _parallel) const {
-    BFS::pushEdgeTilesParallel(cont, graph, n, SrcEdgeTileMaker {n, dist} );
-  }
-
-  template <typename C>
-  void operator () (C& cont, const GNode& n, const Dist& dist) const {
-    BFS::pushEdgeTiles(cont, graph, n, SrcEdgeTileMaker {n, dist} );
-  }
-};
-
 struct NodePushWrap {
+
   template <typename C>
   void operator () (C& cont, const GNode& n, const char* const _parallel) const {
     (*this)(cont, n);
@@ -209,26 +187,9 @@ struct OneTilePushWrap {
 };
 
 
-struct OutEdgeRangeFn {
-  Graph& graph;
-  auto operator () (const GNode& n) const {
-    return graph.edges(n, galois::MethodFlag::UNPROTECTED);
-  };
-
-  auto operator () (const UpdateRequest& req) const {
-    return graph.edges(req.src, galois::MethodFlag::UNPROTECTED);
-  }
-};
-
-struct TileRangeFn {
-  template <typename T>
-  auto operator () (const T& tile) const {
-    return galois::makeIterRange(tile.beg, tile.end);
-  }
-};
 
 template <bool CONCURRENT, typename T, typename P, typename R>
-void asyncAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
+void asyncAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
 
   namespace gwl = galois::worklists;
   //typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
@@ -312,7 +273,7 @@ void asyncAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& edgeR
 }
 
 template <bool CONCURRENT, typename T, typename P, typename R>
-void syncAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
+void syncAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
 
   using Cont = typename std::conditional<CONCURRENT, galois::InsertBag<T>, galois::SerStack<T> >::type;
   using Loop = typename std::conditional<CONCURRENT, galois::DoAll, galois::StdForEach>::type;
@@ -367,7 +328,7 @@ void syncAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& edgeRa
 }
 
 template <bool CONCURRENT, typename P, typename R>
-void sync2phaseAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
+void sync2phaseAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
 
 
   using NodeCont = typename std::conditional<CONCURRENT, galois::InsertBag<GNode>, galois::SerStack<GNode> >::type;
@@ -427,37 +388,34 @@ void sync2phaseAlgoImpl(Graph& graph, GNode source, const P& pushWrap, const R& 
 template <bool CONCURRENT>
 void runAlgo(Graph& graph, const GNode& source) {
 
-  std::cout << "Running " <<  ALGO_NAMES[algo] << " algorithm with "
-    << (CONCURRENT? "PARALLEL" : "SERIAL") << " execution " << std::endl; 
-
   switch (algo) {
     case AsyncTile:
-      asyncAlgoImpl<CONCURRENT, SrcEdgeTile>(graph, source, 
+      asyncAlgo<CONCURRENT, SrcEdgeTile>(graph, source, 
           SrcEdgeTilePushWrap{graph}, 
           TileRangeFn());
       break;
     case Async:
-      asyncAlgoImpl<CONCURRENT, UpdateRequest>(graph, source, 
+      asyncAlgo<CONCURRENT, UpdateRequest>(graph, source, 
           ReqPushWrap(), 
           OutEdgeRangeFn{graph});
       break;
     case SyncTile:
-      syncAlgoImpl<CONCURRENT, EdgeTile>(graph, source, 
+      syncAlgo<CONCURRENT, EdgeTile>(graph, source, 
           EdgeTilePushWrap{graph}, 
           TileRangeFn());
       break;
     case Sync:
-      syncAlgoImpl<CONCURRENT, GNode>(graph, source, 
+      syncAlgo<CONCURRENT, GNode>(graph, source, 
           NodePushWrap(), 
           OutEdgeRangeFn{graph});
       break;
     case Sync2pTile:
-      sync2phaseAlgoImpl<CONCURRENT>(graph, source, 
+      sync2phaseAlgo<CONCURRENT>(graph, source, 
           EdgeTilePushWrap{graph}, 
           TileRangeFn());
       break;
     case Sync2p:
-      sync2phaseAlgoImpl<CONCURRENT>(graph, source, 
+      sync2phaseAlgo<CONCURRENT>(graph, source, 
           OneTilePushWrap{graph}, 
           TileRangeFn());
       break;
@@ -470,9 +428,6 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  galois::StatTimer T("OverheadTime");
-  T.start();
-  
   Graph graph;
   GNode source, report;
 
@@ -507,6 +462,10 @@ int main(int argc, char** argv) {
                        [&graph] (GNode n) { graph.getData(n) = BFS::DIST_INFINITY; });
   graph.getData(source) = 0;
 
+
+  std::cout << "Running " <<  ALGO_NAMES[algo] << " algorithm with "
+    << (bool(execution)? "PARALLEL" : "SERIAL") << " execution " << std::endl; 
+
   galois::StatTimer Tmain;
   Tmain.start();
 
@@ -520,7 +479,6 @@ int main(int argc, char** argv) {
   }
 
   Tmain.stop();
-  T.stop();
 
   galois::reportPageAlloc("MeminfoPost");
   

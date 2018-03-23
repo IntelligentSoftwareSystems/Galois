@@ -39,6 +39,10 @@ struct BFS_SSSP {
     Dist dist;
     EI beg;
     EI end;
+
+    friend bool operator < (const SrcEdgeTile& left, const SrcEdgeTile& right) {
+      return left.dist == right.dist? left.src < right.src : left.dist < right.dist;
+    }
   };
 
   struct SrcEdgeTileMaker {
@@ -101,6 +105,52 @@ struct BFS_SSSP {
       wl.push( f(beg, end) );
     }
   }
+
+  struct ReqPushWrap {
+    template <typename C>
+    void operator () (C& cont, const GNode& n, const Dist& dist, const char* const _parallel) const {
+      (*this)(cont, n, dist);
+    }
+
+    template <typename C>
+    void operator () (C& cont, const GNode& n, const Dist& dist) const {
+      cont.push( UpdateRequest(n, dist) );
+    }
+  };
+
+  struct SrcEdgeTilePushWrap {
+
+    Graph& graph;
+
+    template <typename C>
+    void operator () (C& cont, const GNode& n, const Dist& dist, const char* const _parallel) const {
+      pushEdgeTilesParallel(cont, graph, n, SrcEdgeTileMaker {n, dist} );
+    }
+
+    template <typename C>
+    void operator () (C& cont, const GNode& n, const Dist& dist) const {
+      pushEdgeTiles(cont, graph, n, SrcEdgeTileMaker {n, dist} );
+    }
+  };
+
+
+  struct OutEdgeRangeFn {
+    Graph& graph;
+    auto operator () (const GNode& n) const {
+      return graph.edges(n, galois::MethodFlag::UNPROTECTED);
+    }
+
+    auto operator () (const UpdateRequest& req) const {
+      return graph.edges(req.src, galois::MethodFlag::UNPROTECTED);
+    }
+  };
+
+  struct TileRangeFn {
+    template <typename T>
+    auto operator () (const T& tile) const {
+      return galois::makeIterRange(tile.beg, tile.end);
+    }
+  };
 
   struct not_consistent {
     Graph& g;
