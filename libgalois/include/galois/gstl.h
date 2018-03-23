@@ -99,6 +99,106 @@ namespace gstl {
   }
 } // end namespace gstl
 
+template <typename I>
+class IterRange {
+  I m_beg;
+  I m_end;
+
+public:
+  IterRange(const I& b, const I& e): m_beg(b), m_end(e) {}
+  const I& begin(void) const { return m_beg; }
+  const I& end(void) const { return m_end; }
+};
+
+template <typename I>
+auto makeIterRange(const I& beg, const I& end) {
+  return IterRange<I>(beg, end);
+}
+
+template <typename C>
+auto makeIterRange(C&& cont) {
+  using I = decltype(std::forward<C>(cont).begin());
+  return IterRange<I>(std::forward<C>(cont).begin(), std::forward<C>(cont).end());
+}
+
+namespace internal {
+
+  template <typename T, typename C>
+  struct SerCont {
+    C m_q;
+
+    explicit SerCont(const C& q=C()): m_q(q) {}
+
+    void push(const T& x)  {
+      m_q.push_back(x);
+    }
+
+    template <typename I>
+    void push(const I& beg, const I& end) {
+      for (I i = beg; i != end; ++i) {
+        push(*i);
+      }
+    }
+
+    template <typename... Args>
+    void emplace(Args&&... args) {
+      m_q.emplace_back(std::forward<Args>(args)...);
+    }
+
+    bool empty(void) const { return m_q.empty(); }
+
+    void clear(void) { m_q.clear(); }
+
+    using value_type = typename C::value_type;
+    using iterator = typename C::iterator;
+    using const_iterator = typename C::const_iterator;
+
+    iterator begin(void) { return m_q.begin(); }
+    iterator end(void) { return m_q.end(); }
+
+    const_iterator begin(void) const { return m_q.begin(); }
+    const_iterator end(void) const { return m_q.end(); }
+
+    const_iterator cbegin(void) const { return m_q.cbegin(); }
+    const_iterator cend(void) const { return m_q.cend(); }
+
+  };
+}
+
+template <typename T, typename C=std::deque<T> >
+class SerFIFO: public internal::SerCont<T, C> {
+
+  using Base = internal::SerCont<T, C>;
+
+public:
+
+  explicit SerFIFO(const C& q=C()): Base(q) {}
+
+  T pop(void) {
+    T ret = Base::m_q.front();
+    Base::m_q.pop_front();
+    return ret;
+  }
+
+};
+
+
+template <typename T, typename C=std::vector<T> >
+class SerStack: public internal::SerCont<T, C> {
+
+  using Base = internal::SerCont<T, C>;
+
+public:
+
+  explicit SerStack(const C& q=C()): Base(q) {}
+
+  T pop(void) {
+    T ret = Base::m_q.back();
+    Base::m_q.pop_back();
+    return ret;
+  }
+
+};
 
 template<typename IterTy, class Distance>
 IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, 

@@ -153,7 +153,7 @@ void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, cons
 struct DoAll {
   template <typename RangeFunc, typename F, typename... Args>
   void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) const {
-    galois::do_all(rangeMaker, f, args...);
+    galois::do_all(rangeMaker, f, std::forward<Args>(args)...);
   }
 };
 
@@ -169,7 +169,35 @@ struct StdForEach {
   }
 };
 
+struct ForEach {
+  template <typename RangeFunc, typename F, typename... Args>
+  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) const {
+    galois::for_each(rangeMaker, f, std::forward<Args>(args)...);
+  }
+};
 
+template <typename Q>
+struct WhileQ {
+  Q m_q;
+
+  WhileQ(Q&& q=Q()): m_q(std::move(q)) {}
+
+  template <typename RangeFunc, typename F, typename... Args>
+  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) {
+
+    auto range = rangeMaker(std::make_tuple(args...)); 
+
+    m_q.push(range.begin(), range.end());
+
+    while (!m_q.empty()) {
+      auto val = m_q.pop();
+
+      f(val, m_q);
+    }
+
+  }
+
+};
 
 } //namespace galois
 

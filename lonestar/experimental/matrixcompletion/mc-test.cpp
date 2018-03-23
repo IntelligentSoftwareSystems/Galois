@@ -1,4 +1,4 @@
-/* 
+/*
  * License:
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
@@ -364,7 +364,6 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
 
     fn(&steps[0], round + deltaRound, useExactError ? NULL : &errorAccum);
     double error = useExactError ? sumSquaredError(g) : errorAccum.reduce();
-    galois::gPrint(error, "\n");
 
     elapsed.stop();
 
@@ -384,15 +383,14 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
     if (useExactError) {
       std::cout << " RMSE (R " << curRound << "): " << std::sqrt(error/g.sizeEdges());
     } else {
-      std::cout << " Approx. RMSE (R " << (curRound - 1) << ".5): " << std::sqrt(error/g.sizeEdges());
+      std::cout << " Approx. RMSE (R " << (curRound - 1) << ".5): " << std::sqrt(std::abs(error/g.sizeEdges()));
     }
     std::cout << "\n";
 
-
-
     if (!isFinite(error))
       break;
-    if (fixedRounds <= 0 && last >= 0.0 && std::abs((last - error) / last) < tolerance)
+    //TODO: Should this be std::abs as last can be negavtive if not using squaredError
+    if (fixedRounds <= 0 && std::abs(last) >= 0.0 && std::abs((last - error) / last) < tolerance)
       break;
     if (sf.isBold()) {
       // Assume that loss decreases first round
@@ -420,7 +418,7 @@ class BlockedEdgeAlgo {
  public:
   bool isSgd() const { return true; }
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
     //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
     ::template with_no_lockable<!makeSerializable>::type Graph;
@@ -439,7 +437,7 @@ class BlockedEdgeAlgo {
     Graph& g;
     galois::GAccumulator<unsigned>& edgesVisited;
 
-    void operator()(LatentValue* steps, int maxUpdates, 
+    void operator()(LatentValue* steps, int maxUpdates,
                     galois::GAccumulator<double>* errorAccum) {
       galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
       executor.execute(
@@ -448,20 +446,24 @@ class BlockedEdgeAlgo {
         itemsPerBlock, usersPerBlock,
         [&](GNode src, GNode dst, edge_iterator edge) {
           // TODO choose one
-          //const LatentValue stepSize = 
+          //const LatentValue stepSize =
           //  steps[updatesPerEdge - maxUpdates + task.updates];
           //const LatentValue stepSize = steps[1 - maxUpdates + 0];
-          const LatentValue stepSize = 0.5;
 
-          LatentValue error = 
-            doGradientUpdate(g.getData(src).latentVector, 
-                             g.getData(dst).latentVector, lambda, 
+          //TODO: Previous value
+          //const LatentValue stepSize = 0.5;
+          const LatentValue stepSize = steps[0];
+          LatentValue error =
+            doGradientUpdate(g.getData(src).latentVector,
+                             g.getData(dst).latentVector, lambda,
                              g.getEdgeData(edge), stepSize);
           edgesVisited += 1;
-          *errorAccum += error;
-        }, 
+          if(!useExactError)
+            *errorAccum += error;
+        },
         true // use locks
       );
+
     }
   };
 
@@ -503,7 +505,7 @@ size_t initializeGraphData(Graph& g) {
   std::uniform_real<LatentValue> dist(0, top);
   #endif
 
-  galois::do_all(galois::iterate(g), 
+  galois::do_all(galois::iterate(g),
     [&](typename Graph::GraphNode n) {
       auto& data = g.getData(n);
 
