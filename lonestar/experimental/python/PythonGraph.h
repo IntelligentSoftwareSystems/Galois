@@ -53,30 +53,30 @@ void setEdgeAttribute(AttributedGraph *g, uint32_t edgeIndex, char* key, char* v
 size_t getNumNodes(AttributedGraph* g);
 size_t getNumEdges(AttributedGraph* g);
 
-size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph);
+size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 
-size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph);
-size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph);
-size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph);
-size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph);
+size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph, EventWindow window);
+size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWindow window);
+size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
+size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 
-size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid);
-size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid);
-size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid);
-size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid);
-size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid);
-size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid);
-size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid);
-size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid);
+size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window);
+size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window);
+size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window);
+size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window);
+size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window);
+size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window);
+size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window);
+size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window);
 
-size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
-size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid);
+size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
+size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window);
 
 void reportGraphSimulation(AttributedGraph& queryGraph, AttributedGraph& dataGraph, char* outputFile);
 

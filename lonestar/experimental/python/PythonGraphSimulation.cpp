@@ -1,28 +1,30 @@
 #include "PythonGraph.h"
 
-size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph) {
-  runGraphSimulation(queryGraph->graph, dataGraph->graph);
+size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  runGraphSimulation(queryGraph->graph, dataGraph->graph, limit, window);
   return countMatchedEdges(dataGraph->graph);
 }
 
-size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph) {
+size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph, EventWindow window) {
   matchNodeWithRepeatedActions(dataGraph->graph,
       dataGraph->nodeLabelIDs["file"],
-      dataGraph->edgeLabelIDs["WRITE"]);
+      dataGraph->edgeLabelIDs["WRITE"],
+      window);
   return countMatchedEdges(dataGraph->graph);
 }
 
-size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph) {
+size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWindow window) {
   matchNodeWithTwoActions(dataGraph->graph,
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["network"]);
+      dataGraph->nodeLabelIDs["network"],
+      window);
   return countMatchedEdges(dataGraph->graph);
 }
 
-size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph) {
+size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
@@ -49,11 +51,11 @@ size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph) {
   queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 2));
   queryGraph.fixEndEdge(3, 6);
 
-  runGraphSimulation(queryGraph, dataGraph->graph);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
   return countMatchedEdges(dataGraph->graph);
 }
 
-size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph) {
+size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
   Graph queryGraph;
   queryGraph.allocateFrom(6, 10);
   queryGraph.constructNodes();
@@ -92,150 +94,166 @@ size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph)
   queryGraph.constructEdge(9, 4, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 4));
   queryGraph.fixEndEdge(5, 10);
 
-  runGraphSimulation(queryGraph, dataGraph->graph);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
   return countMatchedEdges(dataGraph->graph);
 }
 
-size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
+size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, file_uuid);
 }
 
-size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid) {
+size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, file_uuid);
 }
 
-size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
+size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, network_uuid);
 }
 
-size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid) {
+size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, network_uuid);
 }
 
-size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
+size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, registry_uuid);
 }
 
-size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid) {
+size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, registry_uuid);
 }
 
-size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
+size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, memory_uuid);
 }
 
-size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid) {
+size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["process"]);
+      dataGraph->nodeLabelIDs["process"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, memory_uuid);
 }
 
-size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["file"]);
+      dataGraph->nodeLabelIDs["file"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["file"]);
+      dataGraph->nodeLabelIDs["file"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["network"]);
+      dataGraph->nodeLabelIDs["network"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["network"]);
+      dataGraph->nodeLabelIDs["network"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["registry"]);
+      dataGraph->nodeLabelIDs["registry"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["registry"]);
+      dataGraph->nodeLabelIDs["registry"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
-      dataGraph->nodeLabelIDs["memory"]);
+      dataGraph->nodeLabelIDs["memory"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }
 
-size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid) {
+size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["WRITE"],
-      dataGraph->nodeLabelIDs["memory"]);
+      dataGraph->nodeLabelIDs["memory"],
+      window);
   return countMatchedNeighborEdges(dataGraph->graph, process_uuid);
 }

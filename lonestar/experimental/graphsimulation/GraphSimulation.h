@@ -63,6 +63,19 @@ struct MatchedEdge {
   MatchedNode acted_on;
 };
 
+struct EventLimit { // time-limit of consecutive events (inclusive)
+  bool valid;
+  uint64_t time; // inclusive
+  EventLimit() : valid(false) {}
+};
+
+struct EventWindow { // time-span of all events (inclusive)
+  bool valid;
+  uint64_t startTime; // inclusive
+  uint64_t endTime; // inclusive
+  EventWindow() : valid(false) {}
+};
+
 typedef galois::graphs::LC_CSR_Graph<Node, EdgeData>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -79,12 +92,12 @@ struct AttributedGraph {
   std::map<std::string, std::vector<std::string>> edgeAttributes;
 };
 
-void runGraphSimulation(Graph& queryGraph, Graph& dataGraph);
+void runGraphSimulation(Graph& queryGraph, Graph& dataGraph, EventLimit limit, EventWindow window);
 
-void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action);
-void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2);
+void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action, EventWindow window);
+void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2, EventWindow window);
 
-void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel);
+void matchNeighbors(Graph& graph, Graph::GraphNode node, uint32_t nodeLabel, uint32_t action, uint32_t neighborLabel, EventWindow window);
 
 size_t countMatchedNodes(Graph& graph);
 size_t countMatchedNeighbors(Graph& graph, Graph::GraphNode node);
