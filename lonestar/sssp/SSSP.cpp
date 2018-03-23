@@ -92,9 +92,8 @@ using SSSP = BFS_SSSP<Graph, uint32_t, true, EDGE_TILE_SIZE>;
 using Dist = SSSP::Dist;
 using UpdateRequest = SSSP::UpdateRequest;
 using UpdateRequestIndexer = SSSP::UpdateRequestIndexer;
-using DistEdgeTile = SSSP::DistEdgeTile;
-using DistEdgeTileIndexer = SSSP::DistEdgeTileIndexer;
-using DistEdgeTileMaker = SSSP::DistEdgeTileMaker;
+using SrcEdgeTile = SSSP::SrcEdgeTile;
+using SrcEdgeTileMaker = SSSP::SrcEdgeTileMaker;
 
 void deltaStepAlgo(Graph& graph, const GNode& source) {
 
@@ -111,15 +110,15 @@ void deltaStepAlgo(Graph& graph, const GNode& source) {
   galois::for_each(galois::iterate( { UpdateRequest{source, 0} } ),
       [&] (const UpdateRequest& req, auto& ctx) {
         const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-        const auto& sdata = graph.getData(req.n, flag);
+        const auto& sdata = graph.getData(req.src, flag);
         
-        if (req.w != sdata) {
+        if (req.dist != sdata) {
           if (TRACK_WORK)
             WLEmptyWork += 1;
           return;
         }
         
-        for (auto ii : graph.edges(req.n, flag)) {
+        for (auto ii : graph.edges(req.src, flag)) {
           GNode dst = graph.getEdgeDst(ii);
           auto& ddist  = graph.getData(dst, flag);
           Dist ew    = graph.getEdgeData(ii, flag);
@@ -164,17 +163,17 @@ void serialDeltaAlgo(Graph& graph, const GNode& source) {
       UpdateRequest req = curr.front();
       curr.pop_front();
 
-      if (graph.getData(req.n) < req.w) {
+      if (graph.getData(req.src) < req.dist) {
         // empty work
         continue;
       }
 
-      for (auto e: graph.edges(req.n)) {
+      for (auto e: graph.edges(req.src)) {
 
         GNode dst = graph.getEdgeDst(e);
         auto& ddata = graph.getData(dst);
 
-        auto newDist = req.w + graph.getEdgeData(e);
+        auto newDist = req.dist + graph.getEdgeData(e);
 
         if (newDist < ddata) {
           ddata = newDist;
@@ -190,21 +189,6 @@ void serialDeltaAlgo(Graph& graph, const GNode& source) {
   galois::runtime::reportStat_Single("SSSP-Serial-Delta", "Iterations", iter);
 }
 
-struct SrcEdgeTile {
-  GNode src;
-  Dist dist;
-  Graph::edge_iterator beg;
-  Graph::edge_iterator end;
-};
-
-struct SrcEdgeTileMaker {
-  GNode src;
-  Dist dist;
-
-  SrcEdgeTile operator () (const Graph::edge_iterator& beg, const Graph::edge_iterator& end) const {
-    return SrcEdgeTile {src, dist, beg, end};
-  }
-};
 
 void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
 
@@ -317,16 +301,16 @@ void dijkstraAlgo(Graph& graph, const GNode& source) {
 
     UpdateRequest req = wl.pop();
 
-    if (graph.getData(req.n) < req.w) {
+    if (graph.getData(req.src) < req.dist) {
       // empty work
       continue;
     }
 
-    for (auto e: graph.edges(req.n)) {
+    for (auto e: graph.edges(req.src)) {
       GNode dst = graph.getEdgeDst(e);
       auto& ddata = graph.getData(dst);
 
-      auto newDist = req.w + graph.getEdgeData(e);
+      auto newDist = req.dist + graph.getEdgeData(e);
 
       if (newDist < ddata) {
         ddata = newDist;

@@ -166,7 +166,7 @@ private:
     }
   }
 
-  void destruct() {
+  void destruct_serial() {
     for (unsigned x = 0; x < heads.size(); ++x) {
       PerThread& hpair = *heads.getRemote(x);
       header*& h = hpair.first;
@@ -225,11 +225,11 @@ public:
   }
 
   void clear() {
-    destruct();
+    destruct_parallel();
   }
 
-  void clear_parallel() {
-    destruct_parallel();
+  void clear_serial() {
+    destruct_serial();
   }
 
   void swap(InsertBag& o) {

@@ -14,47 +14,39 @@ struct BFS_SSSP {
   using EI = typename Graph::edge_iterator;
 
   struct UpdateRequest {
-    GNode n;
-    Dist w;
-    UpdateRequest(const GNode& N, Dist W): n(N), w(W) {}
-    UpdateRequest(): n(), w(0) {}
+    GNode src;
+    Dist dist;
+    UpdateRequest(const GNode& N, Dist W): src(N), dist(W) {}
+    UpdateRequest(): src(), dist(0) {}
 
     friend bool operator < (const UpdateRequest& left, const UpdateRequest& right) {
-      return left.w == right.w? left.n < right.n : left.w < right.w;
+      return left.dist == right.dist? left.src < right.src : left.dist < right.dist;
     }
   };
 
   struct UpdateRequestIndexer {
     unsigned shift;
 
-    unsigned int operator()(const UpdateRequest& val) const {
-      unsigned int t = val.w >> shift;
+    template <typename R>
+    unsigned int operator()(const R& req) const {
+      unsigned int t = req.dist >> shift;
       return t;
     }
   };
 
-  struct DistEdgeTile {
+  struct SrcEdgeTile {
+    GNode src;
     Dist dist;
     EI beg;
     EI end;
   };
 
-  struct DistEdgeTileMaker {
+  struct SrcEdgeTileMaker {
+    GNode src;
     Dist dist;
 
-    template <typename EI>
-    DistEdgeTile operator () (const EI& beg, const EI& end) const {
-      return DistEdgeTile {dist, beg, end};
-    }
-  };
-
-  struct DistEdgeTileIndexer {
-    unsigned shift;
-
-    template <typename T>
-    unsigned int operator()(const T& tile) const {
-      unsigned int t = tile.dist >> shift;
-      return t;
+    SrcEdgeTile operator () (const EI& beg, const EI& end) const {
+      return SrcEdgeTile {src, dist, beg, end};
     }
   };
 
@@ -66,13 +58,13 @@ struct BFS_SSSP {
       for (; beg + EDGE_TILE_SIZE < end;) {
         auto ne = beg + EDGE_TILE_SIZE;
         assert(ne < end);
-        wl.push_back( f(beg, ne) );
+        wl.push( f(beg, ne) );
         beg = ne;
       }
     }
     
     if ((end - beg) > 0) {
-      wl.push_back( f(beg, end) );
+      wl.push( f(beg, end) );
     }
   }
 
@@ -106,7 +98,7 @@ struct BFS_SSSP {
 
 
     } else if ((end - beg) > 0) {
-      wl.push_back( f(beg, end) );
+      wl.push( f(beg, end) );
     }
   }
 
@@ -125,17 +117,18 @@ struct BFS_SSSP {
       return g.getEdgeData(ii);
     }
 
-    void operator()(typename Graph::GraphNode n) const {
-      Dist dist = g.getData(n);
-      if (dist == DIST_INFINITY)
+    void operator()(typename Graph::GraphNode node) const {
+      Dist sd = g.getData(node);
+      if (sd == DIST_INFINITY)
         return;
       
-      for (auto ii : g.edges(n)) {
+      for (auto ii : g.edges(node)) {
         auto dst = g.getEdgeDst(ii);
-        Dist ddist = g.getData(dst);
-        Dist w = getEdgeWeight<USE_EDGE_WT>(ii);
-        if (ddist > dist + w) {
-          std::cout << "Wrong label: " <<  ddist << ", on node: " << dst << ", correct label (from pred): " << dist + w << "\n"; // XXX
+        Dist dd = g.getData(dst);
+        Dist ew = getEdgeWeight<USE_EDGE_WT>(ii);
+        if (dd > sd + ew) {
+          std::cout << "Wrong label: " <<  dd << ", on node: " << dst << ", correct label from src node " 
+            << node << " is " << sd + ew << "\n"; // XXX
           refb = true;
           // return;
         }
@@ -149,8 +142,8 @@ struct BFS_SSSP {
 
     max_dist(Graph& g, galois::GReduceMax<Dist>& m) : g(g), m(m) {}
 
-    void operator()(typename Graph::GraphNode n) const {
-      Dist d = g.getData(n);
+    void operator()(typename Graph::GraphNode node) const {
+      Dist d = g.getData(node);
       if (d == DIST_INFINITY)
         return;
       m.update(d);
@@ -165,8 +158,8 @@ struct BFS_SSSP {
 
     std::atomic<size_t> notVisited(0);
     galois::do_all(galois::iterate(graph), 
-        [&notVisited, &graph] (GNode n) { 
-          if (graph.getData(n) >= DIST_INFINITY) 
+        [&notVisited, &graph] (GNode node) { 
+          if (graph.getData(node) >= DIST_INFINITY) 
             ++notVisited; 
           });
 
