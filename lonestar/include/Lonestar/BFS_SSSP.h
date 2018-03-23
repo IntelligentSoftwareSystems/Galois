@@ -209,7 +209,7 @@ public:
     m_buckets.reserve(MAX_BUCKETS);
   }
 
-  void push_back(const T& item) {
+  void push(const T& item) {
     size_t b = m_func(item);
     assert(b >= m_minBucket && "can't push below m_minBucket");
 

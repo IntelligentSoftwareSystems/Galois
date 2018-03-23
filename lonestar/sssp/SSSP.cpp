@@ -151,7 +151,7 @@ void serialDeltaAlgo(Graph& graph, const GNode& source) {
   SerialBucketWL<UpdateRequest, UpdateRequestIndexer> wl(UpdateRequestIndexer {stepShift});;
   graph.getData(source) = 0;
 
-  wl.push_back( UpdateRequest{source, 0} );
+  wl.push( UpdateRequest{source, 0} );
 
   size_t iter = 0ul;
   while (!wl.empty()) {
@@ -177,7 +177,7 @@ void serialDeltaAlgo(Graph& graph, const GNode& source) {
 
         if (newDist < ddata) {
           ddata = newDist;
-          wl.push_back( UpdateRequest(dst, newDist) );
+          wl.push( UpdateRequest(dst, newDist) );
         }
       }
     }
@@ -195,7 +195,7 @@ void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
   namespace gwl = galois::worklists;
 
   using dChunk = gwl:: dChunkedFIFO<CHUNK_SIZE>;
-  using OBIM = gwl::OrderedByIntegerMetric<DistEdgeTileIndexer, dChunk>;
+  using OBIM = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, dChunk>;
 
   graph.getData(source) = 0;
 
@@ -234,7 +234,7 @@ void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
           }
         }
       },
-      galois::wl<OBIM>( DistEdgeTileIndexer{stepShift} ), 
+      galois::wl<OBIM>( UpdateRequestIndexer{stepShift} ), 
       galois::no_conflicts(), 
       galois::loopname("SSSP"));
 
@@ -242,7 +242,7 @@ void deltaStepTiledAlgo(Graph& graph, const GNode& source) {
 
 void serialDeltaTiledAlgo(Graph& graph, const GNode& source) {
 
-  SerialBucketWL<SrcEdgeTile, SSSP::DistEdgeTileIndexer> wl(DistEdgeTileIndexer {stepShift});;
+  SerialBucketWL<SrcEdgeTile, SSSP::UpdateRequestIndexer> wl(UpdateRequestIndexer {stepShift});;
   graph.getData(source) = 0;
 
   SSSP::pushEdgeTiles(wl, graph, source, SrcEdgeTileMaker{source, 0u} );
