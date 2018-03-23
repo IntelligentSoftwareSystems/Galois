@@ -62,32 +62,32 @@ static cll::opt<unsigned int> stepShift("delta",
                                cll::init(10));
 
 enum Algo {
-  deltaTiled=0,
+  deltaTile=0,
   deltaStep,
-  serDeltaTiled,
+  serDeltaTile,
   serDelta,
-  dijkstraTiled,
+  dijkstraTile,
   dijkstra
 };
 
 const char* const ALGO_NAMES[] = {
-  "deltaTiled",
+  "deltaTile",
   "deltaStep",
-  "serDeltaTiled",
+  "serDeltaTile",
   "serDelta",
-  "dijkstraTiled",
+  "dijkstraTile",
   "dijkstra"
 };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumVal(deltaTiled, "deltaTiled"),
+      clEnumVal(deltaTile, "deltaTile"),
       clEnumVal(deltaStep, "deltaStep"),
-      clEnumVal(serDeltaTiled, "serDeltaTiled"),
+      clEnumVal(serDeltaTile, "serDeltaTile"),
       clEnumVal(serDelta, "serDelta"),
-      clEnumVal(dijkstraTiled, "dijkstraTiled"),
+      clEnumVal(dijkstraTile, "dijkstraTile"),
       clEnumVal(dijkstra, "dijkstra"),
-      clEnumValEnd), cll::init(deltaTiled));
+      clEnumValEnd), cll::init(deltaTile));
 
 // typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>
@@ -310,19 +310,19 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   switch(algo) {
-    case deltaTiled:
+    case deltaTile:
       deltaStepAlgo<SrcEdgeTile>(graph, source, SrcEdgeTilePushWrap{graph}, TileRangeFn());
       break;
     case deltaStep:
       deltaStepAlgo<UpdateRequest>(graph, source, ReqPushWrap(), OutEdgeRangeFn{graph});
       break;
-    case serDeltaTiled:
+    case serDeltaTile:
       serDeltaAlgo<SrcEdgeTile>(graph, source, SrcEdgeTilePushWrap{graph}, TileRangeFn());
       break;
     case serDelta:
       serDeltaAlgo<UpdateRequest>(graph, source, ReqPushWrap(), OutEdgeRangeFn{graph});
       break;
-    case dijkstraTiled:
+    case dijkstraTile:
       dijkstraAlgo<SrcEdgeTile>(graph, source, SrcEdgeTilePushWrap{graph}, TileRangeFn());
       break;
     case dijkstra:
