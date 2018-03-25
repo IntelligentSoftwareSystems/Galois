@@ -23,8 +23,10 @@
  * Survey Propagation
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill <gill@cs.utexas.edu>
  */
 #include "galois/Timer.h"
+#include "galois/Atomic.h"
 #include "galois/graphs/Graph.h"
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
@@ -97,6 +99,7 @@ struct SPEdge {
   }
 };
 
+#if 0
 struct SPNode {
   bool isClause;
   int name;
@@ -106,8 +109,25 @@ struct SPNode {
   
   double Bias;
 
-  SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false), t(0) {}
+  galois::GAtomic<bool> onWL;
+
+  SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false), t(0), onWL(false) {}
 };
+#endif
+struct SPNode {
+  uint32_t id;
+
+  SPNode(uint32_t _id) : id(_id){};
+};
+
+//SOA
+std::vector<bool> isClause;
+std::vector<int> nameSPNode;
+std::vector<bool> solved;
+std::vector<bool> value;
+std::vector<int> t;
+std::vector<double> Bias;
+std::vector<galois::GAtomic<bool>> onWL;
 
 typedef galois::graphs::FirstGraph<SPNode, SPEdge, false> Graph;
 typedef galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
@@ -123,7 +143,8 @@ void initialize_random_formula(Graph& graph,
                                int N,
                                int K,
                                std::vector<GNode>& literalsN,
-                               std::vector<std::pair<GNode,int>>& clauses) {
+                               std::vector<GNode>& clauses) {
+                               //std::vector<std::pair<GNode,int>>& clauses) {
   //M clauses
   //N variables
   //K vars per clause
@@ -132,13 +153,38 @@ void initialize_random_formula(Graph& graph,
   clauses.resize(M);
   literalsN.resize(N);
 
+  //Resize vectors for SOA
+  isClause.resize(M+N);
+  nameSPNode.resize(M+N);
+  solved.resize(M+N);
+  value.resize(M+N);
+  t.resize(M+N);
+  Bias.resize(M+N);
+  onWL.resize(M+N);
+
   for (int m = 0; m < M; ++m) {
-    GNode node = graph.createNode(SPNode(m, true));
+    //GNode node = graph.createNode(SPNode(m, true));
+    GNode node = graph.createNode(SPNode(m));
+    nameSPNode[m] = m;
+    isClause[m] = true;
+    solved[m] = false;
+    value[m] = false;
+    t[m] = 0;
+    onWL[m] = false;
+
     graph.addNode(node, galois::MethodFlag::UNPROTECTED);
-    clauses[m] = std::make_pair(node, 0);
+    //clauses[m] = std::make_pair(node, 0);
+    clauses[m] = node;
   }
   for (int n = 0; n < N; ++n) {
-    GNode node = graph.createNode(SPNode(n, false));
+    //GNode node = graph.createNode(SPNode(n, false));
+    GNode node = graph.createNode(SPNode(M+n));
+    nameSPNode[M+n] = n;
+    isClause[M+n] = false;
+    solved[M+n] = false;
+    value[M+n] = false;
+    t[M+n] = 0;
+    onWL[M+n] = false;
     graph.addNode(node, galois::MethodFlag::UNPROTECTED);
     literalsN[n] = node;
   }
@@ -151,21 +197,23 @@ void initialize_random_formula(Graph& graph,
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
         touse.push_back(newK);
-        graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
+        graph.getEdgeData(graph.addEdge(clauses[m], literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
 
-  //std::random_shuffle(literals.begin(), literals.end());
+  //XXX: Shuffling doesn't help
+  //std::random_shuffle(literalsN.begin(), literalsN.end());
   //std::random_shuffle(clauses.begin(), clauses.end());
 }
 
-void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
+//void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
+void print_formula(Graph& graph,std::vector<GNode>& clauses) {
   for (unsigned m = 0; m < clauses.size(); ++m) {
     if (m != 0)
       std::cout << " & ";
     std::cout << "c" << m << "( ";
-    GNode N = clauses[m].first;
+    GNode N = clauses[m];
     for (auto ii : graph.edges(N, galois::MethodFlag::UNPROTECTED)) {
       if (ii != graph.edge_begin(N, galois::MethodFlag::UNPROTECTED))
         std::cout << " | ";
@@ -174,10 +222,10 @@ void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
         std::cout << "-";
 
       SPNode& V = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
-      std::cout << "v" << V.name;
-      if (V.solved)
-        std::cout << "[" << (V.value ? 1 : 0) << "]";
-      std::cout << "{" << E.eta << "," << V.Bias << "," << (V.value ? 1 : 0) << "}";
+      std::cout << "v" << nameSPNode[V.id];
+      if (solved[V.id])
+        std::cout << "[" << (value[V.id] ? 1 : 0) << "]";
+      std::cout << "{" << E.eta << "," << Bias[V.id] << "," << (value[V.id] ? 1 : 0) << "}";
       std::cout << " ";
     }
     std::cout << " )";
@@ -189,8 +237,8 @@ void print_fixed(Graph& graph, std::vector<GNode>& literalsN) {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
     SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
-    if (V.solved)
-      std::cout << V.name << "[" << (V.value ? 1 : 0) << "]\n";
+    if (solved[V.id])
+      std::cout << nameSPNode[V.id] << "[" << (value[V.id] ? 1 : 0) << "]\n";
   }
   std::cout << "\n";
 }
@@ -200,7 +248,7 @@ int count_fixed(Graph& graph, std::vector<GNode>& literalsN) {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
     SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
-    if (V.solved)
+    if (solved[V.id])
       ++retval;
   }
   return retval;
@@ -272,7 +320,8 @@ void SP_algorithm(Graph& graph,
                   galois::GAccumulator<int>& numBias,
                   galois::GAccumulator<double>& sumBias,
                   std::vector<GNode>& literalsN,
-                  std::vector<std::pair<GNode,int>>& clauses) {
+                  std::vector<GNode>& clauses) {
+                  //std::vector<std::pair<GNode,int>>& clauses) {
   //0) at t = 0, for every edge a->i, randomly initialize the message sigma a->i(t=0) in [0,1]
   //1) for t = 1 to tmax:
   //1.1) sweep the set of edges in a random order, and update sequentially the warnings on all the edges of the graph, generating the values sigma a->i (t) using SP_update
@@ -281,13 +330,20 @@ void SP_algorithm(Graph& graph,
   
   //  tlimit += tmax;
 
-  using WL = galois::worklists::dChunkedFIFO<1024>;
+  using WL = galois::worklists::dChunkedFIFO<512>;
+  //using WL = galois::worklists::ParaMeter<>;
+  //using WL = galois::worklists::AltChunkedFIFO<1024>;
+   //using OBIM = galois::worklists::OrderedByIntegerMetric<
+                   //decltype(EIndexer()),
+                   //galois::worklists::dChunkedFIFO<512>
+                 //>;
+
 
   galois::reportPageAlloc("MeminfoPre: SP_algorithm for_each");
   galois::for_each( galois::iterate(clauses), 
-      [&] (const std::pair<GNode, int>& p, auto& ctx) {
+      [&] (const GNode& p, auto& ctx) {
 
-        GNode a = p.first;
+        GNode a = p;
         //std::cerr << graph.getData(a).t << " ";
         // if (graph.getData(a, galois::MethodFlag::UNPROTECTED).t >= tlimit)
         //   return;
@@ -302,7 +358,11 @@ void SP_algorithm(Graph& graph,
         //{}
 
         auto a_data = graph.getData(a);
-        ++graph.getData(a).t;
+        //++a_data.t;
+        onWL[a_data.id] = false;
+        ++t[a_data.id];
+
+        //++graph.getData(a).t;
 
         //for each i
         for (auto iii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
@@ -310,12 +370,15 @@ void SP_algorithm(Graph& graph,
           double e = eta_for_a_i(graph, a, i);
           double olde = graph.getEdgeData(iii, galois::MethodFlag::UNPROTECTED).eta;
           graph.getEdgeData(iii).eta = e;
-          //std::cout << olde << ',' << e << " ";
+          //std::cout << olde << ',' << e << " " << "\n";
           if (fabs(olde - e) > epsilon) {
             for (auto bii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
               GNode b = graph.getEdgeDst(bii);
-              if (a != b) // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
-                ctx.push(std::make_pair(b,100-(int)(100.0*(olde - e))));
+              //auto b_data = graph.getData(b);
+              //if (a != b && onWL[b_data.id].cas(false, true)) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
+              if (a != b) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
+                ctx.push(b);
+              }
             }
           }
         }
@@ -335,7 +398,8 @@ void SP_algorithm(Graph& graph,
   galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
         SPNode& idata = graph.getData(i, galois::MethodFlag::UNPROTECTED);
-        if (idata.solved) return;
+        
+        if (solved[idata.id]) return;
 
         double pp1 = 1.0;
         double pp2 = 1.0;
@@ -345,6 +409,7 @@ void SP_algorithm(Graph& graph,
 
         //for each function a
         for (auto aii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
+          GNode i = graph.getEdgeDst(aii);
           SPEdge& aie = graph.getEdgeData(aii, galois::MethodFlag::UNPROTECTED);
 
           double etaai = aie.eta;
@@ -369,8 +434,8 @@ void SP_algorithm(Graph& graph,
         double d = BiasP - BiasN;
         if (d < 0.0)
           d = BiasN - BiasP;
-        idata.Bias = d;
-        idata.value = (BiasP > BiasN);
+        Bias[idata.id] = d;
+        value[idata.id] = (BiasP > BiasN);
 
         assert(!std::isnan(d) && !std::isnan(-d));
         maxBias.update(d);
@@ -401,14 +466,16 @@ void decimate(Graph& graph,
   galois::do_all(galois::iterate(literalsN),
       [&] (GNode i) {
         SPNode& idata = graph.getData(i);
-        if (idata.solved) return;
-        if (idata.Bias > limit) {
-          idata.solved = true;
+        if (solved[idata.id]){return;};
+        if (Bias[idata.id] > limit) {
+          solved[idata.id] = true;
           //TODO: simplify graph
           //for each b
           for (auto bii : graph.edges(i)) {
-            graph.getData(graph.getEdgeDst(bii)).solved = true;
-            graph.getData(graph.getEdgeDst(bii)).value = true;
+            //graph.getData(graph.getEdgeDst(bii)).solved = true;
+            //graph.getData(graph.getEdgeDst(bii)).value = true;
+            solved[graph.getData(graph.getEdgeDst(bii)).id] = true;
+            value[graph.getData(graph.getEdgeDst(bii)).id] = true;
           }
           graph.removeNode(i);
         }
@@ -424,7 +491,8 @@ bool survey_inspired_decimation(Graph& graph,
                                 galois::GAccumulator<int>& numBias,
                                 galois::GAccumulator<double>& sumBias,
                                 std::vector<GNode>& literalsN,
-                                std::vector<std::pair<GNode,int>>& clauses
+                                //std::vector<std::pair<GNode,int>>& clauses
+                                std::vector<GNode>& clauses
                                 ) {
   //0) Randomize initial conditions for the surveys
   //1) run SP
@@ -437,7 +505,7 @@ bool survey_inspired_decimation(Graph& graph,
   //   c) clean the graph
   //2.2) if all surveys are trivial(n = 0), output simplified subformula
   //4) if solved, output SAT, if no contradiction, continue at 1, if contridiction, stop
-  galois::preAlloc(numThreads + 100*(graph.size()) / galois::runtime::pagePoolSize());
+  galois::preAlloc(numThreads + 120*(graph.size()) / galois::runtime::pagePoolSize());
   do {
     SP_algorithm(graph, nontrivial, maxBias, numBias, sumBias, literalsN, clauses);
     if (nontrivial.reduce()) {
@@ -463,7 +531,8 @@ int main(int argc, char** argv) {
   galois::GAccumulator<double> sumBias;
 
   std::vector<GNode> literalsN;
-  std::vector<std::pair<GNode,int>> clauses;
+  //std::vector<std::pair<GNode,int>> clauses;
+  std::vector<GNode> clauses;
 
   initialize_random_formula(graph,M,N,K,literalsN,clauses);
   //print_formula(graph, clauses);
