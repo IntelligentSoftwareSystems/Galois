@@ -4,7 +4,7 @@ struct DotProductFixedTilingAlgo {
   struct Node {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
-  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
@@ -29,7 +29,7 @@ struct DotProductFixedTilingAlgo {
     // Assuming only item nodes have edges
     galois::GAccumulator<double> error;
     galois::GAccumulator<size_t> visited;
-    galois::Statistic svisited("EdgesVisited");
+    galois::GAccumulator<size_t> svisited;
 
     constexpr bool useExp = true;
     constexpr bool useDot = false;
@@ -60,7 +60,7 @@ struct DotProductFixedTilingAlgo {
     } else {
       flop = countFlops(numVisited, 1, LATENT_VECTOR_SIZE);
     }
-    std::cout 
+    std::cout
       << "ERROR: " << error.reduce()
       << " Time: " << millis
       << " numIterations: " << numVisited
@@ -80,17 +80,17 @@ struct AsyncALSalgo {
   
   struct EmptyBase {};
 
-  typedef typename std::conditional<algo == asyncALSreuse,
-          galois::runtime::InputDAGdata,
-          EmptyBase>::type NodeBase;
+  //typedef typename std::conditional<algo == asyncALSreuse,
+          //galois::runtime::InputDAGdata,
+          //EmptyBase>::type NodeBase;
 
   // TODO: fix compilation when inheriting from NodeBase
-  struct Node: public galois::runtime::InputDAGdata { 
+  struct Node{ //: public galois::runtime::InputDAGdata { 
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  static const bool NEEDS_LOCKS = algo == asyncALSkdg_i || asyncALSkdg_ar;
-  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int> BaseGraph;
+  static const bool NEEDS_LOCKS = false; //algo == asyncALSkdg_i || asyncALSkdg_ar;
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double> BaseGraph;
   typedef typename std::conditional<NEEDS_LOCKS,
           typename BaseGraph::template with_out_of_line_lockable<true>::type,
           typename BaseGraph::template with_no_lockable<true>::type>::type Graph;
@@ -103,8 +103,8 @@ struct AsyncALSalgo {
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
 
-  typedef galois::runtime::PerThreadStorage<XTX> PerThrdXTX;
-  typedef galois::runtime::PerThreadStorage<V> PerThrdV;
+  typedef galois::substrate::PerThreadStorage<XTX> PerThrdXTX;
+  typedef galois::substrate::PerThreadStorage<V> PerThrdV;
 
   Sp A;
   Sp AT;
@@ -117,7 +117,7 @@ struct AsyncALSalgo {
     // Copy out
     for (GNode n : g) {
       LatentValue* ptr = &g.getData(n).latentVector[0];
-      MapV mapV = { ptr };
+      MapV mapV{ptr };
       if (n < NUM_ITEM_NODES) {
         mapV = WT.col(n);
       } else {
@@ -129,7 +129,7 @@ struct AsyncALSalgo {
   void copyFromGraph(Graph& g, MT& WT, MT& HT) {
     for (GNode n : g) {
       LatentValue* ptr = &g.getData(n).latentVector[0];
-      MapV mapV = { ptr };
+      MapV mapV{ ptr };
       if (n < NUM_ITEM_NODES) {
         WT.col(n) = mapV;
       } else {
@@ -227,17 +227,17 @@ struct AsyncALSalgo {
       > ikdg_function_traits;
     typedef std::tuple<
       galois::per_iter_alloc,
-      galois::fixed_neighborhood<>,
+      galois::fixed_neighborhood,
       galois::local_state<LocalState>,
       galois::det_id<DeterministicId>
       > add_remove_function_traits;
     typedef std::tuple<> nondet_function_traits;
 
-    typedef typename std::conditional<(algo != asyncALSkdg_i && algo != asyncALSkdg_ar), 
-      nondet_function_traits,
-      typename std::conditional<algo == asyncALSkdg_ar,
-        add_remove_function_traits,
-        ikdg_function_traits>::type>::type function_traits;
+    //typedef typename std::conditional<(algo != asyncALSkdg_i && algo != asyncALSkdg_ar), 
+      //nondet_function_traits,
+      //typename std::conditional<algo == asyncALSkdg_ar,
+        //add_remove_function_traits,
+        //ikdg_function_traits>::type>::type function_traits;
 
     AsyncALSalgo& self;
     Graph& g;
@@ -256,6 +256,7 @@ struct AsyncALSalgo {
       self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) { }
     
     void operator()(size_t col, galois::UserContext<size_t>& ctx) {
+#if 0
       // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
       if (algo == asyncALSkdg_i || algo == asyncALSkdg_ar) {
@@ -265,6 +266,7 @@ struct AsyncALSalgo {
           return;
         }
       }
+#endif
       self.update(g, col, WT, HT, xtxs, rhs);
     }
   };
@@ -296,13 +298,13 @@ struct AsyncALSalgo {
       }
     };
 
-    typedef galois::runtime::DAGmanager<Graph, VisitAdjacent> Base_ty;
+    //typedef galois::runtime::DAGmanager<Graph, VisitAdjacent> Base_ty;
 
-    struct Manager: public Base_ty {
-      Manager (Graph& g, Sp& A, Sp& AT): 
-        Base_ty {g, VisitAdjacent {g, A, AT} }
-        {}
-    };
+    //struct Manager: public Base_ty {
+      //Manager (Graph& g, Sp& A, Sp& AT): 
+        //Base_ty {g, VisitAdjacent {g, A, AT} }
+        //{}
+    //};
   };
 
   struct VisitNhood {
@@ -341,7 +343,7 @@ struct AsyncALSalgo {
 
   void operator()(Graph& g, const StepFunction&) {
     if (!useSameLatentVector && algo != syncALS) {
-      galois::runtime::LL::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
+      galois::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
     }
     galois::TimeAccumulator elapsed;
     elapsed.start();
@@ -362,18 +364,18 @@ struct AsyncALSalgo {
     PerThrdXTX xtxs;
     PerThrdV rhs;
 
-    typename EigenGraphVisitor::Manager dagManager {g, A, AT}; 
+    //typename EigenGraphVisitor::Manager dagManager {g, A, AT};
 
-    auto* reuseExec = galois::runtime::make_reusable_dag_exec (
-        galois::runtime::makeLocalRange (g),
-        g, dagManager, 
-        ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
-        VisitNhood {*this, g}, std::less<GNode> (),
-        "als-async-reuse");
+    //auto* reuseExec = galois::runtime::make_reusable_dag_exec (
+        //galois::runtime::makeLocalRange (g),
+        //g, dagManager,
+        //ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
+        //VisitNhood {*this, g}, std::less<GNode> (),
+        //"als-async-reuse");
 
-    if (algo == asyncALSreuse) {
-      reuseExec->initialize (galois::runtime::makeLocalRange (g));
-    }
+    //if (algo == asyncALSreuse) {
+      //reuseExec->initialize (galois::runtime::makeLocalRange (g));
+    //}
 
     for (int round = 1; ; ++round) {
 
@@ -382,15 +384,15 @@ struct AsyncALSalgo {
       switch (algo) {
         case syncALS: 
           typedef galois::worklists::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
-          galois::for_each(
+          galois::for_each(galois::iterate(
               boost::counting_iterator<size_t>(0),
-              boost::counting_iterator<size_t>(NUM_ITEM_NODES),
+              boost::counting_iterator<size_t>(NUM_ITEM_NODES)),
               Process(*this, g, WT, HT, xtxs, rhs),
               galois::wl<WL_ty> (),
               galois::loopname ("syncALS-users"));
-          galois::for_each(
+          galois::for_each(galois::iterate(
               boost::counting_iterator<size_t>(NUM_ITEM_NODES),
-              boost::counting_iterator<size_t>(g.size()),
+              boost::counting_iterator<size_t>(g.size())),
               Process(*this, g, WT, HT, xtxs, rhs),
               galois::wl<WL_ty> (),
               galois::loopname ("syncALS-movies"));
@@ -424,22 +426,23 @@ struct AsyncALSalgo {
       last = error;
     } // end for
 
-    delete reuseExec;
-    reuseExec = nullptr;
+    //delete reuseExec;
+    //reuseExec = nullptr;
   }
 };
 
+#if 0
 struct SimpleALSalgo {
   bool isSgd() const { return false; }
   std::string name() const { return "AlternatingLeastSquares"; }
-  struct Node { 
+  struct Node {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
-  // Column-major access 
+  // Column-major access
   typedef Eigen::SparseMatrix<LatentValue> Sp;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> MT;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, 1> V;
@@ -456,7 +459,7 @@ struct SimpleALSalgo {
     // Copy out
     for (GNode n : g) {
       LatentValue* ptr = &g.getData(n).latentVector[0];
-      MapV mapV = { ptr };
+      MapV mapV{ ptr };
       if (n < NUM_ITEM_NODES) {
         mapV = WT.col(n);
       } else {
@@ -468,7 +471,7 @@ struct SimpleALSalgo {
   void copyFromGraph(Graph& g, MT& WT, MT& HT) {
     for (GNode n : g) {
       LatentValue* ptr = &g.getData(n).latentVector[0];
-      MapV mapV = { ptr };
+      MapV mapV{ ptr };
       if (n < NUM_ITEM_NODES) {
         WT.col(n) = mapV;
       } else {
@@ -503,10 +506,14 @@ struct SimpleALSalgo {
     MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
-    typedef galois::runtime::PerThreadStorage<XTX> PerThrdXTX;
+    typedef galois::substrate::PerThreadStorage<XTX> PerThrdXTX;
 
+    galois::gPrint("ALS::Start initializeA\n");
     initializeA(g);
+    galois::gPrint("ALS::End initializeA\n");
+    galois::gPrint("ALS::Start copyFromGraph\n");
     copyFromGraph(g, WT, HT);
+    galois::gPrint("ALS::End copyFromGraph\n");
 
     double last = -1.0;
     galois::StatTimer mmTime("MMTime");
@@ -522,9 +529,9 @@ struct SimpleALSalgo {
       mmTime.stop();
 
       update1Time.start();
-      galois::for_each(
+      galois::for_each( galois::iterate(
           boost::counting_iterator<int>(0),
-          boost::counting_iterator<int>(A.outerSize()),
+          boost::counting_iterator<int>(A.outerSize())),
           [&](int col, galois::UserContext<int>&) {
         // Compute WTW = W^T * W for sparse A
         XTX& WTW = *xtxs.getLocal();
@@ -542,9 +549,9 @@ struct SimpleALSalgo {
       mmTime.stop();
 
       update2Time.start();
-      galois::for_each(
+      galois::for_each( galois::iterate(
           boost::counting_iterator<int>(0),
-          boost::counting_iterator<int>(AT.outerSize()),
+          boost::counting_iterator<int>(AT.outerSize())),
           [&](int col, galois::UserContext<int>&) {
         // Compute HTH = H^T * H for sparse A
         XTX& HTH = *xtxs.getLocal();
@@ -579,9 +586,10 @@ struct SimpleALSalgo {
     }
   }
 };
-#endif
+#endif // if 0
+#endif // if EIGEN
 
-
+#if 0
 // uses locks
 template<typename Graph, bool UseLocks>
 class Recursive2DExecutor {
@@ -1014,7 +1022,7 @@ struct DotProductRecursiveTilingAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<Node, unsigned int>
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
 //    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type InnerGraph;
   typedef typename galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
@@ -1082,7 +1090,7 @@ struct DotProductRecursiveTilingAlgo {
 // uses locks
 struct BlockJumpAlgo {
   bool isSgd() const { return true; }
-  typedef galois::runtime::LL::PaddedLock<true> SpinLock;
+  typedef galois::substrate::PaddedLock<true> SpinLock;
   static const bool precomputeOffsets = false;
 
   std::string name() const { return "BlockAlgo"; }
@@ -1091,7 +1099,7 @@ struct BlockJumpAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  typedef galois::graphs::LC_CSR_Graph<Node, unsigned int>
+  typedef galois::graphs::LC_CSR_Graph<Node, double>
 //    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
@@ -1277,8 +1285,9 @@ struct BlockJumpAlgo {
 
     void operator()(unsigned tid, unsigned total) {
       galois::StatTimer timer("PerThreadTime");
-      galois::Statistic edgesVisited("EdgesVisited");
-      galois::Statistic blocksVisited("BlocksVisited");
+      //TODO: Report Accumulators at the end
+      galois::GAccumulator<size_t> edgesVisited;
+      galois::GAccumulator<size_t> blocksVisited;
       size_t numBlocks = numXBlocks * numYBlocks;
       size_t xBlock = (numXBlocks + total - 1) / total;
       size_t xStart = std::min(xBlock * tid, numXBlocks - 1);
@@ -1342,7 +1351,7 @@ struct BlockJumpAlgo {
 
     // Partition item edges in blocks to users according to range [userStart, userEnd)
     if (precomputeOffsets) {
-      galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode item) {
+      galois::do_all(galois::iterate(g.begin(), g.begin() + NUM_ITEM_NODES), [&](GNode item) {
         size_t sliceY = item / itemsPerBlock;
         BlockInfo* s = &blocks[sliceY * numXBlocks];
 
@@ -1370,3 +1379,5 @@ struct BlockJumpAlgo {
     });
   }
 };
+
+#endif

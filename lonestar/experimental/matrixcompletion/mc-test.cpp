@@ -403,7 +403,299 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
   }
 }
 
-//#include "Test2.h"
+#include "Test2.h"
+// uses locks
+struct BlockJumpAlgo {
+  bool isSgd() const { return true; }
+  typedef galois::substrate::PaddedLock<true> SpinLock;
+  static const bool precomputeOffsets = false;
+
+  std::string name() const { return "BlockAlgo"; }
+
+  struct Node {
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
+  };
+
+  typedef galois::graphs::LC_CSR_Graph<Node, double>
+//    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+
+  void readGraph(Graph& g) { galois::graphs::readGraph(g, inputFilename); }
+
+  size_t userIdToUserNode(size_t userId) {
+    return userId + NUM_ITEM_NODES;
+  }
+
+  struct BlockInfo {
+    size_t id;
+    size_t x;
+    size_t y;
+    size_t userStart;
+    size_t userEnd;
+    size_t itemStart;
+    size_t itemEnd;
+    size_t numitems;
+    size_t updates;
+    double error;
+    int* userOffsets;
+
+    std::ostream& print(std::ostream& os) {
+      os 
+        << "id: " << id
+        << " x: " << x
+        << " y: " << y
+        << " userStart: " << userStart
+        << " userEnd: " << userEnd
+        << " itemStart: " << itemStart
+        << " itemEnd: " << itemEnd
+        << " updates: " << updates
+        << "\n";
+      return os;
+    }
+  };
+
+  struct Process {
+    Graph& g;
+    SpinLock *xLocks, *yLocks;
+    BlockInfo* blocks;
+    size_t numXBlocks, numYBlocks;
+    LatentValue* steps;
+    size_t maxUpdates;
+    galois::GAccumulator<double>* errorAccum;
+    
+    struct GetDst: public std::unary_function<Graph::edge_iterator, GNode> {
+      Graph* g;
+      GetDst() { }
+      GetDst(Graph* _g): g(_g) { }
+      GNode operator()(Graph::edge_iterator ii) const {
+        return g->getEdgeDst(ii);
+      }
+    };
+
+    /**
+     * Preconditions: row and column of slice are locked.
+     *
+     * Postconditions: increments update count, does sgd update on each item
+     * and user in the slice
+     */
+    template<bool Enable = precomputeOffsets>
+    size_t runBlock(BlockInfo& si, typename std::enable_if<!Enable>::type* = 0) {
+      typedef galois::NoDerefIterator<Graph::edge_iterator> no_deref_iterator;
+      typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+
+      LatentValue stepSize = steps[si.updates - maxUpdates + updatesPerEdge];
+      size_t seen = 0;
+      double error = 0.0;
+
+      // Set up item iterators
+      size_t itemId = 0;
+      Graph::iterator mm = g.begin(), em = g.begin();
+      std::advance(mm, si.itemStart);
+      std::advance(em, si.itemEnd);
+      
+      GetDst fn { &g };
+
+      // For each item in the range
+      for (; mm != em; ++mm, ++itemId) {  
+        GNode item = *mm;
+        Node& itemData = g.getData(item);
+        size_t lastUser = si.userEnd + NUM_ITEM_NODES;
+
+        edge_dst_iterator start(no_deref_iterator(g.edge_begin(item, galois::MethodFlag::UNPROTECTED)), fn);
+        edge_dst_iterator end(no_deref_iterator(g.edge_end(item, galois::MethodFlag::UNPROTECTED)), fn);
+
+        // For each edge in the range
+        for (auto ii = std::lower_bound(start, end, si.userStart + NUM_ITEM_NODES); ii != end; ++ii) {
+          GNode user = g.getEdgeDst(*ii.base());
+
+          if (user >= lastUser)
+            break;
+
+          LatentValue e = doGradientUpdate(itemData.latentVector, g.getData(user).latentVector, lambda, g.getEdgeData(*ii.base()), stepSize);
+          if (errorAccum)
+            error += e * e;
+          ++seen;
+        }
+      }
+
+      si.updates += 1;
+      if (errorAccum) {
+        *errorAccum += (error - si.error);
+        si.error = error;
+      }
+      
+      return seen;
+    }
+
+    template<bool Enable = precomputeOffsets>
+    size_t runBlock(BlockInfo& si, typename std::enable_if<Enable>::type* = 0) {
+      LatentValue stepSize = steps[si.updates - maxUpdates + updatesPerEdge];
+      size_t seen = 0;
+      double error = 0.0;
+
+      // Set up item iterators
+      size_t itemId = 0;
+      Graph::iterator mm = g.begin(), em = g.begin();
+      std::advance(mm, si.itemStart);
+      std::advance(em, si.itemEnd);
+      
+      // For each item in the range
+      for (; mm != em; ++mm, ++itemId) {  
+        if (si.userOffsets[itemId] < 0)
+          continue;
+
+        GNode item = *mm;
+        Node& itemData = g.getData(item);
+        size_t lastUser = si.userEnd + NUM_ITEM_NODES;
+
+        // For each edge in the range
+        for (auto ii = g.edge_begin(item) + si.userOffsets[itemId], ei = g.edge_end(item); ii != ei; ++ii) {
+          GNode user = g.getEdgeDst(ii);
+
+          if (user >= lastUser)
+            break;
+
+          LatentValue e = doGradientUpdate(itemData.latentVector, g.getData(user).latentVector, lambda, g.getEdgeData(ii), stepSize);
+          if (errorAccum)
+            error += e * e;
+          ++seen;
+        }
+      }
+
+      si.updates += 1;
+      if (errorAccum) {
+        *errorAccum += (error - si.error);
+        si.error = error;
+      }
+      
+      return seen;
+    }
+
+    /**
+     * Searches next slice to work on.
+     *
+     * @returns slice id to work on, x and y locks are held on the slice
+     */
+    size_t getNextBlock(BlockInfo* sp) {
+      size_t numBlocks = numXBlocks * numYBlocks;
+      size_t nextBlockId = sp->id + 1;
+      for (size_t i = 0; i < 2 * numBlocks; ++i, ++nextBlockId) {
+        // Wrap around
+        if (nextBlockId == numBlocks)
+          nextBlockId = 0;
+
+        BlockInfo& nextBlock = blocks[nextBlockId];
+
+        if (nextBlock.updates < maxUpdates && xLocks[nextBlock.x].try_lock()) {
+          if (yLocks[nextBlock.y].try_lock()) {
+            // Return while holding locks
+            return nextBlockId;
+          } else {
+            xLocks[nextBlock.x].unlock();
+          }
+        }
+      }
+
+      return numBlocks;
+    }
+
+    void operator()(unsigned tid, unsigned total) {
+      galois::StatTimer timer("PerThreadTime");
+      //TODO: Report Accumulators at the end
+      galois::GAccumulator<size_t> edgesVisited;
+      galois::GAccumulator<size_t> blocksVisited;
+      size_t numBlocks = numXBlocks * numYBlocks;
+      size_t xBlock = (numXBlocks + total - 1) / total;
+      size_t xStart = std::min(xBlock * tid, numXBlocks - 1);
+      size_t yBlock = (numYBlocks + total - 1) / total;
+      size_t yStart = std::min(yBlock * tid, numYBlocks - 1);
+      BlockInfo* sp = &blocks[xStart + yStart + numXBlocks];
+
+      timer.start();
+
+      while (true) {
+        sp = &blocks[getNextBlock(sp)];
+        if (sp == &blocks[numBlocks])
+          break;
+        blocksVisited += 1;
+        edgesVisited += runBlock(*sp);
+
+        xLocks[sp->x].unlock();
+        yLocks[sp->y].unlock();
+      }
+
+      timer.stop();
+    }
+  };
+
+  void operator()(Graph& g, const StepFunction& sf) {
+    const size_t numUsers = g.size() - NUM_ITEM_NODES;
+    const size_t numYBlocks = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
+    const size_t numXBlocks = (numUsers + usersPerBlock - 1) / usersPerBlock;
+    const size_t numBlocks = numXBlocks * numYBlocks;
+
+    SpinLock* xLocks = new SpinLock[numXBlocks];
+    SpinLock* yLocks = new SpinLock[numYBlocks];
+    
+    std::cout
+      << "itemsPerBlock: " << itemsPerBlock
+      << " usersPerBlock: " << usersPerBlock
+      << " numBlocks: " << numBlocks
+      << " numXBlocks: " << numXBlocks
+      << " numYBlocks: " << numYBlocks << "\n";
+    
+    // Initialize
+    BlockInfo* blocks = new BlockInfo[numBlocks];
+    for (size_t i = 0; i < numBlocks; i++) {
+      BlockInfo& si = blocks[i];
+      si.id = i;
+      si.x = i % numXBlocks;
+      si.y = i / numXBlocks;
+      si.updates = 0;
+      si.error = 0.0;
+      si.userStart = si.x * usersPerBlock;
+      si.userEnd = std::min((si.x + 1) * usersPerBlock, numUsers);
+      si.itemStart = si.y * itemsPerBlock;
+      si.itemEnd = std::min((si.y + 1) * itemsPerBlock, NUM_ITEM_NODES);
+      si.numitems = si.itemEnd - si.itemStart;
+      if (precomputeOffsets) {
+        si.userOffsets = new int[si.numitems];
+      } else {
+        si.userOffsets = nullptr;
+      }
+    }
+
+    // Partition item edges in blocks to users according to range [userStart, userEnd)
+    if (precomputeOffsets) {
+      galois::do_all(galois::iterate(g.begin(), g.begin() + NUM_ITEM_NODES), [&](GNode item) {
+        size_t sliceY = item / itemsPerBlock;
+        BlockInfo* s = &blocks[sliceY * numXBlocks];
+
+        size_t pos = item - s->itemStart;
+        auto ii = g.edge_begin(item), ei = g.edge_end(item);
+        size_t offset = 0;
+        for (size_t i = 0; i < numXBlocks; ++i, ++s) {
+          size_t start = userIdToUserNode(s->userStart);
+          size_t end = userIdToUserNode(s->userEnd);
+
+          if (ii != ei && g.getEdgeDst(ii) >= start && g.getEdgeDst(ii) < end) {
+            s->userOffsets[pos] = offset;
+          } else {
+            s->userOffsets[pos] = -1;
+          }
+          for (; ii != ei && g.getEdgeDst(ii) < end; ++ii, ++offset)
+            ;
+        }
+      });
+    }
+    
+    executeUntilConverged(sf, g, [&](LatentValue* steps, size_t maxUpdates, galois::GAccumulator<double>* errorAccum) {
+      Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
+      galois::on_each(fn);
+    });
+  }
+};
 
 //! Simple edge-wise operator
 class BlockedEdgeAlgo {
@@ -484,6 +776,169 @@ class BlockedEdgeAlgo {
   }
 };
 
+
+/**
+ * ALS algorithms
+ */
+
+#ifdef HAS_EIGEN
+
+struct SimpleALSalgo {
+  bool isSgd() const { return false; }
+  std::string name() const { return "AlternatingLeastSquares"; }
+  struct Node {
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
+  };
+
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double>
+    ::with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+  // Column-major access
+  typedef Eigen::SparseMatrix<LatentValue> Sp;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> MT;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, 1> V;
+  typedef Eigen::Map<V> MapV;
+
+  Sp A;
+  Sp AT;
+
+  void readGraph(Graph& g) {
+    galois::graphs::readGraph(g, inputFilename); 
+  }
+
+  void copyToGraph(Graph& g, MT& WT, MT& HT) {
+    // Copy out
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV{ ptr };
+      if (n < NUM_ITEM_NODES) {
+        mapV = WT.col(n);
+      } else {
+        mapV = HT.col(n - NUM_ITEM_NODES);
+      }
+    }
+  }
+
+  void copyFromGraph(Graph& g, MT& WT, MT& HT) {
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV{ ptr };
+      if (n < NUM_ITEM_NODES) {
+        WT.col(n) = mapV;
+      } else {
+        HT.col(n - NUM_ITEM_NODES) = mapV;
+      }
+    }
+  }
+
+  void initializeA(Graph& g) {
+    typedef Eigen::Triplet<int> Triplet;
+    std::vector<Triplet> triplets { g.sizeEdges() };
+    auto it = triplets.begin();
+    for (auto n : g) {
+      for (auto edge : g.out_edges(n)) {
+        *it++ = Triplet(n, g.getEdgeDst(edge) - NUM_ITEM_NODES, g.getEdgeData(edge));
+      }
+    }
+    A.resize(NUM_ITEM_NODES, g.size() - NUM_ITEM_NODES);
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    AT = A.transpose();
+  }
+
+  void operator()(Graph& g, const StepFunction&) {
+    galois::TimeAccumulator elapsed;
+    elapsed.start();
+
+    // Find W, H that minimize ||W H^T - A||_2^2 by solving alternating least
+    // squares problems:
+    //   (W^T W + lambda I) H^T = W^T A (solving for H^T)
+    //   (H^T H + lambda I) W^T = H^T A^T (solving for W^T)
+    MT WT { LATENT_VECTOR_SIZE, NUM_ITEM_NODES };
+    MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
+    typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
+    typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
+    typedef galois::substrate::PerThreadStorage<XTX> PerThrdXTX;
+
+    galois::gPrint("ALS::Start initializeA\n");
+    initializeA(g);
+    galois::gPrint("ALS::End initializeA\n");
+    galois::gPrint("ALS::Start copyFromGraph\n");
+    copyFromGraph(g, WT, HT);
+    galois::gPrint("ALS::End copyFromGraph\n");
+
+    double last = -1.0;
+    galois::StatTimer mmTime("MMTime");
+    galois::StatTimer update1Time("UpdateTime1");
+    galois::StatTimer update2Time("UpdateTime2");
+    galois::StatTimer copyTime("CopyTime");
+    PerThrdXTX xtxs;
+
+    for (int round = 1; ; ++round) {
+      mmTime.start();
+      // TODO parallelize this using tiled executor
+      XTSp WTA = WT * A;
+      mmTime.stop();
+
+      update1Time.start();
+      galois::for_each( galois::iterate(
+          boost::counting_iterator<int>(0),
+          boost::counting_iterator<int>(A.outerSize())),
+          [&](int col, galois::UserContext<int>&) {
+        // Compute WTW = W^T * W for sparse A
+        XTX& WTW = *xtxs.getLocal();
+        WTW.setConstant(0);
+        for (Sp::InnerIterator it(A, col); it; ++it)
+          WTW.triangularView<Eigen::Upper>() += WT.col(it.row()) * WT.col(it.row()).transpose();
+        for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+          WTW(i, i) += lambda;
+        HT.col(col) = WTW.selfadjointView<Eigen::Upper>().llt().solve(WTA.col(col));
+      });
+      update1Time.stop();
+
+      mmTime.start();
+      XTSp HTAT = HT * AT;
+      mmTime.stop();
+
+      update2Time.start();
+      galois::for_each( galois::iterate(
+          boost::counting_iterator<int>(0),
+          boost::counting_iterator<int>(AT.outerSize())),
+          [&](int col, galois::UserContext<int>&) {
+        // Compute HTH = H^T * H for sparse A
+        XTX& HTH = *xtxs.getLocal();
+        HTH.setConstant(0);
+        for (Sp::InnerIterator it(AT, col); it; ++it)
+          HTH.triangularView<Eigen::Upper>() += HT.col(it.row()) * HT.col(it.row()).transpose();
+        for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+          HTH(i, i) += lambda;
+        WT.col(col) = HTH.selfadjointView<Eigen::Upper>().llt().solve(HTAT.col(col));
+      });
+      update2Time.stop();
+
+      copyTime.start();
+      copyToGraph(g, WT, HT);
+      copyTime.stop();
+
+      double error = sumSquaredError(g);
+      elapsed.stop();
+      std::cout
+        << "R: " << round
+        << " elapsed (ms): " << elapsed.get()
+        << " RMSE (R " << round << "): " << std::sqrt(error/g.sizeEdges())
+        << "\n";
+      elapsed.start();
+
+      if (fixedRounds <= 0 && round > 1 && std::abs((last - error) / last) < tolerance)
+        break;
+      if (fixedRounds > 0 && round >= fixedRounds)
+        break;
+
+      last = error;
+    }
+  }
+};
+
+#endif //HAS_EIGEN
 
 /** 
  * Initializes latent vector with random values and returns basic graph 
@@ -660,20 +1115,23 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
-    //#ifdef HAS_EIGEN
-    //case Algo::syncALS:
-    //  run<AsyncALSalgo<syncALS>>();
-    //  break;
-    //case Algo::simpleALS:
-    //  run<SimpleALSalgo>();
-    //  break;
-    //#endif
+    #ifdef HAS_EIGEN
+    case Algo::syncALS:
+      run<AsyncALSalgo<syncALS>>();
+      break;
+    case Algo::simpleALS:
+      run<SimpleALSalgo>();
+      break;
+    #endif
     case Algo::blockedEdge:
       run<BlockedEdgeAlgo>();
       break;
+    case Algo::blockJump:
+      run<BlockJumpAlgo>();
+      break;
     //case Algo::dotProductFixedTiling:
-    //  run<DotProductFixedTilingAlgo>();
-    //  break;
+      //run<DotProductFixedTilingAlgo>();
+      //break;
     //case Algo::dotProductRecursiveTiling:
     //  run<DotProductRecursiveTilingAlgo>();
     //  break;
