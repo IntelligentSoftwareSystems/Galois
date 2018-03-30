@@ -247,14 +247,14 @@ struct WeightIndexer: public std::unary_function<GNode, int> {
   }
 };
 
-//unsigned minRuns(unsigned coarsenTo, unsigned size) {
-//  unsigned num = 0;
-//  while (coarsenTo < size) {
-//    ++num;
-//    size /= 2;
-//  }
-//  return num;
-//}
+/*unsigned minRuns(unsigned coarsenTo, unsigned size) {
+  unsigned num = 0;
+  while (coarsenTo < size) {
+    ++num;
+    size /= 2;
+  }
+  return num;
+}*/
 
 unsigned fixupLoners(GNodeBag& b, GGraph* coarseGGraph, GGraph* fineGGraph) {
   unsigned count = 0;
