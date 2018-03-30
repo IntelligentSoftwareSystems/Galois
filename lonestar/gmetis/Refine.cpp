@@ -102,9 +102,15 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
   else
     findBoundary(boundary, cg);
 
+  typedef galois::gstl::Vector<unsigned> VecTy;
+  typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
+  ThreadLocalData edgesThreadLocal;
+
   //Find the partition n is most connected to
   auto pickPartitionEC = [&] (GNode n, auto& cnx) -> unsigned {
-    std::vector<unsigned, galois::PerIterAllocTy::rebind<unsigned>::other> edges(parts.size(), 0, cnx.getPerIterAlloc());
+    auto& edges = *edgesThreadLocal.getLocal();
+    edges.clear();
+    edges.resize(parts.size(), 0);
     unsigned P = cg.getData(n).getPart();
     for (auto ii : cg.edges(n)) {
       GNode neigh = cg.getEdgeDst(ii);
@@ -120,8 +126,10 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
   auto pickPartitionMP = [&] (GNode n, auto& cnx) -> unsigned {
     unsigned P = cg.getData(n).getPart();
     unsigned W = parts[P].partWeight;
-    std::vector<unsigned, galois::PerIterAllocTy::rebind<unsigned>::other> edges(parts.size(), ~0, cnx.getPerIterAlloc());
-     edges[P] = W;
+    auto& edges = *edgesThreadLocal.getLocal();
+    edges.clear();
+    edges.resize(parts.size(), ~0);
+    edges[P] = W;
     W = (double)W * 0.9;
     for (auto ii : cg.edges(n)) {
       GNode neigh = cg.getEdgeDst(ii);
@@ -159,7 +167,6 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
               fg->getData(nd.getChild(x), galois::MethodFlag::UNPROTECTED).setPart(newpart);
         }
       },
-      galois::per_iter_alloc(),
       galois::loopname("refine"),
       galois::wl<pG>(gainIndexer));
 }
