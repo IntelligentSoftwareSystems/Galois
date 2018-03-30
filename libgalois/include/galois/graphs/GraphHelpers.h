@@ -501,7 +501,7 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
   nodeRanges[0] = 0;
 
   uint32_t numNodes = edgePrefixSum.size();
-  uint32_t numEdges = edgePrefixSum[numNodes - 1];
+  uint64_t numEdges = edgePrefixSum[numNodes - 1];
 
   for (uint32_t i = 0; i < unitsToSplit; i++) {
     auto nodeSplits = 
