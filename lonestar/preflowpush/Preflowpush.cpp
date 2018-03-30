@@ -117,10 +117,11 @@ struct PreflowPush {
   GNode source;
   int global_relabel_interval;
   bool should_global_relabel = false;
+  galois::LargeArray<Graph::edge_iterator> reverseDirectionEdgeIterator; // ideally should be on the graph as graph.getReverseEdgeIterator()
 
   void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int64_t amount) {
     Graph::edge_data_type& cap1 = graph.getEdgeData(ii);
-    Graph::edge_data_type& cap2 = graph.getEdgeData(findEdge(dst, src));
+    Graph::edge_data_type& cap2 = graph.getEdgeData(reverseDirectionEdgeIterator[*ii]);
     cap1 -= amount;
     cap2 += amount;
   }
@@ -399,7 +400,7 @@ struct PreflowPush {
               for (auto ii : this->graph.edges(src, galois::MethodFlag::WRITE)) {
                 GNode dst = this->graph.getEdgeDst(ii);
                 int64_t rdata =
-                  this->graph.getEdgeData(this->findEdge(dst, src));
+                  this->graph.getEdgeData(reverseDirectionEdgeIterator[*ii]);
                 if (rdata > 0) {
                   this->graph.getData(dst, galois::MethodFlag::WRITE);
                 }
@@ -417,7 +418,7 @@ struct PreflowPush {
           for (auto ii : this->graph.edges(src, useCAS ? galois::MethodFlag::UNPROTECTED
                 : galois::MethodFlag::WRITE)) {
             GNode dst     = this->graph.getEdgeDst(ii);
-            int64_t rdata = this->graph.getEdgeData(this->findEdge(dst, src));
+            int64_t rdata = this->graph.getEdgeData(reverseDirectionEdgeIterator[*ii]);
             if (rdata > 0) {
               Node& node = this->graph.getData(dst, galois::MethodFlag::UNPROTECTED);
               int newHeight =
@@ -522,42 +523,19 @@ struct PreflowPush {
         case nondet:
           if (useHLOrder) {
             nonDetDischarge(initial, counter, galois::wl<OBIM>(obimIndexer));
-            // galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
-                // galois::loopname("Discharge"),
-                // galois::parallel_break(),
-                // galois::wl<OBIM>(obimIndexer));
           } else {
             nonDetDischarge(initial, counter, galois::wl<Chunk>());
-            // galois::for_each(galois::iterate(initial), ProcessNonDet(counter, *this),
-                // galois::loopname("Discharge"),
-                // galois::parallel_break());
           }
           break;
         case detBase: 
           detDischarge<detBase>(initial, counter);
-              // {
-                        // Process<detBase> fn(counter, *this);
-                        // galois::for_each(
-                            // galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
-                            // galois::per_iter_alloc(),
-                            // galois::det_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak()),
-                            // galois::det_id<Process<detBase>::DeterministicId>(fn.getDetermisticId()));
-                      // } 
-              break;
+          break;
         case detDisjoint: 
           detDischarge<detDisjoint>(initial, counter);
-              // {
-                        // Process<detDisjoint> fn(counter, *this);
-                        // galois::for_each(
-                            // galois::iterate(initial), fn, galois::loopname("Discharge"), galois::wl<DWL>(),
-                            // galois::per_iter_alloc(),
-                            // galois::det_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak()),
-                            // galois::det_id<Process<detDisjoint>::DeterministicId>(fn.getDetermisticId()));
-                      // } 
-              break;
+          break;
         default:
-                          std::cerr << "Unknown algorithm" << detAlgo << "\n";
-                          abort();
+          std::cerr << "Unknown algorithm" << detAlgo << "\n";
+          abort();
       }
       T_discharge.stop();
 
@@ -713,6 +691,17 @@ struct PreflowPush {
       }
       graph.getData(*ii).id = id;
     }
+
+    reverseDirectionEdgeIterator.allocateBlocked(graph.sizeEdges());
+    // memoize the reverse direction edge-iterators
+    galois::do_all(galois::iterate(graph.begin(), graph.end()),
+        [&, this] (const GNode& src) {
+          for (auto ii : this->graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
+            GNode dst     = this->graph.getEdgeDst(ii);
+            reverseDirectionEdgeIterator[*ii] = this->findEdge(dst, src);
+          }
+        },
+        galois::loopname("FindReverseDirectionEdges"));
   }
 
   void checkSorting(void) {
