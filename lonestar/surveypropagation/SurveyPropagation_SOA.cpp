@@ -116,11 +116,11 @@ struct SPNode {
 #endif
 struct SPNode {
   uint32_t id;
-
   SPNode(uint32_t _id) : id(_id){};
 };
 
 //SOA
+//TODO:Use large arrays
 std::vector<bool> isClause;
 std::vector<int> nameSPNode;
 std::vector<bool> solved;
@@ -170,7 +170,7 @@ void initialize_random_formula(Graph& graph,
     solved[m] = false;
     value[m] = false;
     t[m] = 0;
-    onWL[m] = false;
+    onWL[m] = true;
 
     graph.addNode(node, galois::MethodFlag::UNPROTECTED);
     //clauses[m] = std::make_pair(node, 0);
@@ -330,7 +330,7 @@ void SP_algorithm(Graph& graph,
   
   //  tlimit += tmax;
 
-  using WL = galois::worklists::dChunkedFIFO<512>;
+  using WL = galois::worklists::dChunkedFIFO<128>;
   //using WL = galois::worklists::ParaMeter<>;
   //using WL = galois::worklists::AltChunkedFIFO<1024>;
    //using OBIM = galois::worklists::OrderedByIntegerMetric<
@@ -374,9 +374,9 @@ void SP_algorithm(Graph& graph,
           if (fabs(olde - e) > epsilon) {
             for (auto bii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
               GNode b = graph.getEdgeDst(bii);
-              //auto b_data = graph.getData(b);
-              //if (a != b && onWL[b_data.id].cas(false, true)) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
-              if (a != b) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
+              auto b_data = graph.getData(b, galois::MethodFlag::UNPROTECTED);
+              if (a != b && onWL[b_data.id].cas(false, true)) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
+              //if (a != b) { // && graph.getData(b, galois::MethodFlag::UNPROTECTED).t < tlimit)
                 ctx.push(b);
               }
             }
