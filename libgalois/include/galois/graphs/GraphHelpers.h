@@ -501,6 +501,16 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
   nodeRanges[0] = 0;
 
   uint32_t numNodes = edgePrefixSum.size();
+  // handle corner case TODO there are better ways to do this, i.e. call helper
+  if (numNodes == 0) {
+    nodeRanges[0] = 0;
+
+    for (uint32_t i = 0; i < unitsToSplit; i++) {
+      nodeRanges[i + 1] = 0;
+    }
+    return nodeRanges;
+  }
+
   uint64_t numEdges = edgePrefixSum[numNodes - 1];
 
   for (uint32_t i = 0; i < unitsToSplit; i++) {
