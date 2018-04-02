@@ -66,7 +66,7 @@ enum Personality {
 
 std::string personality_str(Personality p);
 
-extern cll::opt<int> gpudevice;
+extern int gpudevice;
 extern cll::opt<Personality> personality;
 extern cll::opt<unsigned> scalegpu;
 extern cll::opt<unsigned> scalecpu;

@@ -73,9 +73,7 @@ std::string personality_str(Personality p) {
   return "";
 }
 
-cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, "
-                                         "default is to choose automatically"), 
-                               cll::init(-1));
+int gpudevice;
 cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
                   clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
@@ -196,8 +194,10 @@ void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
         break;
     }
 
-    if ((personality == GPU_CUDA) && (gpudevice == -1)) {
+    if (personality == GPU_CUDA) {
       gpudevice = get_gpu_device_id(personality_set, num_nodes);
+    } else {
+      gpudevice = -1;
     }
 
     // scale factor setup
