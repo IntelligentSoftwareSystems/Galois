@@ -18,6 +18,7 @@
  *
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
  * Author: Donald Nguyen <ddn@cs.utexas.edu>
+ * Author: Gurbinder Gill <gill@cs.utexas.edu>
  */
 #include "MC.h"
 
@@ -50,8 +51,6 @@ enum Algo {
   simpleALS,
   blockedEdge,
   blockJump,
-  dotProductFixedTiling,
-  dotProductRecursiveTiling
 };
 
 enum Step {
@@ -132,11 +131,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::simpleALS, "simpleALS", "Simple alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
-    clEnumValN(Algo::dotProductFixedTiling, "dotProductFixedTiling", 
-               "Dot product fixed tiling test"),
-    clEnumValN(Algo::dotProductRecursiveTiling, "dotProductRecursiveTiling", 
-               "Dot product recursive tiling test"),
-  clEnumValEnd), 
+  clEnumValEnd),
   cll::init(Algo::blockedEdge));
 
 static cll::opt<Step> learningRateFunction("learningRateFunction", 
@@ -403,7 +398,7 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
   }
 }
 
-#include "Test2.h"
+//#include "Test2.h"
 // uses locks
 struct BlockJumpAlgo {
   bool isSgd() const { return true; }
@@ -742,8 +737,6 @@ class BlockedEdgeAlgo {
           //  steps[updatesPerEdge - maxUpdates + task.updates];
           //const LatentValue stepSize = steps[1 - maxUpdates + 0];
 
-          //TODO: Previous value
-          //const LatentValue stepSize = 0.5;
           const LatentValue stepSize = steps[0];
           LatentValue error =
             doGradientUpdate(g.getData(src).latentVector,
@@ -880,6 +873,7 @@ struct SimpleALSalgo {
       mmTime.stop();
 
       update1Time.start();
+      //TODO: Change to Do_all, pass ints to iterator
       galois::for_each( galois::iterate(
           boost::counting_iterator<int>(0),
           boost::counting_iterator<int>(A.outerSize())),
@@ -937,6 +931,231 @@ struct SimpleALSalgo {
     }
   }
 };
+
+struct SyncALSalgo {
+
+  bool isSgd() const { return false; }
+
+  std::string name() const { return "AsynchronousAlternatingLeastSquares"; }
+
+  struct Node{
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
+  };
+
+  static const bool NEEDS_LOCKS = false;
+  typedef typename galois::graphs::LC_CSR_Graph<Node, double> BaseGraph;
+  typedef typename std::conditional<NEEDS_LOCKS,
+          typename BaseGraph::template with_out_of_line_lockable<true>::type,
+          typename BaseGraph::template with_no_lockable<true>::type>::type Graph;
+  typedef typename Graph::GraphNode GNode;
+  // Column-major access 
+  typedef Eigen::SparseMatrix<LatentValue> Sp;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> MT;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, 1> V;
+  typedef Eigen::Map<V> MapV;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
+
+  typedef galois::substrate::PerThreadStorage<XTX> PerThrdXTX;
+  typedef galois::substrate::PerThreadStorage<V> PerThrdV;
+
+  Sp A;
+  Sp AT;
+
+  void readGraph(Graph& g) {
+    galois::graphs::readGraph(g, inputFilename); 
+  }
+
+  void copyToGraph(Graph& g, MT& WT, MT& HT) {
+    // Copy out
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV{ptr };
+      if (n < NUM_ITEM_NODES) {
+        mapV = WT.col(n);
+      } else {
+        mapV = HT.col(n - NUM_ITEM_NODES);
+      }
+    }
+  }
+
+  void copyFromGraph(Graph& g, MT& WT, MT& HT) {
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV{ ptr };
+      if (n < NUM_ITEM_NODES) {
+        WT.col(n) = mapV;
+      } else {
+        HT.col(n - NUM_ITEM_NODES) = mapV;
+      }
+    }
+  }
+
+  void initializeA(Graph& g) {
+    typedef Eigen::Triplet<int> Triplet;
+    std::vector<Triplet> triplets { g.sizeEdges() };
+    auto it = triplets.begin();
+    for (auto n : g) {
+      for (auto edge : g.out_edges(n)) {
+        *it++ = Triplet(n, g.getEdgeDst(edge) - NUM_ITEM_NODES, g.getEdgeData(edge));
+      }
+    }
+    A.resize(NUM_ITEM_NODES, g.size() - NUM_ITEM_NODES);
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    AT = A.transpose();
+  }
+
+  void update(Graph& g, size_t col, MT& WT, MT& HT,
+    PerThrdXTX& xtxs,
+    PerThrdV& rhs) 
+  {
+    // Compute WTW = W^T * W for sparse A
+    V& r = *rhs.getLocal();
+    if (col < NUM_ITEM_NODES) {
+      r.setConstant(0);
+      // HTAT = HT * AT; r = HTAT.col(col)
+      for (Sp::InnerIterator it(AT, col); it; ++it)
+        r += it.value() * HT.col(it.row());
+      XTX& HTH = *xtxs.getLocal();
+      HTH.setConstant(0);
+      for (Sp::InnerIterator it(AT, col); it; ++it)
+        HTH.triangularView<Eigen::Upper>() += HT.col(it.row()) * HT.col(it.row()).transpose();
+      for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+        HTH(i, i) += lambda;
+      WT.col(col) = HTH.selfadjointView<Eigen::Upper>().llt().solve(r);
+    } else {
+      col = col - NUM_ITEM_NODES;
+      r.setConstant(0);
+      // WTA = WT * A; x = WTA.col(col)
+      for (Sp::InnerIterator it(A, col); it; ++it)
+        r += it.value() * WT.col(it.row());
+      XTX& WTW = *xtxs.getLocal();
+      WTW.setConstant(0);
+      for (Sp::InnerIterator it(A, col); it; ++it)
+        WTW.triangularView<Eigen::Upper>() += WT.col(it.row()) * WT.col(it.row()).transpose();
+      for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+        WTW(i, i) += lambda;
+      HT.col(col) = WTW.selfadjointView<Eigen::Upper>().llt().solve(r);
+    }
+  }
+
+  struct NonDetTraits { 
+    typedef std::tuple<> base_function_traits;
+  };
+
+  struct Process
+  {
+    struct LocalState {
+      LocalState(Process&, galois::PerIterAllocTy&) { }
+    };
+
+    struct DeterministicId {
+      uintptr_t operator()(size_t x) const {
+        return x;
+      }
+    };
+
+    typedef std::tuple<
+      galois::per_iter_alloc,
+      galois::intent_to_read,
+      galois::local_state<LocalState>,
+      galois::det_id<DeterministicId>
+      > ikdg_function_traits;
+    typedef std::tuple<
+      galois::per_iter_alloc,
+      galois::fixed_neighborhood,
+      galois::local_state<LocalState>,
+      galois::det_id<DeterministicId>
+      > add_remove_function_traits;
+    typedef std::tuple<> nondet_function_traits;
+
+    SyncALSalgo& self;
+    Graph& g;
+    MT& WT;
+    MT& HT;
+    PerThrdXTX& xtxs;
+    PerThrdV& rhs;
+
+    Process(
+      SyncALSalgo& self,
+      Graph& g,
+      MT& WT,
+      MT& HT,
+      PerThrdXTX& xtxs,
+      PerThrdV& rhs):
+      self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) { }
+    
+    void operator()(size_t col, galois::UserContext<size_t>& ctx) {
+      self.update(g, col, WT, HT, xtxs, rhs);
+    }
+  };
+
+  void operator()(Graph& g, const StepFunction&) {
+    if (!useSameLatentVector) {
+      galois::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
+    }
+    galois::TimeAccumulator elapsed;
+    elapsed.start();
+
+    // Find W, H that minimize ||W H^T - A||_2^2 by solving alternating least
+    // squares problems:
+    //   (W^T W + lambda I) H^T = W^T A (solving for H^T)
+    //   (H^T H + lambda I) W^T = H^T A^T (solving for W^T)
+    MT WT { LATENT_VECTOR_SIZE, NUM_ITEM_NODES };
+    MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
+
+    initializeA(g);
+    copyFromGraph(g, WT, HT);
+
+    double last = -1.0;
+    galois::StatTimer updateTime("UpdateTime");
+    galois::StatTimer copyTime("CopyTime");
+    PerThrdXTX xtxs;
+    PerThrdV rhs;
+
+    for (int round = 1; ; ++round) {
+
+      updateTime.start();
+
+      typedef galois::worklists::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
+      galois::for_each(galois::iterate(
+          boost::counting_iterator<size_t>(0),
+          boost::counting_iterator<size_t>(NUM_ITEM_NODES)),
+          Process(*this, g, WT, HT, xtxs, rhs),
+          galois::wl<WL_ty> (),
+          galois::loopname ("syncALS-users"));
+      galois::for_each(galois::iterate(
+          boost::counting_iterator<size_t>(NUM_ITEM_NODES),
+          boost::counting_iterator<size_t>(g.size())),
+          Process(*this, g, WT, HT, xtxs, rhs),
+          galois::wl<WL_ty> (),
+          galois::loopname ("syncALS-movies"));
+
+      updateTime.stop();
+
+      copyTime.start();
+      copyToGraph(g, WT, HT);
+      copyTime.stop();
+
+      double error = sumSquaredError(g);
+      elapsed.stop();
+      std::cout
+        << "R: " << round
+        << " elapsed (ms): " << elapsed.get()
+        << " RMSE (R " << round << "): " << std::sqrt(error/g.sizeEdges())
+        << "\n";
+      elapsed.start();
+
+      if (fixedRounds <= 0 && round > 1 && std::abs((last - error) / last) < tolerance)
+        break;
+      if (fixedRounds > 0 && round >= fixedRounds)
+        break;
+
+      last = error;
+    } // end for
+  }
+};
+
 
 #endif //HAS_EIGEN
 
@@ -1117,7 +1336,7 @@ int main(int argc, char** argv) {
   switch (algo) {
     #ifdef HAS_EIGEN
     case Algo::syncALS:
-      run<AsyncALSalgo<syncALS>>();
+      run<SyncALSalgo>();
       break;
     case Algo::simpleALS:
       run<SimpleALSalgo>();
@@ -1129,13 +1348,7 @@ int main(int argc, char** argv) {
     case Algo::blockJump:
       run<BlockJumpAlgo>();
       break;
-    //case Algo::dotProductFixedTiling:
-      //run<DotProductFixedTilingAlgo>();
-      //break;
-    //case Algo::dotProductRecursiveTiling:
-    //  run<DotProductRecursiveTilingAlgo>();
-    //  break;
-    default: 
+    default:
       GALOIS_DIE("unknown algorithm");
       break;
   }
