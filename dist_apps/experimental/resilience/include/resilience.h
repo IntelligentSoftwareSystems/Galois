@@ -74,7 +74,7 @@ static cll::opt<std::string> checkpointFileName("checkpointFileName",
 /**
  * Choose crashNumHosts hosts to crash.
  *
- * @returns set of hosts to be crashed
+ * @returns set of hosts to crash
  */
 std::set<uint32_t> getRandomHosts() {
   const auto& net = galois::runtime::getSystemNetworkInterface();
