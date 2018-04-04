@@ -23,6 +23,7 @@
  *
  * @author Prad Nelluru <pradn@cs.utexas.edu>
  * @author Loc Hoang <lhoang@utexas.edu> (Some utility code/Code cleanup)
+ * @author Gurbinder Gill <gill@cs.utexas.edu> (Some utility code/Code cleanup)
  */
 
 #include "galois/Galois.h"
@@ -180,7 +181,7 @@ struct Node {
   }
 };
 
-using Graph = typename galois::graphs::LC_CSR_Graph<Node, int>
+using Graph = typename galois::graphs::LC_CSR_Graph<Node, double>
                          ::with_numa_alloc<true>::type
                          ::with_no_lockable<false>::type;
 using GNode = Graph::GraphNode;
@@ -555,11 +556,11 @@ void SGDNodeMovie(Graph& g, const LearnFN& lf) {
   if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
 
   while (numIterations < maxUpdates && latestError > errorThreshold) {
-    double step_size = lf->step_size(numIterations);
+    double step_size = lf.step_size(numIterations);
     galois::gDebug("Step Size: ", step_size);
 
     galois::for_each(
-      galois::iterate(g), 
+      galois::iterate(g),
       [&] (GNode node, auto& ctx) {
         for (auto ii : g.edges(node)) {
           doGradientUpdate(g.getData(node, galois::MethodFlag::UNPROTECTED), 
@@ -602,7 +603,7 @@ void SGDEdgeMovie(Graph& g, const LearnFN& lf) {
   if (verifyPerIter) galois::gPrint("Initial RMS: ", latestError, "\n");
 
   while (numIterations < maxUpdates && latestError > errorThreshold) {
-    double step_size = lf->step_size(numIterations);
+    double step_size = lf.step_size(numIterations);
     galois::gDebug("Step Size: ", step_size);
 
     galois::for_each(
@@ -924,7 +925,7 @@ void runBlockSlices(Graph& g, const LearnFN& lf) {
       // Each thread works on 1 work item
       galois::do_all(
         galois::iterate(workItems + 0, workItems + numWorkItems),
-        BlockFn(g, lf->step_size(numIterations))
+        BlockFn(g, lf.step_size(numIterations))
       );
 
       // move each thread's user assingment one block to the right
@@ -986,7 +987,7 @@ void SGDSliceMarch(Graph& g, const LearnFN& lf) {
     workItems[i] = wi;
   }
 
-  double step_size = lf->step_size(1); // FIXME
+  double step_size = lf.step_size(1); // FIXME
 
   //move the edge iterators of each movie to the start of the current block
   //advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
@@ -1365,7 +1366,7 @@ void runSliceJump(Graph& g, const LearnFN& lf) {
     startSlices[i] = &slices[ xSlice + ySlice * numXSlices];
   }
   
-  double step_size = lf->step_size(1); //FIXME
+  double step_size = lf.step_size(1); //FIXME
   galois::GAccumulator<size_t> eVisited;
   galois::do_all(galois::iterate(&startSlices[0], &startSlices[threadCount]),
       sgd_slice_jump(g, &eVisited, xLocks, yLocks, slices, numXSlices, numYSlices, step_size));
@@ -1374,20 +1375,20 @@ void runSliceJump(Graph& g, const LearnFN& lf) {
 }
 
 
-template<typename A, typename G>
-void runAlgo(const A& algo, G& g) {
+template<typename A>
+void runAlgo(const A& algo) {
   switch (learn) {
     case Intel:
-      algo(g, IntelLearnFN());
+      algo(IntelLearnFN());
       break;
     case Purdue:
-      algo(g, PurdueLearnFN());
+      algo(PurdueLearnFN());
       break;
     case Bottou:
-      algo(g, BottouLearnFN());
+      algo(BottouLearnFN());
       break;
     case Inv:
-      algo(g, InvLearnFN());
+      algo(InvLearnFN());
       break;
     default:
       std::abort();
@@ -1428,27 +1429,33 @@ int main(int argc, char** argv) {
 
   switch (algo) {
     case Algo::nodeMovie:
-      runAlgo(&SGDNodeMovie, g);
+      runAlgo([&g] (const auto& lf) { SGDNodeMovie(g, lf); });
       // SGDNodeMovie(g, lf.get());
       break;
-    //case Algo::edgeMovie:
-    //  SGDEdgeMovie(g, lf.get());
-    //  break;
-    //case Algo::block:
-    //  runBlockSlices<SGDBlock>(g, lf.get());
-    //  break;
-    //case Algo::blockAndSliceUsers:
-    //  runBlockSlices<SGDBlockUsers>(g, lf.get());
-    //  break;
-    //case Algo::blockAndSliceBoth:
-    //  runBlockSlices<SGDBlockUsersMovies>(g, lf.get());
-    //  break;
-    //case Algo::sliceMarch:
-    //  SGDSliceMarch(g, lf.get());
-    //  break;
-    //case Algo::sliceJump:
-    //  runSliceJump(g, lf.get());
-    //  break;
+    case Algo::edgeMovie:
+      runAlgo([&g] (const auto& lf) { SGDEdgeMovie(g, lf); });
+      //SGDEdgeMovie(g, lf.get());
+      break;
+    case Algo::block:
+      runAlgo([&g] (const auto& lf) { runBlockSlices<SGDBlock>(g, lf); });
+      //runBlockSlices<SGDBlock>(g, lf.get());
+      break;
+    case Algo::blockAndSliceUsers:
+      runAlgo([&g] (const auto& lf) { runBlockSlices<SGDBlockUsers>(g, lf); });
+      //runBlockSlices<SGDBlockUsers>(g, lf.get());
+      break;
+    case Algo::blockAndSliceBoth:
+      runAlgo([&g] (const auto& lf) { runBlockSlices<SGDBlockUsersMovies>(g, lf); });
+      //runBlockSlices<SGDBlockUsersMovies>(g, lf.get());
+      break;
+    case Algo::sliceMarch:
+      runAlgo([&g] (const auto& lf) { SGDSliceMarch(g, lf); });
+      //SGDSliceMarch(g, lf.get());
+      break;
+    case Algo::sliceJump:
+      runAlgo([&g] (const auto& lf) { runSliceJump(g, lf); });
+      //runSliceJump(g, lf.get());
+      break;
   }
 
   mainTimer.stop();
