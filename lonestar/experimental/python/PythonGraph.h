@@ -57,6 +57,7 @@ size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph
 
 size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph, EventWindow window);
 size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWindow window);
+size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 

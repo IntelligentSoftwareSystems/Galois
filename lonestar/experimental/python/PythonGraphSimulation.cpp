@@ -24,6 +24,37 @@ size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWi
   return countMatchedEdges(dataGraph->graph);
 }
 
+size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  Graph queryGraph;
+  queryGraph.allocateFrom(4, 6);
+  queryGraph.constructNodes();
+
+  queryGraph.getData(0).label = dataGraph->nodeLabelIDs["process"];
+  queryGraph.getData(0).id = 0;
+  queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 0));
+  queryGraph.fixEndEdge(0, 1);
+
+  queryGraph.getData(1).label = dataGraph->nodeLabelIDs["file"];
+  queryGraph.getData(1).id = 1;
+  queryGraph.constructEdge(1, 0, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 0));
+  queryGraph.constructEdge(2, 2, EdgeData(dataGraph->edgeLabelIDs["READ"], 1));
+  queryGraph.fixEndEdge(1, 3);
+
+  queryGraph.getData(2).label = dataGraph->nodeLabelIDs["process"];
+  queryGraph.getData(2).id = 2;
+  queryGraph.constructEdge(3, 1, EdgeData(dataGraph->edgeLabelIDs["READ"], 1));
+  queryGraph.constructEdge(4, 3, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 2));
+  queryGraph.fixEndEdge(2, 5);
+
+  queryGraph.getData(3).label = dataGraph->nodeLabelIDs["network"];
+  queryGraph.getData(3).id = 3;
+  queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 2));
+  queryGraph.fixEndEdge(3, 6);
+
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  return countMatchedEdges(dataGraph->graph);
+}
+
 size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
