@@ -40,7 +40,7 @@
 
 #include <math.h>
 
-using namespace std;
+//using namespace std;
 using namespace galois::worklists;
 
 namespace cll = llvm::cl;
@@ -54,6 +54,7 @@ static cll::opt<int> M(cll::Positional, cll::desc("<num variables>"), cll::Requi
 static cll::opt<int> N(cll::Positional, cll::desc("<num clauses>"), cll::Required);
 static cll::opt<int> K(cll::Positional, cll::desc("<variables per clause>"), cll::Required);
 
+static std::string graphName = "seed9_1Mc_3Ml_1c3l.gr";
 
 //SAT problem:
 //variables Xi E {0,1}, i E {1 .. N), M constraints
@@ -116,7 +117,8 @@ struct SPNode {
 #endif
 struct SPNode {
   uint32_t id;
-  SPNode(uint32_t _id) : id(_id){};
+  SPNode(uint32_t _id) : id(_id) {}
+  SPNode() {}
 };
 
 //SOA
@@ -185,6 +187,7 @@ void initialize_random_formula(Graph& graph,
     value[M+n] = false;
     t[M+n] = 0;
     onWL[M+n] = false;
+
     graph.addNode(node, galois::MethodFlag::UNPROTECTED);
     literalsN[n] = node;
   }
@@ -202,9 +205,93 @@ void initialize_random_formula(Graph& graph,
     }
   }
 
+  galois::graphs::FileGraphWriter p;
+  p.setNumNodes(M+N);
+  p.setNumEdges(M*K);
+  p.setSizeofEdgeData(sizeof(SPEdge));
+
+  p.phase1();
+  for (int m = 0; m < M; ++m) {
+    p.incrementDegree(m, K);
+  }
+  for (int n = 0; n < N; ++n) {
+    p.incrementDegree(M+n, 0);
+  }
+
+  using EdgeData = galois::LargeArray<typename Graph::edge_data_type>;
+  EdgeData edgeData;
+  edgeData.create(M*K);
+
+  p.phase2();
+  for (int m = 0; m < M; ++m) {
+    for (auto e: graph.edges(clauses[m], galois::MethodFlag::UNPROTECTED)) {
+      auto dst = graph.getData(graph.getEdgeDst(e), galois::MethodFlag::UNPROTECTED).id;
+      edgeData.set(p.addNeighbor(m, dst), graph.getEdgeData(e));
+    }
+  }
+
+  using edge_value_type = typename EdgeData::value_type;
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value) {
+    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+  }
+
+  p.toFile(graphName);
+
   //XXX: Shuffling doesn't help
   //std::random_shuffle(literalsN.begin(), literalsN.end());
   //std::random_shuffle(clauses.begin(), clauses.end());
+}
+
+void  initialize_loaded_formula(Graph& graph,
+                                int M,
+                                int N,
+                                int K,
+                                std::vector<GNode>& literalsN,
+                                std::vector<GNode>& clauses){
+  //M clauses
+  //N variables
+  //K vars per clause
+
+  //build up clauses and literals
+  clauses.resize(M);
+  literalsN.resize(N);
+
+  //Resize vectors for SOA
+  isClause.resize(M+N);
+  nameSPNode.resize(M+N);
+  solved.resize(M+N);
+  value.resize(M+N);
+  t.resize(M+N);
+  Bias.resize(M+N);
+  onWL.resize(M+N);
+
+  auto node = graph.begin();
+  for (int m = 0; m < M; ++m) {
+    graph.getData(*node, galois::MethodFlag::UNPROTECTED).id = m;
+    nameSPNode[m] = m;
+    isClause[m] = true;
+    solved[m] = false;
+    value[m] = false;
+    t[m] = 0;
+    onWL[m] = true;
+
+    clauses[m] = *node;
+    node++;
+  }
+
+  for (int n = 0; n < N; ++n) {
+    graph.getData(*node, galois::MethodFlag::UNPROTECTED).id = M+n;
+    nameSPNode[M+n] = n;
+    isClause[M+n] = false;
+    solved[M+n] = false;
+    value[M+n] = false;
+    t[M+n] = 0;
+    onWL[M+n] = false;
+
+    literalsN[n] = *node;
+    node++;
+  }
 }
 
 //void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
@@ -228,9 +315,30 @@ void print_formula(Graph& graph,std::vector<GNode>& clauses) {
       std::cout << "{" << E.eta << "," << Bias[V.id] << "," << (value[V.id] ? 1 : 0) << "}";
       std::cout << " ";
     }
-    std::cout << " )";
+    std::cout << " )\n";
   }
-  std::cout << "\n";
+  std::cout << std::endl;
+}
+
+void print_literal(Graph& graph,std::vector<GNode>& literalsN) {
+  for (unsigned n = 0; n < literalsN.size(); ++n) {
+    std::cout << "v" << n << "( ";
+    GNode N = literalsN[n];
+    for (auto ii : graph.edges(N, galois::MethodFlag::UNPROTECTED)) {
+      SPEdge& E = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
+      if (E.isNegative)
+        std::cout << "-";
+
+      SPNode& V = graph.getData(graph.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED);
+      std::cout << "c" << nameSPNode[V.id];
+      if (solved[V.id])
+        std::cout << "[" << (value[V.id] ? 1 : 0) << "]";
+      std::cout << "{" << E.eta << "," << Bias[V.id] << "," << (value[V.id] ? 1 : 0) << "}";
+      std::cout << " ";
+    }
+    std::cout << " )\n";
+  }
+  std::cout << std::endl;
 }
 
 void print_fixed(Graph& graph, std::vector<GNode>& literalsN) {
@@ -534,12 +642,15 @@ int main(int argc, char** argv) {
   //std::vector<std::pair<GNode,int>> clauses;
   std::vector<GNode> clauses;
 
-  initialize_random_formula(graph,M,N,K,literalsN,clauses);
-  //print_formula(graph, clauses);
+  //initialize_random_formula(graph,M,N,K,literalsN,clauses);
+  galois::graphs::readGraph(graph, graphName);
+  initialize_loaded_formula(graph,M,N,K,literalsN,clauses);
+//  print_formula(graph, clauses);
+//  print_literal(graph, literalsN);
   //build_graph();
   //print_graph();
 
-  std::cout << "Starting...\n";
+  std::cout << "Starting..." << std::endl;
 
   galois::StatTimer T;
   T.start();
@@ -549,7 +660,7 @@ int main(int argc, char** argv) {
   //print_formula(graph, clauses);
   //print_fixed(graph, literalsN);
 
-  std::cout << "Fixed " << count_fixed(graph, literalsN) << " variables\n";
+  std::cout << "Fixed " << count_fixed(graph, literalsN) << " variables" << std::endl;
 
   return 0;
 }
