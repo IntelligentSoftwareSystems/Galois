@@ -129,6 +129,37 @@ size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph,
   return countMatchedEdges(dataGraph->graph);
 }
 
+size_t findProcessesExecutingModifiedFile(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  Graph queryGraph;
+  queryGraph.allocateFrom(4, 6);
+  queryGraph.constructNodes();
+
+  queryGraph.getData(0).label = dataGraph->nodeLabelIDs["file"];
+  queryGraph.getData(0).id = 0;
+  queryGraph.constructEdge(0, 1, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 0));
+  queryGraph.constructEdge(1, 2, EdgeData(dataGraph->edgeLabelIDs["CHMOD"], 1));
+  queryGraph.constructEdge(2, 3, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 2));
+  queryGraph.fixEndEdge(0, 3);
+
+  queryGraph.getData(1).label = dataGraph->nodeLabelIDs["process"];
+  queryGraph.getData(1).id = 1;
+  queryGraph.constructEdge(3, 0, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 0));
+  queryGraph.fixEndEdge(1, 4);
+
+  queryGraph.getData(2).label = dataGraph->nodeLabelIDs["process"];
+  queryGraph.getData(2).id = 2;
+  queryGraph.constructEdge(4, 0, EdgeData(dataGraph->edgeLabelIDs["CHMOD"], 1));
+  queryGraph.fixEndEdge(2, 5);
+
+  queryGraph.getData(3).label = dataGraph->nodeLabelIDs["process"];
+  queryGraph.getData(3).id = 3;
+  queryGraph.constructEdge(5, 0, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 2));
+  queryGraph.fixEndEdge(3, 6);
+
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  return countMatchedEdges(dataGraph->graph);
+}
+
 size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window) {
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[file_uuid],

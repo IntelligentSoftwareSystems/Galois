@@ -60,6 +60,7 @@ size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWi
 size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
+size_t findProcessesExecutingModifiedFile(AttributedGraph* dataGraph, EventLimit limit, EventWindow window);
 
 size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window);
 size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window);
