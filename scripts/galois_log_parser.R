@@ -113,7 +113,8 @@ getTimersDistributed <- function (logData) {
    for( region in regions){
      print(region)
      computeTimeRows <- subset(logData, grepl(paste("^", region, "$", sep=""), REGION) & CATEGORY == "Time" & TOTAL_TYPE == "HMAX")$TOTAL
-     if(!is.null(computeTimeRows)){
+     #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", region, "$", sep=""), CATEGORY) & TOTAL_TYPE == "HMAX")$TOTAL
+     if(!identical(computeTimeRows, character(0))){
        print(paste(region, " : time :  ", as.numeric(computeTimeRows)))
        computeTimeMean = computeTimeMean + round(as.numeric(computeTimeRows)/numRuns, digits = 2)
      }
@@ -123,9 +124,9 @@ getTimersDistributed <- function (logData) {
    computeTimePerIter <- numeric(numRuns)
    for(i in 1:(numRuns)) {
      j = i - 1 #Vectors are 1 indexed in r
-     #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
      computeTimeRows <- subset(logData, grepl(paste("^", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL
-     if(!is.null(computeTimeRows)){
+     #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+     if(!identical(computeTimeRows, character(0))){
        computeTimePerIter[i] <- sum(as.numeric(computeTimeRows))
      }
    }
@@ -403,6 +404,7 @@ computeMaxByMean <- function (logData, paramList, output) {
     for( region in regions){
      print(region)
      computeTimeRows <- subset(logData, grepl(paste("^", region, "$", sep=""), REGION) & CATEGORY == "Time" & TOTAL_TYPE == "HostValues")$TOTAL
+     #computeTimeRows <- subset(logData, grepl(paste("CUDA_DO_ALL_IMPL_", region, "$", sep=""), CATEGORY) & TOTAL_TYPE == "HostValues")$TOTAL
      if(!is.null(computeTimeRows)){
        print(computeTimeRows)
        computeTimePerHost <- (as.numeric(strsplit(computeTimeRows, ";")[[1]]))
