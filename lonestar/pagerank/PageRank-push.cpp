@@ -40,12 +40,12 @@ const char* desc =
 
 constexpr static const unsigned CHUNK_SIZE = 16;
 
-enum Algo { Async, Sync };
+enum Algo { Async, Sync }; // Async has better asbolute performance.
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                            cll::values(clEnumVal(Async, "Async"),
                                        clEnumVal(Sync, "Sync"), clEnumValEnd),
-                           cll::init(Sync));
+                           cll::init(Async));
 
 static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
@@ -107,30 +107,6 @@ static void printTop(Graph& graph, int topn) {
     std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
 }
-
-// This method seems redundant.
-
-// void initResidual(Graph& graph) {
-//   galois::do_all(
-//       galois::iterate(graph),
-//       [&graph](const GNode& src) {
-//         auto nout = std::distance(graph.edge_begin(src),
-//         graph.edge_end(src)); for (auto ii : graph.edges(src)) {
-//           auto dst    = graph.getEdgeDst(ii);
-//           auto& ddata = graph.getData(dst);
-//           atomicAdd(ddata.residual, 1 / nout);
-//         }
-//       },
-//       galois::loopname("initResidual"), galois::steal(), galois::no_stats());
-
-//   galois::do_all(galois::iterate(graph),
-//                  [&graph](const GNode& src) {
-//                    auto& data    = graph.getData(src);
-//                    data.residual = data.residual * ALPHA * (1.0 - ALPHA);
-//                  },
-//                  galois::loopname("scaleResidual"), galois::steal(),
-//                  galois::no_stats());
-// }
 
 void asyncPageRank(Graph& graph) {
   typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
@@ -222,7 +198,7 @@ void syncPageRank(Graph& graph) {
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
                    galois::loopname("CreateEdgeTiles"), galois::no_stats());
 
-    activeNodes.clear_parallel();
+    activeNodes.clear();
 
     galois::do_all(galois::iterate(updates),
                    [&](const Update& up) {
@@ -245,7 +221,7 @@ void syncPageRank(Graph& graph) {
                    galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
                    galois::loopname("PushResidualSync"), galois::no_stats());
 
-    updates.clear_parallel();
+    updates.clear();
   }
 
   if (iter >= maxIterations) {
@@ -300,7 +276,6 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph),
                  [&graph](GNode n) { graph.getData(n).init(); },
                  galois::no_stats(), galois::loopname("Initialize"));
-  // initResidual(graph);
 
   galois::StatTimer Tmain;
   Tmain.start();

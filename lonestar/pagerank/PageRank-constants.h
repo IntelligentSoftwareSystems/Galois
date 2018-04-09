@@ -30,6 +30,8 @@
 const char* name = "Page Rank";
 const char* url  = 0;
 
+// All PageRank algorithm variants use the same constants for ease of
+// comparison.
 constexpr static const float ALPHA       = 0.85;
 constexpr static const float PR_INIT_VAL = 1.0;
 

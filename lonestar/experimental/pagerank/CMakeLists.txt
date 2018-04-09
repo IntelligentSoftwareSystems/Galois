@@ -10,3 +10,5 @@ app(PageRankKDG PageRankKDG.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND EXP_OPT)
 app(PageRankAlamere PageRankAlamere.cpp EXP_OPT)
 
 app(PageRankSet PageRankSet.cpp)
+
+app(pagerank-pull PageRank-pull.cpp)

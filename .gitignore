@@ -11,6 +11,7 @@
 cscope.out
 tags
 .vscode
+.settings
 
 /GPATH
 /GRTAGS

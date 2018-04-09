@@ -35,7 +35,7 @@
 
 namespace cll = llvm::cl;
 const char* desc =
-    "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
+    "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 
 constexpr static const unsigned CHUNK_SIZE = 32;
 
@@ -43,6 +43,8 @@ constexpr static const unsigned CHUNK_SIZE = 32;
 static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<tranpose of input graph>"),
                                       cll::Required);
+// Any delta in pagerank computation across iterations that is greater than the
+// tolerance means the computation has not yet converged.
 static cll::opt<float> tolerance("tolerance",
                                  cll::desc("tolerance for residual"),
                                  cll::init(TOLERANCE));
