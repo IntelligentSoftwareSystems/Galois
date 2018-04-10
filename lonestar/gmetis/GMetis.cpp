@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
 
     galois::for_each(galois::iterate(parts), 
         [&] (int part, auto& lwl) {
-          auto flag = galois::MethodFlag::UNPROTECTED;
+          constexpr auto flag = galois::MethodFlag::UNPROTECTED;
           typedef std::vector<std::pair<unsigned,GNode>, galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
           //copy and translate all edges
           GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
@@ -242,6 +242,7 @@ int main(int argc, char** argv) {
           }
         },
         galois::wl<WL>(),
+        galois::per_iter_alloc(),
         galois::loopname("Order Graph"));
 
     std::map<GNode,uint64_t> globalMap;
