@@ -1,6 +1,37 @@
 #ifndef KD_TREE_H
 #define KD_TREE_H
 
+/**
+ * KD-Tree construction Ideas
+ *
+ * 1) Accumulate Points in a LargeArray and use that
+ * as a backings store for the tree. Each node or leaf nodes have
+ * pointers/iterators into the array instead of allocating a small local array
+ * sort or split operations move things around in the array itself. 
+ * 
+ * 1b) Idea 1) can be implemented using Bag with forward iterators or using
+ * per-thread-vector and random access iterators. 
+ *
+ * 2) Use std::nth_element to implement cheap splitting at the median without
+ * having to sort etc. Leads to a balanced tree, which may have better parallel
+ * performance
+ *
+ * 3) Investigate whether storing the median split point at internal nodes helps in
+ * nearest neighbor searches as opposed to storing split-value and split-type
+ *
+ * 4) We create different types for Leaf and Internal node. Only Leaf has the array 
+ *
+ * 5) We keep a null pointer in the node, which is only allocated and filled in the
+ * leaf node
+ *
+ *
+ * Minimal Tree interface:
+ * -- add range of points (recursive splitting add)
+ * -- contains(pt)
+ * -- nearestNeighbor(pt)
+ * -- recursive delete
+ */
+
 template <typename D, typename P>
 class KDtree {
 
@@ -85,7 +116,7 @@ public:
   }
 
   template <typename I, typename WL>
-  void buildRecursive(I beg, I end) {
+  galois::optional<I> buildRecursive(I beg, I end) {
 
     auto sz = std::distance(beg, end);
 
@@ -94,16 +125,12 @@ public:
     if (sz < KDtree::MAX_POINTS_IN_CELL) {
       setLeaf();
       insertPoints(beg, end);
-      return;
+      return galois::optional<I>();
 
     } else {
-
-
-
-
+      I mid = splitRange(beg, end);
+      return galois::optional<I>(mid);
     }
-
-
   }
 
 protected:

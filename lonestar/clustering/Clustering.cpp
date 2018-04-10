@@ -148,21 +148,7 @@ struct Clustering {
     }
     return addCounter;
   }
-  template <typename V>
-  void clusterGalois(V& lights) {
 
-    int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
-    cout << "Temp size is " << tempSize << " coord. arr size should be "
-         << tempSize * 3 << endl;
-    std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
-    std::vector<ClusterNode*> clusterArray(tempSize);
-
-#if DEBUG_CONSOLE
-
-    cout << "Tree created " << *tree << endl;
-    cout << "================================================================"
-         << endl;
-#endif
     /* 
      * Tree building algorithm
      *
@@ -186,6 +172,41 @@ struct Clustering {
      *    }
      * }
      */
+
+  template <typename V>
+  void clusterParallel(V& lights) {
+
+    int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    cout << "Temp size is " << tempSize << " coord. arr size should be "
+         << tempSize * 3 << endl;
+    std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
+    std::vector<ClusterNode*> clusterArray(tempSize);
+
+    while (true) {
+
+      KDtree T; 
+
+      T.buildParallel(lights);
+
+    }
+
+  }
+
+  template <typename V>
+  void clusterGalois(V& lights) {
+
+    int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    cout << "Temp size is " << tempSize << " coord. arr size should be "
+         << tempSize * 3 << endl;
+    std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
+    std::vector<ClusterNode*> clusterArray(tempSize);
+
+#if DEBUG_CONSOLE
+
+    cout << "Tree created " << *tree << endl;
+    cout << "================================================================"
+         << endl;
+#endif
 
     GVector<NodeWrapper*> workList(0);
     KdTree::getAll(*tree, workList);
