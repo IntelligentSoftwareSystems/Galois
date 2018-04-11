@@ -11,4 +11,4 @@ app(PageRankAlamere PageRankAlamere.cpp EXP_OPT)
 
 app(PageRankSet PageRankSet.cpp)
 
-app(pagerank-pull PageRank-pull.cpp)
+app(PagerankPull PageRank-pull.cpp)
