@@ -268,9 +268,11 @@ struct SGD {
     double rms_normalized = 0.0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
-      std::cerr << "ITERATION : " << _num_iterations << "\n";
+      galois::gPrint("ITERATION : ",  _num_iterations, "\n");
       //Checkpointing the all the node data
-      saveCheckpointToDisk(_num_iterations, _graph);
+      if(enableFT && recoveryScheme == CP){
+        saveCheckpointToDisk(_num_iterations, _graph);
+      }
 
       auto step_size = getstep_size(_num_iterations);
       dga.reset();

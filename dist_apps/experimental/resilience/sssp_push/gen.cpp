@@ -99,8 +99,7 @@ struct InitializeGraph {
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
-                             infinity, src_node, cuda_ctx);
+        InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
         StatTimer_cuda.stop();
       } else if (personality == CPU)
     #endif
@@ -116,7 +115,6 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    //sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
     sdata.dist_old = local_infinity;
   }
 };
@@ -214,9 +212,8 @@ struct SSSP {
         std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        SSSP_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                  __retval, cuda_ctx);
+        unsigned int __retval = 0;
+        SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -262,6 +259,8 @@ struct SSSP {
     if (snode.dist_old > snode.dist_current) {
       snode.dist_old = snode.dist_current;
 
+      DGAccumulator_accum+= 1;
+
       for (auto jj : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
@@ -269,8 +268,6 @@ struct SSSP {
         uint32_t old_dist = galois::atomicMin(dnode.dist_current, new_dist);
         if (old_dist > new_dist) bitset_dist_current.set(dst);
       }
-
-      DGAccumulator_accum+= 1;
     }
   }
 };
@@ -300,8 +297,9 @@ struct SSSPSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum, max;
-      SSSPSanityCheck_cuda(sum, max, infinity, cuda_ctx);
+      uint64_t sum;
+      uint32_t max;
+      SSSPSanityCheck_masterNodes_cuda(sum, max, infinity, cuda_ctx);
       dgas += sum;
       dgm.update(max);
     }

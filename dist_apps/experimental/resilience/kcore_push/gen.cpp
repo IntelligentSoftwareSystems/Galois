@@ -100,8 +100,7 @@ struct InitializeGraph2 {
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      InitializeGraph2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                            cuda_ctx);
+      InitializeGraph2_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -147,8 +146,7 @@ struct InitializeGraph1 {
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      InitializeGraph1_cuda(*(allNodes.begin()), *(allNodes.end()), 
-                            cuda_ctx);
+      InitializeGraph1_allNodes_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -301,7 +299,7 @@ struct KCoreStep2 {
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
-      KCoreStep2_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), cuda_ctx);
+      KCoreStep2_nodesWithEdges_cuda(cuda_ctx);
       StatTimer_cuda.stop();
     } else if (personality == CPU)
   #endif
@@ -359,9 +357,8 @@ struct KCoreStep1 {
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
-        int __retval = 0;
-        KCoreStep1_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
-                        __retval, k_core_num, cuda_ctx);
+        unsigned int __retval = 0;
+        KCoreStep1_nodesWithEdges_cuda(__retval, k_core_num, cuda_ctx);
         dga += __retval;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
@@ -448,8 +445,8 @@ struct KCoreSanityCheck {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      uint32_t sum;
-      KCoreSanityCheck_cuda(sum, cuda_ctx);
+      uint64_t sum;
+      KCoreSanityCheck_masterNodes_cuda(sum, cuda_ctx);
       dga += sum;
     }
     else
