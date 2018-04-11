@@ -128,6 +128,50 @@ struct InitializeGraph {
   }
 };
 
+struct InitializeGraph_crashed {
+  const uint32_t &local_infinity;
+  cll::opt<unsigned long long> &local_src_node;
+  Graph *graph;
+
+  InitializeGraph_crashed(cll::opt<unsigned long long> &_src_node, 
+                  const uint32_t &_infinity, Graph* _graph) : 
+    local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
+
+  void static go(Graph& _graph){
+    const auto& allNodes = _graph.allNodesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        std::string impl_str(_graph.get_run_identifier(
+                               "CUDA_DO_ALL_IMPL_InitializeGraph_"));
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
+        StatTimer_cuda.start();
+        InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
+    #endif
+    {
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      InitializeGraph_crashed{src_node, infinity, &_graph},
+      galois::no_stats(),
+      galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
+    }
+  }
+
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 :
+                                                                  local_infinity;
+    //TODO: Why is this required? Also, we don't need separate first iteration.
+    //Need for resilience. If host with src crashes, src will not propagate the value to it's neighbors.
+    //sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 :
+                                                              //local_infinity;
+    sdata.dist_old = local_infinity;
+  }
+};
+
+
 /* Recovery to be called by resilience based fault tolerance
  * Null recovery operator
  */
@@ -245,7 +289,7 @@ struct BFS {
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph>(_graph);
+        crashSite<recovery, InitializeGraph_crashed>(_graph);
 
         _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
                   Broadcast_dist_current>("RECOVERY");

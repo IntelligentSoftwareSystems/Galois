@@ -169,6 +169,95 @@ struct InitializeGraph1 {
   }
 };
 
+
+/* Degree counting
+ * Called by InitializeGraph1 */
+struct InitializeGraph2_recovery {
+  Graph *graph;
+
+  InitializeGraph2_recovery(Graph* _graph) : graph(_graph){}
+
+  /* Initialize the entire graph node-by-node */
+  void static go(Graph& _graph) {
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph2_" + 
+                           (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      InitializeGraph2_nodesWithEdges_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
+    galois::do_all(
+      galois::iterate(nodesWithEdges),
+      InitializeGraph2_recovery{ &_graph },
+      galois::steal(),
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("InitializeGraph2_recovery").c_str()));
+
+    _graph.sync<writeDestination, readSource, Reduce_add_current_degree, 
+      Broadcast_current_degree, Bitset_current_degree>("InitializeGraph2_recovery");
+  }
+
+  /* Calculate degree of nodes by checking how many nodes have it as a dest and
+   * adding for every dest */
+  void operator()(GNode src) const {
+    for (auto current_edge : graph->edges(src)) {
+      GNode dest_node = graph->getEdgeDst(current_edge);
+
+      NodeData& dest_data = graph->getData(dest_node);
+      galois::atomicAdd(dest_data.current_degree, (uint32_t)1);
+
+      bitset_current_degree.set(dest_node);
+    }
+  }
+};
+
+
+
+/* Initialize Crashed: initial field setup */
+struct InitializeGraph1_crashed {
+  Graph *graph;
+
+  InitializeGraph1_crashed(Graph* _graph) : graph(_graph){}
+
+  /* Initialize the entire graph node-by-node */
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+
+#ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph1_" + 
+                           (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      InitializeGraph1_allNodes_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
+     galois::do_all(
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        InitializeGraph1_crashed{ &_graph },
+        galois::no_stats(), 
+        galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
+
+    // degree calculation
+    InitializeGraph2_recovery::go(_graph);
+  }
+
+  /* Setup intial fields */
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+    src_data.flag = true;
+    src_data.trim = 0;
+    src_data.current_degree = 0;
+  }
+};
+
+
 /* Initialize Recovery for healthy nodes: initial field setup */
 struct InitializeGraph1_Healthy {
   Graph *graph;
@@ -194,10 +283,10 @@ struct InitializeGraph1_Healthy {
         galois::iterate(allNodes.begin(), allNodes.end()),
         InitializeGraph1_Healthy{ &_graph },
         galois::no_stats(), 
-        galois::loopname(_graph.get_run_identifier("InitializeGraph1").c_str()));
+        galois::loopname(_graph.get_run_identifier("InitializeGraph_healthy").c_str()));
 
     // degree calculation
-    InitializeGraph2::go(_graph);
+    InitializeGraph2_recovery::go(_graph);
   }
 
   /* Setup intial fields */
@@ -249,6 +338,51 @@ struct recovery {
   }
 };
 
+/* Use the trim value (i.e. number of incident nodes that have been removed)
+ * to update degrees.
+ * Called by KCoreStep1 */
+struct KCoreStep2_recovery {
+  Graph* graph;
+
+  KCoreStep2_recovery(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph){
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+  #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
+                           (_graph.get_run_identifier()));
+      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+      StatTimer_cuda.start();
+      KCoreStep2_nodesWithEdges_cuda(cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+  #endif
+     galois::do_all(
+       galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
+       KCoreStep2_recovery{ &_graph },
+       galois::no_stats(), 
+       galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
+  }
+
+  void operator()(GNode src) const {
+    NodeData& src_data = graph->getData(src);
+
+    // we currently do not care about degree for dead nodes, 
+    // so we ignore those (i.e. if flag isn't set, do nothing)
+    if (src_data.flag) {
+      if (src_data.trim > 0) {
+        src_data.current_degree = src_data.current_degree - src_data.trim;
+      }
+    }
+
+    src_data.trim = 0;
+  }
+};
+
+
+
+#if 0
 /* XXX: Not using this currently
  * Special kcoreStep2 for recovery.
  * It updates degree even for dead nodes since degree is reset for all nodes, therefore needs ot be set to correct value.
@@ -266,7 +400,7 @@ struct KCoreStep2_recovery {
        galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
        KCoreStep2_recovery{ &_graph },
        galois::no_stats(),
-       galois::loopname(_graph.get_run_identifier("KCoreStep2_recovery").c_str()));
+       galois::loopname(_graph.get_run_identifier("KCore_recovery").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -280,7 +414,7 @@ struct KCoreStep2_recovery {
     src_data.trim = 0;
   }
 };
-
+#endif
 
 
 /* Use the trim value (i.e. number of incident nodes that have been removed)
@@ -382,12 +516,11 @@ struct KCoreStep1 {
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph1, InitializeGraph1_Healthy>(_graph);
+        crashSite<recovery, InitializeGraph1_crashed, InitializeGraph1_Healthy>(_graph);
 
         // handle trimming (locally) for healthy and crashed hosts.
         // TODO: Can a special operator be used to get correct degree values of healthy nodes after the crash.
-        //KCoreStep2_recovery::go(_graph);
-        KCoreStep2::go(_graph);
+        KCoreStep2_recovery::go(_graph);
       }
       /**************************CRASH SITE : end *****************************************/
 

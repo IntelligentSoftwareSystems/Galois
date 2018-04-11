@@ -109,6 +109,40 @@ struct InitializeGraph {
   }
 };
 
+struct InitializeGraph_crashed {
+  Graph *graph;
+
+  InitializeGraph_crashed(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+                             (_graph.get_run_identifier()));
+        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
+        StatTimer_cuda.start();
+        InitializeGraph_allNodes_cuda(cuda_ctx);
+        StatTimer_cuda.stop();
+      } else if (personality == CPU)
+    #endif
+    {
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      InitializeGraph_crashed{&_graph},
+      galois::no_stats(),
+      galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
+    }
+  }
+
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+    sdata.comp_current = graph->getGID(src);
+    sdata.comp_old = graph->getGID(src);
+  }
+};
+
 /* Recovery to be called by resilience based fault tolerance
  * Null recovery operator
  */
@@ -219,7 +253,7 @@ struct ConnectedComp {
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph>(_graph);
+        crashSite<recovery, InitializeGraph_crashed>(_graph);
 
         //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
                   //Broadcast_comp_current>("RECOVERY");
