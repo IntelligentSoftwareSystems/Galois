@@ -46,6 +46,10 @@ void matchLabel(QG& qG, DG& dG, W& w) {
             dData.matched |= 1 << qn; // multiple matches
           }
         }
+        for (auto de: dG.edges(dn)) {
+          auto& deData = dG.getEdgeData(de);
+          deData.matched = 0; // matches to none
+        }
       },
       galois::loopname("MatchLabel"));
 }
@@ -80,7 +84,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
 
             bool matched = false;
             for (auto de: dG.edges(dn)) {
-              auto deData = dG.getEdgeData(de);
+              auto& deData = dG.getEdgeData(de);
               if (useWindow) {
                 if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
                   continue; // skip this edge since it is not in the time-span of interest
@@ -244,7 +248,7 @@ void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow wind
               auto qDst = qG.getEdgeDst(qe);
 
               for (auto de: dG.edges(dn)) {
-                auto deData = dG.getEdgeData(de);
+                auto& deData = dG.getEdgeData(de);
                 auto dDst = dG.getEdgeDst(de);
                 if (dn < dDst) { // match only one of the symmetric edges
                   if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
