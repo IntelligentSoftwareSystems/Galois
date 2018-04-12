@@ -753,7 +753,7 @@ class PTAConcurrent : public PTABase<true> {
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
 
-      updates.clear_parallel();
+      updates.clear();
 
       // After propagating all constraints, see if load/store constraints need 
       // to be added in since graph was potentially updated
