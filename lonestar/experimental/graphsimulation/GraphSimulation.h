@@ -92,7 +92,7 @@ struct AttributedGraph {
   std::map<std::string, std::vector<std::string>> edgeAttributes;
 };
 
-void runGraphSimulation(Graph& queryGraph, Graph& dataGraph, EventLimit limit, EventWindow window);
+void runGraphSimulation(Graph& queryGraph, Graph& dataGraph, EventLimit limit, EventWindow window, bool queryNodeHasMoreThan2Edges);
 
 void matchNodeWithRepeatedActions(Graph &graph, uint32_t nodeLabel, uint32_t action, EventWindow window);
 void matchNodeWithTwoActions(Graph &graph, uint32_t nodeLabel, uint32_t action1, uint32_t dstNodeLabel1, uint32_t action2, uint32_t dstNodeLabel2, EventWindow window);
