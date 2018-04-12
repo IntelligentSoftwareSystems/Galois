@@ -36,7 +36,7 @@ void matchLabel(QG& qG, DG& dG, W& w) {
         for (auto qn: qG) {
           assert(qn < 64); // because matched is 64-bit
           auto& qData = qG.getData(qn);
-          if (qData.label & dData.label) { // query could be any or multiple labels
+          if (qData.label == dData.label) { // TODO: query could be any or multiple labels
             if (!qData.matched) {
               qData.matched = 1;
             }
@@ -86,7 +86,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
                   continue; // skip this edge since it is not in the time-span of interest
                 }
               }
-              if (qeData.label & deData.label) { // query could be any or multiple labels
+              if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
                 auto& dDstData = dG.getData(dG.getEdgeDst(de));
                 if (dDstData.matched & (1 << qDst)) {
                   matched = true;
@@ -118,7 +118,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
                   continue; // skip this edge since it is not in the time-span of interest
                 }
               }
-              if (qeData.label & deData.label) { // query could be any or multiple labels
+              if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
                 auto dDst = dG.getEdgeDst(de);
                 auto& dDstData = dG.getData(dDst);
                 if (dDstData.matched & (1 << qDst)) {
@@ -135,7 +135,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
 
                     for (auto& de2: dG.edges(dn)) {
                       auto& deData2 = dG.getEdgeData(de2);
-                      if (qeData2.label & deData2.label) { // query could be any or multiple labels
+                      if (qeData2.label == deData2.label) { // TODO: query could be any or multiple labels
                         auto dDst2 = dG.getEdgeDst(de2);
                         auto& dDstData2 = dG.getData(dDst2);
                         if (dDstData2.matched & (1 << qDst2)) {
@@ -247,7 +247,7 @@ void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow wind
                 auto deData = dG.getEdgeData(de);
                 auto dDst = dG.getEdgeDst(de);
                 if (dn < dDst) { // match only one of the symmetric edges
-                  if (qeData.label & deData.label) { // query could be any or multiple labels
+                  if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
                     auto& dDstData = dG.getData(dDst);
                     if (dDstData.matched & (1 << qDst)) {
                       deData.matched |= 1 << *qe;
