@@ -6,6 +6,11 @@ size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph
 }
 
 size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNodeWithRepeatedActions(dataGraph->graph,
       dataGraph->nodeLabelIDs["file"],
       dataGraph->edgeLabelIDs["WRITE"],
@@ -14,6 +19,14 @@ size_t findFilesWithMultipleWrites(AttributedGraph* dataGraph, EventWindow windo
 }
 
 size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNodeWithTwoActions(dataGraph->graph,
       dataGraph->nodeLabelIDs["process"],
       dataGraph->edgeLabelIDs["READ"],
@@ -25,6 +38,14 @@ size_t findProcessesWithReadFileWriteNetwork(AttributedGraph* dataGraph, EventWi
 }
 
 size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
@@ -56,6 +77,15 @@ size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLi
 }
 
 size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("EXECUTE") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
@@ -87,6 +117,15 @@ size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimi
 }
 
 size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("EXECUTE") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   Graph queryGraph;
   queryGraph.allocateFrom(6, 10);
   queryGraph.constructNodes();
@@ -130,6 +169,14 @@ size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph,
 }
 
 size_t findProcessesExecutingModifiedFile(AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("CHMOD") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("EXECUTE") == dataGraph->edgeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   Graph queryGraph;
   queryGraph.allocateFrom(4, 6);
   queryGraph.constructNodes();
@@ -161,6 +208,12 @@ size_t findProcessesExecutingModifiedFile(AttributedGraph* dataGraph, EventLimit
 }
 
 size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
@@ -171,6 +224,12 @@ size_t processesReadFromFile(AttributedGraph* dataGraph, uint32_t file_uuid, Eve
 }
 
 size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[file_uuid],
       dataGraph->nodeLabelIDs["file"],
@@ -181,6 +240,12 @@ size_t processesWroteToFile(AttributedGraph* dataGraph, uint32_t file_uuid, Even
 }
 
 size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
@@ -191,6 +256,12 @@ size_t processesReadFromNetwork(AttributedGraph* dataGraph, uint32_t network_uui
 }
 
 size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[network_uuid],
       dataGraph->nodeLabelIDs["network"],
@@ -201,6 +272,12 @@ size_t processesWroteToNetwork(AttributedGraph* dataGraph, uint32_t network_uuid
 }
 
 size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("registry") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
@@ -211,6 +288,12 @@ size_t processesReadFromRegistry(AttributedGraph* dataGraph, uint32_t registry_u
 }
 
 size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("registry") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[registry_uuid],
       dataGraph->nodeLabelIDs["registry"],
@@ -221,6 +304,12 @@ size_t processesWroteToRegistry(AttributedGraph* dataGraph, uint32_t registry_uu
 }
 
 size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("memory") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
@@ -231,6 +320,12 @@ size_t processesReadFromMemory(AttributedGraph* dataGraph, uint32_t memory_uuid,
 }
 
 size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("memory") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[memory_uuid],
       dataGraph->nodeLabelIDs["memory"],
@@ -241,6 +336,12 @@ size_t processesWroteToMemory(AttributedGraph* dataGraph, uint32_t memory_uuid, 
 }
 
 size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -251,6 +352,12 @@ size_t filesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, Eve
 }
 
 size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("file") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -261,6 +368,12 @@ size_t filesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, 
 }
 
 size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -271,6 +384,12 @@ size_t networksReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, 
 }
 
 size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("network") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -281,6 +400,12 @@ size_t networksWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uui
 }
 
 size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("registry") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -291,6 +416,12 @@ size_t registriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid
 }
 
 size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("registry") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -301,6 +432,12 @@ size_t registriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_u
 }
 
 size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("memory") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("READ") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
@@ -311,6 +448,12 @@ size_t memoriesReadByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, 
 }
 
 size_t memoriesWrittenByProcess(AttributedGraph* dataGraph, uint32_t process_uuid, EventWindow window) {
+  if ((dataGraph->nodeLabelIDs.find("process") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->nodeLabelIDs.find("memory") == dataGraph->nodeLabelIDs.end())
+        || (dataGraph->edgeLabelIDs.find("WRITE") == dataGraph->edgeLabelIDs.end())) {
+    return 0;
+  }
+
   matchNeighbors(dataGraph->graph,
       dataGraph->nodeIndices[process_uuid],
       dataGraph->nodeLabelIDs["process"],
