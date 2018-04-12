@@ -75,7 +75,7 @@ namespace graphs {
  */
 template<typename NodeTy, typename EdgeTy,
          bool HasNoLockable=false,
-         bool UseNumaAlloc=false,
+         bool UseNumaAlloc=false, // true => numa-blocked, false => numa-interleaved
          bool HasOutOfLineLockable=false,
          typename FileEdgeTy=EdgeTy>
 class LC_CSR_Graph :
@@ -227,8 +227,8 @@ class LC_CSR_Graph :
 
     if(!nodeData.data()){
       if (UseNumaAlloc) {
-        nodeData.allocateLocal(numNodes);
-        this->outOfLineAllocateLocal(numNodes);
+        nodeData.allocateBlocked(numNodes);
+        this->outOfLineAllocateBlocked(numNodes);
       } else{
         nodeData.allocateInterleaved(numNodes);
         this->outOfLineAllocateInterleaved(numNodes);
@@ -322,11 +322,11 @@ class LC_CSR_Graph :
    : numNodes(_numNodes), numEdges(_numEdges) {
     //std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes);
-      edgeIndData.allocateLocal(numNodes);
-      edgeDst.allocateLocal(numEdges);
-      edgeData.allocateLocal(numEdges);
-      this->outOfLineAllocateLocal(numNodes, false);
+      nodeData.allocateBlocked(numNodes);
+      edgeIndData.allocateBlocked(numNodes);
+      edgeDst.allocateBlocked(numEdges);
+      edgeData.allocateBlocked(numEdges);
+      this->outOfLineAllocateBlocked(numNodes, false);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
@@ -527,11 +527,11 @@ class LC_CSR_Graph :
     numEdges = nEdges;
 
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes);
-      edgeIndData.allocateLocal(numNodes);
-      edgeDst.allocateLocal(numEdges);
-      edgeData.allocateLocal(numEdges);
-      this->outOfLineAllocateLocal(numNodes);
+      nodeData.allocateBlocked(numNodes);
+      edgeIndData.allocateBlocked(numNodes);
+      edgeDst.allocateBlocked(numEdges);
+      edgeData.allocateBlocked(numEdges);
+      this->outOfLineAllocateBlocked(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
@@ -597,10 +597,17 @@ class LC_CSR_Graph :
     EdgeIndData edgeIndData_old;
     EdgeIndData edgeIndData_temp;
 
-    edgeIndData_old.allocateInterleaved(numNodes);
-    edgeIndData_temp.allocateInterleaved(numNodes);
-    edgeDst_old.allocateInterleaved(numEdges);
-    edgeData_new.allocateInterleaved(numEdges);
+    if (UseNumaAlloc) {
+      edgeIndData_old.allocateBlocked(numNodes);
+      edgeIndData_temp.allocateBlocked(numNodes);
+      edgeDst_old.allocateBlocked(numEdges);
+      edgeData_new.allocateBlocked(numEdges);
+    } else {
+      edgeIndData_old.allocateInterleaved(numNodes);
+      edgeIndData_temp.allocateInterleaved(numNodes);
+      edgeDst_old.allocateInterleaved(numEdges);
+      edgeData_new.allocateInterleaved(numEdges);
+    }
 
     // Copy old node->index location + initialize the temp array
     galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
