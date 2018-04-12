@@ -105,7 +105,7 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
   return os;
 }
 
-using Graph = galois::graphs::LC_CSR_Graph<Node, int32_t>::with_numa_alloc<true>::type;
+using Graph = galois::graphs::LC_CSR_Graph<Node, int32_t>::with_numa_alloc<false>::type;
 using GNode =  Graph::GraphNode;
 using Counter = galois::GAccumulator<int>;
 
@@ -692,7 +692,7 @@ struct PreflowPush {
       graph.getData(*ii).id = id;
     }
 
-    reverseDirectionEdgeIterator.allocateBlocked(graph.sizeEdges());
+    reverseDirectionEdgeIterator.allocateInterleaved(graph.sizeEdges());
     // memoize the reverse direction edge-iterators
     galois::do_all(galois::iterate(graph.begin(), graph.end()),
         [&, this] (const GNode& src) {
