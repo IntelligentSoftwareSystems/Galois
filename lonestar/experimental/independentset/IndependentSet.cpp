@@ -20,7 +20,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
- * @author Michael Jiayuan He <hejy@cs.utexas.edu> 
+ * @author Michael Jiayuan He <hejy@cs.utexas.edu> (prio implementation)
  */
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
@@ -51,6 +51,8 @@ enum Algo {
   pull,
   nondet,
   detBase,
+  detPrefix,
+  detDisjoint,
   prio,
   edgetiledprio
 };
@@ -63,6 +65,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(pull, "Pull-based (deterministic)"),
       clEnumVal(nondet, "Non-deterministic"),
       clEnumVal(detBase, "Base deterministic execution"),
+      clEnumVal(detPrefix, "Prefix deterministic execution"),
+      clEnumVal(detDisjoint, "Disjoint deterministic execution"),
       clEnumVal(prio, "prio algo based on Martin's GPU ECL-MIS algorithm"),
       clEnumVal(edgetiledprio, "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm"),
       clEnumValEnd), cll::init(prio));
@@ -83,10 +87,10 @@ struct prioNode {
 
 
 struct SerialAlgo {
-  using Graph = galois::graphs::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
-    ::with_no_lockable<true>::type;
-  using GNode = Graph::GraphNode;
+    ::with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
 
   void operator()(Graph& graph) {
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -124,10 +128,10 @@ struct SerialAlgo {
 template<Algo algo>
 struct DefaultAlgo {
 
-  using Graph = typename galois::graphs::LC_CSR_Graph<Node,void>
-    ::template with_numa_alloc<true>::type;
+  typedef typename galois::graphs::LC_CSR_Graph<Node,void>
+    ::template with_numa_alloc<true>::type Graph;
 
-  using GNode = typename Graph::GraphNode;
+  typedef typename Graph::GraphNode GNode;
 
   struct LocalState {
     bool mod;
@@ -162,11 +166,19 @@ struct DefaultAlgo {
   template <int Version, typename C>
   void processNode(Graph& graph, const GNode& src, C& ctx) {
     bool mod;
-    if (ctx.isFirstPass()) {
+    if (Version != detDisjoint || ctx.isFirstPass()) {
       mod = build<galois::MethodFlag::WRITE>(graph, src);
-      graph.getData(src, galois::MethodFlag::WRITE);
-      ctx.cautiousPoint(); // Failsafe point
-      
+
+      if (Version == detPrefix) { 
+        return;
+      } else if (Version == detDisjoint) {
+        LocalState* localState = ctx.template createLocalState<LocalState>();
+        localState->mod = mod;
+        return;
+      } else {
+        graph.getData(src, galois::MethodFlag::WRITE);
+        ctx.cautiousPoint(); // Failsafe point
+      }
     } else { // Version == detDisjoint && !ctx.isFirstPass
       LocalState* localState = ctx.template getLocalState<LocalState>();
       mod = localState->mod;
@@ -197,9 +209,9 @@ struct DefaultAlgo {
   }
 
   void operator()(Graph& graph) {
-    using DWL = galois::worklists::Deterministic<>;
+    typedef galois::worklists::Deterministic<> DWL;
 
-    using BSWL = galois::worklists::BulkSynchronous<typename galois::worklists::dChunkedFIFO<64> >;
+    typedef galois::worklists::BulkSynchronous<typename galois::worklists::dChunkedFIFO<64> > BSWL;
         //typedef galois::worklists::dChunkedFIFO<256> WL;
 
     switch (algo) {
@@ -209,6 +221,17 @@ struct DefaultAlgo {
       case detBase:
         run<detBase, DWL>(graph);
         break;
+      case detPrefix:
+        {
+          auto nv = [&, this] (const GNode& src, auto& ctx) {
+            this->processNode<detPrefix>(graph, src, ctx);
+          };
+          run<detBase, DWL>(graph, galois::neighborhood_visitor< decltype(nv) >(nv));
+        }
+        break;
+      case detDisjoint:
+        run<detDisjoint, DWL>(graph);
+        break;
       default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
     }
   }
@@ -216,12 +239,13 @@ struct DefaultAlgo {
 
 struct PullAlgo {
 
-  using Graph = galois::graphs::LC_CSR_Graph<Node,void>
+  typedef galois::graphs::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
-    ::with_no_lockable<true>::type;
+    ::with_no_lockable<true>::type
+    Graph;
 
-  using GNode = Graph::GraphNode;
-  using Bag = galois::InsertBag<GNode>;
+  typedef Graph::GraphNode GNode;
+  typedef galois::InsertBag<GNode> Bag;
 
   using Counter = galois::GAccumulator<size_t>;
 
@@ -326,10 +350,11 @@ struct PullAlgo {
 };
 
 struct PrioAlgo {
-  using Graph = galois::graphs::LC_CSR_Graph<prioNode,void>
+  typedef galois::graphs::LC_CSR_Graph<prioNode,void>
     ::with_numa_alloc<true>::type
-    ::with_no_lockable<true>::type;
-  using GNode = Graph::GraphNode;
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
 
   unsigned int hash(unsigned int val) const {
     val = ((val >> 16) ^ val) * 0x45d9f3b;
@@ -423,10 +448,11 @@ struct PrioAlgo {
 };
 
 struct edgetiledPrioAlgo {
-  using Graph = galois::graphs::LC_CSR_Graph<prioNode,void>
+  typedef galois::graphs::LC_CSR_Graph<prioNode,void>
     ::with_numa_alloc<true>::type
-    ::with_no_lockable<true>::type;
-  using GNode = Graph::GraphNode;
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
 
   struct EdgeTile{
     GNode src;
@@ -582,8 +608,8 @@ struct edgetiledPrioAlgo {
 
 template<typename Graph>
 struct is_bad {
-  using GNode = typename Graph::GraphNode;
-  using Node = typename Graph::node_data_type;
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type Node;
   Graph& graph;
 
   is_bad(Graph& g): graph(g) { }
@@ -620,7 +646,7 @@ struct is_bad {
 template<typename Graph>
 struct is_matched {
   Graph& graph;
-  using GNode = typename Graph::GraphNode;
+  typedef typename Graph::GraphNode GNode;
   
   is_matched(Graph& g): graph(g) { }
 
@@ -631,8 +657,8 @@ struct is_matched {
 
 template<typename Graph>
 bool verify(Graph& graph) {
-  using GNode = typename Graph::GraphNode;
-  using prioNode = typename Graph::node_data_type;
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type prioNode;
 
 
   galois::do_all(galois::iterate(graph), 
@@ -658,8 +684,8 @@ bool verify(Graph& graph) {
 
 template<typename Algo>
 void run() {
-  using Graph = typename Algo::Graph;
-  using GNode = typename Graph::GraphNode;
+  typedef typename Algo::Graph Graph;
+  typedef typename Graph::GraphNode GNode;
 
   Algo algo;
   Graph graph;
@@ -677,7 +703,16 @@ void run() {
   galois::StatTimer T;
 
   T.start();
-  algo(graph);
+  /*galois::runtime::profileVtune(
+    [&] () {
+    algo(graph);
+    }, "algo()"
+  );*/
+  galois::runtime::profilePapi(
+    [&] () {
+    algo(graph);
+    }, "algo()"
+  );  
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
 
@@ -700,6 +735,8 @@ int main(int argc, char** argv) {
     case serial: run<SerialAlgo>(); break;
     case nondet: run<DefaultAlgo<nondet> >(); break;
     case detBase: run<DefaultAlgo<detBase> >(); break;
+    case detPrefix: run<DefaultAlgo<detPrefix> >(); break;
+    case detDisjoint: run<DefaultAlgo<detDisjoint> >(); break;
     case pull: run<PullAlgo>(); break;
     case prio: run<PrioAlgo>(); break;
     case edgetiledprio: run<edgetiledPrioAlgo>(); break;
