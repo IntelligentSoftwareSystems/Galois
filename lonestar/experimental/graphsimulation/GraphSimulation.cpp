@@ -36,7 +36,7 @@ void matchLabel(QG& qG, DG& dG, W& w) {
         for (auto qn: qG) {
           assert(qn < 64); // because matched is 64-bit
           auto& qData = qG.getData(qn);
-          if (qData.label & dData.label) { // query could be any or multiple labels
+          if (qData.label == dData.label) { // TODO: query could be any or multiple labels
             if (!qData.matched) {
               qData.matched = 1;
             }
@@ -45,6 +45,10 @@ void matchLabel(QG& qG, DG& dG, W& w) {
             }
             dData.matched |= 1 << qn; // multiple matches
           }
+        }
+        for (auto de: dG.edges(dn)) {
+          auto& deData = dG.getEdgeData(de);
+          deData.matched = 0; // matches to none
         }
       },
       galois::loopname("MatchLabel"));
@@ -62,7 +66,7 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
   return false;
 }
 
-template<bool useLimit, bool useWindow>
+template<bool useLimit, bool useWindow, bool queryNodeHasMoreThan2Edges>
 void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* cur, galois::InsertBag<Graph::GraphNode>* next, EventLimit limit, EventWindow window) {
   galois::do_all(galois::iterate(*cur),
     [&] (auto dn) {
@@ -72,111 +76,122 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
         uint64_t mask = (1 << qn);
         if (dData.matched & mask) {
           // match children links
-          // TODO: sort query edges and data edges by label; e.g., node data
-#ifdef QUERY_GRAPH_GENERAL_SOLUTION
-          for (auto qe: qG.edges(qn)) {
-            auto qeData = qG.getEdgeData(qe);
-            auto qDst = qG.getEdgeDst(qe);
+          // TODO: sort data edges by timestamp
+          // Assumption: query edges are sorted by timestamp
+          if (queryNodeHasMoreThan2Edges) {
+            uint64_t qPrevEdgeTimestamp = 0;
+            uint64_t dPrevEdgeTimestamp = 0;
+            for (auto qe: qG.edges(qn)) {
+              auto qeData = qG.getEdgeData(qe);
+              auto qDst = qG.getEdgeDst(qe);
 
-            bool matched = false;
-            for (auto de: dG.edges(dn)) {
-              auto deData = dG.getEdgeData(de);
-              if (useWindow) {
-                if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
-                  continue; // skip this edge since it is not in the time-span of interest
+              bool matched = false;
+              uint64_t dNextEdgeTimestamp = std::numeric_limits<uint64_t>::max();
+              for (auto de: dG.edges(dn)) {
+                auto& deData = dG.getEdgeData(de);
+                if (useWindow) {
+                  if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
+                    continue; // skip this edge since it is not in the time-span of interest
+                  }
                 }
-              }
-              if (qeData.label & deData.label) { // query could be any or multiple labels
-                auto& dDstData = dG.getData(dG.getEdgeDst(de));
-                if (dDstData.matched & (1 << qDst)) {
-                  matched = true;
-                  break;
-                }
-              }
-            }
-
-            // remove qn from dn when we have an unmatched edge
-            if (!matched) {
-              dData.matched &= ~mask;
-              break;
-            }
-          }
-          // TODO: compare matched edges for timestamp and dst-id inequality
-#else
-          // assume query graph has at the most 2 edges for any node
-          auto qe1 = qG.edge_begin(qn);
-          auto qend = qG.edge_end(qn);
-          if (qe1 != qend) {
-            auto& qeData = qG.getEdgeData(qe1);
-            auto qDst = qG.getEdgeDst(qe1);
-
-            bool matched = false;
-            for (auto& de: dG.edges(dn)) {
-              auto& deData = dG.getEdgeData(de);
-              if (useWindow) {
-                if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
-                  continue; // skip this edge since it is not in the time-span of interest
-                }
-              }
-              if (qeData.label & deData.label) { // query could be any or multiple labels
-                auto dDst = dG.getEdgeDst(de);
-                auto& dDstData = dG.getData(dDst);
-                if (dDstData.matched & (1 << qDst)) {
-
-                  auto qe2 = qe1 + 1;
-                  if (qe2 == qend) { // only 1 edge
-                    matched = true;
-                    break;
-                  } else {
-                    assert ((qe2 + 1) == qend);
-                    // match the second edge
-                    auto& qeData2 = qG.getEdgeData(qe2);
-                    auto qDst2 = qG.getEdgeDst(qe2);
-
-                    for (auto& de2: dG.edges(dn)) {
-                      auto& deData2 = dG.getEdgeData(de2);
-                      if (qeData2.label & deData2.label) { // query could be any or multiple labels
-                        auto dDst2 = dG.getEdgeDst(de2);
-                        auto& dDstData2 = dG.getData(dDst2);
-                        if (dDstData2.matched & (1 << qDst2)) {
-                          assert(qeData.timestamp != qeData2.timestamp);
-                          if (useWindow) {
-                            if ((deData2.timestamp > window.endTime) || (deData2.timestamp < window.startTime)) {
-                              continue; // skip this edge since it is not in the time-span of interest
-                            }
-                          }
-                          if ((qeData.timestamp <= qeData2.timestamp) == (deData.timestamp <= deData2.timestamp)) {
-                            if (useLimit) {
-                              if (std::abs(deData.timestamp - deData2.timestamp) > limit.time) {
-                                continue; // skip this sequence of events because too much time has lapsed between them
-                              }
-                            }
-#ifdef UNIQUE_QUERY_NODES
-                            if ((qDst != qDst2) == (dDst != dDst2)) {
-#endif
-                              matched = true;
-                              break;
-#ifdef UNIQUE_QUERY_NODES
-                            }
-#endif
-                          }
-                        }
+                if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
+                  auto& dDstData = dG.getData(dG.getEdgeDst(de));
+                  if (dDstData.matched & (1 << qDst)) {
+                    if ((qPrevEdgeTimestamp <= qeData.timestamp) == (dPrevEdgeTimestamp <= deData.timestamp)) {
+                      if (dNextEdgeTimestamp > deData.timestamp) {
+                        dNextEdgeTimestamp = deData.timestamp; // minimum of matched edges
                       }
+                      matched = true;
                     }
-
-                    if (matched) break;
                   }
                 }
               }
-            }
 
-            // remove qn from dn when we have an unmatched edge
-            if (!matched) {
-              dData.matched &= ~mask;
-              break;
+              // remove qn from dn when we have an unmatched edge
+              if (!matched) {
+                dData.matched &= ~mask;
+                break;
+              }
+
+              qPrevEdgeTimestamp = qeData.timestamp;
+              dPrevEdgeTimestamp = dNextEdgeTimestamp;
+            }
+          } else {
+            // assume query graph has at the most 2 edges for any node
+            auto qe1 = qG.edge_begin(qn);
+            auto qend = qG.edge_end(qn);
+            if (qe1 != qend) {
+              auto& qeData = qG.getEdgeData(qe1);
+              auto qDst = qG.getEdgeDst(qe1);
+
+              bool matched = false;
+              for (auto& de: dG.edges(dn)) {
+                auto& deData = dG.getEdgeData(de);
+                if (useWindow) {
+                  if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
+                    continue; // skip this edge since it is not in the time-span of interest
+                  }
+                }
+                if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
+                  auto dDst = dG.getEdgeDst(de);
+                  auto& dDstData = dG.getData(dDst);
+                  if (dDstData.matched & (1 << qDst)) {
+
+                    auto qe2 = qe1 + 1;
+                    if (qe2 == qend) { // only 1 edge
+                      matched = true;
+                      break;
+                    } else {
+                      assert ((qe2 + 1) == qend);
+                      // match the second edge
+                      auto& qeData2 = qG.getEdgeData(qe2);
+                      auto qDst2 = qG.getEdgeDst(qe2);
+
+                      for (auto& de2: dG.edges(dn)) {
+                        auto& deData2 = dG.getEdgeData(de2);
+                        if (qeData2.label == deData2.label) { // TODO: query could be any or multiple labels
+                          auto dDst2 = dG.getEdgeDst(de2);
+                          auto& dDstData2 = dG.getData(dDst2);
+                          if (dDstData2.matched & (1 << qDst2)) {
+                            assert(qeData.timestamp != qeData2.timestamp);
+                            if (useWindow) {
+                              if ((deData2.timestamp > window.endTime) || (deData2.timestamp < window.startTime)) {
+                                continue; // skip this edge since it is not in the time-span of interest
+                              }
+                            }
+                            if ((qeData.timestamp <= qeData2.timestamp) == (deData.timestamp <= deData2.timestamp)) {
+                              if (useLimit) {
+                                if (std::abs(deData.timestamp - deData2.timestamp) > limit.time) {
+                                  continue; // skip this sequence of events because too much time has lapsed between them
+                                }
+                              }
+#ifdef UNIQUE_QUERY_NODES
+                              if ((qDst != qDst2) == (dDst != dDst2)) {
+#endif
+                                matched = true;
+                                break;
+#ifdef UNIQUE_QUERY_NODES
+                              }
+#endif
+                            }
+                          }
+                        }
+                      }
+
+                      if (matched) break;
+                    }
+                  }
+                }
+              }
+
+              // remove qn from dn when we have an unmatched edge
+              if (!matched) {
+                dData.matched &= ~mask;
+                break;
+              }
             }
           }
-#endif
+          // TODO: add support for dst-id inequality
         }
       }
 
@@ -188,7 +203,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
     galois::loopname("MatchNeighbors"));
 }
 
-void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow window) {
+void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow window, bool queryNodeHasMoreThan2Edges) {
   using WorkQueue = galois::InsertBag<Graph::GraphNode>;
   WorkQueue w[2];
   WorkQueue* cur = &w[0];
@@ -215,15 +230,31 @@ void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow wind
 
     if (limit.valid) {
       if (window.valid) {
-        matchNodesOnce<true, true>(qG, dG, cur, next, limit, window);
+        if (queryNodeHasMoreThan2Edges) {
+          matchNodesOnce<true, true, true>(qG, dG, cur, next, limit, window);
+        } else {
+          matchNodesOnce<true, true, false>(qG, dG, cur, next, limit, window);
+        }
       } else {
-        matchNodesOnce<true, false>(qG, dG, cur, next, limit, window);
+        if (queryNodeHasMoreThan2Edges) {
+          matchNodesOnce<true, false, true>(qG, dG, cur, next, limit, window);
+        } else {
+          matchNodesOnce<true, false, false>(qG, dG, cur, next, limit, window);
+        }
       }
     } else {
       if (window.valid) {
-        matchNodesOnce<false, true>(qG, dG, cur, next, limit, window);
+        if (queryNodeHasMoreThan2Edges) {
+          matchNodesOnce<false, true, true>(qG, dG, cur, next, limit, window);
+        } else {
+          matchNodesOnce<false, true, false>(qG, dG, cur, next, limit, window);
+        }
       } else {
-        matchNodesOnce<false, false>(qG, dG, cur, next, limit, window);
+        if (queryNodeHasMoreThan2Edges) {
+          matchNodesOnce<false, false, true>(qG, dG, cur, next, limit, window);
+        } else {
+          matchNodesOnce<false, false, false>(qG, dG, cur, next, limit, window);
+        }
       }
     }
 
@@ -244,10 +275,10 @@ void runGraphSimulation(Graph& qG, Graph& dG, EventLimit limit, EventWindow wind
               auto qDst = qG.getEdgeDst(qe);
 
               for (auto de: dG.edges(dn)) {
-                auto deData = dG.getEdgeData(de);
+                auto& deData = dG.getEdgeData(de);
                 auto dDst = dG.getEdgeDst(de);
                 if (dn < dDst) { // match only one of the symmetric edges
-                  if (qeData.label & deData.label) { // query could be any or multiple labels
+                  if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
                     auto& dDstData = dG.getData(dDst);
                     if (dDstData.matched & (1 << qDst)) {
                       deData.matched |= 1 << *qe;

@@ -155,12 +155,60 @@ struct InitializeGraph {
     } else if (personality == CPU)
     #endif
     galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()), 
-                   InitializeGraph {&_graph}, galois::loopname("Init"));
+                   InitializeGraph {&_graph}, galois::loopname("InitializeGraph"));
 
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
     _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
                 Broadcast_latent_vector>("InitializeGraph");
+  }
+
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+
+    //resize vectors
+    sdata.latent_vector.resize(LATENT_VECTOR_SIZE);
+    sdata.residual_latent_vector.resize(LATENT_VECTOR_SIZE);
+
+    for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
+      sdata.latent_vector[i] = genRand(); // randomly create latent vector 
+      sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
+
+      #ifndef NDEBUG
+      if(!std::isnormal(sdata.latent_vector[i]))
+        galois::gDebug("GEN for ", i, " ",  sdata.latent_vector[i]);
+      #endif
+    }
+  }
+};
+
+
+struct InitializeGraph_crashed {
+  Graph *graph;
+
+  InitializeGraph_crashed(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    auto& allNodes = _graph.allNodesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str(
+        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+      );
+      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()), 
+                   InitializeGraph_crashed {&_graph}, galois::loopname("InitializeGraph_crashed"));
+
+    // due to latent_vector being generated randomly, it should be sync'd
+    // to 1 consistent version across all hosts
+    _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
+                Broadcast_latent_vector>("InitializeGraph_crashed");
 
   }
 
@@ -182,6 +230,8 @@ struct InitializeGraph {
     }
   }
 };
+
+
 
 /* Recovery to be called by resilience based fault tolerance
  * It is a NoOp
@@ -294,7 +344,7 @@ struct SGD {
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph>(_graph);
+        crashSite<recovery, InitializeGraph_crashed>(_graph);
       }
       /**************************CRASH SITE : end *****************************************/
 

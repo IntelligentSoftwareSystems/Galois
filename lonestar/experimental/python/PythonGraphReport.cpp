@@ -53,7 +53,7 @@ void reportGraphSimulation(AttributedGraph& qG, AttributedGraph& dG, char* outpu
         if (src.matched & mask) {
           for(auto qe: qgraph.edges(qn)) {
             auto& qeData = qgraph.getEdgeData(qe);
-            if (qeData.label & ed.label) { // query could be any or multiple labels
+            if (qeData.label == ed.label) { // query could be any or multiple labels
               auto qDst = qgraph.getEdgeDst(qe);
               mask = (1 << qDst);
               if (dst.matched & mask) {

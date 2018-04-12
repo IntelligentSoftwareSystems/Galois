@@ -1,7 +1,7 @@
 #include "PythonGraph.h"
 
 size_t runAttributedGraphSimulation(AttributedGraph* queryGraph, AttributedGraph* dataGraph, EventLimit limit, EventWindow window) {
-  runGraphSimulation(queryGraph->graph, dataGraph->graph, limit, window);
+  runGraphSimulation(queryGraph->graph, dataGraph->graph, limit, window, true);
   return countMatchedEdges(dataGraph->graph);
 }
 
@@ -51,7 +51,7 @@ size_t findProcessesWritingNetworkIndirectly(AttributedGraph* dataGraph, EventLi
   queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeLabelIDs["WRITE"], 2));
   queryGraph.fixEndEdge(3, 6);
 
-  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window, false);
   return countMatchedEdges(dataGraph->graph);
 }
 
@@ -82,7 +82,7 @@ size_t findProcessesOriginatingFromNetwork(AttributedGraph* dataGraph, EventLimi
   queryGraph.constructEdge(5, 2, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 2));
   queryGraph.fixEndEdge(3, 6);
 
-  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window, false);
   return countMatchedEdges(dataGraph->graph);
 }
 
@@ -125,7 +125,7 @@ size_t findProcessesOriginatingFromNetworkIndirectly(AttributedGraph* dataGraph,
   queryGraph.constructEdge(9, 4, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 4));
   queryGraph.fixEndEdge(5, 10);
 
-  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window, false);
   return countMatchedEdges(dataGraph->graph);
 }
 
@@ -156,7 +156,7 @@ size_t findProcessesExecutingModifiedFile(AttributedGraph* dataGraph, EventLimit
   queryGraph.constructEdge(5, 0, EdgeData(dataGraph->edgeLabelIDs["EXECUTE"], 2));
   queryGraph.fixEndEdge(3, 6);
 
-  runGraphSimulation(queryGraph, dataGraph->graph, limit, window);
+  runGraphSimulation(queryGraph, dataGraph->graph, limit, window, true);
   return countMatchedEdges(dataGraph->graph);
 }
 

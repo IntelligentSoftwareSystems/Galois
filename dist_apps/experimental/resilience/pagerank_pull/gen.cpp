@@ -371,7 +371,7 @@ struct recoveryAdjust {
       galois::iterate(nodesWithEdges),
       recoveryAdjust{&_graph},
       galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
+      galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str()));
 
       //TODO: Is this required??
       //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY");
