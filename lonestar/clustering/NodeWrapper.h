@@ -40,7 +40,8 @@ private:
   const int descendents;
   GVector<ClusterNode*> coneClusters;
   const bool cleanLight;
-  NodeWrapper *_l, *_r;
+  NodeWrapper* m_left;
+  NodeWrapper* m_right;
 
 public:
   NodeWrapper(LeafNode& inNode)
@@ -53,9 +54,10 @@ public:
     location.set(getMin());
     location.add(getMax());
     location.scale(0.5f);
-    _l = _r = NULL;
+    m_left = m_right = NULL;
   }
 
+  // TODO: get rid of 'new' here and corresponding 'delete'
   NodeWrapper(NodeWrapper& pLeft, NodeWrapper& pRight,
               GVector<double>* coordArr, GVector<ClusterNode*>& tempClusterArr)
       : light(*(new ClusterNode())), location(0), coneDirection(0),
@@ -95,8 +97,8 @@ public:
         }
       }
     }
-    _l = l;
-    _r = r;
+    m_left = l;
+    m_right = r;
   }
 
   ~NodeWrapper() {
@@ -226,10 +228,10 @@ std::ostream& operator<<(std::ostream& s, const NodeWrapper& node) {
     if (node.coneClusters[i] != NULL)
       s << "" << (*node.coneClusters[i]) << ",";
   }
-  if (node._l != NULL)
-    s << "{LEFT " << *node._l << "}";
-  if (node._r != NULL)
-    s << "{RIGHT " << *node._r << "}";
+  if (node.m_left != NULL)
+    s << "{LEFT " << *node.m_left << "}";
+  if (node.m_right != NULL)
+    s << "{RIGHT " << *node.m_right << "}";
   s << std::endl;
   return s;
 }

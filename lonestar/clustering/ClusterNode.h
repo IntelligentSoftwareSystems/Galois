@@ -27,8 +27,8 @@
 
 class ClusterNode : public AbstractNode {
 private:
-  AbstractNode* leftChild;
-  AbstractNode* rightChild;
+  AbstractNode* m_left;
+  AbstractNode* m_right;
   GVector<LeafNode*> reps;
   Point3 boxRadius;
   Point3 coneDirection;
@@ -54,10 +54,10 @@ public:
 
   void setChildren(AbstractNode* inLeft, AbstractNode* inRight,
                    double repRandomNum) {
-    leftChild  = inLeft;
-    rightChild = inRight;
-    setSummedIntensity(*leftChild, *rightChild);
-    // setCombinedFlags(leftChild, rightChild);
+    m_left  = inLeft;
+    m_right = inRight;
+    setSummedIntensity(*m_left, *m_right);
+    // setCombinedFlags(m_left, m_right);
     // we only apply clamping to nodes that are low in the tree
     std::vector<double>& ranVec =
         repRandomNums[(int)(repRandomNum * numRepRandomNums)];
@@ -71,24 +71,24 @@ public:
       //          reps[j] = null;
       //        } //fill unused values will nulls
       //      }
-      //      if (leftChild.isLeaf()) {
-      //        LeafNode leftLeaf = (LeafNode) leftChild;
-      //        if (rightChild.isLeaf()) {
+      //      if (m_left.isLeaf()) {
+      //        LeafNode leftLeaf = (LeafNode) m_left;
+      //        if (m_right.isLeaf()) {
       //          chooseRepsWithTime(reps, this, ranVec, leftLeaf, (LeafNode)
-      //          rightChild);
+      //          m_right);
       //        } else {
       //          chooseRepsWithTime(reps, this, ranVec, (ClusterNode)
-      //          rightChild, leftLeaf); //note: operation is symmectric so we
+      //          m_right, leftLeaf); //note: operation is symmectric so we
       //          just interchange the children in the call
       //        }
       //      } else {
-      //        ClusterNode leftClus = (ClusterNode) leftChild;
-      //        if (rightChild.isLeaf()) {
+      //        ClusterNode leftClus = (ClusterNode) m_left;
+      //        if (m_right.isLeaf()) {
       //          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafNode)
-      //          rightChild);
+      //          m_right);
       //        } else {
       //          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterNode)
-      //          rightChild);
+      //          m_right);
       //        }
       //      }
     } else {
@@ -96,25 +96,25 @@ public:
         reps.clear();
         reps.resize(globalNumReps);
       }
-      if (leftChild->isLeaf()) {
-        LeafNode* leftLeaf = (LeafNode*)leftChild;
-        if (rightChild->isLeaf()) {
+      if (m_left->isLeaf()) {
+        LeafNode* leftLeaf = (LeafNode*)m_left;
+        if (m_right->isLeaf()) {
           chooseRepsNoTime(reps, *this, ranVec, *leftLeaf,
-                           (LeafNode&)*rightChild);
+                           (LeafNode&)*m_right);
         } else {
-          chooseRepsNoTime(reps, *this, ranVec, (ClusterNode&)*rightChild,
+          chooseRepsNoTime(reps, *this, ranVec, (ClusterNode&)*m_right,
                            *leftLeaf); // note: operation is symmectric so we
                                        // just interchange the children in the
                                        // call
         }
       } else {
-        ClusterNode* leftClus = (ClusterNode*)leftChild;
-        if (rightChild->isLeaf()) {
+        ClusterNode* leftClus = (ClusterNode*)m_left;
+        if (m_right->isLeaf()) {
           chooseRepsNoTime(reps, *this, ranVec, *leftClus,
-                           (LeafNode&)*rightChild);
+                           (LeafNode&)*m_right);
         } else {
           chooseRepsNoTime(reps, *this, ranVec, *leftClus,
-                           (ClusterNode&)*rightChild);
+                           (ClusterNode&)*m_right);
         }
       }
     }
@@ -180,8 +180,8 @@ public:
   void findConeDirsRecursive(V1& coordArr,
                              V2& tempClusterArr) {
     // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
-    findConeDirsRecursive(*leftChild, coordArr, 0, tempClusterArr, 3);
-    findConeDirsRecursive(*rightChild, coordArr, 0, tempClusterArr, 3);
+    findConeDirsRecursive(*m_left, coordArr, 0, tempClusterArr, 3);
+    findConeDirsRecursive(*m_right, coordArr, 0, tempClusterArr, 3);
   }
 
   template <typename V1, typename V2>
@@ -206,9 +206,9 @@ public:
           }
         }
       } else {
-        numDirs = findConeDirsRecursive(*(clus.leftChild), fArr, numDirs, cArr,
+        numDirs = findConeDirsRecursive(*(clus.m_left), fArr, numDirs, cArr,
                                         recurseDepth - 1);
-        numDirs = findConeDirsRecursive(*(clus.rightChild), fArr, numDirs, cArr,
+        numDirs = findConeDirsRecursive(*(clus.m_right), fArr, numDirs, cArr,
                                         recurseDepth - 1);
       }
     } else {
@@ -239,7 +239,7 @@ public:
 
   int size() {
     // only leafs are counted
-    return leftChild->size() + rightChild->size();
+    return m_left->size() + m_right->size();
   }
 };
 

@@ -1,5 +1,5 @@
-#ifndef KD_TREE_H
-#define KD_TREE_H
+#ifndef KD_TREE_GAP_SPLIT_H
+#define KD_TREE_GAP_SPLIT_H
 
 /**
  * KD-Tree construction Ideas
@@ -24,6 +24,10 @@
  * 5) We keep a null pointer in the node, which is only allocated and filled in the
  * leaf node
  *
+ * 6) With each data item, keep a pointer to the node in the tree, so that nearest
+ * neighbor search works bottom up and is more efficient, since all queries for
+ * nearest neighbor are in the tree themselves
+ *
  *
  * Minimal Tree interface:
  * -- add range of points (recursive splitting add)
@@ -32,88 +36,92 @@
  * -- recursive delete
  */
 
-template <typename D, typename P>
+
+/* 
+ * Tree building algorithm
+ *
+ * KdNode<NodeWrapper*> root;
+ *
+ * wl = { (root, lights.begin(), lights.end())
+ *
+ * for_each( (node, beg,end) in wl) {
+ *    node->buildRecursive(beg, end) {
+ *      init(beg, end);
+ *      if (end - beg < MAX_POINTS_IN_CELL) {
+ *        isLeaf = true;
+ *        copy points to local array
+ *      } else {
+ *        mid = split(beg, end);
+ *        l = node->createLeftChild();
+ *        r = node->createRightChild();
+ *        wl.push( (l, beg, mid) );
+ *        wl.push( (r, mid, end) );
+ *      }
+ *    }
+ * }
+ */
+
+template <bool CONCURRENT, typename T, typename GetPoint, typename DistFunc, unsigned int DIM=3>
 class KDtree {
 
 public:
-  enum SplitType {
-    SPLIT_X=0, SPLIT_Y, SPLIT_Z, LEAF
-  };
-  constexpr static const MAX_POINTS_IN_CELL = 4;
+  static const unsigned SPLIT_X = 0;
+  static const unsigned SPLIT_Y = 1;
+  static const unsigned SPLIT_Z = 2;
+
+  static const unsigned MAX_POINTS_IN_CELL = 4;
 
 protected:
-  using PointList = std::vector<P*>;
 
+  using DataList = galois::LargeArray<T*>;
+  using LI = typename DataList::iterator;
+ 
+  struct KDcell {
+    Point3 m_min;
+    Point3 m_max;
+    const unsigned m_splitType;
+    const double m_splitValue;
+    LI m_beg;
+    LI m_end;
+    KDtree* m_parent;
+    KDtree* m_leftChild;
+    KDtree* m_rightChild;
+  };
 
-  Point3 m_min;
-  Point3 m_max;
-  const SplitType m_splitType;
-  const double m_splitValue;
-  KDtree* m_leftChild;
-  KDtree* m_rightChild;
-  PointList m_pointList;
+  using CellAlloc = typename std::conditional<CONCURRENT, 
+        galois::FixedSizeAllocator<KDcell>, std::allocator<KDCell> >::type;
+
+  using LeafBag = typename std::conditional<CONCURRENT, 
+        galois::InsertBag<KDcell*>, std::vector<KDcell*> >::type;
+
+  KDcell* root = nullptr;
+  DataList m_dataList;
+  LeafBag m_leaves;
 
 public:
 
-  KDtree()
-      : m_min(std::numeric_limits<double>::max()),
-        m_max(-1 * std::numeric_limits<double>::max()), 
-        m_splitType(LEAF),
-        m_splitValue(std::numeric_limits<double>::max()) 
-  {
-    m_pointList.resize(MAX_POINTS_IN_CELL);
-    m_leftChild      = NULL;
-    m_rightChild     = NULL;
+  template <typename I>
+  typename std::enable_if<CONCURRENT, void>::type build(const I& beg, const I& end) {
+
+    size_t sz = std::distance(beg, end);
+
+    m_dataList.allocateBlocked(sz);
+
+    galois::do_all(galois::iterate(0ul, sz),
+        [&] (size_t i) {
+          m_dataList[i] = *(beg + i); // TODO: implement parallel copy algorithm
+        });
+
+
+          auto it = std::advance(beg
+    auto 
+
   }
 
-  KDtree(int inSplitType, double inSplitValue)
-      : min(0), max(0), m_splitType(inSplitType), m_splitValue(inSplitValue) {
-
-    if (m_splitType == LEAF) {
-      m_pointList.resize(MAX_POINTS_IN_CELL);
-    } else {
-      m_pointList.resize(0);
-    }
-
-    m_leftChild = m_rightChild = NULL;
+  template <typename I>
+  typename std::enable_if<!CONCURRENT, void>::type build(const I& beg, const I& end) {
   }
 
-  // TODO: simplify
-  bool equals(KDtree& other) const {
-    if (m_splitType != other.m_splitType) {
-      return false;
-    }
-    if (m_splitValue != other.m_splitValue) {
-      return false;
-    }
-    if (min.equals(other.min) == false) {
-      return false;
-    }
-    if (max.equals(other.max) == false) {
-      return false;
-    }
-    if (m_splitType == KDtree::LEAF) {
-      //TODO: create leaf node
-
-      return m_leftChild->equals(*other.m_leftChild) && m_rightChild->equals(*m_rightChild);
-    }
-    if (m_points.size() != other.m_points.size()) {
-      return false;
-    }
-
-    for (unsigned int i = 0; i < m_points.size(); i++) {
-
-      if (m_points[i] != NULL && other.m_points[i] != NULL) {
-        if (m_points[i]->equals(*other.m_points[i]) == false) {
-          return false;
-        }
-      }
-      if (m_points[i] != other.m_points[i]) {
-        return false;
-      }
-    }
-    return true;
-  }
 
   template <typename I, typename WL>
   galois::optional<I> buildRecursive(I beg, I end) {
@@ -380,4 +388,4 @@ protected:
 };
 
 
-#endif// KD_TREE_H
+#endif// KD_TREE_GAP_SPLIT_H

@@ -93,7 +93,7 @@ struct Clustering {
 
     genRandomLights(numPoints);
 
-    size_t tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
+    constexpr size_t tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
     coordinatesArray.resize(tempSize * 3);
     clusterArray.resize(tempSize);
 
@@ -149,29 +149,47 @@ struct Clustering {
     return addCounter;
   }
 
-    /* 
-     * Tree building algorithm
-     *
-     * KdNode<NodeWrapper*> root;
-     *
-     * wl = { (root, lights.begin(), lights.end())
-     *
-     * for_each( (node, beg,end) in wl) {
-     *    node->buildRecursive(beg, end) {
-     *      init(beg, end);
-     *      if (end - beg < MAX_POINTS_IN_CELL) {
-     *        isLeaf = true;
-     *        copy points to local array
-     *      } else {
-     *        mid = split(beg, end);
-     *        l = node->createLeftChild();
-     *        r = node->createRightChild();
-     *        wl.push( (l, beg, mid) );
-     *        wl.push( (r, mid, end) );
-     *      }
-     *    }
-     * }
-     */
+
+/*
+ * Clustering algorithm
+ *
+ * input: lights
+ *
+ * KDtree T;
+ * T.build(lights);
+ *
+ * Bag newNodes;
+ *
+ * while(true) {
+ *
+ *  do_all(T.leafBegin(), T.leafEnd(), 
+ *    [&] (LeafNode l) {
+ *      m = T.nearsetNeighbor(l);
+ *
+ *      if (m != null) {
+ *        lp = T.nearsetNeighbor(m);
+ *        if (lp ==  l) {
+ *          if (l < m) { // avoid duplication by ordering
+ *            Node n = cluster(l, m);
+ *            newNodes.push(n);
+ *          }
+ *        } else {
+ *          newNodes.push(l);
+ *        }
+ *      } else {
+ *        newNodes.push(l);
+ *      }
+ *    });
+ *
+ *  T.clear();
+ *
+ *  if (newNodes.size() < 1) { break; }
+ *
+ *  T.build(newNodes);
+ *  newNodes.clear();
+ * } 
+ *
+ */
 
   template <typename V>
   void clusterParallel(V& lights) {
@@ -290,7 +308,7 @@ struct Clustering {
     T.stop();
   }
 
-  void clusterSerial(GVector<LeafNode*>& lights) {
+  void clusterSerial(GVector<LeafNode*>& lights) {SplitType
 
     int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
     cout << "Temp size is " << tempSize << " coord. arr size should be "
@@ -338,7 +356,7 @@ struct Clustering {
           assert(tree->contains(*match) && "match not in tree?");
 
           auto* counterMatch = tree->findBestMatch(*match);
-  GVector
+  
           if (counterMatch != nullptr) {
             assert(tree->contains(*counterMatch) && "counterMatch not in tree?");
 
@@ -350,7 +368,7 @@ struct Clustering {
               newNodes.push_back(clust);
               allocs.push_back(clust);
 
-            } else {GVector
+            } else {
               newNodes.push_back(nodeA);
             }
           }
