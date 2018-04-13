@@ -72,6 +72,10 @@ static cll::opt<double> LAMBDA("LAMBDA",
 static cll::opt<double> DECAY_RATE("DECAY_RATE",
     cll::desc("Decay rate to be used in step size function (DECAY_RATE): Default 0.9"),
     cll::init(0.9));
+static cll::opt<double> tolerance("tolerance", 
+    cll::desc("rms normalized tolerance for convergence:Default 0.01"), 
+    cll::init(0.01));
+
 /******************************************************************************/
 /* Graph structure declarations + helper functions + other initialization */
 /******************************************************************************/
@@ -316,6 +320,7 @@ struct SGD {
   void static go(Graph& _graph, galois::DGAccumulator<double>& dga) {
     unsigned _num_iterations = 0;
     double rms_normalized = 0.0;
+    double last = -1.0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
       galois::gPrint("ITERATION : ",  _num_iterations, "\n");
@@ -351,11 +356,19 @@ struct SGD {
       ++_num_iterations;
 
       // calculate root mean squared error
-      rms_normalized = std::sqrt(dga.reduce() /
-                                 _graph.globalSizeEdges());
+      double error = dga.reduce(); 
+      rms_normalized = std::sqrt(error/_graph.globalSizeEdges());
+
       galois::gDebug("RMS Normalized : ", rms_normalized);
       galois::gPrint("RMS : ", rms_normalized, "\n");
-    } while((_num_iterations < maxIterations) && (rms_normalized > 0.1));
+      double error_change = std::abs((last - error)/last);
+      galois::gPrint("abs(last - error/last) : ", error_change, "\n");
+
+      if(error_change < tolerance){
+        break;
+      }
+      last = error;
+    } while((_num_iterations < maxIterations));
 
   }
 
