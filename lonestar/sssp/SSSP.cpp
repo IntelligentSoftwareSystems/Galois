@@ -59,7 +59,7 @@ static cll::opt<unsigned int> reportNode("reportNode",
                                          cll::init(1));
 static cll::opt<unsigned int> stepShift("delta",
                                cll::desc("Shift value for the deltastep"),
-                               cll::init(10));
+                               cll::init(13));
 
 enum Algo {
   deltaTile=0,
