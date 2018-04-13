@@ -338,11 +338,11 @@ struct recovery {
 
   void static go(Graph& _graph) {
 
-    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    //const auto& allNodes = _graph.allNodesRange();
+    //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      galois::iterate(nodesWithEdges),
-      //galois::iterate(allNodes.begin(), allNodes.end()),
+      //galois::iterate(nodesWithEdges),
+      galois::iterate(allNodes.begin(), allNodes.end()),
       recovery{&_graph},
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
@@ -424,12 +424,12 @@ struct PageRank_delta {
     sdata.delta = 0;
 
     if (sdata.residual > this->local_tolerance) {
-      sdata.value += sdata.residual;
-      if (sdata.nout > 0) {
-        sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
-        DGAccumulator_accum += 1;
-      }
-      sdata.residual = 0;
+        sdata.value += sdata.residual;
+        if (sdata.nout > 0) {
+          sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
+          DGAccumulator_accum += 1;
+        }
+        sdata.residual = 0;
     }
   }
 };
@@ -538,7 +538,8 @@ struct PageRank {
       if (ddata.delta > 0) {
         galois::add(sdata.residual, ddata.delta);
 
-        bitset_residual.set(src);
+        if (sdata.residual > 0)
+          bitset_residual.set(src);
       }
     }
   }
