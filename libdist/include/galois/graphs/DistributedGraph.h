@@ -4200,6 +4200,7 @@ public:
 
     graph.serializeNodeData(ar);
 
+    outputStream.flush();
     outputStream.close();
     TimerSaveCheckPoint.stop();
   }
