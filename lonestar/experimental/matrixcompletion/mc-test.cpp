@@ -357,8 +357,9 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
         steps[i] = sf.stepSize(round + i);
     }
 
-    fn(&steps[0], round + deltaRound, useExactError ? NULL : &errorAccum);
-    double error = useExactError ? sumSquaredError(g) : errorAccum.reduce();
+    //fn(&steps[0], round + deltaRound, useExactError ? NULL : &errorAccum);
+    fn(&steps[0], round + deltaRound, useExactError ? &errorAccum : NULL);
+    double error = useExactError ? errorAccum.reduce() : sumSquaredError(g);
 
     elapsed.stop();
 
@@ -743,7 +744,7 @@ class BlockedEdgeAlgo {
                              g.getData(dst).latentVector, lambda,
                              g.getEdgeData(edge), stepSize);
           edgesVisited += 1;
-          if(!useExactError)
+          if(useExactError)
             *errorAccum += error;
         },
         true // use locks
