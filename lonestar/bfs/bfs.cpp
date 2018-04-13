@@ -108,8 +108,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 
 using Graph = galois::graphs::LC_CSR_Graph<unsigned, void>
-  ::with_no_lockable<true>::type
-  ::with_numa_alloc<true>::type;
+  ::with_no_lockable<true>::type;
+  //::with_numa_alloc<true>::type;
 
 using GNode =  Graph::GraphNode;
 
@@ -307,6 +307,7 @@ void syncAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange)
 
           for (auto e: edgeRange(item)) {
             auto dst = graph.getEdgeDst(e);
+            //if(dst == 13 || dst == 2 || dst == 51) std::cout<<" node " << dst << " visited"<<std::endl;
             auto& dstData = graph.getData(dst, flag);
 
             if (dstData == BFS::DIST_INFINITY) {
