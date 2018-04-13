@@ -1,5 +1,5 @@
 add_subdirectory(barneshut)
-add_subdirectory(bc-inner)
+#add_subdirectory(bc-inner)
 add_subdirectory(betweennesscentrality)
 add_subdirectory(bfs)
 add_subdirectory(bfs_wf)

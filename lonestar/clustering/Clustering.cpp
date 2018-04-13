@@ -220,7 +220,7 @@ void clusterGalois(GVector<LeafNode*>& lights) {
     tree = (KdTree::createTree(workList));
     TcreateTree.stop();
 
-    newNodes->clear_parallel();
+    newNodes->clear();
   }
   T.stop();
 #if DEBUG_CONSOLE

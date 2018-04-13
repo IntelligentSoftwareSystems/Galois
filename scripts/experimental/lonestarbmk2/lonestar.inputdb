@@ -20,10 +20,10 @@ name = r4-2e26-symmetric
 file = random/symmetric/r4-2e26.gr
 format = bin/galois
 
-[random/rmat25.sgr]
+[random/rmat25.rsgr]
 flags = 
-name = rmat25-symmetric
-file = scalefree/symmetric/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.sgr
+name = rmat25-rsymmetric
+file = scalefree/randomized/symmetric/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.srgr
 format = bin/galois
 
 [road/USA-road-d.USA.gr]
@@ -48,6 +48,12 @@ format = bin/galois
 flags = 
 name = rmat28
 file = scalefree/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=.05.gr
+format = bin/galois
+
+[scalefree/random/rmat27.sgr]
+flags = 
+name = rmat27-rsymmetric
+file = scalefree/randomized/symmetric/rmat16-2e27-a=0.57-b=0.19-c=0.19-d=.05.srgr
 format = bin/galois
 
 [scalefree/random/rmat28.sgr]
@@ -114,6 +120,12 @@ format = bin/galois
 flags = 
 name = tshark_constraints
 file = java/pta/tshark_constraints.txt
+format = text
+
+[java/pta/gdb_constraints]
+flags = 
+name = gdb_constraints
+file = java/pta/gdb_constraints.txt
 format = text
 
 [nothing]

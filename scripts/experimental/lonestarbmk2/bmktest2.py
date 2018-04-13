@@ -7,11 +7,11 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 0
+    startThread = 28
     # thread to end at (inclusive)
-    endThread = 40
+    endThread = 28
     # step to use for looping through threads
-    step = 10
+    step = 28
 
     def filter_inputs(self, inputs):
         """Ignore inputs that aren't currently supported."""
@@ -95,33 +95,19 @@ class BarnesHut(SharedMemApp):
         
         return specs
 
-class BCInnerAsync(SharedMemApp):
-    relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
-    benchmark = "bc-inner-async"
+class BCAsync(SharedMemApp):
+    relativeAppPath = "betweennesscentrality/bc-async"
+    benchmark = "bc-async"
 
     def get_run_spec(self, bmkinput, config):
-        """BC inner async command line setup"""
+        """BC async command line setup"""
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-symmetricGraph") # say it is symmetric
+            # do 5 nodes with edges
+            s.set_arg("-numOfOutSources=5") 
         
         return specs
-
-class BCInnerLeveled(SharedMemApp):
-    relativeAppPath = "betweennesscentrality/betweennesscentrality-inner"
-    benchmark = "bc-inner-leveled"
-
-    def get_run_spec(self, bmkinput, config):
-        """BC inner async command line setup"""
-        specs = self.get_default_run_specs(bmkinput, config)
-
-        for s in specs:
-            s.set_arg("-symmetricGraph") # say it is symmetric
-            s.set_arg("-algo=leveled") # leveled algo
-        
-        return specs
-
 
 class BCOuter(SharedMemApp):
     relativeAppPath = "betweennesscentrality/betweennesscentrality-outer"
@@ -217,6 +203,32 @@ class MCM(SharedMemApp):
         
         return specs
 
+class PageRankPullResidual(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-pull-residual"
+    benchmark = "pagerank-pull-residual"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
+        
+        return specs
+
+class PageRankPullSb(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-pull-sb"
+    benchmark = "pagerank-pull-sb"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
+        
+        return specs
+
 class PageRankPull(SharedMemApp):
     relativeAppPath = "pagerank/pagerank-pull"
     benchmark = "pagerank-pull"
@@ -226,7 +238,7 @@ class PageRankPull(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.0001") # pagerank tolerance
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
         
         return specs
 
@@ -239,7 +251,7 @@ class PageRankPush(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.0001") # pagerank tolerance
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
         
         return specs
 
@@ -342,7 +354,15 @@ class TrianglesEdge(SharedMemApp):
 
 # specification of binaries to run
 # apps present in Galois 2.2
-BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
-            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
-            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
+#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
+#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+#            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
+#            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
+
+# apr 12 run
+BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
+            ConnectedComponents(), DelaunayTriangulation(), DMR(), 
+            GMetis(), IndependentSet(), PageRankPullSb(), 
+            PageRankPullResidual(), PageRankPull(), PageRankPush(), 
+            PreflowPush(), PointsToAnalysis(), SSSP(), SurveyPropagation(), 
+            TrianglesNode(), TrianglesEdge()] 
