@@ -410,6 +410,8 @@ int main(int argc, char** argv) {
                                 (unsigned long)maxIterations);
     galois::runtime::reportParam(regionname, "Source Node ID", 
                                 (unsigned long long)src_node);
+    galois::runtime::reportParam(regionname, "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 

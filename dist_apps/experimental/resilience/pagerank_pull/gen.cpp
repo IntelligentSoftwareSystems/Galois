@@ -698,6 +698,9 @@ int main(int argc, char** argv) {
     std::ostringstream ss;
     ss << tolerance;
     galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());
+
+    galois::runtime::reportParam(REGION_NAME, "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);

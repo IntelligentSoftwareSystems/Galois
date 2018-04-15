@@ -394,6 +394,8 @@ int main(int argc, char** argv) {
       (unsigned long)maxIterations);
     galois::runtime::reportParam("SSSP", "Source Node ID", 
       (unsigned long)src_node);
+    galois::runtime::reportParam("SSSP", "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);

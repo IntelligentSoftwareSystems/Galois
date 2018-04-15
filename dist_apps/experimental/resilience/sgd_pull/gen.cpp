@@ -428,6 +428,9 @@ int main(int argc, char** argv) {
   if (net.ID == 0) {
     galois::runtime::reportParam(regionname, "Max Iterations", 
         (unsigned long)maxIterations);
+
+    galois::runtime::reportParam(regionname, "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
