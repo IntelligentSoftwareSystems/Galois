@@ -659,7 +659,7 @@ private:
             auto& sendBuffer = (*sendBuffers.getLocal())[h];
             galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h], 
                                         gdata_vec[h]);
-            if (sendBuffer.size() > partition_edge_send_buffer_size) {
+            if (sendBuffer.size() > edgePartitionSendBufSize) {
               net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
               sendBuffer.getVec().clear();
             }
@@ -786,7 +786,7 @@ private:
           if (gdst_vec[h].size()) {
             auto& sendBuffer = (*sendBuffers.getLocal())[h];
             galois::runtime::gSerialize(sendBuffer, src, gdst_vec[h]);
-            if (sendBuffer.size() > partition_edge_send_buffer_size) {
+            if (sendBuffer.size() > edgePartitionSendBufSize) {
               net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
               sendBuffer.getVec().clear();
             }

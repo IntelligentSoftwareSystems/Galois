@@ -78,7 +78,7 @@ extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
 extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
-extern cll::opt<unsigned> partition_edge_send_buffer_size;
+extern cll::opt<unsigned> edgePartitionSendBufSize;
 
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
