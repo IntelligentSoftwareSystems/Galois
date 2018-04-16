@@ -211,8 +211,8 @@ struct InitializeGraph_crashed {
 
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
-    _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector>("InitializeGraph_crashed");
+    //_graph.sync<writeSource, readAny, Reduce_set_latent_vector,
+                //Broadcast_latent_vector>("InitializeGraph_crashed");
 
   }
 
