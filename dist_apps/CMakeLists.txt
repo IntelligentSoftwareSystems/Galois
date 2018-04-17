@@ -71,3 +71,5 @@ distApp(kcore_pull)
 distApp(bc_push)
 
 distAppNoGPU(sgd)
+
+distApp(pagerank_pull_topo)
