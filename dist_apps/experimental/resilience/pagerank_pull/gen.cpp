@@ -364,11 +364,11 @@ struct recoveryAdjust {
 
   void static go(Graph& _graph) {
 
-    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    //const auto& allNodes = _graph.allNodesRange();
+    //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      //galois::iterate(allNodes.begin(), allNodes.end()),
-      galois::iterate(nodesWithEdges),
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      //galois::iterate(nodesWithEdges),
       recoveryAdjust{&_graph},
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str()));
