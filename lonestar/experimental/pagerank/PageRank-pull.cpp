@@ -184,7 +184,8 @@ void finalizePR(Graph& g) {
                  galois::no_stats(), galois::loopname("Finalize"));
 }
 
-// Make use of edge tiling
+// Make use of edge tiling with PageRank topological pull version (array of
+// structures)
 void computePageRankET(Graph& graph) {
   struct ActivePRNode {
     GNode src;
@@ -333,8 +334,8 @@ void computePageRankET(Graph& graph) {
   }
 }
 
-// This structure is for debugging scalability limitations in PageRank by
-// avoiding inlining of the important functions.
+// This structure is for debugging scalability limitations in PageRank (pull
+// topological) by avoiding inlining of the operator.
 struct PageRankPull {
   Graph& graph;
   unsigned int iteration;
@@ -413,6 +414,7 @@ struct PageRankPull {
   }
 };
 
+// PageRank topological pull version (array of structures)
 void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;

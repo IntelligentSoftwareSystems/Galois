@@ -99,6 +99,7 @@ void computeOutDeg(Graph& graph, DegreeArray& degree) {
   outDegreeTimer.stop();
 }
 
+// PageRank pull topological (structure of arrays)
 void computePageRank(Graph& graph, DegreeArray& degree) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
@@ -230,7 +231,7 @@ int main(int argc, char** argv) {
   initNodeData(transposeGraph, degree);
   computeOutDeg(transposeGraph, degree);
 
-  galois::StatTimer Tmain("computePageRankSB");
+  galois::StatTimer Tmain("computePageRank");
   Tmain.start();
   computePageRank(transposeGraph, degree);
   Tmain.stop();
