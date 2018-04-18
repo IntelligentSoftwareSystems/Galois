@@ -104,10 +104,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
   if (enableFT && recoveryScheme == CP) {
     if (_num_iterations % checkpointInterval == 0) {
 
-      galois::StatTimer TimerSaveCheckpoint(
-          _graph.get_run_identifier("TIMER_SAVE_CHECKPOINT").c_str(),
-          "RECOVERY"
-          );
+      galois::StatTimer TimerSaveCheckpoint(("TOTAL_TIMER_SAVE_CHECKPOINT"), "RECOVERY");
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::gPrint("Checkpoint for iteration: ", _num_iterations, "\n");    
       }
@@ -198,7 +195,7 @@ void crashSite(GraphTy& _graph) {
     galois::gPrint("[", net.ID, "] Using CP\n");
 
     // Crashed hosts need to reconstruct local graphs
-    if (crashHostSet.find(net.ID) != crashHostSet.end()) {
+    //if (crashHostSet.find(net.ID) != crashHostSet.end()) {
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -208,11 +205,11 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    } else {
-      TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData(checkpointFileName);
-      TimerRecoveryHealthy.stop();
-    }
+    //} else {
+      //TimerRecoveryHealthy.start();
+      //_graph.checkpointApplyNodeData(checkpointFileName);
+      //TimerRecoveryHealthy.stop();
+    //}
   }
   TimerRecoveryTotal.stop();
 }
@@ -296,7 +293,7 @@ void crashSite(GraphTy& _graph) {
     }
     galois::gPrint("[", net.ID, "] Using CP\n");
     // Crashed hosts need to reconstruct local graphs
-    if(crashHostSet.find(net.ID) != crashHostSet.end()){
+    //if(crashHostSet.find(net.ID) != crashHostSet.end()){
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -306,11 +303,11 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    } else {
-      TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData(checkpointFileName);
-      TimerRecoveryHealthy.stop();
-    }
+    //} else {
+      //TimerRecoveryHealthy.start();
+      //_graph.checkpointApplyNodeData(checkpointFileName);
+      //TimerRecoveryHealthy.stop();
+    //}
   }
   TimerRecoveryTotal.stop();
 }
