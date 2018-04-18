@@ -449,13 +449,6 @@ struct PageRank {
 
     do {
 
-       /**************************CRASH SITE : ADJUST : start *****************************************/
-      //if(enableFT && (_num_iterations == crashIteration + 1)){
-        //galois::gPrint("CALLING crashSiteAdjust\n");
-        //crashSiteAdjust<recoveryAdjust>(_graph);
-      //}
-      /**************************CRASH SITE : ADJUST : end *****************************************/
-
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
         saveCheckpointToDisk(_num_iterations, _graph);
@@ -489,6 +482,7 @@ struct PageRank {
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
+        dga += 1;
         const auto& net = galois::runtime::getSystemNetworkInterface();
         if(recoveryScheme == CP){
           galois::gPrint(net.ID, " : recovery DONE!!!\n");
@@ -503,7 +497,6 @@ struct PageRank {
 
           //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
           //Bitset_residual>("PageRank-afterCrash");
-
           _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("PageRank-afterCrash");
 
           crashSiteAdjust<recoveryAdjust>(_graph);

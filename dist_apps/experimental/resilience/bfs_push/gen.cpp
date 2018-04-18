@@ -290,6 +290,7 @@ struct BFS {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        dga += 1;
 
         if(recoveryScheme == RS){
           _graph.sync<writeDestination, readSource, Reduce_min_dist_current,

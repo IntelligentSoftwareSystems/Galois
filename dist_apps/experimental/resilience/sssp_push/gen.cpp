@@ -241,6 +241,7 @@ struct SSSP {
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
         saveCheckpointToDisk(_num_iterations, _graph);
+        //TODO:barrier()
       }
 
       _graph.set_num_iter(_num_iterations);
@@ -271,6 +272,7 @@ struct SSSP {
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        dga += 1;
 
         if(recoveryScheme == RS){
           //Only sync is required

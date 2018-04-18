@@ -112,6 +112,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
       TimerSaveCheckpoint.start();
       _graph.checkpointSaveNodeData(checkpointFileName);
       TimerSaveCheckpoint.stop();
+      galois::runtime::getHostBarrier().wait();
     }
   }
 }
@@ -177,11 +178,13 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.start();
       _graph.read_local_graph_from_file(localGraphFileName);
       TimerGraphConstructCrashed.stop();
+      galois::runtime::getHostBarrier().wait();
       // init and recover
       InitGraphCrashedTy::go(_graph);
       RecoveryTy::go(_graph);
       TimerRecoveryCrashed.stop();
     } else {
+      galois::runtime::getHostBarrier().wait();
       TimerRecoveryHealthy.start();
       RecoveryTy::go(_graph);
       TimerRecoveryHealthy.stop();
@@ -195,7 +198,6 @@ void crashSite(GraphTy& _graph) {
     galois::gPrint("[", net.ID, "] Using CP\n");
 
     // Crashed hosts need to reconstruct local graphs
-    //if (crashHostSet.find(net.ID) != crashHostSet.end()) {
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -205,11 +207,7 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    //} else {
-      //TimerRecoveryHealthy.start();
-      //_graph.checkpointApplyNodeData(checkpointFileName);
-      //TimerRecoveryHealthy.stop();
-    //}
+      galois::runtime::getHostBarrier().wait();
   }
   TimerRecoveryTotal.stop();
 }
@@ -275,11 +273,13 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.start();
       _graph.read_local_graph_from_file(localGraphFileName);
       TimerGraphConstructCrashed.stop();
+      galois::runtime::getHostBarrier().wait();
       // init and recover
       InitGraphCrashedTy::go(_graph);
       RecoveryTy::go(_graph);
       TimerRecoveryCrashed.stop();
     } else {
+      galois::runtime::getHostBarrier().wait();
       TimerRecoveryHealthy.start();
       InitGraphHealthyTy::go(_graph); // healthy init operator
       RecoveryTy::go(_graph);
@@ -293,7 +293,6 @@ void crashSite(GraphTy& _graph) {
     }
     galois::gPrint("[", net.ID, "] Using CP\n");
     // Crashed hosts need to reconstruct local graphs
-    //if(crashHostSet.find(net.ID) != crashHostSet.end()){
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -303,11 +302,7 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    //} else {
-      //TimerRecoveryHealthy.start();
-      //_graph.checkpointApplyNodeData(checkpointFileName);
-      //TimerRecoveryHealthy.stop();
-    //}
+      galois::runtime::getHostBarrier().wait();
   }
   TimerRecoveryTotal.stop();
 }

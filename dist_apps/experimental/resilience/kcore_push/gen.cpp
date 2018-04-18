@@ -245,7 +245,7 @@ struct InitializeGraph1_crashed {
         galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
 
     // degree calculation
-    InitializeGraph2_recovery::go(_graph);
+    //InitializeGraph2_recovery::go(_graph);
   }
 
   /* Setup intial fields */
@@ -286,7 +286,7 @@ struct InitializeGraph1_Healthy {
         galois::loopname(_graph.get_run_identifier("InitializeGraph_healthy").c_str()));
 
     // degree calculation
-    InitializeGraph2_recovery::go(_graph);
+    //InitializeGraph2_recovery::go(_graph);
   }
 
   /* Setup intial fields */
@@ -297,7 +297,6 @@ struct InitializeGraph1_Healthy {
   }
 };
 
-
 /* Recovery to be called by resilience based fault tolerance
  */
 struct recovery {
@@ -307,36 +306,36 @@ struct recovery {
 
   void static go(Graph& _graph) {
 
-    const auto& allNodes = _graph.allNodesRange();
+    //Sync flag everywhere
+    _graph.sync<writeSource, readSource, Reduce_min_flag, Broadcast_flag>("RECOVERY_FLAG");
+
+    //TODO: nodes with edges
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
+      galois::iterate(nodesWithEdges),
       recovery{&_graph},
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
 
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
-                  Bitset_trim>("RECOVERY");
+    //Sync degree
+    _graph.sync<writeDestination, readSource, Reduce_add_current_degree, Broadcast_current_degree, Bitset_current_degree>("RECOVERY_CURRENT_DEGREE");
   }
 
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
     // only if node is alive we do things
     // Find all dead nodes and increment the neighbor's trim value.
-    if (!src_data.flag || src_data.current_degree < k_core_num) {
-      //set flag to 0 if not already set.
-      src_data.flag = false;
-
+    if (src_data.flag){
       for (auto current_edge : graph->edges(src)) {
         GNode dst = graph->getEdgeDst(current_edge);
-
         auto& dst_data = graph->getData(dst);
-
-        galois::atomicAdd(dst_data.trim, (uint32_t)1);
-        bitset_trim.set(dst);
+        galois::atomicAdd(dst_data.current_degree, (uint32_t)1);
+        bitset_current_degree.set(dst);
       }
     }
   }
 };
+
 
 /* Use the trim value (i.e. number of incident nodes that have been removed)
  * to update degrees.
@@ -517,12 +516,7 @@ struct KCoreStep1 {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (iterations == crashIteration)){
         crashSite<recovery, InitializeGraph1_crashed, InitializeGraph1_Healthy>(_graph);
-
-        if(recoveryScheme == RS){
-          // handle trimming (locally) for healthy and crashed hosts.
-          // TODO: Can a special operator be used to get correct degree values of healthy nodes after the crash.
-          KCoreStep2_recovery::go(_graph);
-        }
+        dga += 1;// Must do one more iteration
       }
       /**************************CRASH SITE : end *****************************************/
 

@@ -350,6 +350,8 @@ struct SGD {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        ++_num_iterations;
+        continue;
       }
       /**************************CRASH SITE : end *****************************************/
 
