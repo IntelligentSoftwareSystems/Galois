@@ -34,7 +34,6 @@
 // These implementations are based on the Push-based PageRank computation
 // (Algorithm 4) as described in the PageRank Europar 2015 paper.
 
-namespace cll = llvm::cl;
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a push-style algorithm.";
 
@@ -47,14 +46,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                                        clEnumVal(Sync, "Sync"), clEnumValEnd),
                            cll::init(Async));
 
-static cll::opt<std::string>
-    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
-                                 cll::init(TOLERANCE));
-static cll::opt<unsigned int>
-    maxIterations("maxIterations",
-                  cll::desc("Maximum iterations, Sync version only"),
-                  cll::init(MAX_ITER));
 
 struct LNode {
   PRTy value;
@@ -62,7 +53,7 @@ struct LNode {
 
   void init() {
     value    = 0.0;
-    residual = 1 - ALPHA;
+    residual = INIT_RESIDUAL;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -74,39 +65,6 @@ struct LNode {
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<
     true>::type ::with_no_lockable<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
-
-template <typename Graph>
-static void printTop(Graph& graph, int topn) {
-  typedef typename Graph::node_data_reference node_data_reference;
-  typedef TopPair<GNode> Pair;
-  typedef std::map<Pair, GNode> Top;
-
-  Top top;
-
-  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src             = *ii;
-    node_data_reference n = graph.getData(src);
-    float value           = n.value;
-    Pair key(value, src);
-
-    if ((int)top.size() < topn) {
-      top.insert(std::make_pair(key, src));
-      continue;
-    }
-
-    if (top.begin()->first < key) {
-      top.erase(top.begin());
-      top.insert(std::make_pair(key, src));
-    }
-  }
-
-  int rank = 1;
-  std::cout << "Rank PageRank Id\n";
-  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend();
-       ii != ei; ++ii, ++rank) {
-    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
-  }
-}
 
 void asyncPageRank(Graph& graph) {
   typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
@@ -230,19 +188,6 @@ void syncPageRank(Graph& graph) {
   }
 }
 
-#if DEBUG
-static void printPageRank(Graph& graph) {
-  std::cout << "Id\tPageRank\n";
-  int counter = 0;
-  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
-    GNode src                    = *ii;
-    Graph::node_data_reference n = graph.getData(src);
-    std::cout << counter << " " << n.value << "\n";
-    counter++;
-  }
-}
-#endif
-
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -260,16 +205,6 @@ int main(int argc, char** argv) {
                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  switch (algo) {
-  case Async:
-    std::cout << "Running Edge Async push version,";
-    break;
-  case Sync:
-    std::cout << "Running Edge Sync push version,";
-    break;
-  default:
-    std::abort();
-  }
   std::cout << "tolerance:" << tolerance << ", maxIterations:" << maxIterations
             << "\n";
 
@@ -281,13 +216,19 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   switch (algo) {
-  case Async: {
-    asyncPageRank(graph);
-    break;
-  }
-  case Sync: {
-    syncPageRank(graph);
-  }
+    case Async: 
+      std::cout << "Running Edge Async push version,";
+      asyncPageRank(graph);
+      break;
+
+    case Sync: 
+      std::cout << "Running Edge Sync push version,";
+      syncPageRank(graph);
+      break;
+
+    default:
+      std::abort();
+
   }
 
   Tmain.stop();
@@ -295,7 +236,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    printTop(graph, PRINT_TOP);
+    printTop(graph);
   }
 
 #if DEBUG

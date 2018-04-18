@@ -33,25 +33,10 @@
 #include "galois/graphs/TypeTraits.h"
 #include "galois/gstl.h"
 
-namespace cll = llvm::cl;
 const char* desc =
     "Computes page ranks a la Page and Brin. This is a pull-style algorithm.";
 
 constexpr static const unsigned CHUNK_SIZE = 32;
-
-// We require a transpose graph since this is a pull-style algorithm
-static cll::opt<std::string> filename(cll::Positional,
-                                      cll::desc("<tranpose of input graph>"),
-                                      cll::Required);
-// Any delta in pagerank computation across iterations that is greater than the
-// tolerance means the computation has not yet converged.
-static cll::opt<float> tolerance("tolerance",
-                                 cll::desc("tolerance for residual"),
-                                 cll::init(TOLERANCE));
-static cll::opt<unsigned int>
-    maxIterations("maxIterations",
-                  cll::desc("Maximum iterations: Default 1000"),
-                  cll::init(MAX_ITER));
 
 struct LNode {
   PRTy value;
@@ -61,52 +46,6 @@ struct LNode {
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
-
-template <typename Graph>
-static void printTop(Graph& graph, int topn) {
-  typedef typename Graph::node_data_reference node_data_reference;
-  typedef TopPair<GNode> Pair;
-  typedef std::map<Pair, GNode> Top;
-
-  Top top;
-
-  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src             = *ii;
-    node_data_reference n = graph.getData(src);
-    PRTy value            = n.value;
-    Pair key(value, src);
-
-    if ((int)top.size() < topn) {
-      top.insert(std::make_pair(key, src));
-      continue;
-    }
-
-    if (top.begin()->first < key) {
-      top.erase(top.begin());
-      top.insert(std::make_pair(key, src));
-    }
-  }
-
-  int rank = 1;
-  std::cout << "Rank PageRank Id\n";
-  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend();
-       ii != ei; ++ii, ++rank) {
-    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
-  }
-}
-
-#if DEBUG
-static void printPageRank(Graph& graph) {
-  std::cout << "Id\tPageRank\n";
-  int counter = 0;
-  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
-    GNode src                    = *ii;
-    Graph::node_data_reference n = graph.getData(src);
-    std::cout << counter << " " << n.value << "\n";
-    counter++;
-  }
-}
-#endif
 
 using DeltaArray    = galois::LargeArray<PRTy>;
 using ResidualArray = galois::LargeArray<PRTy>;
@@ -118,7 +57,7 @@ void initNodeData(Graph& g, DeltaArray& delta, ResidualArray& residual) {
                    sdata.value = 0;
                    sdata.nout  = 0;
                    delta[n]    = 0;
-                   residual[n] = 1 - ALPHA;
+                   residual[n] = INIT_RESIDUAL;
                  },
                  galois::no_stats(), galois::loopname("initNodeData"));
 }
@@ -141,7 +80,7 @@ void computeOutDeg(Graph& graph) {
                    for (auto nbr : graph.edges(src)) {
                      GNode dst = graph.getEdgeDst(nbr);
                      vec[dst].fetch_add(1ul);
-                   }
+                   };
                  },
                  galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
                  galois::no_stats(), galois::loopname("ComputeDeg"));
@@ -249,7 +188,7 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
-    printTop(transposeGraph, PRINT_TOP);
+    printTop(transposeGraph);
   }
 
 #if DEBUG
