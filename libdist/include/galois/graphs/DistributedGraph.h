@@ -4200,6 +4200,11 @@ public:
 
     graph.serializeNodeData(ar);
 
+    std::string statSendBytes_str("CHECKPOINT_BYTES_TOTAL");
+    constexpr static const char* const RREGION = "RECOVERY";
+    size_t cp_size = outputStream.tellp();
+    galois::runtime::reportStat_Tsum(RREGION, statSendBytes_str, cp_size); 
+
     outputStream.flush();
     outputStream.close();
     TimerSaveCheckPoint.stop();
