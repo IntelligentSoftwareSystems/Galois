@@ -36,11 +36,6 @@
 //For resilience
 #include "resilience.h"
 
-#ifdef __GALOIS_HET_CUDA__
-#include "gen_cuda.h"
-struct CUDA_Context *cuda_ctx;
-#endif
-
 #include <iostream>
 #include <limits>
 #include <algorithm>
@@ -95,15 +90,6 @@ struct ResetGraph {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      ResetGraph_allNodes_cuda(alpha, cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph{ alpha, &_graph },
@@ -131,16 +117,6 @@ struct InitializeGraph {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
-        (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      InitializeGraph_nodesWithEdges_cuda(cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
     // doing a local do all because we are looping over edges
     galois::do_all(
       galois::iterate(nodesWithEdges),
@@ -176,16 +152,7 @@ struct ResetGraph_crashed {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-    //TODO: not correct for CUDA
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
+
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph_crashed{ alpha, &_graph },
@@ -213,18 +180,6 @@ struct InitializeGraph_crashed {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    //TODO:: not correct for CUDA
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
-        (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
-                           cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
     // doing a local do all because we are looping over edges
     galois::do_all(
       galois::iterate(nodesWithEdges),
@@ -258,15 +213,7 @@ struct ResetGraph_healthy {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), alpha, cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
+    
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       ResetGraph_healthy{ &_graph },
@@ -295,17 +242,6 @@ struct InitializeGraph_healthy {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
-        (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      InitializeGraph_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(), 
-                           cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
     // doing a local do all because we are looping over edges
     galois::do_all(
       galois::iterate(nodesWithEdges),
@@ -403,18 +339,6 @@ struct PageRank_delta {
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     const auto& allNodes = _graph.allNodesRange();
 
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" +
-        (_graph.get_run_identifier()));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-      StatTimer_cuda.start();
-      unsigned int __retval = 0;
-      PageRank_delta_allNodes_cuda(__retval, alpha, tolerance, cuda_ctx);
-      dga += __retval;
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-    #endif
     galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
@@ -462,16 +386,6 @@ struct PageRank {
       PageRank_delta::go(_graph, dga);
       _graph.reset_mirrorField<Reduce_add_residual>();
 
-      #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + 
-          (_graph.get_run_identifier()));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
-        StatTimer_cuda.start();
-        PageRank_nodesWithEdges_cuda(cuda_ctx);
-        StatTimer_cuda.stop();
-      } else if (personality == CPU)
-      #endif
       galois::do_all(
         galois::iterate(nodesWithEdges),
         PageRank{ &_graph },
@@ -596,28 +510,6 @@ struct PageRankSanity {
     min_residual.reset();
     DGA_residual_over_tolerance.reset();
 
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      float _max_value;
-      float _min_value;
-      float _sum_value;
-      float _sum_residual;
-      uint64_t num_residual_over_tolerance;
-      float _max_residual;
-      float _min_residual;
-      PageRankSanity_masterNodes_cuda(num_residual_over_tolerance, _sum_value, _sum_residual, 
-                               _max_residual, _max_value, _min_residual, _min_value, 
-                               tolerance, cuda_ctx);
-      DGA_sum += _sum_value;
-      DGA_sum_residual += _sum_residual;
-      DGA_residual_over_tolerance += num_residual_over_tolerance;
-      max_value.update(_max_value);
-      max_residual.update(_max_residual);
-      min_value.update(_min_value);
-      min_residual.update(_min_residual);
-    }
-    else
-  #endif
     {
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
                                      _graph.masterNodesRange().end()), 
@@ -706,11 +598,7 @@ int main(int argc, char** argv) {
 
   StatTimer_total.start();
 
-  #ifdef __GALOIS_HET_CUDA__
-  Graph* hg = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
-  #else
   Graph* hg = distGraphInitialization<NodeData, void, false>();
-  #endif
 
   bitset_residual.resize(hg->size());
   bitset_nout.resize(hg->size());
@@ -749,12 +637,6 @@ int main(int argc, char** argv) {
     );
 
     if ((run + 1) != numRuns) {
-      #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) { 
-        bitset_residual_reset_cuda(cuda_ctx);
-        bitset_nout_reset_cuda(cuda_ctx);
-      } else
-      #endif
       { 
         bitset_residual.reset();
         bitset_nout.reset(); 
@@ -770,25 +652,12 @@ int main(int argc, char** argv) {
 
   // Verify
   if (verify) {
-    #ifdef __GALOIS_HET_CUDA__
-    if (personality == CPU) { 
-    #endif
-      for (auto ii = (*hg).masterNodesRange().begin(); 
-                ii != (*hg).masterNodesRange().end(); 
-                ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
-          (*hg).getData(*ii).value);
-      }
-    #ifdef __GALOIS_HET_CUDA__
-    } else if (personality == GPU_CUDA) {
-      for (auto ii = (*hg).masterNodesRange().begin(); 
-                ii != (*hg).masterNodesRange().end(); 
-                ++ii) {
-        galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
-          get_node_value_cuda(cuda_ctx, *ii));
-      }
+    for (auto ii = (*hg).masterNodesRange().begin(); 
+              ii != (*hg).masterNodesRange().end(); 
+              ++ii) {
+      galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
+        (*hg).getData(*ii).value);
     }
-    #endif
   }
 
   return 0;
