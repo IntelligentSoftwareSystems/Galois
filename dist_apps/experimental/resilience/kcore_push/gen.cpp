@@ -518,9 +518,11 @@ struct KCoreStep1 {
       if(enableFT && (iterations == crashIteration)){
         crashSite<recovery, InitializeGraph1_crashed, InitializeGraph1_Healthy>(_graph);
 
-        // handle trimming (locally) for healthy and crashed hosts.
-        // TODO: Can a special operator be used to get correct degree values of healthy nodes after the crash.
-        KCoreStep2_recovery::go(_graph);
+        if(recoveryScheme == RS){
+          // handle trimming (locally) for healthy and crashed hosts.
+          // TODO: Can a special operator be used to get correct degree values of healthy nodes after the crash.
+          KCoreStep2_recovery::go(_graph);
+        }
       }
       /**************************CRASH SITE : end *****************************************/
 

@@ -490,22 +490,25 @@ struct PageRank {
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
         const auto& net = galois::runtime::getSystemNetworkInterface();
-        galois::gPrint(net.ID, " : recovery DONE!!!\n");
+        if(recoveryScheme == CP){
+          galois::gPrint(net.ID, " : recovery DONE!!!\n");
+        } else {
+          _graph.reset_mirrorField<Reduce_add_residual>();
+          galois::do_all(
+              galois::iterate(nodesWithEdges),
+              PageRank{ &_graph },
+              galois::steal(),
+              galois::no_stats(),
+              galois::loopname(_graph.get_run_identifier("PageRank-afterCrash").c_str()));
 
-        _graph.reset_mirrorField<Reduce_add_residual>();
-        galois::do_all(
-            galois::iterate(nodesWithEdges),
-            PageRank{ &_graph },
-            galois::steal(),
-            galois::no_stats(),
-            galois::loopname(_graph.get_run_identifier("PageRank-afterCrash").c_str()));
-
-        //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
+          //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
           //Bitset_residual>("PageRank-afterCrash");
 
-        _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("PageRank-afterCrash");
+          _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("PageRank-afterCrash");
 
-        crashSiteAdjust<recoveryAdjust>(_graph);
+          crashSiteAdjust<recoveryAdjust>(_graph);
+          galois::gPrint(net.ID, " : recovery DONE!!!\n");
+        }
 
         // Do all and sync
         //_graph.reset_mirrorField<Reduce_add_residual>();

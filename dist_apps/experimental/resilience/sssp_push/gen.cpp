@@ -272,9 +272,11 @@ struct SSSP {
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
 
-        //Only sync is required
-        _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-          Broadcast_dist_current>("RECOVERY");
+        if(recoveryScheme == RS){
+          //Only sync is required
+          _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+            Broadcast_dist_current>("RECOVERY");
+        }
       }
       /**************************CRASH SITE : end *****************************************/
 
