@@ -160,7 +160,9 @@ NetworkInterface& makeNetworkBuffered();
 NetworkInterface& makeNetworkRouted();
 
 //! Host Barrier
-substrate::Barrier& getHostBarrier();
+// should not be called within a parallel region; assumes only one thread is calling it
+substrate::Barrier& getHostBarrier(); // regular MPI-like Barrier
+substrate::Barrier& getHostFence(); // ensures all pending messages are delivered acting like a memory-barrier
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
