@@ -16,27 +16,26 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
+#ifndef CLUSTER_LIGHT_H
+#define CLUSTER_LIGHT_H
 
-#ifndef CLUSTERNODE_H_
-#define CLUSTERNODE_H_
-
-#include "LeafNode.h"
+#include "LeafLight.h"
 #include "NodeWrapper.h"
 #include "galois/gstl.h"
 #include <assert.h>
 
-class ClusterNode : public AbstractNode {
+class ClusterLight : public AbstractNode {
 private:
   AbstractNode* m_left;
   AbstractNode* m_right;
-  GVector<LeafNode*> reps;
+  GVector<LeafLight*> reps;
   Point3 boxRadius;
   Point3 coneDirection;
   double coneCos;
 
 public:
-  ClusterNode() : boxRadius(0), coneDirection(0) {}
-  virtual ~ClusterNode() { reps.clear(); }
+  ClusterLight() : boxRadius(0), coneDirection(0) {}
+  virtual ~ClusterLight() { reps.clear(); }
   void setBox(double minX, double maxX, double minY, double maxY, double minZ,
               double maxZ) {
     myLoc.set(0.5f * (minX + maxX), 0.5f * (minY + maxY), 0.5f * (minZ + maxZ));
@@ -65,29 +64,29 @@ public:
       assert(false && "Should  not have time true!");
       //      int numReps = endTime - startTime + 1;
       //      if (reps == null || reps.length < numReps) {
-      //        reps = new LeafNode[numReps];
+      //        reps = new LeafLight[numReps];
       //      } else {
       //        for (int j = numReps; j < reps.length; j++) {
       //          reps[j] = null;
       //        } //fill unused values will nulls
       //      }
       //      if (m_left.isLeaf()) {
-      //        LeafNode leftLeaf = (LeafNode) m_left;
+      //        LeafLight leftLeaf = (LeafLight) m_left;
       //        if (m_right.isLeaf()) {
-      //          chooseRepsWithTime(reps, this, ranVec, leftLeaf, (LeafNode)
+      //          chooseRepsWithTime(reps, this, ranVec, leftLeaf, (LeafLight)
       //          m_right);
       //        } else {
-      //          chooseRepsWithTime(reps, this, ranVec, (ClusterNode)
+      //          chooseRepsWithTime(reps, this, ranVec, (ClusterLight)
       //          m_right, leftLeaf); //note: operation is symmectric so we
       //          just interchange the children in the call
       //        }
       //      } else {
-      //        ClusterNode leftClus = (ClusterNode) m_left;
+      //        ClusterLight leftClus = (ClusterLight) m_left;
       //        if (m_right.isLeaf()) {
-      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafNode)
+      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafLight)
       //          m_right);
       //        } else {
-      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterNode)
+      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterLight)
       //          m_right);
       //        }
       //      }
@@ -97,24 +96,24 @@ public:
         reps.resize(globalNumReps);
       }
       if (m_left->isLeaf()) {
-        LeafNode* leftLeaf = (LeafNode*)m_left;
+        LeafLight* leftLeaf = (LeafLight*)m_left;
         if (m_right->isLeaf()) {
           chooseRepsNoTime(reps, *this, ranVec, *leftLeaf,
-                           (LeafNode&)*m_right);
+                           (LeafLight&)*m_right);
         } else {
-          chooseRepsNoTime(reps, *this, ranVec, (ClusterNode&)*m_right,
+          chooseRepsNoTime(reps, *this, ranVec, (ClusterLight&)*m_right,
                            *leftLeaf); // note: operation is symmectric so we
                                        // just interchange the children in the
                                        // call
         }
       } else {
-        ClusterNode* leftClus = (ClusterNode*)m_left;
+        ClusterLight* leftClus = (ClusterLight*)m_left;
         if (m_right->isLeaf()) {
           chooseRepsNoTime(reps, *this, ranVec, *leftClus,
-                           (LeafNode&)*m_right);
+                           (LeafLight&)*m_right);
         } else {
           chooseRepsNoTime(reps, *this, ranVec, *leftClus,
-                           (ClusterNode&)*m_right);
+                           (ClusterLight&)*m_right);
         }
       }
     }
@@ -122,8 +121,8 @@ public:
 
   template <typename V1, typename V2>
   static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
-                               V2& ranVec, LeafNode& left,
-                               LeafNode& right) {
+                               V2& ranVec, LeafLight& left,
+                               LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -137,8 +136,8 @@ public:
 
   template <typename V1, typename V2>
   static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
-                               V2& ranVec, ClusterNode& left,
-                               LeafNode& right) {
+                               V2& ranVec, ClusterLight& left,
+                               LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -153,8 +152,8 @@ public:
 
   template <typename V1, typename V2>
   static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
-                               V2& ranVec, ClusterNode& left,
-                               ClusterNode& right) {
+                               V2& ranVec, ClusterLight& left,
+                               ClusterLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -189,7 +188,7 @@ public:
                                    int numDirs, V2& cArr,
                                    int recurseDepth) {
     if (!node.isLeaf()) {
-      ClusterNode& clus = (ClusterNode&)node;
+      ClusterLight& clus = (ClusterLight&)node;
       if (clus.coneCos == 1.0) {
         numDirs =
             addConeDir(fArr, numDirs, clus.coneDirection.getX(),
@@ -212,7 +211,7 @@ public:
                                         recurseDepth - 1);
       }
     } else {
-      LeafNode& light = (LeafNode&)node;
+      LeafLight& light = (LeafLight&)node;
       numDirs = addConeDir(fArr, numDirs, light.getDirX(), light.getDirY(),
                            light.getDirZ());
     }
@@ -243,4 +242,4 @@ public:
   }
 };
 
-#endif /* CLUSTERNODE_H_ */
+#endif /* CLUSTER_LIGHT_H */

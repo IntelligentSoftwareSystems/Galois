@@ -21,8 +21,8 @@
 #define NODEWRAPPER_H_
 
 #include "Box3d.h"
-#include "ClusterNode.h"
-#include "LeafNode.h"
+#include "ClusterLight.h"
+#include "LeafLight.h"
 #include "Point3.h"
 #include <math.h>
 
@@ -38,13 +38,13 @@ private:
   Point3 location;
   Point3 coneDirection;
   const int descendents;
-  GVector<ClusterNode*> coneClusters;
+  GVector<ClusterLight*> coneClusters;
   const bool cleanLight;
   NodeWrapper* m_left;
   NodeWrapper* m_right;
 
 public:
-  NodeWrapper(LeafNode& inNode)
+  NodeWrapper(LeafLight& inNode)
       : light(inNode), location(0), coneDirection(0), descendents(1),
         cleanLight(false) {
     setBox(inNode.getPoint());
@@ -59,8 +59,8 @@ public:
 
   // TODO: get rid of 'new' here and corresponding 'delete'
   NodeWrapper(NodeWrapper& pLeft, NodeWrapper& pRight,
-              GVector<double>* coordArr, GVector<ClusterNode*>& tempClusterArr)
-      : light(*(new ClusterNode())), location(0), coneDirection(0),
+              GVector<double>* coordArr, GVector<ClusterLight*>& tempClusterArr)
+      : light(*(new ClusterLight())), location(0), coneDirection(0),
         descendents(pLeft.descendents + pRight.descendents), cleanLight(true) {
     NodeWrapper *l = &pLeft, *r = &pRight;
     if ((pLeft.location.getX() > pRight.location.getX()) ||
@@ -77,15 +77,15 @@ public:
     location.set(max);
     location.add(min);
     location.scale(0.5);
-    ((ClusterNode&)light).setBox(min, max);
-    ((ClusterNode&)light)
+    ((ClusterLight&)light).setBox(min, max);
+    ((ClusterLight&)light)
         .setChildren(&l->light, &r->light,
                      ((double)rand()) / std::numeric_limits<double>::max());
-    coneCosine = computeCone(*l, *r, ((ClusterNode&)light));
+    coneCosine = computeCone(*l, *r, ((ClusterLight&)light));
     if (coneCosine > -0.9f) {
       direction.addBox(l->direction);
       direction.addBox(r->direction);
-      ((ClusterNode&)light).findConeDirsRecursive(coordArr, tempClusterArr);
+      ((ClusterLight&)light).findConeDirsRecursive(coordArr, tempClusterArr);
       int numClus = 0;
       for (; tempClusterArr[numClus] != NULL; numClus++) {
       }
@@ -103,12 +103,12 @@ public:
 
   ~NodeWrapper() {
     if (cleanLight) {
-      delete (ClusterNode*)(&light);
+      delete (ClusterLight*)(&light);
     }
   }
 
   static double computeCone(const NodeWrapper& a, const NodeWrapper& b,
-                            ClusterNode& cluster) {
+                            ClusterLight& cluster) {
     if (a.direction.isInitialized() == false ||
         b.direction.isInitialized() == false)
       return -1.0f;

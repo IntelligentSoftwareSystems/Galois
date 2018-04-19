@@ -36,10 +36,10 @@
 #include <set>
 #include <stdlib.h>
 
-#include "LeafNode.h"
+#include "LeafLight.h"
 #include "NodeWrapper.h"
 #include "KdTree.h"
-#include "ClusterNode.h"
+#include "ClusterLight.h"
 #include <stdlib.h>
 #include <sys/time.h>
 // clang-format on
@@ -64,7 +64,7 @@ struct Clustering {
   std::vector<NodeWrapper*> lights;
   std::vector<double> coordinatesArray;
 
-  std::vector<ClusterNode*> clusterArray;
+  std::vector<ClusterLight*> clusterArray;
 
   void genRandomLights(int numPoints) {
 
@@ -83,7 +83,7 @@ struct Clustering {
       double y = ((double)rand()) / (numeric_limits<int>::max());
       double z = ((double)rand()) / (numeric_limits<int>::max());
 
-      Light l = LeafNode(x, y, z, dirX, dirY, dirZ);
+      Light l = LeafLight(x, y, z, dirX, dirY, dirZ);
       NodeWrapper* nw = new NodeWrapper(l);
       lights.push_back(nw);
     }
@@ -112,7 +112,7 @@ struct Clustering {
                 galois::InsertBag<NodeWrapper*>*& newNodes,
                 galois::InsertBag<NodeWrapper*>& allocs,
                 GVector<double>* coordinatesArray,
-                GVector<ClusterNode*>& clusterArray) {
+                GVector<ClusterLight*>& clusterArray) {
     int addCounter = 0;
     if (tree->contains(*nodeA)) {
 
@@ -162,8 +162,8 @@ struct Clustering {
  *
  * while(true) {
  *
- *  do_all(T.leafBegin(), T.leafEnd(), 
- *    [&] (LeafNode l) {
+ *  do_all(galois::iterate(T), 
+ *    [&] (LeafLight l) {
  *      m = T.nearsetNeighbor(l);
  *
  *      if (m != null) {
@@ -198,7 +198,7 @@ struct Clustering {
     cout << "Temp size is " << tempSize << " coord. arr size should be "
          << tempSize * 3 << endl;
     std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
-    std::vector<ClusterNode*> clusterArray(tempSize);
+    std::vector<ClusterLight*> clusterArray(tempSize);
 
     while (true) {
 
@@ -217,7 +217,7 @@ struct Clustering {
     cout << "Temp size is " << tempSize << " coord. arr size should be "
          << tempSize * 3 << endl;
     std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
-    std::vector<ClusterNode*> clusterArray(tempSize);
+    std::vector<ClusterLight*> clusterArray(tempSize);
 
 #if DEBUG_CONSOLE
 
@@ -308,7 +308,7 @@ struct Clustering {
     T.stop();
   }
 
-  void clusterSerial(GVector<LeafNode*>& lights) {SplitType
+  void clusterSerial(GVector<LeafLight*>& lights) {SplitType
 
     int tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
     cout << "Temp size is " << tempSize << " coord. arr size should be "
@@ -316,7 +316,7 @@ struct Clustering {
 
     std::vector<double>* coordinatesArray = new std::vector<double>(tempSize * 3);
     std::vector<NodeWrapper*> initialWorklist(lights.size());
-    std::vector<ClusterNode*> clusterArray(tempSize);
+    std::vector<ClusterLight*> clusterArray(tempSize);
 
     for (unsigned int i = 0; i < lights.size(); i++) {
       NodeWrapper* nw    = new NodeWrapper(*(lights[i]));
@@ -450,7 +450,7 @@ int main(int argc, char** argv) {
   cout << "Starting Clustering app...[" << numPoints << "]" << endl;
   // Initializing...
 
-  std::vector<LeafNode> lights;
+  std::vector<LeafLight> lights;
   lights.reserve(numPoints);
   genRandomLights(lights, numPoints);
 
