@@ -222,7 +222,7 @@ struct ConnectedComp {
 
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
-        saveCheckpointToDisk(_num_iterations, _graph);
+        saveCheckpointToDisk(_num_iterations-1, _graph);
       }
 
       _graph.set_num_iter(_num_iterations);
