@@ -278,6 +278,7 @@ struct ResetGraph_healthy {
     auto& sdata = graph->getData(src);
     //Reset residual on healthy nodes.
     sdata.residual = 0;
+    sdata.delta = 0;
     sdata.nout = 0;
   }
 };
@@ -337,6 +338,8 @@ struct recovery {
   recovery(Graph * _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
+
+    _graph.sync<writeAny, readAny, Reduce_max_value, Broadcast_value>("RECOVERY_VALUE");
 
     //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.allNodesRange();
@@ -493,11 +496,11 @@ struct PageRank {
               PageRank{ &_graph },
               galois::steal(),
               galois::no_stats(),
-              galois::loopname(_graph.get_run_identifier("PageRank-afterCrash").c_str()));
+              galois::loopname(_graph.get_run_identifier("RECOVERY_PageRank").c_str()));
 
           //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
           //Bitset_residual>("PageRank-afterCrash");
-          _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("PageRank-afterCrash");
+          _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY_PageRank");
 
           crashSiteAdjust<recoveryAdjust>(_graph);
           galois::gPrint(net.ID, " : recovery DONE!!!\n");
