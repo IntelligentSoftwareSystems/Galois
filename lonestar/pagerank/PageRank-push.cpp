@@ -46,7 +46,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
                                        clEnumVal(Sync, "Sync"), clEnumValEnd),
                            cll::init(Async));
 
-
 struct LNode {
   PRTy value;
   std::atomic<PRTy> residual;
@@ -216,19 +215,18 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   switch (algo) {
-    case Async: 
-      std::cout << "Running Edge Async push version,";
-      asyncPageRank(graph);
-      break;
+  case Async:
+    std::cout << "Running Edge Async push version,";
+    asyncPageRank(graph);
+    break;
 
-    case Sync: 
-      std::cout << "Running Edge Sync push version,";
-      syncPageRank(graph);
-      break;
+  case Sync:
+    std::cout << "Running Edge Sync push version,";
+    syncPageRank(graph);
+    break;
 
-    default:
-      std::abort();
-
+  default:
+    std::abort();
   }
 
   Tmain.stop();

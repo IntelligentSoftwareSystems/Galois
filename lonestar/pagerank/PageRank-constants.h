@@ -32,7 +32,7 @@ static const char* url  = 0;
 
 // All PageRank algorithm variants use the same constants for ease of
 // comparison.
-constexpr static const float ALPHA       = 0.85;
+constexpr static const float ALPHA         = 0.85;
 constexpr static const float INIT_RESIDUAL = 1 - ALPHA;
 
 constexpr static const float TOLERANCE   = 1.0e-5;
@@ -43,14 +43,14 @@ constexpr static const unsigned PRINT_TOP = 20;
 namespace cll = llvm::cl;
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
                                  cll::init(TOLERANCE));
-static cll::opt<unsigned int>
-    maxIterations("maxIterations",
-                  cll::desc("Maximum iterations, applies round-based versions only"),
-                  cll::init(MAX_ITER));
+static cll::opt<unsigned int> maxIterations(
+    "maxIterations",
+    cll::desc("Maximum iterations, applies round-based versions only"),
+    cll::init(MAX_ITER));
 static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-// Type definitions
 
+// Type definitions
 typedef float PRTy;
 
 template <typename GNode>
@@ -78,7 +78,7 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 }
 
 template <typename Graph>
-void printTop(Graph& graph, unsigned topn=PRINT_TOP) {
+void printTop(Graph& graph, unsigned topn = PRINT_TOP) {
 
   using GNode = typename Graph::GraphNode;
   typedef TopPair<GNode> Pair;
@@ -87,12 +87,12 @@ void printTop(Graph& graph, unsigned topn=PRINT_TOP) {
   TopMap top;
 
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src             = *ii;
-    auto& n = graph.getData(src);
-    PRTy value            = n.value;
+    GNode src  = *ii;
+    auto& n    = graph.getData(src);
+    PRTy value = n.value;
     Pair key(value, src);
 
-    if ((int)top.size() < topn) {
+    if (top.size() < topn) {
       top.insert(std::make_pair(key, src));
       continue;
     }
@@ -122,8 +122,5 @@ void printPageRank(Graph& graph) {
   }
 }
 #endif
-
-
-
 
 #endif

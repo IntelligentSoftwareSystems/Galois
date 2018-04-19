@@ -37,30 +37,28 @@ const char* desc =
 
 constexpr static const unsigned CHUNK_SIZE = 4096;
 
-
-using DegreeArray = galois::LargeArray<PRTy>;
-
 struct LNode {
   PRTy value;
+  uint32_t nout;
 };
 
 typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
     true>::type ::with_numa_alloc<true>::type Graph;
 typedef typename Graph::GraphNode GNode;
 
-void initNodeData(Graph& g, DegreeArray& degree) {
+void initNodeData(Graph& g) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
                    auto& data = g.getData(n, galois::MethodFlag::UNPROTECTED);
                    data.value = INIT_RESIDUAL;
-                   degree[n]  = 0;
+                   data.nout  = 0;
                  },
                  galois::no_stats(), galois::loopname("initNodeData"));
 }
 
 // Computing outdegrees in the tranpose graph is equivalent to computing the
 // indegrees in the original graph
-void computeOutDeg(Graph& graph, DegreeArray& degree) {
+void computeOutDeg(Graph& graph) {
   galois::StatTimer outDegreeTimer("computeOutDeg");
   outDegreeTimer.start();
 
@@ -82,14 +80,18 @@ void computeOutDeg(Graph& graph, DegreeArray& degree) {
                  galois::no_stats(), galois::loopname("ComputeDeg"));
 
   galois::do_all(galois::iterate(graph),
-                 [&](const GNode& src) { degree[src] = vec[src]; },
+                 [&](const GNode& src) {
+                   auto& srcData =
+                       graph.getData(src, galois::MethodFlag::UNPROTECTED);
+                   srcData.nout = vec[src];
+                 },
                  galois::no_stats(), galois::loopname("CopyDeg"));
 
   outDegreeTimer.stop();
 }
 
-// PageRank pull topological (structure of arrays)
-void computePageRank(Graph& graph, DegreeArray& degree) {
+// PageRank pull topological
+void computePageRank(Graph& graph) {
   unsigned int iteration = 0;
   galois::GReduceMax<float> max_delta;
 
@@ -109,7 +111,7 @@ void computePageRank(Graph& graph, DegreeArray& degree) {
                        GNode dst = graph.getEdgeDst(jj);
 
                        LNode& ddata = graph.getData(dst, flag);
-                       sum += ddata.value / degree[dst];
+                       sum += ddata.value / sdata.nout;
                      }
 
                      // New value of pagerank after computing contributions from
@@ -157,15 +159,15 @@ int main(int argc, char** argv) {
   Graph transposeGraph;
 
   std::cout << "Reading graph: " << filename << std::endl;
-  std::cout << "WARNING: pull style algorithms work on the transpose of the actual graph " << std::endl;
-  std::cout << "WARNING: this program assumes that " << filename << " contains transposed representation" << std::endl;
+  std::cout << "WARNING: pull style algorithms work on the transpose of the "
+               "actual graph "
+            << std::endl;
+  std::cout << "WARNING: this program assumes that " << filename
+            << " contains transposed representation" << std::endl;
 
   galois::graphs::readGraph(transposeGraph, filename);
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
-
-  DegreeArray degree;
-  degree.allocateInterleaved(transposeGraph.size());
 
   galois::preAlloc(3 * numThreads + (3 * transposeGraph.size() *
                                      sizeof(typename Graph::node_data_type)) /
@@ -175,12 +177,12 @@ int main(int argc, char** argv) {
   std::cout << "Running synchronous Pull version, tolerance:" << tolerance
             << ", maxIterations:" << maxIterations << "\n";
 
-  initNodeData(transposeGraph, degree);
-  computeOutDeg(transposeGraph, degree);
+  initNodeData(transposeGraph);
+  computeOutDeg(transposeGraph);
 
   galois::StatTimer Tmain("computePageRank");
   Tmain.start();
-  computePageRank(transposeGraph, degree);
+  computePageRank(transposeGraph);
   Tmain.stop();
 
   galois::reportPageAlloc("MeminfoPost");
