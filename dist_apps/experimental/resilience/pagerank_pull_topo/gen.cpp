@@ -103,6 +103,46 @@ struct ResetGraph {
 };
 
 /**
+ * Crashed reset (same as original reset graph)
+ */
+struct ResetGraphCrashed {
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      ResetGraph{ alpha, &_graph },
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("ResetGraph_crashed").c_str())
+    );
+  }
+};
+
+/**
+ * Healthy reset (don't reset value)
+ */
+struct ResetGraphHealthy {
+  Graph* graph;
+
+  ResetGraphHealthy(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()),
+      ResetGraphHealthy{ &_graph },
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("ResetGraph_healthy").c_str())
+    );
+  }
+
+  void operator()(GNode src) const {
+    auto& sdata = graph->getData(src);
+    sdata.nout = 0;
+    sdata.partialSum = 0;
+  }
+};
+
+/**
  * Determine nout
  */
 struct InitializeGraph {
@@ -122,7 +162,8 @@ struct InitializeGraph {
       InitializeGraph{ &_graph },
       galois::steal(), 
       galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
+      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str())
+    );
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph");
@@ -150,7 +191,7 @@ struct InitializeGraph_crashed {
 
   void static go(Graph& _graph) {
     // init graph
-    ResetGraph::go(_graph);
+    ResetGraphCrashed::go(_graph);
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -180,16 +221,57 @@ struct InitializeGraph_crashed {
 };
 
 /**
+ * Healthy initialize
+ */
+struct InitializeGraph_healthy {
+  Graph* graph;
+
+  InitializeGraph_healthy(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    ResetGraphHealthy::go(_graph);
+
+    const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+
+    // doing a local do all because we are looping over edges
+    galois::do_all(
+      galois::iterate(nodesWithEdges),
+      InitializeGraph_healthy{ &_graph },
+      galois::steal(), 
+      galois::no_stats(), 
+      galois::loopname(_graph.get_run_identifier("InitializeGraph_healthy").c_str())
+    );
+
+    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+                Bitset_nout>("InitializeGraph_healthy");
+  }
+
+  // Calculate "outgoing" edges for destination nodes (note we are using
+  // the tranpose graph for pull algorithms)
+  void operator()(GNode src) const {
+    for (auto nbr : graph->edges(src)) {
+      GNode dst = graph->getEdgeDst(nbr);
+      auto& ddata = graph->getData(dst);
+      galois::atomicAdd(ddata.nout, (uint32_t)1);
+      bitset_nout.set(dst);
+    }
+  }
+};
+
+
+/**
  * Recovery operator for resilience based fault tolerance.
- *
- * In this case it does nothing (because nothing needs to be done).
  */
 struct RecoveryOperator {
   Graph* graph;
 
   RecoveryOperator(Graph* _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {}
+  void static go(Graph& _graph) {
+    // make value (i.e. pagerank) consistent across all proxies
+    _graph.sync<writeSource, readAny, Reduce_max_value, 
+                Broadcast_value>("PageRank-afterCrash");
+  }
 };
 
 /**
@@ -276,10 +358,7 @@ struct PageRank {
 
       // CRASH HERE
       if (enableFT && (_num_iterations == crashIteration)) {
-        crashSite<RecoveryOperator, InitializeGraph_crashed>(_graph);
-        // make value consistent across all proxies
-        _graph.sync<writeSource, readAny, Reduce_max_value, 
-                    Broadcast_value>("PageRank-afterCrash");
+        crashSite<RecoveryOperator, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
       }
       // END CRASH
 
