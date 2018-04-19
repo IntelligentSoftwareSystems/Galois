@@ -72,4 +72,4 @@ distApp(bc_push)
 
 distAppNoGPU(sgd)
 
-distApp(pagerank_pull_topo)
+distAppNoGPU(pagerank_pull_topo)
