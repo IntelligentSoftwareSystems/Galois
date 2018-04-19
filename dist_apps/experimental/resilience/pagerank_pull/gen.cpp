@@ -266,15 +266,15 @@ struct InitializeGraph_healthy {
   }
 };
 
-/* Recovery to be called by resilience based fault tolerance
+/**
+ * Recovery to be called by resilience based fault tolerance
  */
 struct recovery {
-  Graph * graph;
+  Graph* graph;
 
-  recovery(Graph * _graph) : graph(_graph) {}
+  recovery(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-
     _graph.sync<writeAny, readAny, Reduce_max_value, Broadcast_value>("RECOVERY_VALUE");
 
     //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -289,20 +289,21 @@ struct recovery {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    if(sdata.nout > 0)
+    if (sdata.nout > 0)
       sdata.delta = sdata.value * (1 - alpha) / sdata.nout;
   }
 };
 
-/* Recovery Adjust to be called by resilience based fault tolerance
+
+/** 
+ * Recovery Adjust to be called by resilience based fault tolerance
  */
 struct recoveryAdjust {
-  Graph * graph;
+  Graph* graph;
 
-  recoveryAdjust(Graph * _graph) : graph(_graph) {}
+  recoveryAdjust(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-
     //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
@@ -310,10 +311,11 @@ struct recoveryAdjust {
       //galois::iterate(nodesWithEdges),
       recoveryAdjust{&_graph},
       galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str()));
+      galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str())
+    );
 
-      //TODO: Is this required??
-      //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY");
+    //TODO: Is this required??
+    //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY");
   }
 
   void operator()(GNode src) const {
@@ -343,7 +345,8 @@ struct PageRank_delta {
       galois::iterate(allNodes.begin(), allNodes.end()),
       PageRank_delta{ alpha, tolerance, &_graph, dga },
       galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
+      galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str())
+    );
   }
 
   void operator()(GNode src) const {
@@ -351,12 +354,12 @@ struct PageRank_delta {
     sdata.delta = 0;
 
     if (sdata.residual > this->local_tolerance) {
-        sdata.value += sdata.residual;
-        if (sdata.nout > 0) {
-          sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
-          DGAccumulator_accum += 1;
-        }
-        sdata.residual = 0;
+      sdata.value += sdata.residual;
+      if (sdata.nout > 0) {
+        sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
+        DGAccumulator_accum += 1;
+      }
+      sdata.residual = 0;
     }
   }
 };
@@ -375,7 +378,6 @@ struct PageRank {
     //unsigned int reduced = 0;
 
     do {
-
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
         saveCheckpointToDisk(_num_iterations, _graph);
@@ -391,26 +393,29 @@ struct PageRank {
         PageRank{ &_graph },
         galois::steal(),
         galois::no_stats(),
-        galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
+        galois::loopname(_graph.get_run_identifier("PageRank").c_str())
+      );
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
 
-       /**************************CRASH SITE : start *****************************************/
-      if(enableFT && (_num_iterations == crashIteration)){
+      /**************************CRASH SITE : start *****************************************/
+      if (enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
         dga += 1;
+
         const auto& net = galois::runtime::getSystemNetworkInterface();
         if(recoveryScheme == CP){
           galois::gPrint(net.ID, " : recovery DONE!!!\n");
         } else {
           _graph.reset_mirrorField<Reduce_add_residual>();
           galois::do_all(
-              galois::iterate(nodesWithEdges),
-              PageRank{ &_graph },
-              galois::steal(),
-              galois::no_stats(),
-              galois::loopname(_graph.get_run_identifier("RECOVERY_PageRank").c_str()));
+            galois::iterate(nodesWithEdges),
+            PageRank{ &_graph },
+            galois::steal(),
+            galois::no_stats(),
+            galois::loopname(_graph.get_run_identifier("RECOVERY_PageRank").c_str())
+          );
 
           //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
           //Bitset_residual>("PageRank-afterCrash");
