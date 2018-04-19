@@ -98,6 +98,7 @@ struct NodeData {
   std::vector<double> latent_vector;
 };
 
+galois::DynamicBitSet bitset_latent_vector;
 
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
 //typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
@@ -186,6 +187,23 @@ struct InitializeGraph {
   }
 };
 
+struct setMasterBitset {
+  Graph *graph;
+
+  setMasterBitset(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
+                                   _graph.masterNodesRange().end()),
+                                   setMasterBitset{&_graph}, galois::loopname("InitializeGraph_crashed_setMasterBiset"));
+  }
+
+  void operator()(GNode src) const {
+    bitset_latent_vector.set(src);
+  }
+};
+
+
 
 struct InitializeGraph_crashed {
   Graph *graph;
@@ -193,6 +211,9 @@ struct InitializeGraph_crashed {
   InitializeGraph_crashed(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
+
+    setMasterBitset::go(_graph);
+
     auto& allNodes = _graph.allNodesRange();
 
     #ifdef __GALOIS_HET_CUDA__
@@ -209,10 +230,8 @@ struct InitializeGraph_crashed {
     galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()), 
                    InitializeGraph_crashed {&_graph}, galois::loopname("InitializeGraph_crashed"));
 
-    // due to latent_vector being generated randomly, it should be sync'd
-    // to 1 consistent version across all hosts
-    //_graph.sync<writeSource, readAny, Reduce_set_latent_vector,
-                //Broadcast_latent_vector>("InitializeGraph_crashed");
+    _graph.sync<writeAny, readAny, Reduce_set_latent_vector,
+                Broadcast_latent_vector, Bitset_latent_vector>("InitializeGraph_crashed");
 
   }
 
@@ -236,6 +255,43 @@ struct InitializeGraph_crashed {
 };
 
 
+struct InitializeGraph_healthy {
+  Graph *graph;
+
+  InitializeGraph_healthy(Graph* _graph) : graph(_graph){}
+
+  void static go(Graph& _graph) {
+    auto& allNodes = _graph.allNodesRange();
+
+    #ifdef __GALOIS_HET_CUDA__
+    if (personality == GPU_CUDA) {
+      std::string impl_str(
+        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+      );
+      galois::StatTimer StatTimer_cuda(impl_str.c_str());
+      StatTimer_cuda.start();
+      InitializeGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
+      StatTimer_cuda.stop();
+    } else if (personality == CPU)
+    #endif
+    galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()), 
+                   InitializeGraph_healthy {&_graph}, galois::loopname("InitializeGraph_healthy"));
+
+    _graph.sync<writeAny, readAny, Reduce_set_latent_vector,
+                Broadcast_latent_vector, Bitset_latent_vector>("InitializeGraph_healthy");
+  }
+
+  void operator()(GNode src) const {
+    NodeData& sdata = graph->getData(src);
+
+    for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
+      sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
+    }
+    bitset_latent_vector.set(src);
+  }
+};
+
+
 
 /* Recovery to be called by resilience based fault tolerance
  * It is a NoOp
@@ -245,21 +301,7 @@ struct recovery {
 
   recovery(Graph * _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {
-
-    const auto& allNodes = _graph.allNodesRange();
-    galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      recovery{&_graph},
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
-
-  }
-
-  void operator()(GNode src) const {
-    //NodeData& snode = graph->getData(src);
-
-  }
+  void static go(Graph& _graph) {}
 };
 
 struct SGD_mergeResidual {
@@ -349,7 +391,7 @@ struct SGD {
 
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph_crashed>(_graph);
+        crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
         ++_num_iterations;
         continue;
       }
@@ -450,6 +492,9 @@ int main(int argc, char** argv) {
   Graph* hg = distGraphInitialization<NodeData, double>();
 #endif
 
+  // bitset comm setup
+  bitset_latent_vector.resize(hg->size());
+
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", regionname); 
@@ -480,6 +525,8 @@ int main(int argc, char** argv) {
         //bitset_dist_current_reset_cuda(cuda_ctx);
       } else
 #endif
+      bitset_latent_vector.reset();
+
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
