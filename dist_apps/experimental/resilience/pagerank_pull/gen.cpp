@@ -420,6 +420,7 @@ struct PageRank {
           //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
           //Bitset_residual>("PageRank-afterCrash");
           _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY_PageRank");
+          bitset_residual.reset();
 
           crashSiteAdjust<recoveryAdjust>(_graph);
           galois::gPrint(net.ID, " : recovery DONE!!!\n");
