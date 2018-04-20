@@ -262,8 +262,13 @@ int main(int argc, char** argv) {
   overheadTime.start();
 
   Graph transposeGraph;
+  std::cout << "WARNING: pull style algorithms work on the transpose of the "
+               "actual graph\n"
+            << "WARNING: this program assumes that " << filename
+            << " contains transposed representation\n\n"
+            << "Reading graph: " << filename << std::endl;
+
   galois::graphs::readGraph(transposeGraph, filename);
-  std::cout << "Reading graph: " << filename << std::endl;
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
