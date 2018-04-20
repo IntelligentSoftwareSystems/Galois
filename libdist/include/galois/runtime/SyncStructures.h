@@ -57,6 +57,7 @@
 #define _SYNC_STRUCT_MACROS_
 
 #include <cstdint> // for uint types used below
+#include <galois/AtomicHelpers.h> // for galois::max, min
 #include <galois/gIO.h> // for GALOIS DIE
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -760,6 +761,124 @@ struct Reduce_min_##fieldname {\
   }\
 }
 #endif
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Reduce Max
+////////////////////////////////////////////////////////////////////////////////
+
+#ifdef __GALOIS_HET_CUDA__
+// GPU code included
+#define GALOIS_SYNC_STRUCTURE_REDUCE_MAX(fieldname, fieldtype) \
+struct Reduce_max_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    if (personality == GPU_CUDA)\
+      return get_node_##fieldname##_cuda(cuda_ctx, node_id);\
+    assert (personality == CPU);\
+    return node.fieldname;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  uint64_t *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                              data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    if (personality == GPU_CUDA) {\
+      batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    if (personality == GPU_CUDA) {\
+      return y > max_node_##fieldname##_cuda(cuda_ctx, node_id, y);\
+    }\
+    assert(personality == CPU);\
+    { return y > galois::max(node.fieldname, y); }\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           uint64_t *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    if (personality == GPU_CUDA) {\
+      batch_max_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,\
+                                        data_mode);\
+      return true;\
+    }\
+    assert (personality == CPU);\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#else
+// Non-GPU code
+#define GALOIS_SYNC_STRUCTURE_REDUCE_MAX(fieldname, fieldtype) \
+struct Reduce_max_##fieldname {\
+  typedef fieldtype ValTy;\
+\
+  static ValTy extract(uint32_t node_id, const struct NodeData &node) {\
+    return node.fieldname;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id,\
+                                  uint64_t *b,\
+                                  unsigned int *o,\
+                                  ValTy *y,\
+                                  size_t *s,\
+                                  DataCommMode *data_mode) {\
+    return false;\
+  }\
+\
+  static bool extract_reset_batch(unsigned from_id, ValTy *y) {\
+    return false;\
+  }\
+\
+  static bool reset_batch(size_t begin, size_t end) {\
+    return true;\
+  }\
+\
+  static bool reduce(uint32_t node_id, struct NodeData &node, ValTy y) {\
+    { return y > galois::max(node.fieldname, y); }\
+  }\
+\
+  static bool reduce_batch(unsigned from_id,\
+                           uint64_t *b,\
+                           unsigned int *o,\
+                           ValTy *y,\
+                           size_t s,\
+                           DataCommMode data_mode) {\
+    return false;\
+  }\
+\
+  static void reset (uint32_t node_id, struct NodeData &node) {\
+  }\
+}
+#endif
+
 
 // Sync structure used for reduce via min of all pairwise elements in an 
 // array/vector type.

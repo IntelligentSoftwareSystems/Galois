@@ -78,7 +78,7 @@ extern cll::opt<uint32_t> nodeWeightOfMaster;
 extern cll::opt<uint32_t> edgeWeightOfMaster;
 extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
-extern cll::opt<unsigned> partition_edge_send_buffer_size;
+extern cll::opt<unsigned> edgePartitionSendBufSize;
 
 // Enumerations for specifiying read/write location for sync calls
 enum WriteLocation { writeSource, writeDestination, writeAny };
@@ -4199,6 +4199,11 @@ public:
     boost::archive::binary_oarchive ar(outputStream, boost::archive::no_header);
 
     graph.serializeNodeData(ar);
+
+    std::string statSendBytes_str("CHECKPOINT_BYTES_TOTAL");
+    constexpr static const char* const RREGION = "RECOVERY";
+    size_t cp_size = outputStream.tellp();
+    galois::runtime::reportStat_Tsum(RREGION, statSendBytes_str, cp_size); 
 
     outputStream.flush();
     outputStream.close();

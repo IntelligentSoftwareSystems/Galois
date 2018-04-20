@@ -104,10 +104,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
   if (enableFT && recoveryScheme == CP) {
     if (_num_iterations % checkpointInterval == 0) {
 
-      galois::StatTimer TimerSaveCheckpoint(
-          _graph.get_run_identifier("TIMER_SAVE_CHECKPOINT").c_str(),
-          "RECOVERY"
-          );
+      galois::StatTimer TimerSaveCheckpoint(("TOTAL_TIMER_SAVE_CHECKPOINT"), "RECOVERY");
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::gPrint("Checkpoint for iteration: ", _num_iterations, "\n");    
       }
@@ -115,6 +112,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
       TimerSaveCheckpoint.start();
       _graph.checkpointSaveNodeData(checkpointFileName);
       TimerSaveCheckpoint.stop();
+      galois::runtime::getHostBarrier().wait();
     }
   }
 }
@@ -142,8 +140,12 @@ void crashSite(GraphTy& _graph) {
   std::set<uint32_t> crashHostSet = getRandomHosts();
 
   if (net.ID == 0) {
-    galois::runtime::reportStat_Single("RECOVERY", "NUM_HOST_CRASHED", 
+    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED_SET", 
                                        (crashHostSet.size()));
+    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED",
+                                       (crashNumHosts));
+    galois::runtime::reportParam("RECOVERY", "NUM_ITERATION_CRASHED", 
+                                       (crashIteration));
   }
 
   galois::StatTimer TimerRecoveryCrashed(
@@ -161,7 +163,9 @@ void crashSite(GraphTy& _graph) {
 
   // Use resilience to recover
   if (recoveryScheme == RS) {
-    galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+    if (net.ID == 0) {
+      galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+    }
     galois::gPrint("[", net.ID, "] Using RS\n");
 
     // Crashed hosts need to reconstruct local graphs
@@ -174,21 +178,26 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.start();
       _graph.read_local_graph_from_file(localGraphFileName);
       TimerGraphConstructCrashed.stop();
+      galois::runtime::getHostBarrier().wait();
       // init and recover
       InitGraphCrashedTy::go(_graph);
       RecoveryTy::go(_graph);
       TimerRecoveryCrashed.stop();
     } else {
+      galois::runtime::getHostBarrier().wait();
       TimerRecoveryHealthy.start();
       RecoveryTy::go(_graph);
       TimerRecoveryHealthy.stop();
     }
   } else if (recoveryScheme == CP) {
-    galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
+    if (net.ID == 0) {
+      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
+      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+                                       (checkpointInterval));
+    }
     galois::gPrint("[", net.ID, "] Using CP\n");
 
     // Crashed hosts need to reconstruct local graphs
-    if (crashHostSet.find(net.ID) != crashHostSet.end()) {
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -198,11 +207,7 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    } else {
-      TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData(checkpointFileName);
-      TimerRecoveryHealthy.stop();
-    }
+      galois::runtime::getHostBarrier().wait();
   }
   TimerRecoveryTotal.stop();
 }
@@ -231,8 +236,13 @@ void crashSite(GraphTy& _graph) {
   std::set<uint32_t> crashHostSet = getRandomHosts();
 
   if (net.ID == 0) {
-    galois::runtime::reportStat_Single("RECOVERY", "NUM_HOST_CRASHED", 
+    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED_SET", 
                                        (crashHostSet.size()));
+    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED",
+                                       (crashNumHosts));
+    galois::runtime::reportParam("RECOVERY", "NUM_ITERATION_CRASHED", 
+                                       (crashIteration));
+
   }
 
   galois::StatTimer TimerRecoveryCrashed(
@@ -249,7 +259,9 @@ void crashSite(GraphTy& _graph) {
       );
   // Use resilience to recover
   if (recoveryScheme == RS) {
-    galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+    if (net.ID == 0) {
+      galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+    }
     galois::gPrint("[", net.ID, "] Using RS\n");
 
     // Crashed hosts need to reconstruct local graphs
@@ -261,21 +273,26 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.start();
       _graph.read_local_graph_from_file(localGraphFileName);
       TimerGraphConstructCrashed.stop();
+      galois::runtime::getHostBarrier().wait();
       // init and recover
       InitGraphCrashedTy::go(_graph);
       RecoveryTy::go(_graph);
       TimerRecoveryCrashed.stop();
     } else {
+      galois::runtime::getHostBarrier().wait();
       TimerRecoveryHealthy.start();
       InitGraphHealthyTy::go(_graph); // healthy init operator
       RecoveryTy::go(_graph);
       TimerRecoveryHealthy.stop();
     }
   } else if (recoveryScheme == CP) {
-    galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
+    if (net.ID == 0) {
+      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
+      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+                                       (checkpointInterval));
+    }
     galois::gPrint("[", net.ID, "] Using CP\n");
     // Crashed hosts need to reconstruct local graphs
-    if(crashHostSet.find(net.ID) != crashHostSet.end()){
       TimerRecoveryCrashed.start();
       galois::gPrint("[", net.ID, "] CRASHED!!!\n");
 
@@ -285,11 +302,7 @@ void crashSite(GraphTy& _graph) {
       TimerGraphConstructCrashed.stop();
       _graph.checkpointApplyNodeData(checkpointFileName);
       TimerRecoveryCrashed.stop();
-    } else {
-      TimerRecoveryHealthy.start();
-      _graph.checkpointApplyNodeData(checkpointFileName);
-      TimerRecoveryHealthy.stop();
-    }
+      galois::runtime::getHostBarrier().wait();
   }
   TimerRecoveryTotal.stop();
 }

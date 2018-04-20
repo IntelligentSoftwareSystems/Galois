@@ -31,71 +31,25 @@
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/runtime/Network.h"
 //#include "galois/runtime/Directory.h"
+#include "galois/runtime/LWCI.h"
 
 #include <cstdlib>
 #include <cstdio>
 #include <limits>
-/*
-class StupidDistBarrier : public galois::substrate::Barrier {
-  Barrier& localBarrier;
-
-  std::atomic<int> count;
-
-  static void barrierLandingPad() {
-    //std::cout << "inside barrierLandingpad , count : " << getDistBarrier().count << "\n";
-    --getDistBarrier().count;
-  }
-
-public:
-
-  StupidDistBarrier() : count(0) {}
-
-  virtual const char* name() const { return "DistBarrier"; }
-
-  virtual void reinit(unsigned val) {
-    localBarrier.reinit(val);
-  }
-
-  virtual void wait() {
-    if (galois::runtime::LL::getTID() == 0) {
-      count += galois::runtime::NetworkInterface::Num;
-    }
-
-    //wait at local barrier
-    localBarrier.wait();
-
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (galois::runtime::LL::getTID() == 0) {
-      //notify global and wait on global
-      net.broadcastAlt(barrierLandingPad);
-      --count;
-    }
-
-    while (count > 0) {
-      galois::runtime::doNetworkWork();
-    }
-
-    //wait at local barrier
-    localBarrier.wait();
-  }
-};
-*/
 
 #include <iostream>
 #include "galois/runtime/BareMPI.h"
 
 namespace {
-class HostBarrier : public galois::substrate::Barrier {
+class HostFence : public galois::substrate::Barrier {
 
 public:
-  virtual const char* name() const { return "HostBarrier"; }
+  virtual const char* name() const { return "HostFence"; }
 
   virtual void reinit(unsigned val) { }
 
   // control-flow barrier across distributed hosts
-  // acts as a distributed-memory behavior as well (flushes send and receives)
-  // should not be called within a parallel region
-  // assumes only one thread is calling it
+  // acts as a distributed-memory fence as well (flushes send and receives)
   virtual void wait() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -124,10 +78,33 @@ public:
     }
   }
 };
+
+class HostBarrier : public galois::substrate::Barrier {
+
+public:
+  virtual const char* name() const { return "HostBarrier"; }
+
+  virtual void reinit(unsigned val) { }
+
+  // control-flow barrier across distributed hosts
+  virtual void wait() {
+#ifdef GALOIS_USE_LWCI
+    lc_barrier(mv);
+#else
+    MPI_Barrier(MPI_COMM_WORLD); // assumes MPI_THREAD_MULTIPLE
+#endif
+  }
+};
+
 } // end namespace ""
 
 galois::substrate::Barrier& galois::runtime::getHostBarrier() {
   static HostBarrier b;
+  return b;
+}
+
+galois::substrate::Barrier& galois::runtime::getHostFence() {
+  static HostFence b;
   return b;
 }
 

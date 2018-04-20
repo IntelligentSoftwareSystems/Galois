@@ -170,7 +170,7 @@ void DistStatManager::combineAtHost_0(void) {
     combineAtHost_0_helper();
   }
 
-  galois::runtime::getHostBarrier().wait();
+  galois::runtime::getHostFence().wait();
 
   if (getHostID() != 0) {
     combineAtHost_0_helper();
@@ -178,7 +178,7 @@ void DistStatManager::combineAtHost_0(void) {
 
   getSystemNetworkInterface().flush();
 
-  galois::runtime::getHostBarrier().wait();
+  galois::runtime::getHostFence().wait();
 
 
 }
@@ -250,5 +250,5 @@ void DistStatManager::printStats(std::ostream& out) {
     strDistStats.print(out);
   }
   // all hosts must wait for host 0 to finish printing stats
-  galois::runtime::getHostBarrier().wait();
+  galois::runtime::getHostFence().wait();
 }

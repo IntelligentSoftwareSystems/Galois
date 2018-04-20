@@ -260,7 +260,7 @@ struct BFS {
 
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
-        saveCheckpointToDisk(_num_iterations, _graph);
+        saveCheckpointToDisk(_num_iterations-1, _graph);
       }
 
       _graph.set_num_iter(_num_iterations);
@@ -290,9 +290,12 @@ struct BFS {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        dga += 1;
 
-        _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Broadcast_dist_current>("RECOVERY");
+        if(recoveryScheme == RS){
+          _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+            Broadcast_dist_current>("RECOVERY");
+        }
       }
       /**************************CRASH SITE : end *****************************************/
 
@@ -410,6 +413,8 @@ int main(int argc, char** argv) {
                                 (unsigned long)maxIterations);
     galois::runtime::reportParam(regionname, "Source Node ID", 
                                 (unsigned long long)src_node);
+    galois::runtime::reportParam(regionname, "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 

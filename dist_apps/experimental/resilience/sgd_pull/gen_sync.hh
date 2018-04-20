@@ -24,6 +24,7 @@ GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(residual_latent_vector, VecAtom
 //New vector type
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(latent_vector, VecTy);
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(latent_vector, VecTy);
+GALOIS_SYNC_STRUCTURE_BITSET(latent_vector);
 
 //Old arrays
 //GALOIS_SYNC_STRUCTURE_BROADCAST(residual_latent_vector, ArrAtomicTy);

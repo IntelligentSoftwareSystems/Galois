@@ -240,7 +240,8 @@ struct SSSP {
 
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
-        saveCheckpointToDisk(_num_iterations, _graph);
+        saveCheckpointToDisk(_num_iterations-1, _graph);
+        //TODO:barrier()
       }
 
       _graph.set_num_iter(_num_iterations);
@@ -271,10 +272,13 @@ struct SSSP {
        /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        dga += 1;
 
-        //Only sync is required
-        _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-          Broadcast_dist_current>("RECOVERY");
+        if(recoveryScheme == RS){
+          //Only sync is required
+          _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+            Broadcast_dist_current>("RECOVERY");
+        }
       }
       /**************************CRASH SITE : end *****************************************/
 
@@ -394,6 +398,8 @@ int main(int argc, char** argv) {
       (unsigned long)maxIterations);
     galois::runtime::reportParam("SSSP", "Source Node ID", 
       (unsigned long)src_node);
+    galois::runtime::reportParam("SSSP", "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);

@@ -17,7 +17,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Nikunj Yadav nikunj@cs.utexas.edu
+ * @author Nikunj Yadav <nikunj@cs.utexas.edu>
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
  */
 
 #ifndef GRAPHREADER_H_

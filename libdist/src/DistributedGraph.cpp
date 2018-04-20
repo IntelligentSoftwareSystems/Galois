@@ -121,8 +121,8 @@ cll::opt<BareMPI> bare_mpi("bare_mpi",
                              cll::Hidden);
 #endif
 
-cll::opt<unsigned> partition_edge_send_buffer_size("edge_buffer_size",
+cll::opt<unsigned> edgePartitionSendBufSize("edgeBufferSize",
                                  cll::desc("Buffer size for batching edges to "
                                            "send during partitioning."), 
-                                 cll::init(1400),
+                                 cll::init(32000),
                                  cll::Hidden);

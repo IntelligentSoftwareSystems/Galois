@@ -75,6 +75,8 @@ typedef typename Graph::GraphNode GNode;
 /* Algorithm structures */
 /******************************************************************************/
 
+const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
+
 struct InitializeGraph {
   Graph *graph;
 
@@ -139,7 +141,7 @@ struct InitializeGraph_crashed {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
-    sdata.comp_old = graph->getGID(src);
+    sdata.comp_old = infinity; // graph->getGID(src);
   }
 };
 
@@ -222,7 +224,7 @@ struct ConnectedComp {
 
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
-        saveCheckpointToDisk(_num_iterations, _graph);
+        saveCheckpointToDisk(_num_iterations-1, _graph);
       }
 
       _graph.set_num_iter(_num_iterations);
@@ -254,11 +256,14 @@ struct ConnectedComp {
       /**************************CRASH SITE : start *****************************************/
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
+        dga += 1;
 
-        //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
-                  //Broadcast_comp_current>("RECOVERY");
-        _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
-                  Broadcast_comp_current>("RECOVERY");
+        if(recoveryScheme == RS ){
+          //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
+          //Broadcast_comp_current>("RECOVERY");
+          _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
+            Broadcast_comp_current>("RECOVERY");
+        }
       }
       /**************************CRASH SITE : end *****************************************/
 
@@ -361,6 +366,8 @@ int main(int argc, char** argv) {
   if (net.ID == 0) {
     galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
       (unsigned long)maxIterations);
+    galois::runtime::reportParam(REGION_NAME, "ENABLE_FT", 
+                                       (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
