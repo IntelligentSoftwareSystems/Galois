@@ -75,10 +75,9 @@ enum OutputEdgeType {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"), cll::Required);
 static cll::opt<std::string> largestComponentFilename("outputLargestComponent", cll::desc("[output graph file]"), cll::init(""));
 static cll::opt<std::string> permutationFilename("outputNodePermutation", cll::desc("[output node permutation file]"), cll::init(""));
-static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
@@ -116,17 +115,6 @@ struct Node: public galois::UnionFindNode<Node> {
   component_type component() { return this->findAndCompress(); }
 };
 
-template<typename Graph>
-void readInOutGraph(Graph& graph) {
-  using namespace galois::graphs;
-  if (symmetricGraph) {
-    galois::graphs::readGraph(graph, inputFilename);
-  } else if (transposeGraphName.size()) {
-    galois::graphs::readGraph(graph, inputFilename, transposeGraphName);
-  } else {
-    GALOIS_DIE("Graph type not supported");
-  }
-}
 
 /** 
  * Serial connected components algorithm. Just use union-find.
@@ -268,7 +256,7 @@ struct LabelPropAlgo {
 
   template<typename G>
   void readGraph(G& graph) {
-    readInOutGraph(graph);
+    galois::graphs::readGraph(graph, inputFilename);
   }
 
   template<typename C>
@@ -397,7 +385,7 @@ struct EdgeTiledAsyncAlgo {
       }
   };*/
 
-  const int EDGE_TILE_SIZE=512;
+  const int EDGE_TILE_SIZE=64;//512 -> 64
 
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> emptyMerges;
@@ -452,7 +440,7 @@ struct EdgeTiledAsyncAlgo {
         }
         ,galois::loopname("CC-edgetiledAsync")
         ,galois::steal()
-        , galois::chunk_size<16>()
+        , galois::chunk_size<1>()//16 -> 1
         );
         //, galois::steal()
         //, galois::chunk_size<1>());
