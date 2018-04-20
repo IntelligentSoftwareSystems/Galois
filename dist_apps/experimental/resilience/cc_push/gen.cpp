@@ -75,6 +75,8 @@ typedef typename Graph::GraphNode GNode;
 /* Algorithm structures */
 /******************************************************************************/
 
+const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
+
 struct InitializeGraph {
   Graph *graph;
 
@@ -139,7 +141,7 @@ struct InitializeGraph_crashed {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
-    sdata.comp_old = graph->getGID(src);
+    sdata.comp_old = infinity; // graph->getGID(src);
   }
 };
 
