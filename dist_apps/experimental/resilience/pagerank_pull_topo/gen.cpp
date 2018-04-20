@@ -331,7 +331,7 @@ struct PageRank {
     do {
       // checkpoint if fault tolerance is enabled
       if (enableFT && recoveryScheme == CP){
-        saveCheckpointToDisk(_num_iterations, _graph);
+        saveCheckpointToDisk(_num_iterations - 1, _graph);
       }
       // end checkpoint
 
