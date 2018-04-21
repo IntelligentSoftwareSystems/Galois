@@ -254,17 +254,21 @@ struct SSSPSanityCheck {
 
   galois::DGAccumulator<uint64_t>& DGAccumulator_sum;
   galois::DGReduceMax<uint32_t>& DGMax;
+  galois::DGAccumulator<uint64_t>& dg_avg;
 
   SSSPSanityCheck(const uint32_t& _infinity, Graph* _graph, 
                  galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGReduceMax<uint32_t>& dgm)
+                 galois::DGReduceMax<uint32_t>& dgm,
+                 galois::DGAccumulator<uint64_t>& _dg_avg)
     : local_infinity(_infinity), graph(_graph), DGAccumulator_sum(dgas),
-      DGMax(dgm) { }
+      DGMax(dgm), dg_avg(_dg_avg)  { }
 
   void static go(Graph& _graph, galois::DGAccumulator<uint64_t>& dgas,
-                 galois::DGReduceMax<uint32_t>& dgm) {
+                 galois::DGReduceMax<uint32_t>& dgm, 
+                 galois::DGAccumulator<uint64_t>& dgag) {
     dgas.reset();
     dgm.reset();
+    dgag.reset();
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -279,7 +283,7 @@ struct SSSPSanityCheck {
     {
       galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
                                      _graph.masterNodesRange().end()),
-                     SSSPSanityCheck(infinity, &_graph, dgas, dgm),
+                     SSSPSanityCheck(infinity, &_graph, dgas, dgm, dgag),
                      galois::no_stats(),
                      galois::loopname("SSSPSanityCheck"));
     }
@@ -287,12 +291,15 @@ struct SSSPSanityCheck {
     uint64_t num_visited = dgas.reduce();
     uint32_t max_distance = dgm.reduce();
 
+    float visit_average = ((float)dgag.reduce()) / num_visited;
+
     // Only host 0 will print the info
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::gPrint("Number of nodes visited from source ", src_node, " is ", 
                      num_visited, "\n");
       galois::gPrint("Max distance from source ", src_node, " is ", 
                      max_distance, "\n");
+      galois::gPrint("Average distances on visited nodes is ", visit_average, "\n");
     }
   }
 
@@ -302,6 +309,7 @@ struct SSSPSanityCheck {
     if (src_data.dist_current < local_infinity) {
       DGAccumulator_sum += 1;
       DGMax.update(src_data.dist_current);
+      dg_avg += src_data.dist_current;
     }
   }
 };
@@ -353,6 +361,7 @@ int main(int argc, char** argv) {
   // accumulators for use in operators
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
+  galois::DGAccumulator<uint64_t> dg_avge;
   galois::DGReduceMax<uint32_t> m;
 
   for(auto run = 0; run < numRuns; ++run){
@@ -364,7 +373,7 @@ int main(int argc, char** argv) {
       SSSP::go(*hg, DGAccumulator_accum);
     StatTimer_main.stop();
 
-    SSSPSanityCheck::go(*hg, DGAccumulator_sum, m);
+    SSSPSanityCheck::go(*hg, DGAccumulator_sum, m, dg_avge);
 
     if ((run + 1) != numRuns) {
       #ifdef __GALOIS_HET_CUDA__
