@@ -164,7 +164,10 @@ struct recovery {
 
   recovery(Graph * _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {}
+  void static go(Graph& _graph) {
+    //Only sync is required
+    _graph.sync<writeDestination, readSource, Reduce_min_dist_current, Broadcast_dist_current>("RECOVERY");
+  }
 };
 
 struct FirstItr_SSSP {
@@ -239,9 +242,8 @@ struct SSSP {
     do { 
 
       //Checkpointing the all the node data
-      if(enableFT && recoveryScheme == CP){
+      if(enableFT && (recoveryScheme == CP || recoveryScheme == HR)){
         saveCheckpointToDisk(_num_iterations-1, _graph);
-        //TODO:barrier()
       }
 
       _graph.set_num_iter(_num_iterations);
@@ -274,11 +276,12 @@ struct SSSP {
         crashSite<recovery, InitializeGraph_crashed>(_graph);
         dga += 1;
 
-        if(recoveryScheme == RS){
-          //Only sync is required
-          _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-            Broadcast_dist_current>("RECOVERY");
-        }
+        //Moved inside recovery operator
+        //if(recoveryScheme == RS){
+          ////Only sync is required
+          //_graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+            //Broadcast_dist_current>("RECOVERY");
+        //}
       }
       /**************************CRASH SITE : end *****************************************/
 
