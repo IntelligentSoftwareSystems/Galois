@@ -75,7 +75,7 @@ typedef typename Graph::GraphNode GNode;
 /* Algorithm structures */
 /******************************************************************************/
 
-const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
+const uint32_t infinity = std::numeric_limits<uint32_t>::max();
 
 struct InitializeGraph {
   Graph *graph;
@@ -107,7 +107,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.comp_current = graph->getGID(src);
-    sdata.comp_old = graph->getGID(src);
+    sdata.comp_old = infinity; // graph->getGID(src);
   }
 };
 
@@ -260,9 +260,11 @@ struct ConnectedComp {
 
         if(recoveryScheme == RS ){
           //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
-          //Broadcast_comp_current>("RECOVERY");
-          _graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
-            Broadcast_comp_current>("RECOVERY");
+                      //Broadcast_comp_current>("RECOVERY");
+          _graph.sync<writeAny, readSource, Reduce_min_comp_current,Broadcast_comp_current>("RECOVERY");
+
+          //_graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
+            //Broadcast_comp_current>("RECOVERY");
         }
       }
       /**************************CRASH SITE : end *****************************************/
@@ -329,6 +331,9 @@ struct ConnectedCompSanityCheck {
                    galois::no_stats(),
                    galois::loopname("ConnectedCompSanityCheck"));
 
+    //uint64_t local_num_components = dga.read_local();
+    //auto& net = galois::runtime::getSystemNetworkInterface();
+    //galois::gPrint("HostID : ", net.ID, " Number of local components is ", local_num_components, "\n");
     uint64_t num_components = dga.reduce();
 
     // Only node 0 will print the number visited
