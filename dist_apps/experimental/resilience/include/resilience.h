@@ -49,7 +49,7 @@ static cll::opt<RECOVERY_SCHEME> recoveryScheme("recoveryScheme",
                                              clEnumValN(RS, "rs", 
                                                         "Resilience"), 
                                              clEnumValN(HR, "hr", 
-                                                        "hr"), 
+                                                        "hybrid resilience"), 
                                              clEnumValEnd),
                                             cll::init(CP));
 static cll::opt<unsigned int> checkpointInterval("checkpointInterval",
@@ -373,7 +373,7 @@ void crashSite(GraphTy& _graph) {
  */
 template<typename RecoveryAdjustTy, typename GraphTy>
 void crashSiteAdjust(GraphTy& _graph) {
-  if (recoveryScheme == RS) {
+  if (recoveryScheme == RS || recoveryScheme == HR) {
     const auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer TimerRecoveryCrashedAdjust(
       _graph.get_run_identifier("TIMER_RECOVERY_CRASHED_ADJUST").c_str(), 
