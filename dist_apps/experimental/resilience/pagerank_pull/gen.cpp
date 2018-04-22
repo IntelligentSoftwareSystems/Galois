@@ -289,6 +289,7 @@ struct recovery {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
+    sdata.residual = 0;
     if (sdata.nout > 0)
       sdata.delta = sdata.value * (1 - alpha) / sdata.nout;
   }
@@ -379,7 +380,7 @@ struct PageRank {
 
     do {
       //Checkpointing the all the node data
-      if(enableFT && recoveryScheme == CP){
+      if(enableFT && (recoveryScheme == CP || recoveryScheme == HR)){
         saveCheckpointToDisk(_num_iterations, _graph);
       }
 
