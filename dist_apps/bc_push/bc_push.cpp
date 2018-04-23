@@ -40,16 +40,19 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/runtime/Tracer.h"
 
 #define __USE_BFS__ // also defined in bc_push_cuda.h
+
 #ifdef __GALOIS_HET_CUDA__
 #include "bc_push_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
 
-
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
 namespace cll = llvm::cl;
+static cll::opt<std::string> sourcesToUse("sourcesToUse",
+                                          cll::desc("Sources to use in BC"),
+                                          cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
@@ -114,6 +117,9 @@ struct NodeData {
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
+// reading in list of sources to operate on if provided
+std::ifstream sourceFile;
+std::vector<uint64_t> sourceVector;
 
 #ifndef __USE_BFS__
 typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
@@ -1031,6 +1037,14 @@ struct BC {
       } else {
         loop_end = _graph.globalSize();
       }
+
+      // if provided a file of sources to work with, use that
+      if (sourceVector.size() != 0) {
+        if (loop_end > sourceVector.size()) {
+          loop_end = sourceVector.size();
+        }
+        use_random = false;
+      }
     }
 
     for (uint64_t i = 0; i < loop_end; i++) {
@@ -1039,6 +1053,8 @@ struct BC {
         assert(loop_end == 1);
         galois::gDebug("This is single source node BC");
         current_src_node = startSource;
+      } else if (sourceVector.size() != 0) {
+        current_src_node = sourceVector[i];
       } else if (use_random) {
         // number of sources non-zero, so use random sources
         current_src_node = *random_sources_iterator;
@@ -1048,7 +1064,7 @@ struct BC {
         current_src_node = i;
       }
 
-      //galois::gDebug("Current source node for BC is ", current_src_node);
+      galois::gDebug("Current source node for BC is ", current_src_node);
 
       #ifndef NDEBUG
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -1253,6 +1269,14 @@ int main(int argc, char** argv) {
         random_sources.insert(r_dist(r_generator));
       }
     }
+  }
+
+  if (sourcesToUse != "") {
+    sourceFile.open(sourcesToUse);
+    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
+                            std::istream_iterator<uint64_t>{});
+    sourceVector = t;
+    sourceFile.close();
   }
 
   #ifndef NDEBUG
