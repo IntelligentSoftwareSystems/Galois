@@ -7,7 +7,7 @@ G = Graph("graph")
 WL = Worklist()
 ast = Module([
 CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
-CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
+CBlock([cgen.Include("bc_push_cuda.cuh", system = False)], parse = False),
 Kernel("InitializeGraph", [G.param(), ('unsigned int', '__begin'), ('unsigned int', '__end'), ('float *', 'p_betweeness_centrality'), ('float *', 'p_dependency'), ('uint32_t *', 'p_num_predecessors'), ('uint64_t *', 'p_num_shortest_paths'), ('uint32_t *', 'p_num_successors'), ('uint8_t *', 'p_propagation_flag'), ('uint64_t *', 'p_to_add'), ('float *', 'p_to_add_float'), ('uint32_t *', 'p_trim')],
 [
 ForAll("src", G.nodes("__begin", "__end"),

@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include "gen_cuda.h"
+#include "bc_push_cuda.h"
 #include "galois/runtime/cuda/DeviceSync.h"
 
 struct CUDA_Context : public CUDA_Context_Common {
