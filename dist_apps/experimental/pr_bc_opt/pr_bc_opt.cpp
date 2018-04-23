@@ -97,7 +97,7 @@ galois::DynamicBitSet bitset_dependency;
 using Graph = galois::graphs::DistGraph<NodeData, void>;
 using GNode = typename Graph::GraphNode;
 
-#include "gen_sync.hh"
+#include "pr_bc_opt_sync.hh"
 
 /******************************************************************************/
 /* Functions for running the algorithm */
