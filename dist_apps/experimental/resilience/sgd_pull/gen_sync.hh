@@ -15,6 +15,7 @@ typedef std::vector<double> VecTy;
 //New vector type
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(residual_latent_vector, VecAtomicTy);
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(residual_latent_vector, VecAtomicTy);
+GALOIS_SYNC_STRUCTURE_BITSET(residual_latent_vector);
 
 
 //GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(residual_latent_vector, ArrAtomicTy);

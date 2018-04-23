@@ -99,6 +99,7 @@ struct NodeData {
 };
 
 galois::DynamicBitSet bitset_latent_vector;
+galois::DynamicBitSet bitset_residual_latent_vector;
 
 typedef galois::graphs::DistGraph<NodeData, double> Graph;
 //typedef galois::graphs::DistGraph<NodeData, uint32_t> Graph;
@@ -384,8 +385,11 @@ struct SGD {
     //_graph.sync<writeAny, readAny, Reduce_pair_wise_avg_array_residual_latent_vector,
                 //Broadcast_residual_latent_vector>("SGD");
 
-    _graph.sync<writeAny, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
-                Broadcast_residual_latent_vector>("SGD");
+    //_graph.sync<writeAny, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
+                //Broadcast_residual_latent_vector>("SGD");
+
+    _graph.sync<writeDestination, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
+                Broadcast_residual_latent_vector, Bitset_residual_latent_vector>("SGD");
 
       SGD_mergeResidual::go(_graph);
 
@@ -400,7 +404,8 @@ struct SGD {
       ++_num_iterations;
 
       // calculate root mean squared error
-      double error = dga.reduce(); 
+      // Divide by 2 since for symmetric graph it is counted twice
+      double error = dga.reduce()/2; 
       rms_normalized = std::sqrt(error/_graph.globalSizeEdges());
 
       galois::gDebug("RMS Normalized : ", rms_normalized);
@@ -447,18 +452,25 @@ struct SGD {
 
       assert(cur_error < 10000 && cur_error > -10000);
 
+      bool setBit = false;
       // update both vectors based on error derived from 2 previous vectors
       for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
 
         double prevUser = user_node[i];
         double prevMovie = movie_node[i];
 
+        //Only update the destination
         galois::atomicAdd(residual_user_node[i],  double(step_size * (cur_error * prevMovie - LAMBDA * prevUser)));
+        //galois::gPrint("val : ", residual_user_node[i], "\n");
         assert(std::isnormal(residual_user_node[i]));
+        if(!setBit && std::abs(residual_user_node[i]) > 0.1)
+          setBit = true;
 
-        galois::atomicAdd(residual_movie_node[i],  double(step_size * (cur_error * prevUser - LAMBDA * prevMovie)));
-        assert(std::isnormal(residual_movie_node[i]));
+        //galois::atomicAdd(residual_movie_node[i],  double(step_size * (cur_error * prevUser - LAMBDA * prevMovie)));
+        //assert(std::isnormal(residual_movie_node[i]));
       }
+      if(setBit)
+        bitset_residual_latent_vector.set(dst);
     }
   }
 };
@@ -494,6 +506,7 @@ int main(int argc, char** argv) {
 
   // bitset comm setup
   bitset_latent_vector.resize(hg->size());
+  bitset_residual_latent_vector.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -526,6 +539,7 @@ int main(int argc, char** argv) {
       } else
 #endif
       bitset_latent_vector.reset();
+      bitset_residual_latent_vector.reset();
 
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
