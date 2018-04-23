@@ -20,15 +20,12 @@
  *
  * @section Description
  *
- * Compute BFS push on distributed Galois.
+ * Compute BFS pull on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
-
-// NOTE: must be before DistBenchStart.h as that relies on some cuda
-// calls
 
 #include <iostream>
 #include <limits>
@@ -39,7 +36,7 @@
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "gen_cuda.h"
+#include "bfs_pull_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
 
@@ -56,7 +53,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations",
                                                       "Default 1000"), 
                                             cll::init(1000));
 
-static cll::opt<unsigned long long> src_node("startNode", // not uint64_t due to a bug in llvm cl
+static cll::opt<unsigned long long> src_node("startNode", // not uint64_t due to a bug in llvm cl 
                                              cll::desc("ID of the source node"), 
                                              cll::init(0));
 
@@ -67,16 +64,15 @@ static cll::opt<unsigned long long> src_node("startNode", // not uint64_t due to
 const uint32_t infinity = std::numeric_limits<uint32_t>::max()/4;
 
 struct NodeData {
-  std::atomic<uint32_t> dist_current;
-  uint32_t dist_old;
+  uint32_t dist_current;
 };
-
-galois::DynamicBitSet bitset_dist_current;
 
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
-#include "gen_sync.hh"
+galois::DynamicBitSet bitset_dist_current;
+
+#include "bfs_pull_sync.hh"
 
 /******************************************************************************/
 /* Algorithm structures */
@@ -89,15 +85,15 @@ struct InitializeGraph {
 
   InitializeGraph(cll::opt<unsigned long long> &_src_node, 
                   const uint32_t &_infinity, Graph* _graph) : 
-    local_infinity(_infinity), local_src_node(_src_node), graph(_graph){}
+                    local_infinity(_infinity), local_src_node(_src_node), 
+                    graph(_graph){}
 
   void static go(Graph& _graph){
     const auto& allNodes = _graph.allNodesRange();
-
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str(_graph.get_run_identifier(
-                               "CUDA_DO_ALL_IMPL_InitializeGraph_"));
+        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+                             (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         InitializeGraph_allNodes_cuda(infinity, src_node, cuda_ctx);
@@ -106,8 +102,8 @@ struct InitializeGraph {
     #endif
     {
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      InitializeGraph{src_node, infinity, &_graph}, 
+      galois::iterate(allNodes),
+      InitializeGraph(src_node, infinity, &_graph),
       galois::no_stats(),
       galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
     }
@@ -116,62 +112,6 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
     sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-    sdata.dist_old = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
-  }
-};
-
-struct FirstItr_BFS {
-  Graph * graph;
-
-  FirstItr_BFS(Graph * _graph) : graph(_graph) {}
-
-  void static go(Graph& _graph) {
-    uint32_t __begin, __end;
-    if (_graph.isLocal(src_node)) {
-      __begin = _graph.getLID(src_node);
-      __end = __begin + 1;
-    } else {
-      __begin = 0;
-      __end = 0;
-    }
-    _graph.set_num_iter(0);
-  #ifdef __GALOIS_HET_CUDA__
-    if (personality == GPU_CUDA) {
-      std::string impl_str(_graph.get_run_identifier(
-                             "CUDA_DO_ALL_IMPL_BFS_"));
-      galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
-      StatTimer_cuda.start();
-      FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
-      StatTimer_cuda.stop();
-    } else if (personality == CPU)
-  #endif
-    {
-    // one node
-    galois::do_all(
-      galois::iterate(__begin, __end),
-      FirstItr_BFS{&_graph}, 
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("BFS").c_str()));
-    }
-
-    _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
-                Broadcast_dist_current, Bitset_dist_current>("BFS");
-    
-    galois::runtime::reportStat_Tsum(regionname,
-       _graph.get_run_identifier("NUM_WORK_ITEMS"), __end - __begin);
-  }
-
-  void operator()(GNode src) const {
-    NodeData& snode = graph->getData(src);
-    snode.dist_old = snode.dist_current;
-
-    for (auto jj : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(jj);
-      auto& dnode = graph->getData(dst);
-      uint32_t new_dist = 1 + snode.dist_current;
-      uint32_t old_dist = galois::atomicMin(dnode.dist_current, new_dist);
-      if (old_dist > new_dist) bitset_dist_current.set(dst);
-    }
   }
 };
 
@@ -183,35 +123,33 @@ struct BFS {
     graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    FirstItr_BFS::go(_graph);
-
-    unsigned _num_iterations = 1;
+    unsigned _num_iterations = 0;
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    
-    do { 
+    do {
       _graph.set_num_iter(_num_iterations);
       dga.reset();
-    #ifdef __GALOIS_HET_CUDA__
-      if (personality == GPU_CUDA) {
-        std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
-        galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
-        StatTimer_cuda.start();
-        unsigned int __retval = 0;
-        BFS_nodesWithEdges_cuda(__retval, cuda_ctx);
-        dga += __retval;
-        StatTimer_cuda.stop();
-      } else if (personality == CPU)
-    #endif
-    {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
+          galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
+          StatTimer_cuda.start();
+          unsigned int __retval = 0;
+          BFS_nodesWithEdges_cuda(__retval, cuda_ctx);
+          dga += __retval;
+          StatTimer_cuda.stop();
+        } else if (personality == CPU)
+      #endif
+      {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         BFS(&_graph, dga),
-        galois::steal(),
         galois::no_stats(),
+        galois::steal(),
         galois::loopname(_graph.get_run_identifier("BFS").c_str()));
-    }
-      _graph.sync<writeDestination, readSource, Reduce_min_dist_current, 
+
+      }
+      _graph.sync<writeSource, readDestination, Reduce_min_dist_current, 
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat_Tsum(regionname,
@@ -221,7 +159,7 @@ struct BFS {
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Single(regionname,
+      galois::runtime::reportStat_Single(regionname, 
         "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
@@ -230,17 +168,14 @@ struct BFS {
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
 
-    if (snode.dist_old > snode.dist_current) {
-      snode.dist_old = snode.dist_current;
-
-      DGAccumulator_accum += 1;
-
-      for (auto jj : graph->edges(src)) {
-        GNode dst = graph->getEdgeDst(jj);
-        auto& dnode = graph->getData(dst);
-        uint32_t new_dist = 1 + snode.dist_current;
-        uint32_t old_dist = galois::atomicMin(dnode.dist_current, new_dist);
-        if (old_dist > new_dist) bitset_dist_current.set(dst);
+    for (auto jj : graph->edges(src)) {
+      GNode dst = graph->getEdgeDst(jj);
+      auto& dnode = graph->getData(dst);
+      uint32_t new_dist = dnode.dist_current + 1;
+      uint32_t old_dist = galois::min(snode.dist_current, new_dist);
+      if (old_dist > new_dist){
+        bitset_dist_current.set(src);
+        DGAccumulator_accum += 1;
       }
     }
   }
@@ -313,42 +248,39 @@ struct BFSSanityCheck {
 /* Main */
 /******************************************************************************/
 
-constexpr static const char* const name = "BFS - Distributed Heterogeneous with "
-                                          "worklist.";
-constexpr static const char* const desc = "BFS on Distributed Galois.";
-constexpr static const char* const url = 0;
+static const char* const name = "BFS pull - Distributed Heterogeneous";
+static const char* const desc = "BFS pull on Distributed Galois.";
+static const char* const url = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  const auto& net = galois::runtime::getSystemNetworkInterface();
+  auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
     galois::runtime::reportParam(regionname, "Max Iterations", 
                                 (unsigned long)maxIterations);
     galois::runtime::reportParam(regionname, "Source Node ID", 
                                 (unsigned long long)src_node);
   }
-
   galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
 
   StatTimer_total.start();
+
   #ifdef __GALOIS_HET_CUDA__
-  Graph* hg = distGraphInitialization<NodeData, void>(&cuda_ctx);
+  Graph* hg = distGraphInitialization<NodeData, void, false>(&cuda_ctx);
   #else
-  Graph* hg = distGraphInitialization<NodeData, void>();
+  Graph* hg = distGraphInitialization<NodeData, void, false>();
   #endif
 
-  // bitset comm setup
   bitset_dist_current.resize(hg->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", regionname); 
   StatTimer_init.start();
-  InitializeGraph::go((*hg));
+    InitializeGraph::go((*hg));
   StatTimer_init.stop();
-
   galois::runtime::getHostBarrier().wait();
 
   // accumulators for use in operators
@@ -369,11 +301,11 @@ int main(int argc, char** argv) {
     BFSSanityCheck::go(*hg, DGAccumulator_sum, m);
 
     if ((run + 1) != numRuns) {
-    #ifdef __GALOIS_HET_CUDA__
+      #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 
         bitset_dist_current_reset_cuda(cuda_ctx);
       } else
-    #endif
+      #endif
       bitset_dist_current.reset();
 
       (*hg).set_num_run(run+1);
@@ -396,16 +328,16 @@ int main(int argc, char** argv) {
                                        (*hg).getData(*ii).dist_current);
       }
     #ifdef __GALOIS_HET_CUDA__
-    } else if (personality == GPU_CUDA)  {
+    } else if(personality == GPU_CUDA)  {
       for (auto ii = (*hg).masterNodesRange().begin(); 
                 ii != (*hg).masterNodesRange().end(); 
                 ++ii) {
+        if ((*hg).isOwned((*hg).getGID(*ii))) 
           galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
                                    get_node_dist_current_cuda(cuda_ctx, *ii));
       }
     }
     #endif
   }
-
   return 0;
 }

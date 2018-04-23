@@ -28,7 +28,7 @@ if(ENABLE_HETERO_GALOIS)
 endif()
 
 function(distApp name)
-  app(${name} ${name}/gen.cpp DISTSAFE)
+  app(${name} ${name}/${name}.cpp DISTSAFE)
   target_link_libraries(${name} distbench)
   target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
   if(USE_BARE_MPI)
@@ -39,13 +39,13 @@ function(distApp name)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
     target_link_libraries(${name} ${name}_cuda)
 
-    cuda_add_library(${name}_cuda ${name}/gen_cuda.cu)
+    cuda_add_library(${name}_cuda ${name}/${name}_cuda.cu)
     target_link_libraries(${name}_cuda galois_gpu)
   endif()
 endfunction()
 
 function(distAppNoGPU name)
-  app(${name} ${name}/gen.cpp DISTSAFE)
+  app(${name} ${name}/${name}.cpp DISTSAFE)
   target_link_libraries(${name} distbench)
   target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
   if(USE_BARE_MPI)
@@ -56,20 +56,20 @@ endfunction()
 distApp(bfs_pull)
 distApp(bfs_push)
 
-distApp(cc_pull)
-distApp(cc_push)
-
-distApp(pagerank_pull)
-distApp(pagerank_push)
-
-distApp(sssp_pull)
-distApp(sssp_push)
-
-distApp(kcore_push)
-distApp(kcore_pull)
-
-distApp(bc_push)
-
-distAppNoGPU(sgd)
-
-distAppNoGPU(pagerank_pull_topo)
+#distApp(cc_pull)
+#distApp(cc_push)
+#
+#distApp(pagerank_pull)
+#distApp(pagerank_push)
+#
+#distApp(sssp_pull)
+#distApp(sssp_push)
+#
+#distApp(kcore_push)
+#distApp(kcore_pull)
+#
+#distApp(bc_push)
+#
+#distAppNoGPU(sgd)
+#
+#distAppNoGPU(pagerank_pull_topo)

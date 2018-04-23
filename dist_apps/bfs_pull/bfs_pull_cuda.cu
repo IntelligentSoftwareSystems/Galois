@@ -6,10 +6,9 @@ void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
 const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ instrument_mode=None $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 #include "kernels/reduce.cuh"
-#include "gen_cuda.cuh"
-static const int __tb_FirstItr_BFS = TB_SIZE;
+#include "bfs_pull_cuda.cuh"
 static const int __tb_BFS = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, unsigned long long local_src_node, uint32_t * p_dist_current, uint32_t * p_dist_old)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, unsigned long long local_src_node, uint32_t * p_dist_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -24,230 +23,11 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
     if (pop)
     {
       p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
-      p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
     }
   }
-  // FP: "8 -> 9;
+  // FP: "7 -> 8;
 }
-__global__ void FirstItr_BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = __tb_FirstItr_BFS;
-  index_type src_end;
-  index_type src_rup;
-  // FP: "1 -> 2;
-  const int _NP_CROSSOVER_WP = 32;
-  const int _NP_CROSSOVER_TB = __kernel_tb_size;
-  // FP: "2 -> 3;
-  const int BLKSIZE = __kernel_tb_size;
-  const int ITSIZE = BLKSIZE * 8;
-  // FP: "3 -> 4;
-
-  typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
-  typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
-
-  // FP: "4 -> 5;
-  __shared__ npsTy nps ;
-  // FP: "5 -> 6;
-  src_end = __end;
-  src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
-  for (index_type src = __begin + tid; src < src_rup; src += nthreads)
-  {
-    multiple_sum<2, index_type> _np_mps;
-    multiple_sum<2, index_type> _np_mps_total;
-    // FP: "6 -> 7;
-    bool pop  = src < __end;
-    // FP: "7 -> 8;
-    if (pop)
-    {
-      p_dist_old[src] = p_dist_current[src];
-    }
-    // FP: "10 -> 11;
-    // FP: "13 -> 14;
-    struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "14 -> 15;
-    __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "15 -> 16;
-    _np_closure[threadIdx.x].src = src;
-    // FP: "16 -> 17;
-    if (pop)
-    {
-      _np.size = (graph).getOutDegree(src);
-      _np.start = (graph).getFirstEdge(src);
-    }
-    // FP: "19 -> 20;
-    // FP: "20 -> 21;
-    _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
-    _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "21 -> 22;
-    BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "22 -> 23;
-    if (threadIdx.x == 0)
-    {
-      nps.tb.owner = MAX_TB_SIZE + 1;
-    }
-    // FP: "25 -> 26;
-    __syncthreads();
-    // FP: "26 -> 27;
-    while (true)
-    {
-      // FP: "27 -> 28;
-      if (_np.size >= _NP_CROSSOVER_TB)
-      {
-        nps.tb.owner = threadIdx.x;
-      }
-      // FP: "30 -> 31;
-      __syncthreads();
-      // FP: "31 -> 32;
-      if (nps.tb.owner == MAX_TB_SIZE + 1)
-      {
-        // FP: "32 -> 33;
-        __syncthreads();
-        // FP: "33 -> 34;
-        break;
-      }
-      // FP: "35 -> 36;
-      if (nps.tb.owner == threadIdx.x)
-      {
-        nps.tb.start = _np.start;
-        nps.tb.size = _np.size;
-        nps.tb.src = threadIdx.x;
-        _np.start = 0;
-        _np.size = 0;
-      }
-      // FP: "38 -> 39;
-      __syncthreads();
-      // FP: "39 -> 40;
-      int ns = nps.tb.start;
-      int ne = nps.tb.size;
-      // FP: "40 -> 41;
-      if (nps.tb.src == threadIdx.x)
-      {
-        nps.tb.owner = MAX_TB_SIZE + 1;
-      }
-      // FP: "43 -> 44;
-      assert(nps.tb.src < __kernel_tb_size);
-      src = _np_closure[nps.tb.src].src;
-      // FP: "44 -> 45;
-      for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
-      {
-        index_type jj;
-        jj = ns +_np_j;
-        {
-          index_type dst;
-          uint32_t new_dist;
-          uint32_t old_dist;
-          dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
-          if (old_dist > new_dist)
-          {
-            bitset_dist_current.set(dst);
-          }
-        }
-      }
-      // FP: "57 -> 58;
-      __syncthreads();
-    }
-    // FP: "59 -> 60;
-
-    // FP: "60 -> 61;
-    {
-      const int warpid = threadIdx.x / 32;
-      // FP: "61 -> 62;
-      const int _np_laneid = cub::LaneId();
-      // FP: "62 -> 63;
-      while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
-      {
-        if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
-        {
-          nps.warp.owner[warpid] = _np_laneid;
-        }
-        if (nps.warp.owner[warpid] == _np_laneid)
-        {
-          nps.warp.start[warpid] = _np.start;
-          nps.warp.size[warpid] = _np.size;
-          nps.warp.src[warpid] = threadIdx.x;
-          _np.start = 0;
-          _np.size = 0;
-        }
-        index_type _np_w_start = nps.warp.start[warpid];
-        index_type _np_w_size = nps.warp.size[warpid];
-        assert(nps.warp.src[warpid] < __kernel_tb_size);
-        src = _np_closure[nps.warp.src[warpid]].src;
-        for (int _np_ii = _np_laneid; _np_ii < _np_w_size; _np_ii += 32)
-        {
-          index_type jj;
-          jj = _np_w_start +_np_ii;
-          {
-            index_type dst;
-            uint32_t new_dist;
-            uint32_t old_dist;
-            dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
-            old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
-            if (old_dist > new_dist)
-            {
-              bitset_dist_current.set(dst);
-            }
-          }
-        }
-      }
-      // FP: "85 -> 86;
-      __syncthreads();
-      // FP: "86 -> 87;
-    }
-
-    // FP: "87 -> 88;
-    __syncthreads();
-    // FP: "88 -> 89;
-    _np.total = _np_mps_total.el[1];
-    _np.offset = _np_mps.el[1];
-    // FP: "89 -> 90;
-    while (_np.work())
-    {
-      // FP: "90 -> 91;
-      int _np_i =0;
-      // FP: "91 -> 92;
-      _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "92 -> 93;
-      __syncthreads();
-      // FP: "93 -> 94;
-
-      // FP: "94 -> 95;
-      for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
-      {
-        index_type jj;
-        assert(nps.fg.src[_np_i] < __kernel_tb_size);
-        src = _np_closure[nps.fg.src[_np_i]].src;
-        jj= nps.fg.itvalue[_np_i];
-        {
-          index_type dst;
-          uint32_t new_dist;
-          uint32_t old_dist;
-          dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
-          if (old_dist > new_dist)
-          {
-            bitset_dist_current.set(dst);
-          }
-        }
-      }
-      // FP: "108 -> 109;
-      _np.execute_round_done(ITSIZE);
-      // FP: "109 -> 110;
-      __syncthreads();
-    }
-    // FP: "111 -> 112;
-    assert(threadIdx.x < __kernel_tb_size);
-    src = _np_closure[threadIdx.x].src;
-  }
-  // FP: "113 -> 114;
-}
-__global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -284,61 +64,52 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, ui
     // FP: "9 -> 10;
     if (pop)
     {
-      if (p_dist_old[src] > p_dist_current[src])
-      {
-        p_dist_old[src] = p_dist_current[src];
-        DGAccumulator_accum.reduce( 1);
-      }
-      else
-      {
-        pop = false;
-      }
     }
-    // FP: "15 -> 16;
-    // FP: "18 -> 19;
+    // FP: "11 -> 12;
+    // FP: "14 -> 15;
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    // FP: "19 -> 20;
+    // FP: "15 -> 16;
     __shared__ struct { index_type src; } _np_closure [TB_SIZE];
-    // FP: "20 -> 21;
+    // FP: "16 -> 17;
     _np_closure[threadIdx.x].src = src;
-    // FP: "21 -> 22;
+    // FP: "17 -> 18;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
       _np.start = (graph).getFirstEdge(src);
     }
-    // FP: "24 -> 25;
-    // FP: "25 -> 26;
+    // FP: "20 -> 21;
+    // FP: "21 -> 22;
     _np_mps.el[0] = _np.size >= _NP_CROSSOVER_WP ? _np.size : 0;
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
-    // FP: "26 -> 27;
+    // FP: "22 -> 23;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "27 -> 28;
+    // FP: "23 -> 24;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
     }
-    // FP: "30 -> 31;
+    // FP: "26 -> 27;
     __syncthreads();
-    // FP: "31 -> 32;
+    // FP: "27 -> 28;
     while (true)
     {
-      // FP: "32 -> 33;
+      // FP: "28 -> 29;
       if (_np.size >= _NP_CROSSOVER_TB)
       {
         nps.tb.owner = threadIdx.x;
       }
-      // FP: "35 -> 36;
+      // FP: "31 -> 32;
       __syncthreads();
-      // FP: "36 -> 37;
+      // FP: "32 -> 33;
       if (nps.tb.owner == MAX_TB_SIZE + 1)
       {
-        // FP: "37 -> 38;
+        // FP: "33 -> 34;
         __syncthreads();
-        // FP: "38 -> 39;
+        // FP: "34 -> 35;
         break;
       }
-      // FP: "40 -> 41;
+      // FP: "36 -> 37;
       if (nps.tb.owner == threadIdx.x)
       {
         nps.tb.start = _np.start;
@@ -347,20 +118,20 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, ui
         _np.start = 0;
         _np.size = 0;
       }
-      // FP: "43 -> 44;
+      // FP: "39 -> 40;
       __syncthreads();
-      // FP: "44 -> 45;
+      // FP: "40 -> 41;
       int ns = nps.tb.start;
       int ne = nps.tb.size;
-      // FP: "45 -> 46;
+      // FP: "41 -> 42;
       if (nps.tb.src == threadIdx.x)
       {
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
-      // FP: "48 -> 49;
+      // FP: "44 -> 45;
       assert(nps.tb.src < __kernel_tb_size);
       src = _np_closure[nps.tb.src].src;
-      // FP: "49 -> 50;
+      // FP: "45 -> 46;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -370,25 +141,26 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, ui
           uint32_t new_dist;
           uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
+          new_dist = p_dist_current[dst] + 1;
+          old_dist = atomicTestMin(&p_dist_current[src], new_dist);
           if (old_dist > new_dist)
           {
-            bitset_dist_current.set(dst);
+            bitset_dist_current.set(src);
+            DGAccumulator_accum.reduce( 1);
           }
         }
       }
-      // FP: "62 -> 63;
+      // FP: "59 -> 60;
       __syncthreads();
     }
-    // FP: "64 -> 65;
+    // FP: "61 -> 62;
 
-    // FP: "65 -> 66;
+    // FP: "62 -> 63;
     {
       const int warpid = threadIdx.x / 32;
-      // FP: "66 -> 67;
+      // FP: "63 -> 64;
       const int _np_laneid = cub::LaneId();
-      // FP: "67 -> 68;
+      // FP: "64 -> 65;
       while (__any(_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB))
       {
         if (_np.size >= _NP_CROSSOVER_WP && _np.size < _NP_CROSSOVER_TB)
@@ -416,37 +188,38 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, ui
             uint32_t new_dist;
             uint32_t old_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + p_dist_current[src];
-            old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
+            new_dist = p_dist_current[dst] + 1;
+            old_dist = atomicTestMin(&p_dist_current[src], new_dist);
             if (old_dist > new_dist)
             {
-              bitset_dist_current.set(dst);
+              bitset_dist_current.set(src);
+              DGAccumulator_accum.reduce( 1);
             }
           }
         }
       }
-      // FP: "90 -> 91;
+      // FP: "88 -> 89;
       __syncthreads();
-      // FP: "91 -> 92;
+      // FP: "89 -> 90;
     }
 
-    // FP: "92 -> 93;
+    // FP: "90 -> 91;
     __syncthreads();
-    // FP: "93 -> 94;
+    // FP: "91 -> 92;
     _np.total = _np_mps_total.el[1];
     _np.offset = _np_mps.el[1];
-    // FP: "94 -> 95;
+    // FP: "92 -> 93;
     while (_np.work())
     {
-      // FP: "95 -> 96;
+      // FP: "93 -> 94;
       int _np_i =0;
-      // FP: "96 -> 97;
+      // FP: "94 -> 95;
       _np.inspect2(nps.fg.itvalue, nps.fg.src, ITSIZE, threadIdx.x);
-      // FP: "97 -> 98;
+      // FP: "95 -> 96;
       __syncthreads();
-      // FP: "98 -> 99;
+      // FP: "96 -> 97;
 
-      // FP: "99 -> 100;
+      // FP: "97 -> 98;
       for (_np_i = threadIdx.x; _np_i < ITSIZE && _np.valid(_np_i); _np_i += BLKSIZE)
       {
         index_type jj;
@@ -458,26 +231,27 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, ui
           uint32_t new_dist;
           uint32_t old_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + p_dist_current[src];
-          old_dist = atomicTestMin(&p_dist_current[dst], new_dist);
+          new_dist = p_dist_current[dst] + 1;
+          old_dist = atomicTestMin(&p_dist_current[src], new_dist);
           if (old_dist > new_dist)
           {
-            bitset_dist_current.set(dst);
+            bitset_dist_current.set(src);
+            DGAccumulator_accum.reduce( 1);
           }
         }
       }
-      // FP: "113 -> 114;
+      // FP: "112 -> 113;
       _np.execute_round_done(ITSIZE);
-      // FP: "114 -> 115;
+      // FP: "113 -> 114;
       __syncthreads();
     }
-    // FP: "116 -> 117;
+    // FP: "115 -> 116;
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
-  // FP: "119 -> 120;
+  // FP: "117 -> 118;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
-  // FP: "120 -> 121;
+  // FP: "118 -> 119;
 }
 __global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGReduceMax<uint32_t> DGMax)
 {
@@ -523,7 +297,7 @@ void InitializeGraph_cuda(unsigned int  __begin, unsigned int  __end, const uint
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
   // FP: "4 -> 5;
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, __begin, __end, local_infinity, local_src_node, ctx->dist_current.data.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
@@ -546,38 +320,6 @@ void InitializeGraph_nodesWithEdges_cuda(const uint32_t & local_infinity, unsign
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_BFS_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
-{
-  dim3 blocks;
-  dim3 threads;
-  // FP: "1 -> 2;
-  // FP: "2 -> 3;
-  // FP: "3 -> 4;
-  kernel_sizing(blocks, threads);
-  // FP: "4 -> 5;
-  FirstItr_BFS <<<blocks, __tb_FirstItr_BFS>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()));
-  // FP: "5 -> 6;
-  check_cuda_kernel;
-  // FP: "6 -> 7;
-}
-void FirstItr_BFS_allNodes_cuda(struct CUDA_Context*  ctx)
-{
-  // FP: "1 -> 2;
-  FirstItr_BFS_cuda(0, ctx->gg.nnodes, ctx);
-  // FP: "2 -> 3;
-}
-void FirstItr_BFS_masterNodes_cuda(struct CUDA_Context*  ctx)
-{
-  // FP: "1 -> 2;
-  FirstItr_BFS_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ctx);
-  // FP: "2 -> 3;
-}
-void FirstItr_BFS_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
-{
-  // FP: "1 -> 2;
-  FirstItr_BFS_cuda(0, ctx->numNodesWithEdges, ctx);
-  // FP: "2 -> 3;
-}
 void BFS_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
@@ -595,7 +337,7 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccum
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  BFS <<<blocks, __tb_BFS>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  BFS <<<blocks, __tb_BFS>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
