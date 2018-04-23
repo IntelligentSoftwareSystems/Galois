@@ -41,6 +41,9 @@ constexpr static const char* const REGION_NAME = "PR_BC";
 /******************************************************************************/
 namespace cll = llvm::cl;
 
+static cll::opt<std::string> sourcesToUse("sourcesToUse",
+                                          cll::desc("Sources to use in BC"),
+                                          cll::init(""));
 static cll::opt<unsigned int> numSourcesPerRound("numRoundSources", 
                                 cll::desc("Number of sources to use for APSP"),
                                 cll::init(1));
@@ -590,6 +593,19 @@ int main(int argc, char** argv) {
   std::vector<uint64_t> nodesToConsider;
   nodesToConsider.resize(numSourcesPerRound);
 
+  // reading in list of sources to operate on if provided
+  std::ifstream sourceFile;
+  std::vector<uint64_t> sourceVector;
+  if (sourcesToUse != "") {
+    sourceFile.open(sourcesToUse);
+
+    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
+                            std::istream_iterator<uint64_t>{});
+
+    sourceVector = t;
+    sourceFile.close();
+  }
+
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] Run ", run, " started\n");
     std::string timer_str("TIMER_" + std::to_string(run));
@@ -605,14 +621,26 @@ int main(int argc, char** argv) {
       unsigned sourcesFound = 0;
       
       // determine sources to work on in this batch
-      while (sourcesFound < numSourcesPerRound && offset < numNodes &&
-             totalSourcesFound < totalNumSources) {
-        // no skip
-        nodesToConsider[sourcesFound] = offset;
-        sourcesFound++;
-        totalSourcesFound++;
+      if (sourceVector.size() == 0) {
+        while (sourcesFound < numSourcesPerRound && offset < numNodes &&
+               totalSourcesFound < totalNumSources) {
+          // no skip
+          nodesToConsider[sourcesFound] = offset;
+          sourcesFound++;
+          totalSourcesFound++;
 
-        offset++;
+          offset++;
+        }
+      // get sources from read file instead
+      } else {
+        while (sourcesFound < numSourcesPerRound && 
+               offset < sourceVector.size() &&
+               totalSourcesFound < totalNumSources) {
+          nodesToConsider[sourcesFound] = sourceVector[offset]; 
+          sourcesFound++;
+          totalSourcesFound++;
+          offset++;
+        }
       }
 
       if (sourcesFound == 0) {
@@ -631,6 +659,11 @@ int main(int argc, char** argv) {
 
       if (useSingleSource) {
         nodesToConsider[0] = startNode;
+      }
+
+      galois::gDebug("Using the following sources");
+      for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        galois::gDebug(nodesToConsider[i]);
       }
 
       StatTimer_main.start();
