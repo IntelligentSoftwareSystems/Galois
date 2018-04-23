@@ -26,19 +26,14 @@ function(distApp name)
   endif()
 endfunction()
 
-
-distAppNoGPU(bfs_do)
-
-distApp(bfs_push_wl)
-distApp(sssp_push_wl)
-distApp(pagerank_push_wl)
-distApp(bfs_push_od)
-
-distApp(pagerank_pull_od)
-
-distAppNoGPU(bc_pull)
-
-distAppNoGPU(sgd_pull)
+#distAppNoGPU(bfs_do)
+#distApp(bfs_push_wl)
+#distApp(sssp_push_wl)
+#distApp(pagerank_push_wl)
+#distApp(bfs_push_od)
+#distApp(pagerank_pull_od)
+#distAppNoGPU(bc_pull)
+#distAppNoGPU(sgd_pull)
 
 distAppNoGPU(pr_bc)
 distAppNoGPU(pr_bc_opt)
@@ -54,9 +49,7 @@ endif()
 
 distAppNoGPU(toy_read)
 distAppNoGPU(toyinspect)
-
 distAppNoGPU(graph_reader)
-
 distAppNoGPU(transposecheck)
 distAppNoGPU(weightcheck)
 distAppNoGPU(samenesscheck)
