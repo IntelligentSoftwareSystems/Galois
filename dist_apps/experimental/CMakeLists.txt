@@ -26,38 +26,32 @@ function(distApp name)
   endif()
 endfunction()
 
+#distAppNoGPU(bfs_do)
+#distApp(bfs_push_wl)
+#distApp(sssp_push_wl)
+#distApp(pagerank_push_wl)
+#distApp(bfs_push_od)
+#distApp(pagerank_pull_od)
+#distAppNoGPU(bc_pull)
+#distAppNoGPU(sgd_pull)
 
-distAppNoGPU(bfs_do)
-
-distApp(bfs_push_wl)
-distApp(sssp_push_wl)
-distApp(pagerank_push_wl)
-distApp(bfs_push_od)
-
-distApp(pagerank_pull_od)
-
-distAppNoGPU(bc_pull)
-
-distAppNoGPU(sgd_pull)
-
-distAppNoGPU(pr_bc)
 distAppNoGPU(pr_bc_opt)
+distAppNoGPU(pr_bc)
 
 # inefficient version of prbc where entire vector is synchronized
-app(pr_bc_vecsync pr_bc/gen.cpp DISTSAFE)
-target_link_libraries(pr_bc_vecsync distbench)
-target_include_directories(pr_bc_vecsync PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
-target_compile_definitions(pr_bc_vecsync PRIVATE _VECTOR_SYNC_)
-if(USE_BARE_MPI)
-  target_compile_definitions(pr_bc_vecsync PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
-endif()
+#app(pr_bc_vecsync pr_bc/gen.cpp DISTSAFE)
+#target_link_libraries(pr_bc_vecsync distbench)
+#target_include_directories(pr_bc_vecsync PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+#target_compile_definitions(pr_bc_vecsync PRIVATE _VECTOR_SYNC_)
+#if(USE_BARE_MPI)
+#  target_compile_definitions(pr_bc_vecsync PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+#endif()
 
-distAppNoGPU(toy_read)
-distAppNoGPU(toyinspect)
-
-distAppNoGPU(graph_reader)
-
-distAppNoGPU(transposecheck)
-distAppNoGPU(weightcheck)
-distAppNoGPU(samenesscheck)
+# Various tools (TODO move to a tools directory or get rid of some)
 distAppNoGPU(findhighdegree)
+#distAppNoGPU(graph_reader)
+#distAppNoGPU(toy_read)
+#distAppNoGPU(toyinspect)
+#distAppNoGPU(transposecheck)
+#distAppNoGPU(weightcheck)
+#distAppNoGPU(samenesscheck)
