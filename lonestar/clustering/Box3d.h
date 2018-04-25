@@ -25,43 +25,63 @@
 
 class Box3d {
 protected:
-  Point3 min;
-  Point3 max;
-  bool initialized;
+  Point3 m_min;
+  Point3 m_max;
+  bool m_init;
 
 public:
   Box3d()
-      : min(std::numeric_limits<float>::max()),
-        max(-1 * std::numeric_limits<double>::max()) {
-    initialized = false;
+      : m_min(std::numeric_limits<double>::m_max()),
+        m_max(-1 * std::numeric_limits<double>::m_max()),
+        m_init(false)
+  {}
+
+  explicit Box3d(const Point3& pt)
+    :
+      m_min(pt),
+      m_max(pt),
+      m_init(true)
+  
+  {}
+
+  Box3d(const Point3& a, const Point3& b) 
+    :
+      m_min(a),
+      m_max(a),
+      m_init(true)
+  {
+    addPoint(b);
   }
 
-  void setBox(Point3& pt) {
-    initialized = true;
-    min.set(pt);
-    max.set(pt);
+
+  void addPoint(const Point3& pt) {
+    m_init = true;
+    m_min.setIfMin(pt);
+    m_max.setIfMax(pt);
   }
 
-  void addPoint(Point3& pt) {
-    initialized = true;
-    min.setIfMin(pt);
-    max.setIfMax(pt);
+  void addBox(const Box3d& b) {
+    m_init = true;
+    m_min.setIfMin(b.m_min);
+    m_max.setIfMax(b.m_max);
   }
 
-  void addBox(Box3d& b) {
-    initialized = true;
-    min.setIfMin(b.min);
-    max.setIfMax(b.max);
+  Point3 size(void) const {
+
+    Point3 ret(m_max);
+    ret.absDiff(m_min);
+
+    return ret;
   }
 
-  const Point3& getMin() const { return min; }
+  const Point3& getMin() const { return m_min; }
 
-  const Point3& getMax() const { return max; }
+  const Point3& getMax() const { return m_max; }
 
-  bool isInitialized() const { return initialized; }
+  bool isInitialized() const { return m_init; }
 
-  bool equals(const Box3d& other) const {
-    return min.equals(other.min) && max.equals(other.max);
+  bool operator == (const Box3d& other) const {
+    return m_min == other.m_min && m_max == other.m_max;
   }
 };
 

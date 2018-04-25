@@ -19,7 +19,6 @@
 
 // clang-format off
 #include "galois/Timer.h"
-#include "galois/graphs/Graph.h"
 #include "galois/Galois.h"
 #include "galois/Reduction.h"
 
@@ -51,7 +50,7 @@ static const char* desc =
     "Clusters data points using the well-known data-mining algorithm";
 static const char* url = "agglomerative_clustering";
 
-static cll::opt<int> numPoints("numPoints", cll::desc("Number of Points"),
+static cll::opt<int> numLights("n", cll::desc("Number of Points"),
                                cll::init(1000));
 static cll::opt<bool> parallel("parallel",
                                cll::desc("Run the parallel Galoised version?"),
@@ -66,7 +65,7 @@ struct Clustering {
 
   std::vector<ClusterLight*> clusterArray;
 
-  void genRandomLights(int numPoints) {
+  void genRandomLights(int numLights) {
 
     double dirX = 0;
     double dirY = 0;
@@ -74,11 +73,11 @@ struct Clustering {
     AbstractLight::setGlobalMultitime();
     AbstractLight::setGlobalNumReps();
 
-    lights.reserve(numPoints);
+    lights.reserve(numLights);
 
     // generating random lights
     // TODO: use C++ random number generators
-    for (int i = 0; i < numPoints; i++) {
+    for (int i = 0; i < numLights; i++) {
       double x = ((double)rand()) / (numeric_limits<int>::max());
       double y = ((double)rand()) / (numeric_limits<int>::max());
       double z = ((double)rand()) / (numeric_limits<int>::max());
@@ -89,9 +88,9 @@ struct Clustering {
     }
   }
 
-  Clustering(int numPoints) {
+  Clustering(int numLights) {
 
-    genRandomLights(numPoints);
+    genRandomLights(numLights);
 
     constexpr size_t tempSize = (1 << NodeWrapper::CONE_RECURSE_SIZE) + 1;
     coordinatesArray.resize(tempSize * 3);
@@ -472,12 +471,12 @@ struct Clustering {
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
-  cout << "Starting Clustering app...[" << numPoints << "]" << endl;
+  cout << "Starting Clustering app...[" << numLights << "]" << endl;
   // Initializing...
 
   std::vector<LeafLight> lights;
-  lights.reserve(numPoints);
-  genRandomLights(lights, numPoints);
+  lights.reserve(numLights);
+  genRandomLights(lights, numLights);
 
   cout << "Running the " << (parallel ? "parallel" : "serial") << " version\n ";
   if (!parallel) {

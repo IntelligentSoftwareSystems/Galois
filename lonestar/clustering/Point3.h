@@ -35,14 +35,13 @@ public:
     this->z = z;
   }
 
-  Point3(const Point3& pt) {
-    this->x = pt.x;
-    this->y = pt.y;
-    this->z = pt.z;
-  }
   double getSum() const { return x + y + z; }
 
   double getLen() const { return x * x + y * y + z * z; }
+
+  double getArea(void) const {
+    return x * y * z;
+  }
 
   void scale(double factor) {
     x *= factor;
@@ -60,6 +59,17 @@ public:
     x -= pt.x;
     y -= pt.y;
     z -= pt.z;
+  }
+
+  void convAbs(void) {
+    x = std::fabs(x);
+    y = std::fabs(y);
+    z = std::fabs(z);
+  }
+
+  void absDiff(const Point3& pt) {
+    this->sub(pt);
+    this->convAbs();
   }
 
   void set(double n) { x = y = z = n; }
@@ -124,7 +134,7 @@ public:
   
   double getZ() const { return z; }
 
-  bool equals(const Point3& other) const {
+  bool operator == (const Point3& other) const {
     return (x == other.x) && (y == other.y) && (z == other.z);
   }
 
