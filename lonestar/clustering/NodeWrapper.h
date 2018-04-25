@@ -32,7 +32,7 @@ public:
   static const double GLOBAL_SCENE_DIAGONAL;
 
 private:
-  AbstractNode& light;
+  AbstractLight& light;
   Box3d direction;
   double coneCosine;
   Point3 location;
@@ -161,7 +161,7 @@ public:
     return minCos;
   }
 
-  AbstractNode& getLight() const { return light; }
+  AbstractLight& getLight() const { return light; }
 
   double getLocationX() const { return location.getX(); }
   double getLocationY() const { return location.getY(); }

@@ -16,9 +16,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
-#ifndef ABSTRACTNODE_H_
-#define ABSTRACTNODE_H_
+#ifndef ABSTRACT_LIGHT_H
+#define ABSTRACT_LIGHT_H
 
 #include "Point3.h"
 
@@ -28,26 +27,30 @@
 #include <stdlib.h>
 
 
-class AbstractNode {
+class AbstractLight {
 public:
   static int globalNumReps;
+  // TODO: get rid of this vector
   static std::vector<std::vector<double>*> repRandomNums;
   static bool globalMultitime;
 
 protected:
+  Box3d locBox;
+  Box3d dirBox;
   Point3 myLoc;
+  Point3 coneDirection;
+  double coneCos;
+
   Point3 intensity; // Use r,g,b as x,y,z
   int startTime, endTime;
   GVector<double> timeVector;
 
 public:
-  AbstractNode(double x, double y, double z) : myLoc(x, y, z), intensity(0) {
+  AbstractLight(double x, double y, double z) : myLoc(x, y, z), intensity(0) {
     startTime = -1;
   }
 
-  AbstractNode() : myLoc(0), intensity(0) { startTime = -1; }
-
-  virtual ~AbstractNode() {}
+  AbstractLight() : myLoc(0), intensity(0) { startTime = -1; }
 
   double getScalarTotalIntensity() const {
     return (1.0f / 3.0f) * intensity.getSum();
@@ -84,7 +87,7 @@ public:
       scaleIntensity(len);
     }
   }
-  void setSummedIntensity(AbstractNode& inA, AbstractNode& inB) {
+  void setSummedIntensity(AbstractLight& inA, AbstractLight& inB) {
     intensity.set(inA.intensity);
     intensity.add(inB.intensity);
     startTime = inA.startTime < inB.startTime ? inA.startTime : inB.endTime;
@@ -140,9 +143,9 @@ public:
           (*ranVec)[j]     = (*ranVec)[index];
           (*ranVec)[index] = temp;
         }
-        if (AbstractNode::repRandomNums[i] != NULL)
-          delete AbstractNode::repRandomNums[i];
-        AbstractNode::repRandomNums[i] = ranVec;
+        if (AbstractLight::repRandomNums[i] != NULL)
+          delete AbstractLight::repRandomNums[i];
+        AbstractLight::repRandomNums[i] = ranVec;
       }
     }
   }
@@ -159,20 +162,128 @@ public:
   virtual int size() = 0;
   static void cleanup() {
     for (unsigned int i = 0; i < repRandomNums.size(); i++)
-      delete AbstractNode::repRandomNums[i];
+      delete AbstractLight::repRandomNums[i];
   }
-  friend std::ostream& operator<<(std::ostream& s, AbstractNode& pt);
+
+  static double computeCone(const NodeWrapper& a, const NodeWrapper& b,
+                            ClusterLight& cluster) {
+    if (a.direction.isInitialized() == false ||
+        b.direction.isInitialized() == false)
+      return -1.0f;
+    Point3 min(a.direction.getMin());
+    min.setIfMin(b.direction.getMin());
+    Point3 max(a.direction.getMax());
+    max.setIfMax(b.direction.getMax());
+    Point3 temp(max);
+    temp.sub(min);
+    double radiusSq = temp.getLen();
+    temp.set(max);
+    temp.add(min);
+    double centerSq = temp.getLen();
+    if (centerSq < 0.01) {
+      return -1.0f;
+    }
+    double invLen = 1.0f / sqrt(centerSq);
+    double minCos = (centerSq + 4.0f - radiusSq) * 0.25f * invLen;
+    if (minCos < -1.0f) {
+      minCos = -1.0f;
+    }
+    temp.scale(invLen);
+    cluster.setDirectionCone(temp.getX(), temp.getY(), temp.getZ(), minCos);
+    return minCos;
+  }
+
+  static double computeCone(const NodeWrapper& a, const NodeWrapper& b) {
+    if (a.direction.isInitialized() == false ||
+        b.direction.isInitialized() == false)
+      return -1.0f;
+    Point3 min(a.direction.getMin());
+    min.setIfMin(b.direction.getMin());
+    Point3 max(a.direction.getMax());
+    max.setIfMax(b.direction.getMax());
+    Point3 temp(max);
+    temp.sub(min);
+    double radiusSq = temp.getLen();
+    temp.set(max);
+    temp.add(min);
+    double centerSq = temp.getLen();
+    if (centerSq < 0.01) {
+      return -1.0f;
+    }
+    double invLen = 1.0f / sqrt(centerSq);
+    double minCos = (centerSq + 4.0f - radiusSq) * 0.25f * invLen;
+    if (minCos < -1.0f) {
+      minCos = -1.0f;
+    }
+    temp.scale(invLen);
+    return minCos;
+  }
+
+  AbstractLight& getLight() const { return light; }
+
+  double getLocationX() const { return location.getX(); }
+  double getLocationY() const { return location.getY(); }
+
+  double getLocationZ() const { return location.getZ(); }
+  double getConeCosine() const { return coneCosine; }
+  double getHalfSizeX() const { return max.getX() - location.getX(); }
+  double getHalfSizeY() const { return max.getY() - location.getY(); }
+  double getHalfSizeZ() const { return max.getZ() - location.getZ(); }
+
+  const Point3& getLocation() const { return location; }
+
+  bool equals(const NodeWrapper& other) {
+    bool retVal = true;
+    if (this->direction.equals(other.direction) == false)
+      retVal &= false;
+    if (this->coneCosine != other.coneCosine)
+      retVal &= false;
+    if (this->location.equals(other.location) == false)
+      retVal &= false;
+    if (this->coneDirection.equals(other.coneDirection) == false)
+      retVal &= false;
+    if (this->direction.equals(other.direction) == false)
+      retVal &= false;
+    // TODO : Add light comparison logic here!
+    return retVal;
+  }
+
+  static double potentialClusterSize(const NodeWrapper& a, NodeWrapper& b) {
+    Point3 max(a.max);
+    max.setIfMax(b.max);
+    Point3 min(a.min);
+    min.setIfMin(b.min);
+    Point3 diff(max);
+    diff.sub(min);
+    double minCos = computeCone(a, b);
+    double maxIntensity =
+        a.light.getScalarTotalIntensity() + b.light.getScalarTotalIntensity();
+    return clusterSizeMetric(diff, minCos, maxIntensity);
+  }
+
+  /**
+   * Compute a measure of the size of a light cluster
+   */
+  static double clusterSizeMetric(Point3& size, double cosSemiAngle,
+                                  double intensity) {
+    double len2        = size.getLen();
+    double angleFactor = (1 - cosSemiAngle) * GLOBAL_SCENE_DIAGONAL;
+    double res         = intensity * (len2 + angleFactor * angleFactor);
+    return res;
+  }
+  friend std::ostream& operator<<(std::ostream& s, AbstractLight& pt);
 };
 
-std::ostream& operator<<(std::ostream& s, AbstractNode& pt) {
+std::ostream& operator<<(std::ostream& s, AbstractLight& pt) {
   s << "Abs Node :: Loc " << pt.myLoc << " , Int ::" << pt.intensity
     << " Time:: [" << pt.startTime << " - " << pt.endTime << "]";
   return s;
 }
 
 const int numRepRandomNums = 256;
-std::vector<std::vector<double>*> AbstractNode::repRandomNums(256);
-int AbstractNode::globalNumReps    = -1;
-bool AbstractNode::globalMultitime = false;
+std::vector<std::vector<double>*> AbstractLight::repRandomNums(256);
+// TODO: remove globalNumReps
+int AbstractLight::globalNumReps    = -1;
+bool AbstractLight::globalMultitime = false;
 
-#endif /* ABSTRACTNODE_H_ */
+#endif /* ABSTRACT_LIGHT_H */

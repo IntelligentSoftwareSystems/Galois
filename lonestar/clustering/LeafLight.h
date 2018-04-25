@@ -21,13 +21,13 @@
 #define LEAF_LIGHT_H
 
 #include "common.h"
-#include "AbstractNode.h"
+#include "AbstractLight.h"
 #include "Point3.h"
 
 #include <iostream>
 
 
-class LeafLight : public AbstractNode {
+class LeafLight : public AbstractLight {
 protected:
 
 
@@ -37,9 +37,9 @@ protected:
 public:
 
   LeafLight(double x, double y, double z, double dirX, double dirY, double dirZ)
-      : AbstractNode(x, y, z), direction(dirX, dirY, dirZ) {
+      : AbstractLight(x, y, z), direction(dirX, dirY, dirZ) {
 
-        AbstractNode::setIntensity(1.0 / MATH_PI, 0);
+        AbstractLight::setIntensity(1.0 / MATH_PI, 0);
   }
 
   Point3& getDirection() { return direction; }
@@ -61,7 +61,7 @@ public:
 
 std::ostream& operator<<(std::ostream& s, const LeafLight& pt) {
   s << "LeafLight :: ";
-  operator<<(s, (AbstractNode&)pt);
+  operator<<(s, (AbstractLight&)pt);
   s << "Dir::" << pt.direction;
   return s;
 }

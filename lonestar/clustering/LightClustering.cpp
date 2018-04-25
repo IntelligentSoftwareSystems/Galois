@@ -71,8 +71,8 @@ struct Clustering {
     double dirX = 0;
     double dirY = 0;
     double dirZ = 1;
-    AbstractNode::setGlobalMultitime();
-    AbstractNode::setGlobalNumReps();
+    AbstractLight::setGlobalMultitime();
+    AbstractLight::setGlobalNumReps();
 
     lights.reserve(numPoints);
 
@@ -155,7 +155,7 @@ struct Clustering {
  *
  * input: lights
  *
- * KDtree T;
+ * KDtree<AbstractLight> T;
  * T.build(lights);
  *
  * Bag newNodes;
@@ -163,14 +163,14 @@ struct Clustering {
  * while(true) {
  *
  *  do_all(galois::iterate(T), 
- *    [&] (LeafLight l) {
+ *    [&] (AbstractLight& l) {
  *      m = T.nearsetNeighbor(l);
  *
  *      if (m != null) {
  *        lp = T.nearsetNeighbor(m);
  *        if (lp ==  l) {
  *          if (l < m) { // avoid duplication by ordering
- *            Node n = cluster(l, m);
+ *            Cluster n = cluster(l, m);
  *            newNodes.push(n);
  *          }
  *        } else {
@@ -188,6 +188,31 @@ struct Clustering {
  *  T.build(newNodes);
  *  newNodes.clear();
  * } 
+ *
+ *
+ * Cost: 
+ * Async cost, assuming perfect binary cluster tree of  logN height at the end , tree has 2N
+ * nodes
+ *
+ * build KD tree: NlogN
+ * NN: NlogN
+ * cluster: 2N
+ * add clusters: NlogN
+ * remove: 2NlogN
+ *
+ *
+ * Per round, with k nodes:
+ *
+ * build KD tree: O(KlogK) if O(N) median splitting 
+ * or (d*(NlogN)^2) if sorting * O(NlogN) median splitting
+ *
+ * NN search: O(KlogK)
+ *
+ * Cluster: O(K)
+ *
+ * delete O(K)
+ *
+ * # of rounds: logN assuming perfect binary cluster tree
  *
  */
 
@@ -423,7 +448,7 @@ struct Clustering {
 
     //!!!!!!!!!!!!!!!!!!!Cleanup
     KdCell::cleanupTree(tree);
-    AbstractNode::cleanup();
+    AbstractLight::cleanup();
 
     for (unsigned int i = 0; i < lights.size(); i++) {
       NodeWrapper* nw = initialWorklist[i];

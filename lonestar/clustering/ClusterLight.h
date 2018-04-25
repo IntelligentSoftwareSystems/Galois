@@ -24,24 +24,25 @@
 #include "galois/gstl.h"
 #include <assert.h>
 
-class ClusterLight : public AbstractNode {
+class ClusterLight : public AbstractLight {
 private:
-  AbstractNode* m_left;
-  AbstractNode* m_right;
-  GVector<LeafLight*> reps;
+  AbstractLight* m_left;
+  AbstractLight* m_right;
   Point3 boxRadius;
-  Point3 coneDirection;
-  double coneCos;
 
 public:
   ClusterLight() : boxRadius(0), coneDirection(0) {}
-  virtual ~ClusterLight() { reps.clear(); }
+
+
+  // TODO: remove
+  /*
   void setBox(double minX, double maxX, double minY, double maxY, double minZ,
               double maxZ) {
     myLoc.set(0.5f * (minX + maxX), 0.5f * (minY + maxY), 0.5f * (minZ + maxZ));
     boxRadius.set(0.5f * (maxX - minX), 0.5f * (maxY - minY),
                   0.5f * (maxZ - minZ));
   }
+  */
   void setBox(Point3& min, Point3& max) {
     myLoc.set(min);
     myLoc.add(max);
@@ -51,7 +52,7 @@ public:
     boxRadius.scale(0.5);
   }
 
-  void setChildren(AbstractNode* inLeft, AbstractNode* inRight,
+  void setChildren(AbstractLight* inLeft, AbstractLight* inRight,
                    double repRandomNum) {
     m_left  = inLeft;
     m_right = inRight;
@@ -62,6 +63,7 @@ public:
         repRandomNums[(int)(repRandomNum * numRepRandomNums)];
     if (globalMultitime) {
       assert(false && "Should  not have time true!");
+      std::abort();
       //      int numReps = endTime - startTime + 1;
       //      if (reps == null || reps.length < numReps) {
       //        reps = new LeafLight[numReps];
@@ -120,7 +122,7 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
                                V2& ranVec, LeafLight& left,
                                LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
@@ -135,7 +137,7 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
                                V2& ranVec, ClusterLight& left,
                                LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
@@ -151,7 +153,7 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractNode& parent,
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
                                V2& ranVec, ClusterLight& left,
                                ClusterLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
@@ -184,7 +186,7 @@ public:
   }
 
   template <typename V1, typename V2>
-  static int findConeDirsRecursive(AbstractNode& node, V1& fArr,
+  static int findConeDirsRecursive(AbstractLight& node, V1& fArr,
                                    int numDirs, V2& cArr,
                                    int recurseDepth) {
     if (!node.isLeaf()) {
