@@ -472,7 +472,7 @@ struct MatchingABMP {
           // No need to lock shared edge data here.
           // It was already locked previously.
           bool found = false;
-          for (auto kk : g.edges(ii->first)) {
+          for (auto kk : g.edges(ii->first, galois::MethodFlag::UNPROTECTED)) {
             if (g.getEdgeDst(kk) == ii->second) {
               found = true;
               auto edge_flag = g.getEdgeData(kk);
