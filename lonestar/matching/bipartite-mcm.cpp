@@ -89,22 +89,9 @@ static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"), 
 static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"), cll::init(""));
 static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding matching, removed matched edges and repeat"), cll::init(false));
 
-struct sharedEdgeData : galois::runtime::Lockable {
-  bool val;
-  // May as well default initialize to 0 since the edges are
-  // all going the same direction to begin with.
-  sharedEdgeData() : val(0) {}
-  // Implicit conversions to and from bool for convenience.
-  sharedEdgeData(bool v) : val(v) {}
-  operator bool&() {return val;}
-  operator bool() const {return val;}
-  sharedEdgeData& operator=(const bool &v) {
-    val = v;
-    return *this;
-  }
-};
-
 //******************************** Common ************************
+
+typedef std::atomic<int> sharedEdgeData;
 
 template<typename G>
 struct GraphTypes {
@@ -269,10 +256,6 @@ struct MatchingFF {
       queue.pop_front();
 
       for (auto ii : g.edges(src, flag)) {
-        // What is the approprate lock flag to use when checking this?
-        // Depending on the memory consistency guarantees of the system,
-        // UNPROTECTED may be sufficient.
-        doAcquire(g.getEdgeData(ii), flag);
         if ((src < numA) == *g.getEdgeData(ii)) {
           // This is an incoming edge, so there's no need to process it.
           continue;
@@ -303,7 +286,6 @@ struct MatchingFF {
           //assert(std::distance(g.edge_begin(dst), g.edge_end(dst)) == 1);
           for (auto jj : g.edges(dst, flag)) {
             auto edge = g.getEdgeData(jj);
-            doAcquire(edge, flag);
             if ((dst < numA) == *edge) {
               continue;
             }
@@ -363,21 +345,19 @@ struct MatchingFF {
 
       // Reverse edges in augmenting path
       for (typename RevsWrapper::Type::iterator jj = revs.begin(), ej = revs.end(); jj != ej; ++jj) {
-        sharedEdgeData *edge;
+        sharedEdgeData *edge_data;
         bool found = false;
         for (auto kk : g.edges(jj->first, galois::MethodFlag::UNPROTECTED)) {
           if (g.getEdgeDst(kk) == jj->second) {
-            edge = g.getEdgeData(kk);
+            edge_data = g.getEdgeData(kk);
             found = true;
             break;
           }
         }
         assert(found);
-        assert((jj->first < numA) != *edge);
-        // Not necessary to lock the shared edge data since it has already been locked
-        // in findAugmentingPath.
+        assert((jj->first < numA) != *edge_data);
         // Reverse the edge by flipping the shared flag.
-        *(edge) = !*(edge);
+        *edge_data ^= true;
       }
       revs.clear();
 
@@ -452,7 +432,6 @@ struct MatchingABMP {
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
     while (ii != ei) {
-      doAcquire(g.getEdgeData(ii), flag);
       if ((src < numA) == *g.getEdgeData(ii)) {
         ++ii;
         continue;
@@ -497,7 +476,7 @@ struct MatchingABMP {
             if (g.getEdgeDst(kk) == ii->second) {
               found = true;
               auto edge_flag = g.getEdgeData(kk);
-              *edge_flag = !*edge_flag;
+              *edge_flag ^= true;
               break;
             }
           }
