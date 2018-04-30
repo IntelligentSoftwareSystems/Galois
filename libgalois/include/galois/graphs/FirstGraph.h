@@ -615,8 +615,8 @@ public:
       if ((!Directional || InOut) && edgesF.mustDel()) {
 	for (auto ii : edges(n, MethodFlag::UNPROTECTED))
 	  edgesF.delEdge(ii->second());
-        for (auto ii : in_edges(n, MethodFlag::UNPROTECTED))
-          edgesF.delEdge(ii->second());
+//        for (auto ii : in_edges(n, MethodFlag::UNPROTECTED))
+//          edgesF.delEdge(ii->second());
       }
       N->edges.clear();
     }

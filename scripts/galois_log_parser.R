@@ -180,7 +180,7 @@ getTimersDistributed <- function (logData) {
  if(benchmarkRegionName == "BC"){
    regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
    for(region in regions){
-     sendBytesRegion <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", region, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+     sendBytesRegion <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", region, "_0_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL))
      print(paste(region, " : ", sendBytesRegion))
      syncBytes <- syncBytes + sendBytesRegion 
      print(syncBytes)
@@ -199,6 +199,10 @@ getTimersDistributed <- function (logData) {
  ## Replication factor
  replicationFactor <- subset(logData, CATEGORY == "REPLICATION_FACTOR_0_0" & TOTAL_TYPE != "HostValues")$TOTAL
  print(paste("replicationFactor:", replicationFactor))
+ #if(is.null(replicationFactor)){
+if(identical(replicationFactor, character(0))){
+   replicationFactor <- 0
+ }
 
  ## Communication memory usage: Max and Min.
  communicationMemUsageMax = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MAX" & TOTAL_TYPE == "HMAX")$TOTAL)
@@ -455,8 +459,122 @@ computeMaxByMean <- function (logData, paramList, output) {
   }
 }
 
+getTimersFT <- function(logData) {
+
+  enableFT <- 0
+  crashIteration <- 0
+  crashNumHosts <- 0
+  checkPointInterval <- 0
+  recoveryScheme <- "NA"
+  recoveryTimeTotal <- 0
+  recoveryTimeTotalCrashed <- 0
+  recoveryTimeTotalHealthy <- 0
+  recoveryTimeGraphConstruct <- 0
+  recoveryTime <- 0
+  recoveryTimeSync <- 0
+  checkpointSaveTime <- 0
+
+
+  enableFT <- as.numeric(subset(logData, CATEGORY == "ENABLE_FT"& TOTAL_TYPE != "HostValues")$TOTAL)
+  if(identical(enableFT, numeric(0))){
+    cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
+    cmdLine <- substring(cmdLineRow[,6], 0)
+    cmdLineSplit = strsplit(cmdLine, "\\s+")[[1]]
+    for (c in cmdLineSplit) {
+      if(any(grep("-enableFT", c))){
+        splitStr = strsplit(c, "=")[[1]]
+        enableFT <- splitStr[2]
+      }
+    }
+  }
+
+  print(enableFT)
+  if(enableFT == 1){
+  print("here", enableFT)
+
+    cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
+    cmdLine <- substring(cmdLineRow[,6], 0)
+    cmdLineSplit = strsplit(cmdLine, "\\s+")[[1]]
+    for (c in cmdLineSplit) {
+      if(any(grep("-crashIteration", c))){
+        splitStr = strsplit(c, "=")[[1]]
+        crashIteration <- splitStr[2]
+      } else if(any(grep("-crashNumHosts", c))){
+        splitStr = strsplit(c, "=")[[1]]
+        crashNumHosts <- splitStr[2]
+      } else if(any(grep("-recoveryScheme", c))){
+        splitStr = strsplit(c, "=")[[1]]
+        recoveryScheme <- splitStr[2]
+      } else if(any(grep("-checkpointInterval", c))){
+        splitStr = strsplit(c, "=")[[1]]
+        checkPointInterval <- splitStr[2]
+      }
+    }
+
+    print(paste("enableFT:", enableFT, " crashIteration:", crashIteration, " crashNumHosts:", crashNumHosts, " recoveryScheme:", recoveryScheme, " checkPointInterval:", checkPointInterval))
+
+    #### Recovery counters
+    #recoveryTimeTotal <- (subset(logData, grepl(paste("TIMER_RECOVERY_TOTAL_[0-9]+_", crashIteration, sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTimeTotal <- (subset(logData, grepl(paste("TIMER_RECOVERY_TOTAL_[0-9]+_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTimeTotal, character(0))){
+      recoveryTimeTotal <- 0
+    }
+
+    #recoveryTimeTotalCrashed <- (subset(logData, grepl(paste("TIMER_RECOVERY_CRASHED_[0-9]+_", crashIteration, sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTimeTotalCrashed <- (subset(logData, grepl(paste("TIMER_RECOVERY_CRASHED_[0-9]+_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTimeTotalCrashed, character(0))){
+      recoveryTimeTotalCrashed <- 0
+    }
+
+    #recoveryTimeGraphConstruct <- (subset(logData, grepl(paste("TIMER_RECOVERY_GRAPH_CONSTRUCT_[0-9]+_", crashIteration, sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTimeGraphConstruct <- (subset(logData, grepl(paste("TIMER_RECOVERY_GRAPH_CONSTRUCT_[0-9]+_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTimeGraphConstruct, character(0))){
+      recoveryTimeGraphConstruct <- 0
+    }
+
+    ### Timers for the healthy host
+    #recoveryTimeTotalHealthy <- (subset(logData, grepl(paste("TIMER_RECOVERY_HEALTHY_[0-9]+_", crashIteration, sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTimeTotalHealthy <- (subset(logData, grepl(paste("TIMER_RECOVERY_HEALTHY_[0-9]+_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTimeTotalHealthy, character(0))){
+      recoveryTimeTotalHealthy <- 0
+    }
+
+    ## Time spent on recovery
+    #recoveryTime <- (subset(logData, grepl(paste("^RECOVERY_[0-9]+_", crashIteration, sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTime <- (subset(logData, grepl(paste("^RECOVERY_[0-9]+_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTime, character(0))){
+      recoveryTime <- 0
+    }
+    #recoveryTimeSync <- (subset(logData, grepl(paste("^SYNC_RECOVERY_[0-9]+_", crashIteration, sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    recoveryTimeSync <- (subset(logData, grepl(paste("^SYNC_RECOVERY_[0-9]+_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)
+    if(identical(recoveryTimeSync, character(0))){
+      recoveryTimeSync <- 0
+    }
+
+    #### Total time to save checkpoint
+    checkpointSaveTime <- 0
+    if(recoveryScheme == "cp" || recoveryScheme == "hr"){
+    #checkpointSaveTime <- sum(as.numeric(subset(logData, grepl(paste("^TIMER_SAVE_CHECKPOINT_[0-9]+_[0-9]+",sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL))
+    checkpointSaveTime <- (as.numeric(subset(logData, grepl(paste("^TOTAL_TIMER_SAVE_CHECKPOINT",sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL))
+    print (checkpointSaveTime)
+    }
+
+    print(recoveryTimeTotal)
+    print(recoveryTimeTotalCrashed)
+    print(recoveryTimeTotalHealthy)
+    print(recoveryTime)
+    print(recoveryTimeSync)
+
+  }
+  ### Calculate the number of work items:
+  workItems <- sum(as.numeric(subset(logData, grepl(paste("NUM_WORK_ITEMS_0", sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL))
+  print(paste("workItems : ", workItems))
+  returnList <- list("FT" = enableFT, "crashIter" = crashIteration, "crashNumHosts" = crashNumHosts, "RScheme" = recoveryScheme, "CPInterval" = checkPointInterval, "RTimeTotal" = recoveryTimeTotal, "RTimeTotalCrashed" =  recoveryTimeTotalCrashed, "RTimeTotalHealthy" = recoveryTimeTotalHealthy, "RTimeGraphConstruct" = recoveryTimeGraphConstruct, "RTimeExec" = recoveryTime, "RTimeSync" = recoveryTimeSync, "CPSaveTime" = checkpointSaveTime, "workItems" = workItems)
+  return(returnList)
+}
+
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol, isFautlTolerant) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
   printNormalStats = TRUE;
@@ -484,6 +602,12 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
     }
     else{
       timersList <- getTimersDistributed(logData)
+    }
+
+    if(isTRUE(isFautlTolerant)){
+      print("INSIDE\n")
+      timersList_ft <- getTimersFT(logData)
+      timersList <- append(timersList, timersList_ft)
     }
   }
 
@@ -517,7 +641,9 @@ option_list = list(
                      make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
                                                help="To compute the max by mean compute time[default %default]"),
                      make_option(c("-p", "--perItrVolume"), action="store_true", default=FALSE,
-                                               help="To get the per iteration communication volume [default %default]")
+                                               help="To get the per iteration communication volume [default %default]"),
+                     make_option(c("-f", "--faultTolerance"), action="store_true", default=FALSE,
+                                               help="Logs are fault tolerant [default %default]")
 
                      )
 
@@ -532,7 +658,7 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p, opt$f)
 }
 
 ##################### END #####################
