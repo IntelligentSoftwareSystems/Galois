@@ -478,7 +478,7 @@ struct KCoreStep1 {
 
     do {
       //Checkpointing the all the node data
-      if(enableFT && recoveryScheme == CP){
+      if(enableFT && (recoveryScheme == CP || recoveryScheme == HR)){
         saveCheckpointToDisk(iterations, _graph);
       }
 
