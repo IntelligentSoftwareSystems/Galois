@@ -50,11 +50,9 @@ static const char* desc = "Solves SAT problems using survey propagation";
 static const char* url = "survey_propagation";
 
 static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
-static cll::opt<int> M(cll::Positional, cll::desc("<num variables>"), cll::Required);
-static cll::opt<int> N(cll::Positional, cll::desc("<num clauses>"), cll::Required);
+static cll::opt<int> M(cll::Positional, cll::desc("<num clauses>"), cll::Required);
+static cll::opt<int> N(cll::Positional, cll::desc("<num variables>"), cll::Required);
 static cll::opt<int> K(cll::Positional, cll::desc("<variables per clause>"), cll::Required);
-
-static std::string graphName = "seed9_1Mc_3Ml_1c3l.gr";
 
 //SAT problem:
 //variables Xi E {0,1}, i E {1 .. N), M constraints
@@ -131,9 +129,9 @@ std::vector<int> t;
 std::vector<double> Bias;
 std::vector<galois::GAtomic<bool>> onWL;
 
-typedef galois::graphs::FirstGraph<SPNode, SPEdge, false> Graph;
-typedef galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
-
+using Graph = galois::graphs::FirstGraph<SPNode, SPEdge, false>;
+using GNode = galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode;
+using GNodeArray = typename galois::LargeArray<GNode>;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
@@ -144,51 +142,28 @@ void initialize_random_formula(Graph& graph,
                                int M,
                                int N,
                                int K,
-                               std::vector<GNode>& literalsN,
-                               std::vector<GNode>& clauses) {
-                               //std::vector<std::pair<GNode,int>>& clauses) {
+                               GNodeArray& literalsN,
+                               GNodeArray& clauses) {
   //M clauses
   //N variables
   //K vars per clause
 
+  Graph initGraph;
+
   //build up clauses and literals
-  clauses.resize(M);
-  literalsN.resize(N);
+  clauses.allocateInterleaved(M);
+  literalsN.allocateInterleaved(N);
 
-  //Resize vectors for SOA
-  isClause.resize(M+N);
-  nameSPNode.resize(M+N);
-  solved.resize(M+N);
-  value.resize(M+N);
-  t.resize(M+N);
-  Bias.resize(M+N);
-  onWL.resize(M+N);
-
+  // construct graph topology using initGraph
   for (int m = 0; m < M; ++m) {
-    //GNode node = graph.createNode(SPNode(m, true));
-    GNode node = graph.createNode(SPNode(m));
-    nameSPNode[m] = m;
-    isClause[m] = true;
-    solved[m] = false;
-    value[m] = false;
-    t[m] = 0;
-    onWL[m] = true;
-
-    graph.addNode(node, galois::MethodFlag::UNPROTECTED);
-    //clauses[m] = std::make_pair(node, 0);
+    GNode node = initGraph.createNode(SPNode(m));
+    initGraph.addNode(node, galois::MethodFlag::UNPROTECTED);
     clauses[m] = node;
   }
-  for (int n = 0; n < N; ++n) {
-    //GNode node = graph.createNode(SPNode(n, false));
-    GNode node = graph.createNode(SPNode(M+n));
-    nameSPNode[M+n] = n;
-    isClause[M+n] = false;
-    solved[M+n] = false;
-    value[M+n] = false;
-    t[M+n] = 0;
-    onWL[M+n] = false;
 
-    graph.addNode(node, galois::MethodFlag::UNPROTECTED);
+  for (int n = 0; n < N; ++n) {
+    GNode node = initGraph.createNode(SPNode(M+n));
+    initGraph.addNode(node, galois::MethodFlag::UNPROTECTED);
     literalsN[n] = node;
   }
 
@@ -200,11 +175,12 @@ void initialize_random_formula(Graph& graph,
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
         touse.push_back(newK);
-        graph.getEdgeData(graph.addEdge(clauses[m], literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
+        initGraph.getEdgeData(initGraph.addEdge(clauses[m], literalsN[newK], galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
 
+  // save initGraph to a FileGraph
   galois::graphs::FileGraphWriter p;
   p.setNumNodes(M+N);
   p.setNumEdges(M*K);
@@ -224,9 +200,9 @@ void initialize_random_formula(Graph& graph,
 
   p.phase2();
   for (int m = 0; m < M; ++m) {
-    for (auto e: graph.edges(clauses[m], galois::MethodFlag::UNPROTECTED)) {
-      auto dst = graph.getData(graph.getEdgeDst(e), galois::MethodFlag::UNPROTECTED).id;
-      edgeData.set(p.addNeighbor(m, dst), graph.getEdgeData(e));
+    for (auto e: initGraph.edges(clauses[m], galois::MethodFlag::UNPROTECTED)) {
+      auto dst = initGraph.getData(initGraph.getEdgeDst(e), galois::MethodFlag::UNPROTECTED).id;
+      edgeData.set(p.addNeighbor(m, dst), initGraph.getEdgeData(e));
     }
   }
 
@@ -236,26 +212,8 @@ void initialize_random_formula(Graph& graph,
     std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
   }
 
-  p.toFile(graphName);
-
-  //XXX: Shuffling doesn't help
-  //std::random_shuffle(literalsN.begin(), literalsN.end());
-  //std::random_shuffle(clauses.begin(), clauses.end());
-}
-
-void  initialize_loaded_formula(Graph& graph,
-                                int M,
-                                int N,
-                                int K,
-                                std::vector<GNode>& literalsN,
-                                std::vector<GNode>& clauses){
-  //M clauses
-  //N variables
-  //K vars per clause
-
-  //build up clauses and literals
-  clauses.resize(M);
-  literalsN.resize(N);
+  // reload initGraph from p to graph in a NUMA-aware way
+  galois::graphs::readGraphDispatch(graph, Graph::read_tag(), p);
 
   //Resize vectors for SOA
   isClause.resize(M+N);
@@ -292,10 +250,14 @@ void  initialize_loaded_formula(Graph& graph,
     literalsN[n] = *node;
     node++;
   }
+
+  //XXX: Shuffling doesn't help
+  //std::random_shuffle(literalsN.begin(), literalsN.end());
+  //std::random_shuffle(clauses.begin(), clauses.end());
 }
 
 //void print_formula(Graph& graph,std::vector<std::pair<GNode,int>>& clauses) {
-void print_formula(Graph& graph,std::vector<GNode>& clauses) {
+void print_formula(Graph& graph,GNodeArray& clauses) {
   for (unsigned m = 0; m < clauses.size(); ++m) {
     if (m != 0)
       std::cout << " & ";
@@ -320,7 +282,7 @@ void print_formula(Graph& graph,std::vector<GNode>& clauses) {
   std::cout << std::endl;
 }
 
-void print_literal(Graph& graph,std::vector<GNode>& literalsN) {
+void print_literal(Graph& graph, GNodeArray& literalsN) {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     std::cout << "v" << n << "( ";
     GNode N = literalsN[n];
@@ -341,7 +303,7 @@ void print_literal(Graph& graph,std::vector<GNode>& literalsN) {
   std::cout << std::endl;
 }
 
-void print_fixed(Graph& graph, std::vector<GNode>& literalsN) {
+void print_fixed(Graph& graph, GNodeArray& literalsN) {
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
     SPNode& V = graph.getData(N, galois::MethodFlag::UNPROTECTED);
@@ -351,7 +313,7 @@ void print_fixed(Graph& graph, std::vector<GNode>& literalsN) {
   std::cout << "\n";
 }
 
-int count_fixed(Graph& graph, std::vector<GNode>& literalsN) {
+int count_fixed(Graph& graph, GNodeArray& literalsN) {
   int retval = 0;
   for (unsigned n = 0; n < literalsN.size(); ++n) {
     GNode N = literalsN[n];
@@ -427,8 +389,8 @@ void SP_algorithm(Graph& graph,
                   galois::GReduceMax<double>& maxBias,
                   galois::GAccumulator<int>& numBias,
                   galois::GAccumulator<double>& sumBias,
-                  std::vector<GNode>& literalsN,
-                  std::vector<GNode>& clauses) {
+                  GNodeArray& literalsN,
+                  GNodeArray& clauses) {
                   //std::vector<std::pair<GNode,int>>& clauses) {
   //0) at t = 0, for every edge a->i, randomly initialize the message sigma a->i(t=0) in [0,1]
   //1) for t = 1 to tmax:
@@ -559,7 +521,7 @@ void decimate(Graph& graph,
               galois::GReduceMax<double>& maxBias,
               galois::GAccumulator<int>& numBias,
               galois::GAccumulator<double>& sumBias,
-              std::vector<GNode>& literalsN) {
+              GNodeArray& literalsN) {
   double m = maxBias.reduce();
   double n = nontrivial.reduce();
   int num = numBias.reduce();
@@ -598,9 +560,8 @@ bool survey_inspired_decimation(Graph& graph,
                                 galois::GReduceMax<double>& maxBias,
                                 galois::GAccumulator<int>& numBias,
                                 galois::GAccumulator<double>& sumBias,
-                                std::vector<GNode>& literalsN,
-                                //std::vector<std::pair<GNode,int>>& clauses
-                                std::vector<GNode>& clauses
+                                GNodeArray& literalsN,
+                                GNodeArray& clauses
                                 ) {
   //0) Randomize initial conditions for the surveys
   //1) run SP
@@ -638,13 +599,10 @@ int main(int argc, char** argv) {
   galois::GAccumulator<int> numBias;
   galois::GAccumulator<double> sumBias;
 
-  std::vector<GNode> literalsN;
-  //std::vector<std::pair<GNode,int>> clauses;
-  std::vector<GNode> clauses;
+  GNodeArray literalsN;
+  GNodeArray clauses;
 
-  //initialize_random_formula(graph,M,N,K,literalsN,clauses);
-  galois::graphs::readGraph(graph, graphName);
-  initialize_loaded_formula(graph,M,N,K,literalsN,clauses);
+  initialize_random_formula(graph,M,N,K,literalsN,clauses);
 //  print_formula(graph, clauses);
 //  print_literal(graph, literalsN);
   //build_graph();
