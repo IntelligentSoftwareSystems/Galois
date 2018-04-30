@@ -32,8 +32,9 @@
 #include "galois/Reduction.h"
 
 #include "llvm/Support/CommandLine.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include "galois/runtime/Profile.h"
 
 #include <cstdlib>
 #include <iostream>
@@ -591,7 +592,12 @@ public:
 
     galois::StatTimer T;
     T.start();
-    survey_inspired_decimation();
+    galois::runtime::profileVtune(
+        [&] () {
+          survey_inspired_decimation();
+        },
+        "Main Loop"
+    );
     T.stop();
 
     //print_formula(graph, clauses);
