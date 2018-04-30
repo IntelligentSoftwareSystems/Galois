@@ -153,7 +153,9 @@ struct recovery {
 
   recovery(Graph * _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph) {}
+  void static go(Graph& _graph) {
+          _graph.sync<writeAny, readSource, Reduce_min_comp_current,Broadcast_comp_current>("RECOVERY");
+   }
 };
 struct FirstItr_ConnectedComp{
   Graph * graph;
@@ -223,7 +225,7 @@ struct ConnectedComp {
     do {
 
       //Checkpointing the all the node data
-      if(enableFT && recoveryScheme == CP){
+      if(enableFT && (recoveryScheme == CP || recoveryScheme == HR)){
         saveCheckpointToDisk(_num_iterations-1, _graph);
       }
 
@@ -258,14 +260,14 @@ struct ConnectedComp {
         crashSite<recovery, InitializeGraph_crashed>(_graph);
         dga += 1;
 
-        if(recoveryScheme == RS ){
+        //if(recoveryScheme == RS ){
           //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
                       //Broadcast_comp_current>("RECOVERY");
-          _graph.sync<writeAny, readSource, Reduce_min_comp_current,Broadcast_comp_current>("RECOVERY");
+          //_graph.sync<writeAny, readSource, Reduce_min_comp_current,Broadcast_comp_current>("RECOVERY");
 
           //_graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
             //Broadcast_comp_current>("RECOVERY");
-        }
+        //}
       }
       /**************************CRASH SITE : end *****************************************/
 
