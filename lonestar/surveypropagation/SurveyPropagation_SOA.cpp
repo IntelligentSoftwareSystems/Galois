@@ -152,20 +152,21 @@ struct EGreater {
 };
 
 class SurveyPropagation {
-  using GNodeArray = typename galois::LargeArray<GNode>;
+  template<typename T>
+  using Array = galois::LargeArray<T>;
 
   Graph graph;
-  GNodeArray literalsN;
-  GNodeArray clauses;
+  Array<GNode> literalsN;
+  Array<GNode> clauses;
 
   // nodes' fields in SOA form
-  galois::LargeArray<bool> isClause;
-  galois::LargeArray<int> nameSPNode;
-  galois::LargeArray<bool> solved;
-  galois::LargeArray<bool> value;
-  galois::LargeArray<int> t;
-  galois::LargeArray<double> Bias;
-  galois::LargeArray<galois::GAtomic<bool>> onWL;
+  Array<bool> isClause;
+  Array<int> nameSPNode;
+  Array<bool> solved;
+  Array<bool> value;
+  Array<int> t;
+  Array<double> Bias;
+  Array<galois::GAtomic<bool>> onWL;
 
   galois::GAccumulator<unsigned int> nontrivial;
   galois::GReduceMax<double> maxBias;
