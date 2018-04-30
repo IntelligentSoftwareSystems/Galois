@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     free(dummyBuffer);
   }
 
-  galois::gInfo("Total read is ", fileSize);
+  galois::gInfo("Total read is ", totalRead);
 
   galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID, "] Time "
                 "in seconds is ", readTimer.get() / 1000.0, " (", 
