@@ -38,7 +38,11 @@
 #include "galois/runtime/Tracer.h"
 
 #include "galois/graphs/DistributedGraphLoader.h"
-
+#include <boost/serialization/vector.hpp>
+#include <boost/serialization/array.hpp>
+#include <boost/archive/binary_oarchive.hpp>
+#include <boost/archive/binary_iarchive.hpp>
+using namespace boost::archive;
 //For resilience
 #include "resilience.h"
 
@@ -94,8 +98,15 @@ struct NodeData {
   //galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> residual_latent_vector;
   //galois::CopyableArray<double, LATENT_VECTOR_SIZE> latent_vector;
 
-  std::vector<galois::CopyableAtomic<double>> residual_latent_vector;
   std::vector<double> latent_vector;
+  std::vector<galois::CopyableAtomic<double>> residual_latent_vector;
+
+  template<class Archive>
+    void serialize(Archive & ar, const unsigned int version)
+    {
+      ar & boost::serialization::make_array(latent_vector.data(), LATENT_VECTOR_SIZE);
+      //ar & boost::serialization::make_array(residual_latent_vector.data(), LATENT_VECTOR_SIZE);
+    }
 };
 
 galois::DynamicBitSet bitset_latent_vector;
@@ -111,6 +122,12 @@ static double genRand() {
   // generate a random double in (-1,1)
   return 2.0 * ((double)std::rand() / (double)RAND_MAX) - 1.0;
 }
+
+static double genVal(uint32_t n) {
+  // generate a random double in (-1,1)
+  return 2.0 * ((double)n/(double)RAND_MAX) - 1.0;
+}
+
 
 // Purdue learning function
 double getstep_size(unsigned int round) {
@@ -177,7 +194,7 @@ struct InitializeGraph {
     sdata.residual_latent_vector.resize(LATENT_VECTOR_SIZE);
 
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-      sdata.latent_vector[i] = genRand(); // randomly create latent vector 
+      sdata.latent_vector[i] = genVal(src); // randomly create latent vector 
       sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
 
       #ifndef NDEBUG
@@ -244,7 +261,7 @@ struct InitializeGraph_crashed {
     sdata.residual_latent_vector.resize(LATENT_VECTOR_SIZE);
 
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-      sdata.latent_vector[i] = genRand(); // randomly create latent vector 
+      sdata.latent_vector[i] = genVal(src); // randomly create latent vector 
       sdata.residual_latent_vector[i] = 0 ; // randomly create latent vector 
 
       #ifndef NDEBUG
@@ -362,17 +379,24 @@ struct SGD {
 
   void static go(Graph& _graph, galois::DGAccumulator<double>& dga) {
     unsigned _num_iterations = 0;
+    unsigned _num_iterations_stepSize = 0;
+    unsigned _num_iterations_checkpointed = 0;
     double rms_normalized = 0.0;
     double last = -1.0;
+    double last_checkpointed = -1.0;
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do {
-      galois::gPrint("ITERATION : ",  _num_iterations, "\n");
       //Checkpointing the all the node data
       if(enableFT && recoveryScheme == CP){
         saveCheckpointToDisk(_num_iterations, _graph);
+        //Saving other state variables  
+        if (_num_iterations % checkpointInterval == 0) {
+          last_checkpointed = last;
+          _num_iterations_checkpointed = _num_iterations;
+        }
       }
 
-      auto step_size = getstep_size(_num_iterations);
+      auto step_size = getstep_size(_num_iterations_stepSize);
       dga.reset();
       galois::do_all(
           galois::iterate(nodesWithEdges),
@@ -380,13 +404,6 @@ struct SGD {
           galois::loopname(_graph.get_run_identifier("SGD").c_str()),
           galois::steal(),
           galois::no_stats());
-
-    // sync all latent vectors
-    //_graph.sync<writeAny, readAny, Reduce_pair_wise_avg_array_residual_latent_vector,
-                //Broadcast_residual_latent_vector>("SGD");
-
-    //_graph.sync<writeAny, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
-                //Broadcast_residual_latent_vector>("SGD");
 
     _graph.sync<writeDestination, readAny, Reduce_pair_wise_add_array_residual_latent_vector,
                 Broadcast_residual_latent_vector, Bitset_residual_latent_vector>("SGD");
@@ -397,26 +414,35 @@ struct SGD {
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
         ++_num_iterations;
+        if(recoveryScheme == CP){
+          _num_iterations_stepSize = _num_iterations_checkpointed;
+          last = last_checkpointed;
+        }
+
         continue;
       }
       /**************************CRASH SITE : end *****************************************/
 
-      ++_num_iterations;
 
       // calculate root mean squared error
       // Divide by 2 since for symmetric graph it is counted twice
       double error = dga.reduce()/2; 
       rms_normalized = std::sqrt(error/_graph.globalSizeEdges());
 
-      galois::gDebug("RMS Normalized : ", rms_normalized);
-      galois::gPrint("RMS : ", rms_normalized, "\n");
       double error_change = std::abs((last - error)/last);
-      galois::gPrint("abs(last - error/last) : ", error_change, "\n");
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::gPrint("ITERATION : ",  _num_iterations, "\n");
+        galois::gDebug("RMS Normalized : ", rms_normalized);
+        galois::gPrint("RMS : ", rms_normalized, "\n");
+        galois::gPrint("abs(last - error/last) : ", error_change, "\n");
+      }
 
       if(error_change < tolerance){
         break;
       }
       last = error;
+      ++_num_iterations;
+      ++_num_iterations_stepSize;
     } while((_num_iterations < maxIterations));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -442,7 +468,7 @@ struct SGD {
       auto& residual_user_node = ddata.residual_latent_vector;
       //auto& sdata_up = sdata.updates;
 
-      double edge_rating = graph->getEdgeData(dst);
+      double edge_rating = graph->getEdgeData(jj);
 
       // doGradientUpdate
       double old_dp = galois::innerProduct(user_node, movie_node, double(0));

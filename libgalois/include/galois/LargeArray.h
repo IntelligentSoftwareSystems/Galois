@@ -126,11 +126,14 @@ private:
     // TODO DON'T USE CERR
     //std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
     ar << m_size;
-    ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    //for(size_t i = 0; i < m_size; ++i){
+      //ar << m_data[i];
+    //}
+    //ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
     /*
      * Cas use make_array too as shown below
      */
-    //ar << boost::serialization::make_array<T>(m_data, m_size);
+    ar << boost::serialization::make_array<T>(m_data, m_size);
   }
   template <typename Archive>
   void load(Archive &ar, const unsigned int version) {
@@ -144,8 +147,11 @@ private:
     if(!m_data)
       allocateInterleaved(m_size);
 
-    ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
-    //ar >> boost::serialization::make_array<T>(m_data, m_size);
+    //for(size_t i = 0; i < m_size; ++i){
+      //ar >> m_data[i];
+    //}
+    //ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    ar >> boost::serialization::make_array<T>(m_data, m_size);
   }
   //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
   BOOST_SERIALIZATION_SPLIT_MEMBER()

@@ -254,6 +254,19 @@ public:
   NodeInfoBase(Args&&... args): data(std::forward<Args>(args)...) { }
 
   typename NodeInfoBase::reference getData() { return data; }
+  /*
+   * To support boost serialization
+   */
+  friend class boost::serialization::access;
+  template <typename Archive>
+  void save(Archive &ar, const unsigned int version) const {
+    ar << data;
+  }
+  template <typename Archive>
+  void load(Archive &ar, const unsigned int version) {
+    ar >> data ;
+  }
+  BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 template<bool HasLockable>

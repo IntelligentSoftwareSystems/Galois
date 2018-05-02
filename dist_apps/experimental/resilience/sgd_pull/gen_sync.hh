@@ -2,10 +2,10 @@
 #include "galois/AtomicWrapper.h"
 #include "galois/ArrayWrapper.h"
 
-#define LATENT_VECTOR_SIZE 20
+//#define LATENT_VECTOR_SIZE 20
 
-typedef galois::CopyableArray<double, LATENT_VECTOR_SIZE> ArrTy;
-typedef galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> ArrAtomicTy;
+//typedef galois::CopyableArray<double, LATENT_VECTOR_SIZE> ArrTy;
+//typedef galois::CopyableArray<galois::CopyableAtomic<double>, LATENT_VECTOR_SIZE> ArrAtomicTy;
 typedef std::vector<galois::CopyableAtomic<double>> VecAtomicTy;
 typedef std::vector<double> VecTy;
 
