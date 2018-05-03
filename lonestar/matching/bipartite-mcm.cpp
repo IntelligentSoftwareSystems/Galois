@@ -357,7 +357,7 @@ struct MatchingFF {
         assert(found);
         assert((jj->first < numA) != *edge_data);
         // Reverse the edge by flipping the shared flag.
-        *edge_data ^= true;
+        edge_data->fetch_xor(true, std::memory_order_acq_rel);
       }
       revs.clear();
 
@@ -477,7 +477,7 @@ struct MatchingABMP {
             if (g.getEdgeDst(kk) == ii->second) {
               found = true;
               auto edge_flag = g.getEdgeData(kk);
-              *edge_flag ^= true;
+              edge_flag->fetch_xor(true, std::memory_order_acq_rel);
               break;
             }
           }
