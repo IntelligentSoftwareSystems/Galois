@@ -432,7 +432,7 @@ class SurveyPropagation {
           // 	//     	     jii != jee; ++jii)
           //{}
 
-          auto a_data = graph.getData(a);
+          auto& a_data = graph.getData(a);
           //++a_data.t;
           onWL[a_data.id] = false;
 //          ++t[a_data.id];
