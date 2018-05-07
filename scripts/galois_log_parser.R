@@ -569,7 +569,18 @@ getTimersFT <- function(logData) {
   ### Calculate the number of work items:
   workItems <- sum(as.numeric(subset(logData, grepl(paste("NUM_WORK_ITEMS_0", sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL))
   print(paste("workItems : ", workItems))
-  returnList <- list("FT" = enableFT, "crashIter" = crashIteration, "crashNumHosts" = crashNumHosts, "RScheme" = recoveryScheme, "CPInterval" = checkPointInterval, "RTimeTotal" = recoveryTimeTotal, "RTimeTotalCrashed" =  recoveryTimeTotalCrashed, "RTimeTotalHealthy" = recoveryTimeTotalHealthy, "RTimeGraphConstruct" = recoveryTimeGraphConstruct, "RTimeExec" = recoveryTime, "RTimeSync" = recoveryTimeSync, "CPSaveTime" = checkpointSaveTime, "workItems" = workItems)
+
+  ### calculate the sync bytes in recovery phase
+  recoverySyncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_RECOVERY.*_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+  print(paste("recoverySyncBytes", recoverySyncBytes))
+
+  ### To calculate any bytes spent in initialization
+  #syncBytesInitGraph <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_InitializeGraph_[crashed|healthy]_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+  syncBytesInitGraph <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_InitializeGraph_(?:crashed|healthy)_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+  print(paste("syncBytesInitGraph", syncBytesInitGraph))
+
+
+  returnList <- list("FT" = enableFT, "crashIter" = crashIteration, "crashNumHosts" = crashNumHosts, "RScheme" = recoveryScheme, "CPInterval" = checkPointInterval, "RTimeTotal" = recoveryTimeTotal, "RTimeTotalCrashed" =  recoveryTimeTotalCrashed, "RTimeTotalHealthy" = recoveryTimeTotalHealthy, "RTimeGraphConstruct" = recoveryTimeGraphConstruct, "RTimeExec" = recoveryTime, "RTimeSync" = recoveryTimeSync, "CPSaveTime" = checkpointSaveTime, "workItems" = workItems, "RSyncBytes" = recoverySyncBytes, "RSyncBytesGraphInit" = syncBytesInitGraph)
   return(returnList)
 }
 
@@ -605,7 +616,6 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
     }
 
     if(isTRUE(isFautlTolerant)){
-      print("INSIDE\n")
       timersList_ft <- getTimersFT(logData)
       timersList <- append(timersList, timersList_ft)
     }
