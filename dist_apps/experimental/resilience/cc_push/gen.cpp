@@ -259,15 +259,6 @@ struct ConnectedComp {
       if(enableFT && (_num_iterations == crashIteration)){
         crashSite<recovery, InitializeGraph_crashed>(_graph);
         dga += 1;
-
-        //if(recoveryScheme == RS ){
-          //_graph.sync<writeAny, readAny, Reduce_min_comp_current, 
-                      //Broadcast_comp_current>("RECOVERY");
-          //_graph.sync<writeAny, readSource, Reduce_min_comp_current,Broadcast_comp_current>("RECOVERY");
-
-          //_graph.sync<writeDestination, readSource, Reduce_min_comp_current, 
-            //Broadcast_comp_current>("RECOVERY");
-        //}
       }
       /**************************CRASH SITE : end *****************************************/
 

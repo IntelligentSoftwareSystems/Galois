@@ -255,14 +255,14 @@ struct MatchingFF {
       GraphNode src = queue.front();
       queue.pop_front();
 
-      for (auto ii : g.edges(src, flag)) {
+      for (auto ii : g.edges(src, galois::MethodFlag::UNPROTECTED)) {
         if ((src < numA) == *g.getEdgeData(ii)) {
           // This is an incoming edge, so there's no need to process it.
           continue;
         }
 
         GraphNode dst = g.getEdgeDst(ii);
-        node_data_type& ddst = g.getData(dst, galois::MethodFlag::UNPROTECTED);
+        node_data_type& ddst = g.getData(dst, flag);
         if (ddst.reached)
           continue;
 
@@ -284,7 +284,7 @@ struct MatchingFF {
           return true;
         } else {
           //assert(std::distance(g.edge_begin(dst), g.edge_end(dst)) == 1);
-          for (auto jj : g.edges(dst, flag)) {
+          for (auto jj : g.edges(dst, galois::MethodFlag::UNPROTECTED)) {
             auto edge = g.getEdgeData(jj);
             if ((dst < numA) == *edge) {
               continue;
@@ -292,7 +292,7 @@ struct MatchingFF {
 
             GraphNode cur = g.getEdgeDst(jj);
 
-            g.getData(cur, galois::MethodFlag::UNPROTECTED).pred = preds.size();
+            g.getData(cur, flag).pred = preds.size();
             preds.push_back(dst);
 
             g.getData(cur, galois::MethodFlag::UNPROTECTED).reached = true;
@@ -357,7 +357,7 @@ struct MatchingFF {
         assert(found);
         assert((jj->first < numA) != *edge_data);
         // Reverse the edge by flipping the shared flag.
-        *edge_data ^= true;
+        edge_data->fetch_xor(true, std::memory_order_acq_rel);
       }
       revs.clear();
 
@@ -427,8 +427,8 @@ struct MatchingABMP {
     unsigned l = dsrc.layer - 1;
 
     // Start search where we last left off
-    edge_iterator ii = g.edge_begin(src, flag);
-    edge_iterator ei = g.edge_end(src, flag);
+    edge_iterator ii = g.edge_begin(src, galois::MethodFlag::UNPROTECTED);
+    edge_iterator ei = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
     while (ii != ei) {
@@ -436,7 +436,8 @@ struct MatchingABMP {
         ++ii;
         continue;
       }
-      if (g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED).layer == l) break;
+      auto neighbor = g.getEdgeDst(ii);
+      if (g.getData(neighbor, flag).layer == l) break;
       ++ii;
       ++dsrc.next;
     }
@@ -476,7 +477,7 @@ struct MatchingABMP {
             if (g.getEdgeDst(kk) == ii->second) {
               found = true;
               auto edge_flag = g.getEdgeData(kk);
-              *edge_flag ^= true;
+              edge_flag->fetch_xor(true, std::memory_order_acq_rel);
               break;
             }
           }

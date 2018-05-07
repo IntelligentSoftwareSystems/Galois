@@ -165,7 +165,7 @@ class SurveyPropagation {
   Array<int> nameSPNode;
   Array<bool> solved;
   Array<bool> value;
-  Array<int> t;
+//  Array<int> t;
   Array<double> Bias;
   Array<galois::GAtomic<bool>> onWL;
 
@@ -258,7 +258,7 @@ class SurveyPropagation {
     nameSPNode.allocateInterleaved(M+N);
     solved.allocateInterleaved(M+N);
     value.allocateInterleaved(M+N);
-    t.allocateInterleaved(M+N);
+//    t.allocateInterleaved(M+N);
     Bias.allocateInterleaved(M+N);
     onWL.allocateInterleaved(M+N);
 
@@ -269,7 +269,7 @@ class SurveyPropagation {
       isClause[m] = true;
       solved[m] = false;
       value[m] = false;
-      t[m] = 0;
+//      t[m] = 0;
       onWL[m] = true;
 
       clauses[m] = *node;
@@ -282,7 +282,7 @@ class SurveyPropagation {
       isClause[M+n] = false;
       solved[M+n] = false;
       value[M+n] = false;
-      t[M+n] = 0;
+//      t[M+n] = 0;
       onWL[M+n] = false;
 
       literalsN[n] = *node;
@@ -432,10 +432,10 @@ class SurveyPropagation {
           // 	//     	     jii != jee; ++jii)
           //{}
 
-          auto a_data = graph.getData(a);
+          auto& a_data = graph.getData(a);
           //++a_data.t;
           onWL[a_data.id] = false;
-          ++t[a_data.id];
+//          ++t[a_data.id];
 
           //++graph.getData(a).t;
 
