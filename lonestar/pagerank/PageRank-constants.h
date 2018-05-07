@@ -18,6 +18,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * @author Swarnendu Biswas <sbiswas@ices.utexas.edu>
+ *
  */
 
 #ifndef LONESTAR_PAGERANK_CONSTANTS_H
@@ -35,7 +37,7 @@ static const char* url  = 0;
 constexpr static const float ALPHA         = 0.85;
 constexpr static const float INIT_RESIDUAL = 1 - ALPHA;
 
-constexpr static const float TOLERANCE   = 1.0e-5;
+constexpr static const float TOLERANCE   = 1.0e-3;
 constexpr static const unsigned MAX_ITER = 1000;
 
 constexpr static const unsigned PRINT_TOP = 20;
