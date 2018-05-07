@@ -46,8 +46,8 @@ struct BCNode {
   LockType spinLock;
 
   //typedef std::vector<BCNode*> predTY;
-  //using predTY = galois::gstl::Vector<uint32_t>;
-  using predTY = std::vector<uint32_t>;
+  using predTY = galois::gstl::Vector<uint32_t>;
+  //using predTY = std::vector<uint32_t>;
   //using predTY = llvm::SmallVector<uint32_t, 2>;
   predTY preds;
 
