@@ -129,11 +129,13 @@ private:
     //for(size_t i = 0; i < m_size; ++i){
       //ar << m_data[i];
     //}
-    //ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
     /*
      * Cas use make_array too as shown below
+     * IMPORTANT: Use make_array as temp fix for benchmarks using non-trivial structures in nodeData (Eg. SGD)
+     *            This also requires changes in libgalois/include/galois/graphs/Details.h (specified in the file).
      */
-    ar << boost::serialization::make_array<T>(m_data, m_size);
+    //ar << boost::serialization::make_array<T>(m_data, m_size);
   }
   template <typename Archive>
   void load(Archive &ar, const unsigned int version) {
@@ -150,8 +152,13 @@ private:
     //for(size_t i = 0; i < m_size; ++i){
       //ar >> m_data[i];
     //}
-    //ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
-    ar >> boost::serialization::make_array<T>(m_data, m_size);
+    ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    /*
+     * Cas use make_array too as shown below
+     * IMPORTANT: Use make_array as temp fix for SGD
+     *            This also requires changes in libgalois/include/galois/graphs/Details.h (specified in the file).
+     */
+    //ar >> boost::serialization::make_array<T>(m_data, m_size);
   }
   //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
   BOOST_SERIALIZATION_SPLIT_MEMBER()
