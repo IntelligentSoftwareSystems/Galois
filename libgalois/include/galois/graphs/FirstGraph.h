@@ -139,24 +139,32 @@ struct UEdgeInfoBase<NTy, void, false> {
   bool isInEdge() const { return (uintptr_t)N&1; }
 };
 
-template<typename ETy>
+/*
+ * Only graphs w/ in-out/symmetric edges and non-void edge data,
+ * i.e. ETy != void and DirectedNotInOut = false,
+ * need to allocate memory for edge data
+ */
+template<typename ETy, bool DirectedNotInOut>
 struct EdgeFactory {
-  galois::runtime::FixedSizeAllocator<ETy> mem;
+  galois::InsertBag<ETy> mem;
   template<typename... Args>
   ETy* mkEdge(Args&&... args) {
-    ETy* e = mem.allocate(1);
-    mem.construct(e, std::forward<Args>(args)...);
-    return e;
+    return &mem.emplace(std::forward<Args>(args)...);
   }
-  void delEdge(ETy* e) {
-    mem.destroy(e);
-    mem.deallocate(e, 1);
-  }
-  bool mustDel() const { return true; }
+  void delEdge(ETy*) {}
+  bool mustDel() const { return false; }
+};
+
+template<typename ETy>
+struct EdgeFactory<ETy, true> {
+  template<typename... Args>
+  ETy* mkEdge(Args&&... args) { return nullptr; }
+  void delEdge(ETy*) {}
+  bool mustDel() const { return false; }
 };
 
 template<>
-struct EdgeFactory<void> {
+struct EdgeFactory<void, false> {
   template<typename... Args>
   void* mkEdge(Args&&... args) { return static_cast<void*>(NULL); }
   void delEdge(void*) {}
@@ -405,7 +413,7 @@ private:
   typedef galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
-  internal::EdgeFactory<EdgeTy> edgesF;
+  internal::EdgeFactory<EdgeTy, Directional && !InOut> edgesF;
 
   //Helpers for iterator classes
   struct is_node : public std::unary_function<gNode&, bool>{
