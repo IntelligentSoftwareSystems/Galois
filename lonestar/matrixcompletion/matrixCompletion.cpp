@@ -1001,9 +1001,11 @@ struct SimpleALSalgo {
     galois::StatTimer update1Time("UpdateTime1");
     galois::StatTimer update2Time("UpdateTime2");
     galois::StatTimer copyTime("CopyTime");
+    galois::StatTimer totalExecTime("totalExecTime");
     PerThrdXTX xtxs;
 
     for (int round = 1; ; ++round) {
+      totalExecTime.start();
       mmTime.start();
       // TODO parallelize this using tiled executor
       XTSp WTA = WT * A;
@@ -1049,6 +1051,7 @@ struct SimpleALSalgo {
       copyTime.start();
       copyToGraph(g, WT, HT);
       copyTime.stop();
+      totalExecTime.stop();
 
       double error = sumSquaredError(g);
       elapsed.stop();
@@ -1247,11 +1250,13 @@ struct SyncALSalgo {
     double last = -1.0;
     galois::StatTimer updateTime("UpdateTime");
     galois::StatTimer copyTime("CopyTime");
+    galois::StatTimer totalExecTime("totalExecTime");
     PerThrdXTX xtxs;
     PerThrdV rhs;
 
     for (int round = 1; ; ++round) {
 
+      totalExecTime.start();
       updateTime.start();
 
       typedef galois::worklists::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
@@ -1273,6 +1278,7 @@ struct SyncALSalgo {
       copyTime.start();
       copyToGraph(g, WT, HT);
       copyTime.stop();
+      totalExecTime.stop();
 
       double error = sumSquaredError(g);
       elapsed.stop();
