@@ -23,9 +23,6 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
-
-//#define NDEBUG // Used in Debug build to prevent things from printing
-
 #include "Lonestar/BoilerPlate.h"
 #include "galois/ConditionalReduction.h"
 
@@ -35,8 +32,6 @@
 
 #include "BCNode.h"
 #include "BCEdge.h"
-
-#include "galois/runtime/Profile.h"
 
 #include <iomanip>
 
@@ -77,12 +72,12 @@ static cll::opt<bool> generateCert("generateCertificate",
                                    cll::desc("Prints certificate at end of "
                                              "execution"),
                                    cll::init(false));
-// TODO better description
+// TODO bring this back
 //static cll::opt<bool> useNodeBased("useNodeBased",
 //                                   cll::desc("Use node based execution"),
 //                                   cll::init(true));
 
-using NodeType = BCNode<false, true>;
+using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
 using Graph = galois::graphs::B_LC_CSR_Graph<NodeType, BCEdge, false, true>;
 
 // Work items for the forward phase
@@ -268,7 +263,6 @@ struct BetweenessCentralityAsync {
   }
   
   void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
-    galois::runtime::profileVtune([&] () {
     galois::for_each(
       galois::iterate(wl), 
       [&] (ForwardPhaseWorkItem& wi, auto& ctx) {
@@ -317,11 +311,9 @@ struct BetweenessCentralityAsync {
       galois::wl<OBIM>(FPWorkItemIndexer()),
       galois::loopname("ForwardPhase")
     );
-    }, "forward");
   }
   
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
-    //galois::runtime::profileVtune([&] () {
     galois::for_each(
       galois::iterate(wl),
       [&] (uint32_t srcID, auto& ctx) {
@@ -367,7 +359,6 @@ struct BetweenessCentralityAsync {
       },
       galois::loopname("BackwardPhase")
     );
-    //}, "back");
   }
   
   void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {
@@ -400,6 +391,7 @@ int main(int argc, char** argv) {
     galois::gInfo("Running in serial mode");
   }
 
+  galois::gInfo("Constructing graph");
   // create bidirectional graph
   Graph bcGraph;
   galois::graphs::BufferedGraph<void> fileReader;
@@ -440,17 +432,17 @@ int main(int argc, char** argv) {
   bcExecutor.largestNodeDist.reset();
 
   galois::reportPageAlloc("MemAllocPre");
+  galois::gInfo("Going to pre-allocate pages");
   galois::preAlloc(std::min(
                      (uint64_t)
                      (std::min(galois::getActiveThreads(), 100u) * 
-                     std::max((nnodes / 3000000), (unsigned)2) * 
+                     std::max((nnodes / 4500000), (unsigned)2) * 
                      std::max((nedges / 30000000), (uint64_t)2) * 
                      2.5), 
-                     (uint64_t)1250
+                     (uint64_t)1500
                    ) + 5);
+  galois::gInfo("Pre-allocation complete");
   galois::reportPageAlloc("MemAllocMid");
-
-  galois::StatTimer executionTimer;
 
   // reset everything in preparation for run
   galois::do_all(
@@ -500,6 +492,9 @@ int main(int argc, char** argv) {
   galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
   galois::InsertBag<uint32_t> backwardPhaseWL;
 
+  galois::gInfo("Beginning execution");
+
+  galois::StatTimer executionTimer;
   executionTimer.start();
   for (uint32_t i = startNode; i < numOfSources; ++i) {
     uint32_t sourceToUse = i;
@@ -521,8 +516,6 @@ int main(int argc, char** argv) {
     bcExecutor.dagConstruction(forwardPhaseWL);
     forwardPhaseWL.clear();
 
-    //if (DOCHECKS) graph.checkGraph(active);
-
     bcExecutor.leafCount.reset();
     bcExecutor.findLeaves(backwardPhaseWL, nnodes);
 
@@ -536,8 +529,6 @@ int main(int argc, char** argv) {
     active.bc = backupSrcBC; // current source BC should not get updated
 
     backwardPhaseWL.clear();
-
-    //if (DOCHECKS) graph.checkSteadyState2();
 
     // break out once number of sources user specified to do (if any) has been 
     // reached
@@ -565,7 +556,6 @@ int main(int argc, char** argv) {
 
   // prints out first 10 node BC values
   if (!skipVerify) {
-    //graph.verify(); // TODO see what this does/what it is supposed to do
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
