@@ -63,12 +63,12 @@ static cll::opt<bool> useSymmetricDirectly(
     cll::init(false));
 static cll::opt<int>
     relabelInt("relabel",
-               cll::desc("relabel interval: < 0 no relabeling, 0 use default "
-                         "interval, > 0 relabel every X iterations"),
+               cll::desc("relabel interval X: relabel every X iterations "
+                         "(default 0 uses default interval)"),
                cll::init(0));
 static cll::opt<DetAlgo> detAlgo(
     cll::desc("Deterministic algorithm:"),
-    cll::values(clEnumVal(nondet, "Non-deterministic"),
+    cll::values(clEnumVal(nondet, "Non-deterministic (default)"),
                 clEnumVal(detBase, "Base execution"),
                 clEnumVal(detDisjoint, "Disjoint execution"), clEnumValEnd),
     cll::init(nondet));
@@ -844,8 +844,8 @@ int main(int argc, char** argv) {
   } else {
     app.global_relabel_interval = relabelInt;
   }
-  std::cout << "number of nodes: " << app.graph.size() << "\n";
-  std::cout << "global relabel interval: " << app.global_relabel_interval
+  std::cout << "Number of nodes: " << app.graph.size() << "\n";
+  std::cout << "Global relabel interval: " << app.global_relabel_interval
             << "\n";
 
   galois::StatTimer T;
