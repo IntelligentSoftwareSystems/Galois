@@ -45,12 +45,6 @@
 #include <algorithm>
 #include <iostream>
 
-#ifdef GALOIS_USE_EXP
-#include "LigraAlgo.h"
-#include "GraphLabAlgo.h"
-#include "GraphChiAlgo.h"
-#endif
-
 #include <ostream>
 #include <fstream>
 
@@ -78,7 +72,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"), cll::Required);
 static cll::opt<std::string> largestComponentFilename("outputLargestComponent", cll::desc("[output graph file]"), cll::init(""));
 static cll::opt<std::string> permutationFilename("outputNodePermutation", cll::desc("[output node permutation file]"), cll::init(""));
-static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
+static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(true));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
@@ -385,7 +379,7 @@ struct EdgeTiledAsyncAlgo {
       }
   };*/
 
-  const int EDGE_TILE_SIZE=64;//512 -> 64
+  const int EDGE_TILE_SIZE=512;//512 -> 64
 
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> emptyMerges;
@@ -804,7 +798,7 @@ void run() {
     graph.getData(*ii).id = id;
   }
   
-  galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::pagePoolSize());
+  galois::preAlloc(numThreads + (3 * graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;

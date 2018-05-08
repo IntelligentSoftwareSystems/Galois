@@ -93,7 +93,7 @@ public:
       if (a == b)
         return 0;
       // Avoid cycles by directing edges consistently
-      if (a > b)
+      if (a < b)
         std::swap(a, b);
       if (a->m_component.compare_exchange_strong(a, b)) {
         return b;
