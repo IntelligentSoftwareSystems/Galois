@@ -53,6 +53,12 @@ static cll::opt<std::string> filename(cll::Positional,
                                                 "format>"),
                                       cll::Required);
 
+static cll::opt<std::string> sourcesToUse("sourcesToUse",
+                                          cll::desc("Whitespace separated list "
+                                                    "of sources in a file to "
+                                                    "use in BC"),
+                                          cll::init(""));
+
 static cll::opt<unsigned int> startNode("startNode", 
                                         cll::desc("Node to start search from"),
                                         cll::init(0));
@@ -262,6 +268,7 @@ struct BetweenessCentralityAsync {
   }
   
   void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
+    galois::runtime::profileVtune([&] () {
     galois::for_each(
       galois::iterate(wl), 
       [&] (ForwardPhaseWorkItem& wi, auto& ctx) {
@@ -310,9 +317,11 @@ struct BetweenessCentralityAsync {
       galois::wl<OBIM>(FPWorkItemIndexer()),
       galois::loopname("ForwardPhase")
     );
+    }, "forward");
   }
   
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
+    //galois::runtime::profileVtune([&] () {
     galois::for_each(
       galois::iterate(wl),
       [&] (uint32_t srcID, auto& ctx) {
@@ -358,6 +367,7 @@ struct BetweenessCentralityAsync {
       },
       galois::loopname("BackwardPhase")
     );
+    //}, "back");
   }
   
   void findLeaves(galois::InsertBag<uint32_t>& fringeWL, unsigned nnodes) {
@@ -395,6 +405,7 @@ int main(int argc, char** argv) {
   galois::graphs::BufferedGraph<void> fileReader;
   fileReader.loadGraph(filename);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
+  bcGraph.constructNodes();
 
   galois::do_all(
     galois::iterate((uint32_t)0, fileReader.size()),
@@ -429,7 +440,14 @@ int main(int argc, char** argv) {
   bcExecutor.largestNodeDist.reset();
 
   galois::reportPageAlloc("MemAllocPre");
-  galois::preAlloc(galois::getActiveThreads() * nnodes / 2000000);
+  galois::preAlloc(std::min(
+                     (uint64_t)
+                     (std::min(galois::getActiveThreads(), 100u) * 
+                     std::max((nnodes / 3000000), (unsigned)2) * 
+                     std::max((nedges / 30000000), (uint64_t)2) * 
+                     2.5), 
+                     (uint64_t)1250
+                   ) + 5);
   galois::reportPageAlloc("MemAllocMid");
 
   galois::StatTimer executionTimer;
@@ -448,15 +466,35 @@ int main(int argc, char** argv) {
     }
   );
 
+  // reading in list of sources to operate on if provided
+  std::ifstream sourceFile;
+  std::vector<uint64_t> sourceVector;
+  if (sourcesToUse != "") {
+    sourceFile.open(sourcesToUse);
+    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
+                            std::istream_iterator<uint64_t>{});
+    sourceVector = t;
+    sourceFile.close();
+  }
+
   if (numOfSources == 0) {
     numOfSources = nnodes;
   }
 
-  // if user specifies a certain number of out sources (i.e. only sources with
-  // outgoing edges), then we must loop over all nodes
+  // if user does specifes a certain number of out sources (i.e. only sources with
+  // outgoing edges), we need to loop over the entire node set to look for good 
+  // sources to use
   uint32_t goodSource = 0;
   if (numOfOutSources != 0) {
     numOfSources = nnodes;
+  }
+
+  // only use at most the number of sources in the passed in source file (if
+  // such a file was actually pass in)
+  if (sourceVector.size() != 0) {
+    if (numOfSources > sourceVector.size()) {
+      numOfSources = sourceVector.size();
+    }
   }
 
   galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
@@ -464,15 +502,21 @@ int main(int argc, char** argv) {
 
   executionTimer.start();
   for (uint32_t i = startNode; i < numOfSources; ++i) {
+    uint32_t sourceToUse = i;
+    if (sourceVector.size() != 0) {
+      sourceToUse = sourceVector[i];
+    }
+
     // ignore nodes with no neighbors
-    if (!std::distance(bcGraph.edge_begin(i), bcGraph.edge_end(i))) {
+    if (!std::distance(bcGraph.edge_begin(sourceToUse), bcGraph.edge_end(sourceToUse))) {
+      galois::gDebug(sourceToUse, " has no outgoing edges");
       continue;
     }
 
-    forwardPhaseWL.push_back(ForwardPhaseWorkItem(i, 0));
-    NodeType& active = bcGraph.getData(i);
+    forwardPhaseWL.push_back(ForwardPhaseWorkItem(sourceToUse, 0));
+    NodeType& active = bcGraph.getData(sourceToUse);
     active.initAsSource();
-    //galois::gDebug("Source is ", i);
+    galois::gDebug("Source is ", sourceToUse);
 
     bcExecutor.dagConstruction(forwardPhaseWL);
     forwardPhaseWL.clear();
@@ -501,6 +545,8 @@ int main(int argc, char** argv) {
     if (numOfOutSources != 0 && goodSource >= numOfOutSources) break;
   }
   executionTimer.stop();
+
+  galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
   galois::reportPageAlloc("MemAllocPost");
 
