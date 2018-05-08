@@ -29,6 +29,7 @@
 
 #include "galois/gstl.h"
 #include "galois/gio.h"
+#include "galois/Reduction.h"
 
 #include <cmath>
 
@@ -37,6 +38,8 @@ constexpr double MATH_PI = std::acos(-1);
 
 template <typename T>
 using GVector = galois::gstl::Vector<T>;
+
+using Counter = galois::GAccumulator<size_t>;
 
 template <typename T>
 bool recursiveTreeCheck(T* rootA, T* rootB) {

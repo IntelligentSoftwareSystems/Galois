@@ -39,7 +39,7 @@ public:
 
   double getLen() const { return x * x + y * y + z * z; }
 
-  double getArea(void) const {
+  double getVol(void) const {
     return x * y * z;
   }
 

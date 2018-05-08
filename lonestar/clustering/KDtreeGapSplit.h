@@ -4,36 +4,27 @@
 /**
  * KD-Tree construction Ideas
  *
- * 1) Accumulate Points in a LargeArray and use that
- * as a backings store for the tree. Each node or leaf nodes have
- * pointers/iterators into the array instead of allocating a small local array
- * sort or split operations move things around in the array itself. 
- * 
- * 1b) Idea 1) can be implemented using Bag with forward iterators or using
- * per-thread-vector and random access iterators. 
+ * -- Median split is cheaper than gap split which uses sorting (NlogN). Median split can
+ *  use std::nth_element(O(N)), which requires random access itertors.
+ *    >> We can use Large Array as backing structure, while nodes contain iterators
+ *    or indices to the Large Array
+ *    >> But pushing new items after clustering or unclustered requires a Bag,
+ *    which supports forward for bi-directional iterators. Need to copy stuff from
+ *    bag to large array
+ *    >> Per-THread-Vector may be a compromise for this 
+ *    >> Using LargeArray as backing store for points makes it easy to provide
+ *    iterators to go over all points
  *
- * 2) Use std::nth_element to implement cheap splitting at the median without
- * having to sort etc. Leads to a balanced tree, which may have better parallel
- * performance
+ * -- Since query nodes for Nearest Neighbor search are all in the tree, NN search may 
+ *  benefit from starting at the node in the tree. Need to investigate it. 
  *
- * 3) Investigate whether storing the median split point at internal nodes helps in
- * nearest neighbor searches as opposed to storing split-value and split-type
+ * -- Investigate whether storing a data point at the split point improves
+ *  performance
  *
- * 4) We create different types for Leaf and Internal node. Only Leaf has the array 
- *
- * 5) We keep a null pointer in the node, which is only allocated and filled in the
- * leaf node
- *
- * 6) With each data item, keep a pointer to the node in the tree, so that nearest
- * neighbor search works bottom up and is more efficient, since all queries for
- * nearest neighbor are in the tree themselves
+ * -- While parallel clustering algorithm rebuilds the tree every round, serial
+ *  algorithm doesn't need to do so, therefore, serial KdTree needs to support add and remove operations
  *
  *
- * Minimal Tree interface:
- * -- add range of points (recursive splitting add)
- * -- contains(pt)
- * -- nearestNeighbor(pt)
- * -- recursive delete
  */
 
 
@@ -61,7 +52,7 @@
  * }
  */
 
-template <bool CONCURRENT, typename T, typename GetPoint, typename DistFunc, unsigned int DIM=3>
+template <bool CONCURRENT, typename T, typename GetPoint, typename DistFunc>
 class KDtree {
 
 public:
