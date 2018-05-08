@@ -620,12 +620,6 @@ public:
     gNode* N = n;
     if (N->active) {
       N->active = false;
-      if ((!Directional || InOut) && edgesF.mustDel()) {
-	for (auto ii : edges(n, MethodFlag::UNPROTECTED))
-	  edgesF.delEdge(ii->second());
-//        for (auto ii : in_edges(n, MethodFlag::UNPROTECTED))
-//          edgesF.delEdge(ii->second());
-      }
       N->edges.clear();
     }
   }
@@ -667,7 +661,6 @@ public:
     } else {
       dst->first()->acquire(mflag);
       EdgeTy* e = dst->second();
-      edgesF.delEdge(e);
       dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
       src->erase(dst.base());
     }
