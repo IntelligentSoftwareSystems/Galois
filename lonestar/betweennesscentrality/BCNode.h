@@ -51,7 +51,7 @@ struct BCNode {
   unsigned distance;
   unsigned nsuccs;
 
-  uint64_t sigma; 
+  ShortPathType sigma; 
   double delta;
   double bc;
   int mark;

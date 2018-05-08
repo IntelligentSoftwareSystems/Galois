@@ -33,9 +33,12 @@
 #include "BCNode.h"
 #include "BCEdge.h"
 
+#include "galois/runtime/Profile.h"
+
 #include <iomanip>
 
-constexpr static const unsigned CHUNK_SIZE = 8u;
+// optimal chunk size may differ depending on input graph
+constexpr static const unsigned CHUNK_SIZE = 64u;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -175,7 +178,7 @@ struct BetweenessCentralityAsync {
 
     // make dst a successor of src, src predecessor of dst
     srcData.nsuccs++;
-    const uint64_t srcSigma = srcData.sigma;
+    const ShortPathType srcSigma = srcData.sigma;
     assert(srcSigma > 0);
     NodeType::predTY& dstPreds = dstData.preds;
     bool dstPredsNotEmpty = !dstPreds.empty();
@@ -203,21 +206,23 @@ struct BetweenessCentralityAsync {
     NodeType& srcData = graph.getData(srcID);
     NodeType& dstData = graph.getData(dstID);
 
-    const uint64_t srcSigma = srcData.sigma;
-    const uint64_t eval = ed.val;
-    const uint64_t diff = srcSigma - eval;
+    const ShortPathType srcSigma = srcData.sigma;
+    const ShortPathType eval = ed.val;
+    const ShortPathType diff = srcSigma - eval;
 
     srcData.unlock();
-    if (diff > 0) {
+    // greater than 0.0001 instead of 0 due to floating point imprecision
+    if (diff > 0.0001) {
       updateSigmaP2Count.update(1);
       ed.val = srcSigma;
 
-      uint64_t old = dstData.sigma;
+      //ShortPathType old = dstData.sigma;
       dstData.sigma += diff;
-      if (old >= dstData.sigma) {
-        galois::gDebug("Overflow detected; capping at max uint64_t");
-        dstData.sigma = std::numeric_limits<uint64_t>::max();
-      }
+
+      //if (old >= dstData.sigma) {
+      //  galois::gDebug("Overflow detected; capping at max uint64_t");
+      //  dstData.sigma = std::numeric_limits<uint64_t>::max();
+      //}
 
       int nbsuccs = dstData.nsuccs;
 
@@ -237,19 +242,19 @@ struct BetweenessCentralityAsync {
 
     NodeType& srcData = graph.getData(srcID);
     srcData.nsuccs++;
-    const uint64_t srcSigma = srcData.sigma;
+    const ShortPathType srcSigma = srcData.sigma;
 
     NodeType& dstData = graph.getData(dstID);
     dstData.preds.push_back(srcID);
 
-    const uint64_t dstSigma = dstData.sigma;
+    const ShortPathType dstSigma = dstData.sigma;
 
-    uint64_t old = dstData.sigma;
+    //ShortPathType old = dstData.sigma;
     dstData.sigma = dstSigma + srcSigma;
-    if (old >= dstData.sigma) {
-      galois::gDebug("Overflow detected; capping at max uint64_t");
-      dstData.sigma = std::numeric_limits<uint64_t>::max();
-    }
+    //if (old >= dstData.sigma) {
+    //  galois::gDebug("Overflow detected; capping at max uint64_t");
+    //  dstData.sigma = std::numeric_limits<uint64_t>::max();
+    //}
 
     ed.val = srcSigma;
     ed.level = srcData.distance;
@@ -263,6 +268,7 @@ struct BetweenessCentralityAsync {
   }
   
   void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
+    galois::runtime::profileVtune([&]() {
     galois::for_each(
       galois::iterate(wl), 
       [&] (ForwardPhaseWorkItem& wi, auto& ctx) {
@@ -312,6 +318,7 @@ struct BetweenessCentralityAsync {
       galois::no_conflicts(),
       galois::loopname("ForwardPhase")
     );
+    }, "forward");
   }
   
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
@@ -334,8 +341,12 @@ struct BetweenessCentralityAsync {
             uint32_t predID = srcPreds[i];
             NodeType& predData = graph.getData(predID);
 
+            assert(srcData.sigma >= 1);
             const double term = (double)predData.sigma * (1.0 + srcDelta) / 
                                 srcData.sigma; 
+            //if (std::isnan(term)) {
+            //  galois::gPrint(predData.sigma, " ", srcDelta, " ", srcData.sigma, "\n");
+            //}
             predData.lock();
             predData.delta += term;
             const unsigned prevPdNsuccs = predData.nsuccs;
@@ -423,6 +434,8 @@ int main(int argc, char** argv) {
   uint64_t nedges = bcGraph.sizeEdges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
   galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
+  galois::gInfo("Note that optimal chunk size may differ depending on input "
+                "graph");
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();

@@ -1,6 +1,8 @@
 #ifndef _BC_ASYNC_CONTROL_H_
 #define _BC_ASYNC_CONTROL_H_
 
+using ShortPathType = double;
+
 #define BC_COUNT_ACTIONS 0
 #define BC_COUNT_LEAVES 0
 
