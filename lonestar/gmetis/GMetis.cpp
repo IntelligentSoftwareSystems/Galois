@@ -51,19 +51,19 @@ static const char* url = "gMetis";
 
 static cll::opt<InitialPartMode> partMode(cll::desc("Choose a inital part mode:"),
     cll::values(
-      clEnumVal(GGP, "GGP."),
-      clEnumVal(GGGP, "GGGP, default."),
-      clEnumVal(MGGGP, "MGGGP."),
+      clEnumVal(GGP, "GGP"),
+      clEnumVal(GGGP, "GGGP (default)"),
+      clEnumVal(MGGGP, "MGGGP"),
       clEnumValEnd), cll::init(GGGP));
 static cll::opt<refinementMode> refineMode(cll::desc("Choose a refinement mode:"),
     cll::values(
       clEnumVal(BKL, "BKL"),
-      clEnumVal(BKL2, "BKL2, default."),
+      clEnumVal(BKL2, "BKL2 (default)"),
       clEnumVal(ROBO, "ROBO"),
       clEnumVal(GRACLUS, "GRACLUS"),
       clEnumValEnd), cll::init(BKL2));
 
-static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead binary based ones"), cll::init(false));
+static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead of binary galois gr files"), cll::init(false));
 static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
 static cll::opt<bool> verbose("verbose", cll::desc("verbose output (debugging mode, takes extra time)"), cll::init(false));
 static cll::opt<std::string> outfile("output", cll::desc("output partition file name"));
@@ -71,7 +71,7 @@ static cll::opt<std::string> orderedfile("ordered", cll::desc("output ordered gr
 static cll::opt<std::string> permutationfile("permutation", cll::desc("output permutation file name"));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
-static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size"), cll::init(0.01));
+static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size (default 0.01)"), cll::init(0.01));
 const double COARSEN_FRACTION = 0.9;
 
 /**
