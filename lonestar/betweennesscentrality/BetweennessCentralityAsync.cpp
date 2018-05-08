@@ -33,8 +33,6 @@
 #include "BCNode.h"
 #include "BCEdge.h"
 
-#include "galois/runtime/Profile.h"
-
 #include <iomanip>
 
 // optimal chunk size may differ depending on input graph
@@ -268,7 +266,6 @@ struct BetweenessCentralityAsync {
   }
   
   void dagConstruction(galois::InsertBag<ForwardPhaseWorkItem>& wl) {
-    galois::runtime::profileVtune([&]() {
     galois::for_each(
       galois::iterate(wl), 
       [&] (ForwardPhaseWorkItem& wi, auto& ctx) {
@@ -318,7 +315,6 @@ struct BetweenessCentralityAsync {
       galois::no_conflicts(),
       galois::loopname("ForwardPhase")
     );
-    }, "forward");
   }
   
   void dependencyBackProp(galois::InsertBag<uint32_t>& wl) {
@@ -451,8 +447,8 @@ int main(int argc, char** argv) {
   galois::preAlloc(std::min(
                      (uint64_t)
                      (std::min(galois::getActiveThreads(), 100u) * 
-                     std::max((nnodes / 4500000), (unsigned)2) * 
-                     std::max((nedges / 30000000), (uint64_t)2) * 
+                     std::max((nnodes / 4500000), (unsigned)5) * 
+                     std::max((nedges / 30000000), (uint64_t)5) * 
                      2.5), 
                      (uint64_t)1500
                    ) + 5);
