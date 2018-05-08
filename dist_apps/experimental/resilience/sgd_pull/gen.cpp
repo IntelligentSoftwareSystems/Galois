@@ -124,7 +124,6 @@ static double genRand() {
 }
 
 static double genVal(uint32_t n) {
-  // generate a random double in (-1,1)
   return 2.0 * ((double)n/(double)RAND_MAX) - 1.0;
 }
 

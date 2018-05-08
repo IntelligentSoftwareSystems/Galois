@@ -256,17 +256,19 @@ public:
   typename NodeInfoBase::reference getData() { return data; }
   /*
    * To support boost serialization
+   * IMPORTANT: This is temp fix for benchmarks using non-trivial structures in the
+   * nodeData (Eg. SGD)
    */
-  friend class boost::serialization::access;
-  template <typename Archive>
-  void save(Archive &ar, const unsigned int version) const {
-    ar << data;
-  }
-  template <typename Archive>
-  void load(Archive &ar, const unsigned int version) {
-    ar >> data ;
-  }
-  BOOST_SERIALIZATION_SPLIT_MEMBER()
+  //friend class boost::serialization::access;
+  //template <typename Archive>
+  //void save(Archive &ar, const unsigned int version) const {
+    //ar << data;
+  //}
+  //template <typename Archive>
+  //void load(Archive &ar, const unsigned int version) {
+    //ar >> data ;
+  //}
+  //BOOST_SERIALIZATION_SPLIT_MEMBER()
 };
 
 template<bool HasLockable>

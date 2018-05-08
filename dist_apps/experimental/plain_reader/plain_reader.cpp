@@ -35,6 +35,10 @@ constexpr static const char* const regionname = "PlainReader";
 /* Declaration of command line arguments */
 /******************************************************************************/
 
+static cll::opt<bool> sameFile("sameFile", 
+                               cll::desc("All processes read same file"),
+                               cll::init(false));
+
 /******************************************************************************/
 /* Main */
 /******************************************************************************/
@@ -51,6 +55,11 @@ int main(int argc, char** argv) {
 
   std::string netNum = 
       std::to_string(galois::runtime::getSystemNetworkInterface().ID);
+  
+  // if same file is set make all processes read _0
+  if (sameFile) {
+    netNum = "0";
+  }
 
   std::string newName = inputFile + "_" + netNum + ".gr";
   galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID, 

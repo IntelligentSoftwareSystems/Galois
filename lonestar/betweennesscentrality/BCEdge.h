@@ -34,7 +34,7 @@ struct BCEdge {
   using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
   NodeType* src;
   NodeType* dst;
-  uint64_t val;
+  ShortPathType val;
   unsigned level;
   
   BCEdge(NodeType* _src, NodeType* _dst) 

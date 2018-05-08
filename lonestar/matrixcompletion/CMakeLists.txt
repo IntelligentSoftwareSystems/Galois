@@ -6,4 +6,4 @@ if(Eigen_FOUND)
   add_definitions(-DHAS_EIGEN -DEIGEN_DONT_PARALLELIZE)
 endif()
 
-app(mc mc.cpp)
+app(matrixCompletion matrixCompletion.cpp)

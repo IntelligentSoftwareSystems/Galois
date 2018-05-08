@@ -45,19 +45,16 @@ struct BCNode {
                                              char>::type;
   LockType spinLock;
 
-  //typedef std::vector<BCNode*> predTY;
-  //using predTY = galois::gstl::Vector<uint32_t>;
-  using predTY = std::vector<uint32_t>;
-  //using predTY = llvm::SmallVector<uint32_t, 2>;
+  using predTY = galois::gstl::Vector<uint32_t>;
   predTY preds;
 
   unsigned distance;
   unsigned nsuccs;
 
-  uint64_t sigma; 
+  ShortPathType sigma; 
   double delta;
   double bc;
-  char mark;
+  int mark;
 
   BCNode() 
     : spinLock(), preds(), distance(infinity), nsuccs(0),
@@ -171,11 +168,11 @@ struct BCNode {
    * @returns true if mark is set to 1
    */
   template<bool M = UseMarking, typename std::enable_if<M>::type* = nullptr>
-  char isAlreadyIn() {
+  int isAlreadyIn() {
     if (Concurrent) {
       return __sync_fetch_and_or(&mark, 1);
     } else {
-      char retval = mark;
+      int retval = mark;
       mark = 1;
       return retval;
     }
@@ -185,7 +182,7 @@ struct BCNode {
    * @returns 0
    */
   template<bool M = UseMarking, typename std::enable_if<!M>::type* = nullptr>
-  char isAlreadyIn() {
+  int isAlreadyIn() {
     return 0;
   }
 

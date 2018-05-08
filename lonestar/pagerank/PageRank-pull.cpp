@@ -22,6 +22,8 @@
  *
  * Compute pageRank Pull version using residual.
  *
+ * @author Swarnendu Biswas <sbiswas@ices.utexas.edu>
+ *
  */
 
 #include "Lonestar/BoilerPlate.h"

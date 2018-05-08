@@ -51,24 +51,26 @@ struct CUDA_Context *cuda_ctx;
 /******************************************************************************/
 namespace cll = llvm::cl;
 static cll::opt<std::string> sourcesToUse("sourcesToUse",
-                                          cll::desc("Sources to use in BC"),
+                                          cll::desc("Whitespace separated list "
+                                                    "of sources in a file to "
+                                                    "use in BC (default empty)"),
                                           cll::init(""));
 static cll::opt<unsigned int> maxIterations("maxIterations", 
                                cll::desc("Maximum iterations: Default 10000"), 
                                cll::init(10000));
 static cll::opt<bool> singleSourceBC("singleSource", 
-                                cll::desc("Use for single source BC"),
+                                cll::desc("Use for single source BC (default off)"),
                                 cll::init(false));
 static cll::opt<unsigned long long> startSource("startNode",// not uint64_t due to a bug in llvm cl 
                                 cll::desc("Starting source node used for "
-                                          "betweeness-centrality"),
+                                          "betweeness-centrality (default 0)"),
                                 cll::init(0));
 static cll::opt<unsigned int> numberOfSources("numOfSources", 
                                 cll::desc("Number of sources to use for "
-                                          "betweeness-centraility"),
+                                          "betweeness-centraility (default all)"),
                                 cll::init(0));
 static cll::opt<bool> randomSources("randomSources", 
-                                cll::desc("Use random sources."),
+                                cll::desc("Use random sources (default false)"),
                                 cll::init(false));
 
 /******************************************************************************/

@@ -16,6 +16,16 @@ residual information to improve locality and use of memory bandwidth.
 Note that the pull variants expect a transpose graph.
 
 
+TUNING PERFORMANCE  
+
+The performance of the push and the pull versions depend on an optimal choice 
+of the the compile time constant, CHUNK_SIZE. For the pull version, CHUNK_SIZE 
+denotes the granularity of stolen work when work stealing is enabled (via 
+galois::steal()). The optimal value of the constant might depend on the 
+architecture, so you might want to evaluate the performance over a range of 
+values (say [16-4096]).
+
+
 BUILD
 
 $GALOIS_ROOT denotes the root of the Galois source. $BUILD_ROOT denotes the 

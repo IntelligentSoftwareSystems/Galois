@@ -23,9 +23,6 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Loc Hoang <l_hoang@utexas.edu>
  */
-
-//#define NDEBUG // Used in Debug build to prevent things from printing
-
 #include "Lonestar/BoilerPlate.h"
 #include "galois/ConditionalReduction.h"
 
@@ -36,11 +33,10 @@
 #include "BCNode.h"
 #include "BCEdge.h"
 
-#include "galois/runtime/Profile.h"
-
 #include <iomanip>
 
-constexpr static const unsigned CHUNK_SIZE = 8u;
+// optimal chunk size may differ depending on input graph
+constexpr static const unsigned CHUNK_SIZE = 64u;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters
@@ -52,6 +48,12 @@ static cll::opt<std::string> filename(cll::Positional,
                                       cll::desc("<input graph in Galois bin "
                                                 "format>"),
                                       cll::Required);
+
+static cll::opt<std::string> sourcesToUse("sourcesToUse",
+                                          cll::desc("Whitespace separated list "
+                                                    "of sources in a file to "
+                                                    "use in BC"),
+                                          cll::init(""));
 
 static cll::opt<unsigned int> startNode("startNode", 
                                         cll::desc("Node to start search from"),
@@ -71,12 +73,12 @@ static cll::opt<bool> generateCert("generateCertificate",
                                    cll::desc("Prints certificate at end of "
                                              "execution"),
                                    cll::init(false));
-// TODO better description
+// TODO bring this back
 //static cll::opt<bool> useNodeBased("useNodeBased",
 //                                   cll::desc("Use node based execution"),
 //                                   cll::init(true));
 
-using NodeType = BCNode<false, true>;
+using NodeType = BCNode<BC_USE_MARKING, BC_CONCURRENT>;
 using Graph = galois::graphs::B_LC_CSR_Graph<NodeType, BCEdge, false, true>;
 
 // Work items for the forward phase
@@ -174,7 +176,7 @@ struct BetweenessCentralityAsync {
 
     // make dst a successor of src, src predecessor of dst
     srcData.nsuccs++;
-    const uint64_t srcSigma = srcData.sigma;
+    const ShortPathType srcSigma = srcData.sigma;
     assert(srcSigma > 0);
     NodeType::predTY& dstPreds = dstData.preds;
     bool dstPredsNotEmpty = !dstPreds.empty();
@@ -202,21 +204,23 @@ struct BetweenessCentralityAsync {
     NodeType& srcData = graph.getData(srcID);
     NodeType& dstData = graph.getData(dstID);
 
-    const uint64_t srcSigma = srcData.sigma;
-    const uint64_t eval = ed.val;
-    const uint64_t diff = srcSigma - eval;
+    const ShortPathType srcSigma = srcData.sigma;
+    const ShortPathType eval = ed.val;
+    const ShortPathType diff = srcSigma - eval;
 
     srcData.unlock();
-    if (diff > 0) {
+    // greater than 0.0001 instead of 0 due to floating point imprecision
+    if (diff > 0.0001) {
       updateSigmaP2Count.update(1);
       ed.val = srcSigma;
 
-      uint64_t old = dstData.sigma;
+      //ShortPathType old = dstData.sigma;
       dstData.sigma += diff;
-      if (old >= dstData.sigma) {
-        galois::gDebug("Overflow detected; capping at max uint64_t");
-        dstData.sigma = std::numeric_limits<uint64_t>::max();
-      }
+
+      //if (old >= dstData.sigma) {
+      //  galois::gDebug("Overflow detected; capping at max uint64_t");
+      //  dstData.sigma = std::numeric_limits<uint64_t>::max();
+      //}
 
       int nbsuccs = dstData.nsuccs;
 
@@ -236,19 +240,19 @@ struct BetweenessCentralityAsync {
 
     NodeType& srcData = graph.getData(srcID);
     srcData.nsuccs++;
-    const uint64_t srcSigma = srcData.sigma;
+    const ShortPathType srcSigma = srcData.sigma;
 
     NodeType& dstData = graph.getData(dstID);
     dstData.preds.push_back(srcID);
 
-    const uint64_t dstSigma = dstData.sigma;
+    const ShortPathType dstSigma = dstData.sigma;
 
-    uint64_t old = dstData.sigma;
+    //ShortPathType old = dstData.sigma;
     dstData.sigma = dstSigma + srcSigma;
-    if (old >= dstData.sigma) {
-      galois::gDebug("Overflow detected; capping at max uint64_t");
-      dstData.sigma = std::numeric_limits<uint64_t>::max();
-    }
+    //if (old >= dstData.sigma) {
+    //  galois::gDebug("Overflow detected; capping at max uint64_t");
+    //  dstData.sigma = std::numeric_limits<uint64_t>::max();
+    //}
 
     ed.val = srcSigma;
     ed.level = srcData.distance;
@@ -308,6 +312,7 @@ struct BetweenessCentralityAsync {
         }
       },
       galois::wl<OBIM>(FPWorkItemIndexer()),
+      galois::no_conflicts(),
       galois::loopname("ForwardPhase")
     );
   }
@@ -332,8 +337,12 @@ struct BetweenessCentralityAsync {
             uint32_t predID = srcPreds[i];
             NodeType& predData = graph.getData(predID);
 
+            assert(srcData.sigma >= 1);
             const double term = (double)predData.sigma * (1.0 + srcDelta) / 
                                 srcData.sigma; 
+            //if (std::isnan(term)) {
+            //  galois::gPrint(predData.sigma, " ", srcDelta, " ", srcData.sigma, "\n");
+            //}
             predData.lock();
             predData.delta += term;
             const unsigned prevPdNsuccs = predData.nsuccs;
@@ -356,6 +365,7 @@ struct BetweenessCentralityAsync {
           srcData.unlock();
         }
       },
+      galois::no_conflicts(),
       galois::loopname("BackwardPhase")
     );
   }
@@ -390,11 +400,13 @@ int main(int argc, char** argv) {
     galois::gInfo("Running in serial mode");
   }
 
+  galois::gInfo("Constructing graph");
   // create bidirectional graph
   Graph bcGraph;
   galois::graphs::BufferedGraph<void> fileReader;
   fileReader.loadGraph(filename);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
+  bcGraph.constructNodes();
 
   galois::do_all(
     galois::iterate((uint32_t)0, fileReader.size()),
@@ -418,6 +430,8 @@ int main(int argc, char** argv) {
   uint64_t nedges = bcGraph.sizeEdges();
   galois::gInfo("Num nodes is ", nnodes, ", num edges is ", nedges);
   galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
+  galois::gInfo("Note that optimal chunk size may differ depending on input "
+                "graph");
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();
@@ -429,10 +443,17 @@ int main(int argc, char** argv) {
   bcExecutor.largestNodeDist.reset();
 
   galois::reportPageAlloc("MemAllocPre");
-  galois::preAlloc(galois::getActiveThreads() * nnodes / 2000000);
+  galois::gInfo("Going to pre-allocate pages");
+  galois::preAlloc(std::min(
+                     (uint64_t)
+                     (std::min(galois::getActiveThreads(), 100u) * 
+                     std::max((nnodes / 4500000), (unsigned)5) * 
+                     std::max((nedges / 30000000), (uint64_t)5) * 
+                     2.5), 
+                     (uint64_t)1500
+                   ) + 5);
+  galois::gInfo("Pre-allocation complete");
   galois::reportPageAlloc("MemAllocMid");
-
-  galois::StatTimer executionTimer;
 
   // reset everything in preparation for run
   galois::do_all(
@@ -448,36 +469,63 @@ int main(int argc, char** argv) {
     }
   );
 
+  // reading in list of sources to operate on if provided
+  std::ifstream sourceFile;
+  std::vector<uint64_t> sourceVector;
+  if (sourcesToUse != "") {
+    sourceFile.open(sourcesToUse);
+    std::vector<uint64_t> t(std::istream_iterator<uint64_t>{sourceFile},
+                            std::istream_iterator<uint64_t>{});
+    sourceVector = t;
+    sourceFile.close();
+  }
+
   if (numOfSources == 0) {
     numOfSources = nnodes;
   }
 
-  // if user specifies a certain number of out sources (i.e. only sources with
-  // outgoing edges), then we must loop over all nodes
+  // if user does specifes a certain number of out sources (i.e. only sources with
+  // outgoing edges), we need to loop over the entire node set to look for good 
+  // sources to use
   uint32_t goodSource = 0;
   if (numOfOutSources != 0) {
     numOfSources = nnodes;
   }
 
+  // only use at most the number of sources in the passed in source file (if
+  // such a file was actually pass in)
+  if (sourceVector.size() != 0) {
+    if (numOfSources > sourceVector.size()) {
+      numOfSources = sourceVector.size();
+    }
+  }
+
   galois::InsertBag<ForwardPhaseWorkItem> forwardPhaseWL;
   galois::InsertBag<uint32_t> backwardPhaseWL;
 
+  galois::gInfo("Beginning execution");
+
+  galois::StatTimer executionTimer;
   executionTimer.start();
   for (uint32_t i = startNode; i < numOfSources; ++i) {
+    uint32_t sourceToUse = i;
+    if (sourceVector.size() != 0) {
+      sourceToUse = sourceVector[i];
+    }
+
     // ignore nodes with no neighbors
-    if (!std::distance(bcGraph.edge_begin(i), bcGraph.edge_end(i))) {
+    if (!std::distance(bcGraph.edge_begin(sourceToUse), bcGraph.edge_end(sourceToUse))) {
+      galois::gDebug(sourceToUse, " has no outgoing edges");
       continue;
     }
 
-    forwardPhaseWL.push_back(ForwardPhaseWorkItem(i, 0));
-    NodeType& active = bcGraph.getData(i);
+    forwardPhaseWL.push_back(ForwardPhaseWorkItem(sourceToUse, 0));
+    NodeType& active = bcGraph.getData(sourceToUse);
     active.initAsSource();
-    //galois::gDebug("Source is ", i);
+    galois::gDebug("Source is ", sourceToUse);
 
     bcExecutor.dagConstruction(forwardPhaseWL);
     forwardPhaseWL.clear();
-
-    //if (DOCHECKS) graph.checkGraph(active);
 
     bcExecutor.leafCount.reset();
     bcExecutor.findLeaves(backwardPhaseWL, nnodes);
@@ -493,14 +541,14 @@ int main(int argc, char** argv) {
 
     backwardPhaseWL.clear();
 
-    //if (DOCHECKS) graph.checkSteadyState2();
-
     // break out once number of sources user specified to do (if any) has been 
     // reached
     goodSource++;
     if (numOfOutSources != 0 && goodSource >= numOfOutSources) break;
   }
   executionTimer.stop();
+
+  galois::gInfo("Number of sources with outgoing edges was ", goodSource);
 
   galois::reportPageAlloc("MemAllocPost");
 
@@ -519,7 +567,6 @@ int main(int argc, char** argv) {
 
   // prints out first 10 node BC values
   if (!skipVerify) {
-    //graph.verify(); // TODO see what this does/what it is supposed to do
     int count = 0;
     for (unsigned i = 0; i < nnodes && count < 10; ++i, ++count) {
       galois::gPrint(count, ": ", std::setiosflags(std::ios::fixed), 
