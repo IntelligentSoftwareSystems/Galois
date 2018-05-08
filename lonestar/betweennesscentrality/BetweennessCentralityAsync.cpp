@@ -309,6 +309,7 @@ struct BetweenessCentralityAsync {
         }
       },
       galois::wl<OBIM>(FPWorkItemIndexer()),
+      galois::no_conflicts(),
       galois::loopname("ForwardPhase")
     );
   }
@@ -357,6 +358,7 @@ struct BetweenessCentralityAsync {
           srcData.unlock();
         }
       },
+      galois::no_conflicts(),
       galois::loopname("BackwardPhase")
     );
   }
