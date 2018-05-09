@@ -403,6 +403,10 @@ int main(int argc, char** argv) {
   galois::gInfo("Constructing graph");
   // create bidirectional graph
   Graph bcGraph;
+
+  galois::StatTimer graphConstructTimer("GRAPH_CONSTRUCT");
+  graphConstructTimer.start();
+
   galois::graphs::BufferedGraph<void> fileReader;
   fileReader.loadGraph(filename);
   bcGraph.allocateFrom(fileReader.size(), fileReader.sizeEdges());
@@ -423,6 +427,8 @@ int main(int argc, char** argv) {
     }
   );
   bcGraph.constructIncomingEdges();
+
+  graphConstructTimer.stop();
 
   BetweenessCentralityAsync bcExecutor(bcGraph);
 
