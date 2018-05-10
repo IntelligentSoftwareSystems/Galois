@@ -431,16 +431,7 @@ struct MatchingABMP {
     edge_iterator ei = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
-    while (ii != ei) {
-      if ((src < numA) == *g.getEdgeData(ii)) {
-        ++ii;
-        continue;
-      }
-      auto neighbor = g.getEdgeDst(ii);
-      if (g.getData(neighbor, flag).layer == l) break;
-      ++ii;
-      ++dsrc.next;
-    }
+    for (; ii != ei && (src < numA == *g.getEdgeData(ii) || g.getData(g.getEdgeDst(ii), flag).layer != l); ++ii, ++dsrc.next) { ; }
 
     if (ii == ei) {
       return nullptr;
