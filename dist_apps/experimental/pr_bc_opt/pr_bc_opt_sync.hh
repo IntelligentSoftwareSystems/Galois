@@ -30,27 +30,28 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 struct APSPReduce {
-  // TODO change to triple (constant size)
-  using ValTy = galois::gstl::Vector<uint64_t>;
+  using ValTy = std::pair<std::pair<uint32_t, uint32_t>, ShortPathType>;
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
 
-    // declare vector to be sent
-    ValTy vecToSend;
-    vecToSend.emplace_back(indexToGet);
+    uint32_t a;
+    uint32_t b;
+    ShortPathType c;
+
+    a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      vecToSend.emplace_back(node.minDistances[indexToGet]);
-      vecToSend.emplace_back(node.shortestPathNumbers[indexToGet]);
+      b = node.minDistances[indexToGet];
+      c = node.shortestPathNumbers[indexToGet];
       node.shortestPathNumbers[indexToGet] = 0;
     } else {
       // no-op
-      vecToSend.emplace_back(infinity);
-      vecToSend.emplace_back(0);
+      b = infinity;
+      c = 0;
     }
 
-    return vecToSend;
+    return ValTy(std::pair<uint32_t, uint32_t>(a, b), c);
   }
 
   static bool extract_reset_batch(unsigned, unsigned long int*,
@@ -60,11 +61,11 @@ struct APSPReduce {
   static bool extract_reset_batch(unsigned, ValTy*) { return false; }
 
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
-    uint32_t rIndex = y[0];
+    uint32_t rIndex = y.first.first;
 
     if (rIndex != infinity) {
-      uint32_t rDistance = y[1];
-      uint64_t rNumPaths = y[2];
+      uint32_t rDistance = y.first.second;
+      ShortPathType rNumPaths = y.second;
 
       // do updates based on received numbers
       uint32_t old = galois::min(node.minDistances[rIndex], rDistance);
@@ -74,18 +75,18 @@ struct APSPReduce {
         assert(rNumPaths != 0);
         node.shortestPathNumbers[rIndex] = rNumPaths;
       } else if (old == rDistance) {
-        uint64_t oldS = node.shortestPathNumbers[rIndex];
+        //uint64_t oldS = node.shortestPathNumbers[rIndex];
 
         // add to short path
         node.shortestPathNumbers[rIndex] += rNumPaths;
 
         // overflow
-        if (oldS > node.shortestPathNumbers[rIndex]) {
-          galois::gDebug("Overflow detected in sync; capping at max uint64_t");
-          galois::gDebug(oldS, " ", rNumPaths);
-          node.shortestPathNumbers[rIndex] = 
-            std::numeric_limits<uint64_t>::max();
-        }
+        //if (oldS > node.shortestPathNumbers[rIndex]) {
+        //  galois::gDebug("Overflow detected in sync; capping at max uint64_t");
+        //  galois::gDebug(oldS, " ", rNumPaths);
+        //  node.shortestPathNumbers[rIndex] = 
+        //    std::numeric_limits<uint64_t>::max();
+        //}
       }
 
       // if received distance is smaller than current candidate for sending, send
@@ -123,26 +124,28 @@ struct APSPReduce {
 };
 
 struct APSPBroadcast {
-  using ValTy = galois::gstl::Vector<uint64_t>;
+  using ValTy = std::pair<std::pair<uint32_t, uint32_t>, ShortPathType>;
 
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {
     uint32_t indexToGet = node.roundIndexToSend;
 
-    // declare vector to be sent
-    ValTy vecToSend;
-    vecToSend.emplace_back(indexToGet);
+    uint32_t a;
+    uint32_t b;
+    ShortPathType c;
 
+    a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      vecToSend.emplace_back(node.minDistances[indexToGet]);
-      vecToSend.emplace_back(node.shortestPathNumbers[indexToGet]);
-      assert(vecToSend[2] != 0); // should not send out 0 for # paths
+      b = node.minDistances[indexToGet];
+      c = node.shortestPathNumbers[indexToGet];
+      assert(c != 0); // should not send out 0 for # paths
     } else {
-      vecToSend.emplace_back(infinity);
-      vecToSend.emplace_back(0);
+      // no-op
+      b = infinity;
+      c = 0;
     }
 
-    return vecToSend;
+    return ValTy(std::pair<uint32_t, uint32_t>(a, b), c);
   }
 
   static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
@@ -151,10 +154,10 @@ struct APSPBroadcast {
   static bool extract_batch(unsigned, ValTy*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
-    uint32_t rIndex = y[0];
+    uint32_t rIndex = y.first.first;
     if (rIndex != infinity) {
-      uint32_t rDistance = y[1];
-      uint32_t rNumPaths = y[2];
+      uint32_t rDistance = y.first.second;
+      ShortPathType rNumPaths = y.second;
 
       // values from master are canonical ones for this round
       node.roundIndexToSend = rIndex;

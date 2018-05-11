@@ -36,6 +36,9 @@ constexpr static const char* const REGION_NAME = "PR_BC";
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
+// type of short path
+using ShortPathType = double;
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -76,7 +79,7 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 // need to be changed for very large graphs
 struct NodeData {
   galois::gstl::Vector<uint32_t> minDistances; // current min distances for each source
-  galois::gstl::Vector<uint64_t> shortestPathNumbers; // actual shortest path number
+  galois::gstl::Vector<ShortPathType> shortestPathNumbers; // actual shortest path number
   galois::gstl::Vector<char> sentFlag; // marks if message has been sent for a source
   uint32_t roundIndexToSend; // index that needs to be sent in a round
   // round numbers saved for determining when to send out back-prop messages
@@ -285,7 +288,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
               src_data.shortestPathNumbers[indexToSend];
           } else if (oldValue == newValue) {
             assert(src_data.shortestPathNumbers[indexToSend] != 0);
-            uint64_t old = dnode.shortestPathNumbers[indexToSend];
+            ShortPathType old = dnode.shortestPathNumbers[indexToSend];
 
             // add to short path
             dnode.shortestPathNumbers[indexToSend] += 
@@ -666,6 +669,9 @@ int main(int argc, char** argv) {
         galois::gDebug(nodesToConsider[i]);
       }
 
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::gPrint("Begin batch #", macroRound, "\n");
+      }
       StatTimer_main.start();
       InitializeIteration(*hg, nodesToConsider);
 
@@ -735,7 +741,7 @@ int main(int argc, char** argv) {
         //galois::runtime::printOutput(v_out);
 
         uint64_t a = 0;
-        uint64_t b = 0;
+        ShortPathType b = 0;
         uint64_t c = 0;
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           if ((*hg).getData(*ii).minDistances[i] != infinity) {
@@ -747,7 +753,7 @@ int main(int argc, char** argv) {
           }
         }
         // outputs min distance and short path numbers
-        sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
+        //sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
         //sprintf(v_out, "%lu %lu %lu\n", (*hg).getGID(*ii), a, c);
         //sprintf(v_out, "%lu %lu\n", (*hg).getGID(*ii), b);
         //sprintf(v_out, "%lu %u %lu\n", (*hg).getGID(*ii),
