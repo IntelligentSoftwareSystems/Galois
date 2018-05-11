@@ -46,6 +46,10 @@ constexpr static const char* const REGION_NAME = "BC";
 struct CUDA_Context *cuda_ctx;
 #endif
 
+
+// type of the num shortest paths variable
+using ShortPathType = double;
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -55,9 +59,6 @@ static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                                     "of sources in a file to "
                                                     "use in BC (default empty)"),
                                           cll::init(""));
-static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 10000"), 
-                               cll::init(10000));
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC (default off)"),
                                 cll::init(false));
@@ -88,11 +89,11 @@ struct NodeData {
   uint32_t old_length;
 
   // Betweeness centrality vars
-  uint64_t num_shortest_paths; // 64 because # paths can get really big
+  ShortPathType num_shortest_paths; 
   uint32_t num_successors;
   std::atomic<uint32_t> num_predecessors;
   std::atomic<uint32_t> trim;
-  std::atomic<uint64_t> to_add;
+  std::atomic<ShortPathType> to_add;
 
   float to_add_float;
   float dependency;
@@ -702,7 +703,7 @@ struct NumShortestPaths {
           edge_weight += graph->getEdgeData(current_edge);
           #endif
 
-          uint64_t paths_to_add = src_data.num_shortest_paths;
+          ShortPathType paths_to_add = src_data.num_shortest_paths;
 
           #ifdef BCDEBUG
           if (paths_to_add < 1) {
@@ -1066,7 +1067,7 @@ struct BC {
         current_src_node = i;
       }
 
-      galois::gDebug("Current source node for BC is ", current_src_node);
+      galois::gPrint("Current source node for BC is ", current_src_node, "\n");
 
       #ifndef NDEBUG
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -1226,10 +1227,6 @@ int main(int argc, char** argv) {
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
-  if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
-                                (unsigned long)maxIterations);
-  }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
