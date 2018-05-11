@@ -99,7 +99,7 @@ struct InitializeGraph {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(_graph.get_run_identifier(
-                               "CUDA_DO_ALL_IMPL_InitializeGraph_"));
+                               "InitializeGraph_"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         InitializeGraph_cuda(*(allNodes.begin()), *(allNodes.end()),
@@ -143,7 +143,7 @@ struct FirstItr_BFS {
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(_graph.get_run_identifier(
-                             "CUDA_DO_ALL_IMPL_BFS_"));
+                             "BFS_"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
@@ -203,7 +203,7 @@ struct BFS {
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BFS"));
+        std::string impl_str(_graph.get_run_identifier("BFS"));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
         StatTimer_cuda.start();
         int __retval = 0;

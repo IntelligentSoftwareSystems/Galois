@@ -97,7 +97,7 @@ struct DegreeCounting {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_DegreeCounting_" + 
+      std::string impl_str("DegreeCounting_" + 
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -147,7 +147,7 @@ struct InitializeGraph {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+      std::string impl_str("InitializeGraph_" + 
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -219,7 +219,7 @@ struct LiveUpdate {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_LiveUpdate_" + 
+      std::string impl_str("LiveUpdate_" + 
                            (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -297,7 +297,7 @@ struct KCore {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_KCore_" + 
+        std::string impl_str("KCore_" + 
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();

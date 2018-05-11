@@ -82,7 +82,7 @@ struct InitializeGraph {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        std::string impl_str("InitializeGraph_" + 
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -115,7 +115,7 @@ struct FirstItr_ConnectedComp{
     _graph.set_num_iter(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
+      std::string impl_str("ConnectedComp_" + 
                              (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -176,7 +176,7 @@ struct ConnectedComp {
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_ConnectedComp_" + 
+        std::string impl_str("ConnectedComp_" + 
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();

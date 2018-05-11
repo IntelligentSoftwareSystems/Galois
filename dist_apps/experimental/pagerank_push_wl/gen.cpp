@@ -151,7 +151,7 @@ struct ResetGraph {
     auto& allNodes = _graph.allNodesRange();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_ResetGraph_" + (_graph.get_run_identifier()));
+        std::string impl_str("ResetGraph_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         ResetGraph_cuda(*allNodes.begin(), *allNodes.end(), cuda_ctx);
@@ -192,7 +192,7 @@ struct InitializeGraph {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        std::string impl_str("InitializeGraph_" + 
           (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -241,7 +241,7 @@ struct PageRank_delta {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
+      std::string impl_str("PageRank_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
       PageRank_delta_cuda(*nodesWithEdges.begin(), *nodesWithEdges.end(),
@@ -296,7 +296,7 @@ struct PageRank {
       dga.reset();
       #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_PageRank_" + (_graph.get_run_identifier()));
+        std::string impl_str("PageRank_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
         int __retval = 0;
