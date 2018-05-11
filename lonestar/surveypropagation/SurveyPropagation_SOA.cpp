@@ -482,7 +482,7 @@ class SurveyPropagation {
 
           //for each function a
           for (auto aii : graph.edges(i, galois::MethodFlag::UNPROTECTED)) {
-            GNode i = graph.getEdgeDst(aii);
+            //GNode i = graph.getEdgeDst(aii);
             SPEdge& aie = graph.getEdgeData(aii, galois::MethodFlag::UNPROTECTED);
 
             double etaai = aie.eta;

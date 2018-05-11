@@ -302,7 +302,7 @@ void SP_algorithm(Graph& graph,
         //{}
 
         auto a_data = graph.getData(a);
-        ++graph.getData(a).t;
+        ++(a_data.t);
 
         //for each i
         for (auto iii : graph.edges(a, galois::MethodFlag::UNPROTECTED)) {
