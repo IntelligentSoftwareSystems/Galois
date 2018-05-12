@@ -1,3 +1,4 @@
+app(surveypropagation_AOS SurveyPropagation_AOS.cpp)
 app(surveypropagation SurveyPropagation.cpp)
 
 add_test_scale(small surveypropagation 9 100 300 3)
