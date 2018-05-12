@@ -91,7 +91,9 @@ int main(int argc, char **argv) {
 //! [ReadGraph]
 
   //! Use a lambda as the operator
-  galois::do_all(galois::iterate(graph.begin(), graph.end()), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+      [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; }
+  );
 
   using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
@@ -107,11 +109,14 @@ int main(int argc, char **argv) {
   //!use a structure as an operator and pass a loopname for stats
   std::string schedule = argv[2];
   if ("dchunk1" == schedule) {
-    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<dChunkedLIFO<1> >(), galois::loopname("sssp_dchunk1"));
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}
+        , galois::wl<dChunkedLIFO<1> >(), galois::loopname("sssp_dchunk1"));
   } else if ("dchunk16" == schedule) {
-    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<dChunk>(), galois::loopname("sssp_dchunk16"));
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}
+        , galois::wl<dChunk>(), galois::loopname("sssp_dchunk16"));
   } else if ("obim" == schedule) {
-    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_obim"));
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}
+        , galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_obim"));
   } else {
     std::cerr << "Unknown schedule " << schedule << std::endl;
     return 1;
