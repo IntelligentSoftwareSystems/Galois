@@ -148,13 +148,10 @@ int main(int argc, char** argv) {
   Graph graph;
   constructTorus(graph, N, N);
 
-  // pull operator
-  galois::do_all(galois::iterate(graph),
+  // read/write only a node itself
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
       [&] (GNode n) {
-        auto& data = graph.getData(n);
-        data = 0;
-        for (auto e: graph.edges(n))
-          data += 1;
+        graph.getData(n) = std::distance(graph.edge_begin(n), graph.edge_end(n));
       }
       , galois::loopname("do_all")
   );
@@ -164,12 +161,14 @@ int main(int argc, char** argv) {
   galois::do_all(galois::iterate(graph), Init{graph});
   galois::for_each(galois::iterate(graph.begin(), graph.end()), 
       IncrementNeighbors(graph)
-      , galois::loopname("for_each"));
+      , galois::loopname("for_each")
+//      , galois::no_pushes()
+  );
   verify(graph, N);
 
   // push operator with self synchronization in optimized for_each
   galois::do_all(galois::iterate(graph), Init{graph});
-  galois::for_each(galois::iterate(graph),
+  galois::for_each(galois::iterate(graph.begin(), graph.end()),
       IncrementNeighborSelfSync{graph}
       , galois::loopname("for_each_self_sync")
       , galois::no_conflicts()
@@ -179,10 +178,11 @@ int main(int argc, char** argv) {
 
   // push operator with self synchronization in do_all
   galois::do_all(galois::iterate(graph), Init{graph});
-  galois::do_all(galois::iterate(graph),
+  galois::do_all(galois::iterate(graph.begin(), graph.end()),
       IncrementNeighborSelfSync{graph}
       , galois::loopname("do_all_self_sync")
       , galois::steal()
+      , galois::chunk_size<32>()
   );
   verify(graph, N);
 
