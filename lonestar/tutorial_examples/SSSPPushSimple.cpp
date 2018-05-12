@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
   galois::SharedMemSys G;
   galois::setActiveThreads(256); // Galois will cap at hw max
 
-  if (argc != 2) {
-    std::cout << "Usage: " << argv[0] << " filename\n";
+  if (argc != 3) {
+    std::cout << "Usage: " << argv[0] << " filename <dchunk1|dchunk16|obim>\n";
     return 1;
   } else {
     std::cout << "Note: This is just a very simple example and provides no useful information for performance\n";
@@ -105,7 +105,17 @@ int main(int argc, char **argv) {
   //! [for_each in SSSPPushSimple]
   std::array<GNode,1> init = {*graph.begin()};
   //!use a structure as an operator and pass a loopname for stats
-  galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_run_loop"));
+  std::string schedule = argv[2];
+  if ("dchunk1" == schedule) {
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<dChunkedLIFO<1> >(), galois::loopname("sssp_dchunk1"));
+  } else if ("dchunk16" == schedule) {
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<dChunk>(), galois::loopname("sssp_dchunk16"));
+  } else if ("obim" == schedule) {
+    galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_obim"));
+  } else {
+    std::cerr << "Unknown schedule " << schedule << std::endl;
+    return 1;
+  }
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;
