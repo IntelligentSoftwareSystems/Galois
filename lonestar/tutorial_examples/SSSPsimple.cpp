@@ -47,7 +47,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 void relax_edge(unsigned src_data, Graph::edge_iterator ii, 
-		galois::UserContext<UpdateRequest>& ctx) {
+		auto& ctx) {
   GNode dst = graph.getEdgeDst(ii);
     //![get edge and node data] 
   unsigned int edge_data = graph.getEdgeData(ii);
@@ -62,7 +62,7 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
 
 //! [Operator in SSSPsimple]
 struct SSSP {
-  void operator()(UpdateRequest& req, galois::UserContext<UpdateRequest>& ctx) const {
+  void operator()(UpdateRequest& req, auto& ctx) const {
     GNode active_node = req.second;
     unsigned& data = graph.getData(active_node);
     if (req.first > data) return;
@@ -76,21 +76,21 @@ struct SSSP {
 //! [Operator in SSSPsimple]
 
 struct Init {
-  void operator()(GNode& n, galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode& n, auto& ctx) const {
     graph.getData(n) = DIST_INFINITY;
   }
 };
 
 
 int main(int argc, char **argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, 0,0,0);
 
 //! [ReadGraph]
   galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
-  galois::for_each(graph.begin(), graph.end(), Init());
+  galois::for_each(galois::iterate(graph.begin(), graph.end()), Init());
 
   //! [OrderedByIntegerMetic in SSSPsimple]
   struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPsimple]
   UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
-  galois::for_each(&init[0], &init[1], SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
+  galois::for_each(galois::iterate(&init[0], &init[1]), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPsimple]
   T.stop();
   return 0;

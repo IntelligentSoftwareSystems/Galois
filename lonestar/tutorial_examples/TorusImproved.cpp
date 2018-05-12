@@ -43,10 +43,10 @@ struct IncrementNeighbors {
   IncrementNeighbors(Graph& g): g(g) { }
 
   //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, auto& ctx) {
     // For each outgoing edge (n, dst)
     //for (auto ii : g.edges(n)) {
-    for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
+    for (auto ii: g.edges(n)) {
       GNode dst = g.getEdgeDst(ii);
       int& data = g.getData(dst);
       // Increment node data by 1
@@ -129,7 +129,7 @@ void constructTorus(Graph& g, int height, int width) {
 
   // Using space-filling order, assign nodes and create (and allocate) them in parallel
   std::vector<GNode> nodes(numNodes);
-  galois::do_all(points.begin(), points.end(), CreateNodes(g, nodes, height));
+  galois::do_all(galois::iterate(points.begin(), points.end()), CreateNodes(g, nodes, height));
 
   // Add edges
   for (int x = 0; x < width; ++x) {
@@ -148,6 +148,8 @@ void constructTorus(Graph& g, int height, int width) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
+
   if (argc < 3) {
     std::cerr << "<num threads> <sqrt grid size>\n";
     return 1;
@@ -169,7 +171,7 @@ int main(int argc, char** argv) {
   // based on which thread created each node (galois::for_each uses a simple
   // blocking of the iterator range to initialize work, but the iterator order
   // of a Graph is implementation-defined). 
-  galois::for_each(graph, IncrementNeighbors(graph));
+  galois::for_each(galois::iterate(graph), IncrementNeighbors(graph));
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";

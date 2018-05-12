@@ -47,7 +47,7 @@ struct SSSP {
   Graph& graph;
   SSSP(Graph& _g) :graph(_g) {}
 
-  void operator()(GNode active_node, galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode active_node, auto& ctx) const {
     //![Get the value on the node]
     unsigned data = graph.getData(active_node);
 
@@ -75,7 +75,7 @@ struct UpdateRequestIndexer {
 
 
 int main(int argc, char **argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   galois::setActiveThreads(256); // Galois will cap at hw max
 
   if (argc != 2) {
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
 //! [ReadGraph]
 
   //! Use a lambda as the operator
-  galois::do_all(graph.begin(), graph.end(), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
+  galois::do_all(galois::iterate(graph.begin(), graph.end()), [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; });
 
   using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
   //! [for_each in SSSPPushSimple]
   std::array<GNode,1> init = {*graph.begin()};
   //!use a structure as an operator and pass a loopname for stats
-  galois::for_each(init.begin(), init.end(), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_run_loop"));
+  galois::for_each(galois::iterate(init.begin(), init.end()), SSSP{graph}, galois::wl<OBIM>(UpdateRequestIndexer{graph}), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;

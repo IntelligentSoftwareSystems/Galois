@@ -43,10 +43,10 @@ struct IncrementNeighbors {
   IncrementNeighbors(Graph& g): g(g) { }
 
   //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, galois::UserContext<GNode>& ctx) {
+  void operator()(GNode n, auto& ctx) {
     // For each outgoing edge (n, dst)
     //! [loop over neighbors]
-    for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
+    for (auto ii: g.edges(n)) {
       GNode dst = g.getEdgeDst(ii);
       //! [access node data]
       int& data = g.getData(dst);
@@ -100,6 +100,8 @@ void constructTorus(Graph& g, int height, int width) {
 }
 
 int main(int argc, char** argv) {
+  galois::SharedMemSys G;
+
   if (argc < 3) {
     std::cerr << "<num threads> <sqrt grid size>\n";
     return 1;
@@ -115,7 +117,7 @@ int main(int argc, char** argv) {
 
   galois::StatTimer T;
   T.start();
-  galois::for_each(graph.begin(), graph.end(), IncrementNeighbors(graph));
+  galois::for_each(galois::iterate(graph.begin(), graph.end()), IncrementNeighbors(graph));
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";
