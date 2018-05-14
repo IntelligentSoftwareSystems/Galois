@@ -20,7 +20,7 @@ struct SumEdgeWeightAtomic {
   SumEdgeWeightAtomic(Graph& g): g(g) {}
 
   void operator()(const GNode n) const {
-    for (auto e: g.edges(n)) {                     // cautious point
+    for (auto e: g.edges(n)) {
       auto dst = g.getEdgeDst(e);
       auto& dstData = g.getData(dst);
       auto edgeWeight = g.getEdgeData(e);

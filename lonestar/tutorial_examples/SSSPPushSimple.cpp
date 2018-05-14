@@ -17,7 +17,7 @@ using UpdateRequest = std::pair<unsigned, GNode>;
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max();
 
-unsigned stepShift = 11;
+unsigned int stepShift = 11;
 
 // functor for the operator in this example
 struct SSSP {
@@ -26,7 +26,7 @@ struct SSSP {
 
   void operator()(GNode active_node, auto& ctx) const {
     // Get the value on the node
-    unsigned data = graph.getData(active_node);
+    unsigned int data = graph.getData(active_node);
 
     // loop over neighbors to compute new value
     for (auto ii : graph.edges(active_node)) {                 // cautious point
