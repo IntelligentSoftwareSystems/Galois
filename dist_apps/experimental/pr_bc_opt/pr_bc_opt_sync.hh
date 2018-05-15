@@ -30,7 +30,7 @@
 ////////////////////////////////////////////////////////////////////////////////
 
 struct APSPReduce {
-  using ValTy = std::pair<std::pair<uint32_t, uint32_t>, ShortPathType>;
+  using ValTy = galois::TupleOfThree<uint32_t, uint32_t, ShortPathType>;
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
@@ -51,7 +51,7 @@ struct APSPReduce {
       c = 0;
     }
 
-    return ValTy(std::pair<uint32_t, uint32_t>(a, b), c);
+    return ValTy(a, b, c);
   }
 
   static bool extract_reset_batch(unsigned, unsigned long int*,
@@ -61,11 +61,11 @@ struct APSPReduce {
   static bool extract_reset_batch(unsigned, ValTy*) { return false; }
 
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
-    uint32_t rIndex = y.first.first;
+    uint32_t rIndex = y.first;
 
     if (rIndex != infinity) {
-      uint32_t rDistance = y.first.second;
-      ShortPathType rNumPaths = y.second;
+      uint32_t rDistance = y.second;
+      ShortPathType rNumPaths = y.third;
 
       // do updates based on received numbers
       uint32_t old = galois::min(node.minDistances[rIndex], rDistance);
@@ -124,7 +124,7 @@ struct APSPReduce {
 };
 
 struct APSPBroadcast {
-  using ValTy = std::pair<std::pair<uint32_t, uint32_t>, ShortPathType>;
+  using ValTy = galois::TupleOfThree<uint32_t, uint32_t, ShortPathType>;
 
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {
     uint32_t indexToGet = node.roundIndexToSend;
@@ -145,7 +145,7 @@ struct APSPBroadcast {
       c = 0;
     }
 
-    return ValTy(std::pair<uint32_t, uint32_t>(a, b), c);
+    return ValTy(a, b, c);
   }
 
   static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
@@ -154,10 +154,10 @@ struct APSPBroadcast {
   static bool extract_batch(unsigned, ValTy*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
-    uint32_t rIndex = y.first.first;
+    uint32_t rIndex = y.first;
     if (rIndex != infinity) {
-      uint32_t rDistance = y.first.second;
-      ShortPathType rNumPaths = y.second;
+      uint32_t rDistance = y.second;
+      ShortPathType rNumPaths = y.third;
 
       // values from master are canonical ones for this round
       node.roundIndexToSend = rIndex;
