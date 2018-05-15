@@ -65,7 +65,6 @@ distApp(kcore_push)
 distApp(kcore_pull)
 
 distApp(pagerank_pull)
-distAppNoGPU(pagerank_pull_topo)
 distApp(pagerank_push)
 
 distAppNoGPU(sgd)
