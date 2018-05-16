@@ -155,7 +155,7 @@ struct InitializeGraph {
     auto& allNodes = _graph.allNodesRange();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        std::string impl_str("CUDA_DO_ALL_IMPL_InitializeGraph_" + 
+        std::string impl_str("InitializeGraph_" + 
                              (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str());
         StatTimer_cuda.start();
@@ -204,7 +204,7 @@ struct BFS {
 
       #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) {
-          std::string impl_str("CUDA_DO_ALL_IMPL_BFS_" + (_graph.get_run_identifier()));
+          std::string impl_str("BFS_" + (_graph.get_run_identifier()));
           galois::StatTimer StatTimer_cuda(impl_str.c_str());
           StatTimer_cuda.start();
           int __retval = 0;

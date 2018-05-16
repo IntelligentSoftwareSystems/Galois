@@ -168,7 +168,7 @@ struct InitializeGraph {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+        _graph.get_run_identifier("InitializeGraph")
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -236,7 +236,7 @@ struct InitializeGraph_crashed {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+        _graph.get_run_identifier("InitializeGraph")
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -283,7 +283,7 @@ struct InitializeGraph_healthy {
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(
-        _graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
+        _graph.get_run_identifier("InitializeGraph")
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
@@ -333,7 +333,7 @@ struct SGD_mergeResidual {
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str("CUDA_DO_ALL_IMPL_SGD_" + (_graph.get_run_identifier()));
+      std::string impl_str("SGD_" + (_graph.get_run_identifier()));
       galois::StatTimer StatTimer_cuda(impl_str.c_str());
       StatTimer_cuda.start();
       int __retval = 0;

@@ -34,6 +34,7 @@
 #include <assert.h>
 
 namespace galois {
+  /* Concurrent dynamically allocated bitset */
   class DynamicBitSet {
     std::vector<galois::CopyableAtomic<uint64_t>> bitvec;
     size_t num_bits;

@@ -4,9 +4,9 @@
 // ToAdd
 ////////////////////////////////////////////////////////////////////////////
 
-GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add, uint64_t);
-GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add, uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(to_add, uint64_t);
+GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add, ShortPathType);
+GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add, ShortPathType);
+GALOIS_SYNC_STRUCTURE_BROADCAST(to_add, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(to_add);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -22,8 +22,8 @@ GALOIS_SYNC_STRUCTURE_BITSET(to_add_float);
 // # short paths
 ////////////////////////////////////////////////////////////////////////////
 
-GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, uint64_t);
+GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, ShortPathType);
+GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 
 ////////////////////////////////////////////////////////////////////////////

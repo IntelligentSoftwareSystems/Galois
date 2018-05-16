@@ -1,0 +1,1 @@
+app(surveypropagation_AOS SurveyPropagation_AOS.cpp)

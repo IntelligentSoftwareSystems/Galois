@@ -280,8 +280,7 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
   int deltaRound = updatesPerEdge;
   LatentValue rate = learningRate;
 
-  galois::StatTimer executeTimer("executeUntilConvergedTime");
-  executeTimer.start();
+  galois::StatTimer executeAlgoTimer("Algorithm Execution Time");
   galois::TimeAccumulator elapsed;
   elapsed.start();
 
@@ -302,9 +301,9 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
         steps[i] = sf.stepSize(round + i);
     }
 
-    executeTimer.start();
+    executeAlgoTimer.start();
     fn(&steps[0], round + deltaRound, useExactError ? &errorAccum : NULL);
-    executeTimer.stop();
+    executeAlgoTimer.stop();
     double error = useExactError ? errorAccum.reduce() : sumSquaredError(g);
 
     elapsed.stop();
@@ -636,10 +635,13 @@ struct SGDBlockJumpAlgo {
     }
     preProcessTimer.stop();
 
+    galois::StatTimer executeTimer("Total Execution Time");
+    executeTimer.start();
     executeUntilConverged(sf, g, [&](LatentValue* steps, size_t maxUpdates, galois::GAccumulator<double>* errorAccum) {
       Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
       galois::on_each(fn);
     });
+    executeTimer.stop();
   }
 };
 
@@ -711,13 +713,13 @@ class SGDItemsAlgo{
     verify(g, "sgdItemsAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer execute("ExecuteTime");
-    execute.start();
+    galois::StatTimer executeTimer("Total Execution Time");
+    executeTimer.start();
 
     Execute fn { g, edgesVisited };
     executeUntilConverged(sf, g, fn);
 
-    execute.stop();
+    executeTimer.stop();
 
     galois::runtime::reportStat_Single("sgdItemsAlgo", "EdgesVisited", 
                                        edgesVisited.reduce());
@@ -810,13 +812,13 @@ class SGDEdgeItem{
     verify(g, "sgdEdgeItem");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer execute("ExecuteTime");
-    execute.start();
+    galois::StatTimer executeTimer("Total Execution Time");
+    executeTimer.start();
 
     Execute fn { g, edgesVisited };
     executeUntilConverged(sf, g, fn);
 
-    execute.stop();
+    executeTimer.stop();
 
     galois::runtime::reportStat_Single("sgdEdgeItem", "EdgesVisited", edgesVisited.reduce());
   }
@@ -893,13 +895,13 @@ class SGDBlockEdgeAlgo {
     verify(g, "sgdBlockEdgeAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer execute("ExecuteTime");
-    execute.start();
+    galois::StatTimer executeTimer("Total Execution Time");
+    executeTimer.start();
 
     Execute fn { g, edgesVisited };
     executeUntilConverged(sf, g, fn);
 
-    execute.stop();
+    executeTimer.stop();
 
     galois::runtime::reportStat_Single("sgdBlockEdgeAlgo", "EdgesVisited", 
                                        edgesVisited.reduce());
@@ -1460,10 +1462,10 @@ void run() {
   }
 
   // algorithm call
-  galois::StatTimer timer("AlgoTime");
-  timer.start();
+  galois::StatTimer totalTimer("Total Time");
+  totalTimer.start();
   algo(g, *sf);
-  timer.stop();
+  totalTimer.stop();
 
   if (!skipVerify) {
     verify(g, "Final");

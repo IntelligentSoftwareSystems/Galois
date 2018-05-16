@@ -140,6 +140,34 @@ galois::DynamicBitSet bitset_dependency;
 /* Functors for running the algorithm */
 /******************************************************************************/
 
+/**
+ * Functor to initialize fields on the nodes to starting value.
+ */
+struct InitializeGraph {
+  Graph* graph;
+
+  InitializeGraph(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    galois::do_all(
+      galois::iterate(allNodes.begin(), allNodes.end()), 
+      InitializeGraph{&_graph}, 
+      galois::no_stats(),
+      galois::loopname("InitializeGraph")
+    );
+  }
+
+  void operator()(GNode node) const {
+    NodeData& node_data = graph->getData(node);
+
+    // TODO
+  }
+};
+
+struct ForwardPhase {
+
+}
+
 // TODO
 
 /******************************************************************************/

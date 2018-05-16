@@ -40,6 +40,7 @@
 #include <galois/gdeque.h>
 #include <galois/DynamicBitset.h>
 #include <galois/AtomicWrapper.h>
+#include "galois/CopyableTuple.h"
 #include "galois/Bag.h"
 
 namespace galois {
@@ -294,6 +295,23 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
 }
 
 /**
+ * Specialization for tuple of 3. Either memcpys entire struct or serializes
+ * each element individually.
+ */
+template<typename T1, typename T2, typename T3>
+inline void gSerializeObj(SerializeBuffer& buf, 
+                          const galois::TupleOfThree<T1, T2, T3>& data) {
+  if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value &&
+      is_memory_copyable<T3>::value) {
+    // do memcpy
+    buf.insert((uint8_t*)&data, sizeof(data));
+  } else {
+    // serialize each individually
+    gSerialize(buf, data.first, data.second, data.third);
+  }
+}
+
+/**
  * Specialization for copyable atomic: load atomic data as a plain old 
  * datatype (POD) and mem copy it to the buffer.
  */
@@ -463,6 +481,23 @@ void gDeserializeObj(DeSerializeBuffer& buf, T& data,
 template<typename T1, typename T2>
 void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
   gDeserialize(buf, data.first, data.second);
+}
+
+/**
+ * Specialization for tuple of 3. Either memcpys from buffer or deserializes
+ * each element individually.
+ */
+template<typename T1, typename T2, typename T3>
+inline void gSerializeObj(DeSerializeBuffer& buf, 
+                          galois::TupleOfThree<T1, T2, T3>& data) {
+  if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value &&
+      is_memory_copyable<T3>::value) {
+    // do memcpy straight to data
+    buf.extract((uint8_t*)&data, sizeof(data));
+  } else {
+    // deserialize each individually
+    gDeserialize(buf, data.first, data.second, data.third);
+  }
 }
 
 /**

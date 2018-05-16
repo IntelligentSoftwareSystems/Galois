@@ -48,7 +48,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 //! [Operator in SSSPPullsimple]
 struct SSSP {
-  void operator()(UpdateRequest& req, galois::UserContext<UpdateRequest>& ctx) const {
+  void operator()(UpdateRequest& req, auto& ctx) const {
     GNode active_node = req.second;
     unsigned& data = graph.getData(active_node);
     unsigned newValue = data;
@@ -72,21 +72,21 @@ struct SSSP {
 //! [Operator in SSSPPullsimple]
 
 struct Init {
-  void operator()(GNode& n, galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode& n, auto& ctx) const {
     graph.getData(n) = DIST_INFINITY;
   }
 };
 
 
 int main(int argc, char **argv) {
-  galois::StatManager statManager;
+  galois::SharedMemSys G;
   LonestarStart(argc, argv, 0,0,0);
 
 //! [ReadGraph]
   galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
-  galois::for_each(graph.begin(), graph.end(), Init());
+  galois::for_each(galois::iterate(graph.begin(), graph.end()), Init());
 
   //! [OrderedByIntegerMetic in SSSPsimple]
   struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
   for (auto ii : graph.edges(*graph.begin()))
     init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
 
-  galois::for_each(init.begin(), init.end(), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
+  galois::for_each(galois::iterate(init.begin(), init.end()), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;

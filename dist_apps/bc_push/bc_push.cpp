@@ -46,6 +46,10 @@ constexpr static const char* const REGION_NAME = "BC";
 struct CUDA_Context *cuda_ctx;
 #endif
 
+
+// type of the num shortest paths variable
+using ShortPathType = double;
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -55,9 +59,6 @@ static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                                     "of sources in a file to "
                                                     "use in BC (default empty)"),
                                           cll::init(""));
-static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 10000"), 
-                               cll::init(10000));
 static cll::opt<bool> singleSourceBC("singleSource", 
                                 cll::desc("Use for single source BC (default off)"),
                                 cll::init(false));
@@ -88,11 +89,11 @@ struct NodeData {
   uint32_t old_length;
 
   // Betweeness centrality vars
-  uint64_t num_shortest_paths; // 64 because # paths can get really big
+  ShortPathType num_shortest_paths; 
   uint32_t num_successors;
   std::atomic<uint32_t> num_predecessors;
   std::atomic<uint32_t> trim;
-  std::atomic<uint64_t> to_add;
+  std::atomic<ShortPathType> to_add;
 
   float to_add_float;
   float dependency;
@@ -160,8 +161,8 @@ struct InitializeGraph {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeGraph")
-          "CUDA_DO_ALL_IMPL_InitializeGraph"
+          //_graph.get_run_identifier("InitializeGraph")
+          "InitializeGraph"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -214,8 +215,8 @@ struct InitializeIteration {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_InitializeIteration")
-          "CUDA_DO_ALL_IMPL_InitializeIteration"
+          //_graph.get_run_identifier("InitializeIteration")
+          "InitializeIteration"
         );
 
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
@@ -282,8 +283,8 @@ struct FirstIterationSSSP {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_FirstIterationSSSP")
-          "CUDA_DO_ALL_IMPL_SSSP"
+          //_graph.get_run_identifier("FirstIterationSSSP")
+          "SSSP"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -350,10 +351,10 @@ struct SSSP {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_SSSP_0");
+        //std::string impl_str("SSSP_0");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_SSSP")
-          "CUDA_DO_ALL_IMPL_SSSP"
+          //_graph.get_run_identifier("SSSP")
+          "SSSP"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -444,10 +445,10 @@ struct PredAndSucc {
     
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_PredAndSucc");
+        //std::string impl_str("PredAndSucc");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PredAndSucc")
-          "CUDA_DO_ALL_IMPL_PredAndSucc"
+          //_graph.get_run_identifier("PredAndSucc")
+          "PredAndSucc"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -527,10 +528,10 @@ struct NumShortestPathsChanges {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPathsChanges");
+        //std::string impl_str("NumShortestPathsChanges");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPathsChanges")
-          "CUDA_DO_ALL_IMPL_NumShortestPathsChanges"
+          //_graph.get_run_identifier("NumShortestPathsChanges")
+          "NumShortestPathsChanges"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -622,10 +623,10 @@ struct NumShortestPaths {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_NumShortestPaths");
+        //std::string impl_str("NumShortestPaths");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_NumShortestPaths")
-          "CUDA_DO_ALL_IMPL_NumShortestPaths"
+          //_graph.get_run_identifier("NumShortestPaths")
+          "NumShortestPaths"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -702,7 +703,7 @@ struct NumShortestPaths {
           edge_weight += graph->getEdgeData(current_edge);
           #endif
 
-          uint64_t paths_to_add = src_data.num_shortest_paths;
+          ShortPathType paths_to_add = src_data.num_shortest_paths;
 
           #ifdef BCDEBUG
           if (paths_to_add < 1) {
@@ -749,10 +750,10 @@ struct PropagationFlagUpdate {
 
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      //std::string impl_str("CUDA_DO_ALL_IMPL_PropagationFlagUpdate");
+      //std::string impl_str("PropagationFlagUpdate");
       std::string impl_str(
-        //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_PropagationFlagUpdate")
-        "CUDA_DO_ALL_IMPL_PropagationFlagUpdate"
+        //_graph.get_run_identifier("PropagationFlagUpdate")
+        "PropagationFlagUpdate"
       );
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
@@ -810,10 +811,10 @@ struct DependencyPropChanges {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropChanges");
+        //std::string impl_str("DependencyPropChanges");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropChanges")
-          "CUDA_DO_ALL_IMPL_DependencyPropChanges"
+          //_graph.get_run_identifier("DependencyPropChanges")
+          "DependencyPropChanges"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -910,10 +911,10 @@ struct DependencyPropagation {
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str("CUDA_DO_ALL_IMPL_DependencyPropagation");
+        //std::string impl_str("DependencyPropagation");
         std::string impl_str(
-          //_graph.get_run_identifier("CUDA_DO_ALL_IMPL_DependencyPropagation")
-          "CUDA_DO_ALL_IMPL_DependencyPropagation"
+          //_graph.get_run_identifier("DependencyPropagation")
+          "DependencyPropagation"
         );
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
@@ -1066,7 +1067,7 @@ struct BC {
         current_src_node = i;
       }
 
-      galois::gDebug("Current source node for BC is ", current_src_node);
+      galois::gPrint("Current source node for BC is ", current_src_node, "\n");
 
       #ifndef NDEBUG
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -1112,8 +1113,8 @@ struct BC {
       // point, add them to the betweeness centrality measure on each node
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
-        //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_BC"));
-        std::string impl_str("CUDA_DO_ALL_IMPL_BC");
+        //std::string impl_str(_graph.get_run_identifier("BC"));
+        std::string impl_str("BC");
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         BC_nodesWithEdges_cuda(cuda_ctx);
@@ -1168,8 +1169,8 @@ struct Sanity {
 
     #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      //std::string impl_str(_graph.get_run_identifier("CUDA_DO_ALL_IMPL_Sanity"));
-      std::string impl_str("CUDA_DO_ALL_IMPL_Sanity");
+      //std::string impl_str(_graph.get_run_identifier("Sanity"));
+      std::string impl_str("Sanity");
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       float sum, max, min;
@@ -1226,10 +1227,6 @@ int main(int argc, char** argv) {
   DistBenchStart(argc, argv, name, desc, url);
 
   auto& net = galois::runtime::getSystemNetworkInterface();
-  if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
-                                (unsigned long)maxIterations);
-  }
 
   galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
 
