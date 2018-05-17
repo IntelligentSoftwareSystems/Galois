@@ -9,6 +9,6 @@ using ShortPathType = double;
 // on if concurrent BC is to be used
 #define BC_CONCURRENT 1
 // on if markings on nodes are to be used (helps with no duplicates in worklist)
-#define BC_USE_MARKING 0
+#define BC_USE_MARKING 1
 
 #endif // end BC_ASYNC_CONTROL

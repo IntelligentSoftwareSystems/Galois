@@ -40,8 +40,8 @@ struct NodeData {
   char dummy;
 };
 
-typedef galois::graphs::DistGraph<NodeData, unsigned> Graph;
-typedef galois::graphs::DistGraph_edgeCut<NodeData, unsigned> Graph_edgeCut;
+typedef galois::graphs::DistGraph<NodeData, void> Graph;
+typedef galois::graphs::DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
 
 /******************************************************************************/
 /* Main */
