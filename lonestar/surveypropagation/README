@@ -7,6 +7,20 @@ A. Braunstein, M. Mezard, and R. Zecchina. Survey Propagation: An Algorithm for
 Satisfiability. Random Structures and Algorithms, 27:201-226, 2005.
 
 
+BUILD
+
+1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
+
+2. Run `cd <BUILD>/lonestar/surveypropagation; make -j`
+
+
+RUN
+
+The following is an example command line.
+
+`$ ./surveypropagation <random-seed> <num-literals> <num-clauses> <num-literals-per-clause> -t 40`
+
+
 TUNING PERFORMANCE  
 
 The performance depends on the followings:
@@ -20,19 +34,3 @@ CHUNK_SIZE, the granularity of work distribution used by galois::wl<WL>().
 
 The optimal value of the constant might depend on the architecture, so you 
 might want to evaluate the performance over a range of values (say [16-4096]).
-
-BUILD
-
-$GALOIS_ROOT denotes the root of the Galois source. $BUILD_ROOT denotes the 
-directory where you want to build PageRank. 
-
-$ mkdir -p $BUILD_ROOT; cd $BUILD_ROOT
-$ CC=gcc CXX=g++ cmake -DCMAKE_EXPORT_COMPILE_COMMANDS=1  $GALOIS_ROOT
-$ cd ./lonestar/surveypropagation; make -j
-
-
-RUN
-
-The following are a few examples of running PageRank.
-
-$ ./surveypropagation <random-seed> <num-literals> <num-clauses> <num-literals-per-clause> -t 40
