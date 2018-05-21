@@ -19,3 +19,7 @@ tags
 /build*
 /.project
 /.dir-locals.el
+.tags 
+.tags1
+
+.clang-complete
