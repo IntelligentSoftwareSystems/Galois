@@ -87,7 +87,8 @@ struct AttributedGraph {
   std::map<std::string, uint32_t> edgeLabelIDs; // maps Name to ID
   std::map<uint32_t, uint32_t> nodeIndices; // maps node UUID/ID to index/GraphNode
   std::vector<std::string> nodeNames; // cannot use LargeArray because serialize does not do deep-copy
-  // custom attributes
+  // custom attributes: maps from an attribute name to a vector that contains
+  // the attribute for each node/edge
   std::map<std::string, std::vector<std::string>> nodeAttributes;
   std::map<std::string, std::vector<std::string>> edgeAttributes;
 };
