@@ -5,7 +5,7 @@ Betweenness Centrality (Outer)
 DESCRIPTION 
 --------------------------------------------------------------------------------
 
-Runs Betweenness Centrality where the unit of parallelism is a betweeness 
+Runs Betweenness Centrality where the unit of parallelism is a betweenness 
 centrality source. Each thread will work on the betweenness centrality
 computation of it own individual source and find the BC contributions of that
 source to the rest of the graph.
@@ -47,7 +47,14 @@ DESCRIPTION
 ----------------------------------------
 
 Runs an asynchronous version of Brandes's Betweenness Centrality as formulated
-through the operator formulation of algorithms.
+through the operator formulation of algorithms. It is a two-phase algorithm:
+the first phase determines the shortest path DAG and counts the number of 
+shortest paths through a given node for a particular source, and the second
+phase back-propagates dependency values for the calculation of betweenness
+centrality.
+
+control.h has some variables that may alter how the algorithm runs and what kind
+of data it collects.
 
 Pass in a regular .gr graph.
 
@@ -88,3 +95,7 @@ dependent.
 
 Good scaling also comes from using the Galois power-of-two allocator
 for memory allocations in parallel regions.
+
+Finally, it may be useful to toggle BC_USE_MARKING in control.h: if on, it will
+check to see if a node is in a worklist before adding it (preventing duplicates).
+Depending on the input graph, performance may improve with this setting on.
