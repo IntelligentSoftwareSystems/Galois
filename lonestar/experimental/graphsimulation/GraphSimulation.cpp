@@ -43,7 +43,8 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
 template<bool useLimit, bool useWindow, bool queryNodeHasMoreThan2Edges>
 void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* cur, galois::InsertBag<Graph::GraphNode>* next, EventLimit limit, EventWindow window) {
   typedef galois::gstl::Vector<uint64_t> VecTy;
-  galois::substrate::PerThreadStorage<VecTy> matchedEdgesPerThread;
+  typedef galois::gstl::Vector<VecTy> VecVecTy;
+  galois::substrate::PerThreadStorage<VecVecTy> matchedEdgesPerThread;
   galois::do_all(galois::iterate(*cur),
     [&] (auto dn) {
       auto& dData = dG.getData(dn);
@@ -57,7 +58,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
           // Assumption: query edges are sorted by timestamp
           matchedEdges.clear();
           size_t num_qEdges = std::distance(qG.edge_begin(qn), qG.edge_end(qn));
-          matchedEdges.resize(num_qEdges, 0);
+          matchedEdges.resize(num_qEdges);
           for (auto de: dG.edges(dn)) {
             auto& deData = dG.getEdgeData(de);
             if (useWindow) {
@@ -73,10 +74,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
                 auto qDst = qG.getEdgeDst(qe);
                 auto& dDstData = dG.getData(dG.getEdgeDst(de));
                 if (dDstData.matched & (1 << qDst)) {
-                  if ((matchedEdges[edgeID] == 0)
-                      || (matchedEdges[edgeID] > deData.timestamp)) {
-                    matchedEdges[edgeID] = deData.timestamp; // minimum of matched edges
-                  }
+                  matchedEdges[edgeID].push_back(deData.timestamp);
                 }
               }
               ++edgeID;
@@ -84,20 +82,43 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
           }
           // Assumption: each query edge of this query node has a different label
           bool matched = true;
-          if (matchedEdges[0] == 0) {
-            matched = false;
-          } else {
+          for (size_t i = 0; i < matchedEdges.size(); ++i) {
+            if (matchedEdges[i].size() == 0) {
+              matched = false;
+              break;
+            }
+          }
+          if (matched) { // check if it matches query timestamp order
+            uint64_t prev = matchedEdges[0][0];
+            for (size_t j = 1; j < matchedEdges[0].size(); ++j) {
+              uint64_t cur = matchedEdges[0][j];
+              if (cur < prev) {
+                prev = cur;
+              }
+            }
+            matchedEdges[0].clear();
             for (size_t i = 1; i < matchedEdges.size(); ++i) {
+              uint64_t next = matchedEdges[i][0];
+              for (size_t j = 1; j < matchedEdges[i].size(); ++j) {
+                uint64_t cur = matchedEdges[i][j];
+                if (cur > prev) {
+                  if (cur < next) {
+                    next = cur;
+                  }
+                }
+              }
               // Assumption: query edges are sorted by timestamp
-              if (matchedEdges[i] < matchedEdges[i-1]) {
+              if (next < prev) {
                 matched = false;
                 break;
               }
-            }
-            if (useLimit) {
-              if ((matchedEdges[matchedEdges.size() - 1] - matchedEdges[0]) > limit.time) {
-                matched = false; // skip this sequence of events because too much time has lapsed between them
+              if (useLimit) {
+                if ((next - prev) > limit.time) { // TODO: imprecise - fix this
+                  matched = false; // skip this sequence of events because too much time has lapsed between them
+                }
               }
+              prev = next;
+              matchedEdges[i].clear();
             }
           }
           // remove qn from dn
