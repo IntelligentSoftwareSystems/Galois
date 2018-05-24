@@ -1,4 +1,5 @@
 #include "GraphSimulation.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 template<typename QG, typename DG, typename W>
 void matchLabel(QG& qG, DG& dG, W& w) {
@@ -41,9 +42,12 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
 
 template<bool useLimit, bool useWindow, bool queryNodeHasMoreThan2Edges>
 void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* cur, galois::InsertBag<Graph::GraphNode>* next, EventLimit limit, EventWindow window) {
+  typedef galois::gstl::Vector<uint64_t> VecTy;
+  galois::substrate::PerThreadStorage<VecTy> matchedEdgesPerThread;
   galois::do_all(galois::iterate(*cur),
     [&] (auto dn) {
       auto& dData = dG.getData(dn);
+      auto& matchedEdges = *matchedEdgesPerThread.getLocal();
 
       for (auto qn: qG) { // multiple matches
         uint64_t mask = (1 << qn);
@@ -51,6 +55,58 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
           // match children links
           // TODO: sort data edges by timestamp
           // Assumption: query edges are sorted by timestamp
+          matchedEdges.clear();
+          size_t num_qEdges = std::distance(qG.edge_begin(qn), qG.edge_end(qn));
+          matchedEdges.resize(num_qEdges, 0);
+          for (auto de: dG.edges(dn)) {
+            auto& deData = dG.getEdgeData(de);
+            if (useWindow) {
+              if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
+                continue; // skip this edge since it is not in the time-span of interest
+              }
+            }
+            size_t edgeID = 0;
+            // Assumption: each query edge of this query node has a different label
+            for (auto qe: qG.edges(qn)) {
+              auto qeData = qG.getEdgeData(qe);
+              if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
+                auto qDst = qG.getEdgeDst(qe);
+                auto& dDstData = dG.getData(dG.getEdgeDst(de));
+                if (dDstData.matched & (1 << qDst)) {
+                  if ((matchedEdges[edgeID] == 0)
+                      || (matchedEdges[edgeID] > deData.timestamp)) {
+                    matchedEdges[edgeID] = deData.timestamp; // minimum of matched edges
+                  }
+                }
+              }
+              ++edgeID;
+            }
+          }
+          // Assumption: each query edge of this query node has a different label
+          bool matched = true;
+          if (matchedEdges[0] == 0) {
+            matched = false;
+          } else {
+            for (size_t i = 1; i < matchedEdges.size(); ++i) {
+              // Assumption: query edges are sorted by timestamp
+              if (matchedEdges[i] < matchedEdges[i-1]) {
+                matched = false;
+                break;
+              }
+            }
+            if (useLimit) {
+              if ((matchedEdges[matchedEdges.size() - 1] - matchedEdges[0]) > limit.time) {
+                matched = false; // skip this sequence of events because too much time has lapsed between them
+              }
+            }
+          }
+          // remove qn from dn
+          if (!matched) {
+            dData.matched &= ~mask;
+          }
+          // TODO: add support for dst-id inequality
+
+#ifdef SLOW_NO_MATCH_FAST_MATCH
           if (queryNodeHasMoreThan2Edges) {
             uint64_t qPrevEdgeTimestamp = 0;
             uint64_t dPrevEdgeTimestamp = 0;
@@ -164,7 +220,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
               }
             }
           }
-          // TODO: add support for dst-id inequality
+#endif
         }
       }
 
