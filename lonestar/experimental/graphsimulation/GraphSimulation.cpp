@@ -1,4 +1,5 @@
 #include "GraphSimulation.h"
+#include "galois/substrate/PerThreadStorage.h"
 
 template<typename QG, typename DG, typename W>
 void matchLabel(QG& qG, DG& dG, W& w) {
@@ -41,9 +42,13 @@ bool existEmptyLabelMatchQGNode(QG& qG) {
 
 template<bool useLimit, bool useWindow, bool queryNodeHasMoreThan2Edges>
 void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* cur, galois::InsertBag<Graph::GraphNode>* next, EventLimit limit, EventWindow window) {
+  typedef galois::gstl::Vector<uint64_t> VecTy;
+  typedef galois::gstl::Vector<VecTy> VecVecTy;
+  galois::substrate::PerThreadStorage<VecVecTy> matchedEdgesPerThread;
   galois::do_all(galois::iterate(*cur),
     [&] (auto dn) {
       auto& dData = dG.getData(dn);
+      auto& matchedEdges = *matchedEdgesPerThread.getLocal();
 
       for (auto qn: qG) { // multiple matches
         uint64_t mask = (1 << qn);
@@ -51,6 +56,78 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
           // match children links
           // TODO: sort data edges by timestamp
           // Assumption: query edges are sorted by timestamp
+          matchedEdges.clear();
+          size_t num_qEdges = std::distance(qG.edge_begin(qn), qG.edge_end(qn));
+          matchedEdges.resize(num_qEdges);
+          for (auto de: dG.edges(dn)) {
+            auto& deData = dG.getEdgeData(de);
+            if (useWindow) {
+              if ((deData.timestamp > window.endTime) || (deData.timestamp < window.startTime)) {
+                continue; // skip this edge since it is not in the time-span of interest
+              }
+            }
+            size_t edgeID = 0;
+            // Assumption: each query edge of this query node has a different label
+            for (auto qe: qG.edges(qn)) {
+              auto qeData = qG.getEdgeData(qe);
+              if (qeData.label == deData.label) { // TODO: query could be any or multiple labels
+                auto qDst = qG.getEdgeDst(qe);
+                auto& dDstData = dG.getData(dG.getEdgeDst(de));
+                if (dDstData.matched & (1 << qDst)) {
+                  matchedEdges[edgeID].push_back(deData.timestamp);
+                }
+              }
+              ++edgeID;
+            }
+          }
+          // Assumption: each query edge of this query node has a different label
+          bool matched = true;
+          for (size_t i = 0; i < matchedEdges.size(); ++i) {
+            if (matchedEdges[i].size() == 0) {
+              matched = false;
+              break;
+            }
+          }
+          if (matched) { // check if it matches query timestamp order
+            uint64_t prev = matchedEdges[0][0];
+            for (size_t j = 1; j < matchedEdges[0].size(); ++j) {
+              uint64_t cur = matchedEdges[0][j];
+              if (cur < prev) {
+                prev = cur;
+              }
+            }
+            matchedEdges[0].clear();
+            for (size_t i = 1; i < matchedEdges.size(); ++i) {
+              uint64_t next = std::numeric_limits<uint64_t>::max();
+              for (size_t j = 0; j < matchedEdges[i].size(); ++j) {
+                uint64_t cur = matchedEdges[i][j];
+                if (cur >= prev) {
+                  if (cur < next) {
+                    next = cur;
+                  }
+                }
+              }
+              // Assumption: query edges are sorted by timestamp
+              if ((next == std::numeric_limits<uint64_t>::max()) || (next < prev)) {
+                matched = false;
+                break;
+              }
+              if (useLimit) {
+                if ((next - prev) > limit.time) { // TODO: imprecise - fix this
+                  matched = false; // skip this sequence of events because too much time has lapsed between them
+                }
+              }
+              prev = next;
+              matchedEdges[i].clear();
+            }
+          }
+          // remove qn from dn
+          if (!matched) {
+            dData.matched &= ~mask;
+          }
+          // TODO: add support for dst-id inequality
+
+#ifdef SLOW_NO_MATCH_FAST_MATCH
           if (queryNodeHasMoreThan2Edges) {
             uint64_t qPrevEdgeTimestamp = 0;
             uint64_t dPrevEdgeTimestamp = 0;
@@ -164,7 +241,7 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
               }
             }
           }
-          // TODO: add support for dst-id inequality
+#endif
         }
       }
 

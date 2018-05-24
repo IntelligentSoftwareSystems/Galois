@@ -1,14 +1,12 @@
-#include "matrixCompletion.h"
-
-#include "galois/runtime/TiledExecutor.h"
-#include "galois/ParallelSTL.h"
-#include "galois/graphs/Graph.h"
-#include "Lonestar/BoilerPlate.h"
-
 #include <cmath>
 #include <fstream>
 #include <iostream>
 #include <ostream>
+#include "matrixCompletion.h"
+#include "galois/runtime/TiledExecutor.h"
+#include "galois/ParallelSTL.h"
+#include "galois/graphs/Graph.h"
+#include "Lonestar/BoilerPlate.h"
 
 #ifdef HAS_EIGEN
 #include <Eigen/Sparse>
@@ -117,9 +115,7 @@ double sumSquaredError(Graph& g) {
   // Assuming only item nodes have edges
   galois::GAccumulator<double> error;
 
-  // Save for performance testing
-#if 0
-  galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
+  galois::do_all(galois::iterate(g.begin(), g.begin() + NUM_ITEM_NODES), [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
       LatentValue e = predictionError(g.getData(n).latentVector, 
@@ -128,21 +124,6 @@ double sumSquaredError(Graph& g) {
       error += (e * e);
     }
   });
-#else
-  galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
-  executor.execute(
-    g.begin(), g.begin() + NUM_ITEM_NODES,
-    g.begin() + NUM_ITEM_NODES, g.end(),
-    itemsPerBlock, usersPerBlock,
-    [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
-      LatentValue e = predictionError(g.getData(src).latentVector, 
-                                      g.getData(dst).latentVector, 
-                                      g.getEdgeData(edge));
-      error += (e * e);
-    },
-    false
-  );
-#endif
   return error.reduce();
 }
 
@@ -246,8 +227,13 @@ double countFlops(size_t nnz, int rounds, int k) {
   return flop;
 }
 
-/**
- * TODO
+/*
+ * Common function to execute different algorithms
+ * till convergence.
+ *
+ * @param StepFunction to be used
+ * @param Graph
+ * @param fn (algorithm)
  *
  */
 template<typename Graph, typename Fn>
@@ -705,7 +691,7 @@ class SGDItemsAlgo{
 };
 
 /**
- * Simple by-edge grouped by items(only one edge per item on the WL at any
+ * Simple by-edge grouped by items (only one edge per item on the WL at any
  * time)
  */
 class SGDEdgeItem{
@@ -849,10 +835,6 @@ class SGDBlockEdgeAlgo {
         g.begin() + NUM_ITEM_NODES, g.end(),
         itemsPerBlock, usersPerBlock,
         [&](GNode src, GNode dst, edge_iterator edge) {
-          //const LatentValue stepSize =
-          //  steps[updatesPerEdge - maxUpdates + task.updates];
-          //const LatentValue stepSize = steps[1 - maxUpdates + 0];
-
           const LatentValue stepSize = steps[0];
           LatentValue error =
             doGradientUpdate(g.getData(src).latentVector,
@@ -1282,8 +1264,8 @@ struct SyncALSalgo {
 
 #endif //HAS_EIGEN
 
-/** 
- * Initializes latent vector with random values and returns basic graph 
+/**
+ * Initializes latent vector with random values and returns basic graph
  * parameters.
  *
  * @tparam Graph type of g
