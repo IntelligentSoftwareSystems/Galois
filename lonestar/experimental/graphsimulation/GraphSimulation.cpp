@@ -98,17 +98,17 @@ void matchNodesOnce(Graph& qG, Graph& dG, galois::InsertBag<Graph::GraphNode>* c
             }
             matchedEdges[0].clear();
             for (size_t i = 1; i < matchedEdges.size(); ++i) {
-              uint64_t next = matchedEdges[i][0];
-              for (size_t j = 1; j < matchedEdges[i].size(); ++j) {
+              uint64_t next = std::numeric_limits<uint64_t>::max();
+              for (size_t j = 0; j < matchedEdges[i].size(); ++j) {
                 uint64_t cur = matchedEdges[i][j];
-                if (cur > prev) {
+                if (cur >= prev) {
                   if (cur < next) {
                     next = cur;
                   }
                 }
               }
               // Assumption: query edges are sorted by timestamp
-              if (next < prev) {
+              if ((next == std::numeric_limits<uint64_t>::max()) || (next < prev)) {
                 matched = false;
                 break;
               }
