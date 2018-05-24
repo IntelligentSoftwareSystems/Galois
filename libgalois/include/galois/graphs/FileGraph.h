@@ -1,3 +1,40 @@
+/** Basic serialized graphs -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galois is a framework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
+ *
+ * This file contains low-level representations of graphs, closely
+ * tied with their serialized form in the Galois system. These graphs
+ * are very basic (e.g., they don't support concurrency) and are
+ * intended to be converted to/from more specialized graph data
+ * structures.  More full featured graphs are available in LCGraph.h.
+ *
+ * @author Andrew Lenharth <andrewl@lenharth.org>
+ */
+
 #ifndef GALOIS_GRAPH_FILEGRAPH_H
 #define GALOIS_GRAPH_FILEGRAPH_H
 
