@@ -45,7 +45,6 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file (symmetric)>"), cll::Required);
 static cll::opt<std::string> largestComponentFilename("outputLargestComponent", cll::desc("[output graph file]"), cll::init(""));
 static cll::opt<std::string> permutationFilename("outputNodePermutation", cll::desc("[output node permutation file]"), cll::init(""));
-static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(true));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
@@ -150,7 +149,7 @@ struct SynchronousAlgo {
         [&] (const GNode& src) {
           for (auto ii : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
             GNode dst = graph.getEdgeDst(ii);
-            if (symmetricGraph && src >= dst)
+            if (src >= dst)
               continue;
             Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
             next->push(Edge(src, &ddata, 0));
@@ -181,7 +180,7 @@ struct SynchronousAlgo {
             std::advance(ii, count);
             for (; ii != ei; ++ii, ++count) {
               GNode dst = graph.getEdgeDst(ii);
-              if (symmetricGraph && src >= dst)
+              if (src >= dst)
                 continue;
               Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
               Node* dcomponent = ddata.findAndCompress();
@@ -283,7 +282,7 @@ struct AsyncAlgo {
             GNode dst = graph.getEdgeDst(ii);
             Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-            if (symmetricGraph && src >= dst)
+            if (src >= dst)
               continue;
 
             if (!sdata.merge(&ddata))
@@ -361,12 +360,12 @@ struct EdgeTiledAsyncAlgo {
 
         for (auto ii = tile.beg; ii != tile.end; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
-          if (symmetricGraph && src >= dst)
+          if (src >= dst)
             continue;
 
           Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-          if (symmetricGraph && src >= dst)
+          if (src >= dst)
             continue;
 
           if (!sdata.merge(&ddata))
@@ -414,7 +413,7 @@ struct EdgeAsyncAlgo {
         GNode dst = graph.getEdgeDst(e.second);
         Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-        if(symmetricGraph && e.first > dst)
+        if(e.first > dst)
           //continue;
           ;
         else if (!sdata.merge(&ddata)) {
@@ -455,7 +454,7 @@ struct BlockedAsyncAlgo {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-      if (symmetricGraph && src >= dst)
+      if (src >= dst)
         continue;
 
       if (sdata.merge(&ddata)) {

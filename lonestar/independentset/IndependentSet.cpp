@@ -32,14 +32,14 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph (symmetric)>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
-      clEnumVal(pull, "Pull-based (deterministic)"),
-      clEnumVal(nondet, "Non-deterministic"),
-      clEnumVal(detBase, "Base deterministic execution"),
-      clEnumVal(prio, "prio algo based on Martin's GPU ECL-MIS algorithm"),
+      clEnumVal(pull, "Pull-based (deterministic, node 0 is initially in the independent set)"),
+      clEnumVal(nondet, "Non-deterministic, use bulk synchronous worklist"),
+      clEnumVal(detBase, "use deterministic worklist"),
+      clEnumVal(prio, "prio algo based on Martin's GPU ECL-MIS algorithm (default)"),
       clEnumVal(edgetiledprio, "edge-tiled prio algo based on Martin's GPU ECL-MIS algorithm"),
       clEnumValEnd), cll::init(prio));
 
@@ -135,7 +135,7 @@ struct DefaultAlgo {
     me.flag = MATCHED;
   }
 
-  template <int Version, typename C>
+  template <typename C>
   void processNode(Graph& graph, const GNode& src, C& ctx) {
     bool mod;
     if (ctx.isFirstPass()) {
@@ -143,7 +143,7 @@ struct DefaultAlgo {
       graph.getData(src, galois::MethodFlag::WRITE);
       ctx.cautiousPoint(); // Failsafe point
       
-    } else { // Version == detDisjoint && !ctx.isFirstPass
+    } else { 
       LocalState* localState = ctx.template getLocalState<LocalState>();
       mod = localState->mod;
     }
@@ -153,7 +153,7 @@ struct DefaultAlgo {
     }
   }
 
-  template <int Version, typename WL, typename... Args>
+  template <typename WL, typename... Args>
   void run(Graph& graph, Args&&... args) {
 
     auto detID = [] (const GNode& x) { 
@@ -162,7 +162,7 @@ struct DefaultAlgo {
 
     galois::for_each(galois::iterate(graph), 
         [&, this] (const GNode& src, auto& ctx) {
-          this->processNode<Version>(graph, src, ctx);
+          this->processNode(graph, src, ctx);
         },
         galois::no_pushes(),
         galois::wl<WL>(),
@@ -180,10 +180,10 @@ struct DefaultAlgo {
 
     switch (algo) {
       case nondet: 
-        run<nondet, BSWL>(graph);
+        run<BSWL>(graph);
         break;
       case detBase:
-        run<detBase, DWL>(graph);
+        run<DWL>(graph);
         break;
       default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
     }
@@ -398,7 +398,7 @@ struct PrioAlgo {
 
 };
 
-struct edgetiledPrioAlgo {
+struct EdgeTiledPrioAlgo {
   using Graph = galois::graphs::LC_CSR_Graph<prioNode,void>
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type;
@@ -605,27 +605,29 @@ struct is_matched {
   }
 };
 
-template<typename Graph>
-bool verify(Graph& graph) {
+template<typename Graph, typename Algo>
+bool verify(Graph& graph, Algo& algo) {
   using GNode = typename Graph::GraphNode;
   using prioNode = typename Graph::node_data_type;
 
 
-  galois::do_all(galois::iterate(graph), 
-    [&] (const GNode& src) {
-      prioNode& nodedata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-      if(nodedata.flag == (unsigned char)0xfe){
-        nodedata.flag = MATCHED;
-      }
-      else if(nodedata.flag == (unsigned char)0x00)
-      {
-        nodedata.flag = OTHER_MATCHED;
-      }
-      else 
-        std::cout<<"error in verify_change!"<<std::endl;
+  if (std::is_same<Algo, PrioAlgo >::value || std::is_same<Algo, EdgeTiledPrioAlgo> :: value) {
+    galois::do_all(galois::iterate(graph), 
+        [&] (const GNode& src) {
+        prioNode& nodedata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+        if(nodedata.flag == (unsigned char)0xfe){
+            nodedata.flag = MATCHED;
+        }
+        else if(nodedata.flag == (unsigned char)0x00)
+        {
+            nodedata.flag = OTHER_MATCHED;
+        }
+        else 
+            std::cout<<"error in verify_change! Some nodes are not decided."<<std::endl;
 
-    }
-    , galois::loopname("verify_change"));
+        }
+        , galois::loopname("verify_change"));
+  }
 
   return galois::ParallelSTL::find_if(
       graph.begin(), graph.end(), is_bad<Graph>(graph))
@@ -661,7 +663,7 @@ void run() {
     << galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched<Graph>(graph)) 
     << "\n";
 
-  if (!skipVerify && !verify(graph)) {
+  if (!skipVerify && !verify(graph, algo)) {
     std::cerr << "verification failed\n";
     assert(0 && "verification failed");
     abort();
@@ -678,7 +680,7 @@ int main(int argc, char** argv) {
     case detBase: run<DefaultAlgo<detBase> >(); break;
     case pull: run<PullAlgo>(); break;
     case prio: run<PrioAlgo>(); break;
-    case edgetiledprio: run<edgetiledPrioAlgo>(); break;
+    case edgetiledprio: run<EdgeTiledPrioAlgo>(); break;
     default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
   return 0;
