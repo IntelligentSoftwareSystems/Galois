@@ -116,6 +116,12 @@ name = yahoo-music
 file = weighted/bipartite/yahoo.gr
 format = bin/galois
 
+[weighted/bipartite/netflix]
+flags = 
+name = netflix
+file = weighted/bipartite/floatEdgeWts/netflix.gr
+format = bin/galois
+
 [java/pta/tshark_constraints]
 flags = 
 name = tshark_constraints
