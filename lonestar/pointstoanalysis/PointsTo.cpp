@@ -1,31 +1,3 @@
-/** Points-to Analysis application -*- C++ -*-
- * @file
- *
- * An inclusion-based points-to analysis algorithm to demostrate the Galois 
- * system.
- *
- * @section License
- *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @author Loc Hoang <l_hoang@utexas.edu>
- * @author Rupesh Nasre <rupesh0508@gmail.com>
- */
-
 #include "galois/Galois.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -46,12 +18,13 @@ const char* desc = "Performs inclusion-based points-to analysis over the input "
 const char* url = NULL;
 
 static cll::opt<std::string> input(cll::Positional, 
-                                   cll::desc("constraints file"), 
+                                   cll::desc("Constraints file"), 
                                    cll::Required);
 
 static cll::opt<bool> useSerial("serial",
                                 cll::desc("Runs serial version of the algorithm "
-                                          "(i.e. 1 thread, no galois::for_each)"), 
+                                          "(i.e. 1 thread, no galois::for_each) "
+                                          "(default false)"), 
                                 cll::init(false));
 
 static cll::opt<bool> printAnswer("printAnswer",
@@ -61,13 +34,15 @@ static cll::opt<bool> printAnswer("printAnswer",
 
 static cll::opt<bool> useCycleDetection("ocd",
                                 cll::desc("If set, online cycle detection is"
-                                          " used in algorithm (serial only)"),
+                                          " used in algorithm (serial only) "
+                                          "(default false)"),
                                 cll::init(false));
 
 static cll::opt<unsigned> THRESHOLD_LS("lsThreshold",
                             cll::desc("Determines how many constraints to "
                                       "process before load/store constraints "
-                                      "are reprocessed (serial only)"),
+                                      "are reprocessed (serial only) "
+                                      "(default 500000)"),
                             cll::init(500000));
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -760,7 +735,7 @@ class PTAConcurrent : public PTABase<true> {
       processLoadStore<galois::DoAll>(loadStoreConstraints, updates);
 
       // do cycle squashing
-      //ocd.process(updates); // TODO have parallel version, if possible
+      //ocd.process(updates); // TODO have parallel OCD, if possible
     }
   }
 };
@@ -796,13 +771,10 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  unsigned numThreads = galois::getActiveThreads();
-
-
   // depending on serial or concurrent, create the correct class and pass it
   // into the run harness which takes care of the rest
   if (!useSerial) {
-    galois::gInfo("-------- Parallel version: ", numThreads, " threads.");
+    galois::gInfo("-------- Parallel version: ", galois::getActiveThreads(), " threads.");
     galois::gInfo("Note correctness of this version is relative to the serial "
                   "version.");
     
