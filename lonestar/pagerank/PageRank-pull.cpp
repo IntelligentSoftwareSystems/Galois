@@ -59,7 +59,7 @@ void initNodeDataResidual(Graph& g, DeltaArray& delta,
 // Computing outdegrees in the tranpose graph is equivalent to computing the
 // indegrees in the original graph
 void computeOutDeg(Graph& graph) {
-  galois::StatTimer outDegreeTimer("computeOutDeg");
+  galois::StatTimer outDegreeTimer("computeOutDegFunc");
   outDegreeTimer.start();
 
   galois::LargeArray<std::atomic<size_t>> vec;
@@ -77,7 +77,7 @@ void computeOutDeg(Graph& graph) {
                    };
                  },
                  galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                 galois::no_stats(), galois::loopname("ComputeDeg"));
+                 galois::no_stats(), galois::loopname("computeOutDeg"));
 
   galois::do_all(galois::iterate(graph),
                  [&](const GNode& src) {
@@ -208,7 +208,7 @@ void computePRTopological(Graph& graph) {
 void prTopological(Graph& graph) {
   initNodeDataTopological(graph);
   computeOutDeg(graph);
-  galois::StatTimer prTimer("PageRankResidual");
+  galois::StatTimer prTimer;
   prTimer.start();
   computePRTopological(graph);
   prTimer.stop();
@@ -222,7 +222,7 @@ void prResidual(Graph& graph) {
 
   initNodeDataResidual(graph, delta, residual);
   computeOutDeg(graph);
-  galois::StatTimer prTimer("PageRankResidual");
+  galois::StatTimer prTimer;
   prTimer.start();
   computePRResidual(graph, delta, residual);
   prTimer.stop();
@@ -246,9 +246,9 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
-  galois::preAlloc(numThreads + (3 * transposeGraph.size() *
-                                 sizeof(typename Graph::node_data_type)) /
-                                    galois::runtime::pagePoolSize());
+  galois::preAlloc(2 * numThreads + (3 * transposeGraph.size() *
+                                     sizeof(typename Graph::node_data_type)) /
+                                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
