@@ -1,11 +1,9 @@
-/** Distributed graph converter helpers (header) -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -17,12 +15,8 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * Distributed graph converter helper signatures/definitions (and 
- * implementations for templated functions).
- *
- * @author Loc Hoang <l_hoang@utexas.edu>
  */
+
 #ifndef _GALOIS_DIST_CONVERT_HELP_
 #define _GALOIS_DIST_CONVERT_HELP_
 

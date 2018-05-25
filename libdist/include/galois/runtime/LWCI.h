@@ -1,11 +1,9 @@
-/** LWCI Reduce Functions -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF

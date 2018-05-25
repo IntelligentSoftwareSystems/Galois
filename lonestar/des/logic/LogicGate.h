@@ -1,11 +1,9 @@
-/** LogicGate implements the basic structure of a logic gate -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -17,8 +15,6 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
 #ifndef DES_BASE_LOGIC_GATE_H_

@@ -1,90 +1,20 @@
-/** Two Level Iterator for Per-thread workList-*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * This file is part of Galois.  Galois is a framework to exploit
- * amorphous data-parallelism in irregular programs.
- *
- * Galois is free software: you can redistribute it and/or modify it
- * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
- *
- * Galois is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with Galois.  If not, see
- * <http://www.gnu.org/licenses/>.
- *
- * @section Copyright
- *
- * Copyright (C) 2015, The University of Texas at Austin. All rights
- * reserved.
- *
- * @section Description
- *
- * Two Level Iterator for per-thread workList.
- *
- * Assumptions
- * <ul>
- *  <li>Outer and Inner iterators are default- and copy-constructible</li>
- *  <li>Inner and Outer must be at least forward_iterator_tag</li>
- *  <li>InnerBegFn and InnerEndFn take an argument of type *Outer and return an Inner
- *    pointing to begin or end of inner range.</li>
- *  <li>InnerBegFn and InnerEndFn must inherit from std::unary_function so that
- *    argument_type and result_type are available.</li>
- * </ul>
- *
- * Important pitfalls to handle
- * <ol>
- *  <li>If Outer and Inner have different categories, which category to choose?. The
- *  category of Inner can be chosen after (expensively) supporting moving backwards for
- *  outer iterators of forward category. Note: Lowest category currently supported
- *  is forward iterators.</li>
- *
- *  <li>Prevent Outer from falling outside the [begin,end) range, because calling
- *  container functions e.g. outer->begin () and outer->end () is not valid and may
- *  cause a segfault.</li>
- *
- *  <li>The initial position of Outer and Inner iterators must be such that calling
- *  operator * or operator -> on at two level iterator yields a valid result (if
- *  possible). This means advancing the inner iterator to begin of first non-empty
- *  container (else to the end of outer). If the outer iterator is initialized to
- *  end of the outer range i.e. [end, end), then inner iterator cannot be
- *  initialized.</li>
- *
- *  <li>When incrementing (++), the inner iterator should initially be at a valid
- *  begin position, but after incrementing may end up at end of an Inner range.
- *  So the next valid local begin must be found, else the end of
- *  outer should be reached</li>
- *
- *  <ol>
- *    <li> When jumping forward, outer should not go beyond end. After jump is
- *    completed, inner may be at local end, so a valid next begin must be found
- *    or else end of outer must be reached</li>
- *  </ol>
- *
- *  <li>When decrementing (--), the inner iterator may initially be uninitialized
- *  due to outer being at end (See 3 above).
- *  Inner iterator must be brought to a valid location after decrementing, or, else
- *  the begin of outer must be reached (and not exceeded).</li>
- *
- *  <ol>
- *    <li>When jumping backward, inner iterator may be uninitialized due to
- *    outer being at end.</li>
- *  </ol>
- *
- *  <li>When jumping forward or backward, check for jump amount being negative.</li>
- *  <ol>
- *    <li>Jumping outside the range of outer cannot be supported.</li>
- *  </ol>
- *
- * </ol>
- *
- * @author <ahassaan@ices.utexas.edu>
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
  */
 
 #ifndef GALOIS_TWO_LEVEL_ITER_H

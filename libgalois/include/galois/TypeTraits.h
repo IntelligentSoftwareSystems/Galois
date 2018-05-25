@@ -1,11 +1,9 @@
-/** Galois type traits -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -17,40 +15,8 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @section Description
- *
- * There are two ways to declare a typetrait.
- *
- * First, with a typedef or other valid name declaration:
- * \code
- * struct MyClass {
- *   typedef int tt_needs_parallel_break;
- *   ....
- * };
- * \endcode
- *
- * Since the compiler doesn't check the names of these traits, a good
- * programming practice is to add a <code>static_assert</code> to check if
- * everything is ok:
- * \code
- * struct MyClass {
- *   typedef int tt_needs_parallel_break;
- *   static_assert(galois::needs_parallel_break<MyClass>::value, "Oops!");
- *   ...
- * };
- * \endcode
- *
- * The second way is by specializing a type:
- * \code
- * namespace galois {
- *   template<>
- *   struct needs_parallel_break<MyClass> : public boost::true_type {};
- * }
- * \endcode
- *
- * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_TYPETRAITS_H
 #define GALOIS_TYPETRAITS_H
 

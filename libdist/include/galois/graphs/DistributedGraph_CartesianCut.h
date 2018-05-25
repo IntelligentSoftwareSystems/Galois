@@ -1,9 +1,7 @@
-/** partitioned graph wrapper for cartesianCut -*- C++ -*-
- * @file
- * @section License
- *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -17,12 +15,8 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @section Contains the cartesian/grid vertex-cut functionality to be used in dGraph.
- *
- * @author Roshan Dathathri <roshan@cs.utexas.edu>
- * @author Gurbinder Gill <gill@cs.utexas.edu>
  */
+
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 

@@ -1,11 +1,9 @@
-/** Galois traits -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -17,32 +15,8 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @section Description
- *
- * Optional properties (type traits) for {@link galois::for_each()}, {@link
- * galois::do_all()}, etc. can be supplied in two ways.
- *
- * First, by passing an argument to the corresponding method call:
- * \code
- * galois::for_each(galois::iterate(0, 10), fn, galois::parallel_break());
- * \endcode
- *
- * Second, by providing a specially named nested type
- * \code
- * #include <tuple>
- *
- * struct MyClass { 
- *   typedef std::tuple<galois::parallel_break> function_traits;
- * };
- *
- * int main() {
- *   galois::for_each(galois::iterate(v), MyClass {});
- * \endcode
- *
- * @author Andrew Lenharth <andrewl@lenharth.org>
- * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #ifndef GALOIS_TRAITS_H
 #define GALOIS_TRAITS_H
 

@@ -1,5 +1,7 @@
-/*
- * License:
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -13,12 +15,6 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * Stochastic gradient descent for matrix factorization, implemented with Galois.
- *
- * Author: Prad Nelluru <pradn@cs.utexas.edu>
- * Author: Donald Nguyen <ddn@cs.utexas.edu>
- * Author: Gurbinder Gill <gill@cs.utexas.edu>
  */
 
 #include <cmath>

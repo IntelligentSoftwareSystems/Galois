@@ -1,11 +1,9 @@
-/** SyncStructures.h -*- C++ -*-
- * @file
- * @section License
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
- *
- * Copyright (C) 2017, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -17,42 +15,8 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
- *
- * @section Description
- *
- * TODO info about flags
- *
- * Macros for easy construction of sync structures for distributed Galois 
- * programs. Define a reductions for all fields as well as a broadcast. If
- * using bitsets, then define the bitset as well (see the bitset section
- * for more details on this).
- *
- * A NodeData struct must be declared before including this file. It must 
- * have the field names that you pass into these macros.
- * You need to add a semicolon at the end of the macros since they expand into
- * structs.
- *
- * Example:
- *
- * // This is declared in your main file.
- * struct NodeData {
- *   std::atomic<unsigned int> current_degree;
- * }
- *
- * // These are written in wherever you want your sync structs to go. It should
- * // go after the declaration of your NodeData struct.
- * GALOIS_SYNC_STRUCTURE_REDUCE_ADD(current_degree, unsigned int);
- * GALOIS_SYNC_STRUCTURE_BROADCAST(current_degree, unsigned int);
- *
- * 
- * WARNING: "bool" is NOT supported as a field type: the code uses the data
- * operation on C vectors, and a vector<bool> has a specialized version of
- * the data operation that causes problems. Use a uint8_t instead.
- *
- * @author Loc Hoang <l_hoang@utexas.edu>
- * @author Roshan Dathathri <roshan@cs.utexas.edu>
- * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
+
 #ifndef _SYNC_STRUCT_MACROS_
 #define _SYNC_STRUCT_MACROS_
 
