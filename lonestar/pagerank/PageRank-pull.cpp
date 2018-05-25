@@ -1,3 +1,22 @@
+/**
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
+ *
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
 #include "Lonestar/BoilerPlate.h"
 #include "PageRank-constants.h"
 #include "galois/Galois.h"
@@ -59,7 +78,7 @@ void initNodeDataResidual(Graph& g, DeltaArray& delta,
 // Computing outdegrees in the tranpose graph is equivalent to computing the
 // indegrees in the original graph
 void computeOutDeg(Graph& graph) {
-  galois::StatTimer outDegreeTimer("computeOutDeg");
+  galois::StatTimer outDegreeTimer("computeOutDegFunc");
   outDegreeTimer.start();
 
   galois::LargeArray<std::atomic<size_t>> vec;
@@ -77,7 +96,7 @@ void computeOutDeg(Graph& graph) {
                    };
                  },
                  galois::steal(), galois::chunk_size<CHUNK_SIZE>(),
-                 galois::no_stats(), galois::loopname("ComputeDeg"));
+                 galois::no_stats(), galois::loopname("computeOutDeg"));
 
   galois::do_all(galois::iterate(graph),
                  [&](const GNode& src) {
@@ -208,7 +227,7 @@ void computePRTopological(Graph& graph) {
 void prTopological(Graph& graph) {
   initNodeDataTopological(graph);
   computeOutDeg(graph);
-  galois::StatTimer prTimer("PageRankResidual");
+  galois::StatTimer prTimer;
   prTimer.start();
   computePRTopological(graph);
   prTimer.stop();
@@ -222,7 +241,7 @@ void prResidual(Graph& graph) {
 
   initNodeDataResidual(graph, delta, residual);
   computeOutDeg(graph);
-  galois::StatTimer prTimer("PageRankResidual");
+  galois::StatTimer prTimer;
   prTimer.start();
   computePRResidual(graph, delta, residual);
   prTimer.stop();
@@ -246,9 +265,9 @@ int main(int argc, char** argv) {
   std::cout << "Read " << transposeGraph.size() << " nodes, "
             << transposeGraph.sizeEdges() << " edges\n";
 
-  galois::preAlloc(numThreads + (3 * transposeGraph.size() *
-                                 sizeof(typename Graph::node_data_type)) /
-                                    galois::runtime::pagePoolSize());
+  galois::preAlloc(2 * numThreads + (3 * transposeGraph.size() *
+                                     sizeof(typename Graph::node_data_type)) /
+                                        galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {

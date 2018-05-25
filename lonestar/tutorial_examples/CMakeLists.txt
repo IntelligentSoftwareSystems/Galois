@@ -8,6 +8,7 @@ app(example-torus-contruction TorusConstruction.cpp)
 app(example-graph-traversal-serial GraphTraversalSerial.cpp)
 app(example-graph-traversal-pull GraphTraversalPullOperator.cpp)
 app(example-graph-traversal-push GraphTraversalPushOperator.cpp)
+app(example-conflict-aware-torus ConflictAwareTorus.cpp)
 
 add_test_scale(small example-hello-world 2 10)
 add_test_scale(small example-torus 2 100)
