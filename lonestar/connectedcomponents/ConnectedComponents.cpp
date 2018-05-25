@@ -318,13 +318,13 @@ struct EdgeTiledAsyncAlgo {
   };*/
 
   const int EDGE_TILE_SIZE=512;//512 -> 64
-
+  const int CHUNK_SIZE=1;
   void operator()(Graph& graph) {
     galois::GAccumulator<size_t> emptyMerges;
     
     galois::InsertBag<EdgeTile> works;
 
-    std::cout << "INFO: Using edge tile size of " << EDGE_TILE_SIZE << "and chunk size of "<< 1 << "\n";
+    std::cout << "INFO: Using edge tile size of " << EDGE_TILE_SIZE << " and chunk size of "<< 1 << "\n";
     std::cout << "WARNING: Performance varies considerably due to parameter.\n";
     std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
 
@@ -374,7 +374,7 @@ struct EdgeTiledAsyncAlgo {
       },
       galois::loopname("CC-edgetiledAsync"),
       galois::steal(),
-      galois::chunk_size<1>()//16 -> 1
+      galois::chunk_size<CHUNK_SIZE>()//16 -> 1
       );
         
     galois::runtime::reportStat_Single("CC-edgeTiledAsync", "emptyMerges", emptyMerges.reduce());

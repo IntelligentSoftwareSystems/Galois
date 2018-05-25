@@ -36,7 +36,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph (
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
-      clEnumVal(pull, "Pull-based (deterministic, node 0 is initially in the independent set)"),
+      clEnumVal(pull, "Pull-based (node 0 is initially in the independent set)"),
       clEnumVal(nondet, "Non-deterministic, use bulk synchronous worklist"),
       clEnumVal(detBase, "use deterministic worklist"),
       clEnumVal(prio, "prio algo based on Martin's GPU ECL-MIS algorithm (default)"),

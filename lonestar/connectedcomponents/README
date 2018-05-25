@@ -1,0 +1,53 @@
+--------------------------------------------------------------------------------
+Connected Components
+--------------------------------------------------------------------------------
+
+DESCRIPTION 
+--------------------------------------------------------------------------------
+
+Find all connected components of an undirected (symmetric) graph. Set the same label
+to nodes which belong to the same component.
+Two major categories of algorithm: Pointer Jumping and Label Propogation.
+Pointer Jumping is based on union-find that nodes' label is a pointer pointing to its
+representative. Representative are updated when two trees are connected and merged 
+into one tree. The program keep executing until no pointer can be updated.
+In Label Propagation, the label is set to node ID initially. Each node keeps checking 
+if its neighbors' label is smalled than its. If yes, update its label to neighbor's label. 
+Keep doing until no node can be updated.
+
+serial: Serial pointer-jumping implementation.
+synchronous: Bulk synchronous data-driven implementation. Iteratively execute on two 
+worklist.
+async: asynchronous topology-driven implementation. Work unit is a node.
+blockedasync: asynchronous topology-driven implementation with NUMA-aware optimization.
+Work unit is a node.
+edgeasync: asynchronous topology-driven. Work unit is an edge.
+edgetiledasync (default): asynchronous topology-driven. Work unit is an edge tile.
+labelProp: Label propagation implementation.
+
+Pass in a symmetric .sgr graph.
+
+BUILD
+--------------------------------------------------------------------------------
+
+1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
+
+2. Run `cd <BUILD>/lonestar/connectedcomponents; make -j`
+
+RUN
+--------------------------------------------------------------------------------
+
+To run default algorithm (edgetiledasync), use the following:
+./connectedcomponents <input-graph (symmetric)> -t=<num-threads>
+
+To run a specific algorithm, use the following:
+./connectedcomponents <input-graph (symmetric)> -t=<num-threads> -algo=<algorithm>
+
+
+TUNING PERFORMANCE  
+--------------------------------------------------------------------------------
+Default algorithm 'edgetiledasync' works best on rmat25, r4-2e26, roadUSA graphs.
+Two parameters 'EDGE_TILE_SIZE' and 'CHUNK_SIZE' (granularity of work stealing) are 
+crucial to performance and has to be tuned on different platforms. They are set to 
+be 512 and 1 respectively by default.
+
