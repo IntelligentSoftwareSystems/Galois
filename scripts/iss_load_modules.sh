@@ -26,12 +26,7 @@ module load mpich2
 module load boost
 module load gdb
 module load isspython # needed for vim
-
-if [ "$SYSTEMTYPE" == "c7" ] ; then
-  module load serf
-else
-  module load git
-fi
+module load git
 
 if [ "$1" != "min" ]; then
   module load tbb
@@ -44,8 +39,8 @@ if [ "$1" != "min" ]; then
   module load subversion
   # module load screen #disabling for now because screen was compiled without proper color support
   if [ "$SYSTEMTYPE" != "c7" ] ; then
-    module load gnuplot
     module load doxygen
+    module load gnuplot
     module load ghostscript
     module load valgrind
   fi
