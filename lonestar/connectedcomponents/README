@@ -16,8 +16,8 @@ if its neighbors' label is smalled than its. If yes, update its label to neighbo
 Keep doing until no node can be updated.
 
 serial: Serial pointer-jumping implementation.
-synchronous: Bulk synchronous data-driven implementation. Iteratively execute on two 
-worklist.
+synchronous: Bulk synchronous data-driven implementation. Alternatively execute on two 
+worklists.
 async: asynchronous topology-driven implementation. Work unit is a node.
 blockedasync: asynchronous topology-driven implementation with NUMA-aware optimization.
 Work unit is a node.
