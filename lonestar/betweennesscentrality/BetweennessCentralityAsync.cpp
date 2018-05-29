@@ -30,7 +30,7 @@
 #include <iomanip>
 
 // WARNING: optimal chunk size may differ depending on input graph
-constexpr static const unsigned CHUNK_SIZE = 8u;
+constexpr static const unsigned CHUNK_SIZE = 64u;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Command line parameters

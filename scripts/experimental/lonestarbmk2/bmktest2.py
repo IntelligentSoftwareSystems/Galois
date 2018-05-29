@@ -7,11 +7,11 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 28
+    startThread = 0
     # thread to end at (inclusive)
-    endThread = 28
+    endThread = 56
     # step to use for looping through threads
-    step = 28
+    step = 7
 
     def filter_inputs(self, inputs):
         """Ignore inputs that aren't currently supported."""
@@ -171,30 +171,157 @@ class IndependentSet(SharedMemApp):
     relativeAppPath = "independentset/independentset"
     benchmark = "independentset"
 
-class MatrixCompletion(SharedMemApp):
-    relativeAppPath = "matrixcompletion/mc"
-    benchmark = "matrixcompletion"
+# triggers caps for matrix completion
+MCCAP = False
 
-    #def get_run_spec(self, bmkinput, config):
-    #    """Adds matrix completion type"""
-    #    specs = self.get_default_run_specs(bmkinput, config)
+class MatrixCompletionSync(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-sync"
 
-    #    ## TODO change this to some canonical version
-    #    #for s in specs:
-    #    #    s.set_arg("-algo=block") # algo type
-    #    
-    #    return specs
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
 
+        for s in specs:
+            s.set_arg("-algo=syncALS") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
+
+class MatrixCompletionSimple(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-simple"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=simpleALS") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
+
+class MatrixCompletionEdge(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-edge"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=sgdBlockEdge") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
+
+class MatrixCompletionJump(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-jump"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=sgdBlockJump") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
+
+class MatrixCompletionByItems(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-byitems"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=sgdByItems") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
+
+class MatrixCompletionByEdges(SharedMemApp):
+    relativeAppPath = "matrixcompletion/matrixCompletion"
+    benchmark = "matrixcompletion-byedges"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds matrix completion type"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-algo=sgdByEdges") # algo type
+            s.set_arg("-lambda=0.001") 
+            s.set_arg("-learningRate=0.01") 
+            s.set_arg("-learningRateFunction=intel") 
+            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-noverify")
+            s.set_arg("-useSameLatentVector")
+            s.set_arg("-useDetInit")
+            if MCCAP:
+              s.set_arg("-fixedRounds=8")
+              s.set_arg("-maxUpdates=8")
+        
+        return specs
 
 class MCM(SharedMemApp):
     relativeAppPath = "matching/bipartite-mcm"
     benchmark = "mcm"
 
     def get_run_spec(self, bmkinput, config):
-        """Adds max card bipartite matching specific arguments"""
+        """Adds bipartite matching specific arguments"""
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
+            s.set_arg("-abmpAlgo")
             s.set_arg("-inputType=generated")
             s.set_arg("-n=1000000") # nodes in each bipartite set
             s.set_arg("-numEdges=100000000") 
@@ -285,7 +412,7 @@ class PreflowPush(SharedMemApp):
         return specs
 
 class PointsToAnalysis(SharedMemApp):
-    relativeAppPath = "pointsToAnalysis/pta"
+    relativeAppPath = "pointstoanalysis/pta"
     benchmark = "pta"
 
 class SpanningTree(SharedMemApp):
@@ -362,7 +489,10 @@ class TrianglesEdge(SharedMemApp):
 # apr 12 run
 BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
             ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), PageRankPullSb(), 
-            PageRankPullResidual(), PageRankPull(), PageRankPush(), 
+            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
             PreflowPush(), PointsToAnalysis(), SSSP(), SurveyPropagation(), 
             TrianglesNode(), TrianglesEdge()] 
+
+#BINARIES = [MatrixCompletionSync(), MatrixCompletionSimple(), 
+#            MatrixCompletionEdge(), MatrixCompletionJump(), 
+#            MatrixCompletionByItems(), MatrixCompletionByEdges()]

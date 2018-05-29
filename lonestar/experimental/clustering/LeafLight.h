@@ -17,45 +17,53 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef BOX3D_H_
-#define BOX3D_H_
+#ifndef LEAF_LIGHT_H
+#define LEAF_LIGHT_H
 
+#include "common.h"
+#include "AbstractLight.h"
 #include "Point3.h"
-#include <limits>
 
-class Box3d {
+#include <iostream>
+
+
+class LeafLight : public AbstractLight {
 protected:
-  Point3 min;
-  Point3 max;
-  bool initialized;
+
+
+  // direction of maximum emission
+  Point3 direction;
 
 public:
-  Box3d()
-      : min(std::numeric_limits<float>::max()),
-        max(-1 * std::numeric_limits<double>::max()) {
-    initialized = false;
+
+  LeafLight(double x, double y, double z, double dirX, double dirY, double dirZ)
+      : AbstractLight(x, y, z), direction(dirX, dirY, dirZ) {
+
+        AbstractLight::setIntensity(1.0 / MATH_PI, 0);
   }
-  void setBox(Point3& pt) {
-    initialized = true;
-    min.set(pt);
-    max.set(pt);
-  }
-  void addPoint(Point3& pt) {
-    initialized = true;
-    min.setIfMin(pt);
-    max.setIfMax(pt);
-  }
-  void addBox(Box3d& b) {
-    initialized = true;
-    min.setIfMin(b.min);
-    max.setIfMax(b.max);
-  }
-  const Point3& getMin() const { return min; }
-  const Point3& getMax() const { return max; }
-  bool isInitialized() const { return initialized; }
-  bool equals(const Box3d& other) const {
-    return min.equals(other.min) && max.equals(other.max);
-  }
+
+  Point3& getDirection() { return direction; }
+
+  const Point3& getDirection() const { return direction; }
+
+  double getDirX() const { return direction.getX(); }
+
+  double getDirY() const { return direction.getY(); }
+
+  double getDirZ() const { return direction.getZ(); }
+
+  bool isLeaf() const { return true; }
+
+  int size() const { return 1; }
+
+  friend std::ostream& operator<<(std::ostream& s, LeafLight& pt);
 };
 
-#endif /* BOX3D_H_ */
+std::ostream& operator<<(std::ostream& s, const LeafLight& pt) {
+  s << "LeafLight :: ";
+  operator<<(s, (AbstractLight&)pt);
+  s << "Dir::" << pt.direction;
+  return s;
+}
+
+#endif /* LEAF_LIGHT_H */
