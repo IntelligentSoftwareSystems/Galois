@@ -395,13 +395,13 @@ int main(int argc, char** argv) {
   std::cout << "Node " << reportNode << " has distance "
             << graph.getData(report).dist_current << "\n";
 
-  if (!skipVerify) {
-    if (SSSP::verify(graph, source)) {
-      std::cout << "Verification successful.\n";
-    } else {
-      GALOIS_DIE("Verification failed");
-    }
-  }
+  // if (!skipVerify) {
+    // if (SSSP::verify(graph, source)) {
+      // std::cout << "Verification successful.\n";
+    // } else {
+      // GALOIS_DIE("Verification failed");
+    // }
+  // }
 
   return 0;
 }

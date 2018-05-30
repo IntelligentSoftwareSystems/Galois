@@ -18,6 +18,7 @@
  */
 
 #include "galois/Galois.h"
+#include "galois/AtomicHelpers.h"
 #include "galois/Reduction.h"
 #include "galois/PriorityQueue.h"
 #include "galois/Timer.h"
@@ -60,8 +61,8 @@ enum Algo {
   serDelta,
   dijkstraTile,
   dijkstra,
-  sync,
-  syncTile
+  Sync,
+  SyncTile
 };
 
 const char* const ALGO_NAMES[] = {
@@ -71,7 +72,8 @@ const char* const ALGO_NAMES[] = {
   "serDelta",
   "dijkstraTile",
   "dijkstra",
-  "syncTile"
+  "Sync",
+  "SyncTile"
 };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
@@ -82,8 +84,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(serDelta, "serDelta"),
       clEnumVal(dijkstraTile, "dijkstraTile"),
       clEnumVal(dijkstra, "dijkstra"),
-      clEnumVal(sync, "sync"),
-      clEnumVal(syncTile, "syncTile"),
+      clEnumVal(Sync, "Sync"),
+      clEnumVal(SyncTile, "SyncTile"),
       clEnumValEnd), cll::init(deltaTile));
 
 // typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
@@ -261,11 +263,12 @@ void dijkstraAlgo(Graph& graph, const GNode& source, const P& pushWrap, const R&
 void syncAlgo(Graph& graph, const GNode& source) {
 
   galois::LargeArray<Dist> oldDist;
-  oldDist.allocateInterleaved(size);
+  oldDist.allocateInterleaved(graph.size());
 
-  galois::do_all(galois::iterate(0ul, size);
+  constexpr Dist INFTY = SSSP::DIST_INFINITY;
+  galois::do_all(galois::iterate(0ul, graph.size()),
       [&] (size_t i) {
-        oldDist.constructAt(i, SSSP::DIST_INFINITY);
+        oldDist.constructAt(i, INFTY);
       }, 
       galois::no_stats(),
       galois::loopname("initDistArray"));
@@ -274,14 +277,17 @@ void syncAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
+  constexpr bool DO_INIT_NEIGH_LOOP = true;
   
 
-  for (auto e: graph.edges(source)) {
-    auto dst = graph.getEdgeDst(e);
-    const auto newDist = graph.getEdgeData(e);
-    auto& ddata = newDist;
+  if (DO_INIT_NEIGH_LOOP) {
+    for (auto e: graph.edges(source)) {
+      auto dst = graph.getEdgeDst(e);
+      auto& ddata = graph.getData(dst);
+      const auto newDist = graph.getEdgeData(e);
+      ddata = newDist;
+    }
   }
-
 
   galois::GReduceLogicalOR changed;
   size_t rounds = 0;
@@ -294,7 +300,6 @@ void syncAlgo(Graph& graph, const GNode& source) {
     galois::do_all(galois::iterate(graph),
       [&] (const GNode& n) {
         auto& sdata = graph.getData(n);
-        const auto srcDist = oldDist[n];
 
         if (oldDist[n] > sdata) {
 
@@ -326,7 +331,7 @@ void syncTileAlgo (Graph& graph, const GNode& source) {
 
   galois::do_all(galois::iterate(graph),
       [&] (const GNode& n) {
-        pushEdgeTiles(tiles, graph, n, SrcEdgeTileMaker{n, SSSP::DIST_INFINITY});
+        SSSP::pushEdgeTiles(tiles, graph, n, SrcEdgeTileMaker{n, SSSP::DIST_INFINITY});
       },
       galois::steal(),
       galois::loopname("MakeTiles"));
@@ -431,11 +436,10 @@ int main(int argc, char** argv) {
     case dijkstra:
       dijkstraAlgo<UpdateRequest>(graph, source, ReqPushWrap(), OutEdgeRangeFn{graph});
       break;
-
-    case sync:
+    case Sync:
       syncAlgo(graph, source);
       break;
-    case syncTile:
+    case SyncTile:
       syncTileAlgo(graph, source);
       break;
     default:
