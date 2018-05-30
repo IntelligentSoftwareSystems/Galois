@@ -60,6 +60,7 @@ enum Algo {
   serDelta,
   dijkstraTile,
   dijkstra,
+  sync,
   syncTile
 };
 
@@ -81,6 +82,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(serDelta, "serDelta"),
       clEnumVal(dijkstraTile, "dijkstraTile"),
       clEnumVal(dijkstra, "dijkstra"),
+      clEnumVal(sync, "sync"),
       clEnumVal(syncTile, "syncTile"),
       clEnumValEnd), cll::init(deltaTile));
 
@@ -256,58 +258,110 @@ void dijkstraAlgo(Graph& graph, const GNode& source, const P& pushWrap, const R&
 }
 
 
-template <typename T, typename P, typename R>
-void syncAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
+void syncAlgo(Graph& graph, const GNode& source) {
 
-  using Cont = galois::InsertBag<T>;
-  using Loop = galois::DoAll;
+  galois::LargeArray<Dist> oldDist;
+  oldDist.allocateInterleaved(size);
 
-  constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
+  galois::do_all(galois::iterate(0ul, size);
+      [&] (size_t i) {
+        oldDist.constructAt(i, SSSP::DIST_INFINITY);
+      }, 
+      galois::no_stats(),
+      galois::loopname("initDistArray"));
+  
 
-  Loop loop;
-
-  Cont* curr = new Cont();
-  Cont* next = new Cont();
 
   graph.getData(source) = 0;
 
-  pushWrap(*next, source, 0);
   
-  assert(!next->empty());
 
-  while (!next->empty()) {
-
-    std::swap(curr, next);
-    next->clear();
-    
-    loop(galois::iterate(*curr),
-        [&] (const T& item) {
-
-          for (auto e: edgeRange(item)) {
-            auto dst = graph.getEdgeDst(e);
-            auto& ddist = graph.getData(dst, flag);
-            const auto newDist = item.dist + graph.getEdgeData(e);
-
-            while (true) {
-              Dist oldDist = ddist;
-
-              if (oldDist <= newDist) { break; }
-
-              if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
-
-                pushWrap(*next, dst, newDist);
-                break;
-              }
-            }
-          }
-          
-        },
-        galois::steal(),
-        galois::chunk_size<CHUNK_SIZE>(),
-        galois::loopname("Sync"));
+  for (auto e: graph.edges(source)) {
+    auto dst = graph.getEdgeDst(e);
+    const auto newDist = graph.getEdgeData(e);
+    auto& ddata = newDist;
   }
-  delete curr;
-  delete next;
+
+
+  galois::GReduceLogicalOR changed;
+  size_t rounds = 0;
+
+  do {
+
+    ++rounds;
+    changed.reset();
+
+    galois::do_all(galois::iterate(graph),
+      [&] (const GNode& n) {
+        auto& sdata = graph.getData(n);
+        const auto srcDist = oldDist[n];
+
+        if (oldDist[n] > sdata) {
+
+          oldDist[n] = sdata;
+          changed.update(true);
+
+          for (auto e: graph.edges(n)) {
+            const auto newDist = sdata + graph.getEdgeData(e);
+            auto dst = graph.getEdgeDst(e);
+            auto& ddata = graph.getData(dst);
+            galois::atomicMin(ddata, newDist);
+          }
+
+        }
+      },
+      galois::steal(),
+      galois::loopname("Update"));
+
+  } while (changed.reduce());
+
+  galois::runtime::reportStat_Single("SSSP-Sync", "rounds", rounds);
+}
+
+void syncTileAlgo (Graph& graph, const GNode& source) {
+
+  galois::InsertBag<SrcEdgeTile> tiles;
+
+  graph.getData(source) = 0;
+
+  galois::do_all(galois::iterate(graph),
+      [&] (const GNode& n) {
+        pushEdgeTiles(tiles, graph, n, SrcEdgeTileMaker{n, SSSP::DIST_INFINITY});
+      },
+      galois::steal(),
+      galois::loopname("MakeTiles"));
+
+
+  galois::GReduceLogicalOR changed;
+  size_t rounds = 0;
+
+  do {
+    ++rounds;
+    changed.reset();
+
+    galois::do_all(galois::iterate(tiles),
+      [&] (SrcEdgeTile& t) {
+        auto& sdata = graph.getData(t.src);
+
+        if (t.dist > sdata) {
+
+          t.dist = sdata;
+          changed.update(true);
+
+          for (auto e = t.beg; e != t.end; ++e) {
+            const auto newDist = sdata + graph.getEdgeData(e);
+            auto dst = graph.getEdgeDst(e);
+            auto& ddata = graph.getData(dst);
+            galois::atomicMin(ddata, newDist);
+          }
+        }
+      },
+      galois::steal(),
+      galois::loopname("Update"));
+
+  } while (changed.reduce());
+
+  galois::runtime::reportStat_Single("SSSP-Sync", "rounds", rounds);
 }
 
 int main(int argc, char** argv) {
@@ -378,8 +432,11 @@ int main(int argc, char** argv) {
       dijkstraAlgo<UpdateRequest>(graph, source, ReqPushWrap(), OutEdgeRangeFn{graph});
       break;
 
+    case sync:
+      syncAlgo(graph, source);
+      break;
     case syncTile:
-      syncAlgo<SrcEdgeTile>(graph, source, SrcEdgeTilePushWrap{graph}, TileRangeFn());
+      syncTileAlgo(graph, source);
       break;
     default:
       std::abort();
