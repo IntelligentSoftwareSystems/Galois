@@ -89,9 +89,11 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(deltaTile));
 
 // typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
+//! [withnumaalloc]
 using Graph = galois::graphs::LC_CSR_Graph<std::atomic<uint32_t>, uint32_t>
   ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type;
+//! [withnumaalloc]
 typedef Graph::GraphNode GNode;
 
 constexpr static const bool TRACK_WORK = false;

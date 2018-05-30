@@ -198,6 +198,7 @@ public:
   iterator end() { return m_data + m_size; }
   const_iterator end() const { return m_data + m_size; }
 
+  //! [allocatefunctions]
   //! Allocates interleaved across NUMA (memory) nodes.
   void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
 
@@ -225,7 +226,6 @@ public:
    */
   void allocateFloating(size_type n) { allocate(n, Floating); }
 
-
   /**
    * Allocate memory to threads based on a provided array specifying which
    * threads receive which elements of data.
@@ -249,6 +249,7 @@ public:
     m_size = numberOfElements;
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
+  //! [allocatefunctions]
 
   template<typename... Args>
   void construct(Args&&... args) {

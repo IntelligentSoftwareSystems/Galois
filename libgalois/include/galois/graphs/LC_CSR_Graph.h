@@ -57,12 +57,14 @@ namespace graphs {
  * @tparam NodeTy data on nodes
  * @tparam EdgeTy data on out edges
  */
+//! [doxygennuma]
 template<typename NodeTy, typename EdgeTy,
          bool HasNoLockable=false,
          bool UseNumaAlloc=false, // true => numa-blocked, false => numa-interleaved
          bool HasOutOfLineLockable=false,
          typename FileEdgeTy=EdgeTy>
 class LC_CSR_Graph :
+//! [doxygennuma]
      private boost::noncopyable,
      private internal::LocalIteratorFeature<UseNumaAlloc>,
      private internal::OutOfLineLockableFeature<HasOutOfLineLockable &&
