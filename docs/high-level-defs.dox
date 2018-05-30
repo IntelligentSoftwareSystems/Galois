@@ -1,0 +1,22 @@
+/**
+
+@namespace galois
+The Galois namespace containing all Galois structures and functions.
+
+@namespace galois::graphs
+Parallel data graph structures in Galois.
+
+@namespace galois::internal
+Internal implementation functions used by Galois that shouldn't be called by 
+the user.
+
+@namespace galois::runtime
+Functions used by the Galois runtime. Use at your own risk.
+
+@namespace galois::substrate
+TODO write a description for this.
+
+@namespace galois::worklists
+Scheduling policies for Galois.
+
+*/
