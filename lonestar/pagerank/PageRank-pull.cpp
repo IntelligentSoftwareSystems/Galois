@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -109,6 +109,7 @@ void computeOutDeg(Graph& graph) {
   outDegreeTimer.stop();
 }
 
+//! [scalarreduction]
 void computePRResidual(Graph& graph, DeltaArray& delta,
                        ResidualArray& residual) {
   unsigned int iterations = 0;
@@ -164,6 +165,7 @@ void computePRResidual(Graph& graph, DeltaArray& delta,
               << std::endl;
   }
 }
+//! [scalarreduction]
 
 // PageRank pull topological
 void computePRTopological(Graph& graph) {
