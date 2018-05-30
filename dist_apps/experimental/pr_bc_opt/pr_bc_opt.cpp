@@ -54,10 +54,16 @@ static cll::opt<unsigned int> vIndex("index",
                                           "paths"),
                                 cll::init(0),
                                 cll::Hidden);
+// debug vars
 static cll::opt<bool> outputDistPaths("outputDistPaths", 
                                       cll::desc("DEBUG: Output min distance"
                                                 "/short path counts instead"),
                                       cll::init(false),
+                                      cll::Hidden);
+static cll::opt<unsigned int> vectorSize("vectorSize", 
+                                      cll::desc("DEBUG: Specify size of vector "
+                                                "used for node data"),
+                                      cll::init(0),
                                       cll::Hidden);
 
 /******************************************************************************/
@@ -110,12 +116,12 @@ void InitializeGraph(Graph& graph) {
     [&] (GNode curNode) {
       NodeData& cur_data = graph.getData(curNode);
   
-      cur_data.minDistances.resize(numSourcesPerRound);
-      cur_data.shortestPathNumbers.resize(numSourcesPerRound);
+      cur_data.minDistances.resize(vectorSize);
+      cur_data.shortestPathNumbers.resize(vectorSize);
       cur_data.roundIndexToSend = infinity;
-      cur_data.savedRoundNumbers.resize(numSourcesPerRound);
-      cur_data.sentFlag.resize(numSourcesPerRound);
-      cur_data.dependencyValues.resize(numSourcesPerRound);
+      cur_data.savedRoundNumbers.resize(vectorSize);
+      cur_data.sentFlag.resize(vectorSize);
+      cur_data.dependencyValues.resize(vectorSize);
       cur_data.numFinalizedSources = 0;
       cur_data.bc = 0.0;
     },
@@ -576,6 +582,12 @@ int main(int argc, char** argv) {
     totalNumSources = 1;
     numSourcesPerRound = 1;
   }
+
+  // set vector size in node data
+  if (vectorSize == 0) {
+    vectorSize = numSourcesPerRound;
+  }
+  GALOIS_ASSERT(vectorSize >= numSourcesPerRound);
 
   // bitset initialization
   bitset_dependency.resize(hg->size());
