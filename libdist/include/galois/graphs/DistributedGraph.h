@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -15,6 +15,12 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/** 
+ * @file DistributedGraph.h
+ * Contains the implementation for DistGraph. Command line argument definitions
+ * are found in DistributedGraph.cpp.
  */
 
 #ifndef _GALOIS_DIST_HGRAPH_H_
@@ -56,24 +62,57 @@
 
 namespace cll = llvm::cl;
 
+/**
+ * Enums specifying how masters are to be distributed among hosts.
+ */
 enum MASTERS_DISTRIBUTION {
-  BALANCED_MASTERS, BALANCED_EDGES_OF_MASTERS, BALANCED_MASTERS_AND_EDGES
+  //! balance nodes
+  BALANCED_MASTERS, 
+  //! balance edges
+  BALANCED_EDGES_OF_MASTERS, 
+  //! balance nodes and edges
+  BALANCED_MASTERS_AND_EDGES 
 };
 
+//! Specifies if synchronization should be partition agnostic
 extern cll::opt<bool> partitionAgnostic;
+//! Specifies what format to send metadata in
 extern cll::opt<DataCommMode> enforce_metadata;
+//! Specifies how to distribute masters among hosts
 extern cll::opt<MASTERS_DISTRIBUTION> masters_distribution;
+//! Specifies how much weight to give to a node when
 extern cll::opt<uint32_t> nodeWeightOfMaster;
+//! Specifies how much weight to give to a node when
 extern cll::opt<uint32_t> edgeWeightOfMaster;
+//! Specifies how much weight to give to a node when
 extern cll::opt<uint32_t> nodeAlphaRanges;
+//! Specifies number of threads doing I/O
 extern cll::opt<unsigned> numFileThreads;
+//! Specifies the size of the buffer used for
 extern cll::opt<unsigned> edgePartitionSendBufSize;
 
-// Enumerations for specifiying read/write location for sync calls
-enum WriteLocation { writeSource, writeDestination, writeAny };
-enum ReadLocation { readSource, readDestination, readAny };
+//! Enumeration for specifiying write location for sync calls
+enum WriteLocation { 
+  //! write at source
+  writeSource, 
+  //! write at destination
+  writeDestination, 
+  //! write at source and/or destination
+  writeAny
+};
+//! Enumeration for specifiying read location for sync calls
+enum ReadLocation { 
+  //! read at source
+  readSource, 
+  //! read at destination
+  readDestination, 
+  //! read at source and/or destination
+  readAny
+};
 
+/** Galois namespace */
 namespace galois {
+/** Namespace for graph classes/functions */
 namespace graphs {
 
 /**

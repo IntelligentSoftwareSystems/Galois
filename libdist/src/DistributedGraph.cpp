@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,23 +17,31 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistributedGraph.h
+ * Contains command line argument defines for DistributedGraph.h.
+ */
+
 #include <galois/graphs/DistributedGraph.h>
 
 namespace cll = llvm::cl;
 
 #ifdef __GALOIS_EXP_COMMUNICATION_ALGORITHM__
+//! Command line definition for buffSize
 cll::opt<unsigned> buffSize("sendBuffSize",
                        cll::desc("max size for send buffers in element count"),
                        cll::init(4096),
                        cll::Hidden);
 #endif
 
+//! Command line definition for partitionAgnostic
 cll::opt<bool> partitionAgnostic("partitionAgnostic",
                              cll::desc("Do not use partition-aware optimizations"),
                              cll::init(false),
                              cll::Hidden);
 
 // TODO: use enums
+//! Command line definition for enforce_metadata
 cll::opt<DataCommMode> enforce_metadata("metadata",
                              cll::desc("Communication metadata"),
                              cll::values(
@@ -53,9 +61,12 @@ cll::opt<DataCommMode> enforce_metadata("metadata",
                              ),
                              cll::init(noData),
                              cll::Hidden);
-DataCommMode enforce_data_mode; // using non-cll type because it can be used 
-                                // directly by the GPU
 
+//! Enforced data mode. Using non-cll type because it can be used directly by 
+//! the GPU.
+DataCommMode enforce_data_mode;
+
+//! Command line definition for masters_distribution
 cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
                              cll::desc("Type of masters distribution."),
                              cll::values(
@@ -70,24 +81,28 @@ cll::opt<MASTERS_DISTRIBUTION> masters_distribution("balanceMasters",
                              cll::init(BALANCED_EDGES_OF_MASTERS),
                              cll::Hidden);
 
+//! Command line definition for nodeWeightOfMaster
 cll::opt<uint32_t> nodeWeightOfMaster("nodeWeight",
                              cll::desc("Determines weight of nodes when "
                              "distributing masterst to hosts"),
                              cll::init(0),
                              cll::Hidden);
 
+//! Command line definition for edgeWeightOfMaster
 cll::opt<uint32_t> edgeWeightOfMaster("edgeWeight",
                              cll::desc("Determines weight of edges when "
                              "distributing masters to hosts"),
                              cll::init(0),
                              cll::Hidden);
 
+//! Command line definition for nodeAlphaRanges
 cll::opt<uint32_t> nodeAlphaRanges("nodeAlphaRanges",
                              cll::desc("Determines weight of nodes when "
                              "partitioning among threads"),
                              cll::init(0),
                              cll::Hidden);
 
+//! Command line definition for numFileThreads
 cll::opt<unsigned> numFileThreads("ft",
                              cll::desc("Number of file reading threads or I/O "
                              "requests per host"),
@@ -95,6 +110,7 @@ cll::opt<unsigned> numFileThreads("ft",
                              cll::Hidden);
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+//! Command line definition for bare_mpi
 cll::opt<BareMPI> bare_mpi("bare_mpi",
                              cll::desc("Type of bare MPI"),
                              cll::values(
@@ -110,6 +126,7 @@ cll::opt<BareMPI> bare_mpi("bare_mpi",
                              cll::Hidden);
 #endif
 
+//! Command line definition for edgePartitionSendBufSize
 cll::opt<unsigned> edgePartitionSendBufSize("edgeBufferSize",
                                  cll::desc("Buffer size for batching edges to "
                                            "send during partitioning."), 
