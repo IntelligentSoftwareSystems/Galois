@@ -564,15 +564,6 @@ int main(int argc, char** argv) {
 
   galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
 
-  StatTimer_graph_init.start();
-  InitializeGraph(*hg);
-  StatTimer_graph_init.stop();
-
-  galois::runtime::getHostBarrier().wait();
-
-  // shared DG accumulator among all steps
-  galois::DGAccumulator<uint32_t> dga;
-
   if (totalNumSources == 0) {
     galois::gDebug("Total num sources unspecified");
     totalNumSources = hg->globalSize();
@@ -589,11 +580,20 @@ int main(int argc, char** argv) {
   }
   GALOIS_ASSERT(vectorSize >= numSourcesPerRound);
 
+  uint64_t origNumRoundSources = numSourcesPerRound;
+
+  StatTimer_graph_init.start();
+  InitializeGraph(*hg);
+  StatTimer_graph_init.stop();
+
+  galois::runtime::getHostBarrier().wait();
+
+  // shared DG accumulator among all steps
+  galois::DGAccumulator<uint32_t> dga;
+
   // bitset initialization
   bitset_dependency.resize(hg->size());
   bitset_minDistances.resize(hg->size());
-
-  uint64_t origNumRoundSources = numSourcesPerRound;
 
   std::vector<uint64_t> nodesToConsider;
   nodesToConsider.resize(numSourcesPerRound);
