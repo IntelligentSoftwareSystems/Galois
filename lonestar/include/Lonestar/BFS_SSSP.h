@@ -202,7 +202,7 @@ struct BFS_SSSP {
 
   static bool verify(Graph& graph, GNode source) {
     if (graph.getData(source) != 0) {
-      std::cerr << "source has non-zero dist value\n";
+      std::cerr << "ERROR: source has non-zero dist value == " << graph.getData(source) << std::endl;
       return false;
     }
 

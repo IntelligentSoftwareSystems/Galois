@@ -61,8 +61,8 @@ enum Algo {
   serDelta,
   dijkstraTile,
   dijkstra,
-  Sync,
-  SyncTile
+  topo,
+  topoTile
 };
 
 const char* const ALGO_NAMES[] = {
@@ -72,8 +72,8 @@ const char* const ALGO_NAMES[] = {
   "serDelta",
   "dijkstraTile",
   "dijkstra",
-  "Sync",
-  "SyncTile"
+  "topo",
+  "topoTile"
 };
 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
@@ -84,8 +84,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumVal(serDelta, "serDelta"),
       clEnumVal(dijkstraTile, "dijkstraTile"),
       clEnumVal(dijkstra, "dijkstra"),
-      clEnumVal(Sync, "Sync"),
-      clEnumVal(SyncTile, "SyncTile"),
+      clEnumVal(topo, "topo"),
+      clEnumVal(topoTile, "topoTile"),
       clEnumValEnd), cll::init(deltaTile));
 
 // typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<unsigned int>, uint32_t>::with_no_lockable<true>::type::with_numa_alloc<true>::type Graph;
@@ -262,7 +262,7 @@ void dijkstraAlgo(Graph& graph, const GNode& source, const P& pushWrap, const R&
 }
 
 
-void syncAlgo(Graph& graph, const GNode& source) {
+void topoAlgo(Graph& graph, const GNode& source) {
 
   galois::LargeArray<Dist> oldDist;
   oldDist.allocateInterleaved(graph.size());
@@ -279,7 +279,7 @@ void syncAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
-  constexpr bool DO_INIT_NEIGH_LOOP = true;
+  constexpr bool DO_INIT_NEIGH_LOOP = false;
   
 
   if (DO_INIT_NEIGH_LOOP) {
@@ -287,7 +287,7 @@ void syncAlgo(Graph& graph, const GNode& source) {
       auto dst = graph.getEdgeDst(e);
       auto& ddata = graph.getData(dst);
       const auto newDist = graph.getEdgeData(e);
-      ddata = newDist;
+      galois::atomicMin(ddata, newDist);
     }
   }
 
@@ -301,7 +301,7 @@ void syncAlgo(Graph& graph, const GNode& source) {
 
     galois::do_all(galois::iterate(graph),
       [&] (const GNode& n) {
-        auto& sdata = graph.getData(n);
+        const auto& sdata = graph.getData(n);
 
         if (oldDist[n] > sdata) {
 
@@ -322,10 +322,10 @@ void syncAlgo(Graph& graph, const GNode& source) {
 
   } while (changed.reduce());
 
-  galois::runtime::reportStat_Single("SSSP-Sync", "rounds", rounds);
+  galois::runtime::reportStat_Single("SSSP-topo", "rounds", rounds);
 }
 
-void syncTileAlgo (Graph& graph, const GNode& source) {
+void topoTileAlgo (Graph& graph, const GNode& source) {
 
   galois::InsertBag<SrcEdgeTile> tiles;
 
@@ -348,7 +348,7 @@ void syncTileAlgo (Graph& graph, const GNode& source) {
 
     galois::do_all(galois::iterate(tiles),
       [&] (SrcEdgeTile& t) {
-        auto& sdata = graph.getData(t.src);
+        const auto& sdata = graph.getData(t.src);
 
         if (t.dist > sdata) {
 
@@ -368,7 +368,7 @@ void syncTileAlgo (Graph& graph, const GNode& source) {
 
   } while (changed.reduce());
 
-  galois::runtime::reportStat_Single("SSSP-Sync", "rounds", rounds);
+  galois::runtime::reportStat_Single("SSSP-topo", "rounds", rounds);
 }
 
 int main(int argc, char** argv) {
@@ -404,9 +404,13 @@ int main(int argc, char** argv) {
                    approxNodeData / galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
-  std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
-  std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
-  std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
+  if (algo == deltaStep || algo == deltaTile || algo == serDelta || algo == serDeltaTile) {
+    std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
+    std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
+    std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
+  }
+
+
   galois::do_all(galois::iterate(graph), 
       [&graph] (GNode n) { 
         graph.getData(n) = SSSP::DIST_INFINITY; 
@@ -438,11 +442,11 @@ int main(int argc, char** argv) {
     case dijkstra:
       dijkstraAlgo<UpdateRequest>(graph, source, ReqPushWrap(), OutEdgeRangeFn{graph});
       break;
-    case Sync:
-      syncAlgo(graph, source);
+    case topo:
+      topoAlgo(graph, source);
       break;
-    case SyncTile:
-      syncTileAlgo(graph, source);
+    case topoTile:
+      topoTileAlgo(graph, source);
       break;
     default:
       std::abort();
