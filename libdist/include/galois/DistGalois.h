@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file DistGalois.h
+ *
+ * Contains the declaration of DistMemSys, a way to explicitly initiate the
+ * Galois runtime.
+ */
 #ifndef GALOIS_DIST_GALOIS_H
 #define GALOIS_DIST_GALOIS_H
 
@@ -27,17 +33,12 @@
 #include <utility>
 #include <tuple>
 
-/**
- * Main Galois namespace. All the core Galois functionality will be found in here.
- */
 namespace galois {
-
 /**
- * Explicit class to initialize the Galois Runtime
- * Runtime is destroyed when this object is destroyed
+ * Explicit class to initialize the Galois Runtime.
+ * The runtime is destroyed when this object is destroyed
  */
 class DistMemSys: public runtime::SharedMemRuntime<runtime::DistStatManager> {
-
 public:
   explicit DistMemSys(void);
 
