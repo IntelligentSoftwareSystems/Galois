@@ -45,14 +45,15 @@ int main(int argc, char** argv) {
   numThreads = galois::setActiveThreads(numThreads);
   std::cout << "Using " << numThreads << " threads and " << n << " iterations\n";
 
-  std::cout << "Using a function object\n";
-  galois::do_all(galois::iterate(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n)), HelloWorld());
-
-  std::cout << "Using a function pointer\n";
-  galois::do_all(galois::iterate(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n)), &helloWorld);
-
   std::cout << "Using a lambda\n";
-  galois::do_all(galois::iterate(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n)), [] (int i) { std::cout << "Hello " << i << "\n"; });
+  galois::do_all(galois::iterate(0, n), [] (int i) { std::cout << "Hello " << i << "\n"; });
+
+  std::cout << "Using a function object\n";
+  galois::do_all(galois::iterate(0, n), HelloWorld());
+
+  std::cout << "Using a function pointer (discouraged)\n";
+  galois::do_all(galois::iterate(0, n), &helloWorld);
+
 //! [do_all example]
 
   return 0;

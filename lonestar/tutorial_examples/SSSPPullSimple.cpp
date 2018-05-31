@@ -32,7 +32,7 @@ typedef std::pair<unsigned, GNode> UpdateRequest;
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max();
 
-unsigned stepShift = 11;
+constexpr unsigned stepShift = 14;
 Graph graph;
 
 namespace cll = llvm::cl;
@@ -46,20 +46,19 @@ int main(int argc, char **argv) {
   galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
-  galois::for_each(
-      galois::iterate(graph.begin(), graph.end()),
-      [&] (GNode& n, auto& ctx) { graph.getData(n) = DIST_INFINITY; }
+  galois::do_all(
+      galois::iterate(graph),
+      [&] (GNode n) { graph.getData(n) = DIST_INFINITY; }
   );
 
   //! [OrderedByIntegerMetic in SSSPsimple]
-  struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
-    unsigned int operator() (const UpdateRequest& val) const {
-      return val.first >> stepShift;
-    }
+  auto reqIndexer = [] (const UpdateRequest& req) {
+    return (req.first >> stepShift);
   };
+
   using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+  typedef OrderedByIntegerMetric<decltype(reqIndexer),dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPPullsimple]
 
   galois::StatTimer T;
@@ -73,7 +72,7 @@ int main(int argc, char **argv) {
 
   galois::for_each(
       galois::iterate(init.begin(), init.end()),
-      [&] (UpdateRequest& req, auto& ctx) {
+      [&] (const UpdateRequest& req, auto& ctx) {
         GNode active_node = req.second;
         unsigned& data = graph.getData(active_node);
         unsigned newValue = data;
@@ -93,7 +92,7 @@ int main(int argc, char **argv) {
           }
         }
       }
-      , galois::wl<OBIM>()
+      , galois::wl<OBIM>(reqIndexer)
       , galois::loopname("sssp_run_loop")
   );
   //! [for_each in SSSPPullsimple]

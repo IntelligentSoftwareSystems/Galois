@@ -94,7 +94,7 @@ int main(int argc, char** argv) {
 
   // read/write only a node itself
   galois::do_all(
-      galois::iterate(graph.begin(), graph.end()),
+      galois::iterate(graph),
       [&] (GNode n) {
         graph.getData(n) = std::distance(graph.edge_begin(n), graph.edge_end(n));
       }
@@ -105,7 +105,7 @@ int main(int argc, char** argv) {
   // push operator with Galois synchronization
   initialize(graph);
   galois::for_each(
-      galois::iterate(graph.begin(), graph.end()),
+      galois::iterate(graph),
       [&] (GNode n, auto& ctx) {
         for (auto ii: graph.edges(n)) {
           GNode dst = graph.getEdgeDst(ii);
@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
   // push operator with self synchronization in do_all
   initialize(graph);
   galois::do_all(
-      galois::iterate(graph.begin(), graph.end()),
+      galois::iterate(graph),
       incrementNeighborsAtomically
       , galois::loopname("do_all_self_sync")
       , galois::steal()
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
   // push operator with self synchronization in optimized for_each
   initialize(graph); 
   galois::for_each(
-      galois::iterate(graph.begin(), graph.end()),
+      galois::iterate(graph),
       [&] (GNode n, auto& ctx) { incrementNeighborsAtomically(n); }
       , galois::loopname("for_each_self_sync")
       , galois::no_conflicts()

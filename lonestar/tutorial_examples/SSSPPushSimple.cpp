@@ -17,7 +17,7 @@ using UpdateRequest = std::pair<unsigned, GNode>;
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max();
 
-unsigned int stepShift = 11;
+constexpr unsigned int stepShift = 14;
 
 int main(int argc, char **argv) {
   galois::SharedMemSys G;
@@ -35,8 +35,8 @@ int main(int argc, char **argv) {
 
   // initialization
   galois::do_all(
-      galois::iterate(graph.begin(), graph.end()),               // range
-      [&graph] (GNode& N) { graph.getData(N) = DIST_INFINITY; }  // operator as lambda expression
+      galois::iterate(graph),
+      [&graph] (GNode N) { graph.getData(N) = DIST_INFINITY; }  // operator as lambda expression
   );
   
   galois::StatTimer T;
@@ -44,9 +44,6 @@ int main(int argc, char **argv) {
 
   // clear source
   graph.getData(*graph.begin()) = 0;
-
-  // pack source to a container to have iterators for galois::iterate
-  std::array<GNode,1> init = {*graph.begin()};
 
   // SSSP operator
   auto SSSP = [&] (GNode active_node, auto& ctx) {
@@ -65,32 +62,28 @@ int main(int argc, char **argv) {
 
   // Priority Function in SSSPPushSimple
   // Map user-defined priority to a bucket number in OBIM
-  struct UpdateRequestIndexer {
-    Graph& g;
-    UpdateRequestIndexer(Graph& _g) :g(_g) {}
 
-    unsigned int operator() (const GNode N) const {
-      return g.getData(N, galois::MethodFlag::UNPROTECTED) >> stepShift;
-    }
+  auto reqIndexer = [&] (const GNode& N) {
+    return (graph.getData(N, galois::MethodFlag::UNPROTECTED) >> stepShift);
   };
 
   using namespace galois::worklists;
   using dChunk = dChunkedLIFO<16>;
-  using OBIM = OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>;
+  using OBIM = OrderedByIntegerMetric<decltype(reqIndexer),dChunk>;
 
   std::string schedule = argv[2];  // argv[2] is the scheduler to be used
   if ("dchunk16" == schedule) {
     galois::for_each(
-        galois::iterate(init.begin(), init.end()),      // range
+        galois::iterate({*graph.begin() }),      // initial range
         SSSP                                            // operator
         , galois::wl<dChunk>()                          // options
         , galois::loopname("sssp_dchunk16")
     );
   } else if ("obim" == schedule) {
      galois::for_each(
-        galois::iterate(init.begin(), init.end()),      // range
+        galois::iterate({*graph.begin() }),      // initial range
         SSSP                                            // operator
-        , galois::wl<OBIM>(UpdateRequestIndexer{graph}) // options
+        , galois::wl<OBIM>(reqIndexer) // options
         , galois::loopname("sssp_obim")
     );
   } else {

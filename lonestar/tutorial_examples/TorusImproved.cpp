@@ -76,7 +76,7 @@ void constructTorus(Graph& g, int height, int width) {
   // Using space-filling order, assign nodes and create (and allocate) them in parallel
   std::vector<GNode> nodes(numNodes);
   galois::do_all(
-      galois::iterate(points.begin(), points.end()),
+      galois::iterate(points),
       [&] (const Point2D& p) {
         auto n = g.createNode(0);
         g.addNode(n);

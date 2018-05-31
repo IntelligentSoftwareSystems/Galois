@@ -32,13 +32,14 @@ typedef std::pair<unsigned, GNode> UpdateRequest;
 static const unsigned int DIST_INFINITY =
   std::numeric_limits<unsigned int>::max();
 
-unsigned stepShift = 11;
+unsigned stepShift = 14;
 Graph graph;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-void relax_edge(unsigned src_data, Graph::edge_iterator ii, auto& ctx) {
+template <typename C>
+void relax_edge(unsigned src_data, Graph::edge_iterator ii, C& ctx) {
   GNode dst = graph.getEdgeDst(ii);
     //![get edge and node data] 
   unsigned int edge_data = graph.getEdgeData(ii);
@@ -60,28 +61,26 @@ int main(int argc, char **argv) {
 //! [ReadGraph]
 
   galois::for_each(
-      galois::iterate(graph.begin(), graph.end()),
+      galois::iterate(graph),
       [&] (GNode n, auto& ctx) { graph.getData(n) = DIST_INFINITY; }
   );
 
   //! [OrderedByIntegerMetic in SSSPsimple]
-  struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
-    unsigned int operator() (const UpdateRequest& val) const {
-      return val.first >> stepShift;
-    }
+  auto reqIndexer = [] (const UpdateRequest& req) {
+    return (req.first >> stepShift);
   };
+
   using namespace galois::worklists;
   typedef dChunkedLIFO<16> dChunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+  typedef OrderedByIntegerMetric<decltype(reqIndexer),dChunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPsimple]
 
   galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
-  UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
   //! [for_each in SSSPsimple]
   galois::for_each(
-      galois::iterate(&init[0], &init[1]),
+      galois::iterate({ std::make_pair(0U, *graph.begin()) }),
       //! [Operator in SSSPsimple]
       [&] (UpdateRequest& req, auto& ctx) {
         GNode active_node = req.second;
@@ -93,7 +92,7 @@ int main(int argc, char **argv) {
         //![loop over neighbors]
       }
       //! [Operator in SSSPsimple]
-      , galois::wl<OBIM>()
+      , galois::wl<OBIM>(reqIndexer)
       , galois::loopname("sssp_run_loop")
   );
   //! [for_each in SSSPsimple]
