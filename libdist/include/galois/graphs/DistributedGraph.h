@@ -244,15 +244,21 @@ protected:
 public:
   /****** VIRTUAL FUNCTIONS *********/
   //! Converts a global node id to a local node id
+  //! @returns local id from passed in global id
   virtual uint32_t G2L(uint64_t) const = 0 ;
   //! Converts a local node id to a local node id
+  //! @returns global id from passed in local id
   virtual uint64_t L2G(uint32_t) const = 0;
+  //! Returns vertex cut status
   //! @returns True if the cut being used is a vertex cut
   virtual bool is_vertex_cut() const = 0;
-  //! @returns Host id of this graph
+  //! Determines which host has the master for a particular node
+  //! @returns Host id of node in question
   virtual unsigned getHostID(uint64_t) const = 0;
+  //! Determine if a node has a master on this host.
   //! @returns True if passed in global id has a master on this host
   virtual bool isOwned(uint64_t) const = 0;
+  //! Determine if a node has a proxy on this host
   //! @returns True if passed in global id has a proxy on this host
   virtual bool isLocal(uint64_t) const = 0;
   //! Serialize this graph
