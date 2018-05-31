@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -15,6 +15,13 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/**
+ * @file GlobalObj.cpp
+ *
+ * Defines GlobalObject's static vector that tracks all GlobalObjects
+ * and the ptrForObj function.
  */
 
 #include "galois/runtime/GlobalObj.h"
