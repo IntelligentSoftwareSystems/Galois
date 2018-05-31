@@ -56,7 +56,7 @@ struct CellPin {
   typedef std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > MapOfTableSet;
 
   std::string name;
-  float capacitance;
+  float riseCapacitance, fallCapacitance, maxCapacitance;
   PinType pinType;
   Cell *cell;
 

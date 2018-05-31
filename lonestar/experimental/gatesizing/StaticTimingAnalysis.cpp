@@ -252,7 +252,7 @@ struct ComputeArrivalTimeAndPower {
       g.edges(n);
 
       auto pin = data.pin;
-      auto pinC = pin->gate->cell->inPins.at(pin->name)->capacitance;
+      auto pinC = pin->gate->cell->inPins.at(pin->name)->riseCapacitance;
       for (auto ie: g.in_edges(n)) {
         auto& inData = g.getData(g.getEdgeDst(ie));
         updateGateInputAndPrimaryOutput(data, inData);
@@ -287,7 +287,7 @@ struct ComputeArrivalTimeAndPower {
         auto& outData = g.getData(g.getEdgeDst(oe));
         auto outPin = outData.pin;
         if (outPin->gate) {
-          data.totalPinC += outPin->gate->cell->inPins.at(outPin->name)->capacitance;
+          data.totalPinC += outPin->gate->cell->inPins.at(outPin->name)->riseCapacitance;
         }
         else {
           // primary output, already recorded

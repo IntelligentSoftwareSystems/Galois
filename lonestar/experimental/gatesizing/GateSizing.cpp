@@ -62,33 +62,33 @@ int main(int argc, char** argv) {
 
   CellLib cellLib;
   cellLib.read(lib);
-//  cellLib.printDebug();
+  cellLib.printDebug();
   std::cout << "parsed cell library" << std::endl;
 
   VerilogModule vModule;
   vModule.read(inputCircuit, &cellLib);
-//  vModule.printDebug();
+  vModule.printDebug();
   std::cout << "parsed verilog module" << std::endl;
 
   CircuitGraph graph;
   graph.construct(vModule);
   graph.initialize();
-//  graph.print();
+  graph.print();
   std::cout << "constructed circuit graph" << std::endl;
 
-  SDC sdc(&cellLib, &vModule, &graph);
-  sdc.setConstraints(sdcFile);
+//  SDC sdc(&cellLib, &vModule, &graph);
+//  sdc.setConstraints(sdcFile);
 //  graph.print();
-  std::cout << "set constraints from sdc file to circuit graph" << std::endl;
+//  std::cout << "set constraints from sdc file to circuit graph" << std::endl;
 
-  doStaticTimingAnalysis(graph);
-  graph.print();
-  std::cout << "finished static timinig analysis" << std::endl;
+//  doStaticTimingAnalysis(graph);
+//  graph.print();
+//  std::cout << "finished static timinig analysis" << std::endl;
 
-  doGateSizing();
+//  doGateSizing();
 //  vModule.printDebug();
 //  graph.print();
-  std::cout << "finished gate sizing" << std::endl;
+//  std::cout << "finished gate sizing" << std::endl;
 
   T.stop();
   vModule.write(outputCircuit);

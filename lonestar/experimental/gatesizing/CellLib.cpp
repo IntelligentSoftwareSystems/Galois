@@ -312,9 +312,21 @@ static void readCellPin(FileReader& fRd, CellLib *cellLib, Cell *cell) {
       fRd.nextToken(); // get ";"
     }
 
-    else if (token == "capacitance") {
+    else if (token == "fall_capacitance") {
       fRd.nextToken(); // get ":"
-      cellPin->capacitance = std::stof(fRd.nextToken());
+      cellPin->fallCapacitance = std::stof(fRd.nextToken());
+      fRd.nextToken(); // get ";"
+    }
+
+    else if (token == "rise_capacitance") {
+      fRd.nextToken(); // get ":"
+      cellPin->riseCapacitance = std::stof(fRd.nextToken());
+      fRd.nextToken(); // get ";"
+    }
+
+    else if (token == "max_capacitance") {
+      fRd.nextToken(); // get ":"
+      cellPin->maxCapacitance = std::stof(fRd.nextToken());
       fRd.nextToken(); // get ";"
     }
 
@@ -404,6 +416,7 @@ static void readCellLibBody(FileReader& fRd, CellLib *cellLib) {
     }
 
     else if (token == "operating_conditions") {
+      // TODO: read tree_type : balanced_tree|worst_case_tree|best_case_tree
       do {
         token = fRd.nextToken();
       } while (token != "}");
@@ -530,7 +543,8 @@ static void printCell(Cell *c) {
     auto pin = item.second;
     std::cout << "    pin (" << pin->name << ") {" << std::endl;
     std::cout << "      direction: input" << std::endl;
-    std::cout << "      capacitance: " << pin->capacitance << std::endl;
+    std::cout << "      fall_capacitance: " << pin->fallCapacitance << std::endl;
+    std::cout << "      rise_capacitance: " << pin->riseCapacitance << std::endl;
     std::cout << "    }" << std::endl;
   }
 
@@ -545,6 +559,7 @@ static void printCell(Cell *c) {
     auto pin = item.second;
     std::cout << "    pin (" << pin->name << ") {" << std::endl;
     std::cout << "      direction: output" << std::endl;
+    std::cout << "      max_capacitance: " << pin->maxCapacitance << std::endl;
 
     for (auto i: pin->tSense) {
       auto inPinName = i.first.first;

@@ -251,8 +251,17 @@ static void writeVerilogIOs(std::ofstream& of, std::string portTypeName, std::un
   // input/output port1, port2, ...;
   of << "  " << portTypeName << " ";
   size_t i = 0, num = ports.size();
+  if ("input" == portTypeName) {
+     num -= 2;
+  }
+
   for (auto item: ports) {
-    of << item.second->name;
+    auto& name = item.second->name;
+    if ("1'b1" == name || "1'b0" == name) {
+      continue;
+    }
+
+    of << name;
     num--;
     i++;
     if (num) {
@@ -268,12 +277,17 @@ static void writeVerilogIOs(std::ofstream& of, std::string portTypeName, std::un
 }
 
 static void writeVerilogWires(std::ofstream& of, std::unordered_map<std::string, VerilogWire *>& wires) {
-  size_t i = 0, num = wires.size();
+  size_t i = 0, num = wires.size() - 2;
 
   // wire wire1, wire2, ...;
   of << "  wire ";
   for (auto item: wires) {
-    of << item.second->name;
+    auto& name = item.second->name;
+    if ("1'b1" == name || "1'b0" == name) {
+      continue;
+    }
+    of << name;
+
     num--;
     i++;
     if (num) {
@@ -296,9 +310,14 @@ void VerilogModule::write(std::string outName) {
 
   // module moduleName (port1, port2, ...);
   of << "module " << name << "(";
-  num = inputs.size() + outputs.size();
+  num = inputs.size() + outputs.size() - 2;
   for (auto item: inputs) {
-    of << item.second->name;
+    auto& name = item.second->name;
+    if ("1'b1" == name || "1'b0" == name) {
+      continue;
+    }
+
+    of << name;
     num--;
     i++;
     if (num) {

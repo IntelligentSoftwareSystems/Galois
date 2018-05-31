@@ -95,7 +95,7 @@ static float getPrimaryInputSlew(FileReader& fRd, SDC *sdc) {
   return slew;
 }
 
-static void setArrivalTimeAndSlewByDrivingCell(std::vector<GNode>& nodes, Cell *drivingCell, std::string pinName, float slew, SDC *sdc) {
+static void setSlewByDrivingCell(std::vector<GNode>& nodes, Cell *drivingCell, std::string pinName, float slew, SDC *sdc) {
   if (0.0 == slew) {
     return;
   }
@@ -122,7 +122,6 @@ static void setArrivalTimeAndSlewByDrivingCell(std::vector<GNode>& nodes, Cell *
     return;
   }
 
-  auto& delayTables = (isPos) ? posDelayIter->second : negDelayIter->second;
   auto& transTables = (isPos) ? posTransMap.at({inPinName, TIMING_SENSE_POSITIVE_UNATE}) : negTransMap.at({inPinName, TIMING_SENSE_NEGATIVE_UNATE});
 
   for (auto n: nodes) {
@@ -135,17 +134,14 @@ static void setArrivalTimeAndSlewByDrivingCell(std::vector<GNode>& nodes, Cell *
       auto& oData = g.getData(g.getEdgeDst(oe));
       auto pin = oData.pin;
       if (pin->gate) {
-        data.totalPinC += pin->gate->cell->inPins.at(pin->name)->capacitance;
+        data.totalPinC += pin->gate->cell->inPins.at(pin->name)->riseCapacitance;
       }
     }
 
     std::vector<float> vTotalC = {std::abs(slew), data.totalPinC + data.totalNetC};
-    auto delay = extractMaxFromTableSet(delayTables, vTotalC);
-
     auto& info = (slew > 0.0) ? 
                    ((isPos) ? data.rise : data.fall) : 
                    ((isPos) ? data.fall : data.rise);
-    info.arrivalTime = delay.first;
     info.slew = extractMaxFromTableSet(transTables, vTotalC).first;
   }
 }
@@ -160,10 +156,10 @@ static void setDrivingCell(FileReader& fRd, SDC *sdc) {
   auto nodes = getGNodesForPorts(fRd, sdc);
 
   float slew = getPrimaryInputSlew(fRd, sdc);
-  setArrivalTimeAndSlewByDrivingCell(nodes, drivingCell, pinName, slew, sdc);
+  setSlewByDrivingCell(nodes, drivingCell, pinName, slew, sdc);
 
   slew = getPrimaryInputSlew(fRd, sdc);
-  setArrivalTimeAndSlewByDrivingCell(nodes, drivingCell, pinName, slew, sdc);
+  setSlewByDrivingCell(nodes, drivingCell, pinName, slew, sdc);
 }
 
 static void setLoad(FileReader& fRd, SDC *sdc) {
@@ -194,25 +190,6 @@ static void readSDC(FileReader& fRd, SDC *sdc) {
 
 static void setDefaultValue(SDC *sdc) {
   sdc->targetDelay = std::numeric_limits<float>::infinity();
-
-  float primaryInputRiseSlew = sdc->cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellRise.at({"A", TIMING_SENSE_NEGATIVE_UNATE}).at("")->index[0][3];
-  float primaryInputFallSlew = sdc->cellLib->cells.at("INV_X4")->outPins.at("ZN")->cellFall.at({"A", TIMING_SENSE_NEGATIVE_UNATE}).at("")->index[0][3];
-
-  auto& g = sdc->graph->g;
-  for (auto oe: g.edges(sdc->graph->dummySrc)) {
-    auto& data = g.getData(g.getEdgeDst(oe));
-    data.rise.slew = primaryInputRiseSlew;
-    data.fall.slew = primaryInputFallSlew;
-  }
-
-  float primaryOutputTotalPinC = 2.0 * sdc->cellLib->cells.at("INV_X1")->inPins.at("A")->capacitance;
-  float primaryOutputTotalNetC = sdc->cellLib->defaultWireLoad->wireCapacitance(1);
-
-  for (auto ie: g.in_edges(sdc->graph->dummySink)) {
-    auto& data = g.getData(g.getEdgeDst(ie));
-    data.totalPinC = primaryOutputTotalPinC;
-    data.totalNetC = primaryOutputTotalNetC;
-  }
 }
 
 void SDC::setConstraints(std::string inName)
@@ -239,6 +216,8 @@ void SDC::setConstraints(std::string inName)
 
     FileReader fRd(inName, delimiters, sizeof(delimiters), separators, sizeof(separators));
     readSDC(fRd, this);
+  } else {
+    std::cout << "Use 0.0, default value.\n";
   }
 }
 
