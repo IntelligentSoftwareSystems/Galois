@@ -279,18 +279,6 @@ void topoAlgo(Graph& graph, const GNode& source) {
 
   graph.getData(source) = 0;
 
-  constexpr bool DO_INIT_NEIGH_LOOP = false;
-  
-
-  if (DO_INIT_NEIGH_LOOP) {
-    for (auto e: graph.edges(source)) {
-      auto dst = graph.getEdgeDst(e);
-      auto& ddata = graph.getData(dst);
-      const auto newDist = graph.getEdgeData(e);
-      galois::atomicMin(ddata, newDist);
-    }
-  }
-
   galois::GReduceLogicalOR changed;
   size_t rounds = 0;
 
