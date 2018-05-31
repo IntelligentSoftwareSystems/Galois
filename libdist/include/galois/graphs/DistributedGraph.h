@@ -19,6 +19,7 @@
 
 /** 
  * @file DistributedGraph.h
+ *
  * Contains the implementation for DistGraph. Command line argument definitions
  * are found in DistributedGraph.cpp.
  */
@@ -110,9 +111,7 @@ enum ReadLocation {
   readAny
 };
 
-/** Galois namespace */
 namespace galois {
-/** Namespace for graph classes/functions */
 namespace graphs {
 
 /**
@@ -126,70 +125,88 @@ namespace graphs {
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false>
 class DistGraph: public galois::runtime::GlobalObject {
 private:
+  //! Graph name used for printing things
   constexpr static const char* const GRNAME = "dGraph";
 
+  //! testing
   using GraphTy = typename std::conditional<WithInEdges, 
                    galois::graphs::B_LC_CSR_Graph<NodeTy, EdgeTy, true>,
                    galois::graphs::LC_CSR_Graph<NodeTy, EdgeTy, true>>::type;
 
+  //! Tracks current round number; has to be set manually by the user
   bool round;
 
 protected:
+  //! The internal graph used by DistGraph to represent the graph
   GraphTy graph;
-  enum SyncType { syncReduce, syncBroadcast };
+  //! Synchronization type
+  enum SyncType { 
+    syncReduce, //!< Reduction sync
+    syncBroadcast //!< Broadcast sync
+  };
 
+  //! Marks if the graph is transposed or not. Important when determining
+  //! how to do synchronization
   bool transposed;
 
-  // global graph
-  uint64_t numGlobalNodes; // Total nodes in the global unpartitioned graph.
-  uint64_t numGlobalEdges; // Total edges in the global unpartitioned graph.
+  // global graph variables
+  uint64_t numGlobalNodes; //!< Total nodes in the global unpartitioned graph.
+  uint64_t numGlobalEdges; //!< Total edges in the global unpartitioned graph.
 
-  const unsigned id; // copy of net.ID
-  const uint32_t numHosts; // copy of net.Num 
+  const unsigned id; //!< Copy of net.ID, which is the ID of the machine.
+  const uint32_t numHosts; //!< Copy of net.Num, which is the total number of machines
 
   // local graph
   // size() = Number of nodes created on this host (masters + mirrors)
-  uint32_t numOwned; // Number of nodes owned (masters) by this host
-                     // size() - numOwned = mirrors on this host
-  uint32_t beginMaster; // local id of the beginning of master nodes
-                        // beginMaster + numOwned = local id of the end of master nodes
-  uint32_t numNodesWithEdges; // Number of nodes (masters + mirrors) that have outgoing edges 
+  uint32_t numOwned; //!< Number of nodes owned (masters) by this host.
+                     //!< size() - numOwned = mirrors on this host
+  uint32_t beginMaster; //!< Local id of the beginning of master nodes.
+                        //!< beginMaster + numOwned = local id of the end of master nodes
+  uint32_t numNodesWithEdges; //!< Number of nodes (masters + mirrors) that have outgoing edges 
 
-  // Master nodes on each host.
+  //! Information that converts GID to host that has master proxy of that node
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
-  uint64_t last_nodeID_withEdges_bipartite; // used only for bipartite graphs
+  uint64_t last_nodeID_withEdges_bipartite; //!< used only for bipartite graphs
 
   // memoization optimization
-  // mirror nodes from different hosts. For reduce
+  //! Mirror nodes from different hosts. For reduce
   std::vector<std::vector<size_t>> mirrorNodes;
-  // master nodes on different hosts. For broadcast
+  //! Master nodes on different hosts. For broadcast
   std::vector<std::vector<size_t>> masterNodes;
 
+  //! Typedef used so galois::runtime::BITVECTOR_STATUS doesn't have to be 
+  //! written
   using BITVECTOR_STATUS = galois::runtime::BITVECTOR_STATUS;
 
-  // FIXME: pass the flag as function paramater instead
-  // a pointer set during sync_on_demand calls that points to the status
-  // of a bitvector with regard to where data has been synchronized
+  //! A pointer set during sync_on_demand calls that points to the status
+  //! of a bitvector with regard to where data has been synchronized
+  //! @todo pass the flag as function paramater instead
   BITVECTOR_STATUS* currentBVFlag;
 
 private:
   // vector for determining range objects for master nodes + nodes
   // with edges (which includes masters)
+  //! represents split of all nodes among threads to balance edges
   std::vector<uint32_t> allNodesRanges;
+  //! represents split of master nodes among threads to balance edges
   std::vector<uint32_t> masterRanges;
+  //! represents split of nodes with edges (includes masters) among threads to 
+  //! balance edges
   std::vector<uint32_t> withEdgeRanges;
 
+  //! represents split of all nodes among threads to balance in-edges
   std::vector<uint32_t> allNodesRangesIn;
+  //! represents split of master nodes among threads to balance in-edges
   std::vector<uint32_t> masterRangesIn;
 
   using NodeRangeType = 
       galois::runtime::SpecificRange<boost::counting_iterator<size_t>>;
 
-  // vector of ranges that stores the 3 different range objects that a user is
-  // able to access
+  //! Vector of ranges that stores the 3 different range objects that a user is
+  //! able to access
   std::vector<NodeRangeType> specificRanges;
-  // for in edges
+  //! Like specificRanges, but for in edges
   std::vector<NodeRangeType> specificRangesIn;
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -197,6 +214,7 @@ private:
 #endif
 
 protected:
+  //! Prints graph statistics.
   void printStatistics() {
     if (id == 0) {
       galois::gPrint("Total nodes: ", numGlobalNodes, "\n");
@@ -214,6 +232,7 @@ protected:
                                      sizeEdges());
   }
 
+  //! Increments evilPhase, a phase counter used by communication.
   void inline increment_evilPhase() {
     ++galois::runtime::evilPhase;
     if (galois::runtime::evilPhase >= 
@@ -224,14 +243,23 @@ protected:
 
 public:
   /****** VIRTUAL FUNCTIONS *********/
+  //! Converts a global node id to a local node id
   virtual uint32_t G2L(uint64_t) const = 0 ;
+  //! Converts a local node id to a local node id
   virtual uint64_t L2G(uint32_t) const = 0;
+  //! @returns True if the cut being used is a vertex cut
   virtual bool is_vertex_cut() const = 0;
+  //! @returns Host id of this graph
   virtual unsigned getHostID(uint64_t) const = 0;
+  //! @returns True if passed in global id has a master on this host
   virtual bool isOwned(uint64_t) const = 0;
+  //! @returns True if passed in global id has a proxy on this host
   virtual bool isLocal(uint64_t) const = 0;
+  //! Serialize this graph
   virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{}
+  //! Deserialize a graph
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0){};
+  //! @returns Range of mirror nodes on this graph
   virtual std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const = 0;
 
 
@@ -277,13 +305,19 @@ public:
      return (sharedNodes[host].size() == 0);
   }
 
+  /**
+   * Reset a provided bitset given the type of synchronization performed
+   *
+   * @param syncType Type of synchronization to consider when doing reset
+   * @param bitset_reset_range Function to reset range with
+   */
   virtual void reset_bitset(SyncType syncType,
                             void (*bitset_reset_range)(size_t,
                                                        size_t)) const = 0;
 
 private:
-  uint32_t num_run; // Keep track of number of runs.
-  uint32_t num_iteration; // Keep track of number of iterations.
+  uint32_t num_run; //!< Keep track of number of runs.
+  uint32_t num_iteration; //!< Keep track of number of iterations.
 
   /**
    * Given an OfflineGraph, compute the masters for each node by
@@ -342,7 +376,6 @@ private:
     }
   }
 
-  // TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   /**
    * Given an OfflineGraph, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
@@ -402,7 +435,6 @@ private:
     increment_evilPhase();
   }
 
-  //TODO:: MAKE IT WORK WITH DECOMPOSE FACTOR
   /**
    * Given an OfflineGraph, compute the masters for each node by
    * evenly (or unevenly as specified by scale factor)
@@ -417,7 +449,10 @@ private:
    * should have more or less than other hosts
    * @param DecomposeFactor Specifies how decomposed the blocking 
    * of nodes should be. For example, a factor of 2 will make 2 blocks
-   * out of 1 block had the decompose factor been set to 1.
+   * out of 1 block had the decompose factor been set to 1. Ignored
+   * in this function currently.
+   *
+   * @todo make this function work with decompose factor
    */
   void computeMastersBalancedNodesAndEdges(galois::graphs::OfflineGraph& g,
       uint64_t numNodes_to_divide, const std::vector<unsigned>& scalefactor,
@@ -563,12 +598,14 @@ private:
 
 
 public:
-  typedef typename GraphTy::GraphNode GraphNode;
-  typedef typename GraphTy::iterator iterator;
-  typedef typename GraphTy::const_iterator const_iterator;
-  typedef typename GraphTy::local_iterator local_iterator;
-  typedef typename GraphTy::const_local_iterator const_local_iterator;
-  typedef typename GraphTy::edge_iterator edge_iterator;
+  //! Type representing a node in this graph
+  using GraphNode = typename GraphTy::GraphNode;
+  //! iterator type over nodes
+  using iterator = typename GraphTy::iterator;
+  //! constant iterator type over nodes
+  using const_iterator = typename GraphTy::const_iterator;
+  //! iterator type over edges
+  using edge_iterator = typename GraphTy::edge_iterator;
 
   /**
    * Constructor for DistGraph. Initializes metadata fields.
@@ -673,7 +710,7 @@ public:
   }
 
   /**
-   * Does nothing (i.e. WithInEdges is false).
+   * Does nothing (in other words WithInEdges is false).
    */
   template<bool T = WithInEdges, typename std::enable_if<!T>::type* = nullptr>
   void constructIncomingEdges() {
@@ -1054,7 +1091,8 @@ protected:
   }
 
   /**
-   * TODO
+   * Determine the thread ranges (splitting of nodes among threads) of master
+   * nodes using in-edges.
    */
   template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
   inline void determineThreadRangesMasterIn() {
@@ -1076,7 +1114,7 @@ protected:
   }
 
   /**
-   * TODO
+   * Initialize the thread ranges for in-edges.
    */
   template<bool T=WithInEdges, typename std::enable_if<T>::type* = nullptr>
   void initializeSpecificRangesIn() {
@@ -4534,12 +4572,10 @@ public:
   }
 
 
-  /*
+  /**
    * Write the local LC_CSR graph to the file on a disk.
    *
-   * @param takes file name to write local graph to.
-   *
-   * @returns: void
+   * @param localGraphFileName file name to write local graph to.
    */
   void save_local_graph_to_file(std::string localGraphFileName = "local_graph"){
     using namespace boost::archive;
@@ -4584,12 +4620,10 @@ public:
     dGraphTimerSaveLocalGraph.stop();
   }
 
-  /*
+  /**
    * Read the local LC_CSR graph from the file on a disk.
    *
-   * @param takes file name to read local graph from.
-   *
-   * @returns: void
+   * @param localGraphFileName file name to read local graph from.
    */
   void read_local_graph_from_file(std::string localGraphFileName = "local_graph"){
     using namespace boost::archive;
@@ -4627,7 +4661,6 @@ public:
     ar >>  numNodesWithEdges;
     ar >>  gid2host;
 
-
     //Serialize partitioning scheme specific data structures.
     boostDeSerializeLocalGraph(ar);
 
@@ -4649,6 +4682,12 @@ public:
     dGraphTimerReadLocalGraph.stop();
   }
 
+  /**
+   * Given a sync structure, reset the field specified by the structure
+   * to the 0 of the reduction on mirrors.
+   *
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   */
   template<typename FnTy>
   void reset_mirrorField() {
     auto mirrorRanges = getMirrorRanges();
