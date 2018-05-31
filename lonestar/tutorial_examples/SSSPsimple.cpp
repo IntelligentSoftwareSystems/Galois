@@ -38,8 +38,7 @@ Graph graph;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-void relax_edge(unsigned src_data, Graph::edge_iterator ii, 
-		auto& ctx) {
+void relax_edge(unsigned src_data, Graph::edge_iterator ii, auto& ctx) {
   GNode dst = graph.getEdgeDst(ii);
     //![get edge and node data] 
   unsigned int edge_data = graph.getEdgeData(ii);
@@ -52,28 +51,6 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
   }
 }
 
-//! [Operator in SSSPsimple]
-struct SSSP {
-  void operator()(UpdateRequest& req, auto& ctx) const {
-    GNode active_node = req.second;
-    unsigned& data = graph.getData(active_node);
-    if (req.first > data) return;
-   
-    //![loop over neighbors] 
-    for (auto ii : graph.edges(active_node))
-      relax_edge(data, ii, ctx);
-    //![loop over neighbors] 
-  }
-};
-//! [Operator in SSSPsimple]
-
-struct Init {
-  void operator()(GNode& n, auto& ctx) const {
-    graph.getData(n) = DIST_INFINITY;
-  }
-};
-
-
 int main(int argc, char **argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, 0,0,0);
@@ -82,7 +59,10 @@ int main(int argc, char **argv) {
   galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
-  galois::for_each(galois::iterate(graph.begin(), graph.end()), Init());
+  galois::for_each(
+      galois::iterate(graph.begin(), graph.end()),
+      [&] (GNode n, auto& ctx) { graph.getData(n) = DIST_INFINITY; }
+  );
 
   //! [OrderedByIntegerMetic in SSSPsimple]
   struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
@@ -98,9 +78,24 @@ int main(int argc, char **argv) {
   galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
-  //! [for_each in SSSPsimple]
   UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
-  galois::for_each(galois::iterate(&init[0], &init[1]), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
+  //! [for_each in SSSPsimple]
+  galois::for_each(
+      galois::iterate(&init[0], &init[1]),
+      //! [Operator in SSSPsimple]
+      [&] (UpdateRequest& req, auto& ctx) {
+        GNode active_node = req.second;
+        unsigned& data = graph.getData(active_node);
+        if (req.first > data) return;
+        //![loop over neighbors]
+        for (auto ii : graph.edges(active_node))
+          relax_edge(data, ii, ctx);
+        //![loop over neighbors]
+      }
+      //! [Operator in SSSPsimple]
+      , galois::wl<OBIM>()
+      , galois::loopname("sssp_run_loop")
+  );
   //! [for_each in SSSPsimple]
   T.stop();
   return 0;

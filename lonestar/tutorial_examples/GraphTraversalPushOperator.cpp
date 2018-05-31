@@ -15,25 +15,6 @@
 using Graph = galois::graphs::LC_CSR_Graph<int, int>;
 using GNode = Graph::GraphNode;
 
-struct SumEdgeWeightAtomic {
-  Graph& g;
-  SumEdgeWeightAtomic(Graph& g): g(g) {}
-
-  void operator()(const GNode n) const {
-    for (auto e: g.edges(n)) {
-      auto dst = g.getEdgeDst(e);
-      auto& dstData = g.getData(dst);
-      auto edgeWeight = g.getEdgeData(e);
-      __sync_fetch_and_add(&dstData, edgeWeight);
-    }
-  }
-
-  // ctx is not used in this example, but expected by for_each
-  void operator()(const GNode n, auto& ctx) const {
-    this->operator()(n);
-  }
-};
-
 void initialize(Graph& g) {
   galois::do_all(
       galois::iterate(g.begin(), g.end()), // range
@@ -83,25 +64,35 @@ int main(int argc, char *argv[]) {
       , galois::loopname("sum_in_for_each_with_push_operator")  // options
   );
 
+  // define lambda expression as a varible for reuse
+  auto sumEdgeWeightsAtomically = [&] (GNode n) {
+    for (auto e: g.edges(n)) {
+      auto dst = g.getEdgeDst(e);
+      auto& dstData = g.getData(dst);
+      auto edgeWeight = g.getEdgeData(e);
+      __sync_fetch_and_add(&dstData, edgeWeight);
+    }
+  };
+
   //******************************************************
   // parallel traversal over a graph using galois::do_all w/o work stealing
-  // 1. push operator using atomic intrinsic is specified using functor
+  // 1. push operator uses atomic intrinsic
   // 2. do_all is named "sum_in_do_all_with_push_atomic" to show stat after this program finishes
   initialize(g);
   galois::do_all(
       galois::iterate(g.begin(), g.end()),                      // range
-      SumEdgeWeightAtomic{g}                                    // operator
+      sumEdgeWeightsAtomically                                  // operator
       , galois::loopname("sum_in_do_all_with_push_atomic")      // options
   );
 
   //******************************************************
   // parallel traversal over a graph using galois::for_each
-  // 1. push operator using atomic intrinsic is specified using functor
+  // 1. push operator uses atomic intrinsic
   // 2. for_each is named "sum_in_do_for_each_with_push_atomic" to show stat after this program finishes
   initialize(g);
   galois::for_each(
       galois::iterate(g.begin(), g.end()),                      // range
-      SumEdgeWeightAtomic{g}                                    // operator
+      [&] (GNode n, auto& ctx) { sumEdgeWeightsAtomically(n); } // operator
       , galois::loopname("sum_in_for_each_with_push_atomic")    // options
       , galois::no_pushes()
       , galois::no_conflicts()

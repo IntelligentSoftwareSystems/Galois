@@ -19,37 +19,6 @@ static const unsigned int DIST_INFINITY =
 
 unsigned int stepShift = 11;
 
-// functor for the operator in this example
-struct SSSP {
-  Graph& graph;
-  SSSP(Graph& _g) :graph(_g) {}
-
-  void operator()(GNode active_node, auto& ctx) const {
-    // Get the value on the node
-    unsigned int data = graph.getData(active_node);
-
-    // loop over neighbors to compute new value
-    for (auto ii : graph.edges(active_node)) {                 // cautious point
-      GNode dst = graph.getEdgeDst(ii);
-      if (graph.getData(dst) > graph.getEdgeData(ii) + data) {
-        graph.getData(dst) = graph.getEdgeData(ii) + data;
-        ctx.push(dst); // add new work items
-      }
-    }
-  }
-};
-
-// Priority Function in SSSPPushSimple
-// Map user-defined priority to a bucket number in OBIM
-struct UpdateRequestIndexer {
-  Graph& g;
-  UpdateRequestIndexer(Graph& _g) :g(_g) {}
-
-  unsigned int operator() (const GNode N) const {
-    return g.getData(N, galois::MethodFlag::UNPROTECTED) >> stepShift;
-  }
-};
-
 int main(int argc, char **argv) {
   galois::SharedMemSys G;
   galois::setActiveThreads(256); // Galois will cap at hw max
@@ -79,35 +48,51 @@ int main(int argc, char **argv) {
   // pack source to a container to have iterators for galois::iterate
   std::array<GNode,1> init = {*graph.begin()};
 
+  // SSSP operator
+  auto SSSP = [&] (GNode active_node, auto& ctx) {
+    // Get the value on the node
+    unsigned int data = graph.getData(active_node);
+
+    // loop over neighbors to compute new value
+    for (auto ii : graph.edges(active_node)) {                 // cautious point
+      GNode dst = graph.getEdgeDst(ii);
+      if (graph.getData(dst) > graph.getEdgeData(ii) + data) {
+        graph.getData(dst) = graph.getEdgeData(ii) + data;
+        ctx.push(dst); // add new work items
+      }
+    }
+  };
+
+  // Priority Function in SSSPPushSimple
+  // Map user-defined priority to a bucket number in OBIM
+  struct UpdateRequestIndexer {
+    Graph& g;
+    UpdateRequestIndexer(Graph& _g) :g(_g) {}
+
+    unsigned int operator() (const GNode N) const {
+      return g.getData(N, galois::MethodFlag::UNPROTECTED) >> stepShift;
+    }
+  };
+
   using namespace galois::worklists;
   using dChunk = dChunkedLIFO<16>;
   using OBIM = OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>;
 
   std::string schedule = argv[2];  // argv[2] is the scheduler to be used
-
-  //*****************************************************************************************
-  // for_each iterates over init to compute SSSP on graph using dChunk scheduler
-  // chunk size of dChunk worklist is 16
   if ("dchunk16" == schedule) {
     galois::for_each(
-        galois::iterate(init.begin(), init.end()), // range
-        SSSP{graph}                                // operator as functor
-        , galois::wl<dChunk>()                     // options
+        galois::iterate(init.begin(), init.end()),      // range
+        SSSP                                            // operator
+        , galois::wl<dChunk>()                          // options
         , galois::loopname("sssp_dchunk16")
     );
-
-  //*****************************************************************************************
-  // for_each iterates over init to compute SSSP on graph using OBIM scheduler
-  // each bin in OBIM is a dChunk worklist
-  // the OBIM in this example uses UpdateRequestIndexer as its indexer
   } else if ("obim" == schedule) {
-    galois::for_each(
+     galois::for_each(
         galois::iterate(init.begin(), init.end()),      // range
-        SSSP{graph}                                     // operator as functor
+        SSSP                                            // operator
         , galois::wl<OBIM>(UpdateRequestIndexer{graph}) // options
         , galois::loopname("sssp_obim")
     );
-
   } else {
     std::cerr << "Unknown schedule " << schedule << std::endl;
     return 1;

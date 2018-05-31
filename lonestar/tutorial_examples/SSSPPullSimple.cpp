@@ -38,38 +38,6 @@ Graph graph;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-//! [Operator in SSSPPullsimple]
-struct SSSP {
-  void operator()(UpdateRequest& req, auto& ctx) const {
-    GNode active_node = req.second;
-    unsigned& data = graph.getData(active_node);
-    unsigned newValue = data;
-
-    //![loop over neighbors to compute new value] 
-    for (auto ii : graph.edges(active_node)) {
-      GNode dst = graph.getEdgeDst(ii);
-      newValue = std::min(newValue, graph.getData(dst) + graph.getEdgeData(ii));
-    }
-    //![set new value and add neighbors to wotklist
-    if (newValue < data) {
-      data = newValue;
-      for (auto ii : graph.edges(active_node)) {
-	GNode dst = graph.getEdgeDst(ii);
-	if (graph.getData(dst) > newValue)
-	  ctx.push(std::make_pair(newValue, dst));
-      }
-    }
-  }
-};
-//! [Operator in SSSPPullsimple]
-
-struct Init {
-  void operator()(GNode& n, auto& ctx) const {
-    graph.getData(n) = DIST_INFINITY;
-  }
-};
-
-
 int main(int argc, char **argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, 0,0,0);
@@ -78,7 +46,10 @@ int main(int argc, char **argv) {
   galois::graphs::readGraph(graph, filename);
 //! [ReadGraph]
 
-  galois::for_each(galois::iterate(graph.begin(), graph.end()), Init());
+  galois::for_each(
+      galois::iterate(graph.begin(), graph.end()),
+      [&] (GNode& n, auto& ctx) { graph.getData(n) = DIST_INFINITY; }
+  );
 
   //! [OrderedByIntegerMetic in SSSPsimple]
   struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
@@ -100,7 +71,31 @@ int main(int argc, char **argv) {
   for (auto ii : graph.edges(*graph.begin()))
     init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
 
-  galois::for_each(galois::iterate(init.begin(), init.end()), SSSP(), galois::wl<OBIM>(), galois::loopname("sssp_run_loop"));
+  galois::for_each(
+      galois::iterate(init.begin(), init.end()),
+      [&] (UpdateRequest& req, auto& ctx) {
+        GNode active_node = req.second;
+        unsigned& data = graph.getData(active_node);
+        unsigned newValue = data;
+
+        //![loop over neighbors to compute new value]
+        for (auto ii : graph.edges(active_node)) {
+          GNode dst = graph.getEdgeDst(ii);
+          newValue = std::min(newValue, graph.getData(dst) + graph.getEdgeData(ii));
+        }
+        //![set new value and add neighbors to wotklist
+        if (newValue < data) {
+          data = newValue;
+          for (auto ii : graph.edges(active_node)) {
+            GNode dst = graph.getEdgeDst(ii);
+            if (graph.getData(dst) > newValue)
+              ctx.push(std::make_pair(newValue, dst));
+          }
+        }
+      }
+      , galois::wl<OBIM>()
+      , galois::loopname("sssp_run_loop")
+  );
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;
