@@ -11,10 +11,10 @@ Find the Maximal Independent Set (not maximum) of ndoes in an undirected
 For convenience, we used IN to represent a node in the independent set, OUT to 
 represent not in the independent set, UNDECIDED represent undecided.
 
-serial: serial version.
-pull: pull-based version. Node 0 is initially marked IN.
-detBase: use Galois deterministic worklist.
-nondet: use Galois bulk synchronous worklist.
+serial: serial greedy version.
+pull: pull-based greedy version. Node 0 is initially marked IN.
+detBase: greedy version, using Galois deterministic worklist.
+nondet: greedy version, using Galois bulk synchronous worklist.
 prio(default): based on Martin Butcher's GPU ECL-MIS algorithm. For more information,
 please look at http://cs.txstate.edu/~burtscher/research/ECL-MIS/.
 edgetiledprio: edge-tiled version of prio.
