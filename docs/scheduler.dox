@@ -1,0 +1,97 @@
+/**
+
+@page Scheduler
+
+@section scheduler_section Scheduler 
+
+The scheduling policy for {@link galois::for_each} can be specified by choosing
+one of the types in {@link galois::worklists} namespace and providing the type-name
+as an argument to {@link galois::wl} parameter of the for_each. 
+The scheduling policies are listed as follows:
+
+ - \b OrderedList
+
+    implements a std::pri_queue compatible priority queue. Elements of same
+    priority are processed in arbitrary order. 
+
+ - \b FIFO and \b LIFO
+    
+    Implements std::queue and std::stack like behaviors respectively. These
+    implementations do not scale with the number of threads, and are often not
+    suitable for parallel implementations. 
+
+ - \b Chunked Worklists
+
+    Chunked worklists assign work items to threads one chunk at a time. Similarly,
+    each thread accumulates new work in a chunk before putting it on the worklist. 
+    Chunking offers better scalability because threads can amortize the cost of their access to
+    the shared worklist over the entire chunk. The user chooses the size of the
+    chunk: A large chunk size means less contention on the shared worklist, but may
+    lead to load-imbalance, while a small chunk size may increase the contention on
+    the shared worklist. The worklist of chunks itself can be organized in
+    different ways, and we have observed that mapping the communication patterns of
+    threads to the hardware-topology leads to more scalable implementations: 
+
+      - \b ChunkedFIFO (or ChunkedLIFO) maintains a single global queue (or stack) for chunks of work items
+
+      - \b dChunkedFIFO (or dChunkedLIFO) maintains a queue (or stack) of chunks per each package (multi-core
+        processor) in the system. A thread tries to find a chunk in its local
+        package before stealing from other packages. 
+
+      - \b AltChunkedFIFO (or AltChunkedLIFO) maintains a queue (or stack) of chunks per each thread. Normally
+        threads steal work within their package, but not every thread can steal
+        from outside its package. Each package
+        has a leader, which steals from other packages when its own package is out
+        of work. 
+        We show an example of using chunked worklists from {@link apps/delaunayrefinement/DelaunayRefinement.cpp}
+
+
+ - \b OrderedByIntegerMetric
+   
+    Implements a priority queue based on a supplied function which maps a work
+    item to an integer priority. Lower values are a higher priority. An inner
+    queue may be passed to control how items within the same priority bin are stored. 
+    An example to define an OrderedByIntegerMetric scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
+    The OBIM in the following example shows how to define a priority scheduling. 
+    The UpdateRequestIndexer defines the priority binning function. Internally It uses a dChunkedLIFO to store the items with the same priority.
+
+    
+    @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
+    
+    
+    OBIM works well when the algorithms performance is sensitive to scheduling, and
+    the work-items can be grouped into a small number of bins, ordered by integer
+    priority (typically ~1000 bins). 
+
+
+ - \b LocalQueues
+
+    Creates local non-shared worklists which are used for all work generated during concurrent operation and use a global worklist for all initial work. 
+
+ - \b BulkSynchronous
+
+    Executes the work items in parallel rounds, where all existing items in the
+    worklist are processed in current round, while any new items generated as a
+    result of this processing are postponed till next round. The rounds are
+    separated by barriers. 
+
+
+ - \b OwnerComputes
+
+    Is similar to LocalQueues, however, the user can provide a functor to map
+    work items to threads. So a thread may generate a work item and specify another
+    thread to process it. This functor is one of the template parameters, which
+    maps each work item to the range [0:numThreads). Another
+    difference from LocalQueues is that worklists are maintained per package. 
+    \b TODO: verify this
+
+
+ - \b StableIterator
+
+    Similar to {@link galois::do_all}, where the loop iterates over a fixed range
+    of items, and the operator does not generate new work. The key difference from
+    {@link galois::do_all} is that this scheduling policy supports speculation and
+    allows for iterations to abort. 
+
+
+*/
