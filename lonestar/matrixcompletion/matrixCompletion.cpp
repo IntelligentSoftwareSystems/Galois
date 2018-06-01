@@ -269,7 +269,6 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
 
   unsigned long lastTime = 0;
 
-  double error = sumSquaredError(g);
   for (int round = 0; ; round += deltaRound) {
     if (fixedRounds > 0 && round >= fixedRounds)
       break;

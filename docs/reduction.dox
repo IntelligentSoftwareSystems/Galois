@@ -1,0 +1,64 @@
+/**
+
+@page reduction Reduction Operations
+
+Reduction is a fundamental operation used in different graph analytics problems such as bread-first search (BFS), connected components (CC), and PageRank (PR). As such, the Galois runtime provides support for different types of reduction operations such as addition.
+
+@section reduction-types Types of Reduction Operations in Galois
+
+Data structures that support reduction in Galois are conceptually divided into two classes: reduction of scalar types (e.g., ints and floats) or reduction of container types (e.g., vectors and maps).
+
+@subsection scalar-reduction Scalar reduction
+
+{@link galois::GSimpleReducible} is the base class to help reduce values of primitive types or types with low copy cost. For example, {@link galois::GAccumulator} is for accumulating values such as ints.
+
+@subsubsection scalar-define Defining a reducer
+
+{@link galois::GSimpleReducible} is used to reduce mutliple values of type `T` to a single value. It is suitable for  basic types or low copy overhead types. It takes the type `T` of the values to be reduced and a functor `BinFunc` as template parameters, where the `BinFunc` conforms to:
+
+    T operator()(const T& a, const T& b);
+
+@subsubsection scalar-reduce Reducing values
+
+{@link galois::GSimpleReducible} starts with the default value of Type `T`. {@link galois::GSimpleReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link galois::GSimpleReducible::reduce}
+
+The following is a list of specialized reducer classes that are supported by the Galois runtime. These classes implement support for reduction operations by inheriting from {@link galois::GSimpleReducible}:
+
+- {@link galois::GAccumulator} is used to accumulate a set of values. It provides {@link galois::GAccumulator::operator+=} and {@link galois::GAccumulator::operator-=} for adding or subtracting new values.
+- {@link galois::GReduceMax} is used to reduce to the maximum value. Type `T` has to meet the type requirements of `std::max`.
+- {@link galois::GReduceMin} is used to reduce to the minimum value. Type `T` has to meet the type requirements of `std::min`.
+- {@link galois::GReduceLogicalAND} is used to perform a `logical and` of the accumulated values. Type `T` has to meet the type requirements of `std::logical_and`.
+- {@link galois::GReduceLogicalOR} is used to perform a `logical or` of the accumulated values. Type `T` has to meet the type requirements of `std::logical_or`.
+
+@subsubsection scalar-example Example
+
+The residual pull algorithm for PageRank (implemented in PageRank-pull.cpp) uses {@link galois::GAccumulator} to keep track of whether the contribution of a node to its outgoing neighbors needs to be recomputed. The PageRank computation can terminate if the reduced value is zero.
+
+@snippet PageRank-pull.cpp scalarreduction
+
+@subsection reduction-containers Container reduction
+
+ {@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is 
+ that `T` is expensive to copy.  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated \em inplace.  The `BinFunc` functor should conform to:
+
+    void operator()(T& lhs, const T& rhs)
+
+Here the lhs is updated in place to reflect the output of the reduction operator. 
+
+@subsubsection specialreducers Special Reducers
+
+There are several built-in container reducers.
+
+- {@link galois::GSetAccumulator} is used to union sets.
+- {@link galois::GVectorAccumulator} is used to concatenate vectors.
+- {@link galois::GListAccumulator} is used to splice `std::list` instances together.
+- {@link galois::GVectorPerItemReduce} and {@link galois::GMapPerItemReduce} provides element-wise reduction over vector and map. {@link galois::GVectorPerItemReduce} reduces vectors where the reduction operator is element-wise binary operator of the type of the elements inside the vector. {@link galois::GMapPerItemReduce} reduces maps, each of which is a set of key-value pairs. The reduction operator reduces the values with the same keys.
+
+@subsubsection container-example Example
+
+An example of using {@link galois::GBigReducible}, defining a `BinFunc` and reduction computation can be seen in {@link Diameter.cpp}
+
+@snippet apps/bfs/Diameter.cpp Define GReducible
+
+
+*/

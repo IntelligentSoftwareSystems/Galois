@@ -648,7 +648,7 @@ public:
       src->erase(dst.base());
     } else {
       dst->first()->acquire(mflag);
-      EdgeTy* e = dst->second();
+      // EdgeTy* e = dst->second();
       dst->first()->erase(src, Directional ? true : false); // erase incoming/symmetric edge
       src->erase(dst.base());
     }

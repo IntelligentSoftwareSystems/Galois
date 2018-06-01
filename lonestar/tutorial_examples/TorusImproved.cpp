@@ -27,34 +27,6 @@ typedef galois::graphs::FirstGraph<int,void,true> Graph;
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
 
-//! Increments node value of each neighbor by 1
-struct IncrementNeighbors {
-  Graph& g;
-  IncrementNeighbors(Graph& g): g(g) { }
-
-  //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, auto& ctx) {
-    // For each outgoing edge (n, dst)
-    //for (auto ii : g.edges(n)) {
-    for (auto ii: g.edges(n)) {
-      GNode dst = g.getEdgeDst(ii);
-      int& data = g.getData(dst);
-      // Increment node data by 1
-      data += 1;
-    }
-  }
-};
-
-//! Returns true if node value equals v
-struct ValueEqual {
-  Graph& g;
-  int v;
-  ValueEqual(Graph& g, int v): g(g), v(v) { }
-  bool operator()(GNode n) {
-    return g.getData(n) == v;
-  }
-};
-
 class Point2D {
   int v[2];
 public:
@@ -67,43 +39,6 @@ public:
   int dim() const { return 2; }
 };
 
-/**
- * Sort pairs according to Morton Z-Order.
- *
- * From http://en.wikipedia.org/wiki/Z-order_%28curve%29
- */
-struct ZOrderCompare {
-  bool operator()(const Point2D& p1, const Point2D& p2) const {
-    int index = 0;
-    int x = 0;
-    for (int k = 0; k < p1.dim(); ++k) {
-      int y = p1.at(k) ^ p2.at(k);
-      if (lessMsb(x, y)) {
-        index = k;
-        x = y;
-      }
-    }
-    return p1.at(index) - p2.at(index) < 0;
-  }
-
-  bool lessMsb(int a, int b) const {
-    return a < b && a < (a ^ b);
-  }
-};
-
-struct CreateNodes {
-  Graph& g;
-  std::vector<GNode>& nodes;
-  int height;
-  CreateNodes(Graph& g, std::vector<GNode>& n, int h): g(g), nodes(n), height(h) { }
-
-  void operator()(const Point2D& p) const {
-    GNode n = g.createNode(0);
-    g.addNode(n);
-    nodes[p.x() * height + p.y()] = n;
-  }
-};
-
 //! Construct a simple torus graph
 void constructTorus(Graph& g, int height, int width) {
   // Construct set of nodes
@@ -114,12 +49,40 @@ void constructTorus(Graph& g, int height, int width) {
       points[x*height + y] = Point2D(x, y);
     }
   }
+
   // Sort in a space-filling way
-  std::sort(points.begin(), points.end(), ZOrderCompare());
+  std::sort(
+      points.begin(), points.end(),
+      /**
+       * Sort pairs according to Morton Z-Order.
+       *
+       * From http://en.wikipedia.org/wiki/Z-order_%28curve%29
+       */
+     [&] (const Point2D& p1, const Point2D& p2) -> bool {
+        int index = 0;
+        int x = 0;
+        for (int k = 0; k < p1.dim(); ++k) {
+          int y = p1.at(k) ^ p2.at(k);
+          bool lessMsb = x < y && x < (x ^ y);
+          if (lessMsb) {
+            index = k;
+            x = y;
+          }
+        }
+        return p1.at(index) - p2.at(index) < 0;
+      }
+  );
 
   // Using space-filling order, assign nodes and create (and allocate) them in parallel
   std::vector<GNode> nodes(numNodes);
-  galois::do_all(galois::iterate(points.begin(), points.end()), CreateNodes(g, nodes, height));
+  galois::do_all(
+      galois::iterate(points),
+      [&] (const Point2D& p) {
+        auto n = g.createNode(0);
+        g.addNode(n);
+        nodes[p.x() * height + p.y()] = n;
+      }
+  );
 
   // Add edges
   for (int x = 0; x < width; ++x) {
@@ -161,13 +124,24 @@ int main(int argc, char** argv) {
   // based on which thread created each node (galois::for_each uses a simple
   // blocking of the iterator range to initialize work, but the iterator order
   // of a Graph is implementation-defined). 
-  galois::for_each(galois::iterate(graph), IncrementNeighbors(graph));
+  galois::for_each(
+      galois::iterate(graph),
+      [&] (GNode n, auto& ctx) {
+        // For each outgoing edge (n, dst)
+        for (auto ii: graph.edges(n)) {
+          GNode dst = graph.getEdgeDst(ii);
+          int& data = graph.getData(dst);
+          // Increment node data by 1
+          data += 1;
+        }
+      }
+  );
   T.stop();
 
   std::cout << "Elapsed time: " << T.get() << " milliseconds\n";
 
   // Verify
-  int count = std::count_if(graph.begin(), graph.end(), ValueEqual(graph, 4));
+  int count = std::count_if(graph.begin(), graph.end(), [&] (GNode n) -> bool { return graph.getData(n) == 4; });
   if (count != n * n) {
     std::cerr << "Expected " << n * n << " nodes with value = 4 but found " << count << " instead.\n";
     return 1;

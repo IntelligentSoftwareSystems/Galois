@@ -13,19 +13,6 @@
 using Graph = galois::graphs::LC_CSR_Graph<int, int>;
 using GNode = Graph::GraphNode;
 
-struct SumEdgeWeight {
-  Graph& g;
-  SumEdgeWeight(Graph& g): g(g) {}
-
-  void operator()(const GNode n) const {
-    auto& sum = g.getData(n);
-    sum = 0;
-    for (auto e: g.edges(n)) {
-      sum += g.getEdgeData(e);
-    }
-  }
-};
-
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
 
@@ -66,16 +53,6 @@ int main(int argc, char *argv[]) {
         }
       }
       , galois::loopname("sum_in_do_all_with_lambda")  // options
-  );
-
-  //******************************************************************************************
-  // parallel traversal over a graph using galois::do_all w/o work stealing
-  // 1. operator is specified using functor
-  // 2. do_all is named "sum_in_do_all_with_functor" to show stat after this program finishes
-  galois::do_all(
-      galois::iterate(g.begin(), g.end()),              // range
-      SumEdgeWeight{g}                                  // operator
-      , galois::loopname("sum_in_do_all_with_functor")  // options
   );
 
   return 0;

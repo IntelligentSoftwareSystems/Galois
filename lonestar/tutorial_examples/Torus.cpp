@@ -29,37 +29,6 @@ typedef galois::graphs::FirstGraph<int,void,true> Graph;
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
 
-//! Increments node value of each neighbor by 1
-struct IncrementNeighbors {
-  Graph& g;
-  IncrementNeighbors(Graph& g): g(g) { }
-
-  //! Operator. Context parameter is unused in this example.
-  void operator()(GNode n, auto& ctx) {
-    // For each outgoing edge (n, dst)
-    //! [loop over neighbors]
-    for (auto ii: g.edges(n)) {
-      GNode dst = g.getEdgeDst(ii);
-      //! [access node data]
-      int& data = g.getData(dst);
-      // Increment node data by 1
-      data += 1;
-      //! [access node data]
-    }
-    //! [loop over neighbors]
-  }
-};
-
-//! Returns true if node value equals v
-struct ValueEqual {
-  Graph& g;
-  int v;
-  ValueEqual(Graph& g, int v): g(g), v(v) { }
-  bool operator()(GNode n) {
-    return g.getData(n) == v;
-  }
-};
-
 //! Construct a simple torus graph
 void constructTorus(Graph& g, int height, int width) {
   // Construct set of nodes
@@ -73,7 +42,6 @@ void constructTorus(Graph& g, int height, int width) {
     //! [create and add node]
   }
 
-  // Add edges
   //! [add edges]
   for (int x = 0; x < width; ++x) {
     for (int y = 0; y < height; ++y) {
@@ -91,37 +59,21 @@ void constructTorus(Graph& g, int height, int width) {
   //! [add edges]
 }
 
-struct Init {
-  Graph& g;
-  Init(Graph& g): g(g) {}
-  void operator()(const GNode n) const {
-    g.getData(n) = 0;
-  }
-};
-
-struct IncrementNeighborSelfSync {
-  Graph& g;
-  IncrementNeighborSelfSync(Graph& g): g(g) {}
-  void operator()(const GNode n, auto& ctx) const {
-    this->operator()(n);
-  }
-  void operator()(const GNode n) const {
-    for (auto e: g.edges(n)) {
-      auto dst = g.getEdgeDst(e);
-      auto& dstData = g.getData(dst);
-      __sync_fetch_and_add(&dstData, 1);
-    }
-  }
-};
-
 void verify(Graph& graph, int n) {
   // Verify
-  int count = std::count_if(graph.begin(), graph.end(), ValueEqual(graph, 4));
+  int count = std::count_if(graph.begin(), graph.end(), [&] (GNode n) -> bool { return graph.getData(n) == 4; });
   if (count != n * n) {
     std::cerr << "Expected " << n * n << " nodes with value = 4 but found " << count << " instead.\n";
   } else {
     std::cout << "Correct!\n";
   }
+}
+
+void initialize(Graph& graph) {
+  galois::do_all(
+      galois::iterate(graph),
+      [&] (GNode n) { graph.getData(n) = 0; }
+  );
 }
 
 int main(int argc, char** argv) {
@@ -141,7 +93,8 @@ int main(int argc, char** argv) {
   constructTorus(graph, N, N);
 
   // read/write only a node itself
-  galois::do_all(galois::iterate(graph.begin(), graph.end()),
+  galois::do_all(
+      galois::iterate(graph),
       [&] (GNode n) {
         graph.getData(n) = std::distance(graph.edge_begin(n), graph.edge_end(n));
       }
@@ -150,31 +103,48 @@ int main(int argc, char** argv) {
   verify(graph, N);
 
   // push operator with Galois synchronization
-  galois::do_all(galois::iterate(graph), Init{graph});
-  galois::for_each(galois::iterate(graph.begin(), graph.end()), 
-      IncrementNeighbors(graph)
+  initialize(graph);
+  galois::for_each(
+      galois::iterate(graph),
+      [&] (GNode n, auto& ctx) {
+        for (auto ii: graph.edges(n)) {
+          GNode dst = graph.getEdgeDst(ii);
+          auto& data = graph.getData(dst);
+          data += 1;
+        }
+      }
       , galois::loopname("for_each")
-//      , galois::no_pushes()
-  );
-  verify(graph, N);
-
-  // push operator with self synchronization in optimized for_each
-  galois::do_all(galois::iterate(graph), Init{graph});
-  galois::for_each(galois::iterate(graph.begin(), graph.end()),
-      IncrementNeighborSelfSync{graph}
-      , galois::loopname("for_each_self_sync")
-      , galois::no_conflicts()
       , galois::no_pushes()
   );
   verify(graph, N);
 
+  auto incrementNeighborsAtomically = [&] (GNode n) {
+    for (auto e: graph.edges(n)) {
+      auto dst = graph.getEdgeDst(e);
+      auto& dstData = graph.getData(dst);
+      __sync_fetch_and_add(&dstData, 1);
+    }
+  };
+
   // push operator with self synchronization in do_all
-  galois::do_all(galois::iterate(graph), Init{graph});
-  galois::do_all(galois::iterate(graph.begin(), graph.end()),
-      IncrementNeighborSelfSync{graph}
+  initialize(graph);
+  galois::do_all(
+      galois::iterate(graph),
+      incrementNeighborsAtomically
       , galois::loopname("do_all_self_sync")
       , galois::steal()
       , galois::chunk_size<32>()
+  );
+  verify(graph, N);
+
+  // push operator with self synchronization in optimized for_each
+  initialize(graph); 
+  galois::for_each(
+      galois::iterate(graph),
+      [&] (GNode n, auto& ctx) { incrementNeighborsAtomically(n); }
+      , galois::loopname("for_each_self_sync")
+      , galois::no_conflicts()
+      , galois::no_pushes()
   );
   verify(graph, N);
 

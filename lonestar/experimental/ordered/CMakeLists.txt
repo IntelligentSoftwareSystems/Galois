@@ -1,0 +1,8 @@
+add_subdirectory(avi)
+add_subdirectory(bfs_wf)
+add_subdirectory(bh_odg)
+add_subdirectory(billiards)
+add_subdirectory(des)
+add_subdirectory(kruskal)
+add_subdirectory(sparselu)
+add_subdirectory(treecodes)
