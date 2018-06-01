@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file ArrayWrapper.h
+ * 
+ * Defines the CopyableArray subclass used to make arrays trivially copyable if 
+ * possible.
+ */
+
 #ifndef _ARRAY_WRAPPER_H_
 #define _ARRAY_WRAPPER_H_
 
@@ -24,10 +31,19 @@
 #include "galois/runtime/Extra_dist_traits.h"
 
 namespace galois {
+  /**
+   * A subclass of std::array that is marked trivially copyable if the type is
+   * also memory copyable. Useful when you need a trivially copyable type for
+   * serialization.
+   *
+   * @tparam T type of the items to be stored in the array
+   * @tparam N total number of items in the array
+   */
   template<class T, size_t N>
   class CopyableArray : public std::array<T, N> {
   public:
-    // only typedef if T is trivially copyable to use mem copy in serialize/deserialize.
+    //! Only typedef tt_is_copyable if T is trivially copyable. 
+    //! Allows the use of memcopy in serialize/deserialize.
     using tt_is_copyable = 
       typename std::enable_if<galois::runtime::is_memory_copyable<T>::value, int>::type;
   };
