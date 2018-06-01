@@ -16,23 +16,32 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  //! [Define LC_CSR_Graph] 
+  // An LC_CSR_Graph whose node data type is int and edge data type is int
   using Graph = galois::graphs::LC_CSR_Graph<int, int>;
+  //! [Define LC_CSR_Graph]
 
+  //! [Read a graph]
   Graph g;
   galois::graphs::readGraph(g, argv[1]); // argv[1] is the file name for graph
+  //! [Read a graph]
 
   //******************************************************
   // serial traversal over a graph
   // sum over nodes and edges in C++11 syntax
   galois::StatTimer T("sum_serial");
   T.start();
+  //! [Graph traversal]
+  // iterate over nodes
   for (auto n: g) {
-    auto& sum = g.getData(n);
+    auto& sum = g.getData(n); // get node data of n
     sum = 0;
+    // iterate over edges from node n
     for (auto e: g.edges(n)) {
-      sum += g.getEdgeData(e);
+      sum += g.getEdgeData(e); // get edge data of e
     }
   }
+  //! [Graph traversal]
   T.stop();
 
   return 0;
