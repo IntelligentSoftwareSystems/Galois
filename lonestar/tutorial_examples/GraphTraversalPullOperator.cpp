@@ -43,6 +43,7 @@ int main(int argc, char *argv[]) {
   // parallel traversal over a graph using galois::do_all w/o work stealing
   // 1. operator is specified using lambda expression
   // 2. do_all is named "sum_in_do_all_with_lambda" to show stat after this program finishes
+  //! [Graph traversal in pull using do_all]
   galois::do_all(
       galois::iterate(g.begin(), g.end()),             // range
       [&] (GNode n) {                                  // operator
@@ -54,6 +55,7 @@ int main(int argc, char *argv[]) {
       }
       , galois::loopname("sum_in_do_all_with_lambda")  // options
   );
+  //! [Graph traversal in pull using do_all]
 
   return 0;
 }
