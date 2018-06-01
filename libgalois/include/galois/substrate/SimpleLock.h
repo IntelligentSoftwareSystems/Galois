@@ -84,7 +84,6 @@ public:
 
 //! Dummy Lock implements the lock interface without a lock for serial code
 
-namespace internal {
 class DummyLock {
 public:
   inline void lock() const {}
@@ -92,11 +91,10 @@ public:
   inline bool try_lock() const { return true; }
   inline bool is_locked() const { return false; }
 };
-}
 
 
 template <bool Enabled>
-using CondLock = typename std::conditional<Enabled, SimpleLock, internal::DummyLock>::type;
+using CondLock = typename std::conditional<Enabled, SimpleLock, DummyLock>::type;
 
 
 using lock_guard_galois =  std::lock_guard<SimpleLock>;

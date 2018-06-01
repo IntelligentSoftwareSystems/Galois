@@ -47,8 +47,9 @@ struct MatchingWithLocalState {
   Graph& graph;
   galois::GAccumulator<int>& size;
 
-  void operator()(GNode x, galois::UserContext<GNode>& ctx) const { 
-    LocalState* p = (LocalState*) ctx.getLocalState();
+  template <typename C>
+  void operator()(GNode x, C& ctx) const { 
+    LocalState* p = ctx.template getLocalState<LocalState>();
     if (!ctx.isFirstPass()) {
       // operator is being resumed; use p
       if (!p->toMark)
