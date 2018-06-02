@@ -1305,6 +1305,8 @@ struct SyncALSalgo {
 template<typename Graph>
 size_t initializeGraphData(Graph& g) {
   galois::gPrint("initializeGraphData\n");
+  galois::StatTimer initTimer("InitializeGraph");
+  initTimer.start();
   double top = 1.0 / std::sqrt(LATENT_VECTOR_SIZE);
   galois::substrate::PerThreadStorage<std::mt19937> gen;
 
@@ -1352,6 +1354,7 @@ size_t initializeGraphData(Graph& g) {
                                                g.edge_end(n)) != 0;
                         });
 
+  initTimer.stop();
   return numItemNodes;
 }
 
