@@ -617,7 +617,8 @@ struct SGDBlockJumpAlgo {
     }
     preProcessTimer.stop();
 
-    galois::StatTimer executeTimer("Total Execution Time");
+    //galois::StatTimer executeTimer("Total Execution Time");
+    galois::StatTimer executeTimer("Time");
     executeTimer.start();
     executeUntilConverged(sf, g, [&](LatentValue* steps, size_t maxUpdates, galois::GAccumulator<double>* errorAccum) {
       Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
@@ -695,7 +696,8 @@ class SGDItemsAlgo{
     verify(g, "sgdItemsAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer executeTimer("Total Execution Time");
+    //galois::StatTimer executeTimer("Total Execution Time");
+    galois::StatTimer executeTimer("Time");
     executeTimer.start();
 
     Execute fn { g, edgesVisited };
@@ -794,7 +796,8 @@ class SGDEdgeItem{
     verify(g, "sgdEdgeItem");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer executeTimer("Total Execution Time");
+    //galois::StatTimer executeTimer("Total Execution Time");
+    galois::StatTimer executeTimer("Time");
     executeTimer.start();
 
     Execute fn { g, edgesVisited };
@@ -873,7 +876,8 @@ class SGDBlockEdgeAlgo {
     verify(g, "sgdBlockEdgeAlgo");
     galois::GAccumulator<unsigned> edgesVisited;
 
-    galois::StatTimer executeTimer("Total Execution Time");
+    //galois::StatTimer executeTimer("Total Execution Time");
+    galois::StatTimer executeTimer("Time");
     executeTimer.start();
 
     Execute fn { g, edgesVisited };
@@ -982,8 +986,10 @@ struct SimpleALSalgo {
     galois::StatTimer update2Time("UpdateTime2");
     galois::StatTimer copyTime("CopyTime");
     galois::StatTimer totalExecTime("totalExecTime");
+    galois::StatTimer totalAlgoTime("Time");
     PerThrdXTX xtxs;
 
+    totalAlgoTime.start();
     for (int round = 1; ; ++round) {
       totalExecTime.start();
       mmTime.start();
@@ -1049,6 +1055,7 @@ struct SimpleALSalgo {
 
       last = error;
     }
+    totalAlgoTime.stop();
   }
 };
 
@@ -1231,9 +1238,11 @@ struct SyncALSalgo {
     galois::StatTimer updateTime("UpdateTime");
     galois::StatTimer copyTime("CopyTime");
     galois::StatTimer totalExecTime("totalExecTime");
+    galois::StatTimer totalAlgoTime("Time");
     PerThrdXTX xtxs;
     PerThrdV rhs;
 
+    totalAlgoTime.start();
     for (int round = 1; ; ++round) {
 
       totalExecTime.start();
@@ -1276,6 +1285,7 @@ struct SyncALSalgo {
 
       last = error;
     } // end for
+    totalAlgoTime.stop();
   }
 };
 
