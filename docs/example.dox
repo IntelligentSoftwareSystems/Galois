@@ -8,4 +8,10 @@
  * @example apps/pagerank/PageRank.cpp
  * @example apps/boruvka/Boruvka.cpp
  * @example apps/boruvka/BoruvkaMerge.cpp
+ * @example lonestar/tutorial_examples/GraphTraversalSerial.cpp
+ * @example lonestar/tutorial_examples/GraphTraversalPullOperator.cpp
+ * @example lonestar/tutorial_examples/GraphTraversalPushOperator.cpp
+ * @example lonestar/tutorial_examples/TorusConstruction.cpp
+ * @example lonestar/tutorial_examples/ConflictAwareTorus.cpp
+ * @example lonestar/tutorial_examples/SSSPPushSimple.cpp
  */
