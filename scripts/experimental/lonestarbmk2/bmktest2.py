@@ -486,13 +486,11 @@ class TrianglesEdge(SharedMemApp):
 #            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
 #            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
 
-# apr 12 run
 BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
             ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
+            GMetis(), IndependentSet(), MatrixCompletionSync(), 
+            MatrixCompletionSimple(), MatrixCompletionEdge(), 
+            MatrixCompletionJump(), MatrixCompletionByItems(), 
+            MatrixCompletionByEdges(), MCM(), PageRankPull(), PageRankPush(), 
             PreflowPush(), PointsToAnalysis(), SSSP(), SurveyPropagation(), 
             TrianglesNode(), TrianglesEdge()] 
-
-#BINARIES = [MatrixCompletionSync(), MatrixCompletionSimple(), 
-#            MatrixCompletionEdge(), MatrixCompletionJump(), 
-#            MatrixCompletionByItems(), MatrixCompletionByEdges()]
