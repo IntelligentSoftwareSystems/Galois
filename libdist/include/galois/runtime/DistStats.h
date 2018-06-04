@@ -31,13 +31,9 @@ namespace runtime {
 class StatRecvHelper;
 
 class DistStatManager: public galois::runtime::StatManager {
-
   friend class galois::runtime::StatRecvHelper;
-
   using Base = galois::runtime::StatManager;
-
   using Str = galois::gstl::Str;
-
   using Base::SEP;
 
   static constexpr const char* const HSTAT_SEP = Base::TSTAT_SEP;
@@ -72,17 +68,17 @@ class DistStatManager: public galois::runtime::StatManager {
 
     void mergeStats(void) {
       if (merged) { return; }
-
-      GALOIS_ASSERT(perThrdMap.getLocal() == perThrdMap.getRemote(0), "Must call from Thread 0");
+      GALOIS_ASSERT(perThrdMap.getLocal() == perThrdMap.getRemote(0), 
+                    "Must call from Thread 0");
 
       auto* t0Map = perThrdMap.getRemote(0);
 
       for (unsigned t = 1; t < perThrdMap.size(); ++t) {
-
         const auto* manager = perThrdMap.getRemote(t);
 
         for (auto i = manager->cbegin(), end_i = manager->cend(); i != end_i; ++i) {
-          t0Map->addToStat(manager->region(i), manager->category(i), 0, manager->stat(i).totalTy());
+          t0Map->addToStat(manager->region(i), manager->category(i), 0, 
+                           manager->stat(i).totalTy());
         }
       }
 
@@ -133,11 +129,8 @@ class DistStatManager: public galois::runtime::StatManager {
     }
 
     void printHostVals(std::ostream& out, const Str& region, const Str& category) const {
-
       out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID() << SEP;
-
       out << region << SEP << category << SEP;
-
       out << HSTAT_NAME << SEP;
 
       const char* sep = "";
@@ -152,17 +145,13 @@ class DistStatManager: public galois::runtime::StatManager {
 
     void printThreadVals(std::ostream& out, const Str& region, const Str& category) const {
       for (const auto& p: perHostThrdStats) {
-
         out << StatManager::statKind<T>() << SEP << p.first << SEP;
         out << region << SEP << category << SEP;
-
         out << StatTotal::str(p.second.totalTy()) << SEP << p.second.total();
-
         out << std::endl;
 
         out << StatManager::statKind<T>() << SEP << p.first << SEP;
         out << region << SEP << category << SEP;
-
         out << StatManager::TSTAT_NAME << SEP;
 
         const char* sep = "";
@@ -174,12 +163,10 @@ class DistStatManager: public galois::runtime::StatManager {
         out << std::endl;
       }
     }
-
   };
 
   template <typename T>
   struct DistStatCombiner: public internal::BasicStatMap<HostStat<T> > {
-
     using Base = internal::BasicStatMap<HostStat<T> >;
 
 #if __GNUC__ < 5
@@ -198,11 +185,8 @@ class DistStatManager: public galois::runtime::StatManager {
     }
 
     void print(std::ostream& out) const {
-
       for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
-
         out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID() << SEP;
-
         out << Base::region(i) << SEP << Base::category(i) << SEP;
 
         const HostStat<T>& hs = Base::stat(i);
@@ -219,7 +203,6 @@ class DistStatManager: public galois::runtime::StatManager {
         }
       }
     }
-
   };
   
   DistStatCombiner<int64_t> intDistStats;

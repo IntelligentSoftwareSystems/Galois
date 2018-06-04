@@ -73,13 +73,9 @@ public:
 };
 
 void DistStatManager::mergeStats(void) {
-
   Base::mergeStats();
-
   hostTotalTypes.mergeStats();
-
   combineAtHost_0();
-
 }
 
 void DistStatManager::combineAtHost_0_helper(void) {
@@ -155,7 +151,6 @@ void DistStatManager::combineAtHost_0(void) {
   // then barrier
   // then other hosts send stats to host 0
   // another barrier
-
   if (getHostID() == 0) {
     combineAtHost_0_helper();
   }
@@ -169,8 +164,6 @@ void DistStatManager::combineAtHost_0(void) {
   getSystemNetworkInterface().flush();
 
   galois::runtime::getHostFence().wait();
-
-
 }
 
 bool DistStatManager::printingHostVals(void) {
@@ -229,7 +222,6 @@ void DistStatManager::printHeader(std::ostream& out) const {
 }
 
 void DistStatManager::printStats(std::ostream& out) {
-
   mergeStats();
 
   if (getHostID() == 0) {
