@@ -2,6 +2,7 @@ add_subdirectory(generators)
 add_subdirectory(comparisons)
 add_subdirectory(graph-convert)
 add_subdirectory(dist-graph-convert)
+add_subdirectory(graph-remap)
 #add_subdirectory(graph-convert-standalone)
 add_subdirectory(graph-stats)
 
