@@ -110,26 +110,6 @@ public:
     return true;
   }
 
-  std::string getMetaFileName(const std::string & basename, unsigned hostID, 
-                              unsigned num_hosts){
-    std::string result = basename;
-    result+= ".META.";
-    result+=std::to_string(hostID);
-    result+= ".OF.";
-    result+=std::to_string(num_hosts);
-    return result;
-  }
-
-  std::string getPartitionFileName(const std::string & basename, 
-                                   unsigned hostID, unsigned num_hosts) {
-    std::string result = basename;
-    result+= ".PART.";
-    result+=std::to_string(hostID);
-    result+= ".OF.";
-    result+=std::to_string(num_hosts);
-    return result;
-  }
-
   /**
    * Constructor for Vertex Cut
    *

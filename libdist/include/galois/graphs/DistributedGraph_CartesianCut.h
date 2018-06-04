@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistributedGraph_CartesianCut.h
+ *
+ * Implements the cartesian cut partitioning scheme for DistributedGraph. 
+ *
+ * @todo document this code
+ */
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 
@@ -25,49 +32,43 @@
 namespace galois {
 namespace graphs {
 
+/**
+ * TODO
+ *
+ * @tparam NodeTy type of node data for the graph
+ * @tparam EdgeTy type of edge data for the graph
+ * @tparam columnBlocked TODO 
+ * @tparam moreColumnHosts TODO 
+ * @tparam DecomposeFactor TODO 
+ */
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
 class DistGraph_cartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
-
   using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
 
 public:
-  typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
+  //! @copydoc DistGraph_edgeCut::base_DistGraph
+  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
 private:
   unsigned numRowHosts;
   unsigned numColumnHosts;
-
   unsigned numVirtualHosts;
 
-  // only for checkerboard partitioning, i.e., columnBlocked = true
-  uint32_t dummyOutgoingNodes; // nodes without outgoing edges that are stored with nodes having outgoing edges (to preserve original ordering locality)
+  //! Nodes without outgoing edges that are stored with nodes having outgoing 
+  //! edges (to preserve original ordering locality).
+  //! Only for checkerboard partitioning, i.e. columnBlocked = true
+  uint32_t dummyOutgoingNodes; 
 
   // factorize numHosts such that difference between factors is minimized
-#if 0
-  template<bool isVirtual = false, typename std::enable_if<!isVirtual>::type* = nullptr>
-  void factorize_hosts() {
-    numColumnHosts = sqrt(base_DistGraph::numHosts);
-    while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
-    numRowHosts = base_DistGraph::numHosts/numColumnHosts;
-    assert(numRowHosts>=numColumnHosts);
-    if (moreColumnHosts) {
-      std::swap(numRowHosts, numColumnHosts);
-    }
-    if (base_DistGraph::id == 0) {
-      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
-    }
-  }
-#endif
-
   void factorizeHosts() {
     numVirtualHosts = base_DistGraph::numHosts*DecomposeFactor;
     numColumnHosts = sqrt(base_DistGraph::numHosts);
 
     while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
 
-    numRowHosts = base_DistGraph::numHosts/numColumnHosts;
+    numRowHosts = base_DistGraph::numHosts / numColumnHosts;
     assert(numRowHosts>=numColumnHosts);
 
     if (moreColumnHosts) {
@@ -203,10 +204,12 @@ public:
   // LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
+  //! number of nodes on local to this host
   uint32_t numNodes;
+  //! number of edges on local to this host
   uint64_t numEdges;
 
-  // Return the ID to which gid belongs after patition.
+  //! @copydoc DistGraph_edgeCut::isOwned
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     //for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
@@ -221,7 +224,7 @@ public:
     return base_DistGraph::numHosts;
   }
 
-  // Return if gid is Owned by local host.
+  //! @copydoc DistGraph_edgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
     for(unsigned d = 0; d < DecomposeFactor; ++d){
@@ -232,18 +235,20 @@ public:
     return false;
   }
 
-  // Return is gid is present locally (owned or mirror).
+  //! @copydoc DistGraph_edgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
+  //! @copydoc DistGraph_edgeCut::G2L
   virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
+  //! @copydoc DistGraph_edgeCut::L2G
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }
@@ -834,13 +839,15 @@ public:
     net.flush();
   }
 
-  // used below
+  //! Optional type
+  //! @tparam T type that the variable may possibly take
   template<typename T>
   #if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
   using optional_t = std::experimental::optional<T>;
   #else
   using optional_t = boost::optional<T>;
   #endif
+
   template<typename GraphTy>
   void processReceivedEdgeBuffer(
     optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
@@ -961,11 +968,6 @@ public:
     }
   }
 
-  std::string getPartitionFileName(const std::string& filename,
-                                   const std::string&, unsigned, unsigned) {
-    return filename;
-  }
-
   bool is_vertex_cut() const {
     if (moreColumnHosts) {
       // IEC and OEC will be reversed, so do not handle it as an edge-cut
@@ -1006,9 +1008,6 @@ public:
     return mirrorRanges_vec;
   }
 
-  /*
-   * This function serializes the local data structures using boost binary archive.
-   */
   virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, 
                                         const unsigned int version = 0) const {
     // unsigned ints
@@ -1021,9 +1020,6 @@ public:
     ar << globalToLocalMap;
   }
 
-  /*
-   * This function DeSerializes the local data structures using boost binary archive.
-   */
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, 
                                           const unsigned int version = 0) {
     // unsigned ints
