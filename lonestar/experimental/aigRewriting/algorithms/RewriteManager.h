@@ -31,24 +31,19 @@ typedef struct ThreadContextData_ {
     std::vector< aig::GNode > currentFanins;
     std::vector< aig::GNode > bestFanins;
 	// Decomposition graphs data
-    std::vector< int > decNodeLevel;
     std::vector< aig::GNode > decNodeFunc;
-
+    //std::vector< int > decNodeLevel;	
 	// MFFC IDs to be reused
-	std::unordered_set< int > currentMFFCIds;
-	std::unordered_set< int > bestMFFCIds;
-	std::unordered_set< int > currentGraphBannedIds;
-	std::unordered_set< int > currentMFFCBannedIds;
-	std::unordered_set< int > bestMFFCBannedIds;
+	std::unordered_set< int > currentCutMFFCIds;
+	std::unordered_set< int > bestCutMFFCIds;
+	std::unordered_set< int > currentGraphMFFCPreservedIds;
+	std::unordered_set< int > currentCutMFFCPreservedIds;
+	std::unordered_set< int > bestCutMFFCPreservedIds;
 
-	// Stack for node replacement
-	//std::stack< aig::GNode > oldNodesStack;
-	//std::stack< aig::GNode > newNodesStack;
-    
     ThreadContextData_() : threadId( 0 ), travId( 0 ), 
 					   	   currentFaninsPol( 4 ), bestFaninsPol( 4 ), 
 						   currentFanins( 4 ), bestFanins( 4 ),
-					   	   decNodeLevel( 20 ), decNodeFunc( 20 ) { }
+					   	   decNodeFunc( 20 ) { } //, decNodeLevel( 20 ) { }
 
 } ThreadContextData;
 

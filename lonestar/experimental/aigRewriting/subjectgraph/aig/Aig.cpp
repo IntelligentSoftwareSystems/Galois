@@ -33,6 +33,10 @@ std::vector< GNode > & Aig::getOutputNodes() {
 	return this->outputNodes;
 }
 
+GNode Aig::getConstZero() {
+	return this->nodes[0];
+}
+
 int Aig::getNumInputs() {
 	return this->inputNodes.size();
 }
@@ -124,10 +128,6 @@ std::unordered_multimap< unsigned, GNode > & Aig::getFanoutMap( int nodeId ) {
 
 std::vector< std::unordered_multimap< unsigned, GNode > > & Aig::getNodesFanoutMap() {
 	return this->nodesFanoutMap;
-}
-
-GNode Aig::getConstZero() {
-	return this->nodes[0];
 }
 
 void Aig::insertNodeInFanoutMap( GNode andNode, GNode lhsNode, GNode rhsNode, bool lhsPol, bool rhsPol ) {
@@ -290,6 +290,7 @@ void Aig::resetAndIds() {
 	int currentId = this->getNumInputs() + this->getNumLatches() + 1;
 
 	while ( !stack.empty() ) {
+
 		GNode node = stack.top();
 		stack.pop();
 		NodeData & nodeData = graph.getData( node, galois::MethodFlag::WRITE );

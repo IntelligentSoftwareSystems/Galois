@@ -24,13 +24,13 @@ typedef Graph::GraphNode GNode;
 enum NodeType { AND, PI, PO, LATCH, CONSTZERO, CHOICE };
 
 struct NodeData {
-	NodeType type;
 	int id;
-	int counter;
 	int level;
 	int nFanout;
+	short int counter;
+	NodeType type;
 	
-	NodeData( ) : counter( 0 ), level( 0 ), nFanout( 0 ) { }
+	NodeData( ) : level( 0 ), nFanout( 0 ), counter( 0 ) { }
 };
 
 class Aig {

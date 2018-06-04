@@ -23,11 +23,11 @@ CutManager::CutManager( aig::Aig & aig, int K, int C, int nThreads, bool compTru
 	
 	aig( aig ), K( K ), C( C ), nThreads( nThreads ), compTruth( compTruth ), 
 	nWords( Functional32::wordNum( K ) ),
-	cutPoolSize( ( std::distance( aig.getGraph().begin(), aig.getGraph().end() ) ) / nThreads ), 
+	nNodes( std::distance( aig.getGraph().begin(), aig.getGraph().end() ) - aig.getNumOutputs() ),
+	cutPoolSize( nNodes / nThreads ), 
 	perThreadCutPool( cutPoolSize, K, compTruth ), perThreadCutList( K ), perThreadAuxTruth( nWords ) {
 
 	kcutTime = 0;
-	nNodes = aig.getNumInputs() + aig.getNumLatches() + aig.getNumAnds();
 	nodeCuts = new Cut*[ nNodes+1 ];
 	for ( int i = 0; i < nNodes+1; i++ ) {
 		nodeCuts[i] = nullptr;
@@ -213,7 +213,7 @@ inline bool CutManager::processTwoCuts( CutPool * cutPool, CutList * cutList, Au
 		return false;
 	}
 
-	assert( (resCut->nLeaves > 1) && (resCut->nLeaves <= K) );
+	//assert( (resCut->nLeaves > 1) && (resCut->nLeaves <= K) );
 
 	// set the signature
 	resCut->sig = lhsCut->sig | rhsCut->sig;
@@ -259,7 +259,7 @@ Cut * CutManager::mergeCuts( CutPool * cutPool, Cut * lhsCut, Cut * rhsCut ) {
 
 	int i, j, l;
 
-	assert( lhsCut->nLeaves >= rhsCut->nLeaves );
+	//assert( lhsCut->nLeaves >= rhsCut->nLeaves );
 	
 	Cut * resCut;
 
@@ -683,18 +683,57 @@ struct KCutOperator {
 				}
 			}
 		}
+		else {
+			if ( nodeData.type == aig::NodeType::PI ) {
+				// Touching outgoing neighobors to acquire their locks and their fanin node's locks.
+				for ( auto outEdge : aigGraph.out_edges( node ) ) { }
+
+				// Set the trivial cut
+				nodeData.counter = 3;
+				CutPool * cutPool = cutMan.getPerThreadCutPool().getLocal();
+				Cut * trivialCut = cutPool->getMemory();
+				trivialCut->leaves[0] = nodeData.id;
+				trivialCut->nLeaves++;
+				trivialCut->sig = ( 1U << (nodeData.id % 31) );
+				if ( cutMan.getCompTruthFlag() ) {
+					unsigned * cutTruth = cutMan.readTruth( trivialCut );
+					for ( int i = 0; i < cutMan.getNWords(); i++ ) {
+						cutTruth[i] = 0xAAAAAAAA;
+					}
+				}
+				cutMan.getNodeCuts()[ nodeData.id ] = trivialCut;
+
+				// Schedule next nodes
+				for ( auto edge : aigGraph.out_edges( node ) ) {
+					aig::GNode nextNode = aigGraph.getEdgeDst( edge );
+					aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );
+					nextNodeData.counter += 1;
+					if ( nextNodeData.counter == 2 ) {
+						ctx.push( nextNode );
+					}
+				}
+			}
+		}
 	}
 };
 
 void runKCutOperator( CutManager & cutMan ) {
 
-	high_resolution_clock::time_point t1 = high_resolution_clock::now();
-	
-	aig::Aig & aig = cutMan.getAig();
-	aig::Graph & aigGraph = aig.getGraph();
-
 	galois::InsertBag< aig::GNode > workList;
+	typedef galois::worklists::dChunkedBag< 500 > DC_BAG;
+	//typedef galois::worklists::dChunkedFIFO< 200 > DC_FIFO;
+	//typedef galois::worklists::dChunkedLIFO< 200 > DC_LIFO;
+  	//typedef galois::worklists::AltChunkedFIFO< 200 > AC_FIFO;
 	
+	for ( auto pi : cutMan.getAig().getInputNodes() ) {
+		workList.push( pi );
+	}
+
+	// Galois Parallel Foreach
+	galois::for_each( galois::iterate( workList.begin(), workList.end() ), KCutOperator( cutMan ), galois::wl< DC_BAG >(), galois::loopname( "KCutOperator" ) );
+
+
+/*
 	for ( auto pi : aig.getInputNodes() ) {		
 		aig::NodeData & piData = aigGraph.getData( pi, galois::MethodFlag::UNPROTECTED );
 		CutPool * cutPool = cutMan.getPerThreadCutPool().getRemote( 0 );
@@ -720,12 +759,8 @@ void runKCutOperator( CutManager & cutMan ) {
 			}
 		}
 	}
+*/
 
-	// Galois Parallel Foreach
-	galois::for_each( galois::iterate( workList.begin(), workList.end() ), KCutOperator( cutMan ), galois::loopname( "KCutOperator" ) );
-
-	high_resolution_clock::time_point t2 = high_resolution_clock::now();
-	cutMan.setKcutTime( duration_cast<microseconds>( t2 - t1 ).count() );
 }
 // ############################################ END OPERATOR ############################################# //
 
