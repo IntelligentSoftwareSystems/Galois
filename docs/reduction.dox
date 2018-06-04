@@ -2,6 +2,8 @@
 
 @page reduction Reduction Operations
 
+\tableofcontents
+
 Reduction is a fundamental operation used in different graph analytics problems such as bread-first search (BFS), connected components (CC), and PageRank (PR). As such, the Galois runtime provides support for different types of reduction operations such as addition.
 
 @section reduction-types Types of Reduction Operations in Galois
@@ -38,12 +40,12 @@ The residual pull algorithm for PageRank (implemented in PageRank-pull.cpp) uses
 
 @subsection reduction-containers Container reduction
 
- {@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is 
+ {@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is
  that `T` is expensive to copy.  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated \em inplace.  The `BinFunc` functor should conform to:
 
     void operator()(T& lhs, const T& rhs)
 
-Here the lhs is updated in place to reflect the output of the reduction operator. 
+Here the lhs is updated in place to reflect the output of the reduction operator.
 
 @subsubsection specialreducers Special Reducers
 
