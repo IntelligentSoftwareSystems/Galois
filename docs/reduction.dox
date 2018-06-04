@@ -34,16 +34,16 @@ The following is a list of specialized reducer classes that are supported by the
 
 @subsubsection scalar-example Example
 
-The residual pull algorithm for PageRank (implemented in PageRank-pull.cpp) uses {@link galois::GAccumulator} to keep track of whether the contribution of a node to its outgoing neighbors needs to be recomputed. The PageRank computation can terminate if the reduced value is zero.
+The residual pull algorithm for PageRank uses {@link galois::GAccumulator} to keep track of whether the contribution of a node to its outgoing neighbors needs to be recomputed. The PageRank computation can terminate if the reduced value is zero.
 
 @snippet PageRank-pull.cpp scalarreduction
 
 @subsection reduction-containers Container reduction
 
- {@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is
- that `T` is expensive to copy.  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated \em inplace.  The `BinFunc` functor should conform to:
+{@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is
+that `T` is expensive to copy.  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated \em inplace.  The `BinFunc` functor should conform to:
 
-    void operator()(T& lhs, const T& rhs)
+    void operator()(T& lhs, const T& rhs);
 
 Here the lhs is updated in place to reflect the output of the reduction operator.
 
@@ -58,9 +58,9 @@ There are several built-in container reducers.
 
 @subsubsection container-example Example
 
-An example of using {@link galois::GBigReducible}, defining a `BinFunc` and reduction computation can be seen in {@link Diameter.cpp}
+An example of using {@link galois::GBigReducible}, defining a `BinFunc` and reduction computation can be seen in {@link CountLevels.cpp}
 
-@snippet apps/bfs/Diameter.cpp Define GReducible
+@snippet CountLevels.cpp Define GReducible
 
-
+<br>
 */
