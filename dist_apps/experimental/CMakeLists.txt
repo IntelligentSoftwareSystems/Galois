@@ -49,6 +49,7 @@ distAppNoGPU(pr_bc)
 
 # Various tools (TODO move to a tools directory or get rid of some)
 distAppNoGPU(findhighdegree)
+distAppNoGPU(print_nodes_with_edges)
 distAppNoGPU(plain_reader)
 distAppNoGPU(threaded_reader)
 #distAppNoGPU(graph_reader)
