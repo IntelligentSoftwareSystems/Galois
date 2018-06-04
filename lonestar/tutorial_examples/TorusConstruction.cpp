@@ -6,11 +6,14 @@
 #include "galois/graphs/Graph.h"
 #include <iostream>
 
+//! [Define a FirstGraph]
 // Graph has int node data, void edge data and is directed
 using Graph = galois::graphs::FirstGraph<int,void,true>;
 // Opaque pointer to graph node
 using GNode = Graph::GraphNode;
+//! [Define a FirstGraph]
 
+//! [Construct torus]
 void constructTorus(Graph& g, int height, int width) {
   // Construct set of nodes
   int numNodes = height * width;
@@ -29,13 +32,14 @@ void constructTorus(Graph& g, int height, int width) {
       GNode s = nodes[x*height + ((y-1+height) % height)];
       GNode e = nodes[((x+1) % width)*height + y];
       GNode w = nodes[((x-1+width) % width)*height + y];
-      g.addEdge(c, n); // addEdge checks if the edge exists or not. nop is so.
+      g.addEdge(c, n); // addEdge checks if the edge exists or not. nop if so.
       g.addEdge(c, s);
       g.addEdge(c, e);
       g.addEdge(c, w);
     }
   }
 }
+//! [Construct torus]
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;

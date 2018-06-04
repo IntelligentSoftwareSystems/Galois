@@ -174,20 +174,39 @@ galois::do_all and galois::for_each assume that the operator allows the loop ite
 Galois' deterministic loop iterator can be launched on-demand and parameter-less by passing galois::wl< galois::worklists::Deterministic <T> > to galois::for_each. Use galois::UserContext::cautiousPoint to signal the cautious point in the operator.
 
 
-@section Additional Notes
+@section additional_notes Additional Notes
 
 
-@subsection FirstGraph APIs
+@subsection galois_first_graph_api FirstGraph APIs
+
+If your application requires change of graph topology, e.g. as in delaunay mesh refinement, you will need to use galois::graphs::FirstGraph. galois::graphs::FirstGraph supports all the functionalities offered by galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in the graph; and sizeEdges(), reporting number of edges in the graph. Additionally, galois::graphs::FirstGraph provides the following APIs to modify graph topology:
+
+<ol>
+<li> galois::graphs::FirstGraph::createNode allocates space for node data, and galois::graphs::FirstGraph::addNode adds a node to a graph so the node can be found later by graph APIs.
+<li> galois::graphs::FirstGraph::addEdge and galois::graphs::FirstGraph::addMultiEdge both add an edge between existing nodes to a graph. The former only adds an edge when the edge does not exist, while the latter always adds the edge.
+<li> galois::graphs::FirstGraph::removeNode removes from a graph a node and edges connecting to/from the node.
+<li> galois::graphs::FirstGraph::removeEdge removes from a graph an edge and its symmetric counterpart, if there is any.
+</ol>
+
+Let us use galois::graphs::FirstGraph to construct and represent a 2-dimensional torus. To define a galois::graphs::FirstGraph, you must provide as template parameters NodeTy, the type of node data; EdgeTy, the type of edge data; and a boolean value indicating whether or not this is a directed graph. The following code snippet shows an example of defining a galois::graphs::FirstGraph. See galois::graphs::FirstGraph for details about other optional template parameters.
+
+@snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a FirstGraph
+
+And the following code snippet shows how to add nodes and edges to a galois::graphs::FirstGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::FirstGraph, and finally add edges in between the nodes.
+
+@snippet lonestar/tutorial_examples/TorusConstruction.cpp Construct torus
+
+See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
 
 
-@subsection Work Distribution in galois::do_all
+@subsection work_in_do_all Work Distribution in galois::do_all
 
 
-@subsection Memory Allocators
+@subsection mem_alloc Memory Allocators
 
 Memory allocation plays an important role in making parallel programs scalable.
 
-@subsection Tuning Guides
+@subsection tuning_guides Tuning Guides
 
 Performance tuning is unavoidable to make a parallel program fast and scalable. Readers should keep the following points in mind when tuning:
 <ol>
