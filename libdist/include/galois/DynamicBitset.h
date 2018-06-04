@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file DynamicBitset.h
+ *
+ * Contains the DynamicBitSet class.
+ */
+
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
 #define _GALOIS_DYNAMIC_BIT_SET_
 
@@ -27,23 +33,42 @@
 #include <assert.h>
 
 namespace galois {
-  /* Concurrent dynamically allocated bitset */
+  /**
+   * Concurrent dynamically allocated bitset 
+   **/
   class DynamicBitSet {
     std::vector<galois::CopyableAtomic<uint64_t>> bitvec;
     size_t num_bits;
     static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
-
   public:
+    //! Constructor which initializes to an empty bitset.
     DynamicBitSet() : num_bits(0) {}
 
+    /**
+     * Returns the underlying bitset representation to the user
+     *
+     * @returns constant reference vector of copyable atomics that represents 
+     * the bitset
+     */
     const std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() const {
       return bitvec;
     }
  
+    /**
+     * Returns the underlying bitset representation to the user
+     *
+     * @returns reference to vector of copyable atomics that represents the 
+     * bitset
+     */
     std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() {
       return bitvec;
     }
 
+    /**
+     * Resizes the bitset.
+     *
+     * @param n Size to change the bitset to
+     */
     void resize(uint64_t n) {
       assert(bits_uint64 == 64); // compatibility with other devices
       num_bits = n;
@@ -51,24 +76,51 @@ namespace galois {
       reset();
     }
 
+    /**
+     * Gets the size of the bitset
+     * @returns The number of bits held by the bitset
+     */
     size_t size() const {
       return num_bits;
     }
 
+    /**
+     * Gets the space taken by the bitset
+     * @returns the space in bytes taken by this bitset
+     */
     size_t alloc_size() const {
       return bitvec.size() * sizeof(uint64_t);
     }
 
+    /**
+     * Unset every bit in the bitset.
+     */
     void reset() {
       std::fill(bitvec.begin(), bitvec.end(), 0);
     }
 
-    // inclusive range
+    /**
+     * Unset a range of bits given an inclusive range
+     *
+     * @param begin first bit in range to reset
+     * @param end last bit in range to reset
+     */
     void reset(size_t begin, size_t end);
 
-    // assumes bit_vector is not updated (set) in parallel
+    /**
+     * Check a bit to see if it is currently set. Assumes the bit set is not
+     * updated (set) in parallel.
+     *
+     * @param index Bit to check to see if set
+     * @returns true if index is set
+     */
     bool test(size_t index) const;
 
+    /**
+     * Set a bit in the bitset.
+     *
+     * @param index Bit to set
+     */
     void set(size_t index);
 
 #if 0
@@ -78,9 +130,15 @@ namespace galois {
     // assumes bit_vector is not updated (set) in parallel
     void bitwise_or(const DynamicBitSet& other);
 
+    /**
+     * Count how many bits are set in the bitset
+     *
+     * @returns number of set bits in the bitset
+     */
     uint64_t count();
 
-    typedef int tt_is_copyable;
+    //! this is defined to 
+    using tt_is_copyable = int;
   };
 
   static galois::DynamicBitSet EmptyBitset;
