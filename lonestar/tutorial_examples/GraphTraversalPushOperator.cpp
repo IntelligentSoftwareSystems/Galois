@@ -15,12 +15,14 @@
 using Graph = galois::graphs::LC_CSR_Graph<int, int>;
 using GNode = Graph::GraphNode;
 
+//! [Initialization]
 void initialize(Graph& g) {
   galois::do_all(
       galois::iterate(g.begin(), g.end()), // range
       [&] (GNode n) { g.getData(n) = 0; }  // operator
   );
 };
+//! [Initialization]
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
@@ -48,6 +50,7 @@ int main(int argc, char *argv[]) {
   }
   T.stop();
 
+  //! [For each with conflict detection]
   //******************************************************
   // parallel traversal over a graph using galois::for_each
   // 1. push operator is specified using lambda expression
@@ -63,7 +66,9 @@ int main(int argc, char *argv[]) {
       }
       , galois::loopname("sum_in_for_each_with_push_operator")  // options
   );
+  //! [For each with conflict detection]
 
+  //! [For each and do all without conflict detection]
   // define lambda expression as a varible for reuse
   auto sumEdgeWeightsAtomically = [&] (GNode n) {
     for (auto e: g.edges(n)) {
@@ -97,6 +102,7 @@ int main(int argc, char *argv[]) {
       , galois::no_pushes()
       , galois::no_conflicts()
   );
+  //! [For each and do all without conflict detection]
 
   return 0;
 }
