@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -50,6 +50,7 @@ enum ConvertMode {
   gr2cgr,
   gr2dimacs,
   gr2edgelist,
+  gr2edgelist1ind,
   gr2linegr,
   gr2lowdegreegr,
   gr2mtx,
@@ -126,6 +127,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2cgr, "Clean up binary gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2edgelist, "Convert binary gr to edgelist"),
+      clEnumVal(gr2edgelist1ind, "Convert binary gr to edgelist, 1-indexed"),
       clEnumVal(gr2linegr, "Overlay line graph"),
       clEnumVal(gr2lowdegreegr, "Remove high degree nodes from binary gr"),
       clEnumVal(gr2mtx, "Convert binary gr to matrix market format"),
@@ -640,6 +642,39 @@ struct Gr2Edgelist: public Conversion {
   }
 };
 
+/**
+ * Edge list conversion from gr except all ids are incremented by 1 (i.e.
+ * 1 indexing).
+ */
+struct Gr2Edgelist1Ind: public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    using Graph = galois::graphs::FileGraph;
+    using GNode = Graph::GraphNode;
+    using EdgeData = galois::LargeArray<EdgeTy>;
+    using edge_value_type = typename EdgeData::value_type;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    std::ofstream file(outfilename.c_str());
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = (*ii) + 1;
+      for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+        GNode dst = (graph.getEdgeDst(jj)) + 1;
+        if (EdgeData::has_value) {
+          file << src << " " << dst << " " << graph.getEdgeData<edge_value_type>(jj) << "\n";
+        } else {
+          file << src << " " << dst << "\n";
+        }
+      }
+    }
+    file.close();
+
+    printStatus(graph.size(), graph.sizeEdges());
+  }
+};
+
 template<bool LittleEndian, typename T>
 void writeEndian(T* out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
@@ -674,8 +709,6 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef galois::LargeArray<InEdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -856,7 +889,6 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
   template<typename OutEdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
-    typedef Graph::GraphNode GNode;
     
     Graph graph, outgraph;
 
@@ -1151,8 +1183,6 @@ struct ToBigEndian: public HasNoVoidSpecialization {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
-    typedef Graph::GraphNode GNode;
-    typedef galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
     ingraph.fromFile(infilename);
@@ -1668,9 +1698,6 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef galois::graphs::FileGraph Graph;
     typedef Graph::GraphNode GNode;
-    typedef galois::graphs::FileGraphWriter Writer;
-    typedef galois::LargeArray<EdgeTy> EdgeData;
-    typedef typename EdgeData::value_type edge_value_type;
     
     Graph orig, graph;
     {
@@ -2047,7 +2074,6 @@ struct Gr2BinaryPbbs: public HasOnlyVoidSpecialization {
   void convert(const std::string& infilename, const std::string& outfilename) {
     static_assert(std::is_same<EdgeTy,void>::value, "conversion undefined for non-void graphs");
     typedef galois::graphs::FileGraph Graph;
-    typedef Graph::GraphNode GNode;
 
     Graph graph;
     graph.fromFile(infilename);
@@ -2483,6 +2509,7 @@ int main(int argc, char** argv) {
     case gr2cgr: convert<Cleanup>(); break;
     case gr2dimacs: convert<Gr2Dimacs>(); break;
     case gr2edgelist: convert<Gr2Edgelist>(); break;
+    case gr2edgelist1ind: convert<Gr2Edgelist1Ind>(); break;
     case gr2linegr: convert<AddRing<true>>(); break;
     case gr2lowdegreegr: convert<RemoveHighDegree>(); break;
     case gr2mtx: convert<Gr2Mtx>(); break;
