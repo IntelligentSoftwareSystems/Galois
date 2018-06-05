@@ -58,7 +58,8 @@ of data it collects.
 
 Pass in a regular .gr graph.
 
-For more details on the algorithm, see paper <TODO add paper link>.
+For more details on the algorithm, see paper here:
+https://dl.acm.org/citation.cfm?id=2442521
 
 BUILD
 --------------------------------------------------------------------------------

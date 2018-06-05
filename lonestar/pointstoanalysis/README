@@ -5,7 +5,7 @@ Points To Analysis
 DESCRIPTION 
 --------------------------------------------------------------------------------
 
-Points-to analysis based on <TODO>
+Points-to analysis based on Hardekopf and Lin's points-to analysis algorithm.
 
 Given a constraint file (format detailed below), runs a graph based points-to
 analysis algorithm to determine which nodes point to which other nodes.
