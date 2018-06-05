@@ -659,13 +659,13 @@ struct Gr2Edgelist1Ind: public Conversion {
 
     std::ofstream file(outfilename.c_str());
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      GNode src = (*ii) + 1;
+      GNode src = *ii;
       for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-        GNode dst = (graph.getEdgeDst(jj)) + 1;
+        GNode dst = graph.getEdgeDst(jj);
         if (EdgeData::has_value) {
-          file << src << " " << dst << " " << graph.getEdgeData<edge_value_type>(jj) << "\n";
+          file << (src + 1) << " " << (dst + 1) << " " << graph.getEdgeData<edge_value_type>(jj) << "\n";
         } else {
-          file << src << " " << dst << "\n";
+          file << (src + 1) << " " << (dst + 1) << "\n";
         }
       }
     }
