@@ -1,13 +1,4 @@
 /**
- * @example apps/tutorial/SSSPsimple.cpp
- * @example apps/sssp/SSSP.cpp
- * @example apps/tutorial/Torus.cpp
- * @example apps/delaunaytriangulation/DelaunayTriangulation.cpp
- * @example apps/delaunaytriangulation/DelaunayTriangulationDet.cpp
- * @example apps/bfs/Diameter.cpp
- * @example apps/pagerank/PageRank.cpp
- * @example apps/boruvka/Boruvka.cpp
- * @example apps/boruvka/BoruvkaMerge.cpp
  * @example lonestar/tutorial_examples/GraphTraversalSerial.cpp
  * @example lonestar/tutorial_examples/GraphTraversalPullOperator.cpp
  * @example lonestar/tutorial_examples/GraphTraversalPushOperator.cpp
