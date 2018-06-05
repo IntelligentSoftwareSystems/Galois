@@ -32,7 +32,7 @@ A Galois user program consists of operators, schedules and data structure API ca
 
 @image html galois_program_structure.png "Structure of a Galois Program"
 
-To better control the initialization of Galois constructs, galois::SharedMemSys is declared inside a function, thus constructed after the program is loaded. Therefore, all Galois constructs must not be declared as a static global object.
+To better control the initialization of Galois constructs, galois::SharedMemSys is declared inside a function, thus constructed after the program is loaded. Therefore, all Galois constructs must not be declared as static global objects.
 
 Through out this tutorial, we will use the following application as our running example: Read in an undirected graph with edge weights, and then set node label to the sum of weights on edges connected to node. There are two ways to implement this application. If it is implemented as a pull-style algorithm, each node iterates over its edges and compute its label; there are no conflicts among activities at different nodes. However, when it is implemented as a push-style algorithm, each node iterates over its edges and for each edge, the node updates weight of destination node. Therefore, activities may conflict with each other. Both variants iterate over all nodes, so they are topology-driven algorithms.
 
@@ -112,7 +112,7 @@ The full example is available as {@link lonestar/tutorial_examples/GraphTraversa
 
 galois::for_each can be used for parallel iterations that may generate new work items, and that may have conflicts among iterations. Operators must be cautious: All locks should be acquired successfully before the first write to user state. Optional features for galois::for_each include (1) turning off conflict detection, (2) asserting that no new work items will be created, and (3) specifying desired schedule for processing active elements. galois::for_each is suitable to implement push-style algorithms.
 
-galois::for_each uses galois::UserContext, a per-thread object, to track conflicts and new work. To insert new work items to the worklist, call galois::UserContext::push. To detect conflicts, galois::UserContext maintains a linked list of acquired items. Each sharable object, i.e. graph nodes, has a lock, which is automatically acquired when getData(), edge_begin(), edge_end(), edges(), etc. are called. Conflict is detected by Galois runtime when the lock acquisition fails. Locks are released when aborting or finishing an iteration. Since Galois assumes cautious operators, i.e. no writes to user state before acquiring all locks, there is no need to rollback user state when aborting an iteration.
+galois::for_each uses galois::UserContext, a per-thread object, to track conflicts and new work. To insert new work items to the worklist, call galois::UserContext::push. To detect conflicts, galois::UserContext maintains a linked list of acquired items. Each sharable object, e.g. graph nodes, has a lock, which is automatically acquired when getData(), edge_begin(), edge_end(), edges(), etc. are called. Conflict is detected by Galois runtime when the lock acquisition fails. Locks are released when aborting or finishing an iteration. Since Galois assumes cautious operators, i.e. no writes to user state before acquiring all locks, there is no need to rollback user state when aborting an iteration.
 
 galois::for_each expects the following inputs:
 <ol>
