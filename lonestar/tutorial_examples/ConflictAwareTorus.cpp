@@ -58,10 +58,28 @@ public:
   }
 
   //************************************************************************
+  // functions for size of the torus
+  //************************************************************************
+  size_t height() { return numRows; }
+  size_t width() { return numCols; }
+  size_t size() { return width()*height(); }
+
+  //************************************************************************
   // functions to traverse nodes
   //************************************************************************
   iterator begin() { return iterator(0); }
-  iterator end() { return iterator(numRows*numCols); }
+  iterator end() { return iterator(size()); }
+
+  //************************************************************************
+  // functions to acquire node ownership
+  //************************************************************************
+  void acquireNode(TorusNode n, galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+    // sanity check
+    assert(n < size());
+
+    // use this call to detect conflicts and handling aborts
+    galois::runtime::acquire(&data[n], mflag);
+  }
 
   //************************************************************************
   // function to access node data
@@ -69,11 +87,7 @@ public:
   typename NodeData::reference
   getData(TorusNode n, galois::MethodFlag mflag = galois::MethodFlag::WRITE)
   {
-    // sanity check
-    assert(n < numRows*numCols);
-
-    // use this call to detect conflicts and handling aborts
-    galois::runtime::acquire(&data[n], mflag);
+    acquireNode(n, mflag);
 
     // use the internal wrapper type to encapsulate users from Lockable objects
     return data[n].getData();
@@ -110,11 +124,11 @@ public:
   // function to lock all neighbors of node n
   // similar to edge_begin(), edge_end() or edges() in a general graph
   //************************************************************************
-  void secureAllNeighbors(TorusNode n) {
-    getData(*upNeighbor(n));
-    getData(*downNeighbor(n));
-    getData(*leftNeighbor(n));
-    getData(*rightNeighbor(n));
+  void acquireAllNeighbors(TorusNode n, galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+    acquireNode(*upNeighbor(n), mflag);
+    acquireNode(*downNeighbor(n), mflag);
+    acquireNode(*leftNeighbor(n), mflag);
+    acquireNode(*rightNeighbor(n), mflag);
   }
 }; // end of class Torus2D
 
@@ -133,16 +147,16 @@ int main(int argc, char *argv[]) {
   galois::setActiveThreads(std::atoi(argv[3]));
 
   galois::do_all(
-      galois::iterate(torus),                             // range
+      galois::iterate(0ul, torus.size()),                 // range as a pair of unsigned integers
       [&] (TorusNode n) { torus.getData(n) = 0; }         // operator
       , galois::loopname("do_all_torus_reset_self")       // options
   );
 
   galois::for_each(
-      galois::iterate(torus),                             // range
+      galois::iterate(0ul, torus.size()),                 // range as a pair of unsigned integers
       [&] (TorusNode n, auto& ctx) {                      // operator
         // cautious point
-        torus.secureAllNeighbors(n);
+        torus.acquireAllNeighbors(n);
 
         torus.getData(*torus.upNeighbor(n)) += 1;
         torus.getData(*torus.downNeighbor(n)) += 1;
