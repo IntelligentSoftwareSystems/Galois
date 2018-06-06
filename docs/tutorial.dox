@@ -32,6 +32,9 @@ Galois is different from other models in the following two ways.
 
 A Galois user program consists of operators, schedules and data structure API calls. Galois runtime system implements schedulers and data structures, which are built upon thread primitives and memory allocators. If the Galois runtime system is geared toward shared-memory platforms, then the Galois program executes on multi-cores. This is summarized as the following figure.
 
+@htmlonly
+<style>div.image img[src="galois_program_structure.png"]{width:40%}</style>
+@endhtmlonly
 @image html galois_program_structure.png "Structure of a Galois Program"
 
 To better control the initialization of Galois constructs, galois::SharedMemSys is declared inside a function, thus constructed after the program is loaded. Therefore, all Galois constructs must not be declared as static global objects.
@@ -48,6 +51,9 @@ For graph computation, Galois provides unified, standard APIs to access graph el
 <li> galois::graphs::LC_CSR_Graph: It disallows creation and removal of nodes and edges. Internally, it is implemented with compressed sparse row format, as shown in the following figure. Undirected edges are represented as two directed edges. Galois also provides variants of this graph with different storage representations, e.g. galois::graphs::LC_InlineEdge_Graph, galois::graphs::LC_Linear_Graph, galois::graphs::LC_InOut_Graph.
 </ol>
 
+@htmlonly
+<style>div.image img[src="csr_format_example.png"]{width:40%}</style>
+@endhtmlonly
 @image html csr_format_example.png "Graph in CSR Format"
 
 Other data structures available in Galois are galois::InsertBag, trees and reducers. We will focus on galois::graphs::LC_CSR_Graph in this section.
