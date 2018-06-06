@@ -744,6 +744,43 @@ inline void reportStat_Tavg(const S1& region, const S2& category, const T& value
   reportStat(region, category, value, StatTotal::TAVG);
 }
 
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond(const S1& region, const S2& category, const T& value, const StatTotal::Type& type) {
+  if (Report)
+    internal::sysStatManager()->addToStat(region, category, value, type);
+}
+
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond_Single(const S1& region, const S2& category, const T& value) {
+  if (Report)
+    reportStat(region, category, value, StatTotal::SINGLE);
+}
+         
+
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond_Tmin(const S1& region, const S2& category, const T& value) {
+  if (Report)
+    reportStat(region, category, value, StatTotal::TMIN);
+}
+
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond_Tmax(const S1& region, const S2& category, const T& value) {
+  if (Report)
+    reportStat(region, category, value, StatTotal::TMAX);
+}
+
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond_Tsum(const S1& region, const S2& category, const T& value) {
+  if (Report)
+    reportStat(region, category, value, StatTotal::TSUM);
+}
+
+template <bool Report=false, typename S1, typename S2, typename T>
+inline void reportStatCond_Tavg(const S1& region, const S2& category, const T& value) {
+  if (Report)
+    reportStat(region, category, value, StatTotal::TAVG);
+}
+
 template <typename S1, typename S2, typename V>
 void reportParam(const S1& region, const S2& category, const V& value) {
   internal::sysStatManager()->addToParam(region, category, value);
