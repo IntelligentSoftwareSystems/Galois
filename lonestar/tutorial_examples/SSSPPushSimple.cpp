@@ -24,7 +24,7 @@ int main(int argc, char **argv) {
   galois::setActiveThreads(256); // Galois will cap at hw max
 
   if (argc != 3) {
-    std::cout << "Usage: " << argv[0] << " filename <dchunk16|obim>\n";
+    std::cout << "Usage: " << argv[0] << " filename <dchunk16|obim|ParaMeter|det>\n";
     return 1;
   } else {
     std::cout << "Note: This is just a very simple example and provides no useful information for performance\n";
@@ -87,18 +87,41 @@ int main(int argc, char **argv) {
         , galois::wl<dChunk>()               // options
         , galois::loopname("sssp_dchunk16")
     );
-  } else if ("obim" == schedule) {
+  } 
+  else if ("obim" == schedule) {
      galois::for_each(
         galois::iterate({*graph.begin()}),   // initial range using initializer list
         SSSP                                 // operator
         , galois::wl<OBIM>(reqIndexer)       // options. Pass an indexer instance for OBIM construction.
         , galois::loopname("sssp_obim")
     );
-  } else {
+  } 
+  //! [Data-driven loops]
+
+  else if ("ParaMeter" == schedule) {
+     //! [ParaMeter loop iterator]
+     galois::for_each(
+        galois::iterate({*graph.begin()}),              // initial range using initializer list
+        SSSP                                            // operator
+        , galois::wl<galois::worklists::ParaMeter<> >() // options
+        , galois::loopname("sssp_ParaMeter")
+     );
+     //! [ParaMeter loop iterator]
+  } 
+  else if ("det") {
+     //! [Deterministic loop iterator]
+     galois::for_each(
+        galois::iterate({*graph.begin()}),                  // initial range using initializer list
+        SSSP                                                // operator
+        , galois::wl<galois::worklists::Deterministic<> >() // options
+        , galois::loopname("sssp_deterministic")
+     );
+     //! [Deterministic loop iterator]
+  } 
+  else {
     std::cerr << "Unknown schedule " << schedule << std::endl;
     return 1;
   }
-  //! [Data-driven loops]
 
   T.stop();
   return 0;
