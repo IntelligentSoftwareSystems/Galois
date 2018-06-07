@@ -1,7 +1,7 @@
 // This example shows
 // 1. how to bulid a conflict-aware data structure w/ Locakable
 // 2. how to implement conflict detection in your data structure's APIs
-// 3. how to define iterators for Galois to construct ranges
+// 3. how to define iterators for STL compliance
 // 4. how to leverage LargeArray to do NUMA-aware allocation
 // 5. how to turn-off conflict-detection when you do not want it
 #include "galois/Galois.h"
