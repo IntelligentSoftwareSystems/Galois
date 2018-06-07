@@ -1,6 +1,5 @@
---------------------------------------------------------------------------------
 Points To Analysis
---------------------------------------------------------------------------------
+================================================================================
 
 DESCRIPTION 
 --------------------------------------------------------------------------------
@@ -17,6 +16,7 @@ edges and points-to information.
 
 The input is a constraint file in the following format:
 
+```
 <num vars> <num constraints>
 <constraint num> <src> <dst> <type> <offset>
 <constraint num> <src> <dst> <type> <offset>
@@ -26,12 +26,14 @@ The input is a constraint file in the following format:
 .
 <constraint num> <src> <dst> <type> <offset>
 <EOF>
+```
 
-<src> and <dst> are node IDs, and <type> specifies the relation
-between them. <offset> is not supported in the implementation: it must be
+`<src>` and `<dst>` are node IDs, and `<type>` specifies the relation
+between them. `<offset>` is not supported in the implementation: it must be
 set to 0. If it is not, the entire constraint will be ignored.
 
 The constraint types supported are the following:
+
 0 = Address Of Constraint
 1 = Copy Constraint
 2 = Load Constraint
@@ -54,22 +56,22 @@ RUN
 --------------------------------------------------------------------------------
 
 Run serial points-to analysis with the following command:
-./pta <constraint file> -serial
+`./pta <constraint file> -serial`
 
 Run serial points-to analysis with online cycle detection with the following 
 command:
-./pta <constraint file> -serial -ocd
+`./pta <constraint file> -serial -ocd`
 
 Run serial points-to analysis that reprocesses load/store constraints after
 N constraints with the following command:
-./pta <constraint file> -serial -lsThreshold=N
+`./pta <constraint file> -serial -lsThreshold=N`
 
 Run the parallel version of points-to analysis with the following command:
-./pta <constraint file> -t=<num threads>
+`./pta <constraint file> -t=<num threads>`
 
 Run the parallel version of points-to analysis and print the results with
 the following command (the serial version also supports printAnswer):
-./pta <constraint file> -t=<num threads> -printAnswer
+`./pta <constraint file> -t=<num threads> -printAnswer`
 
 TUNING PERFORMANCE  
 --------------------------------------------------------------------------------
@@ -80,4 +82,3 @@ has a threshold that determines load/store constraints are reprocessed.
 Depending on your input, you may get better performance by tuning the frequency
 at which these constraints are reprocessed (the idea is that it may eliminate
 redundant constraints that currently exist in the worklist).
-
