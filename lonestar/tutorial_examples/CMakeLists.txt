@@ -11,6 +11,7 @@ app(example-graph-traversal-push GraphTraversalPushOperator.cpp)
 app(example-conflict-aware-torus ConflictAwareTorus.cpp)
 app(example-spanningtree SpanningTree.cpp)
 app(example-countlevels CountLevels.cpp)
+app(example-numa-aware-torus NumaAwareTorus.cpp)
 
 add_test_scale(small example-hello-world 2 10)
 add_test_scale(small example-torus 2 100)
