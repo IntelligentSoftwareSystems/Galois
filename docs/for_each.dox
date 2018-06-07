@@ -81,17 +81,6 @@ one of the types in {@link galois::worklists} namespace and providing the type-n
 as an argument to {@link galois::wl} parameter of the for_each. 
 The scheduling policies are listed as follows:
 
- - \b OrderedList
-
-    implements a std::pri_queue compatible priority queue. Elements of same
-    priority are processed in arbitrary order. 
-
- - \b FIFO and \b LIFO
-    
-    Implements std::queue and std::stack like behaviors respectively. These
-    implementations do not scale with the number of threads, and are often not
-    suitable for parallel implementations. 
-
  - \b Chunked Worklists
 
     Chunked worklists assign work items to threads one chunk at a time. Similarly,
@@ -110,7 +99,7 @@ The scheduling policies are listed as follows:
         processor) in the system. A thread tries to find a chunk in its local
         package before stealing from other packages. 
 
-      - \b AltChunkedFIFO (or AltChunkedLIFO) maintains a queue (or stack) of chunks per each thread. Normally
+      - \b PerThreadChunkFIFO (or PerThreadChunkLIFO) maintains a queue (or stack) of chunks per each thread. Normally
         threads steal work within their package, but not every thread can steal
         from outside its package. Each package
         has a leader, which steals from other packages when its own package is out
@@ -163,6 +152,16 @@ The scheduling policies are listed as follows:
     {@link galois::do_all} is that this scheduling policy supports speculation and
     allows for iterations to abort. 
 
+ - \b OrderedList
+
+    implements a std::pri_queue compatible priority queue. Elements of same
+    priority are processed in arbitrary order. 
+
+ - \b FIFO and \b LIFO
+    
+    Implements std::queue and std::stack like behaviors respectively. These
+    implementations do not scale with the number of threads, and are often not
+    suitable for parallel implementations. 
 
 
 \subsection Deterministic for_each

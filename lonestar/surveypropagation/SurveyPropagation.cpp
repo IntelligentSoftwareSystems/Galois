@@ -401,7 +401,7 @@ class SurveyPropagation {
 
     using WL = galois::worklists::dChunkedFIFO<128>;
     //using WL = galois::worklists::ParaMeter<>;
-    //using WL = galois::worklists::AltChunkedFIFO<1024>;
+    //using WL = galois::worklists::PerThreadChunkFIFO<1024>;
     //using OBIM = galois::worklists::OrderedByIntegerMetric<
                    //decltype(EIndexer()),
                    //galois::worklists::dChunkedFIFO<512>

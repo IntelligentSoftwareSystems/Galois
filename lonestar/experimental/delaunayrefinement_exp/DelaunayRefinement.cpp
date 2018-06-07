@@ -165,7 +165,7 @@ int main(int argc, char** argv) {
   Tprefetch.start();
   std::cout << "beginning prefetch\n";
   galois::for_each(graph, Prefetch(graph), 
-      galois::loopname("prefetch"), galois::wl<galois::worklists::AltChunkedLIFO<32>>());
+      galois::loopname("prefetch"), galois::wl<galois::worklists::PerThreadChunkLIFO<32>>());
   //galois::runtime::setTrace(true);
   Tprefetch.stop();
 
@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
   Tfindbad.start();
   std::cout << "beginning findbad\n";
   galois::for_each(graph, Preprocess(graph,gwl),
-      galois::loopname("findbad"), galois::wl<galois::worklists::AltChunkedLIFO<32>>());
+      galois::loopname("findbad"), galois::wl<galois::worklists::PerThreadChunkLIFO<32>>());
   Tfindbad.stop();
 
   galois::reportPageAlloc("MeminfoMid");
@@ -205,7 +205,7 @@ int main(int argc, char** argv) {
   
       //! [for_each example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef AltChunkedLIFO<32> Chunked;
+  typedef PerThreadChunkLIFO<32> Chunked;
 
   std::cout << "beginning refine\n";
   galois::for_each(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunked>());

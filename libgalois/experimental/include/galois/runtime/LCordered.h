@@ -549,7 +549,7 @@ public:
     CtxtLocalQ ctxtLocalQ;
 
     typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
-    // typedef galois::worklists::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    // typedef galois::worklists::PerThreadChunkFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();

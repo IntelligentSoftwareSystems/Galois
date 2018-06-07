@@ -402,7 +402,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    //typedef AltChunkedFIFO<64> Chunk;
+    //typedef PerThreadChunkFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     typedef dChunkedFIFO<128> Chunk;
@@ -552,7 +552,7 @@ struct Algo2 {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    //typedef AltChunkedFIFO<64> Chunk;
+    //typedef PerThreadChunkFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     //typedef dChunkedFIFO<64> Chunk;
     const int blockPeriod = 10;

@@ -521,7 +521,7 @@ template<typename OptionsTy>
 class DAGManagerBase<OptionsTy,true> {
   typedef DeterministicContext<OptionsTy> Context;
   typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
-  typedef worklists::AltChunkedLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
+  typedef worklists::PerThreadChunkLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
   typedef worklists::dChunkedFIFO<32,Context*> WL3;
 
   struct ThreadLocalData: private boost::noncopyable {

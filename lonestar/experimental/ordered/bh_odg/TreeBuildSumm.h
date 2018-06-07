@@ -884,7 +884,7 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
 
     static const unsigned CHUNK_SIZE = 2;
     // typedef galois::worklists::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
-    typedef galois::worklists::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    typedef galois::worklists::PerThreadChunkLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
       std::cout << "KDG hand checking the tree. Timing may be off" << std::endl;

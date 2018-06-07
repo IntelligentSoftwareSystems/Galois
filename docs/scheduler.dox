@@ -38,7 +38,7 @@ The scheduling policies are listed as follows:
         processor) in the system. A thread tries to find a chunk in its local
         package before stealing from other packages. 
 
-      - \b AltChunkedFIFO (or AltChunkedLIFO) maintains a queue (or stack) of chunks per each thread. Normally
+      - \b PerThreadChunkFIFO (or PerThreadChunkLIFO) maintains a queue (or stack) of chunks per each thread. Normally
         threads steal work within their package, but not every thread can steal
         from outside its package. Each package
         has a leader, which steals from other packages when its own package is out

@@ -646,7 +646,7 @@ struct Process {
 */
 
 static void run(Rounds& rounds, Graph& graph) {
-  typedef galois::worklists::AltChunkedLIFO<32> Chunked;
+  typedef galois::worklists::PerThreadChunkLIFO<32> Chunked;
   typedef galois::worklists::Deterministic<> DWL;
 
   for (int i = maxRounds - 1; i >= 0; --i) {

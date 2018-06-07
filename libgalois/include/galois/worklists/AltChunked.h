@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_WORKLIST_ALTCHUNKED_H
-#define GALOIS_WORKLIST_ALTCHUNKED_H
+#ifndef GALOIS_WORKLIST_PERTHREADCHUNK_H
+#define GALOIS_WORKLIST_PERTHREADCHUNK_H
 
 #include "galois/FixedSizeRing.h"
 #include "galois/Threads.h"
@@ -36,7 +36,7 @@ struct ChunkHeader {
   ChunkHeader* prev;
 };
 
-class AltChunkedQueue {
+class PerThreadChunkQueue {
   substrate::PtrLock<ChunkHeader> head;
   ChunkHeader* tail;
 
@@ -52,7 +52,7 @@ class AltChunkedQueue {
   }
 
 public:
-  AltChunkedQueue(): tail(0) { }
+  PerThreadChunkQueue(): tail(0) { }
 
   bool empty() const {
     return !tail;
@@ -93,7 +93,7 @@ public:
     return h;
   }
 
-  ChunkHeader* stealAllAndPop(AltChunkedQueue& victim) {
+  ChunkHeader* stealAllAndPop(PerThreadChunkQueue& victim) {
     //Don't do work on empty victims (lockfree check)
     if (victim.empty()) return 0;
     //Steal everything
@@ -111,7 +111,7 @@ public:
     return retval;
   }
 
-  ChunkHeader* stealHalfAndPop(AltChunkedQueue& victim) {
+  ChunkHeader* stealHalfAndPop(PerThreadChunkQueue& victim) {
     //Don't do work on empty victims (lockfree check)
     if (victim.empty()) return 0;
     //Steal half
@@ -141,7 +141,7 @@ public:
   }
 };
 
-class AltChunkedStack {
+class PerThreadChunkStack {
   substrate::PtrLock<ChunkHeader> head;
 
   void prepend(ChunkHeader* C) {
@@ -182,7 +182,7 @@ public:
     return retval;
   }
 
-  ChunkHeader* stealAllAndPop(AltChunkedStack& victim) {
+  ChunkHeader* stealAllAndPop(PerThreadChunkStack& victim) {
     //Don't do work on empty victims (lockfree check)
     if (victim.empty()) return 0;
     //Steal everything
@@ -198,7 +198,7 @@ public:
     return retval;
   }
 
-  ChunkHeader* stealHalfAndPop(AltChunkedStack& victim) {
+  ChunkHeader* stealHalfAndPop(PerThreadChunkStack& victim) {
     //Don't do work on empty victims (lockfree check)
     if (victim.empty()) return 0;
     //Steal half
@@ -281,15 +281,15 @@ public:
 };
 
 template<bool IsLocallyLIFO, int ChunkSize, typename Container, typename T>
-struct AltChunkedMaster : private boost::noncopyable {
+struct PerThreadChunkMaster : private boost::noncopyable {
   template<typename _T>
-  using retype = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T>;
+  using retype = PerThreadChunkMaster<IsLocallyLIFO, ChunkSize, Container, _T>;
 
   template<bool _concurrent>
-  using rethread = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T>;
+  using rethread = PerThreadChunkMaster<IsLocallyLIFO, ChunkSize, Container, T>;
 
   template<int _chunk_size>
-  using with_chunk_size = AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T>;
+  using with_chunk_size = PerThreadChunkMaster<IsLocallyLIFO, _chunk_size, Container, T>;
 
 private:
   class Chunk : public ChunkHeader, public galois::FixedSizeRing<T, ChunkSize> {};
@@ -352,7 +352,7 @@ private:
 public:
   typedef T value_type;
 
-  AltChunkedMaster() {}
+  PerThreadChunkMaster() {}
 
   void push(value_type val) {
     std::pair<Chunk*, Chunk*>& tld = *data.getLocal();
@@ -397,12 +397,12 @@ public:
 };
 
 template<int ChunkSize=64, typename T = int>
-using AltChunkedLIFO = AltChunkedMaster<true, ChunkSize, StealingQueue<AltChunkedStack>, T>;
-GALOIS_WLCOMPILECHECK(AltChunkedLIFO)
+using PerThreadChunkLIFO = PerThreadChunkMaster<true, ChunkSize, StealingQueue<PerThreadChunkStack>, T>;
+GALOIS_WLCOMPILECHECK(PerThreadChunkLIFO)
 
 template<int ChunkSize=64, typename T = int>
-using AltChunkedFIFO = AltChunkedMaster<false, ChunkSize, StealingQueue<AltChunkedQueue>, T>;
-GALOIS_WLCOMPILECHECK(AltChunkedFIFO)
+using PerThreadChunkFIFO = PerThreadChunkMaster<false, ChunkSize, StealingQueue<PerThreadChunkQueue>, T>;
+GALOIS_WLCOMPILECHECK(PerThreadChunkFIFO)
 
 } // end namespace
 } // end namespace

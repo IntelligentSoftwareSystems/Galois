@@ -29,7 +29,7 @@
 #include "galois/runtime/UserContextAccess.h"
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
-#include "galois/worklists/AltChunked.h"
+#include "galois/worklists/PerThreadChunk.h"
 #include "galois/worklists/ExternalReference.h"
 
 #include <atomic>
@@ -81,7 +81,7 @@ protected:
   };
 
   static const unsigned CHUNK_SIZE = 2;
-  typedef galois::worklists::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
+  typedef galois::worklists::PerThreadChunkLIFO<CHUNK_SIZE, Task*> WL_ty;
   typedef FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
   typedef substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
@@ -261,8 +261,8 @@ protected:
 
   typedef std::pair<Task*, F*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
-  typedef worklists::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
-  // typedef worklists::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  typedef worklists::PerThreadChunkLIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  // typedef worklists::PerThreadChunkFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
 public:
 

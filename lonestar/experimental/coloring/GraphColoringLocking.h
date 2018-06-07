@@ -39,7 +39,7 @@ protected:
     }
   };
 
-  typedef galois::worklists::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
+  typedef galois::worklists::PerThreadChunkFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
   // typedef galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
   void firstFit (void) {
 

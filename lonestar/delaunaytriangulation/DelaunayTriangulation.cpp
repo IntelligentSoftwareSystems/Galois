@@ -181,7 +181,7 @@ struct Process {
   }
 
   void generateMesh() {
-    typedef galois::worklists::AltChunkedLIFO<32> CA;
+    typedef galois::worklists::PerThreadChunkLIFO<32> CA;
     galois::for_each(galois::iterate(ptrPoints),
         [&, self=this] (Point* p, auto& ctx) {
           p->get(galois::MethodFlag::WRITE);

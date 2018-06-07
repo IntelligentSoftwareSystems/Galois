@@ -320,7 +320,7 @@ struct BFSpartitioner {
   void bfsTraversal (I beg, I end) {
 
     using WL = galois::worklists::dChunkedFIFO<32>;
-    // using WL = galois::worklists::AltChunkedFIFO<8>;
+    // using WL = galois::worklists::PerThreadChunkFIFO<8>;
 
     galois::for_each (galois::iterate(beg, end),
         [this] (GNode src, galois::UserContext<GNode>& ctxt) {

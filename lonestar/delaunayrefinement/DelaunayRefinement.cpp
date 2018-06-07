@@ -173,7 +173,7 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
-  typedef AltChunkedLIFO<32> Chunked;
+  typedef PerThreadChunkLIFO<32> Chunked;
   
   switch (detAlgo) {
     case nondet: 

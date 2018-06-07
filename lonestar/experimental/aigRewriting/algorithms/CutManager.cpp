@@ -723,7 +723,7 @@ void runKCutOperator( CutManager & cutMan ) {
 	typedef galois::worklists::dChunkedBag< 500 > DC_BAG;
 	//typedef galois::worklists::dChunkedFIFO< 200 > DC_FIFO;
 	//typedef galois::worklists::dChunkedLIFO< 200 > DC_LIFO;
-  	//typedef galois::worklists::AltChunkedFIFO< 200 > AC_FIFO;
+  	//typedef galois::worklists::PerThreadChunkFIFO< 200 > AC_FIFO;
 	
 	for ( auto pi : cutMan.getAig().getInputNodes() ) {
 		workList.push( pi );

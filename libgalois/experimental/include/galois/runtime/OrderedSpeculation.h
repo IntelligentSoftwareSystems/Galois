@@ -1100,7 +1100,7 @@ protected:
         std::make_tuple (
           galois::loopname ("handle-aborts"),
           galois::no_conflicts(),
-          galois::wl<galois::worklists::AltChunkedFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::PerThreadChunkFIFO<ThisClass::DEFAULT_CHUNK_SIZE> >()));
 
 
     galois::on_each(
@@ -1249,7 +1249,7 @@ protected:
         std::make_tuple (
           galois::loopname ("retire"),
           galois::no_conflicts(),
-          galois::wl<galois::worklists::AltChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::PerThreadChunkFIFO<Base::DEFAULT_CHUNK_SIZE> >()));
 
     commitRoots.clear_all_parallel();
   }

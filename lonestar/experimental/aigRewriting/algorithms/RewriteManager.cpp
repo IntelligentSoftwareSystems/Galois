@@ -903,7 +903,7 @@ void runRewriteOperator( RewriteManager & rwtMan ) {
 	typedef galois::worklists::dChunkedBag< 500 > DC_BAG;
 	//typedef galois::worklists::dChunkedFIFO< 5000 > DC_FIFO;
 	//typedef galois::worklists::dChunkedLIFO< 5000 > DC_LIFO;
-  	//typedef galois::worklists::AltChunkedFIFO< 5000 > AC_FIFO;
+  	//typedef galois::worklists::PerThreadChunkFIFO< 5000 > AC_FIFO;
 
 	for ( auto pi : rwtMan.getAig().getInputNodes() ) {	
 		workList.push( pi );

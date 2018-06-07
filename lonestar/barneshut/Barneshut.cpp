@@ -476,7 +476,7 @@ double checkAllPairs(Bodies& bodies, int N) {
 
 void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
   typedef galois::worklists::dChunkedLIFO<256> WL_;
-  typedef galois::worklists::AltChunkedLIFO<32> WL;
+  typedef galois::worklists::PerThreadChunkLIFO<32> WL;
   typedef galois::worklists::StableIterator<true> WLL;
 
   galois::preAlloc (galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/galois::runtime::pagePoolSize());

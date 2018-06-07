@@ -383,7 +383,7 @@ struct AsyncALSalgo {
 
       switch (algo) {
         case syncALS: 
-          typedef galois::worklists::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
+          typedef galois::worklists::PerThreadChunkLIFO<ALS_CHUNK_SIZE> WL_ty;
           galois::for_each(galois::iterate(
               boost::counting_iterator<size_t>(0),
               boost::counting_iterator<size_t>(NUM_ITEM_NODES)),

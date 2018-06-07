@@ -22,7 +22,7 @@
 
 #include "galois/optional.h"
 
-#include "AltChunked.h"
+#include "PerThreadChunk.h"
 #include "BulkSynchronous.h"
 #include "Chunked.h"
 #include "Simple.h"
