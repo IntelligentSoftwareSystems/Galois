@@ -1,0 +1,92 @@
+/**
+\page your_own_ds Build Your Own Galois Data Structure
+
+\tableofcontents
+
+
+@section goal_tutorial Goal of This Section
+
+We assume the readers have read @ref tutorial and understand Galois programming model and related constructs reasonably.
+
+This guide has two parts. The first part talks about how to build a NUMA-aware data structure working with Galois; the second part talks about how to make your data structure work with Galois' conflict detection.
+
+
+@section numa_aware_ds NUMA-aware Galois Data Structure
+
+TBD
+
+
+@section conflict_aware_ds Conflict-aware Galois Data Structure
+
+Suppose we want to write a program to count the number of neighbors for each node in a 2D torus using a push-style operator, where each node increments its neighbors' labels. There are conflicts among node activities, so we need the torus nodes to be conflict-aware if we do not want to handle synchronization in our operator code. 
+
+The neighbors of a 2D torus node can be inferred given the width, height and node numbering scheme of the torus. Therefore, it suffices to store only node data in an array, e.g. galois::LargeArray. Using a graph to represent a 2D torus is possible but would be an overkill. For simplicity of this presentation, torus nodes are numbered from 0 onwards in row-major order.
+
+
+@subsection torus_conflict_awareness Conflict Awareness
+
+To make torus nodes be aware of conflicts, we can (1) use an internal struct to hold the real data, and (2) let the internal struct inherit from galois::runtime::Locakble. See the code snippet below for an example. T, given as a template parameter, is the type of actual node data.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Internal type with Lockable
+
+To store node data with locks for a torus, we instantiate a galois::LargeArray containing elements of the internal struct:
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Array of internal type
+
+To detect conflicts, we need to call galois::runtime::acquire on instances of the internal struct. All functions acquiring node ownership need to do so, so it is convenient to implement the call inside a wrapper function, as the following code snippet shows. size() returns the number of nodes in the torus. The parameter mflag is default to galois::MethodFlag::WRITE. We will see an example of optimizing out conflict detection using this parameter later.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Acquire node ownership
+
+Now we need to let all methods that need ownership of a node call the wrapper function, as the code snippet below shows. Returning reference to node data allows users to modify it in-place.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Get data
+
+
+@subsection torus_stl Container Interface
+
+Recall that galois::do_all and galois::for_each expect galois::iterate, whose parameter can be a pair of integers or a container with well-defined iterator. To make our 2D torus interoperable with Galois, we need to provide size-related functions or the iterator, given by begin() and end(), to loop through nodes. Size-related functions are easy to provide:
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp APIs for sizes
+
+Iterators can be defined as the following:
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Types for STL
+
+Users may instantiate iterators by begin() and end(), which are implemented as the following:
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Iterators
+
+
+@subsection torus_easy_cautiousness Easy Operator Cautiousness
+
+In our current example, we need to increment each node's immediate neighbors. Hence, we need APIs to get neighbors for a given node. Since we need to lock all neighbors before actual increments for operator cautiousness, it will be convenient to have a function locking all neighbors for a given node. The following code snippet shows how to achieve this.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Easy operator cautiousness
+
+
+@subsection torus_use Use the 2D Torus
+
+Now we can use our 2D torus as the following.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Use torus
+
+Upon termination, this example app will output statistics similar to the following (generated with a 2000*2000 torus and 24 threads).
+
+STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
+STAT, do_all_torus_reset_self, Iterations, TSUM, 4000000<br>
+STAT, do_all_torus_reset_self, Time, TMAX, 70<br>
+STAT, for_each_torus_add_neighbors, Iterations, TSUM, 4001481<br>
+STAT, for_each_torus_add_neighbors, Time, TMAX, 88<br>
+STAT, for_each_torus_add_neighbors, Commits, TSUM, 4000000<br>
+STAT, for_each_torus_add_neighbors, Pushes, TSUM, 0<br>
+STAT, for_each_torus_add_neighbors, Conflicts, TSUM, 1481<br>
+
+Note that all conflicts are detected successfully and reported.
+
+Conflict detection can be turned off when not required by passing galois::MethodFlag::UNPROTECTED to getData(), as shown below in the serial loop for verification.
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Turn off conflict detection  
+
+The full example is available at {@link lonestar/tutorial_examples/ConflictAwareTorus.cpp}
+
+*/

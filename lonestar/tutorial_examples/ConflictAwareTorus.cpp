@@ -13,6 +13,7 @@
 
 template<typename T>
 class Torus2D {
+  //! [Internal type with Lockable]
   //************************************************************************
   // internal type to combine user data with Lockable object
   //************************************************************************
@@ -28,18 +29,27 @@ class Torus2D {
   public:
     reference getData() { return v; }
   };
+  //! [Internal type with Lockable]
 
+  //! [Array of internal type]
   size_t numRows, numCols;
 
   // use galois::LargeArray for NUMA-aware allocation
+  // will allocate numRows*numCols elements in constructors
   galois::LargeArray<NodeData> data;
+  //! [Array of internal type]
 
+  //! [Types for STL]
   //************************************************************************
   // subtypes visible to user
   //************************************************************************
 public:
+  // opaque type for node
   using TorusNode = size_t;
+
+  // iterator for an STL container
   using iterator = boost::counting_iterator<TorusNode>;
+  //! [Types for STL]
 
 public:
   //************************************************************************
@@ -57,19 +67,24 @@ public:
     }
   }
 
+  //! [APIs for sizes]
   //************************************************************************
   // functions for size of the torus
   //************************************************************************
   size_t height() { return numRows; }
   size_t width() { return numCols; }
   size_t size() { return width()*height(); }
+  //! [APIs for sizes]
 
+  //! [Iterators]
   //************************************************************************
   // functions to traverse nodes
   //************************************************************************
   iterator begin() { return iterator(0); }
   iterator end() { return iterator(size()); }
+  //! [Iterators]
 
+  //! [Acquire node ownership]
   //************************************************************************
   // functions to acquire node ownership
   //************************************************************************
@@ -80,7 +95,9 @@ public:
     // use this call to detect conflicts and handling aborts
     galois::runtime::acquire(&data[n], mflag);
   }
+  //! [Acquire node ownership]
 
+  //! [Get data]
   //************************************************************************
   // function to access node data
   //************************************************************************
@@ -92,7 +109,9 @@ public:
     // use the internal wrapper type to encapsulate users from Lockable objects
     return data[n].getData();
   }
+  //! [Get data]
 
+  //! [Easy operator cautiousness]
   //************************************************************************
   // functions to access neighboring nodes, i.e. edges in a general graph
   //************************************************************************
@@ -130,6 +149,7 @@ public:
     acquireNode(*leftNeighbor(n), mflag);
     acquireNode(*rightNeighbor(n), mflag);
   }
+  //! [Easy operator cautiousness]
 }; // end of class Torus2D
 
 int main(int argc, char *argv[]) {
@@ -140,11 +160,13 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  galois::setActiveThreads(std::atoi(argv[3]));
+
+  //! [Use torus]
   using Torus = Torus2D<unsigned int>;
   using TorusNode = Torus::TorusNode;
 
   Torus torus(std::atoi(argv[1]), std::atoi(argv[2]));
-  galois::setActiveThreads(std::atoi(argv[3]));
 
   galois::do_all(
       galois::iterate(0ul, torus.size()),                 // range as a pair of unsigned integers
@@ -153,7 +175,7 @@ int main(int argc, char *argv[]) {
   );
 
   galois::for_each(
-      galois::iterate(0ul, torus.size()),                 // range as a pair of unsigned integers
+      galois::iterate(torus),                             // range as a container. assuming begin() and end()
       [&] (TorusNode n, auto& ctx) {                      // operator
         // cautious point
         torus.acquireAllNeighbors(n);
@@ -166,7 +188,9 @@ int main(int argc, char *argv[]) {
       , galois::loopname("for_each_torus_add_neighbors")  // options
       , galois::no_pushes()
   );
+  //! [Use torus]
 
+  //! [Turn off conflict detection]
   // serial verification, no conflict is possible
   size_t numWrongAnswer = 0;
   for (auto n: torus) {
@@ -177,6 +201,7 @@ int main(int argc, char *argv[]) {
     }
   }
   std::cout << "# nodes of wrong answer: " << numWrongAnswer << std::endl;
+  //! [Turn off conflict detection]
 
   return 0;
 }
