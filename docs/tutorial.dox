@@ -284,20 +284,28 @@ Memory allocation plays an important role in making parallel programs scalable. 
 <ol>
 <li> Allocate objects with fixed size, e.g. set elements, from galois::FixedSizeAllocator.
 <li> Allocate objects with variable size, e.g. vectors, from galois::Pow_2_VarSizeAlloc.
-<li> Allocate objects used only in a loop iteration from galois::PerIterAllocTy. This allocator assumes the existence of galois::UserContext. Here is an example of how to use it:
+<li> Allocate objects used only in a loop iteration from galois::PerIterAllocTy. To use per-iteration allocator, you need to pass galois::per_iter_alloc to galois::for_each. Here is an example of how to use it:
 @code
-[&] (GNode n, auto& ctx) {
-  // syntax for conforming to STL allocator interface
-  using Alloc = galois::PerIterAllocTy::rebind<GNode>::other;
+using Graph = /* graph type definition */;
+using GNode = Graph::GraphNode;
+Graph g;
+galois::for_each(
+    galois::iterate(graph),
+    [&] (GNode n, auto& ctx) {
+      // syntax for conforming to STL allocator interface
+      using Alloc = galois::PerIterAllocTy::rebind<GNode>::other;
 
-  // fast, scalable allocation for v, a per-iteration vector
-  // get per-iteration allocator from ctx to initialize the v
-  std::vector<GNode, Alloc> v(ctx.getPerIterAlloc());
+      // fast, scalable allocation for v, a per-iteration vector
+      // get per-iteration allocator from ctx to initialize the v
+      std::vector<GNode, Alloc> v(ctx.getPerIterAlloc());
 
-  auto& d = graph.getData(n).data;
-  std::copy(d.begin(), d.end(), std::back_inserter(v));
-  // use of v below
-}
+      auto& d = graph.getData(n).data;
+      std::copy(d.begin(), d.end(), std::back_inserter(v));
+      // use of v below
+    }
+    , galois::per_iter_alloc()
+    , galois::loopname("per_iter_alloc_example")
+);
 @endcode
 </ol>
 
