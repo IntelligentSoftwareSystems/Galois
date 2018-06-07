@@ -17,37 +17,37 @@ The following topics are outside the scope of this tutorial:
 
 @section execution_model Execution Model
 
-A Galois program alternates its execution in between serial and parallel phases. The execution begins serially with master thread, whose thread ID is 0. Other threads wait in a "sleep" state in galois::substrate::ThreadPool, which is created by galois::SharedMemSys. Upon encountering a parallel section, Galois runtime wakes up threads in cascade, and hand threads a work function. Threads meet at a barrier by the end of the parallel section. In current implementation, parallel sections are loops and work items are iterations of that loop. This is summarized as the following figure.
+A Galois program alternates its execution in between serial and parallel phases. The execution begins serially on the master thread, whose thread ID is 0. Other threads wait in a "sleep" state in galois::substrate::ThreadPool, which is created by galois::SharedMemSys. Upon encountering a parallel section, the Galois runtime wakes up the threads in cascade, and hands each thread a work function. Threads synchronize at a barrier at the end of the parallel section. In the current implementation, parallel sections are loops and work items are iterations of that loop. This is summarized in the following figure.
 
 @image html galois_execution_model.png "Galois Execution Model"
 
 Galois is different from other models in the following two ways.
 <ol>
-<li> Parallel work may or may not be independent; implementation guarantees transactional execution of each work item (iteration).
-<li> Parallel sections may create and execute new work items. This intuitively follows data-driven algorithms, in which active work items are tracked and may be created on the fly. This feature is important for high-diameter graphs like circuits.
+<li> Parallel work may or may not be independent; the implementation guarantees transactional execution of each work item (iteration).
+<li> Parallel sections may create and execute new work items. This feature is important for high-diameter graphs like circuits.
 </ol>
 
 
 @section galois_program Galois Programs
 
-A Galois user program consists of operators, schedules and data structure API calls. Galois runtime system implements schedulers and data structures, which are built upon thread primitives and memory allocators. If the Galois runtime system is geared toward shared-memory platforms, then the Galois program executes on multi-cores. This is summarized as the following figure.
+A Galois user program consists of operators, schedules and data structure API calls. The Galois library implements schedulers and data structures, which are built upon thread primitives and memory allocators. This is summarized by the following figure.
 
 @htmlonly
 <style>div.image img[src="galois_program_structure.png"]{width:40%}</style>
 @endhtmlonly
 @image html galois_program_structure.png "Structure of a Galois Program"
 
-To better control the initialization of Galois constructs, galois::SharedMemSys is declared inside a function, thus constructed after the program is loaded. Therefore, all Galois constructs must not be declared as static global objects.
+The first statement of a Galois program must be the declaration of galois::SharedMemSys. This object creates galois::substrate::ThreadPool and other runtime structures. After that, application-specific data structures, e.g. graphs, can be declared.
 
-Through out this tutorial, we will use the following application as our running example: Read in an undirected graph with edge weights, and then set node label to the sum of weights on edges connected to node. There are two ways to implement this application. If it is implemented as a pull-style algorithm, each node iterates over its edges and compute its label; there are no conflicts among activities at different nodes. However, when it is implemented as a push-style algorithm, each node iterates over its edges and for each edge, the node updates weight of destination node. Therefore, activities may conflict with each other. Both variants iterate over all nodes, so they are topology-driven algorithms.
+Throughout this tutorial, we will use the following application as our running example: read in an undirected graph with edge weights, and then set the label of each node to the sum of the weights on the edges connected to the node. There are two ways to implement this application. If it is implemented as a pull-style algorithm, each node iterates over its edges and compute its own label; there are no conflicts among activities at different nodes. However, when it is implemented as a push-style algorithm, each node iterates over its edges and for each edge, the node updates the weight of the destination node. Therefore, activities may conflict with each other. Both variants iterate over all nodes, so they are topology-driven algorithms.
 
 Below we will cover parallel data structures, parallel loop iterators, and worklists and schedules.
 
 @section galois_lc_graphs Parallel Data Structures
 
-For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with Galois runtime system. All graphs are in namespace galois::graphs. There are two types of graphs:
+For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with the Galois runtime system. All graphs are in namespace galois::graphs. There are two types of graphs:
 <ol>
-<li> galois::graphs::FirstGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. galois::graphs::LC_Morph_Graph can be used if (1) only insertions of nodes and edges are possible, and (2) when a node is created, its maximum degree is known.
+<li> galois::graphs::FirstGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) only insertions of nodes and edges are possible, and (2) when a node is created, its maximum degree is known.
 <li> galois::graphs::LC_CSR_Graph: It disallows creation and removal of nodes and edges. Internally, it is implemented with compressed sparse row format, as shown in the following figure. Undirected edges are represented as two directed edges. Galois also provides variants of this graph with different storage representations, e.g. galois::graphs::LC_InlineEdge_Graph, galois::graphs::LC_Linear_Graph, galois::graphs::LC_InOut_Graph.
 </ol>
 
@@ -56,11 +56,11 @@ For graph computation, Galois provides unified, standard APIs to access graph el
 @endhtmlonly
 @image html csr_format_example.png "Graph in CSR Format"
 
-Other data structures available in Galois are galois::InsertBag, trees and reducers. We will focus on galois::graphs::LC_CSR_Graph in this section.
+Other data structures available in Galois are galois::InsertBag, an unordered bag allowing thread-safe concurrent insertion; galois::GSimpleReducible, a template for scalar reduction; and galois::GBigReducible, a template for container reduction. We will focus on galois::graphs::LC_CSR_Graph in this section.
 
 When defining a galois::graphs::LC_CSR_Graph, you must provide as template paratemers NodeTy, the type of data stored on each node; and EdgeTy, the type of data stored on each edge. Use void when no data needs to be stored on nodes or edges. See galois::graphs::LC_CSR_Graph for other optional template parameters.
 
-Below is an example of defining a LC_CSR_Graph with integer as its node data type and edge data type:
+Below is an example of defining an LC_CSR_Graph with integer as its node data type and edge data type:
 
 @snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Define LC_CSR_Graph
 
@@ -70,14 +70,14 @@ The following code snippet shows how to instantiate and read in a graph from a f
 
 To access graph elements, use the following constructs.
 <ol>
-<li> The nodes can be accessed by the node iterator galois::graphs::LC_CSR_Graph::iterator with galois::graphs::LC_CSR_Graph::begin and galois::graphs::LC_CSR_Graph::end.
-<li> The outgoing edges of a node can be accessed by the edge iterator galois::graphs::LC_CSR_Graph::edge_iterator with galois::graphs::LC_CSR_Graph::edge_begin and galois::graphs::LC_CSR_Graph::edge_end.
-<li> To read/write a node data, use galois::graphs::LC_CSR_Graph::getData.
-<li> To read/write an edge data, use galois::graphs::LC_CSR_Graph::getEdgeData.
-<li> To access the destination node of an outgoing edge, use galois::graphs::LC_CSR_Graph::getEdgeDst.
+<li> Iteration over nodes: use the node iterator galois::graphs::LC_CSR_Graph::iterator given by galois::graphs::LC_CSR_Graph::begin and galois::graphs::LC_CSR_Graph::end.
+<li> Iteration over outgoing edges of a node: use the edge iterator galois::graphs::LC_CSR_Graph::edge_iterator given by galois::graphs::LC_CSR_Graph::edge_begin and galois::graphs::LC_CSR_Graph::edge_end.
+<li> To read/write a node data: use galois::graphs::LC_CSR_Graph::getData.
+<li> To read/write an edge data: use galois::graphs::LC_CSR_Graph::getEdgeData.
+<li> To access the destination node of an outgoing edge: use galois::graphs::LC_CSR_Graph::getEdgeDst.
 </ol>
 
-The following example is a serial implementation of our running example. It is a pull-style implementation: Iterate through all nodes, and for each node, add all outgoing edges' weights to the node data. This example is written in C++11 to avoid mentioning node iterators and edge iterators explicitly.
+The following example is a serial implementation of our running example. It is a pull-style implementation: iterate through all nodes, and for each node, add all outgoing edges' weights to the node data. This example is written in C++11 to avoid mentioning node iterators and edge iterators explicitly.
 
 @snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Graph traversal
 
@@ -109,7 +109,7 @@ Specifically, galois::do_all expects the following inputs:
   </ul>
 </ol>
 
-Below is the example of paralleizing our running example in pull-style operator using galois::do_all. Note that the range for this do_all call is exactly the outer loop range in the serial implementation; and that the operator is exactly the body of the outer loop in our serial implementation.
+Below is the example of paralleizing our running example in pull-style operator using galois::do_all. Note that the range for this do_all call is exactly the outer loop range in the serial implementation, and that the operator is exactly the body of the outer loop in our serial implementation.
 
 @snippet lonestar/tutorial_examples/GraphTraversalPullOperator.cpp Graph traversal in pull using do_all
 
@@ -120,7 +120,7 @@ The full example is available as {@link lonestar/tutorial_examples/GraphTraversa
 
 galois::for_each can be used for parallel iterations that may generate new work items, and that may have conflicts among iterations. Operators must be cautious: All locks should be acquired successfully before the first write to user state. Optional features for galois::for_each include (1) turning off conflict detection, (2) asserting that no new work items will be created, and (3) specifying desired schedule for processing active elements. galois::for_each is suitable to implement push-style algorithms.
 
-galois::for_each uses galois::UserContext, a per-thread object, to track conflicts and new work. To insert new work items to the worklist, call galois::UserContext::push. To detect conflicts, galois::UserContext maintains a linked list of acquired items. Each sharable object, e.g. graph nodes, has a lock, which is automatically acquired when getData(), edge_begin(), edge_end(), edges(), etc. are called. Conflict is detected by Galois runtime when the lock acquisition fails. Locks are released when aborting or finishing an iteration. Since Galois assumes cautious operators, i.e. no writes to user state before acquiring all locks, there is no need to rollback user state when aborting an iteration.
+galois::for_each uses galois::UserContext, a per-thread object, to track conflicts and new work. To insert new work items to the worklist, call galois::UserContext::push. To detect conflicts, galois::UserContext maintains a linked list of acquired items. Each sharable object, e.g. graph nodes, has a lock, which is automatically acquired when getData(), edge_begin(), edge_end(), edges(), etc. are called. Conflict is detected by the Galois runtime when the lock acquisition fails. Locks are released when aborting or finishing an iteration. Since Galois assumes cautious operators, i.e. no writes to user state before acquiring all locks, there is no need to rollback user state when aborting an iteration.
 
 galois::for_each expects the following inputs:
 <ol>
@@ -145,7 +145,7 @@ Below is the code snippet of using galois::for_each with conflict detection to i
 
 @snippet lonestar/tutorial_examples/GraphTraversalPushOperator.cpp For each with conflict detection
 
-And the code snippet below shows how to let an operator, instead of galois::for_each, take care of synchronization. Conflict detection is turned off in this case. Since there is no new work generated and the operator synchronizes node data, the same code can be implemented with galois::do_all as well, which is also shown in this example.
+The code snippet below shows how to let an operator, instead of galois::for_each, take care of synchronization. Conflict detection is turned off in this case. Since there is no new work generated and the operator synchronizes node data, the same code can be implemented with galois::do_all as well, which is also shown in this example.
 
 @snippet lonestar/tutorial_examples/GraphTraversalPushOperator.cpp For each and do all without conflict detection
 
@@ -158,9 +158,9 @@ So far we addressed only topology-driven algorithms, e.g. the same computation i
 
 Galois supports varieties of scheduling policies, all of them are in namespace galois::worklists. Example scheduling policies are galois::worklists::FIFO (approximate), galois::worklists::LIFO (approximate), galois::worklists::ChunkedFIFO, galois::worklists::ChunkedLIFO, galois::worklists::dChunkedFIFO, galois::worklists::dChunkedLIFO, galois::worklists::AltChunkedFIFO, galois::worklists::AltChunkedLIFO, and galois::worklists::OrderedByIntegerMetric. The default scheduler is galois::worklists::dChunkedFIFO with chunk size 32.
 
-galois::worklists::OrderedByIntegerMetric can be used to implement user-defined soft priority, a hint for Galois runtime to schedule active elements where priority inversion will not result in incorrect answers or deadlocks. It needs an indexer function to map work items to an integer (priority). Each bin corresponds to a priority level, and is itself a worklist, e.g. galois::worklists::dChunkedLIFO with chunk size 16.
+galois::worklists::OrderedByIntegerMetric can be used to implement user-defined soft priority, a hint for the Galois runtime to schedule active elements where priority inversion will not result in incorrect answers or deadlocks. It needs an indexer function to map work items to an integer (priority). Each bin corresponds to a priority level, and is itself a worklist, e.g. galois::worklists::dChunkedLIFO with chunk size 16.
 
-Let us use single-source shortest path (SSSP) problem to illustrate the implementation of data-driven algorithms using Galois. Given (1) an edge-weighted graph G with no negative cycles, and (2) a source node s; SSSP problem asks for the shortest distance of every node n in G from s. Initially, all nodes have distances infinity from s, and s has distance 0 from itself.
+Let us use single-source shortest path (SSSP) problem to illustrate the implementation of data-driven algorithms using Galois. Given (1) an edge-weighted graph G with no negative-weight cycles, and (2) a source node s; the SSSP problem asks for the shortest distance of every node n in G from s. Initially, s has distance 0 from itself, and all other nodes have distances infinity from s.
 
 Here is the operator code common to all push-style SSSP algorithms:
 
@@ -179,7 +179,7 @@ The full example is available at {@link lonestar/tutorial_examples/SSSPPushSimpl
 
 @subsection galois_deterministic_iterator Deterministic Loop Iterator
 
-galois::do_all and galois::for_each assume that the operator allows the loop iterations to be computed in any order, which may give legal yet different results non-deterministically. When it is important to have deterministic results, deterministic loop iterator can be the rescue: It executes the operator in rounds, and in each round, it deterministically chooses a conflict-free subset of currently active elements to process. In this way, Galois deterministic loop iterator can produce a same answer on different platforms, which we term it "portable determinism".
+galois::do_all and galois::for_each assume that the operator allows the loop iterations to be computed in any order, which may give legal yet different results non-deterministically. When it is important to have deterministic results, the deterministic loop iterator comes to the rescue: it executes the operator in rounds, and in each round, it deterministically chooses a conflict-free subset of currently active elements to process. In this way, Galois deterministic loop iterator can produce the same answer even on different platforms, which we call "portable determinism".
 
 Galois' deterministic loop iterator can be launched on-demand and parameter-less by passing galois::wl< galois::worklists::Deterministic <> > to galois::for_each. Use galois::UserContext::cautiousPoint to signal the cautious point in the operator if necessary. Below is an example of using deterministic loop executor for SSSP:
 
@@ -188,7 +188,7 @@ Galois' deterministic loop iterator can be launched on-demand and parameter-less
 
 @subsection galois_parameter_iterator ParaMeter Loop Iterator
 
-An algorithm can benefit from parallelization only if it has a rich amount of parallelism. Galois provides ParaMeter loop iterator to help algorithm designers find out the amount of parallelism in their algorithms. ParaMeter loop iterator executes the operator in rounds and keeps track of statistics of parallelism for each round.
+An algorithm can benefit from parallelization only if it has a lot of parallelism. Galois provides the ParaMeter loop iterator to help algorithm designers find out the amount of parallelism in their algorithms. This parallelism, of course, depends on input-data. ParaMeter loop iterator executes the operator in rounds and keeps track of statistics of parallelism for each round.
 
 To launch Galois' ParaMeter loop iterator, pass galois::wl< galois::worklists::ParaMeter <> > to galois::for_each. Below shows an example of using ParaMeter loop executor for SSSP:
 
@@ -212,11 +212,11 @@ sssp_ParaMeter, 10, 8, 18, 28<br>
 
 The parallelism profile should be interpreted as follows:
 <ol>
-<li> LOOPNAME indicates the for_each loop the numbers are for. In this example, it refers to the galois::for_each passed as an option galois::loopname("sssp_ParaMeter").
-<li> STEP points out which round is reported for the for_each loop. It counts from 0 whenever the corresponding for_each is launched.
-<li> PARALLELISM gives out the number of active elements that can be processed in parallel in a given round.
-<li> WORKLIST_SIZE tells the number of available active elements in a given round.
-<li> NEIGHBORHOOD_SIZE shows the number of shared objects owned by committed iterations in a given round. NEIGHBORHOOD_SIZE / PARALLELISM gives the average size of neighborhood of an active element.
+<li> LOOPNAME indicates the for_each loop the statistics are for. In this example, it refers to the galois::for_each passed as an option galois::loopname("sssp_ParaMeter").
+<li> STEP indicates which round the statistics are for. It counts from 0 whenever the corresponding for_each is launched.
+<li> PARALLELISM indicates the number of active elements that can be processed in parallel in a given round.
+<li> WORKLIST_SIZE indicates the number of available active elements in a given round.
+<li> NEIGHBORHOOD_SIZE indicates the number of shared objects owned by committed iterations in a given round. NEIGHBORHOOD_SIZE / PARALLELISM gives the average size of neighborhood of an active element.
 </ol>
 
 
@@ -225,7 +225,7 @@ The parallelism profile should be interpreted as follows:
 
 @subsection example_output Example Output of Galois Apps
 
-When terminated, Galois apps will output statistics in csv format, similar to the following:
+Upon termination, Galois apps will output statistics in csv format, similar to the following:
 
 STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
 STAT, for_each_1, Iterations, TSUM, 9028387<br>
@@ -245,7 +245,7 @@ CATEGORY specifies what are being reported for the parallel region. For galois::
 <li> Conflicts: the number of iterations aborted due to conflicts
 </ol>
 
-For galois::do_all loops, only time and iterations are reported, since there is no conflicts and pushes in galois::do_all loops.
+For galois::do_all loops, only time and iterations are reported, since there are no conflicts and pushes in galois::do_all loops.
 
 TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value is the sum of all threads' contributions; TMAX means it is the maximum among all threads for this statistic. TOTAL_TYPE is usually a reduction operation.
 
@@ -265,7 +265,7 @@ Let us use galois::graphs::FirstGraph to construct and represent a two-dimension
 
 @snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a FirstGraph
 
-And the following code snippet shows how to add nodes and edges to a galois::graphs::FirstGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::FirstGraph, and finally add edges in between the nodes.
+The following code snippet shows how to add nodes and edges to a galois::graphs::FirstGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::FirstGraph, and finally add edges in between the nodes.
 
 @snippet lonestar/tutorial_examples/TorusConstruction.cpp Construct torus
 
@@ -274,7 +274,7 @@ See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
 
 @subsection work_in_do_all Work Distribution in galois::do_all
 
-How works are divided among threads in galois::do_all depends on whether work stealing is turned on. If work stealing is turned off, then the range is partitioned evenly among threads, and each threads works on its own partition independently. If work stealing is turned on, the work range is partitioned into chunks of N iterations, where N is the chunk size. Each thread is then assigned an initial set of chunks, and starts working from the beginning of the set. If a thread finishes its own chunks but other threads are still working on theirs, it will steal chunks from another thread's end of set of chunks.
+How work is divided among threads in galois::do_all depends on whether work stealing is turned on. If work stealing is turned off, then the range is partitioned evenly among threads, and each threads works on its own partition independently. If work stealing is turned on, the work range is partitioned into chunks of N iterations, where N is the chunk size. Each thread is then assigned an initial set of chunks, and starts working from the beginning of the set. If a thread finishes its own chunks but other threads are still working on theirs, it will steal chunks from another thread's end of set of chunks.
 
 
 @subsection mem_alloc Memory Allocators
@@ -312,11 +312,11 @@ galois::for_each(
 
 @subsection tuning_guides Tuning Guides
 
-Performance tuning is unavoidable to make a parallel program fast and scalable. Readers should keep the following points in mind when tuning:
+Performance tuning is required to make a parallel program fast and scalable. Readers should keep the following points in mind when tuning performance:
 <ol>
 <li> Chunk size can be tuned to trade-off work balance and overhead to access the worklist, and may hurt priority enforcement when it is large.
 <li> Schedules play an important role in performance. They trade-off the amount of wasted work and parallelism. However, there is overhead in managing additional information.
-<li> NUMA-awareness in data structure and loop execution is critical for performance. galois::iterate prefers local_iterator over iterator if provided a container for this reason.
+<li> NUMA-awareness in data structure and loop execution is critical for performance. For this reason, galois::iterate prefers local_iterator over iterator if provided a container.
 <li> Memory allocation in parallel loops can kill the scalability of a parallel program. Use galois::preAlloc to pre-allocate memory pages instead of on-demand page allocation in parallel loops.
 </ol>
 
