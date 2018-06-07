@@ -49,10 +49,10 @@ static cll::opt<std::string> filename(cll::Positional,
                                       cll::Required);
 
 static cll::opt<unsigned int> startNode("startNode",
-                                        cll::desc("Node to start search from"),
+                                        cll::desc("Node to start search from (default value 0)"),
                                         cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", 
-                                         cll::desc("Node to report distance to"),
+                                         cll::desc("Node to report distance to (default value 1)"),
                                          cll::init(1));
 // static cll::opt<unsigned int> stepShiftw("delta",
                                // cll::desc("Shift value for the deltastep"),
@@ -81,13 +81,13 @@ const char* const ALGO_NAMES[] = {
   "Sync2p"
 };
 
-static cll::opt<Exec> execution("exec", cll::desc("Choose SERIAL or PARALLEL execution:"),
+static cll::opt<Exec> execution("exec", cll::desc("Choose SERIAL or PARALLEL execution (default value PARALLEL):"),
     cll::values(
       clEnumVal(SERIAL, "SERIAL"),
       clEnumVal(PARALLEL, "PARALLEL"),
       clEnumValEnd), cll::init(PARALLEL));
 
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm (default value SyncTile):"),
     cll::values(
       clEnumVal(AsyncTile, "AsyncTile"),
       clEnumVal(Async, "Async"),

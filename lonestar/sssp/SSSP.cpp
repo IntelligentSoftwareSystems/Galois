@@ -45,13 +45,13 @@ static cll::opt<std::string> filename(cll::Positional,
                                       cll::Required);
 
 static cll::opt<unsigned int> startNode("startNode",
-                                        cll::desc("Node to start search from"),
+                                        cll::desc("Node to start search from (default value 0)"),
                                         cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", 
-                                         cll::desc("Node to report distance to"),
+                                         cll::desc("Node to report distance to(default value 1)"),
                                          cll::init(1));
 static cll::opt<unsigned int> stepShift("delta",
-                               cll::desc("Shift value for the deltastep"),
+                               cll::desc("Shift value for the deltastep (default value 13)"),
                                cll::init(13));
 
 enum Algo {
