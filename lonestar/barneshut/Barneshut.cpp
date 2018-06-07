@@ -44,9 +44,9 @@ const char* desc =
   "Barnes-Hut n-body algorithm";
 const char* url = "barneshut";
 
-static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm::cl::init(10000));
-static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps"), llvm::cl::init(1));
-static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"), llvm::cl::init(7));
+static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies (default value 10000)"), llvm::cl::init(10000));
+static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps (default value 1)"), llvm::cl::init(1));
+static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed (default value 7)"), llvm::cl::init(7));
 
 struct Node {
   Point pos;

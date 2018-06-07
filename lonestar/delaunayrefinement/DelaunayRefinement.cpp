@@ -49,7 +49,7 @@ enum DetAlgo {
   detDisjoint
 };
 
-static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
+static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic schedule (default value nondet):"),
     cll::values(
       clEnumVal(nondet, "Non-deterministic"),
       clEnumVal(detBase, "Base execution"),
