@@ -24,18 +24,17 @@
 
 //! standard global options to the benchmarks
 llvm::cl::opt<bool> skipVerify("noverify", 
-                               llvm::cl::desc("Skip verification step"), 
+                               llvm::cl::desc("Skip verification step (default value false)"), 
                                llvm::cl::init(false));
 llvm::cl::opt<int> numThreads("t", 
-                              llvm::cl::desc("Number of threads (default 1)"),
+                              llvm::cl::desc("Number of threads (default value 1)"),
                               llvm::cl::init(1));
 llvm::cl::opt<std::string> statFile("statFile", 
-                                    llvm::cl::desc("ouput file to print stats "
-                                                   "to"), 
+                                    llvm::cl::desc("ouput file to print stats to (default value empty)"), 
                                     llvm::cl::init(""));
 
 static void LonestarPrintVersion() {
-  std::cout << "Galois Benchmark Suite v" << galois::getVersion() << " (" 
+  std::cout << "LoneStar Benchmark Suite v" << galois::getVersion() << " (" 
             << galois::getRevision() << ")\n";
 }
 
