@@ -8,7 +8,7 @@ Reduction is a fundamental operation used in different graph analytics problems 
 
 @section reduction-types Types of Reduction Operations in Galois
 
-Data structures that support reductions in Galois are conceptually divided into two classes: reduction of scalar types (e.g., ints and floats) or reduction of container types (e.g., STL vectors and maps).
+Data structures that support reductions in Galois are conceptually divided into two classes: reduction of scalar types (e.g., ints and floats) or reduction of container types (e.g., STL vectors and maps). 
 
 @subsection scalar-reduction Scalar reduction
 
@@ -24,7 +24,12 @@ Data structures that support reductions in Galois are conceptually divided into 
 
 {@link galois::GSimpleReducible} starts with the default value of type `T`. {@link galois::GSimpleReducible::update()} updates the thread local value by applying the reduction operator to the thread local and provided value. After a parallel region, the final value can be retrieved using {@link galois::GSimpleReducible::reduce()}. Note, that {@link galois::GSimpleReducible::reduce()} can only be used outside of parallel regions (e.g., {@link galois::for_each}).
 
-The following is a list of specialized reducer classes that are supported by the Galois runtime. These classes implement support for different types of reduction operations by inheriting from {@link galois::GSimpleReducible}:
+The following figure shows the inheritance hierarachy of Galois classes that implement support for scalar reduction operations.
+
+\image html scalar-reductions.png "Scalar reducers in Galois"
+
+
+These specialized reducer classes implement support for different types of reduction operations by inheriting from {@link galois::GSimpleReducible}:
 
 - {@link galois::GAccumulator} is used to accumulate a set of values. It provides {@link galois::GAccumulator::operator+=} and {@link galois::GAccumulator::operator-=} for adding or subtracting values.
 - {@link galois::GReduceMax} is used to reduce to the maximum value. Type `T` has to meet the type requirements of `std::max`.
@@ -46,9 +51,13 @@ In the following, we show an example of using reduction operations in a common g
 
 Here the argument `lhs` is updated in place with `rhs` to reflect the output of the reduction operator.
 
-@subsubsection specialreducers Special Reducers
+// @subsubsection specialreducers Special Reducers
 
-There are several built-in container reducers in Galois.
+The following figure shows the inheritance hierarachy of Galois classes that implement support for container reduction operations.
+
+\image html container-reductions.png "Container reducers in Galois"
+
+These specialized reducer classes inherit from {@link galois::GBigReducible}:
 
 - {@link galois::GSetAccumulator} is used to union sets.
 - {@link galois::GVectorAccumulator} is used to concatenate vectors.
@@ -60,6 +69,8 @@ There are several built-in container reducers in Galois.
 In the following, we show a snippet using container reduction. The application first performs BFS on the input graph to determine the distance from a given source node, and then uses {@link galois::GVectorPerItemReduce} to count the number of distinct levels. Please see {@link CountLevels.cpp} for a working example.
 
 @snippet CountLevels.cpp Define GReducible
+
+
 
 <br>
 */
