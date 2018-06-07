@@ -1,6 +1,5 @@
---------------------------------------------------------------------------------
 Betweenness Centrality (Outer)
---------------------------------------------------------------------------------
+================================================================================
 
 DESCRIPTION 
 --------------------------------------------------------------------------------
@@ -23,13 +22,13 @@ RUN
 --------------------------------------------------------------------------------
 
 To run all sources, use the following:
-./betweennesscentrality-outer <input-graph> -t=<num-threads>
+`./betweennesscentrality-outer <input-graph> -t=<num-threads>
 
 To run starting from a particular source, use the following:
-./betweennesscentrality-outer <input-graph> -t=<num-threads> -startNode=<node to begin>
+`./betweennesscentrality-outer <input-graph> -t=<num-threads> -startNode=<node to begin>`
 
 To run only on N nodes (that have outgoing edges), use the following:
-./betweennesscentrality-outer <input-graph> -t=<num-threads> -limit=N
+`./betweennesscentrality-outer <input-graph> -t=<num-threads> -limit=N`
 
 TUNING PERFORMANCE  
 --------------------------------------------------------------------------------
@@ -39,9 +38,8 @@ load balancing should be good. Otherwise, there may be load imbalance among
 threads.
 
 
---------------------------------------------------------------------------------
 Asynchronous Brandes Betweenness Centrality
---------------------------------------------------------------------------------
+================================================================================
 
 DESCRIPTION 
 ----------------------------------------
@@ -72,19 +70,19 @@ RUN
 --------------------------------------------------------------------------------
 
 To run all sources, use the following:
-./bc-async <input-graph> -t=<num-threads>
+`./bc-async <input-graph> -t=<num-threads>`
 
 To run with a specific number of sources N (starting from the beginning), use
 the following:
-./bc-async <input-graph> -t=<num-threads> -numOfSources=N
+`./bc-async <input-graph> -t=<num-threads> -numOfSources=N`
 
 To run with a specific number of sources N (starting from the beginning) **with
 outgoing edges**, use the following:
-./bc-async <input-graph> -t=<num-threads> -numOfOutSources=N
+`./bc-async <input-graph> -t=<num-threads> -numOfOutSources=N`
 
 To run with a specific set of sources, put the sources in a file with
 the source ids separated with a line and use the following:
-./bc-async <input-graph> -t=<num-threads> -sourcesToUse=<path-to-file>
+`./bc-async <input-graph> -t=<num-threads> -sourcesToUse=<path-to-file>`
 
 TUNING PERFORMANCE  
 --------------------------------------------------------------------------------
