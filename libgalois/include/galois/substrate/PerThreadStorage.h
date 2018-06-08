@@ -91,7 +91,7 @@ public:
 extern __thread char* ptsBase;
 PerBackend& getPTSBackend();
 
-extern __thread char* ppsBase;
+extern __thread char* pssBase;
 PerBackend& getPPSBackend();
 
 void initPTS(unsigned maxT);
@@ -222,12 +222,12 @@ public:
   }
 
   T* getLocal() {
-    void* ditem = b.getLocal(offset, ppsBase);
+    void* ditem = b.getLocal(offset, pssBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getLocal() const {
-    void* ditem = b.getLocal(offset, ppsBase);
+    void* ditem = b.getLocal(offset, pssBase);
     return reinterpret_cast<T*>(ditem);
   }
 
