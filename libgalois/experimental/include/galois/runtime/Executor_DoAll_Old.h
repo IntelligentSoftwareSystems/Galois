@@ -95,11 +95,11 @@ class DoAllExecutor {
       return true;
     //Then try stealing from neighbors
     unsigned myID = substrate::ThreadPool::getTID();
-    unsigned myPkg = substrate::ThreadPool::getPackage();
+    unsigned myPkg = substrate::ThreadPool::getSocket();
     auto& tp = substrate::getThreadPool();
-    //try package neighbors
+    //try socket neighbors
     for (unsigned x = 0; x < activeThreads; ++x) {
-      if (x != myID && tp.getPackage(x) == myPkg) {
+      if (x != myID && tp.getSocket(x) == myPkg) {
         if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
           if (std::distance(begin, end) > minSteal) {
             local.stealLock.lock();

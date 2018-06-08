@@ -48,7 +48,7 @@ enum class UpdateType {
   Wild,
   WildOrig,
   ReplicateByThread,
-  ReplicateByPackage,
+  ReplicateBySocket,
   Staleness
 };
 
@@ -77,7 +77,7 @@ static cll::opt<UpdateType> updateType("update", cll::desc("Update type:"),
     clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
     clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
     clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
-    clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
+    clEnumValN(UpdateType::ReplicateBySocket, "replicateBySocket", "socket replication"),
     clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
     clEnumValEnd), cll::init(UpdateType::Wild));
 static cll::opt<AlgoType> algoType("algo", cll::desc("Algorithm:"),
@@ -116,22 +116,22 @@ unsigned variableNodeToId(GNode variable_node) {
 template<typename T, UpdateType UT>
 class DiffractedCollection {
   galois::substrate::PerThreadStorage<T*> thread;
-  galois::substrate::PerPackageStorage<T*> package;
+  galois::substrate::PerSocketStorage<T*> socket;
   galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
-  unsigned num_packages;
+  unsigned num_sockets;
 
   template<typename GetFn>
   void doMerge(const GetFn& getFn) {
     bool byThread = UT == UpdateType::ReplicateByThread || UT == UpdateType::Staleness;
-    double *local = byThread ? *thread.getLocal() : *package.getLocal();
+    double *local = byThread ? *thread.getLocal() : *socket.getLocal();
     galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
-      unsigned n = byThread ? num_threads : num_packages;
+      unsigned n = byThread ? num_threads : num_sockets;
       for (unsigned j = 1; j < n; j++) {
         double o = byThread ?
           (*thread.getRemote(j))[i] :
-          (*package.getRemoteByPkg(j))[i];
+          (*socket.getRemoteByPkg(j))[i];
         local[i] += o;
       }
       local[i] /= n;
@@ -148,9 +148,9 @@ class DiffractedCollection {
           if (tid)
             std::copy(local, local + size, *thread.getLocal());
           break;
-        case UpdateType::ReplicateByPackage:
+        case UpdateType::ReplicateBySocket:
           if (tid && galois::substrate::getThreadPool().isLeader(tid))
-            std::copy(local, local + size, *package.getLocal());
+            std::copy(local, local + size, *socket.getLocal());
           break;
         default: abort();
       }
@@ -160,7 +160,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n) {
     num_threads = galois::getActiveThreads();
-    num_packages = galois::substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_sockets = galois::substrate::getThreadPool().getCumulativeMaxSocket(num_threads-1) + 1;
 
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -172,11 +172,11 @@ public:
           *thread.getLocal() = p;
           std::fill(p, p + n, 0);
         });
-      case UpdateType::ReplicateByPackage:
+      case UpdateType::ReplicateBySocket:
         galois::on_each([n, this](unsigned tid, unsigned total) {
             if (galois::substrate::getThreadPool().isLeader(tid)) {
             T *p = new T[n];
-            *package.getLocal() = p;
+            *socket.getLocal() = p;
             std::fill(p, p + n, 0);
           }
         });
@@ -218,11 +218,11 @@ public:
   };
 
   Accessor get() {
-    if (num_packages > 1 && UT == UpdateType::ReplicateByPackage) {
+    if (num_sockets > 1 && UT == UpdateType::ReplicateBySocket) {
       unsigned tid = galois::substrate::ThreadPool::getTID();
-      unsigned my_package = galois::substrate::ThreadPool::getPackage();
-      unsigned next = (my_package + 1) % num_packages;
-      return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
+      unsigned my_socket = galois::substrate::ThreadPool::getSocket();
+      unsigned next = (my_socket + 1) % num_sockets;
+      return Accessor { *socket.getLocal(), *socket.getLocal(), *socket.getRemoteByPkg(next) };
     }
     
     switch (UT) {
@@ -230,8 +230,8 @@ public:
       case UpdateType::WildOrig:
       case UpdateType::Staleness:
         return Accessor { &old[0], *thread.getLocal() };
-      case UpdateType::ReplicateByPackage:
-        return Accessor { *package.getLocal() };
+      case UpdateType::ReplicateBySocket:
+        return Accessor { *socket.getLocal() };
       case UpdateType::ReplicateByThread:
         return Accessor { *thread.getLocal() };
       default:
@@ -246,7 +246,7 @@ public:
       case UpdateType::WildOrig:
         return;
       case UpdateType::Staleness:
-      case UpdateType::ReplicateByPackage:
+      case UpdateType::ReplicateBySocket:
       case UpdateType::ReplicateByThread:
         return doMerge(getFn);
       default:
@@ -396,7 +396,7 @@ void printParameters(const std::vector<GNode>& trainingSamples, const std::vecto
     case UpdateType::Wild: std::cout << "wild"; break;
     case UpdateType::WildOrig: std::cout << "wild orig"; break;
     case UpdateType::ReplicateByThread: std::cout << "replicate by thread"; break;
-    case UpdateType::ReplicateByPackage: std::cout << "replicate by package"; break;
+    case UpdateType::ReplicateBySocket: std::cout << "replicate by socket"; break;
     case UpdateType::Staleness: std::cout << "stale reads"; break;
     default: abort();
   }
@@ -827,7 +827,7 @@ int main(int argc, char** argv) {
       switch (updateType) {
         case UpdateType::Wild: runPrimalSgd<UpdateType::Wild>(g, gen, trainingSamples, testingSamples); break;
         case UpdateType::WildOrig: runPrimalSgd<UpdateType::WildOrig>(g, gen, trainingSamples, testingSamples); break;
-        case UpdateType::ReplicateByPackage: runPrimalSgd<UpdateType::ReplicateByPackage>(g, gen, trainingSamples, testingSamples); break;
+        case UpdateType::ReplicateBySocket: runPrimalSgd<UpdateType::ReplicateBySocket>(g, gen, trainingSamples, testingSamples); break;
         case UpdateType::ReplicateByThread: runPrimalSgd<UpdateType::ReplicateByThread>(g, gen, trainingSamples, testingSamples); break;
         case UpdateType::Staleness: runPrimalSgd<UpdateType::Staleness>(g, gen, trainingSamples, testingSamples); break;
         default: abort();

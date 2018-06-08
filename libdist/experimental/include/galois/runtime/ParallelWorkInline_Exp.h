@@ -86,7 +86,7 @@ class dChunkedMaster : private boost::noncopyable {
   typedef OuterTy<Chunk, true> LevelItem;
 
   substrate::PerThreadStorage<p> data;
-  substrate::PerPackageStorage<LevelItem> Q;
+  substrate::PerSocketStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);

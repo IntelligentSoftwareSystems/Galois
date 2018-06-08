@@ -44,7 +44,7 @@ static bool sunBindToProcessor(int proc) {
 struct Policy {
   std::vector<int> procmap; //Galois id -> solaris id
 
-  unsigned numThreads, numCores, numPackages;
+  unsigned numThreads, numCores, numSockets;
 
   Policy() {
     processorid_t i, cpuid_max;
@@ -58,7 +58,7 @@ struct Policy {
 
     numThreads = procmap.size();
     numCores = procmap.size();
-    numPackages = 1;
+    numSockets = 1;
   }
 };
 
@@ -87,18 +87,18 @@ unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::runtime::LL::getMaxPackages() {
-  return getPolicy().numPackages;
+unsigned galois::runtime::LL::getMaxSockets() {
+  return getPolicy().numSockets;
 }
 
-unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
-  return getPolicy().numPackages - 1;
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
+  return getPolicy().numSockets - 1;
 }
 
-unsigned galois::runtime::LL::getPackageForThread(int id) {
+unsigned galois::runtime::LL::getSocketForThread(int id) {
   return 0;
 }
 
-bool galois::runtime::LL::isPackageLeader(int id) {
+bool galois::runtime::LL::isSocketLeader(int id) {
   return id == 0;
 }

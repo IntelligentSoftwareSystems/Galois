@@ -63,19 +63,19 @@ unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCpus;
 }
 
-unsigned galois::runtime::LL::getMaxPackages() {
+unsigned galois::runtime::LL::getMaxSockets() {
   return getPolicy().numCpus;
 }
 
-unsigned galois::runtime::LL::getPackageForThread(int id) {
+unsigned galois::runtime::LL::getSocketForThread(int id) {
   return id;
 }
 
-unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
   return id;
 }
 
-bool galois::runtime::LL::isPackageLeader(int id) {
+bool galois::runtime::LL::isSocketLeader(int id) {
   return true;
 }
 
@@ -83,6 +83,6 @@ unsigned galois::runtime::LL::getLeaderForThread(int id) {
   return id;
 }
 
-unsigned galois::runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::runtime::LL::getLeaderForSocket(int id) {
   return id;
 }

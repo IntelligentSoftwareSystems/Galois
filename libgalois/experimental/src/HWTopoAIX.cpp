@@ -50,11 +50,11 @@ struct Policy {
   int numThreads;
   //! number of "real" processors
   int numCores;
-  //! number of packages
-  int numPackages;
+  //! number of sockets
+  int numSockets;
 
-  std::vector<int> packages;
-  std::vector<int> maxPackage;
+  std::vector<int> sockets;
+  std::vector<int> maxSocket;
   std::vector<int> virtmap;
   std::vector<int> leaders;
 
@@ -65,10 +65,10 @@ struct Policy {
    * <pre>
    * levels[0] = [ 0, 1, 2, 4, 5, 6, 7 ]  "AIX logical processor"
    * levels[2] = [ 0, 0, 1, 2, 2, 3, 3 ]  "Core"
-   * levels[4] = [ 0, 0, 0, 1, 1, 1, 1 ]  "Package"
+   * levels[4] = [ 0, 0, 0, 1, 1, 1, 1 ]  "Socket"
    *
    * levels[1] = [ 0, 1, 0, 0, 1, 0, 1 ]  "Core siblings" (i.e., SMT)
-   * levels[3] = [ 0, 1, 2, 0, 1, 2, 3 ]  "Package siblings"
+   * levels[3] = [ 0, 1, 2, 0, 1, 2, 3 ]  "Socket siblings"
    * </pre>
    *
    * The sibling levels are just an alternate indexing to simplify mapping operations.
@@ -110,7 +110,7 @@ struct Policy {
       return;
     populate(sdl, levels[4], false);
     populate(sdl, levels[3], true);
-    numPackages = *std::max_element(levels[4].begin(), levels[4].end()) + 1;
+    numSockets = *std::max_element(levels[4].begin(), levels[4].end()) + 1;
 
     // Search for SDL for core because it doesn't have an explicit name
     int maxSdl = rs_getinfo(NULL, R_MAXSDL, 0);
@@ -121,7 +121,7 @@ struct Policy {
         continue;
       populate(sdl, levels[2], false);
       int v = *std::max_element(levels[2].begin(), levels[2].end()) + 1;
-      if (numPackages < v && v < numThreads) {
+      if (numSockets < v && v < numThreads) {
         numCores = v;
         populate(sdl, levels[1], true);
         break;
@@ -174,10 +174,10 @@ struct Policy {
       generateUniformLevel(1);
       numCores = numThreads;
     }
-    if (numPackages == -1) {
-      // Assume one package
+    if (numSockets == -1) {
+      // Assume one socket
       generateUniformLevel(3);
-      numPackages = 1;
+      numSockets = 1;
     }
 
     // Remove unmapped processors
@@ -193,20 +193,20 @@ struct Policy {
     std::sort(lthreads.begin(), lthreads.end(), SortedByThread(levels));
 
     virtmap.resize(numThreads);
-    leaders.resize(numPackages);
-    packages.resize(numThreads);
+    leaders.resize(numSockets);
+    sockets.resize(numThreads);
     for (int gid = 0; gid < numThreads; ++gid) {
       int lid = lthreads[gid];
       virtmap[gid] = levels[0][lid];
-      packages[gid] = levels[4][lid];
+      sockets[gid] = levels[4][lid];
       if (levels[3][lid] == 0) 
-        leaders[packages[gid]] = gid;
+        leaders[sockets[gid]] = gid;
     }
-    maxPackage.resize(numThreads);
-    std::partial_sum(packages.begin(), packages.end(), maxPackage.begin(), [](int a, int b) { return std::max(a, b); });
+    maxSocket.resize(numThreads);
+    std::partial_sum(sockets.begin(), sockets.end(), maxSocket.begin(), [](int a, int b) { return std::max(a, b); });
   }
 
-  Policy(): numThreads(-1), numCores(-1), numPackages(-1) {
+  Policy(): numThreads(-1), numCores(-1), numSockets(-1) {
     parse();
     generate();
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
@@ -225,14 +225,14 @@ struct Policy {
 
     gPrint("Threads: ", numThreads, "\n");
     gPrint("Cores: ", numCores, "\n");
-    gPrint("Packages: ", numPackages, "\n");
+    gPrint("Sockets: ", numSockets, "\n");
 
     for (int i = 0; i < (int) virtmap.size(); ++i) {
       gPrint(
           "T ", i, 
-          " P ", packages[i],
+          " P ", sockets[i],
           " Tr ", virtmap[i], 
-          " L? ", (i == leaders[packages[i]] ? 1 : 0));
+          " L? ", (i == leaders[sockets[i]] ? 1 : 0));
       if (i >= numCores)
         gPrint(" HT");
       gPrint("\n");
@@ -265,31 +265,31 @@ unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::runtime::LL::getMaxPackages() {
-  return getPolicy().numPackages;
+unsigned galois::runtime::LL::getMaxSockets() {
+  return getPolicy().numSockets;
 }
 
-unsigned galois::runtime::LL::getPackageForThread(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().packages[id];
+unsigned galois::runtime::LL::getSocketForThread(int id) {
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().sockets[id];
 }
 
-unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
-  assert(size_t(id) < getPolicy().maxPackage.size());
-  return getPolicy().maxPackage[id];
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
+  assert(size_t(id) < getPolicy().maxSocket.size());
+  return getPolicy().maxSocket[id];
 }
 
-bool galois::runtime::LL::isPackageLeader(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().leaders[getPolicy().packages[id]] == id;
+bool galois::runtime::LL::isSocketLeader(int id) {
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().leaders[getPolicy().sockets[id]] == id;
 }
 
 unsigned galois::runtime::LL::getLeaderForThread(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().leaders[getPolicy().packages[id]];
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().leaders[getPolicy().sockets[id]];
 }
 
-unsigned galois::runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::runtime::LL::getLeaderForSocket(int id) {
   assert(size_t(id) < getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }

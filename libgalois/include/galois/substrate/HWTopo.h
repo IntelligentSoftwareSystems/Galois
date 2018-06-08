@@ -27,10 +27,10 @@ namespace substrate {
 
 struct threadTopoInfo {
   unsigned tid; // this thread (galois id)
-  unsigned socketLeader; //first thread id in tid's package
+  unsigned socketLeader; //first thread id in tid's socket
   unsigned socket; // socket (L3 normally) of thread
   unsigned numaNode; // memory bank.  may be different than socket.
-  unsigned cumulativeMaxSocket; // max package id seen from [0, tid]
+  unsigned cumulativeMaxSocket; // max socket id seen from [0, tid]
   unsigned osContext; // OS ID to use for thread binding
   unsigned osNumaNode; // OS ID for numa node
 };
@@ -38,7 +38,7 @@ struct threadTopoInfo {
 struct machineTopoInfo {
   unsigned maxThreads;
   unsigned maxCores;
-  unsigned maxPackages;
+  unsigned maxSockets;
   unsigned maxNumaNodes;
 };
 

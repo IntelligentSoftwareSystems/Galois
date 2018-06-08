@@ -546,18 +546,18 @@ class Fixed2DGraphTiledExecutor {
       start[i] = std::min(block[i] * tid, numBlocks[i] - 1); // block to start
     }
 
-    unsigned coresPerPackage = 
+    unsigned coresPerSocket = 
       galois::substrate::getThreadPool().getMaxCores() / 
-      galois::substrate::getThreadPool().getMaxPackages();
+      galois::substrate::getThreadPool().getMaxSockets();
 
     // if using locks, readjust start Y location of this thread to location of
-    // the thread's package
+    // the thread's socket
     if (useLocks) {
       start = {{ start[0], 
                  std::min(
                    block[1] * 
-                     galois::substrate::getThreadPool().getPackage(tid) * 
-                     coresPerPackage, 
+                     galois::substrate::getThreadPool().getSocket(tid) * 
+                     coresPerSocket, 
                    numBlocks[1] - 1) 
               }};
     }

@@ -28,22 +28,22 @@ namespace worklists {
 
 template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>
-stealHalfInPackage(substrate::PerThreadStorage<QueueTy>& queues) {
+stealHalfInSocket(substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = substrate::ThreadPool::getTID();
-  unsigned pkg = substrate::ThreadPool::getPackage();
+  unsigned pkg = substrate::ThreadPool::getSocket();
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
 
-  //steal from this package
+  //steal from this socket
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   auto& tp = substrate::getThreadPool();
   for (unsigned i = id + 1; i < num; ++i)
-    if (tp.getPackage(i) == pkg)
+    if (tp.getSocket(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   for (unsigned i = 0; i < id; ++i)
-    if (tp.getPackage(i) == pkg)
+    if (tp.getSocket(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   return retval;
@@ -53,12 +53,12 @@ template<typename QueueTy>
 galois::optional<typename QueueTy::value_type>
 stealRemote(substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = substrate::ThreadPool::getTID();
-  //  unsigned pkg = runtime::LL::getPackageForThread(id);
+  //  unsigned pkg = runtime::LL::getSocketForThread(id);
   unsigned num = galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
 
-  //steal from this package
+  //steal from this socket
   //Having 2 loops avoids a modulo, though this is a slow path anyway
   for (unsigned i = id + 1; i < num; ++i)
     if ((retval = me->steal(*queues.getRemote(i), true, true)))
@@ -78,7 +78,7 @@ private:
   substrate::PerThreadStorage<QueueTy> local;
 
   galois::optional<value_type> doSteal() {
-    galois::optional<value_type> retval = stealHalfInPackage(local);
+    galois::optional<value_type> retval = stealHalfInSocket(local);
     if (retval)
       return retval;
     return stealRemote(local);
@@ -165,7 +165,7 @@ public:
     galois::optional<value_type> retval = local.getLocal()->pop();
     if (retval)
       return retval;
-    return doSteal();// stealHalfInPackage(local);
+    return doSteal();// stealHalfInSocket(local);
   }
 };
 //GALOIS_WLCOMPILECHECK(LocalQueues);
@@ -219,7 +219,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   typedef QT<Chunk, concurrent> LevelItem;
 
   substrate::PerThreadStorage<p> data;
-  internal::squeue<distributed, substrate::PerPackageStorage, LevelItem> Q;
+  internal::squeue<distributed, substrate::PerSocketStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -237,7 +237,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = substrate::getThreadPool().getPackage(index);
+      unsigned int mindex = substrate::getThreadPool().getSocket(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }

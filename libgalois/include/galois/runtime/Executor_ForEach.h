@@ -57,17 +57,17 @@ class AbortHandler {
   bool useBasicPolicy;
 
   /**
-   * Policy: serialize via tree over packages.
+   * Policy: serialize via tree over sockets.
    */
   void basicPolicy(const Item& item) {
     auto& tp = substrate::getThreadPool();
-    unsigned package = tp.getPackage();
-    queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+    unsigned socket = tp.getSocket();
+    queues.getRemote(tp.getLeaderForSocket(socket / 2))->push(item);
   }
 
   /**
-   * Policy: retry work 2X locally, then serialize via tree on package (trying
-   * twice at each level), then serialize via tree over packages.
+   * Policy: retry work 2X locally, then serialize via tree on socket (trying
+   * twice at each level), then serialize via tree over sockets.
    */
   void doublePolicy(const Item& item) {
     int retries = item.retries - 1;
@@ -78,19 +78,19 @@ class AbortHandler {
 
     unsigned tid = substrate::ThreadPool::getTID();
     auto& tp = substrate::getThreadPool();
-    unsigned package = substrate::ThreadPool::getPackage();
+    unsigned socket = substrate::ThreadPool::getSocket();
     unsigned leader = substrate::ThreadPool::getLeader();
     if (tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
       queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+      queues.getRemote(tp.getLeaderForSocket(socket / 2))->push(item);
     }
   }
 
   /**
-   * Policy: retry work 2X locally, then serialize via tree on package but
-   * try at most 3 levels, then serialize via tree over packages.
+   * Policy: retry work 2X locally, then serialize via tree on socket but
+   * try at most 3 levels, then serialize via tree over sockets.
    */
   void boundedPolicy(const Item& item) {
     int retries = item.retries - 1;
@@ -101,13 +101,13 @@ class AbortHandler {
 
     unsigned tid = substrate::ThreadPool::getTID();
     auto& tp = substrate::getThreadPool();
-    unsigned package = substrate::ThreadPool::getPackage();
-    unsigned leader = tp.getLeaderForPackage(package);
+    unsigned socket = substrate::ThreadPool::getSocket();
+    unsigned leader = tp.getLeaderForSocket(socket);
     if (retries < 5 && tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
       queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
+      queues.getRemote(tp.getLeaderForSocket(socket / 2))->push(item);
     }
   }
 
@@ -121,7 +121,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = substrate::getThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = substrate::getThreadPool().getMaxSockets() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }

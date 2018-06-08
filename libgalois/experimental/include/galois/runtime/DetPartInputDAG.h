@@ -443,7 +443,7 @@ struct InputGraphPartDAGexecutor {
     // and then put it back or process them one at a time, by repeatedly picking the partition.
     // TODO: order of processing worklists? currInnerWL, local-boundary, external-boundary
     //
-    // TODO: stealing candidates? none, within package only, first within package
+    // TODO: stealing candidates? none, within socket only, first within socket
     // and then outside
     //
     // TODO: what to do with stolen partition? put back in original owner? keep?

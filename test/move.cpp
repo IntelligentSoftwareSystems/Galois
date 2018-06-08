@@ -77,7 +77,7 @@ int main() {
   test(galois::concurrent_gslist<MoveOnly>());
   test(galois::InsertBag<MoveOnly>());
   test(galois::LargeArray<MoveOnly>());
-  test(galois::substrate::PerPackageStorage<MoveOnly>());
+  test(galois::substrate::PerSocketStorage<MoveOnly>());
   test(galois::substrate::PerThreadStorage<MoveOnly>());
 #ifdef GALOIS_USE_EXP
   test(galois::concurrent_flat_map<int, MoveOnly>());

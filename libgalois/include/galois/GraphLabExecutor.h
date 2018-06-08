@@ -41,7 +41,7 @@ private:
 
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef galois::substrate::PerPackageStorage<MyMessages> Messages;
+  typedef galois::substrate::PerSocketStorage<MyMessages> Messages;
 
   galois::UserContext<WorkItem>* ctx;
   Graph* graph;
@@ -189,7 +189,7 @@ class SyncEngine {
   typedef galois::worklists::dChunkedFIFO<256> WL;
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef galois::substrate::PerPackageStorage<MyMessages> Messages;
+  typedef galois::substrate::PerSocketStorage<MyMessages> Messages;
 
   Graph& graph;
   Operator origOp;

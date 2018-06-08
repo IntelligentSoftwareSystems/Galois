@@ -187,7 +187,7 @@ static std::vector<int> parseCPUSet() {
   return vals;
 }
 
-static unsigned countPackages(const std::vector<cpuinfo>& info) {
+static unsigned countSockets(const std::vector<cpuinfo>& info) {
   std::set<unsigned> pkgs;
   for (auto& c : info)
     pkgs.insert(c.physid);
@@ -253,7 +253,7 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getH
 
   std::sort(info.begin(), info.end());
   markSMT(info);
-  retMTI.maxPackages = countPackages(info);
+  retMTI.maxSockets = countSockets(info);
   retMTI.maxThreads = info.size();
   retMTI.maxCores = countCores(info);
   retMTI.maxNumaNodes = countNumaNodes(info);
@@ -267,7 +267,7 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getH
     sockets.insert(i.physid);
     numaNodes.insert(i.numaNode);
   }
-  unsigned mid = 0; // max package id
+  unsigned mid = 0; // max socket id
   for (unsigned i = 0; i < info.size(); ++i) {
     unsigned pid = info[i].physid;
     unsigned repid = std::distance(sockets.begin(), sockets.find(info[i].physid));

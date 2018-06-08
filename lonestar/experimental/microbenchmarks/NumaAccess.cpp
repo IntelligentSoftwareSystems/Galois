@@ -158,12 +158,12 @@ struct LocalArray {
   }
 };
 
-typedef galois::substrate::PerPackageStorage<LocalArray> PerPackageArray;
+typedef galois::substrate::PerSocketStorage<LocalArray> PerSocketArray;
 
 struct LocalAccess {
-  PerPackageArray& pArray;
+  PerSocketArray& pArray;
   galois::substrate::Barrier& barrier;
-  LocalAccess(PerPackageArray& _a, galois::substrate::Barrier& b): pArray(_a), barrier(b) {}
+  LocalAccess(PerSocketArray& _a, galois::substrate::Barrier& b): pArray(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned numEntry = pArray.getLocal()->numEntry;
@@ -208,8 +208,8 @@ struct LocalAccess {
 };
 
 struct LocalMalloc {
-  PerPackageArray& pArray;
-  LocalMalloc(PerPackageArray& _a): pArray(_a) {}
+  PerSocketArray& pArray;
+  LocalMalloc(PerSocketArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
     if(galois::substrate::ThreadPool::isLeader()) {
@@ -219,8 +219,8 @@ struct LocalMalloc {
 };
 
 struct LocalFree {
-  PerPackageArray& pArray;
-  LocalFree(PerPackageArray& _a): pArray(_a) {}
+  PerSocketArray& pArray;
+  LocalFree(PerSocketArray& _a): pArray(_a) {}
 
   void operator()(int tid, int numThreads) {
     if(galois::substrate::ThreadPool::isLeader()) {
@@ -238,11 +238,11 @@ int main(int argc, char **argv) {
   
   totalTime.start();
   Array array;
-  unsigned numPackageUsed = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::runtime::activeThreads)+1;
-  PerPackageArray perPackageArray(numArrayEntry/numPackageUsed);
+  unsigned numSocketUsed = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::runtime::activeThreads)+1;
+  PerSocketArray perSocketArray(numArrayEntry/numSocketUsed);
 
   if(algo == Algo::local) {
-    galois::on_each(LocalMalloc(perPackageArray), galois::loopname("LocalMalloc"));
+    galois::on_each(LocalMalloc(perSocketArray), galois::loopname("LocalMalloc"));
   } else if(algo == Algo::globalLarge || algo == starLargeGraphRead) {
     array.allocateLocal(numArrayEntry);
   } else {
@@ -254,14 +254,14 @@ int main(int argc, char **argv) {
   if(algo == Algo::starInterleavedGraphRead || algo == Algo::starLargeGraphRead) {
     galois::on_each(StarGraphRead(array, barrier), galois::loopname("StarGraphRead"));
   } else if(algo == Algo::local) {
-    galois::on_each(LocalAccess(perPackageArray, barrier), galois::loopname("LocalAccess"));
+    galois::on_each(LocalAccess(perSocketArray, barrier), galois::loopname("LocalAccess"));
   } else {
     galois::on_each(GlobalAccess(array, barrier), galois::loopname("GlobalAccess"));
   }
   T.stop();
 
   if(algo == Algo::local) {
-    galois::on_each(LocalFree(perPackageArray), galois::loopname("LocalFree"));
+    galois::on_each(LocalFree(perSocketArray), galois::loopname("LocalFree"));
   }
 
   totalTime.stop();

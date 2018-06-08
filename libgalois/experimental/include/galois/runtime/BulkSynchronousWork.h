@@ -187,7 +187,7 @@ struct BagMaster: boost::noncopyable {
         if (idx >= bags.size())
           idx -= bags.size();
 
-        unsigned opid = tp.getPackage(idx);
+        unsigned opid = tp.getSocket(idx);
 
         if (opid == id.pid) {
           size_t executed = bags.getRemote(idx)->map_steal(fn, mark, 1);

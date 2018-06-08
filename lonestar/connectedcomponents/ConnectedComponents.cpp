@@ -495,7 +495,7 @@ struct BlockedAsyncAlgo {
     galois::do_all(galois::iterate(graph), 
         [&] (const GNode& src) {
           Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-          if (galois::substrate::ThreadPool::getPackage() == 0) {
+          if (galois::substrate::ThreadPool::getSocket() == 0) {
             process<true, 0>(graph, src, start, items);
           } else {
             process<true, 1>(graph, src, start, items);

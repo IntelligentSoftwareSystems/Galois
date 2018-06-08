@@ -78,7 +78,7 @@ private:
   typedef QT<Chunk, Concurrent> LevelItem;
 
   squeue<Concurrent, substrate::PerThreadStorage, p> data;
-  squeue<Distributed, substrate::PerPackageStorage, LevelItem> Q;
+  squeue<Distributed, substrate::PerSocketStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);

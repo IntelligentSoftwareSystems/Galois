@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
         galois::do_all(galois::iterate(graph),
           [&] (const GNode& src) {
             Graph::edge_iterator start = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-            if (galois::substrate::ThreadPool::getPackage() == 0) {
+            if (galois::substrate::ThreadPool::getSocket() == 0) {
               specialized_process<true, 0>(graph, mst)(src, start, items);
             } else {
               specialized_process<true, 1>(graph, mst)(src, start, items);

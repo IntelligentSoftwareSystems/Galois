@@ -48,7 +48,7 @@ class PerBackend {
   std::vector<std::vector<unsigned> > freeOffsets;
   /**
    * Guards access to non-POD objects that can be accessed after PerBackend
-   * is destroyed. Access can occur through destroying PerThread/PerPackage
+   * is destroyed. Access can occur through destroying PerThread/PerSocket
    * objects with static storage duration, which have a reference to a
    * PerBackend object, which may have be destroyed before the PerThread
    * object itself.
@@ -73,7 +73,7 @@ public:
   }
 
   char* initPerThread(unsigned maxT);
-  char* initPerPackage(unsigned maxT);
+  char* initPerSocket(unsigned maxT);
 
   unsigned allocOffset(const unsigned size);
   void deallocOffset(const unsigned offset, const unsigned size);
@@ -181,43 +181,43 @@ public:
 
 
 template<typename T>
-class PerPackageStorage {
+class PerSocketStorage {
 protected:
   unsigned offset;
   PerBackend& b;
 
   void destruct() {
     auto& tp = getThreadPool();
-    for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
-      reinterpret_cast<T*>(b.getRemote(tp.getLeaderForPackage(n), offset))->~T();
+    for (unsigned n = 0; n < tp.getMaxSockets(); ++n)
+      reinterpret_cast<T*>(b.getRemote(tp.getLeaderForSocket(n), offset))->~T();
     b.deallocOffset(offset, sizeof(T));
   }
 
 public:
 
   template<typename... Args>
-  PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
+  PerSocketStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     getThreadPool();
 
     offset = b.allocOffset(sizeof(T));
     auto& tp = getThreadPool();
-    for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
-      new (b.getRemote(tp.getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
+    for (unsigned n = 0; n < tp.getMaxSockets(); ++n)
+      new (b.getRemote(tp.getLeaderForSocket(n), offset)) T(std::forward<Args>(args)...);
   }
 
-  PerPackageStorage(PerPackageStorage&& o): offset(std::move(o.offset)), b(getPPSBackend()) { }
-  PerPackageStorage& operator=(PerPackageStorage&& o) {
+  PerSocketStorage(PerSocketStorage&& o): offset(std::move(o.offset)), b(getPPSBackend()) { }
+  PerSocketStorage& operator=(PerSocketStorage&& o) {
     destruct();
     offset = std::move(o.offset);
     return *this;
   }
 
-  PerPackageStorage(const PerPackageStorage&) = delete;
-  PerPackageStorage& operator=(const PerPackageStorage&) = delete;
+  PerSocketStorage(const PerSocketStorage&) = delete;
+  PerSocketStorage& operator=(const PerSocketStorage&) = delete;
 
-  ~PerPackageStorage() {
+  ~PerSocketStorage() {
     destruct();
   }
 
@@ -253,12 +253,12 @@ public:
   }
 
   T* getRemoteByPkg(unsigned int pkg) {
-    void* ditem = b.getRemote(getThreadPool().getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getThreadPool().getLeaderForSocket(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getRemoteByPkg(unsigned int pkg) const {
-    void* ditem = b.getRemote(getThreadPool().getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getThreadPool().getLeaderForSocket(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 

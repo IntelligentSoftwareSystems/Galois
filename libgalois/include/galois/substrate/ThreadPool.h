@@ -166,27 +166,27 @@ public:
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
-  unsigned getMaxPackages() const { return mi.maxPackages; }
+  unsigned getMaxSockets() const { return mi.maxSockets; }
   unsigned getMaxNumaNodes() const { return mi.maxNumaNodes; }
 
-  unsigned getLeaderForPackage(unsigned pid) const {
+  unsigned getLeaderForSocket(unsigned pid) const {
     for (unsigned i = 0; i < getMaxThreads(); ++i)
-      if (getPackage(i) == pid && isLeader(i))
+      if (getSocket(i) == pid && isLeader(i))
         return i;
     abort();
   }
 
   bool isLeader(unsigned tid) const { return signals[tid]->topo.socketLeader == tid; }
-  unsigned getPackage(unsigned tid) const { return signals[tid]->topo.socket; }
+  unsigned getSocket(unsigned tid) const { return signals[tid]->topo.socket; }
   unsigned getLeader(unsigned tid) const { return signals[tid]->topo.socketLeader; }
-  unsigned getCumulativeMaxPackage(unsigned tid) const { return signals[tid]->topo.cumulativeMaxSocket; }
+  unsigned getCumulativeMaxSocket(unsigned tid) const { return signals[tid]->topo.cumulativeMaxSocket; }
   unsigned getNumaNode(unsigned tid) const { return signals[tid]->topo.numaNode; }
 
   static unsigned getTID() { return my_box.topo.tid; }
   static bool isLeader() { return my_box.topo.tid == my_box.topo.socketLeader; }
   static unsigned getLeader() { return my_box.topo.socketLeader; }
-  static unsigned getPackage() { return my_box.topo.socket; }
-  static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
+  static unsigned getSocket() { return my_box.topo.socket; }
+  static unsigned getCumulativeMaxSocket() { return my_box.topo.cumulativeMaxSocket; }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
 };

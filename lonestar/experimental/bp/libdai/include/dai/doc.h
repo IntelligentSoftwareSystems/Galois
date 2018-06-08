@@ -84,7 +84,7 @@
  *  tables by Expectation Maximization.
  *
  *  \section limitations Limitations
- *  libDAI is not intended to be a complete package for approximate inference.
+ *  libDAI is not intended to be a complete socket for approximate inference.
  *  Instead, it should be considered as an "inference engine", providing
  *  various inference methods. In particular, it contains no GUI, currently
  *  only supports its own file format for input and output (although support

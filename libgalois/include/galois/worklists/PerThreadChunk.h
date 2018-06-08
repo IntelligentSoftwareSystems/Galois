@@ -236,26 +236,26 @@ class StealingQueue : private boost::noncopyable {
     std::pair<InnerWL, unsigned>& me = *local.getLocal();
     auto& tp = substrate::getThreadPool();
     unsigned id = tp.getTID();
-    unsigned pkg = substrate::ThreadPool::getPackage();
+    unsigned pkg = substrate::ThreadPool::getSocket();
     unsigned num = galois::getActiveThreads();
 
-    //First steal from this package
+    //First steal from this socket
     for (unsigned eid = id + 1; eid < num; ++eid) {
-      if (tp.getPackage(eid) == pkg) {
+      if (tp.getSocket(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
       }
     }
     for (unsigned eid = 0; eid < id; ++eid) {
-      if (tp.getPackage(eid) == pkg) {
+      if (tp.getSocket(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
       }
     }
 
-    //Leaders can cross package
+    //Leaders can cross socket
     if (substrate::ThreadPool::isLeader()) {
       unsigned eid = (id + me.second) % num;
       ++me.second;

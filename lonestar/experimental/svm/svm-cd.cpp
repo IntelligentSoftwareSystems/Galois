@@ -50,7 +50,7 @@ enum class UpdateType {
   Wild,
   WildOrig,
   ReplicateByThread,
-  ReplicateByPackage,
+  ReplicateBySocket,
   Staleness
 };
 
@@ -84,7 +84,7 @@ static cll::opt<UpdateType> updateType("update", cll::desc("Update type:"),
     clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
     clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
     clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
-    clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
+    clEnumValN(UpdateType::ReplicateBySocket, "replicateBySocket", "socket replication"),
     clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
     clEnumValEnd), cll::init(UpdateType::Wild));
 static cll::opt<AlgoType> algoType("algo", cll::desc("Algorithm:"),
@@ -157,7 +157,7 @@ unsigned variableNodeToId(GNode variable_node) {
 }
 
 galois::substrate::PerThreadStorage<double*> thread_weights;
-galois::substrate::PerPackageStorage<double*> package_weights;
+galois::substrate::PerSocketStorage<double*> socket_weights;
 galois::LargeArray<double> old_weights;
 
 //undef to test specialization for dense feature space
@@ -181,7 +181,7 @@ struct LogisticRegression {
   double C;
 
   LogisticRegression(Graph& _g, double _innereps, size_t *_newton_iter) : g(_g), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 	C = creg;
 	alg_type = AlgoType::DCDLR;
   }
@@ -292,7 +292,7 @@ struct linearSVM_DCD {
   DCD_parameters *params;
 
   linearSVM_DCD(Graph& _g, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 
   }
 
@@ -367,7 +367,7 @@ struct linearSGD_Wild {
   double* baseEdgeData;
 #endif
   linearSGD_Wild(Graph& _g, double _lr) : g(_g), learningRate(_lr) {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -435,7 +435,7 @@ struct linearSGD {
   double* baseEdgeData;
 #endif
   linearSGD(Graph& _g, double _lr, galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -444,18 +444,18 @@ struct linearSGD {
   }
 
   void operator()(GNode n, galois::UserContext<GNode>& ctx) {  
-    double *packagew = *package_weights.getLocal();
+    double *socketw = *socket_weights.getLocal();
     double *threadw = *thread_weights.getLocal();
     double *otherw = NULL;
     galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
     if (has_other) {
       unsigned tid = galois::substrate::ThreadPool::getTID();
-      unsigned my_package = galois::substrate::ThreadPool::getPackage();
-      unsigned next = my_package + 1;
+      unsigned my_socket = galois::substrate::ThreadPool::getSocket();
+      unsigned next = my_socket + 1;
       if (next >= 4)
         next -= 4;
-      otherw = *package_weights.getRemoteByPkg(next);
+      otherw = *socket_weights.getRemoteByPkg(next);
     }
     // Store edge data in iteration-local temporary to reduce cache misses
 #ifdef DENSE
@@ -497,8 +497,8 @@ struct linearSGD {
         case UpdateType::ReplicateByThread:
           weight = threadw[cur+edgeOffset];
           break;
-        case UpdateType::ReplicateByPackage:
-          weight = packagew[cur+edgeOffset];
+        case UpdateType::ReplicateBySocket:
+          weight = socketw[cur+edgeOffset];
           break;
         case UpdateType::Staleness:
           weight = old_weights[cur+edgeOffset]; 
@@ -516,8 +516,8 @@ struct linearSGD {
           wptrs[cur] = &threadw[variableNodeToId(variable_node)];
           weight = *wptrs[cur];
           break;
-        case UpdateType::ReplicateByPackage:
-          wptrs[cur] = &packagew[variableNodeToId(variable_node)];
+        case UpdateType::ReplicateBySocket:
+          wptrs[cur] = &socketw[variableNodeToId(variable_node)];
           weight = *wptrs[cur];
           break;
         case UpdateType::Staleness:
@@ -590,8 +590,8 @@ struct linearSGD {
         case UpdateType::ReplicateByThread:
           threadw[cur+edgeOffset] = mweights[cur] - delta;
           break;
-        case UpdateType::ReplicateByPackage:
-          packagew[cur+edgeOffset] = mweights[cur] - delta;
+        case UpdateType::ReplicateBySocket:
+          socketw[cur+edgeOffset] = mweights[cur] - delta;
           break;
         case UpdateType::Staleness:
           threadw[cur+edgeOffset] = mweights[cur] - delta;
@@ -747,7 +747,7 @@ void printParameters(const std::vector<GNode>& trainingSamples, const std::vecto
     case UpdateType::Wild: std::cout << "wild"; break;
     case UpdateType::WildOrig: std::cout << "wild orig"; break;
     case UpdateType::ReplicateByThread: std::cout << "replicate by thread"; break;
-    case UpdateType::ReplicateByPackage: std::cout << "replicate by package"; break;
+    case UpdateType::ReplicateBySocket: std::cout << "replicate by socket"; break;
     case UpdateType::Staleness: std::cout << "stale reads"; break;
     default: abort();
   }
@@ -1086,11 +1086,11 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
       std::fill(p, p + NUM_VARIABLES, 0);
     });
   }
-  if (updateType == UpdateType::ReplicateByPackage) {
+  if (updateType == UpdateType::ReplicateBySocket) {
     galois::on_each([](unsigned tid, unsigned total) {
         if (galois::substrate::getThreadPool().isLeader(tid)) {
         double *p = new double[NUM_VARIABLES];
-        *package_weights.getLocal() = p;
+        *socket_weights.getLocal() = p;
         std::fill(p, p + NUM_VARIABLES, 0);
       }
     });
@@ -1130,8 +1130,8 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
       case UpdateType::WildOrig:
         galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::WildOrig>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
-      case UpdateType::ReplicateByPackage:
-        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByPackage>(g_train, learning_rate, bigUpdates), ln, wl);
+      case UpdateType::ReplicateBySocket:
+        galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateBySocket>(g_train, learning_rate, bigUpdates), ln, wl);
         break;
       case UpdateType::ReplicateByThread:
         galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByThread>(g_train, learning_rate, bigUpdates), ln, wl);
@@ -1147,7 +1147,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
 
     size_t numBigUpdates = bigUpdates.reduce();
     double flop = 4*g_train.sizeEdges() + 2 + 3*numBigUpdates + g_train.sizeEdges();
-    if (type == UpdateType::ReplicateByPackage)
+    if (type == UpdateType::ReplicateBySocket)
       flop += numBigUpdates;
     size_t millis = flopTimer.get();
     double gflops = 0;
@@ -1157,15 +1157,15 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     //swap weights from past iteration and this iteration
     if (type != UpdateType::Wild && type != UpdateType::WildOrig) {
       bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
-      double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
+      double *localw = byThread ? *thread_weights.getLocal() : *socket_weights.getLocal();
       unsigned num_threads = galois::getActiveThreads();
-      unsigned num_packages = galois::substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+      unsigned num_sockets = galois::substrate::getThreadPool().getCumulativeMaxSocket(num_threads-1) + 1;
       galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
-        unsigned n = byThread ? num_threads : num_packages;
+        unsigned n = byThread ? num_threads : num_sockets;
         for (unsigned j = 1; j < n; j++) {
           double o = byThread ?
             (*thread_weights.getRemote(j))[i] :
-            (*package_weights.getRemoteByPkg(j))[i];
+            (*socket_weights.getRemoteByPkg(j))[i];
           localw[i] += o;
         }
         localw[i] /=  n;
@@ -1181,9 +1181,9 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
             if (tid)
               std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
           break;
-          case UpdateType::ReplicateByPackage:
+          case UpdateType::ReplicateBySocket:
             if (tid && galois::substrate::getThreadPool().isLeader(tid))
-              std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
+              std::copy(localw, localw + NUM_VARIABLES, *socket_weights.getLocal());
           break;
           default: abort();
         }

@@ -30,7 +30,7 @@ galois::substrate::PerBackend& galois::substrate::getPTSBackend() {
   return b;
 }
 
-__thread char* galois::substrate::ppsBase;
+__thread char* galois::substrate::pssBase;
 
 galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
   static galois::substrate::PerBackend b;
@@ -142,7 +142,7 @@ char* galois::substrate::PerBackend::initPerThread(unsigned maxT) {
   return b;
 }
 
-char* galois::substrate::PerBackend::initPerPackage(unsigned maxT) {
+char* galois::substrate::PerBackend::initPerSocket(unsigned maxT) {
   initCommon(maxT);
   unsigned id = ThreadPool::getTID();
   unsigned leader = ThreadPool::getLeader();
@@ -151,7 +151,7 @@ char* galois::substrate::PerBackend::initPerPackage(unsigned maxT) {
     memset(b, 0, allocSize);
     return b;
   } else {
-    //wait for leader to fix up package
+    //wait for leader to fix up socket
     while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) { substrate::asmPause(); }
     heads[id] = heads[leader];
     return heads[id];
@@ -164,8 +164,8 @@ void galois::substrate::initPTS(unsigned maxT) {
     //before any other threads are generated
     ptsBase = getPTSBackend().initPerThread(maxT);
   }
-  if (!ppsBase) {
-    ppsBase = getPPSBackend().initPerPackage(maxT);
+  if (!pssBase) {
+    pssBase = getPPSBackend().initPerSocket(maxT);
   }
 }
 

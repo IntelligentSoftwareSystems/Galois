@@ -318,8 +318,8 @@ public:
 
 private:
   substrate::PerThreadStorage<typename LocalWL::template rethread<false> > localQueues;
-  substrate::PerPackageStorage<GlobalWL> sharedQueues;
-  substrate::PerPackageStorage<unsigned long> starvingFlags;
+  substrate::PerSocketStorage<GlobalWL> sharedQueues;
+  substrate::PerSocketStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
@@ -371,9 +371,9 @@ public:
       return ret;
     }
 
-    //Any thread can set the package starving flag
+    //Any thread can set the socket starving flag
     *starvingFlags.getLocal() = 1;
-    //if we are master for the package, handle flags
+    //if we are master for the socket, handle flags
     if (sharedQueues.isFirstInLevel())
       ; // TODO: ???
     return ret;
@@ -2037,7 +2037,7 @@ public:
 };
 
 class LevelLocalAlt : private boost::noncopyable {
-  substrate::PerPackageStorage<LIFO_SB> local;
+  substrate::PerSocketStorage<LIFO_SB> local;
 
 public:
   void push(ChunkHeader* val) {
@@ -2054,7 +2054,7 @@ public:
 };
 
 class LevelStealingAlt : private boost::noncopyable {
-  substrate::PerPackageStorage<LIFO_SB> local;
+  substrate::PerSocketStorage<LIFO_SB> local;
 
 public:
   void push(ChunkHeader* val) {
@@ -2073,7 +2073,7 @@ public:
       return ret;
 
     //steal
-    int id = substrate::ThreadPool::getPackage();
+    int id = substrate::ThreadPool::getSocket();
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();

@@ -50,8 +50,8 @@ enum class UpdateType {
   Wild,
   WildOrig,
   ReplicateByThread,
-  ReplicateByPackage,
-  CycleByPackage,
+  ReplicateBySocket,
+  CycleBySocket,
   Staleness
 };
 
@@ -86,8 +86,8 @@ static cll::opt<UpdateType> updateType("update", cll::desc("Update type:"),
     clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
     clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
     clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
-    clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
-    clEnumValN(UpdateType::CycleByPackage, "cycleByPackage", "package replication"),
+    clEnumValN(UpdateType::ReplicateBySocket, "replicateBySocket", "socket replication"),
+    clEnumValN(UpdateType::CycleBySocket, "cycleBySocket", "socket replication"),
     clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
     clEnumValEnd), cll::init(UpdateType::Wild));
 static cll::opt<AlgoType> algoType("algo", cll::desc("Algorithm:"),
@@ -165,7 +165,7 @@ unsigned variableNodeToId(GNode variable_node) {
 }
 
 galois::substrate::PerThreadStorage<double*> thread_weights;
-galois::substrate::PerPackageStorage<double*> package_weights;
+galois::substrate::PerSocketStorage<double*> socket_weights;
 galois::LargeArray<double> old_weights;
 
 //undef to test specialization for dense feature space
@@ -176,27 +176,27 @@ template<typename T, UpdateType UT>
 class DiffractedCollection {
   galois::substrate::PerThreadStorage<unsigned> counts;
   galois::substrate::PerThreadStorage<T*> thread;
-  galois::substrate::PerPackageStorage<T*> package;
+  galois::substrate::PerSocketStorage<T*> socket;
   galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
-  unsigned num_packages;
+  unsigned num_sockets;
   unsigned block_size;
 
   template<typename GetFn>
   void doMerge(const GetFn& getFn) {
     bool byThread = UT == UpdateType::ReplicateByThread || UT == UpdateType::Staleness;
-    double *local = byThread ? *thread.getLocal() : *package.getLocal();
-    unsigned n = byThread ? num_threads : num_packages;
+    double *local = byThread ? *thread.getLocal() : *socket.getLocal();
+    unsigned n = byThread ? num_threads : num_sockets;
     
-    if (true || UT == UpdateType::CycleByPackage || UT == UpdateType::ReplicateByPackage) {
+    if (true || UT == UpdateType::CycleBySocket || UT == UpdateType::ReplicateBySocket) {
       galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
 	if (byThread) {
 	  int index = i % num_threads;
 	  local[i] = (*thread.getRemote(index))[i];
 	} else {
-	  int index = i % num_packages;
-	  local[i] = (*package.getRemoteByPkg(index))[i];
+	  int index = i % num_sockets;
+	  local[i] = (*socket.getRemoteByPkg(index))[i];
 	}
 	auto& v = getFn(i);
 	if (UT == UpdateType::Staleness)
@@ -209,7 +209,7 @@ class DiffractedCollection {
 	for (unsigned j = 1; j < n; j++) {
 	  double o = byThread ?
 	    (*thread.getRemote(j))[i] :
-	    (*package.getRemoteByPkg(j))[i];
+	    (*socket.getRemoteByPkg(j))[i];
 	  local[i] += o;
 	}
 	local[i] /= n;
@@ -228,10 +228,10 @@ class DiffractedCollection {
           if (tid)
             std::copy(local, local + size, *thread.getLocal());
           break;
-        case UpdateType::CycleByPackage:
-        case UpdateType::ReplicateByPackage:
+        case UpdateType::CycleBySocket:
+        case UpdateType::ReplicateBySocket:
           if (tid && galois::substrate::getThreadPool().isLeader(tid))
-            std::copy(local, local + size, *package.getLocal());
+            std::copy(local, local + size, *socket.getLocal());
           break;
         default: abort();
       }
@@ -241,7 +241,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n), block_size(0) {
     num_threads = galois::getActiveThreads();
-    num_packages = galois::substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_sockets = galois::substrate::getThreadPool().getCumulativeMaxSocket(num_threads-1) + 1;
     
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -252,18 +252,18 @@ public:
 	*thread.getLocal() = p;
 	std::fill(p, p + n, 0);
       });
-    } else if (UT == UpdateType::ReplicateByPackage || UT == UpdateType::CycleByPackage) {
+    } else if (UT == UpdateType::ReplicateBySocket || UT == UpdateType::CycleBySocket) {
       galois::on_each([n, this](unsigned tid, unsigned total) {
           if (galois::substrate::getThreadPool().isLeader(tid)) {
 	  T *p = new T[n];
-	  *package.getLocal() = p;
+	  *socket.getLocal() = p;
 	  std::fill(p, p + n, 0);
 	}
       });
     }
 
-    if (UT == UpdateType::CycleByPackage) {
-      block_size = size / (num_threads * num_packages);
+    if (UT == UpdateType::CycleBySocket) {
+      block_size = size / (num_threads * num_sockets);
     }
   }
 
@@ -299,18 +299,18 @@ public:
 
   Accessor get() {
     // XXX
-    if ((UT == UpdateType::ReplicateByPackage || UT == UpdateType::CycleByPackage) && num_packages > 1) {
+    if ((UT == UpdateType::ReplicateBySocket || UT == UpdateType::CycleBySocket) && num_sockets > 1) {
       unsigned tid = galois::substrate::ThreadPool::getTID();
-      unsigned my_package = galois::substrate::ThreadPool::getPackage();
-      if (UT == UpdateType::ReplicateByPackage || block_size == 0) {
-	unsigned next = (my_package + 1) % num_packages;
-	return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
-      } else if (UT == UpdateType::CycleByPackage) {
+      unsigned my_socket = galois::substrate::ThreadPool::getSocket();
+      if (UT == UpdateType::ReplicateBySocket || block_size == 0) {
+	unsigned next = (my_socket + 1) % num_sockets;
+	return Accessor { *socket.getLocal(), *socket.getLocal(), *socket.getRemoteByPkg(next) };
+      } else if (UT == UpdateType::CycleBySocket) {
 	unsigned v = (*counts.getLocal())++;
 	unsigned index = v / block_size;
-	unsigned cur = (my_package + index) % num_packages;
-	unsigned next = (my_package + index + 1) % num_packages;
-	return Accessor { *package.getRemoteByPkg(cur), *package.getRemoteByPkg(cur), *package.getRemoteByPkg(next) };
+	unsigned cur = (my_socket + index) % num_sockets;
+	unsigned next = (my_socket + index + 1) % num_sockets;
+	return Accessor { *socket.getRemoteByPkg(cur), *socket.getRemoteByPkg(cur), *socket.getRemoteByPkg(next) };
       } else {
 	abort();
       }
@@ -321,9 +321,9 @@ public:
       case UpdateType::WildOrig:
       case UpdateType::Staleness:
         return Accessor { &old[0], *thread.getLocal() };
-      case UpdateType::CycleByPackage:
-      case UpdateType::ReplicateByPackage:
-        return Accessor { *package.getLocal() };
+      case UpdateType::CycleBySocket:
+      case UpdateType::ReplicateBySocket:
+        return Accessor { *socket.getLocal() };
       case UpdateType::ReplicateByThread:
         return Accessor { *thread.getLocal() };
       default:
@@ -337,9 +337,9 @@ public:
       case UpdateType::Wild:
       case UpdateType::WildOrig:
         return;
-      case UpdateType::CycleByPackage:
+      case UpdateType::CycleBySocket:
       case UpdateType::Staleness:
-      case UpdateType::ReplicateByPackage:
+      case UpdateType::ReplicateBySocket:
       case UpdateType::ReplicateByThread:
         return doMerge(getFn);
       default:
@@ -376,7 +376,7 @@ struct LogisticRegression {
   double* baseEdgeData;
 #endif
   LogisticRegression(Graph& _g, double _lr, galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
   	alg_type = AlgoType::SGDL1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -386,7 +386,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, galois::GAccumulator<size_t>& b, double *_alpha, double *_qd, bool useL1Loss) : g(_g), bigUpdates(b), alpha(_alpha), QD(_qd)  {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 
 	diag = 0.5/creg;
 	C = std::numeric_limits<double>::max();
@@ -407,7 +407,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, galois::GAccumulator<size_t>& b, double *_alpha, double *_xTx, double _innereps, size_t *_newton_iter) : g(_g), bigUpdates(b), alpha(_alpha), xTx(_xTx), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 
 	C = creg;
 	alg_type = AlgoType::DCDLR;
@@ -533,7 +533,7 @@ struct linearSVM_DCD {
 #endif
 
   linearSVM_DCD(Graph& _g, galois::GAccumulator<size_t>& b, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), bigUpdates(b), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = galois::substrate::getThreadPool().getCumulativeMaxPackage(galois::getActiveThreads() - 1) > 1;
+    has_other = galois::substrate::getThreadPool().getCumulativeMaxSocket(galois::getActiveThreads() - 1) > 1;
 
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -952,8 +952,8 @@ void printParameters(const std::vector<GNode>& trainingSamples, const std::vecto
     case UpdateType::Wild: std::cout << "wild"; break;
     case UpdateType::WildOrig: std::cout << "wild orig"; break;
     case UpdateType::ReplicateByThread: std::cout << "replicate by thread"; break;
-    case UpdateType::ReplicateByPackage: std::cout << "replicate by package"; break;
-    case UpdateType::CycleByPackage: std::cout << "cycle by package"; break;
+    case UpdateType::ReplicateBySocket: std::cout << "replicate by socket"; break;
+    case UpdateType::CycleBySocket: std::cout << "cycle by socket"; break;
     case UpdateType::Staleness: std::cout << "stale reads"; break;
     default: abort();
   }
@@ -1136,11 +1136,11 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 				std::fill(p, p + NUM_VARIABLES, 0);
 				});
 	}
-	if (updateType == UpdateType::ReplicateByPackage) {
+	if (updateType == UpdateType::ReplicateBySocket) {
 		galois::on_each([](unsigned tid, unsigned total) {
                     if (galois::substrate::getThreadPool().isLeader(tid)) {
 				double *p = new double[NUM_VARIABLES];
-				*package_weights.getLocal() = p;
+				*socket_weights.getLocal() = p;
 				std::fill(p, p + NUM_VARIABLES, 0);
 				}
 				});
@@ -1299,8 +1299,8 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
                     galois::for_each(ts_begin, ts_end, linearSVM_DCD<UpdateType::Wild>(g_train, bigUpdates, &params), ln, wl);
                   }
                   break;
-                case UpdateType::ReplicateByPackage:
-                  //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByPackage>(g, learning_rate, bigUpdates), ln, wl);
+                case UpdateType::ReplicateBySocket:
+                  //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateBySocket>(g, learning_rate, bigUpdates), ln, wl);
                   //        break;
                 case UpdateType::ReplicateByThread:
                   //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByThread>(g, learning_rate, bigUpdates), ln, wl);
@@ -1365,15 +1365,15 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 		//swap weights from past iteration and this iteration
 		if (type != UpdateType::Wild && type != UpdateType::WildOrig) {
 			bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
-			double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
+			double *localw = byThread ? *thread_weights.getLocal() : *socket_weights.getLocal();
 			unsigned num_threads = galois::getActiveThreads();
-			unsigned num_packages = galois::runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+			unsigned num_sockets = galois::runtime::LL::getMaxSocketForThread(num_threads-1) + 1;
 			galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
-					unsigned n = byThread ? num_threads : num_packages;
+					unsigned n = byThread ? num_threads : num_sockets;
 					for (unsigned j = 1; j < n; j++) {
 					double o = byThread ?
 					(*thread_weights.getRemote(j))[i] :
-					(*package_weights.getRemoteByPkg(j))[i];
+					(*socket_weights.getRemoteByPkg(j))[i];
 					localw[i] += o;
 					}
 					localw[i] /=  n;
@@ -1389,9 +1389,9 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 					if (tid)
 					std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
 					break;
-					case UpdateType::ReplicateByPackage:
-					if (tid && galois::runtime::LL::isPackageLeader(tid))
-					std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
+					case UpdateType::ReplicateBySocket:
+					if (tid && galois::runtime::LL::isSocketLeader(tid))
+					std::copy(localw, localw + NUM_VARIABLES, *socket_weights.getLocal());
 					break;
 					default: abort();
 					}
@@ -1507,8 +1507,8 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
 	switch (updateType) {
 		case UpdateType::Wild: return runPrimalSgd_<UpdateType::Wild>(g_train, g_test, gen, trainingSamples, testingSamples);
 		case UpdateType::WildOrig: return runPrimalSgd_<UpdateType::WildOrig>(g_train, g_test, gen, trainingSamples, testingSamples);
-		case UpdateType::ReplicateByPackage: return runPrimalSgd_<UpdateType::ReplicateByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
-		case UpdateType::CycleByPackage: return runPrimalSgd_<UpdateType::CycleByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateBySocket: return runPrimalSgd_<UpdateType::ReplicateBySocket>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::CycleBySocket: return runPrimalSgd_<UpdateType::CycleBySocket>(g_train, g_test, gen, trainingSamples, testingSamples);
 		case UpdateType::ReplicateByThread: return runPrimalSgd_<UpdateType::ReplicateByThread>(g_train, g_test, gen, trainingSamples, testingSamples);
 		case UpdateType::Staleness: return runPrimalSgd_<UpdateType::Staleness>(g_train, g_test, gen, trainingSamples, testingSamples);
 		default: abort();
@@ -1597,8 +1597,8 @@ auto wl = galois::wl<galois::worklists::dChunkedLIFO<32>>();
 //                  	galois::for_each(variables.begin(), variables.end(), Lasso_CD<UpdateType::Wild>(g_train, &params), ln, wl);
 		  }
                   	break;
-                case UpdateType::ReplicateByPackage:
-                  //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByPackage>(g, learning_rate, bigUpdates), ln, wl);
+                case UpdateType::ReplicateBySocket:
+                  //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateBySocket>(g, learning_rate, bigUpdates), ln, wl);
                   //        break;
                 case UpdateType::ReplicateByThread:
                   //        galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByThread>(g, learning_rate, bigUpdates), ln, wl);
@@ -2083,8 +2083,8 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 void runGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
 	switch (updateType) {
 		case UpdateType::Wild: return runGLMNET_<UpdateType::Wild>(g_train, g_test, gen, trainingSamples, testingSamples);
-		case UpdateType::ReplicateByPackage: return runGLMNET_<UpdateType::ReplicateByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
-		case UpdateType::CycleByPackage: return runGLMNET_<UpdateType::CycleByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateBySocket: return runGLMNET_<UpdateType::ReplicateBySocket>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::CycleBySocket: return runGLMNET_<UpdateType::CycleBySocket>(g_train, g_test, gen, trainingSamples, testingSamples);
 		case UpdateType::ReplicateByThread: return runGLMNET_<UpdateType::ReplicateByThread>(g_train, g_test, gen, trainingSamples, testingSamples);
 		case UpdateType::Staleness: return runGLMNET_<UpdateType::Staleness>(g_train, g_test, gen, trainingSamples, testingSamples);
 		default: abort();

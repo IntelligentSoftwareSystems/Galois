@@ -315,8 +315,8 @@ class DGReducibleVector {
     }
   };
 
-  typedef std::vector<Item> PerPackage;
-  typedef runtime::PerPackageStorage<PerPackage> Data;
+  typedef std::vector<Item> PerSocket;
+  typedef runtime::PerSocketStorage<PerSocket> Data;
 
   BinFunc m_func;
   T m_initial;
@@ -328,11 +328,11 @@ class DGReducibleVector {
 
   volatile int reduced;
 
-  void localUpdate(const PerPackage& init) {
+  void localUpdate(const PerSocket& init) {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
-      if (!runtime::LL::isPackageLeader(i))
+      if (!runtime::LL::isSocketLeader(i))
         continue;
-      PerPackage& p = *m_data.getRemote(i);
+      PerSocket& p = *m_data.getRemote(i);
       if (p.empty())
         continue;
       // TODO parallelize
@@ -343,9 +343,9 @@ class DGReducibleVector {
 
   void localUpdate(const T& init) {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
-      if (!runtime::LL::isPackageLeader(i))
+      if (!runtime::LL::isSocketLeader(i))
         continue;
-      PerPackage& p = *m_data.getRemote(i);
+      PerSocket& p = *m_data.getRemote(i);
       if (p.empty())
         continue;
       // TODO parallelize
@@ -367,11 +367,11 @@ class DGReducibleVector {
     return retval;
   }
 
-  void reduceWith(PerPackage& data) {
+  void reduceWith(PerSocket& data) {
     if (data.empty())
       return;
 
-    PerPackage& l = *m_data.getLocal();
+    PerSocket& l = *m_data.getLocal();
     // TODO parallelize
     for (size_t x = 0; x < data.size(); ++x)
       l[x].second = m_func(l[x].second, data[x].second);
@@ -379,7 +379,7 @@ class DGReducibleVector {
 
   void localReduce() {
     for (unsigned int i = 1; i < m_data.size(); ++i) {
-      if (!runtime::LL::isPackageLeader(i))
+      if (!runtime::LL::isSocketLeader(i))
         continue;
       reduceWith(*m_data.getRemote(i));
     }
@@ -391,7 +391,7 @@ class DGReducibleVector {
     //std::cout << "B: " << galois::runtime::NetworkInterface::ID << "\n";
     DGReducibleVector* dst;
     std::vector<DGReducibleVector*> hosts;
-    PerPackage data;
+    PerSocket data;
     gDeserialize(buf, hosts, data);
     dst = hosts[galois::runtime::NetworkInterface::ID];
     dst->localUpdate(data);
@@ -412,7 +412,7 @@ class DGReducibleVector {
     DGReducibleVector* dst;
     std::vector<DGReducibleVector*> hosts;
     bool reset;
-    PerPackage data;
+    PerSocket data;
     gDeserialize(buf, hosts, reset, data);
     dst = hosts[galois::runtime::NetworkInterface::ID];
     assert(dst);
@@ -462,10 +462,10 @@ class DGReducibleVector {
     Allocate(runtime::gptr<DGReducibleVector> p, size_t s): self(p), size(s) { }
 
     void operator()(unsigned tid, unsigned) {
-      if (!runtime::LL::isPackageLeader(tid))
+      if (!runtime::LL::isSocketLeader(tid))
         return;
 
-      PerPackage& p = *self->m_data.getLocal();
+      PerSocket& p = *self->m_data.getLocal();
 
       self->lock.lock();
       p.resize(size, Item(self->m_initial));
@@ -521,7 +521,7 @@ public:
   }
 
   void update(size_t i, const T& t) {
-    PerPackage& p = *m_data.getLocal();
+    PerSocket& p = *m_data.getLocal();
     int val;
     while (true) {
       val = p[i].first;

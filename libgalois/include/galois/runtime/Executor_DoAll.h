@@ -279,7 +279,7 @@ private:
     return succ;
   }
 
-  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinPackage (ThreadContext& poor) {
+  GALOIS_ATTRIBUTE_NOINLINE bool stealWithinSocket (ThreadContext& poor) {
 
     bool sawWork = false;
     bool stoleWork = false;
@@ -287,15 +287,15 @@ private:
     auto& tp = substrate::getThreadPool();
 
     const unsigned maxT = galois::getActiveThreads ();
-    const unsigned my_pack = substrate::ThreadPool::getPackage ();
-    const unsigned per_pack = tp.getMaxThreads() / tp.getMaxPackages ();
+    const unsigned my_pack = substrate::ThreadPool::getSocket ();
+    const unsigned per_pack = tp.getMaxThreads() / tp.getMaxSockets ();
 
     const unsigned pack_beg = my_pack * per_pack;
     const unsigned pack_end = (my_pack + 1) * per_pack;
 
     for (unsigned i = 1; i < pack_end; ++i) {
 
-      // go around the package in circle starting from the next thread
+      // go around the socket in circle starting from the next thread
       unsigned t = (poor.id + i) % per_pack + pack_beg;
       assert ( (t >= pack_beg) && (t < pack_end));
 
@@ -315,19 +315,19 @@ private:
     return sawWork || stoleWork;
   }
 
-  GALOIS_ATTRIBUTE_NOINLINE bool stealOutsidePackage (ThreadContext& poor, const StealAmt& amt) {
+  GALOIS_ATTRIBUTE_NOINLINE bool stealOutsideSocket (ThreadContext& poor, const StealAmt& amt) {
     bool sawWork = false;
     bool stoleWork = false;
 
     auto& tp = substrate::getThreadPool();
-    unsigned myPkg = substrate::ThreadPool::getPackage();
+    unsigned myPkg = substrate::ThreadPool::getSocket();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = galois::getActiveThreads ();
 
     for (unsigned i = 0; i < maxT; ++i) {
       ThreadContext& rich = *(workers.getRemote ((poor.id + i) % maxT));
 
-      if (tp.getPackage(rich.id) != myPkg) {
+      if (tp.getSocket(rich.id) != myPkg) {
         if (rich.hasWorkWeak ()) {
           sawWork = true;
 
@@ -352,11 +352,11 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    assert ((LL::getMaxCores () / LL::getMaxPackages ()) >= 1);
+    assert ((LL::getMaxCores () / LL::getMaxSockets ()) >= 1);
 
-    // TODO: check this steal amount. e.g. all hungry threads in one package may
-    // steal too much work from full threads in another package
-    // size_t stealAmt = chunk_size * (LL::getMaxCores () / LL::getMaxPackages ());
+    // TODO: check this steal amount. e.g. all hungry threads in one socket may
+    // steal too much work from full threads in another socket
+    // size_t stealAmt = chunk_size * (LL::getMaxCores () / LL::getMaxSockets ());
     size_t stealAmt = chunk_size;
 
     for (unsigned i = 1; i < maxT; ++i) { // skip poor.id by starting at 1
@@ -393,32 +393,32 @@ private:
   GALOIS_ATTRIBUTE_NOINLINE bool trySteal (ThreadContext& poor) {
     bool ret = false;
 
-    ret = stealWithinPackage (poor);
+    ret = stealWithinSocket (poor);
 
     if (ret) { return true; }
 
     substrate::asmPause ();
 
     if (substrate::getThreadPool().isLeader(poor.id)) {
-      ret = stealOutsidePackage (poor, HALF);
+      ret = stealOutsideSocket (poor, HALF);
 
       if (ret) { return true; }
       substrate::asmPause ();
     }
 
-    ret = stealOutsidePackage (poor, HALF);
+    ret = stealOutsideSocket (poor, HALF);
     if (ret) { return true; }
     substrate::asmPause ();
 
 
     return ret;
 
-    // if (stealWithinPackage (poor)) {
+    // if (stealWithinSocket (poor)) {
       // return true;
-    // } else if (LL::isPackageLeader(poor.id)
-        // && stealOutsidePackage (poor)) {
+    // } else if (LL::isSocketLeader(poor.id)
+        // && stealOutsideSocket (poor)) {
       // return true;
-    // } else if (stealOutsidePackage (poor)) {
+    // } else if (stealOutsideSocket (poor)) {
       // return true;
 //
     // } else {
@@ -426,7 +426,7 @@ private:
     // }
 
 
-    // if (stealWithinPackage (poor)) {
+    // if (stealWithinSocket (poor)) {
       // return true;
     // } else if (stealWithinActive (poor)) {
       // return true;

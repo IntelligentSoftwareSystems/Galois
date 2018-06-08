@@ -42,8 +42,8 @@ namespace {
 static const char* sProcInfo = "/proc/cpuinfo";
 static const char* sCPUSet   = "/proc/self/cpuset";
 
-  // TODO: store number of cores in each package?
-  // and number of procs in each package?
+  // TODO: store number of cores in each socket?
+  // and number of procs in each socket?
 
 struct cpuinfo {
   // fields filled in from OS files
@@ -223,20 +223,20 @@ class HWTopoLinux : public HWTopo {
 
   unsigned numThreadsRaw;
   unsigned numCoresRaw;
-  unsigned numPackagesRaw;
+  unsigned numSocketsRaw;
 
   unsigned numThreads;
   unsigned numCores;
-  unsigned numPackages;
+  unsigned numSockets;
 
 
   std::vector<unsigned> processorMap;
   std::vector<unsigned> coreMap;
-  std::vector<unsigned> packageMap;
+  std::vector<unsigned> socketMap;
   std::vector<unsigned> leaderMapThread;
 
-  std::vector<unsigned> maxPackageMap;
-  std::vector<unsigned> leaderMapPackage;
+  std::vector<unsigned> maxSocketMap;
+  std::vector<unsigned> leaderMapSocket;
 
 
   Policy() {
@@ -254,14 +254,14 @@ class HWTopoLinux : public HWTopo {
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
       printRawConfiguration(rawInfo, enabledSet);
 
-    computeSizes(rawInfoVec, numPackagesRaw, numCoresRaw, numThreadsRaw);
+    computeSizes(rawInfoVec, numSocketsRaw, numCoresRaw, numThreadsRaw);
 
     std::vector<cpuinfo> activeSet;
     std::vector<cpuinfo>* infovec = nullptr;
 
     if (enabledSet.empty()) {
       infovec = &rawInfoVec;
-      numPackages = numPackagesRaw;
+      numSockets = numSocketsRaw;
       numCores = numCoresRaw;
       numThreads = numThreadsRaw;
     } else {
@@ -281,7 +281,7 @@ class HWTopoLinux : public HWTopo {
       }
 
       // compute the actual sizes based on activeSet 
-      computeSizes(activeSet, numPackages, numCores, numThreads);
+      computeSizes(activeSet, numSockets, numCores, numThreads);
     }
 
     assert (infovec != nullptr);
@@ -411,7 +411,7 @@ class HWTopoLinux : public HWTopo {
     }
 
 
-    // find and assign leader threads for packages
+    // find and assign leader threads for sockets
     for (unsigned p = 0; p < pkg_grps.size(); ++p) {
       // order by vtid;
       std::sort (pkg_grps[p].begin(), pkg_grps[p].end(), OrderByTID());
@@ -427,32 +427,32 @@ class HWTopoLinux : public HWTopo {
     // now compute reverse mappings
     processorMap.clear();
     coreMap.clear();
-    packageMap.clear();
+    socketMap.clear();
     leaderMapThread.clear();
-    maxPackageMap.clear();
+    maxSocketMap.clear();
     
     processorMap.resize (numThreads);
     coreMap.resize (numThreads);
-    packageMap.resize (numThreads);
+    socketMap.resize (numThreads);
     leaderMapThread.resize (numThreads);
-    maxPackageMap.resize (numThreads);
+    maxSocketMap.resize (numThreads);
 
-    leaderMapPackage.resize (numPackages);
+    leaderMapSocket.resize (numSockets);
     for (auto i = infovec.cbegin(), endi = infovec.cend(); i != endi; ++i) {
       processorMap[i->vtid] = i->proc;
       coreMap[i->vtid] = i->vcoreid;
-      packageMap[i->vtid] = i->vpkgid;
+      socketMap[i->vtid] = i->vpkgid;
       leaderMapThread[i->vtid] = i->leader;
     }
 
     unsigned mp = 0;
-    for (unsigned i = 0; i < packageMap.size(); ++i) {
-      mp = std::max (packageMap[i], mp);
-      maxPackageMap[i] = mp;
+    for (unsigned i = 0; i < socketMap.size(); ++i) {
+      mp = std::max (socketMap[i], mp);
+      maxSocketMap[i] = mp;
     }
 
     for (unsigned i = 0; i < leaderMapThread.size(); ++i) {
-      leaderMapPackage[packageMap[i]] =  leaderMapThread[i];
+      leaderMapSocket[socketMap[i]] =  leaderMapThread[i];
     }
   }
 
@@ -471,13 +471,13 @@ class HWTopoLinux : public HWTopo {
     //DEBUG: PRINT Stuff
     gPrint("Threads: ", numThreads, ", ", numThreadsRaw, " (raw)\n");
     gPrint("Cores: ", numCores, ", ", numCoresRaw, " (raw)\n");
-    gPrint("Packages: ", numPackages, ", ", numPackagesRaw, " (raw)\n");
+    gPrint("Sockets: ", numSockets, ", ", numSocketsRaw, " (raw)\n");
 
     for (unsigned i = 0; i < numThreads; ++i) {
       gPrint(
           "T ", i, 
           " Proc ", processorMap[i], 
-          " Pkg ", packageMap[i],
+          " Pkg ", socketMap[i],
           " Core ", coreMap[i],
           " L? ", (i == leaderMapThread[i] ? 1 : 0));
 
@@ -515,21 +515,21 @@ unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::runtime::LL::getMaxPackages() {
-  return getPolicy().numPackages;
+unsigned galois::runtime::LL::getMaxSockets() {
+  return getPolicy().numSockets;
 }
 
-unsigned galois::runtime::LL::getPackageForThread(int id) {
+unsigned galois::runtime::LL::getSocketForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
-  return getPolicy().packageMap[id];
+  return getPolicy().socketMap[id];
 }
 
-unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
   assert(size_t(id) < getPolicy().numThreads);
-  return getPolicy().maxPackageMap[id];
+  return getPolicy().maxSocketMap[id];
 }
 
-bool galois::runtime::LL::isPackageLeader(int id) {
+bool galois::runtime::LL::isSocketLeader(int id) {
   assert(size_t(id) < getPolicy().numThreads);
   return getPolicy().leaderMapThread[id] == id;
 }
@@ -539,7 +539,7 @@ unsigned galois::runtime::LL::getLeaderForThread(int id) {
   return getPolicy().leaderMapThread[id];
 }
 
-unsigned galois::runtime::LL::getLeaderForPackage(int id) {
-  assert(size_t(id) < getPolicy().numPackages);
-  return getPolicy().leaderMapPackage[id];
+unsigned galois::runtime::LL::getLeaderForSocket(int id) {
+  assert(size_t(id) < getPolicy().numSockets);
+  return getPolicy().leaderMapSocket[id];
 }

@@ -29,7 +29,7 @@ class TopoBarrier : public galois::substrate::Barrier {
   struct treenode {
     //vpid is galois::runtime::LL::getTID()
 
-    //package binary tree
+    //socket binary tree
     treenode* parentpointer; //null of vpid == 0
     treenode* childpointers[2];
 
@@ -42,12 +42,12 @@ class TopoBarrier : public galois::substrate::Barrier {
 
   };
 
-  galois::substrate::PerPackageStorage<treenode> nodes;
+  galois::substrate::PerSocketStorage<treenode> nodes;
   galois::substrate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
     auto& tp = galois::substrate::getThreadPool();
-    unsigned pkgs = tp.getCumulativeMaxPackage(P-1) + 1;
+    unsigned pkgs = tp.getCumulativeMaxSocket(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);
       n.childnotready = 0;
@@ -59,7 +59,7 @@ class TopoBarrier : public galois::substrate::Barrier {
 	}
       }
       for (unsigned j = 0; j < P; ++j) {
-	if (tp.getPackage(j) == i && !tp.isLeader(j)) {
+	if (tp.getSocket(j) == i && !tp.isLeader(j)) {
           ++n.childnotready;
           ++n.havechild;
         }

@@ -184,18 +184,18 @@ struct AutoLinuxPolicy {
   //number of "real" processors
   unsigned numCores, numCoresRaw;
 
-  //number of packages
-  unsigned numPackages, numPackagesRaw;
+  //number of sockets
+  unsigned numSockets, numSocketsRaw;
 
-  std::vector<int> packages;
-  std::vector<int> maxPackage;
+  std::vector<int> sockets;
+  std::vector<int> maxSocket;
   std::vector<int> virtmap;
   std::vector<int> leaders;
 
-  //! Sort in package-dense manner
-  struct DensePackageLessThan: public std::binary_function<int,int,bool> {
+  //! Sort in socket-dense manner
+  struct DenseSocketLessThan: public std::binary_function<int,int,bool> {
     const std::vector<cpuinfo>& vals;
-    DensePackageLessThan(const std::vector<cpuinfo>& v): vals(v) { }
+    DenseSocketLessThan(const std::vector<cpuinfo>& v): vals(v) { }
     bool operator()(int a, int b) const {
       if (vals[a].physid < vals[b].physid) {
         return true;
@@ -213,9 +213,9 @@ struct AutoLinuxPolicy {
     }
   };
 
-  struct DensePackageEqual: public std::binary_function<int,int,bool> {
+  struct DenseSocketEqual: public std::binary_function<int,int,bool> {
     const std::vector<cpuinfo>& vals;
-    DensePackageEqual(const std::vector<cpuinfo>& v): vals(v) { }
+    DenseSocketEqual(const std::vector<cpuinfo>& v): vals(v) { }
     bool operator()(int a, int b) const {
       return vals[a].physid == vals[b].physid && vals[a].coreid == vals[b].coreid;
     }
@@ -238,33 +238,33 @@ struct AutoLinuxPolicy {
     numThreadsRaw = vals.size();
     numThreads = virtmap.size();
 
-    //Get package level stuff
-    int maxrawpackage = generateRawPackageData(vals);
-    generatePackageData(vals);
+    //Get socket level stuff
+    int maxrawsocket = generateRawSocketData(vals);
+    generateSocketData(vals);
     
-    //Sort by package to get package-dense mapping
-    std::sort(virtmap.begin(), virtmap.end(), DensePackageLessThan(vals));
+    //Sort by socket to get socket-dense mapping
+    std::sort(virtmap.begin(), virtmap.end(), DenseSocketLessThan(vals));
     generateHyperthreads(vals);
 
     //Finally renumber for virtual processor numbers
-    finalizePackageData(vals, maxrawpackage);
+    finalizeSocketData(vals, maxrawsocket);
 
     //Get core count
     numCores = generateCoreData(vals);
  
-    //Compute cummulative max package
+    //Compute cummulative max socket
     int p = 0;
-    maxPackage.resize(packages.size());
-    for (int i = 0; i < (int)packages.size(); ++i) {
-      p = std::max(packages[i],p);
-      maxPackage[i] = p;
+    maxSocket.resize(sockets.size());
+    for (int i = 0; i < (int)sockets.size(); ++i) {
+      p = std::max(sockets[i],p);
+      maxSocket[i] = p;
     }
 
-    //Compute first thread in package
-    leaders.resize(numPackages, -1);
-    for (int i = 0; i < (int) packages.size(); ++i)
-      if (leaders[packages[i]] == -1)
-	leaders[packages[i]] = i;
+    //Compute first thread in socket
+    leaders.resize(numSockets, -1);
+    for (int i = 0; i < (int) sockets.size(); ++i)
+      if (leaders[sockets[i]] == -1)
+	leaders[sockets[i]] = i;
 
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
       printFinalConfiguration(); 
@@ -284,28 +284,28 @@ struct AutoLinuxPolicy {
     //DEBUG: PRINT Stuff
     gPrint("Threads: ", numThreads, ", ", numThreadsRaw, " (raw)\n");
     gPrint("Cores: ", numCores, ", ", numCoresRaw, " (raw)\n");
-    gPrint("Packages: ", numPackages, ", ", numPackagesRaw, " (raw)\n");
+    gPrint("Sockets: ", numSockets, ", ", numSocketsRaw, " (raw)\n");
 
     for (unsigned i = 0; i < virtmap.size(); ++i) {
       gPrint(
           "T ", i, 
-          " P ", packages[i],
+          " P ", sockets[i],
           " Tr ", virtmap[i], 
-          " L? ", ((int)i == leaders[packages[i]] ? 1 : 0));
+          " L? ", ((int)i == leaders[sockets[i]] ? 1 : 0));
       if (i >= numCores)
 	gPrint(" HT");
       gPrint("\n");
     }
   }
 
-  void finalizePackageData(const std::vector<cpuinfo>& vals, int maxrawpackage) {
-    std::vector<int> mapping(maxrawpackage+1);
+  void finalizeSocketData(const std::vector<cpuinfo>& vals, int maxrawsocket) {
+    std::vector<int> mapping(maxrawsocket+1);
     int nextval = 1;
     for (int i = 0; i < (int)virtmap.size(); ++i) {
       int x = vals[virtmap[i]].physid;
       if (!mapping[x])
         mapping[x] = nextval++;
-      packages.push_back(mapping[x]-1);
+      sockets.push_back(mapping[x]-1);
     }
   }
 
@@ -331,7 +331,7 @@ struct AutoLinuxPolicy {
     // annoyingly, values after tempi are unspecified for std::unique, so copy in and out instead
     std::vector<int> dense(numThreads);
     std::vector<int>::iterator it = std::unique_copy(virtmap.begin(), virtmap.end(), 
-        dense.begin(), DensePackageEqual(vals));
+        dense.begin(), DenseSocketEqual(vals));
     std::vector<bool> mask(numThreadsRaw);
     for (std::vector<int>::iterator ii = dense.begin(); ii < it; ++ii)
       mask[*ii] = true;
@@ -342,16 +342,16 @@ struct AutoLinuxPolicy {
     virtmap = dense;
   }
   
-  void generatePackageData(const std::vector<cpuinfo>& vals) {
+  void generateSocketData(const std::vector<cpuinfo>& vals) {
     std::vector<int> p;
     for (unsigned i = 0; i < virtmap.size(); ++i)
       p.push_back(vals[virtmap[i]].physid);
     std::sort(p.begin(), p.end());
     std::vector<int>::iterator it = std::unique(p.begin(), p.end());
-    numPackages = std::distance(p.begin(), it);
+    numSockets = std::distance(p.begin(), it);
   }
 
-  int generateRawPackageData(const std::vector<cpuinfo>& vals) {
+  int generateRawSocketData(const std::vector<cpuinfo>& vals) {
     std::vector<int> p;
     for (unsigned i = 0; i < vals.size(); ++i)
       p.push_back(vals[i].physid);
@@ -359,7 +359,7 @@ struct AutoLinuxPolicy {
     int retval = *std::max_element(p.begin(), p.end());
     std::sort(p.begin(), p.end());
     std::vector<int>::iterator it = std::unique(p.begin(), p.end());
-    numPackagesRaw = std::distance(p.begin(), it);
+    numSocketsRaw = std::distance(p.begin(), it);
     return retval;
   }
 };
@@ -389,31 +389,31 @@ unsigned galois::runtime::LL::getMaxCores() {
   return getPolicy().numCores;
 }
 
-unsigned galois::runtime::LL::getMaxPackages() {
-  return getPolicy().numPackages;
+unsigned galois::runtime::LL::getMaxSockets() {
+  return getPolicy().numSockets;
 }
 
-unsigned galois::runtime::LL::getPackageForThread(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().packages[id];
+unsigned galois::runtime::LL::getSocketForThread(int id) {
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().sockets[id];
 }
 
-unsigned galois::runtime::LL::getMaxPackageForThread(int id) {
-  assert(size_t(id) < getPolicy().maxPackage.size());
-  return getPolicy().maxPackage[id];
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
+  assert(size_t(id) < getPolicy().maxSocket.size());
+  return getPolicy().maxSocket[id];
 }
 
-bool galois::runtime::LL::isPackageLeader(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().leaders[getPolicy().packages[id]] == id;
+bool galois::runtime::LL::isSocketLeader(int id) {
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().leaders[getPolicy().sockets[id]] == id;
 }
 
 unsigned galois::runtime::LL::getLeaderForThread(int id) {
-  assert(size_t(id) < getPolicy().packages.size());
-  return getPolicy().leaders[getPolicy().packages[id]];
+  assert(size_t(id) < getPolicy().sockets.size());
+  return getPolicy().leaders[getPolicy().sockets[id]];
 }
 
-unsigned galois::runtime::LL::getLeaderForPackage(int id) {
+unsigned galois::runtime::LL::getLeaderForSocket(int id) {
   assert(size_t(id) < getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }
