@@ -3604,7 +3604,7 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
-    galois::CondStatTimer<MORE_COMM_STATS> Tsync(timer_str.c_str(), GRNAME);
+    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
 
     Tsync.start();
 
@@ -3864,7 +3864,7 @@ public:
   inline void sync_on_demand(galois::runtime::FieldFlags& fieldFlags, 
                              std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
-    galois::CondStatTimer<MORE_COMM_STATS> Tsync(timer_str.c_str(), GRNAME);
+    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
     Tsync.start();
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
@@ -4574,8 +4574,12 @@ public:
    * @returns a string run identifier
    */
   inline std::string get_run_identifier() const {
+    #if DIST_PER_ROUND_TIMER
     return std::string(std::to_string(num_run) + "_" +
                        std::to_string(num_round));
+    #else
+    return std::string(std::to_string(num_run));
+    #endif
   }
 
   /**
@@ -4586,8 +4590,12 @@ public:
    * @returns String with run identifier appended to passed in loop name
    */
   inline std::string get_run_identifier(std::string loop_name) const {
+    #if DIST_PER_ROUND_TIMER
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
                        "_" + std::to_string(num_round));
+    #else
+    return std::string(std::string(loop_name) + "_" + std::to_string(num_run));
+    #endif
   }
 
   /**
@@ -4603,9 +4611,14 @@ public:
    */
   inline std::string get_run_identifier(std::string loop_name, 
                                         unsigned alterID) const {
-    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) + 
+    #if DIST_PER_ROUND_TIMER
+    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
                        "_" + std::to_string(num_run) + "_" + 
                        std::to_string(num_round));
+    #else
+    return std::string(std::string(loop_name) + "_" + std::to_string(alterID) +
+                       "_" + std::to_string(num_run));
+    #endif
   }
 
 
