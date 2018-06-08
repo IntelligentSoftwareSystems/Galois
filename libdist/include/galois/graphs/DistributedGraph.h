@@ -226,10 +226,10 @@ protected:
     galois::gPrint("[", id, "] Edges: ", sizeEdges(), "\n");
 
     // reports the number of nodes + edge as well
-    galois::runtime::reportStat_Tsum("dGraph", "TotalNodes", 
-                                     numOwned);
-    galois::runtime::reportStat_Tsum("dGraph", "TotalEdges", 
-                                     sizeEdges());
+    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>("dGraph", "TotalNodes", 
+                                                          numOwned);
+    galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>("dGraph", "TotalEdges", 
+                                                          sizeEdges());
   }
 
   //! Increments evilPhase, a phase counter used by communication.
