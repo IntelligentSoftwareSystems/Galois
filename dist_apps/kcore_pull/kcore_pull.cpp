@@ -387,11 +387,8 @@ int main(int argc, char** argv) {
   bitset_trim.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go functions called\n");
-  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
 
-  StatTimer_graph_init.start();
-    InitializeGraph::go((*h_graph));
-  StatTimer_graph_init.stop();
+  InitializeGraph::go((*h_graph));
   galois::runtime::getHostBarrier().wait();
 
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;

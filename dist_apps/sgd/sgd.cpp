@@ -338,10 +338,7 @@ int main(int argc, char** argv) {
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
-  galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", regionname); 
-  StatTimer_init.start();
   InitializeGraph::go((*hg));
-  StatTimer_init.stop();
 
   galois::runtime::getHostBarrier().wait();
 

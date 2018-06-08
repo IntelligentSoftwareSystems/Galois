@@ -1290,10 +1290,7 @@ int main(int argc, char** argv) {
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
-  galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT", REGION_NAME);
-  StatTimer_graph_init.start();
-    InitializeGraph::go((*h_graph));
-  StatTimer_graph_init.stop();
+  InitializeGraph::go((*h_graph));
   galois::runtime::getHostBarrier().wait();
 
   // shared DG accumulator among all steps
