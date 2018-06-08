@@ -260,7 +260,7 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
   galois::GAccumulator<double> errorAccum;
   std::vector<LatentValue> steps(updatesPerEdge);
   LatentValue last = -1.0;
-  int deltaRound = updatesPerEdge;
+  unsigned deltaRound = updatesPerEdge;
   LatentValue rate = learningRate;
 
   galois::StatTimer executeAlgoTimer("Algorithm Execution Time");
@@ -269,13 +269,13 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
 
   unsigned long lastTime = 0;
 
-  for (int round = 0; ; round += deltaRound) {
+  for (unsigned int round = 0; ; round += deltaRound) {
     if (fixedRounds > 0 && round >= fixedRounds)
       break;
     if (fixedRounds > 0)
       deltaRound = std::min(deltaRound, fixedRounds - round);
 
-    for (int i = 0; i < updatesPerEdge; ++i) {
+    for (unsigned i = 0; i < updatesPerEdge; ++i) {
       // Assume that loss decreases
       if (sf.isBold())
         steps[i] = i == 0 ? rate : steps[i-1] * 1.05;
@@ -990,7 +990,7 @@ struct SimpleALSalgo {
     PerThrdXTX xtxs;
 
     totalAlgoTime.start();
-    for (int round = 1; ; ++round) {
+    for (unsigned round = 1; ; ++round) {
       totalExecTime.start();
       mmTime.start();
       // TODO parallelize this using tiled executor
@@ -1243,7 +1243,7 @@ struct SyncALSalgo {
     PerThrdV rhs;
 
     totalAlgoTime.start();
-    for (int round = 1; ; ++round) {
+    for (unsigned round = 1; ; ++round) {
 
       totalExecTime.start();
       updateTime.start();

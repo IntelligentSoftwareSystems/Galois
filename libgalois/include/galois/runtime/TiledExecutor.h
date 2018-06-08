@@ -85,7 +85,7 @@ class Fixed2DGraphTiledExecutor {
   std::array<std::vector<SpinLock>, numDims> locks;
   std::vector<Task> tasks;
   size_t numTasks;
-  int maxUpdates;
+  unsigned maxUpdates;
   bool useLocks;
   galois::GAccumulator<unsigned> failedProbes;
 
@@ -698,7 +698,7 @@ public:
   template<typename Function>
   void execute(iterator firstX, iterator lastX, iterator firstY, iterator lastY,
                size_t sizeX, size_t sizeY, Function fn, bool _useLocks, 
-               int numIterations = 1) {
+               unsigned numIterations = 1) {
     initializeTasks(firstX, lastX, firstY, lastY, sizeX, sizeY);
     numTasks = tasks.size();
     maxUpdates = numIterations;

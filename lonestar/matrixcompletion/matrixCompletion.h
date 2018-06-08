@@ -93,13 +93,13 @@ static cll::opt<OutputType> outputType("output",
                                        clEnumValEnd), 
                                        cll::init(OutputType::binary));
 
-static cll::opt<int> updatesPerEdge("updatesPerEdge", 
+static cll::opt<unsigned int> updatesPerEdge("updatesPerEdge", 
                                     cll::desc("number of updates per edge"), 
                                     cll::init(1));
 
-static cll::opt<int> fixedRounds("fixedRounds", 
+static cll::opt<unsigned int> fixedRounds("fixedRounds", 
                                  cll::desc("run for a fixed number of rounds"), 
-                                 cll::init(-1));
+                                 cll::init(0));
 static cll::opt<bool> useExactError("useExactError", 
                                     cll::desc("use exact error for testing "
                                               "convergence"), 
