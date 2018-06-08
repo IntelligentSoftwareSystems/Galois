@@ -1198,7 +1198,7 @@ private:
     float replication_factor = (float)(global_total_mirror_nodes + numGlobalNodes) /
                                (float)numGlobalNodes;
     galois::runtime::reportStat_Single(GRNAME, 
-        "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
+        "REPLICATION_FACTOR", replication_factor);
 
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, 
         "TOTAL_NODES_" + get_run_identifier(), numGlobalNodes);
