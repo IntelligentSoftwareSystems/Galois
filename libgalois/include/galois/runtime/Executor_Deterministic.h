@@ -399,11 +399,11 @@ void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   cur += d;
 }
 
-//! Wrapper around worklists::ChunkedFIFO to allow peek() and empty() and still have FIFO order
+//! Wrapper around worklists::ChunkFIFO to allow peek() and empty() and still have FIFO order
 template<int ChunkSize,typename T>
 struct FIFO {
-  worklists::ChunkedFIFO<ChunkSize,T,false> m_data;
-  worklists::ChunkedLIFO<16,T,false> m_buffer;
+  worklists::ChunkFIFO<ChunkSize,T,false> m_data;
+  worklists::ChunkLIFO<16,T,false> m_buffer;
   size_t m_size;
 
   FIFO(): m_size(0) { }
@@ -1285,7 +1285,7 @@ class Executor:
 
   typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Item> WL;
   typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Context> PendingWork;
-  typedef worklists::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
+  typedef worklists::ChunkFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
 
   // Truly thread-local
   using LoopStat = LoopStatistics<OptionsTy::needStats>;

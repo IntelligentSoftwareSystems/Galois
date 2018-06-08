@@ -35,7 +35,7 @@
 #include "galois/substrate/Termination.h"
 #include "galois/substrate/ThreadPool.h"
 #include "galois/runtime/UserContextAccess.h"
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 #include "galois/worklists/Simple.h"
 
 #include <algorithm>

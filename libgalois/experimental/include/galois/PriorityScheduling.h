@@ -42,12 +42,12 @@ struct PickInner;
 template<int CS>
 struct PickInner<CS, true> {
   typedef PerSocketChunkLIFO<CS> PSchunk;
-  typedef  ChunkedLIFO<CS> Chunk;
+  typedef  ChunkLIFO<CS> Chunk;
 };
 template<int CS>
 struct PickInner<CS, false> {
   typedef PerSocketChunkFIFO<CS> PSchunk;
-  typedef  ChunkedFIFO<CS> Chunk;
+  typedef  ChunkFIFO<CS> Chunk;
 };
 
  template<int ChunkSize, typename Ind, typename DEFAULT, typename Less, typename Greater, bool LF = false >

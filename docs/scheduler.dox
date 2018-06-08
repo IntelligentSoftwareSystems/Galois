@@ -32,7 +32,7 @@ The scheduling policies are listed as follows:
     different ways, and we have observed that mapping the communication patterns of
     threads to the hardware-topology leads to more scalable implementations: 
 
-      - \b ChunkedFIFO (or ChunkedLIFO) maintains a single global queue (or stack) for chunks of work items
+      - \b ChunkFIFO (or ChunkLIFO) maintains a single global queue (or stack) for chunks of work items
 
       - \b PerSocketChunkFIFO (or PerSocketChunkLIFO) maintains a queue (or stack) of chunks per each package (multi-core
         processor) in the system. A thread tries to find a chunk in its local

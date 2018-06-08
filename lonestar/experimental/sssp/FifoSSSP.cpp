@@ -669,7 +669,7 @@ struct AsyncAlgoPP {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef ChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";

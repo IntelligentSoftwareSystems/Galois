@@ -20,7 +20,7 @@
 #ifndef GALOIS_WORKLIST_MARKING_SET_H
 #define GALOIS_WORKLIST_MARKING_SET_H
 
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 #include "galois/worklists/WorkListHelpers.h"
 #include "galois/worklists/Separator.h"
 #include "galois/Timer.h"

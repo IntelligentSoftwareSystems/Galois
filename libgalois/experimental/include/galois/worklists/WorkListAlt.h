@@ -205,7 +205,7 @@ public:
 GALOIS_WLCOMPILECHECK(LocalWorklist)
 
 template<typename T, typename OwnerFn, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
-class OwnerComputeChunkedMaster : private boost::noncopyable {
+class OwnerComputeChunkMaster : private boost::noncopyable {
   class Chunk : public galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
   runtime::FixedSizeHeap heap;
@@ -286,12 +286,12 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  using rethread = OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
+  using rethread = OwnerComputeChunkMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
 
   template<typename Tnew>
-  using retype = OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
+  using retype = OwnerComputeChunkMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
 
-  OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
+  OwnerComputeChunkMaster() : heap(sizeof(Chunk)) { }
 
   void flush() {
     p& n = *data.getLocal();
@@ -350,8 +350,8 @@ public:
 };
 
 template<typename OwnerFn=DummyIndexer<int> , int chunksize=64, typename T = int, bool concurrent=true>
-class OwnerComputeChunkedLIFO : public OwnerComputeChunkedMaster<T,OwnerFn,ConExtLinkedQueue, true, true, chunksize, concurrent> {};
-GALOIS_WLCOMPILECHECK(OwnerComputeChunkedLIFO)
+class OwnerComputeChunkLIFO : public OwnerComputeChunkMaster<T,OwnerFn,ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+GALOIS_WLCOMPILECHECK(OwnerComputeChunkLIFO)
 
 
 }//End namespace

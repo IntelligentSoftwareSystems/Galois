@@ -646,7 +646,7 @@ struct Process {
 */
 
 static void run(Rounds& rounds, Graph& graph) {
-  typedef galois::worklists::PerThreadChunkLIFO<32> Chunked;
+  typedef galois::worklists::PerThreadChunkLIFO<32> Chunk;
   typedef galois::worklists::Deterministic<> DWL;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
@@ -667,7 +667,7 @@ static void run(Rounds& rounds, Graph& graph) {
     DelaunayTriangulation dt {&tree, graph};
     switch (detAlgo) {
       case nondet:
-        dt.generateMesh<detBase, Chunked>(pptrs);
+        dt.generateMesh<detBase, Chunk>(pptrs);
         break;
       case detBase:
         dt.generateMesh<detBase, DWL>(pptrs);

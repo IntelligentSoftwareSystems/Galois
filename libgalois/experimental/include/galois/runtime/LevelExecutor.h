@@ -276,7 +276,7 @@ class LevelExecutor {
 
   static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
 
-  // hack to get ChunkedMaster base class
+  // hack to get ChunkMaster base class
   using BaseWL = typename galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>::template retype<T>::type;
   using WL_ty = galois::worklists::WLsizeWrapper<BaseWL>;
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;

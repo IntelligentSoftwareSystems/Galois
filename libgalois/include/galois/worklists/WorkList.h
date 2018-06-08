@@ -24,7 +24,7 @@
 
 #include "PerThreadChunk.h"
 #include "BulkSynchronous.h"
-#include "Chunked.h"
+#include "Chunk.h"
 #include "Simple.h"
 #include "LocalQueue.h"
 #include "Obim.h"

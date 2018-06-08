@@ -25,7 +25,7 @@
 namespace galois {
 namespace worklists {
 
-template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
+template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkLIFO<>, typename T = int>
 struct OwnerComputes : private boost::noncopyable {
   template<typename _T>
   using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;

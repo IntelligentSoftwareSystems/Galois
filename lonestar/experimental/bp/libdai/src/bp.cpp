@@ -694,7 +694,7 @@ Real BP::run() {
 
           using namespace galois::worklists;
           typedef PerSocketChunkFIFO<64> PSchunk;
-          typedef ChunkedFIFO<64> Chunk;
+          typedef ChunkFIFO<64> Chunk;
           typedef OrderedByIntegerMetric<Indexer,PSchunk> OBIM;
           unsigned count = 0;
 

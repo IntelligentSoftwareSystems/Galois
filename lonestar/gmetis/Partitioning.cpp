@@ -252,7 +252,7 @@ void KLMatch(GGraph &graph, std::vector<GNode> &boundary, PerThreadPartInfo &thr
         }
       },
       galois::loopname("KLMatch"),
-      galois::wl<galois::worklists::ChunkedLIFO<32> >());
+      galois::wl<galois::worklists::ChunkLIFO<32> >());
 };
 
 void refine_kl(GGraph &graph, std::vector<GNode> &boundary,
@@ -377,7 +377,7 @@ void parallelBisect(MetisGraph* mg, unsigned totalWeight, unsigned nparts, std::
         cnx.push(item);
       },
       galois::loopname("parallelBisect"),
-      galois::wl<galois::worklists::ChunkedLIFO<1>>());
+      galois::wl<galois::worklists::ChunkLIFO<1>>());
 }
 
 } //anon namespace

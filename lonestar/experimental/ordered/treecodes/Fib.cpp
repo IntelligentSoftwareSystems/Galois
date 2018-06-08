@@ -218,8 +218,8 @@ struct FibHandOp {
 
 unsigned fibHand (unsigned n) {
 
-  typedef galois::worklists::PerThreadChunkFIFO<64> Chunked;
-  // typedef galois::worklists::PerThreadChunkLIFO<4> Chunked;
+  typedef galois::worklists::PerThreadChunkFIFO<64> Chunk;
+  // typedef galois::worklists::PerThreadChunkLIFO<4> Chunk;
 
   FibHandFrame init;
   init.sum = 0;
@@ -229,7 +229,7 @@ unsigned fibHand (unsigned n) {
   galois::for_each(std::make_pair(n, &init), 
       FibHandOp(), 
       galois::loopname ("fib-hand"),
-      galois::wl<Chunked>());
+      galois::wl<Chunk>());
 
   return init.sum;
 }

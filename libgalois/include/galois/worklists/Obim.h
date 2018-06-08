@@ -24,7 +24,7 @@
 #include "galois/runtime/Substrate.h"
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/substrate/Termination.h"
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 #include "galois/worklists/WorkListHelpers.h"
 
 #include <deque>

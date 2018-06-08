@@ -242,7 +242,7 @@ private:
   static Result unorderedAlgo(GNode source, bool reset) {
     using namespace galois::worklists;
     typedef PerSocketChunkFIFO<64> PSchunk;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef ChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,PSchunk> OBIM;
     
     Result res;

@@ -1425,7 +1425,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois:
   }
 };
 
-template<class Indexer, typename ContainerTy = galois::worklists::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
+template<class Indexer, typename ContainerTy = galois::worklists::ChunkLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 
@@ -2114,7 +2114,7 @@ public:
 
 
 template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
-class ChunkedAdaptor : private boost::noncopyable {
+class ChunkAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
   runtime::FixedSizeHeap heap;
@@ -2134,11 +2134,11 @@ class ChunkedAdaptor : private boost::noncopyable {
 
 public:
   template<typename Tnew>
-  using retype = ChunkedAdaptor<gWL, chunksize, Tnew>;
+  using retype = ChunkAdaptor<gWL, chunksize, Tnew>;
 
   typedef T value_type;
 
-  ChunkedAdaptor() : heap(sizeof(ChunkTy)) {
+  ChunkAdaptor() : heap(sizeof(ChunkTy)) {
     for (unsigned int i = 0; i  < data.size(); ++i)
       data.get(i) = 0;
   }
@@ -2202,7 +2202,7 @@ public:
     }
   }
 };
-//GALOIS_WLCOMPILECHECK(ChunkedAdaptor)
+//GALOIS_WLCOMPILECHECK(ChunkAdaptor)
 
 }
 

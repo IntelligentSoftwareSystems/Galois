@@ -21,7 +21,7 @@
 #define GALOIS_WORKLIST_STABLEITERATOR_H
 
 #include "galois/gstl.h"
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 
 namespace galois {
 namespace worklists {

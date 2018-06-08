@@ -20,7 +20,7 @@
 #ifndef GALOIS_WORKLIST_WORKSET_H
 #define GALOIS_WORKLIST_WORKSET_H
 
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 #include "galois/worklists/WorkListHelpers.h"
 #include "galois/PriorityQueue.h"
 #include "galois/UnorderedSet.h"

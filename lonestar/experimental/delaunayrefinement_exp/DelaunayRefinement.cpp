@@ -204,17 +204,17 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
       //! [for_each example]
-  typedef LocalQueue<PerSocketChunkLIFO<256>, ChunkedLIFO<256> > BQ;
-  typedef PerThreadChunkLIFO<32> Chunked;
+  typedef LocalQueue<PerSocketChunkLIFO<256>, ChunkLIFO<256> > BQ;
+  typedef PerThreadChunkLIFO<32> Chunk;
 
   std::cout << "beginning refine\n";
-  galois::for_each(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunked>());
+  galois::for_each(gwl, Process(graph), galois::loopname("refine"), galois::wl<Chunk>());
   Trefine.stop();
   T.stop();
   Tb.stop();
 
   std::cout << "beginning verify\n";
-  galois::for_each(graph, Verification(graph), galois::loopname("verification"), galois::wl<Chunked>());
+  galois::for_each(graph, Verification(graph), galois::loopname("verification"), galois::wl<Chunk>());
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";

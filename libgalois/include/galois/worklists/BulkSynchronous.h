@@ -21,7 +21,7 @@
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
 #include "galois/runtime/Substrate.h"
-#include "Chunked.h"
+#include "Chunk.h"
 #include "WLCompileCheck.h"
 
 #include <atomic>

@@ -173,11 +173,11 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
   typedef Deterministic<> DWL;
-  typedef PerThreadChunkLIFO<32> Chunked;
+  typedef PerThreadChunkLIFO<32> Chunk;
   
   switch (detAlgo) {
     case nondet: 
-      refine<Chunked>(initialBad, graph);
+      refine<Chunk>(initialBad, graph);
       break;
     case detBase:
       refine<DWL>(initialBad, graph);

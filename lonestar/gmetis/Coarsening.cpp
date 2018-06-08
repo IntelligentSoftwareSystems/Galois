@@ -285,7 +285,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
    * Different worklist versions tried, PerSocketChunkFIFO 256 works best with LC_MORPH_graph.
    * Another good type would be Lazy Iter.
    */
-  //typedef galois::worklists::ChunkedLIFO<64, GNode> WL;
+  //typedef galois::worklists::ChunkLIFO<64, GNode> WL;
   //typedef galois::worklists::LazyIter<decltype(fineGGraph->local_begin()),false> WL;
 
   GNodeBag bagOfLoners;

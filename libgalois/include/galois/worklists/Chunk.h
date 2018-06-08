@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_WORKLIST_CHUNKED_H
-#define GALOIS_WORKLIST_CHUNKED_H
+#ifndef GALOIS_WORKLIST_CHUNK_H
+#define GALOIS_WORKLIST_CHUNK_H
 
 #include "galois/FixedSizeRing.h"
 #include "galois/substrate/PaddedLock.h"
@@ -54,15 +54,15 @@ struct squeue<false, PS, TQ> {
 
 //! Common functionality to all chunked worklists
 template<typename T, template<typename, bool> class QT, bool Distributed, bool IsStack, int ChunkSize, bool Concurrent>
-struct ChunkedMaster : private boost::noncopyable {
+struct ChunkMaster : private boost::noncopyable {
   template<typename _T>
-  using retype = ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
+  using retype = ChunkMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
 
   template<int _chunk_size>
-  using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
+  using with_chunk_size = ChunkMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
 
   template<bool _Concurrent>
-  using rethread = ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _Concurrent>;
+  using rethread = ChunkMaster<T, QT, Distributed, IsStack, ChunkSize, _Concurrent>;
 
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
@@ -138,7 +138,7 @@ private:
 public:
   typedef T value_type;
 
-  ChunkedMaster() { }
+  ChunkMaster() { }
 
   void flush() {
     p& n = data.get();
@@ -258,39 +258,39 @@ public:
 } // namespace internal
 
 /**
- * Chunked FIFO. A global FIFO of chunks of some fixed size.
+ * Chunk FIFO. A global FIFO of chunks of some fixed size.
  *
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using ChunkedFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent>;
-GALOIS_WLCOMPILECHECK(ChunkedFIFO)
+using ChunkFIFO = internal::ChunkMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent>;
+GALOIS_WLCOMPILECHECK(ChunkFIFO)
 
 /**
- * Chunked LIFO. A global LIFO of chunks of some fixed size.
+ * Chunk LIFO. A global LIFO of chunks of some fixed size.
  *
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using ChunkedLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent>;
-GALOIS_WLCOMPILECHECK(ChunkedLIFO)
+using ChunkLIFO = internal::ChunkMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent>;
+GALOIS_WLCOMPILECHECK(ChunkLIFO)
 
 /**
- * Distributed chunked FIFO. A more scalable version of {@link ChunkedFIFO}.
+ * Distributed chunked FIFO. A more scalable version of {@link ChunkFIFO}.
  *
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using PerSocketChunkFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
+using PerSocketChunkFIFO = internal::ChunkMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkFIFO)
 
 /**
- * Distributed chunked LIFO. A more scalable version of {@link ChunkedLIFO}.
+ * Distributed chunked LIFO. A more scalable version of {@link ChunkLIFO}.
  *
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using PerSocketChunkLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
+using PerSocketChunkLIFO = internal::ChunkMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkLIFO)
 
 /**
@@ -300,7 +300,7 @@ GALOIS_WLCOMPILECHECK(PerSocketChunkLIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using PerSocketChunkBag = internal::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
+using PerSocketChunkBag = internal::ChunkMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkBag)
 
 

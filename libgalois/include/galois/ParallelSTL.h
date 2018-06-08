@@ -25,7 +25,7 @@
 #include "galois/NoDerefIterator.h"
 #include "galois/Traits.h"
 #include "galois/UserContext.h"
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 #include "galois/runtime/Range.h"
 
 namespace galois {

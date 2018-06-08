@@ -14,7 +14,7 @@
 #include "NPNManager.h"
 #include "PreCompGraphManager.h"
 
-#include "galois/worklists/Chunked.h"
+#include "galois/worklists/Chunk.h"
 
 #include <vector>
 #include <unordered_set>

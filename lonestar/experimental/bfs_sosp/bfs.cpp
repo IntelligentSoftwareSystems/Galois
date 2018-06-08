@@ -311,7 +311,7 @@ struct AsyncAlgo {
   void operator()(Graph& graph, const GNode& source) const {
     using namespace galois::worklists;
     typedef PerSocketChunkFIFO<64> PSchunk;
-    //typedef ChunkedFIFO<64> Chunk;
+    //typedef ChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,PSchunk> OBIM;
     
     graph.getData(source).dist = 0;

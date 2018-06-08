@@ -296,7 +296,7 @@ struct AsyncAlgo {
   void operator()(const GNode& source) const {
     using namespace galois::worklists;
     typedef PerSocketChunkFIFO<64> PSchunk;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef ChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<GNodeIndexer,PSchunk> OBIM;
     
     std::deque<GNode> initial;
