@@ -25,6 +25,7 @@
 #include "galois/Reduction.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/runtime/LWCI.h"
+#include "galois/runtime/DistStats.h"
 
 namespace galois {
 
@@ -107,7 +108,8 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("REDUCE_DGACCUM_" + runID);
 
-    galois::StatTimer reduceTimer(timer_str.c_str(), "DGReducible");
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+                                                       "DGReducible");
     reduceTimer.start();
 
     if (local_mdata == 0) local_mdata = mdata.reduce();
@@ -241,7 +243,8 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("REDUCE_DGREDUCEMAX_" + runID);
 
-    galois::StatTimer reduceTimer(timer_str.c_str(), "DGReduceMax");
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+                                                       "DGReduceMax");
 
     reduceTimer.start();
     if (local_mdata == 0) local_mdata = mdata.reduce();
@@ -375,7 +378,8 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("REDUCE_DGREDUCEMIN_" + runID);
 
-    galois::StatTimer reduceTimer(timer_str.c_str(), "DGReduceMin");
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+                                                       "DGReduceMin");
 
     reduceTimer.start();
     if (local_mdata == std::numeric_limits<Ty>::max()) 

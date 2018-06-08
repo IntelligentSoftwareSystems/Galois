@@ -20,6 +20,10 @@
 #ifndef GALOIS_RUNTIME_DIST_STATS_H
 #define GALOIS_RUNTIME_DIST_STATS_H
 
+// TODO document these defines
+#define MORE_DIST_STATS 0
+#define MORE_COMM_STATS 0
+
 #include "galois/runtime/Statistics.h"
 #include "galois/runtime/Network.h"
 

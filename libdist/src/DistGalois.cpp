@@ -33,6 +33,8 @@ galois::DistMemSys::DistMemSys(void)
 
 //! DistMemSys destructor which reports memory usage from the network
 galois::DistMemSys::~DistMemSys(void) {
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  net.reportMemUsage();
+  if (MORE_DIST_STATS) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    net.reportMemUsage();
+  }
 }

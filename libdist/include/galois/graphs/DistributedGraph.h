@@ -549,7 +549,9 @@ protected:
 
     timer.stop();
 
-    galois::runtime::reportStat_Tmax(GRNAME, "MasterDistTime", timer.get());
+    galois::runtime::reportStatCond_Tmax<MORE_DIST_STATS>(GRNAME, 
+                                                          "MasterDistTime", 
+                                                          timer.get());
 
     galois::gPrint("[", id, "] Master distribution time : ", timer.get_usec()/1000000.0f,
         " seconds to read ", g.num_bytes_read(), " bytes in ", g.num_seeks(),
@@ -641,7 +643,7 @@ protected:
    * different parts of the graph by exchanging master/mirror information.
    */
   void setup_communication() {
-    galois::StatTimer Tcomm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tcomm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
 
     // barrier so that all hosts start the timer together
     galois::runtime::getHostBarrier().wait();
@@ -659,8 +661,10 @@ protected:
                      [&](uint32_t n) {
                        masterNodes[h][n] = G2L(masterNodes[h][n]);
                      },
-                     galois::no_stats(),
-                     galois::loopname(get_run_identifier("MASTER_NODES").c_str()));
+                     #if MORE_COMM_STATS
+                     galois::loopname(get_run_identifier("MASTER_NODES").c_str()),
+                     #endif
+                     galois::no_stats());
     }
 
     for (uint32_t h = 0; h < mirrorNodes.size(); ++h) {
@@ -668,8 +672,10 @@ protected:
                      [&](uint32_t n) {
                        mirrorNodes[h][n] = G2L(mirrorNodes[h][n]);
                      },
-                     galois::no_stats(),
-                     galois::loopname(get_run_identifier("MIRROR_NODES").c_str()));
+                     #if MORE_COMM_STATS
+                     galois::loopname(get_run_identifier("MIRROR_NODES").c_str()),
+                     #endif
+                     galois::no_stats());
     }
 
     Tcomm_setup.stop();
@@ -679,16 +685,16 @@ protected:
       if (x == id) continue;
       std::string master_nodes_str = "MASTER_NODES_FROM_" + std::to_string(id)
                                       + "_TO_" + std::to_string(x);
-      galois::runtime::reportStat_Tsum(GRNAME, master_nodes_str, 
-                                       masterNodes[x].size());
+      galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(GRNAME, master_nodes_str,
+                                                       masterNodes[x].size());
     }
 
     for (auto x = 0U; x < mirrorNodes.size(); ++x) {
       if (x == id) continue;
       std::string mirror_nodes_str = "MIRROR_NODES_FROM_" + std::to_string(x)
                                       + "_TO_" + std::to_string(id);
-      galois::runtime::reportStat_Tsum(GRNAME, mirror_nodes_str, 
-                                       mirrorNodes[x].size());
+      galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(GRNAME, mirror_nodes_str,
+                                                       mirrorNodes[x].size());
     }
 
     send_info_to_host();
@@ -1194,9 +1200,9 @@ private:
     galois::runtime::reportStat_Single(GRNAME, 
         "REPLICATION_FACTOR_" + get_run_identifier(), replication_factor);
 
-    galois::runtime::reportStat_Single(GRNAME, 
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, 
         "TOTAL_NODES_" + get_run_identifier(), numGlobalNodes);
-    galois::runtime::reportStat_Single(GRNAME, 
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, 
         "TOTAL_GLOBAL_MIRROR_NODES_" + get_run_identifier(), 
         global_total_mirror_nodes);
   }
@@ -1268,7 +1274,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string offsets_timer_str(syncTypeStr + "_OFFSETS_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer Toffsets(offsets_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Toffsets(offsets_timer_str.c_str(), GRNAME);
 
     Toffsets.start();
 
@@ -1384,8 +1390,10 @@ private:
                          bitset_comm.set(n);
                        }
                      },
-                     galois::no_stats(),
-                     galois::loopname(get_run_identifier(doall_str).c_str()));
+                     #if MORE_COMM_STATS
+                     galois::loopname(get_run_identifier(doall_str).c_str()),
+                     #endif
+                     galois::no_stats());
 
       // get the number of set bits and the offsets into the comm bitset
       get_offsets_from_bitset<syncType>(loopName, bitset_comm, offsets,
@@ -1531,8 +1539,10 @@ private:
           size_t lid = indices[offset];
           val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid);
         },
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str())
+        #if MORE_COMM_STATS
+        galois::loopname(get_run_identifier(doall_str)).c_str(),
+        #endif
+        galois::no_stats()
       );
     } else { // non-parallel version
       for (unsigned n = start; n < start + size; ++n) {
@@ -1597,8 +1607,10 @@ private:
           size_t lid = indices[offset];
           val_vec[n - start] = extract_wrapper<FnTy, syncType>(lid, vecIndex);
         },
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str())
+        #if MORE_COMM_STATS
+        galois::loopname(get_run_identifier(doall_str).c_str()),
+        #endif
+        galois::no_stats()
       );
     } else { // non-parallel version
       for (unsigned n = start; n < start + size; ++n) {
@@ -1640,8 +1652,10 @@ private:
           size_t lid = indices[offset];
           gSerializeLazy(b, lseq, n-start, extract_wrapper<FnTy, syncType>(lid));
         }, 
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str())
+        #if MORE_COMM_STATS
+        galois::loopname(get_run_identifier(doall_str).c_str()),
+        #endif
+        galois::no_stats()
       );
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
@@ -1891,8 +1905,10 @@ private:
           auto lid = indices[offset];
           set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute);
         }, 
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str()));
+        #if MORE_COMM_STATS
+        galois::loopname(get_run_identifier(doall_str).c_str()),
+        #endif
+        galois::no_stats());
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -1964,8 +1980,11 @@ private:
           set_wrapper<FnTy, syncType>(lid, val_vec[n - start], bit_set_compute,
                                       vecIndex);
         }, 
-        galois::no_stats(),
-        galois::loopname(get_run_identifier(doall_str).c_str()));
+        #if MORE_COMM_STATS
+        galois::loopname(get_run_identifier(doall_str).c_str()),
+        #endif
+        galois::no_stats()
+      );
     } else {
       for (unsigned int n = start; n < start + size; ++n) {
         unsigned int offset;
@@ -2090,8 +2109,10 @@ private:
       [&](unsigned int n) {
         offsets[n] = static_cast<uint32_t>(getGID(indices[offsets[n]]));
       }, 
-      galois::no_stats(),
-      galois::loopname(get_run_identifier(doall_str).c_str())
+      #if MORE_COMM_STATS
+      galois::loopname(get_run_identifier(doall_str).c_str()),
+      #endif
+      galois::no_stats()
     );
   }
   
@@ -2115,8 +2136,10 @@ private:
       [&](unsigned int n) {
         offsets[n] = getLID(offsets[n]);
       }, 
-      galois::no_stats(),
-      galois::loopname(get_run_identifier(doall_str).c_str())
+      #if MORE_COMM_STATS
+      galois::loopname(get_run_identifier(doall_str).c_str()),
+      #endif
+      galois::no_stats()
     );
   }
   
@@ -2149,10 +2172,12 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textract(
+      extract_timer_str.c_str(), GRNAME);
     std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
                                   get_run_identifier(loopName));
-    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+      extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2186,7 +2211,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + "_" + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, metadata_str, 1);
   }
 
   /**
@@ -2218,10 +2243,10 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(), GRNAME);
     std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
                                   get_run_identifier(loopName));
-    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2259,7 +2284,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + "_" + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, metadata_str, 1);
   }
 
   /**
@@ -2288,8 +2313,8 @@ private:
       std::string statSavedBytes_str(syncTypeStr + "_SAVED_BYTES_" + 
                                      get_run_identifier(loopName));
                                    
-      galois::runtime::reportStat_Tsum(GRNAME, statSavedBytes_str, 
-                                       (redundant_size - bit_set_size));
+      galois::runtime::reportStatCond_Tsum<MORE_DIST_STATS>(GRNAME, statSavedBytes_str, 
+                                                       (redundant_size - bit_set_size));
     }
   }
 
@@ -2366,10 +2391,12 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textract(
+      extract_timer_str.c_str(), GRNAME);
     std::string extract_batch_timer_str(syncTypeStr + "_EXTRACT_BATCH_" +
                                   get_run_identifier(loopName));
-    galois::StatTimer Textractbatch(extract_batch_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
+      extract_batch_timer_str.c_str(), GRNAME);
 
     DataCommMode data_mode;
 
@@ -2420,7 +2447,7 @@ private:
     std::string metadata_str(syncTypeStr + "_METADATA_MODE" + 
                              std::to_string(data_mode) + 
                              get_run_identifier(loopName));
-    galois::runtime::reportStat_Single(GRNAME, metadata_str, 1);
+    galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, metadata_str, 1);
   }
 
   /**
@@ -2457,7 +2484,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string extract_timer_str(syncTypeStr + "_EXTRACT_VECTOR_" + 
                                   get_run_identifier(loopName));
-    galois::StatTimer Textract(extract_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(), GRNAME);
 
 
     Textract.start();
@@ -2548,7 +2575,9 @@ private:
     std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_" + 
                                   get_run_identifier(loopName));
 
-    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, b.size());
+    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(
+      GRNAME, statSendBytes_str, b.size()
+    );
   }
 
   template<SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
@@ -2565,7 +2594,9 @@ private:
     std::string statSendBytes_str(syncTypeStr + "_SEND_BYTES_VECTOR_" + 
                                   get_run_identifier(loopName));
 
-    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, b.size());
+    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(
+      GRNAME, statSendBytes_str, b.size()
+    );
   }
 
   
@@ -2703,7 +2734,7 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
+    galois::CondStatTimer<MORE_COMM_STATS> TSendTime((syncTypeStr + "_SEND_" + 
                                  get_run_identifier(loopName)).c_str(), GRNAME);
 
     TSendTime.start();
@@ -2794,10 +2825,10 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string set_timer_str(syncTypeStr + "_SET_" + 
                               get_run_identifier(loopName));
-    galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
     std::string set_batch_timer_str(syncTypeStr + "_SET_BATCH_" +
                               get_run_identifier(loopName));
-    galois::StatTimer Tsetbatch(set_batch_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(set_batch_timer_str.c_str(), GRNAME);
 
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
@@ -2902,7 +2933,7 @@ private:
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
     std::string set_timer_str(syncTypeStr + "_SET_VECTOR_" + 
                               get_run_identifier(loopName));
-    galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
 
     static galois::DynamicBitSet bit_set_comm;
     static std::vector<typename SyncFnTy::ValTy> val_vec;
@@ -3091,8 +3122,8 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_recv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
-                                         get_run_identifier(loopName)).c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime((syncTypeStr + "_RECV_" + 
+                                 get_run_identifier(loopName)).c_str(), GRNAME);
 
     TRecvTime.start();
     sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(loopName);
@@ -3107,9 +3138,9 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_nonblocking_mpi(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
+    galois::CondStatTimer<MORE_COMM_STATS> TSendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
-    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
+    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
     static std::vector<std::vector<uint8_t>> rb;
@@ -3162,9 +3193,9 @@ private:
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
   void sync_onesided_mpi(std::string loopName, bool use_bitset_to_send = true) {
     std::string syncTypeStr = (syncType == syncReduce) ? "REDUCE" : "BROADCAST";
-    galois::StatTimer TSendTime((syncTypeStr + "_SEND_" + 
+    galois::CondStatTimer<MORE_COMM_STATS> TSendTime((syncTypeStr + "_SEND_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
-    galois::StatTimer TRecvTime((syncTypeStr + "_RECV_" + 
+    galois::CondStatTimer<MORE_COMM_STATS> TRecvTime((syncTypeStr + "_RECV_" + 
                                          get_run_identifier(loopName)).c_str(), GRNAME);
 
     static std::vector<MPI_Win> window;
@@ -3254,7 +3285,7 @@ private:
            typename ReduceFnTy, typename BitsetFnTy>
   inline void reduce(std::string loopName) {
     std::string timer_str("REDUCE_" + get_run_identifier(loopName));
-    galois::StatTimer TsyncReduce(timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> TsyncReduce(timer_str.c_str(), GRNAME);
     TsyncReduce.start();
 
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
@@ -3297,7 +3328,7 @@ private:
            typename BroadcastFnTy, typename BitsetFnTy>
   inline void broadcast(std::string loopName) {
     std::string timer_str("BROADCAST_" + get_run_identifier(loopName));
-    galois::StatTimer TsyncBroadcast(timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> TsyncBroadcast(timer_str.c_str(), GRNAME);
 
     TsyncBroadcast.start();
 
@@ -3573,7 +3604,7 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync(std::string loopName) {
     std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
-    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tsync(timer_str.c_str(), GRNAME);
 
     Tsync.start();
 
@@ -3833,7 +3864,7 @@ public:
   inline void sync_on_demand(galois::runtime::FieldFlags& fieldFlags, 
                              std::string loopName) {
     std::string timer_str("SYNC_" + get_run_identifier(loopName));
-    galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
+    galois::CondStatTimer<MORE_COMM_STATS> Tsync(timer_str.c_str(), GRNAME);
     Tsync.start();
 
     currentBVFlag = &(fieldFlags.bitvectorStatus);
@@ -3992,9 +4023,9 @@ private:
     // Will force all messages to be processed before continuing
     net.flush();
 
-    galois::runtime::reportStat_Tsum(GRNAME, statSendBytes_str, 
+    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(GRNAME, statSendBytes_str, 
         SyncReduce_send_bytes);
-    galois::runtime::reportStat_Tsum(GRNAME, statChkPtBytes_str, 
+    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(GRNAME, statChkPtBytes_str, 
         checkpoint_bytes);
 
     // receive

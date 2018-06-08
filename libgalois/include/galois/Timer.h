@@ -117,15 +117,16 @@ template <bool Enable>
 class CondStatTimer: public StatTimer {
 public:
   CondStatTimer(const char* region): StatTimer("Time", region) {}
+  CondStatTimer(const char* const n, const char* region): StatTimer(n, region) {}
 };
 
-template <> class CondStatTimer<false> {
+template <>
+class CondStatTimer<false> {
 public:
-
   CondStatTimer(const char* name) {}
+  CondStatTimer(const char* const n, const char* region) {}
 
   void start(void) const {}
-
   void stop(void) const {}
 };
 
