@@ -181,10 +181,10 @@ struct PageRank {
   PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
      using namespace galois::worklists;
-     typedef dChunkedFIFO<64> dChunk;
+     typedef PerSocketChunkFIFO<64> PSchunk;
 
-     //galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
-     galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
+     //galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
+     galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
 
   }
 

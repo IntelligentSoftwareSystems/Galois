@@ -723,7 +723,7 @@ class PTAConcurrent : public PTABase<true> {
         },
         galois::loopname("PointsToMainUpdateLoop"),
         galois::no_conflicts(),
-        galois::wl<galois::worklists::dChunkedFIFO<8>>() // TODO exp with this
+        galois::wl<galois::worklists::PerSocketChunkFIFO<8>>() // TODO exp with this
       );
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());

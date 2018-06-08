@@ -520,9 +520,9 @@ public:
 template<typename OptionsTy>
 class DAGManagerBase<OptionsTy,true> {
   typedef DeterministicContext<OptionsTy> Context;
-  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
   typedef worklists::PerThreadChunkLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
-  typedef worklists::dChunkedFIFO<32,Context*> WL3;
+  typedef worklists::PerSocketChunkFIFO<32,Context*> WL3;
 
   struct ThreadLocalData: private boost::noncopyable {
     typedef std::vector<Context*, typename PerIterAllocTy::rebind<Context*>::other> SortBuf;
@@ -942,7 +942,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
   typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
   typedef FIFO<1024,Item> ReserveTy;
-  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
 
   struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
     NewWorkManager* self;
@@ -1283,8 +1283,8 @@ class Executor:
   typedef DItem<OptionsTy> Item;
   typedef DeterministicContext<OptionsTy> Context;
 
-  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
-  typedef worklists::dChunkedFIFO<OptionsTy::ChunkSize,Context> PendingWork;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Item> WL;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Context> PendingWork;
   typedef worklists::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
 
   // Truly thread-local

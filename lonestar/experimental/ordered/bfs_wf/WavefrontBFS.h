@@ -196,7 +196,7 @@ class BFSwavefrontNolock;
 
 class BFSwavefrontLock: public AbstractWavefrontBFS {
 protected:
-  typedef GaloisWLwrapper< galois::worklists::dChunkedFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
+  typedef GaloisWLwrapper< galois::worklists::PerSocketChunkFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
 
   typedef AbstractWavefrontBFS::Super_ty BaseBFS;
 

@@ -170,7 +170,7 @@ public:
 
   void execute() {
     typedef typename Context<Graph,Operator>::WorkItem WorkItem;
-    typedef galois::worklists::dChunkedFIFO<256> WL;
+    typedef galois::worklists::PerSocketChunkFIFO<256> WL;
 
     galois::InsertBag<WorkItem> bag;
     galois::do_all(galois::iterate(graph), Initialize(this, bag));
@@ -186,7 +186,7 @@ class SyncEngine {
   typedef typename Graph::in_edge_iterator in_edge_iterator;
   typedef typename Graph::edge_iterator edge_iterator;
   static const bool NeedMessages = !std::is_same<EmptyMessage,message_type>::value;
-  typedef galois::worklists::dChunkedFIFO<256> WL;
+  typedef galois::worklists::PerSocketChunkFIFO<256> WL;
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
   typedef galois::substrate::PerSocketStorage<MyMessages> Messages;

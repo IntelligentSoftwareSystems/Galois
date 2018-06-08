@@ -279,7 +279,7 @@ int main(int argc, char** argv) {
 
   galois::on_each(popstate());
 
-  typedef galois::worklists::dChunkedLIFO<8> WL;
+  typedef galois::worklists::PerSocketChunkLIFO<8> WL;
   //typedef galois::worklists::PerThreadChunkLIFO<32> CA;
   galois::StatTimer T;
   T.start();

@@ -873,7 +873,7 @@ void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
     update(*ii, basis, pairs, ring, ring, initial);
   }
   using namespace galois::worklists;
-  typedef OrderedByIntegerMetric<Indexer,dChunkedLIFO<8> > OBIM;
+  typedef OrderedByIntegerMetric<Indexer,PerSocketChunkLIFO<8> > OBIM;
   galois::for_each(initial.begin(), initial.end(), Process<R>(basis, pairs, ring), galois::wl<OBIM>());
 
   interReduce(basis, ring);

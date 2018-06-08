@@ -60,7 +60,7 @@ typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<
 typedef typename Graph::GraphNode GNode;
 
 void asyncPageRank(Graph& graph) {
-  typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE> WL;
+  typedef galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE> WL;
   galois::for_each(
       galois::iterate(graph),
       [&](GNode src, auto& ctx) {

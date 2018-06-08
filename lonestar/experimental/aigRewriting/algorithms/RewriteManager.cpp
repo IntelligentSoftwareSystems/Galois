@@ -900,9 +900,9 @@ void runRewriteOperator( RewriteManager & rwtMan ) {
 
 
 	galois::InsertBag< aig::GNode > workList;
-	typedef galois::worklists::dChunkedBag< 500 > DC_BAG;
-	//typedef galois::worklists::dChunkedFIFO< 5000 > DC_FIFO;
-	//typedef galois::worklists::dChunkedLIFO< 5000 > DC_LIFO;
+	typedef galois::worklists::PerSocketChunkBag< 500 > DC_BAG;
+	//typedef galois::worklists::PerSocketChunkFIFO< 5000 > DC_FIFO;
+	//typedef galois::worklists::PerSocketChunkLIFO< 5000 > DC_LIFO;
   	//typedef galois::worklists::PerThreadChunkFIFO< 5000 > AC_FIFO;
 
 	for ( auto pi : rwtMan.getAig().getInputNodes() ) {	

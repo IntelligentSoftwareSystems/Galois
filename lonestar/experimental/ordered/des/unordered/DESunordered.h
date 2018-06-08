@@ -181,7 +181,7 @@ class DESunordered: public DESunorderedBase {
 
     Process p(graph, onWLflags, numEvents, numIter, maxPending);
 
-    typedef galois::worklists::dChunkedFIFO<AbstractBase::DEFAULT_CHUNK_SIZE, GNode> WL_ty;
+    typedef galois::worklists::PerSocketChunkFIFO<AbstractBase::DEFAULT_CHUNK_SIZE, GNode> WL_ty;
     // typedef galois::runtime::worklists::GFIFO<GNode> WL_ty;
 
     galois::for_each(initialActive.begin (), initialActive.end (), p, galois::wl<WL_ty>());

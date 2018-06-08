@@ -728,8 +728,8 @@ struct PrtRsd {
     galois::do_all(graph, Process2(this, graph), galois::loopname("P2")); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
     using namespace galois::worklists;
-    typedef dChunkedFIFO<16> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>::with_block_period<4>::type OBIM;
+    typedef PerSocketChunkFIFO<16> PSchunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,PSchunk>::with_block_period<4>::type OBIM;
 #ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
 #else
@@ -855,7 +855,7 @@ struct Async {
 
   void operator()(Graph& graph) {
     //    skip = 0;
-    typedef galois::worklists::dChunkedFIFO<16> WL;
+    typedef galois::worklists::PerSocketChunkFIFO<16> WL;
     galois::for_each(graph, Process(graph), galois::wl<WL>());
   }
 };

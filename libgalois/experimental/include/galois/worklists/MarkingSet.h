@@ -31,7 +31,7 @@ namespace worklists {
 namespace internal {
 
 template<typename T, typename Marker,
-	 typename Scheduler = dChunkedFIFO<64, T> >
+	 typename Scheduler = PerSocketChunkFIFO<64, T> >
 struct MarkingWorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;
@@ -103,8 +103,8 @@ public:
 }  // end namespace internal
 
 template<typename Marker, int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedMarkingSetFIFO = internal::MarkingWorkSetMaster<T, Marker, dChunkedFIFO<ChunkSize,T,Concurrent> >;
-GALOIS_WLCOMPILECHECK(dChunkedMarkingSetFIFO);
+using PerSocketChunkMarkingSetFIFO = internal::MarkingWorkSetMaster<T, Marker, PerSocketChunkFIFO<ChunkSize,T,Concurrent> >;
+GALOIS_WLCOMPILECHECK(PerSocketChunkMarkingSetFIFO);
 
 } // end namespace worklists
 } // end namespace galois

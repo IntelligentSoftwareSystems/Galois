@@ -342,7 +342,7 @@ struct chunk_size:
   chunk_size (unsigned cs=SZ): trait_has_value (regulate (cs)) {}
 };
 
-typedef worklists::dChunkedFIFO<chunk_size<>::value> defaultWL;
+typedef worklists::PerSocketChunkFIFO<chunk_size<>::value> defaultWL;
 
 namespace internal {
 

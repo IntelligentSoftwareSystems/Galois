@@ -129,10 +129,10 @@ struct AsyncEdge {
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
     if (!edgePri) {
-      typedef galois::worklists::dChunkedFIFO<256> WL;
+      typedef galois::worklists::PerSocketChunkFIFO<256> WL;
       galois::for_each(graph, Process(graph, tolerance, amp), galois::wl<WL>());
     } else {
-      typedef galois::worklists::dChunkedFIFO<32> WL;
+      typedef galois::worklists::PerSocketChunkFIFO<32> WL;
       //typedef galois::worklists::PerThreadChunkFIFO<32> WL;
       typedef galois::worklists::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
       //typedef galois::worklists::WorkListTracker<sndPri,OBIM> DOBIM;

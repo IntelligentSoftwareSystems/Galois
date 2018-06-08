@@ -34,7 +34,7 @@ The scheduling policies are listed as follows:
 
       - \b ChunkedFIFO (or ChunkedLIFO) maintains a single global queue (or stack) for chunks of work items
 
-      - \b dChunkedFIFO (or dChunkedLIFO) maintains a queue (or stack) of chunks per each package (multi-core
+      - \b PerSocketChunkFIFO (or PerSocketChunkLIFO) maintains a queue (or stack) of chunks per each package (multi-core
         processor) in the system. A thread tries to find a chunk in its local
         package before stealing from other packages. 
 
@@ -53,7 +53,7 @@ The scheduling policies are listed as follows:
     queue may be passed to control how items within the same priority bin are stored. 
     An example to define an OrderedByIntegerMetric scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
     The OBIM in the following example shows how to define a priority scheduling. 
-    The UpdateRequestIndexer defines the priority binning function. Internally It uses a dChunkedLIFO to store the items with the same priority.
+    The UpdateRequestIndexer defines the priority binning function. Internally It uses a PerSocketChunkLIFO to store the items with the same priority.
 
     
     @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple

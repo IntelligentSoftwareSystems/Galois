@@ -693,9 +693,9 @@ Real BP::run() {
           }
 
           using namespace galois::worklists;
-          typedef dChunkedFIFO<64> dChunk;
+          typedef PerSocketChunkFIFO<64> PSchunk;
           typedef ChunkedFIFO<64> Chunk;
-          typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
+          typedef OrderedByIntegerMetric<Indexer,PSchunk> OBIM;
           unsigned count = 0;
 
           galois::Timer t;

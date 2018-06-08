@@ -583,7 +583,7 @@ static void bs_algo(float **BENCH)
   int ii, jj, kk;
 
   namespace ww = galois::worklists;
-  typedef ww::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
+  typedef ww::StableIterator<>::with_container<ww::PerSocketChunkLIFO<1>>::type WL;
 
   for (kk=0; kk<bots_arg_size; kk++) {
     lu0(BENCH[kk*bots_arg_size+kk]);

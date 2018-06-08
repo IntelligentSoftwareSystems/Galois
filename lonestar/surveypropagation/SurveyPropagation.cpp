@@ -399,12 +399,12 @@ class SurveyPropagation {
 
     //  tlimit += tmax;
 
-    using WL = galois::worklists::dChunkedFIFO<128>;
+    using WL = galois::worklists::PerSocketChunkFIFO<128>;
     //using WL = galois::worklists::ParaMeter<>;
     //using WL = galois::worklists::PerThreadChunkFIFO<1024>;
     //using OBIM = galois::worklists::OrderedByIntegerMetric<
                    //decltype(EIndexer()),
-                   //galois::worklists::dChunkedFIFO<512>
+                   //galois::worklists::PerSocketChunkFIFO<512>
                    //>;
 
     galois::reportPageAlloc("MeminfoPre: SP_algorithm for_each");

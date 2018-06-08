@@ -84,9 +84,9 @@ cll::opt<unsigned int> memoryLimit("memoryLimit",
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
-      clEnumValN(Algo::asyncFifo, "asyncFifo", "async with dChunkedFIFO scheduler"),
+      clEnumValN(Algo::asyncFifo, "asyncFifo", "async with PerSocketChunkFIFO scheduler"),
       clEnumValN(Algo::asyncBlindObim, "asyncBlindObim", "async without discarding empty work"),
-      clEnumValN(Algo::asyncBlindFifo, "asyncBlindFifo", "asyncBlind with dChunkedFIFO scheduling"),
+      clEnumValN(Algo::asyncBlindFifo, "asyncBlindFifo", "asyncBlind with PerSocketChunkFIFO scheduling"),
       clEnumValN(Algo::asyncBlindFifoHSet, "asyncBlindFifoHSet", "asyncBlindFifo with two-level hash uni-set scheduler"),
       clEnumValN(Algo::asyncBlindFifoMSet, "asyncBlindFifoMSet", "asyncBlindFifo with marking set uni-set scheduler"),
       clEnumValN(Algo::asyncBlindFifoOSet, "asyncBlindFifoOSet", "asyncBlindFifo with two-level set uni-set scheduler"),
@@ -95,9 +95,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::asyncBlindObimOSet, "asyncBlindObimOSet", "asyncBlindObim with two-level set uni-set scheduler"),
       clEnumValN(Algo::asyncPP, "asyncPP", "Async, CAS, push-pull"),
       clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
-      clEnumValN(Algo::asyncWithCasFifo, "asyncWithCasFifo", "asyncWithCas with dChunkedFIFO scheduler"),
+      clEnumValN(Algo::asyncWithCasFifo, "asyncWithCasFifo", "asyncWithCas with PerSocketChunkFIFO scheduler"),
       clEnumValN(Algo::asyncWithCasBlindObim, "asyncWithCasBlindObim", "asyncWithCas without discarding empty work"),
-      clEnumValN(Algo::asyncWithCasBlindFifo, "asyncWithCasBlindFifo", "asyncWithCasBlind with dChunkedFIFO scheduling"),
+      clEnumValN(Algo::asyncWithCasBlindFifo, "asyncWithCasBlindFifo", "asyncWithCasBlind with PerSocketChunkFIFO scheduling"),
       clEnumValN(Algo::asyncWithCasBlindFifoHSet, "asyncWithCasBlindFifoHSet", "asyncWithCasBlindFifo with two-level hash uni-set scheduler"),
       clEnumValN(Algo::asyncWithCasBlindFifoMSet, "asyncWithCasBlindFifoMSet", "asyncWithCasBlindFifo with marking set uni-set scheduler"),
       clEnumValN(Algo::asyncWithCasBlindFifoOSet, "asyncWithCasBlindFifoOSet", "asyncWithCasBlindFifo with two-level set uni-set scheduler"),
@@ -388,7 +388,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> Chunk;
+    typedef PerSocketChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
@@ -402,7 +402,7 @@ struct AsyncAlgo {
         graph.out_edges(source, galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
     if(algo == Algo::asyncFifo || algo == Algo::asyncWithCasFifo)
-      galois::for_each(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
+      galois::for_each(initial, Process(this, graph), galois::wl<PerSocketChunkFIFO<64> >());
     else
       galois::for_each(initial, Process(this, graph), galois::wl<OBIM>());
   }
@@ -516,11 +516,11 @@ struct AsyncSetAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> Chunk;
+    typedef PerSocketChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<NodeIndexer<Graph>, Chunk, 10, false> OBIM;
-    typedef dChunkedMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
-    typedef dChunkedTwoLevelSetFIFO<64> OSet;
-    typedef dChunkedTwoLevelHashFIFO<64> HSet;
+    typedef PerSocketChunkMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
+    typedef PerSocketChunkTwoLevelSetFIFO<64> OSet;
+    typedef PerSocketChunkTwoLevelHashFIFO<64> HSet;
     typedef detail::MarkingWorkSetMaster<GNode,NodeSetMarker<Graph>,OBIM> ObimMSet;
     typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;
     typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelHash<GNode> > ObimHSet;
@@ -550,7 +550,7 @@ struct AsyncSetAlgo {
       break;
     case Algo::asyncBlindFifo:
     case Algo::asyncWithCasBlindFifo:
-      galois::for_each(initial, Process(this, graph), galois::wl<dChunkedFIFO<64> >());
+      galois::for_each(initial, Process(this, graph), galois::wl<PerSocketChunkFIFO<64> >());
       break;
     case Algo::asyncBlindObimMSet:
     case Algo::asyncWithCasBlindObimMSet:

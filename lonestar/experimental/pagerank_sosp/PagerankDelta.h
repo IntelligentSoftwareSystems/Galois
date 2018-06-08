@@ -78,7 +78,7 @@ struct PagerankDelta {
   };
 
   void operator()(Graph& graph) {
-    typedef galois::worklists::dChunkedFIFO<512> WL;
+    typedef galois::worklists::PerSocketChunkFIFO<512> WL;
     galois::for_each(graph, Process(this, graph), galois::wl<WL>());
   }
 };

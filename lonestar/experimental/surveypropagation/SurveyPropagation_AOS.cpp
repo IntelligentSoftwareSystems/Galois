@@ -274,7 +274,7 @@ void SP_algorithm(Graph& graph,
   
   //  tlimit += tmax;
 
-  using WL = galois::worklists::dChunkedFIFO<1024>;
+  using WL = galois::worklists::PerSocketChunkFIFO<1024>;
 
   galois::reportPageAlloc("MeminfoPre: SP_algorithm for_each");
   galois::for_each( galois::iterate(clauses), 

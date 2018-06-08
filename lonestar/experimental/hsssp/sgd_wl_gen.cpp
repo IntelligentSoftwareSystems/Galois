@@ -175,8 +175,8 @@ struct Sgd {
       }
 
       using namespace galois::worklists;
-      typedef dChunkedFIFO<64> dChunk;
-      galois::for_each(_graph.begin(), _graph.end(), Sgd(&_graph, _step_size), galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{galois::resetVec(node.latent_vector); }"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
+      typedef PerSocketChunkFIFO<64> PSchunk;
+      galois::for_each(_graph.begin(), _graph.end(), Sgd(&_graph, _step_size), galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{galois::resetVec(node.latent_vector); }"), galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
 
   }
 

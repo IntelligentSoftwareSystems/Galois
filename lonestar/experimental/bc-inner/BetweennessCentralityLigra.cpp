@@ -192,7 +192,7 @@ struct LigraAlgo: public galois::ligraGraphChi::ChooseExecutor<UseGraphChi> {
   };
 
   void operator()(Graph& graph, GNode source) {
-    typedef galois::worklists::dChunkedFIFO<256> WL;
+    typedef galois::worklists::PerSocketChunkFIFO<256> WL;
     std::deque<Bag*> levels;
 
     graph.getData(source).visited = true;

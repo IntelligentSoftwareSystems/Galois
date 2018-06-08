@@ -183,9 +183,9 @@ template <bool CONCURRENT, typename T, typename P, typename R>
 void asyncAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeRange) {
 
   namespace gwl = galois::worklists;
-  //typedef dChunkedFIFO<CHUNK_SIZE> dFIFO;
-  using FIFO = gwl::dChunkedFIFO<CHUNK_SIZE>;
-  using BSWL =  gwl::BulkSynchronous< gwl::dChunkedLIFO<CHUNK_SIZE> >;
+  //typedef PerSocketChunkFIFO<CHUNK_SIZE> dFIFO;
+  using FIFO = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
+  using BSWL =  gwl::BulkSynchronous< gwl::PerSocketChunkLIFO<CHUNK_SIZE> >;
   using WL = FIFO;
 
   using Loop = typename std::conditional<CONCURRENT, galois::ForEach, galois::WhileQ<galois::SerFIFO<T> > >::type;

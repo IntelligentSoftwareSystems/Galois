@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
   };
 
   using namespace galois::worklists;
-  typedef dChunkedLIFO<16> dChunk;
-  typedef OrderedByIntegerMetric<decltype(reqIndexer),dChunk> OBIM;
+  typedef PerSocketChunkLIFO<16> PSchunk;
+  typedef OrderedByIntegerMetric<decltype(reqIndexer),PSchunk> OBIM;
 //! [OrderedByIntegerMetic in SSSPPullsimple]
 
   galois::StatTimer T;

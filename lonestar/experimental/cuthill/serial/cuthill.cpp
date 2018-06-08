@@ -1047,7 +1047,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   using namespace galois::worklists;
-  typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+  typedef BulkSynchronous<PerSocketChunkLIFO<256> > BSWL;
 
   //#ifdef GALOIS_USE_EXP
   //  typedef BulkSynchronousInline<> BSInline;

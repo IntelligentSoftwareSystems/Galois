@@ -70,8 +70,8 @@ int main(int argc, char **argv) {
   };
 
   using namespace galois::worklists;
-  using dChunk = dChunkedLIFO<16>; // chunk size 16
-  using OBIM = OrderedByIntegerMetric<decltype(reqIndexer),dChunk>;
+  using PSchunk = PerSocketChunkLIFO<16>; // chunk size 16
+  using OBIM = OrderedByIntegerMetric<decltype(reqIndexer),PSchunk>;
   //! [Scheduler examples]
 
   //! [Data-driven loops]
@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
     galois::for_each(
         galois::iterate({*graph.begin()}),   // initial range using initializer list
         SSSP                                 // operator
-        , galois::wl<dChunk>()               // options
+        , galois::wl<PSchunk>()               // options
         , galois::loopname("sssp_dchunk16")
     );
   } 

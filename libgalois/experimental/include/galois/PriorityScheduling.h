@@ -41,28 +41,28 @@ struct PickInner;
 
 template<int CS>
 struct PickInner<CS, true> {
-  typedef dChunkedLIFO<CS> dChunk;
+  typedef PerSocketChunkLIFO<CS> PSchunk;
   typedef  ChunkedLIFO<CS> Chunk;
 };
 template<int CS>
 struct PickInner<CS, false> {
-  typedef dChunkedFIFO<CS> dChunk;
+  typedef PerSocketChunkFIFO<CS> PSchunk;
   typedef  ChunkedFIFO<CS> Chunk;
 };
 
  template<int ChunkSize, typename Ind, typename DEFAULT, typename Less, typename Greater, bool LF = false >
 struct PriAuto {
 
-   typedef typename PickInner<ChunkSize, LF>::dChunk dChunk;
+   typedef typename PickInner<ChunkSize, LF>::PSchunk PSchunk;
    typedef typename PickInner<ChunkSize, LF>::Chunk   Chunk;
 
   //OBIM
-  typedef   OrderedByIntegerMetric<Ind,dChunk, true> OBIM_DMB;
-  typedef CTOrderedByIntegerMetric<Ind,dChunk, true> OBIM_DSB;
+  typedef   OrderedByIntegerMetric<Ind,PSchunk, true> OBIM_DMB;
+  typedef CTOrderedByIntegerMetric<Ind,PSchunk, true> OBIM_DSB;
   typedef   OrderedByIntegerMetric<Ind, Chunk, true> OBIM_CMB;
   typedef CTOrderedByIntegerMetric<Ind, Chunk, true> OBIM_CSB;
-  typedef   OrderedByIntegerMetric<Ind,dChunk,false> OBIM_DMN;
-  typedef CTOrderedByIntegerMetric<Ind,dChunk,false> OBIM_DSN;
+  typedef   OrderedByIntegerMetric<Ind,PSchunk,false> OBIM_DMN;
+  typedef CTOrderedByIntegerMetric<Ind,PSchunk,false> OBIM_DSN;
   typedef   OrderedByIntegerMetric<Ind, Chunk,false> OBIM_CMN;
   typedef CTOrderedByIntegerMetric<Ind, Chunk,false> OBIM_CSN;
 

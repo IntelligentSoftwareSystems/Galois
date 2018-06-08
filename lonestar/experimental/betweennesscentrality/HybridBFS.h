@@ -65,7 +65,7 @@ struct HybridBFS {
    */
   void bfsPushAsync(Graph& graph, WorkItemBag& asyncBag) {
     using namespace galois::worklists;
-    using BSWL = BulkSynchronous<dChunkedLIFO<256>>;
+    using BSWL = BulkSynchronous<PerSocketChunkLIFO<256>>;
 
     // each thread processes one node + does pushes along its edges
     galois::for_each(

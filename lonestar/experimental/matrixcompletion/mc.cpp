@@ -310,7 +310,7 @@ struct sgd_node_movie_pri {
       // if (i != 0)
       //   std::random_shuffle(Movies.begin(), Movies.end());
       galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie_pri(g, step_size), 
-                       galois::wl<galois::worklists::dChunkedFIFO<>>());
+                       galois::wl<galois::worklists::PerSocketChunkFIFO<>>());
     }
   }
 };
@@ -347,7 +347,7 @@ struct sgd_edge_movie {
       std::cout << "Step Size: " << step_size << "\n";
       if (i != 0)
         std::random_shuffle(Movies.begin(), Movies.end());
-      galois::for_each(Movies.begin(), Movies.end(), sgd_edge_movie(g, step_size), galois::wl<galois::worklists::dChunkedLIFO<8>>());
+      galois::for_each(Movies.begin(), Movies.end(), sgd_edge_movie(g, step_size), galois::wl<galois::worklists::PerSocketChunkLIFO<8>>());
     }
   }
 };

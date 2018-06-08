@@ -219,10 +219,10 @@ struct Async {
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-    typedef galois::worklists::dChunkedFIFO<16> WL;
-    typedef galois::worklists::dChunkedTwoLevelHashFIFO<16> HSet;
-    typedef galois::worklists::dChunkedTwoLevelSetFIFO<16> OSet;
-    typedef galois::worklists::dChunkedMarkingSetFIFO<LNodeSetMarker<Graph>,16> MSet;
+    typedef galois::worklists::PerSocketChunkFIFO<16> WL;
+    typedef galois::worklists::PerSocketChunkTwoLevelHashFIFO<16> HSet;
+    typedef galois::worklists::PerSocketChunkTwoLevelSetFIFO<16> OSet;
+    typedef galois::worklists::PerSocketChunkMarkingSetFIFO<LNodeSetMarker<Graph>,16> MSet;
 
     auto marker = LNodeSetMarker<Graph>(graph);
 
@@ -327,7 +327,7 @@ struct AsyncNodePri{
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
     using namespace galois::worklists;
-    typedef dChunkedFIFO<32> WL;
+    typedef PerSocketChunkFIFO<32> WL;
     typedef OrderedByIntegerMetric<PRPri,WL>::with_block_period<8>::type OBIM;
     typedef detail::MarkingWorkSetMaster<GNode,LNodeSetMarker<Graph>,OBIM> ObimMSet;
     typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;

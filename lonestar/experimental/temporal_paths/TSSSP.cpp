@@ -143,8 +143,8 @@ int main(int argc, char** argv) {
   Tmain.start();
 
   using namespace galois::worklists;
-  typedef dChunkedFIFO<64> dChunk;
-  typedef OrderedByIntegerMetric<GNIndexer,dChunk> OBIM;
+  typedef PerSocketChunkFIFO<64> PSchunk;
+  typedef OrderedByIntegerMetric<GNIndexer,PSchunk> OBIM;
   galois::for_each(source, EarlyArivalTime{graph}, galois::wl<OBIM>(GNIndexer{graph}), galois::no_conflicts());
   Tmain.stop();
   T.stop();

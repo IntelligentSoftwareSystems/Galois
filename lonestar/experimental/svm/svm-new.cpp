@@ -1279,7 +1279,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 		if(algoType == AlgoType::DCDLR)
 			ln = galois::loopname("LogisticRegression");
 
-	auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
+	auto wl = galois::wl<galois::worklists::PerSocketChunkFIFO<32>>();
 //		auto wl = galois::wl<galois::worklists::StableIterator<true> >();
 		galois::GAccumulator<size_t> bigUpdates;
 
@@ -1467,7 +1467,7 @@ void runPrimalSgd_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
     auto ts_begin = trainingSamples.begin();
     auto ts_end = trainingSamples.end();
     auto ln = galois::loopname("LinearSVM");
-    auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
+    auto wl = galois::wl<galois::worklists::PerSocketChunkFIFO<32>>();
 
 		if (UT == UpdateType::Wild)
 			galois::for_each(ts_begin, ts_end, LinearSGDWild(g_train, learning_rate), ln, wl);
@@ -1580,7 +1580,7 @@ void runCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>&
 		}
 
 		auto ln = galois::loopname("PrimalCD");
-auto wl = galois::wl<galois::worklists::dChunkedLIFO<32>>();
+auto wl = galois::wl<galois::worklists::PerSocketChunkLIFO<32>>();
 //		auto wl = galois::wl<galois::worklists::StableIterator<true> >();
 
 		UpdateType type = updateType;
@@ -1860,7 +1860,7 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 
 		// Compute Newton direction -- Hessian and Gradient
 		auto ln = galois::loopname("GLMENT-QPconstruction");
-		auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
+		auto wl = galois::wl<galois::worklists::PerSocketChunkFIFO<32>>();
 		galois::for_each(active_set.begin(), active_set.end(), glmnet_qp_construct(g_train, params, cur_bag, nr_samples), ln, wl);
 
 		double tmp_Gnorm1_new = params.Gnorm1_new.reduce();
@@ -1898,7 +1898,7 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 				std::shuffle(active_set.begin(), active_set.end(), gen);
 			auto ln = galois::loopname("GLMENT-CDiteration");
 #if 1
-			auto wl = galois::wl<galois::worklists::dChunkedFIFO<32>>();
+			auto wl = galois::wl<galois::worklists::PerSocketChunkFIFO<32>>();
 			galois::for_each(active_set.begin(), active_set.end(), glmnet_cd<UT>(g_train, dstate, params, cd_bag, nr_samples), ln, wl);
 			dstate.merge([&g_train](ptrdiff_t x) -> double& { return g_train.getData(x).xTd; });
 #else

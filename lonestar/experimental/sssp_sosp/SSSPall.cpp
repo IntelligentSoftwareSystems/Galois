@@ -100,9 +100,9 @@ struct reset {
 
 void runBodyParallel(const GNode src[NUM], int n) {
   using namespace galois::worklists;
-  typedef dChunkedLIFO<16> dChunk;
+  typedef PerSocketChunkLIFO<16> PSchunk;
   typedef ChunkedLIFO<16> Chunk;
-  typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+  typedef OrderedByIntegerMetric<UpdateRequestIndexer,PSchunk> OBIM;
 
   galois::StatTimer T;
 

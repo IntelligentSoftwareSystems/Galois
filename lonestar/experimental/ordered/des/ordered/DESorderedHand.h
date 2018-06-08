@@ -474,7 +474,7 @@ protected:
     while (true) {
       ++round;
 
-      typedef galois::worklists::dChunkedFIFO<16> WL_ty;
+      typedef galois::worklists::PerSocketChunkFIFO<16> WL_ty;
 
       galois::for_each(initWL.begin (), initWL.end (),
                        OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents),

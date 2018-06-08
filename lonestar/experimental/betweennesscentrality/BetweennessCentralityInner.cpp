@@ -163,7 +163,7 @@ struct AsyncAlgo {
 
     using OBIM = galois::worklists::OrderedByIntegerMetric<
                    decltype(indexer),
-                   galois::worklists::dChunkedFIFO<ChunkSize>
+                   galois::worklists::PerSocketChunkFIFO<ChunkSize>
                  >;
 
     galois::for_each(
@@ -223,7 +223,7 @@ struct AsyncAlgo {
 
     using OBIM = galois::worklists::OrderedByIntegerMetric<
                    decltype(indexer),
-                   galois::worklists::dChunkedFIFO<ChunkSize>
+                   galois::worklists::PerSocketChunkFIFO<ChunkSize>
                  >;
 
     galois::for_each(

@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
                 }
               },
               galois::loopname("DemoAlgo"),
-              galois::wl<galois::worklists::dChunkedFIFO<32> >());
+              galois::wl<galois::worklists::PerSocketChunkFIFO<32> >());
         }
       }
       break;
@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
           },
           galois::loopname("Merge"),
           galois::no_conflicts(),
-          galois::wl<galois::worklists::dChunkedFIFO<128> >());
+          galois::wl<galois::worklists::PerSocketChunkFIFO<128> >());
         //! Normalize component by doing find with path compression
         galois::do_all(galois::iterate(graph), Normalize, galois::loopname("Normalize"));
       }

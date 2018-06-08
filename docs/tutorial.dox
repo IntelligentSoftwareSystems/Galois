@@ -156,9 +156,9 @@ See {@link lonestar/tutorial_examples/GraphTraversalPushOperator.cpp} for the fu
 
 So far we addressed only topology-driven algorithms, e.g. the same computation is done by all graph nodes. To implement data-driven algorithms, two more constructs are needed: (1) a worklist to track active elements, and (2) a scheduler to decide which active elements to work on first. New work items can be inserted to a worklist by calling galois::UserContext::push. Therefore, this section focuses on the schedulers supported by Galois.
 
-Galois supports varieties of scheduling policies, all of them are in namespace galois::worklists. Example scheduling policies are galois::worklists::FIFO (approximate), galois::worklists::LIFO (approximate), galois::worklists::ChunkedFIFO, galois::worklists::ChunkedLIFO, galois::worklists::dChunkedFIFO, galois::worklists::dChunkedLIFO, galois::worklists::PerThreadChunkFIFO, galois::worklists::PerThreadChunkLIFO, and galois::worklists::OrderedByIntegerMetric. The default scheduler is galois::worklists::dChunkedFIFO with chunk size 32.
+Galois supports varieties of scheduling policies, all of them are in namespace galois::worklists. Example scheduling policies are galois::worklists::FIFO (approximate), galois::worklists::LIFO (approximate), galois::worklists::ChunkedFIFO, galois::worklists::ChunkedLIFO, galois::worklists::PerSocketChunkFIFO, galois::worklists::PerSocketChunkLIFO, galois::worklists::PerThreadChunkFIFO, galois::worklists::PerThreadChunkLIFO, and galois::worklists::OrderedByIntegerMetric. The default scheduler is galois::worklists::PerSocketChunkFIFO with chunk size 32.
 
-galois::worklists::OrderedByIntegerMetric can be used to implement user-defined soft priority, a hint for the Galois runtime to schedule active elements where priority inversion will not result in incorrect answers or deadlocks. It needs an indexer function to map work items to an integer (priority). Each bin corresponds to a priority level, and is itself a worklist, e.g. galois::worklists::dChunkedLIFO with chunk size 16.
+galois::worklists::OrderedByIntegerMetric can be used to implement user-defined soft priority, a hint for the Galois runtime to schedule active elements where priority inversion will not result in incorrect answers or deadlocks. It needs an indexer function to map work items to an integer (priority). Each bin corresponds to a priority level, and is itself a worklist, e.g. galois::worklists::PerSocketChunkLIFO with chunk size 16.
 
 Let us use single-source shortest path (SSSP) problem to illustrate the implementation of data-driven algorithms using Galois. Given (1) an edge-weighted graph G with no negative-weight cycles, and (2) a source node s; the SSSP problem asks for the shortest distance of every node n in G from s. Initially, s has distance 0 from itself, and all other nodes have distances infinity from s.
 
@@ -166,7 +166,7 @@ Here is the operator code common to all push-style SSSP algorithms:
 
 @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp SSSP push operator
 
-And here is the code to declare worklists. Note how OBIM is declared with an indexer, e.g. reqIndexer, and another worklist, e.g. dChunkedLIFO<16>.
+And here is the code to declare worklists. Note how OBIM is declared with an indexer, e.g. reqIndexer, and another worklist, e.g. PerSocketChunkLIFO<16>.
 
 @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp Scheduler examples
 

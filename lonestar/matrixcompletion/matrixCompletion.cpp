@@ -683,7 +683,7 @@ class SGDItemsAlgo{
 
           }
         },
-        galois::wl<galois::worklists::dChunkedFIFO<64>>(),
+        galois::wl<galois::worklists::PerSocketChunkFIFO<64>>(),
         galois::no_pushes(),
         galois::loopname("sgdItemsAlgo")
       );
@@ -785,7 +785,7 @@ class SGDEdgeItem{
               ctx.push(src);
             }
             },
-            galois::wl<galois::worklists::dChunkedLIFO<8>>(),
+            galois::wl<galois::worklists::PerSocketChunkLIFO<8>>(),
             galois::loopname("sgdEdgeItem")
       );
     }

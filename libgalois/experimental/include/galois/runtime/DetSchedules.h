@@ -64,7 +64,7 @@ void for_each_det_choice (const R& range, const F& func, const char* loopname, c
     case non_det:
       {
         const unsigned CHUNK_SIZE = 32;
-        typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE, typename R::value_type> WL_ty;
+        typedef galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE, typename R::value_type> WL_ty;
         galois::runtime::for_each_impl<WL_ty> (range, func, loopname);
         break;
       }

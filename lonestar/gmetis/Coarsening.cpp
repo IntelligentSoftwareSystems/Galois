@@ -282,7 +282,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
   MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
 
   /*
-   * Different worklist versions tried, dChunkedFIFO 256 works best with LC_MORPH_graph.
+   * Different worklist versions tried, PerSocketChunkFIFO 256 works best with LC_MORPH_graph.
    * Another good type would be Lazy Iter.
    */
   //typedef galois::worklists::ChunkedLIFO<64, GNode> WL;
@@ -298,7 +298,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
     parallelMatchAndCreateNodes<RMmatch, WL>(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
   } else {
     //FIXME: use obim for SHEM matching
-    typedef galois::worklists::dChunkedLIFO<32> Chunk;
+    typedef galois::worklists::PerSocketChunkLIFO<32> Chunk;
     //typedef galois::worklists::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
     typedef galois::worklists::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
     //typedef galois::worklists::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;
@@ -313,7 +313,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
   if (verbose && c)
     std::cout << "\n\tLone Matches " << c;
   if (use2Hop) {
-    typedef galois::worklists::dChunkedLIFO<32> Chunk;
+    typedef galois::worklists::PerSocketChunkLIFO<32> Chunk;
     //typedef galois::worklists::OrderedByIntegerMetric<WeightIndexer, Chunk> pW;
     typedef galois::worklists::OrderedByIntegerMetric<LowDegreeIndexer, Chunk> pLD;
     //typedef galois::worklists::OrderedByIntegerMetric<HighDegreeIndexer, Chunk> pHD;

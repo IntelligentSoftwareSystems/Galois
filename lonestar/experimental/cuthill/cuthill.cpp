@@ -241,15 +241,15 @@ private:
 
   static Result unorderedAlgo(GNode source, bool reset) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
     typedef ChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<GNodeIndexer,PSchunk> OBIM;
     
     Result res;
     res.source = source;
 
     graph.getData(source).dist = 0;
-    galois::for_each(source, UnorderedProcess(), galois::wl<dChunk>());
+    galois::for_each(source, UnorderedProcess(), galois::wl<PSchunk>());
 
     struct updater {
       void operator()(std::deque<size_t>& lhs, size_t rhs) {

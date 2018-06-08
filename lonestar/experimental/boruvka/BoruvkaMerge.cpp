@@ -75,8 +75,8 @@ EdgeDataType runBodyParallel(Graph& graph) {
 
 
   using namespace galois::worklists;
-  typedef dChunkedFIFO<64> dChunk;
-  typedef OrderedByIntegerMetric< decltype(indexer), dChunk> OBIM;
+  typedef PerSocketChunkFIFO<64> PSchunk;
+  typedef OrderedByIntegerMetric< decltype(indexer), PSchunk> OBIM;
 
   Counter MSTWeight;
 

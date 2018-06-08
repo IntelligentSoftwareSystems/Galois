@@ -154,7 +154,7 @@ struct BFS {
   BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
 
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {

@@ -57,7 +57,7 @@ namespace galois {
 namespace runtime {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef worklists::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+typedef worklists::PerSocketChunkFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template<typename value_type>
 class AbortHandler {

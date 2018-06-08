@@ -265,7 +265,7 @@ protected:
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  typedef galois::worklists::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  typedef galois::worklists::PerSocketChunkFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
   // typedef galois::worklists::PerThreadChunkFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 

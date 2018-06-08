@@ -545,10 +545,10 @@ struct LabelPropNoCasAlgo {
 
   void operator()(Graph& graph) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<256> WL;
-    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
-    typedef dChunkedTwoLevelSetFIFO<256> OSet;
-    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef PerSocketChunkFIFO<256> WL;
+    typedef PerSocketChunkMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef PerSocketChunkTwoLevelSetFIFO<256> OSet;
+    typedef PerSocketChunkTwoLevelHashFIFO<256> HSet;
     typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
     typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
     typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
@@ -791,10 +791,10 @@ struct LabelPropAlgo {
 
   void operator()(Graph& graph) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<256> WL;
-    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
-    typedef dChunkedTwoLevelSetFIFO<256> OSet;
-    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef PerSocketChunkFIFO<256> WL;
+    typedef PerSocketChunkMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef PerSocketChunkTwoLevelSetFIFO<256> OSet;
+    typedef PerSocketChunkTwoLevelHashFIFO<256> HSet;
     typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
     typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
     typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
@@ -1038,7 +1038,7 @@ struct PullLPAlgo {
   };
 
   void operator()(Graph& graph) {
-    typedef galois::worklists::dChunkedFIFO<256> WL;
+    typedef galois::worklists::PerSocketChunkFIFO<256> WL;
 
     galois::do_all(graph, Initialize(graph));
     galois::for_each(graph, Process(graph), galois::wl<WL>());
@@ -1128,10 +1128,10 @@ struct PullLPCASAlgo {
 
   void operator()(Graph& graph) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<256> WL;
-    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
-    typedef dChunkedTwoLevelSetFIFO<256> OSet;
-    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef PerSocketChunkFIFO<256> WL;
+    typedef PerSocketChunkMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef PerSocketChunkTwoLevelSetFIFO<256> OSet;
+    typedef PerSocketChunkTwoLevelHashFIFO<256> HSet;
     typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
     typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
     typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
@@ -1314,9 +1314,9 @@ struct AsyncAlgo {
     galois::Statistic emptyMerges("EmptyMerges");
 #ifdef GALOIS_USE_EXP
     if(algo == Algo::asyncOSet) {
-      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelSetFIFO<32> >());
+      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::PerSocketChunkTwoLevelSetFIFO<32> >());
     } else if(algo == Algo::asyncHSet) {
-      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::dChunkedTwoLevelHashFIFO<32> >());
+      galois::for_each(graph, Merge(graph, emptyMerges), galois::wl<galois::worklists::PerSocketChunkTwoLevelHashFIFO<32> >());
     } else {
 #endif
       galois::for_each(graph, Merge(graph, emptyMerges));
@@ -1396,7 +1396,7 @@ struct BlockedAsyncAlgo {
     Merge merge = { graph, items };
     galois::do_all(graph, merge, galois::loopname("Initialize"));
     galois::for_each(items, merge,
-        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
+        galois::loopname("Merge"), galois::wl<galois::worklists::PerSocketChunkFIFO<128> >());
   }
 };
 

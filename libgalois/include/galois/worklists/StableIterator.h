@@ -34,7 +34,7 @@ namespace worklists {
  * @tparam Container Worklist to manage work enqueued by the operator
  * @tparam Iterator  (inferred by library)
  */
-template<bool Steal = false, typename Container = dChunkedFIFO<>, typename Iterator=int*>
+template<bool Steal = false, typename Container = PerSocketChunkFIFO<>, typename Iterator=int*>
 struct StableIterator {
   typedef typename std::iterator_traits<Iterator>::value_type value_type;
   typedef Iterator iterator;

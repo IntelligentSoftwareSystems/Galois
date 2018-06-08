@@ -57,7 +57,7 @@ struct WID {
 };
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-class dChunkedMaster : private boost::noncopyable {
+class PerSocketChunkMaster : private boost::noncopyable {
   class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
   FixedSizeAllocator<Chunk> alloc;
@@ -121,7 +121,7 @@ class dChunkedMaster : private boost::noncopyable {
 public:
   typedef T value_type;
 
-  dChunkedMaster() {
+  PerSocketChunkMaster() {
     for (unsigned int i = 0; i < data.size(); ++i) {
       p& r = *data.getRemote(i);
       r.next = 0;
@@ -190,7 +190,7 @@ public:
 };
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
+void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
   while (true) {
     if (n.next && !n.next->empty()) {
       n.next->pop();
@@ -205,7 +205,7 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
 }
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-bool dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
+bool PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
   while (true) {
     if (n.next && !n.next->empty())
       return false;
@@ -218,7 +218,7 @@ bool dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
 }
 
 template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, const T& val) {
+void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, const T& val) {
   if (n.next)
     pushChunk(id, n.next);
   n.next = mkChunk();
@@ -227,7 +227,7 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
 
 // TODO: Switch to thread-local worklists
 template<typename T,int ChunkSize>
-class Worklist: public dChunkedMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
+class Worklist: public PerSocketChunkMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
 
 template<class T, class FunctionTy, class ArgsTy>
 class Executor {

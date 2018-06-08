@@ -507,7 +507,7 @@ struct BlockedAsyncAlgo {
         [&] (const WorkItem& item, auto& ctx) {
           process<true, 0>(graph, item.src, item.start, ctx);
         },
-        galois::loopname("Merge"), galois::wl<galois::worklists::dChunkedFIFO<128> >());
+        galois::loopname("Merge"), galois::wl<galois::worklists::PerSocketChunkFIFO<128> >());
   }
 };
 

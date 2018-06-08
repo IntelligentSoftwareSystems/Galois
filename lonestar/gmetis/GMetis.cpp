@@ -210,7 +210,7 @@ int main(int argc, char** argv) {
       parts[i] = i;
     } 
 
-    using WL = galois::worklists::dChunkedFIFO<16>;
+    using WL = galois::worklists::PerSocketChunkFIFO<16>;
 
     galois::for_each(galois::iterate(parts), 
         [&] (int part, auto& lwl) {

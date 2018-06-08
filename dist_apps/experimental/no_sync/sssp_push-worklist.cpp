@@ -113,7 +113,7 @@ struct SSSP {
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
     galois::for_each(src_node, SSSP (&_graph), galois::workList_version(), galois::no_conflicts(), galois::loopname("SSSP"));
   }
 

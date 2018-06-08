@@ -166,8 +166,8 @@ struct InitializeGraph {
 };
 
 using namespace galois::worklists;
-typedef dChunkedFIFO<64> dChunk;
-typedef WLdistributed<dChunk, Graph> DIST_WL;
+typedef PerSocketChunkFIFO<64> PSchunk;
+typedef WLdistributed<PSchunk, Graph> DIST_WL;
 struct SSSP {
   Graph* graph;
   galois::DGAccumulator<unsigned int>& DGAccumulator_accum;

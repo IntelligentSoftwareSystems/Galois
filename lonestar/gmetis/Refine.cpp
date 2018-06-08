@@ -87,7 +87,7 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
     return -retval / 16;
   };
 
-  typedef galois::worklists::dChunkedFIFO<8> Chunk;
+  typedef galois::worklists::PerSocketChunkFIFO<8> Chunk;
   typedef galois::worklists::OrderedByIntegerMetric<decltype(gainIndexer), Chunk, 10> pG;
 
   GNodeBag boundary;

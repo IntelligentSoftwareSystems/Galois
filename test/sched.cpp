@@ -51,6 +51,6 @@ int main(int argc, char** argv) {
         for (int i = 0; i < item; ++i)
           lwl.push(item - 1);
       },
-      galois::wl<dChunkedLIFO<64>>());
+      galois::wl<PerSocketChunkLIFO<64>>());
   T2.stop();
 }

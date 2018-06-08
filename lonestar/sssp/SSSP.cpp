@@ -120,8 +120,8 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap, const R& edgeR
 
   namespace gwl = galois::worklists;
 
-  using dChunk = gwl:: dChunkedFIFO<CHUNK_SIZE>;
-  using OBIM = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, dChunk>;
+  using PSchunk = gwl:: PerSocketChunkFIFO<CHUNK_SIZE>;
+  using OBIM = gwl::OrderedByIntegerMetric<UpdateRequestIndexer, PSchunk>;
 
   graph.getData(source) = 0;
 

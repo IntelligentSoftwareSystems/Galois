@@ -35,7 +35,7 @@
 namespace galois {
 /**
  * Scheduling policies for Galois iterators. Unless you have very specific
- * scheduling requirement, {@link dChunkedLIFO} or {@link dChunkedFIFO} is a
+ * scheduling requirement, {@link PerSocketChunkLIFO} or {@link PerSocketChunkFIFO} is a
  * reasonable scheduling policy. If you need approximate priority scheduling,
  * use {@link OrderedByIntegerMetric}. For debugging, you may be interested
  * in {@link FIFO} or {@link LIFO}, which try to follow serial order exactly.
@@ -44,7 +44,7 @@ namespace galois {
  * {@link for_each()}. For example,
  *
  * \code
- * galois::for_each(galois::iterate(beg,end), fn, galois::wl<galois::worklists::dChunkedFIFO<32>>());
+ * galois::for_each(galois::iterate(beg,end), fn, galois::wl<galois::worklists::PerSocketChunkFIFO<32>>());
  * \endcode
  */
 namespace worklists {

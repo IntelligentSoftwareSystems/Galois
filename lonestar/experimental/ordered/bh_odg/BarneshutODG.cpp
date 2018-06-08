@@ -177,7 +177,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 
   Point ret;
   for (int step = 0; step < ntimesteps; step++) {
-    typedef galois::worklists::dChunkedLIFO<256> WL;
+    typedef galois::worklists::PerSocketChunkLIFO<256> WL;
 
 
     ReducibleBox bbox;

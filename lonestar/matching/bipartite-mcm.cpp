@@ -390,7 +390,7 @@ struct MatchingFF {
         },
         galois::loopname("MatchingFF"),
         galois::per_iter_alloc(),
-        galois::wl<galois::worklists::dChunkedFIFO<32> >());
+        galois::wl<galois::worklists::PerSocketChunkFIFO<32> >());
         
         
   }
@@ -522,8 +522,8 @@ struct MatchingABMP {
     };
 
 
-    typedef dChunkedFIFO<1024> dChunk;
-    typedef OrderedByIntegerMetric<decltype(indexer),dChunk> OBIM;
+    typedef PerSocketChunkFIFO<1024> PSchunk;
+    typedef OrderedByIntegerMetric<decltype(indexer),PSchunk> OBIM;
     
     galois::for_each(galois::iterate(initial),
         [&, outer=this] (const WorkItem& item, auto& ctx) {
@@ -731,7 +731,7 @@ struct MatchingMF {
             }
           }
         }, 
-        galois::wl<galois::worklists::dChunkedFIFO<32> >());
+        galois::wl<galois::worklists::PerSocketChunkFIFO<32> >());
     T.stop();
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -841,7 +841,7 @@ struct MatchingMF {
           }, 
           galois::loopname("MatchingMF"),
           galois::parallel_break(),
-          galois::wl<galois::worklists::dChunkedFIFO<32> >());
+          galois::wl<galois::worklists::PerSocketChunkFIFO<32> >());
 
       if (!shouldGlobalRelabel)
         break;

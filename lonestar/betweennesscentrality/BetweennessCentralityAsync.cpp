@@ -92,8 +92,8 @@ struct FPWorkItemIndexer {
 
 // obim worklist type declaration
 namespace gwl = galois::worklists;
-using dChunk = gwl::dChunkedFIFO<CHUNK_SIZE>;
-using OBIM = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, dChunk>;
+using PSchunk = gwl::PerSocketChunkFIFO<CHUNK_SIZE>;
+using OBIM = gwl::OrderedByIntegerMetric<FPWorkItemIndexer, PSchunk>;
 
 struct BetweenessCentralityAsync {
   Graph& graph;

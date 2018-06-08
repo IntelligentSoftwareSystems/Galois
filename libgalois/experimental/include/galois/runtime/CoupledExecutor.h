@@ -142,7 +142,7 @@ template <typename R, typename F>
 void for_each_coupled_wake (const R& initRange, const F& func, const char* loopname=nullptr) {
   const unsigned CHUNK_SIZE = 64;
   typedef typename R::value_type T;
-  typedef worklists::WLsizeWrapper<typename galois::worklists::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
+  typedef worklists::WLsizeWrapper<typename galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
 
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();
@@ -182,7 +182,7 @@ void for_each_coupled_explicit (const R& initRange, const F& func, const char* l
 
   typedef typename R::value_type T;
 
-  typedef worklists::WLsizeWrapper<typename galois::worklists::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
+  typedef worklists::WLsizeWrapper<typename galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>::template retype<T>::type> WL_ty;
 
   WL_ty* curr = new WL_ty ();
   WL_ty* next = new WL_ty ();

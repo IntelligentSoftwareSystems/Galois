@@ -43,7 +43,7 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    typedef galois::worklists::dChunkedFIFO<OpFunc::CHUNK_SIZE, Update> C;
+    typedef galois::worklists::PerSocketChunkFIFO<OpFunc::CHUNK_SIZE, Update> C;
     typedef galois::worklists::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
 
     galois::runtime::for_each_ordered_level (

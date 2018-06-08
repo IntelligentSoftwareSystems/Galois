@@ -663,7 +663,7 @@ namespace {
 
           //insert helperFunc in for_each call
           SourceLocation ST_forEach_end = callFS->getSourceRange().getEnd().getLocWithOffset(0);
-          //SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph), galois::wl<dChunk>()";
+          //SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph), galois::wl<PSchunk>()";
 
           //Assumption:: User will give worklist galois::wl in for_each.
           SSHelperStructFunctions << ", Get_info_functor<Graph>(_graph)";

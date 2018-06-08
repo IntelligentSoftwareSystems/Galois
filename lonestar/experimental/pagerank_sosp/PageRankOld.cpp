@@ -689,8 +689,8 @@ struct PrtRsd {
     galois::for_each(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp2: "<<amp2<<"\n";
     using namespace galois::worklists;
-    typedef dChunkedLIFO<4> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+    typedef PerSocketChunkLIFO<4> PSchunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,PSchunk> OBIM;
 #ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
 #else
@@ -854,8 +854,8 @@ struct PrtDeg {
     galois::for_each(graph, Process2(this, graph)); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
     using namespace galois::worklists;
-    typedef dChunkedLIFO<16> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+    typedef PerSocketChunkLIFO<16> PSchunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,PSchunk> OBIM;
      galois::InsertBag<UpdateRequest> initialWL;
     for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;

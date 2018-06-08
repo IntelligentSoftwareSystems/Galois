@@ -1287,8 +1287,8 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   using namespace galois::worklists;
-  typedef dChunkedLIFO<8> BSWL_LIFO;
-  typedef dChunkedFIFO<8> BSWL_FIFO;
+  typedef PerSocketChunkLIFO<8> BSWL_LIFO;
+  typedef PerSocketChunkFIFO<8> BSWL_FIFO;
 
 /*
 #ifdef GALOIS_USE_EXP

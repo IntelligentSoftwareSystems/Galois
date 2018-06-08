@@ -34,7 +34,7 @@ namespace worklists {
 namespace internal {
 
 template<typename T,
-	 typename Scheduler = dChunkedFIFO<64, T>,
+	 typename Scheduler = PerSocketChunkFIFO<64, T>,
          typename Set = galois::ThreadSafeOrderedSet<T> >
 struct WorkSetMaster : private boost::noncopyable {
 private:
@@ -92,20 +92,20 @@ public:
 }  // end namespace internal
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedOrderedSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
-GALOIS_WLCOMPILECHECK(dChunkedOrderedSetFIFO);
+using PerSocketChunkOrderedSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
+GALOIS_WLCOMPILECHECK(PerSocketChunkOrderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedUnorderedSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
-GALOIS_WLCOMPILECHECK(dChunkedUnorderedSetFIFO);
+using PerSocketChunkUnorderedSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
+GALOIS_WLCOMPILECHECK(PerSocketChunkUnorderedSetFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelHashFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
-GALOIS_WLCOMPILECHECK(dChunkedTwoLevelHashFIFO);
+using PerSocketChunkTwoLevelHashFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
+GALOIS_WLCOMPILECHECK(PerSocketChunkTwoLevelHashFIFO);
 
 template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using dChunkedTwoLevelSetFIFO = internal::WorkSetMaster<T, dChunkedFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
-GALOIS_WLCOMPILECHECK(dChunkedTwoLevelSetFIFO);
+using PerSocketChunkTwoLevelSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
+GALOIS_WLCOMPILECHECK(PerSocketChunkTwoLevelSetFIFO);
 
 } // end namespace worklists
 } // end namespace galois

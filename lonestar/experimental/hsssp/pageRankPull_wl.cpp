@@ -137,9 +137,9 @@ struct PageRank_pull {
  void static go(Graph& _graph) {
 
    using namespace galois::worklists;
-   typedef dChunkedFIFO<64> dChunk;
+   typedef PerSocketChunkFIFO<64> PSchunk;
 
-   galois::for_each(_graph.begin(), _graph.end(), PageRank_pull(tolerance, alpha, &_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
+   galois::for_each(_graph.begin(), _graph.end(), PageRank_pull(tolerance, alpha, &_graph), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
 
  }
 

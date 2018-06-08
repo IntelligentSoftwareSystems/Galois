@@ -1155,7 +1155,7 @@ protected:
         std::make_tuple (
           galois::loopname ("handle-aborts"),
           galois::no_conflicts(),
-          galois::wl<galois::worklists::dChunkedFIFO<NhFunc::CHUNK_SIZE> >()));
+          galois::wl<galois::worklists::PerSocketChunkFIFO<NhFunc::CHUNK_SIZE> >()));
 
 
 

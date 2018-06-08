@@ -292,7 +292,7 @@ struct BuildTreeLockFree {
     treeAlloc.construct (root, box.center ());
     internalNodes.push_back (root);
 
-    typedef galois::worklists::dChunkedFIFO<64> WL_ty;
+    typedef galois::worklists::PerSocketChunkFIFO<64> WL_ty;
       
     galois::do_all (beg, end, 
         BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
@@ -441,7 +441,7 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
   typedef galois::GAtomic<unsigned> UnsignedAtomic;
   static const unsigned CHUNK_SIZE = 64;
-  typedef galois::worklists::dChunkedFIFO<CHUNK_SIZE, unsigned> WL_ty;
+  typedef galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE, unsigned> WL_ty;
 
   struct ODGnode {
     UnsignedAtomic numChild;
@@ -883,7 +883,7 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     static const unsigned CHUNK_SIZE = 2;
-    // typedef galois::worklists::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    // typedef galois::worklists::PerSocketChunkLIFO<CHUNK_SIZE, InterNode*> WL_ty;
     typedef galois::worklists::PerThreadChunkLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {

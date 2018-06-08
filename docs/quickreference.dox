@@ -26,9 +26,9 @@
 \subsection worklist WorkList Types
 Specified as a template argument to {@link galois::wl}
 
-- galois::worklists::dChunkedFIFO<CHUNK_SIZE>
+- galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>
 
-- galois::worklists::dChunkedLIFO<CHUNK_SIZE>
+- galois::worklists::PerSocketChunkLIFO<CHUNK_SIZE>
 
 - galois::worklists::OBIM<WorkListType>
 

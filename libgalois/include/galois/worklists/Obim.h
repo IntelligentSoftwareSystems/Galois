@@ -137,7 +137,7 @@ struct OrderedByIntegerMetricComparator<Index, true> {
  */
 // TODO could move to general comparator but there are issues with atomic reads and initial values
 // for arbitrary types
-template<class Indexer = DummyIndexer<int>, typename Container = dChunkedFIFO<>,
+template<class Indexer = DummyIndexer<int>, typename Container = PerSocketChunkFIFO<>,
   unsigned BlockPeriod=0,
   bool BSP=true,
   typename T=int,

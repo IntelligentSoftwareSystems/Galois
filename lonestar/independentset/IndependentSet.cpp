@@ -194,8 +194,8 @@ struct DefaultAlgo {
   void operator()(Graph& graph) {
     using DWL = galois::worklists::Deterministic<>;
 
-    using BSWL = galois::worklists::BulkSynchronous<typename galois::worklists::dChunkedFIFO<64> >;
-        //typedef galois::worklists::dChunkedFIFO<256> WL;
+    using BSWL = galois::worklists::BulkSynchronous<typename galois::worklists::PerSocketChunkFIFO<64> >;
+        //typedef galois::worklists::PerSocketChunkFIFO<256> WL;
 
     switch (algo) {
       case nondet: 

@@ -129,7 +129,7 @@ struct SSSP {
   SSSP(Graph* _g):graph(_g){}
   void static go(Graph& _graph){
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
 
     //XXX: Need a better way to fix this!!
     if(galois::runtime::getSystemNetworkInterface().ID == 0)
@@ -137,7 +137,7 @@ struct SSSP {
     else
       _graph.getData(src_node).dist_current = std::numeric_limits<int>::max()/4;
 
-    galois::for_each(WorkItem(src_node), SSSP(&_graph), Get_info_functor<Graph>(_graph), galois::wl<dChunk>());
+    galois::for_each(WorkItem(src_node), SSSP(&_graph), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
   }
 
   void operator()(WorkItem& src, galois::UserContext<WorkItem>& ctx) const {

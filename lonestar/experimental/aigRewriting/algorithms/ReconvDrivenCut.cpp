@@ -203,9 +203,9 @@ void ReconvDrivenCut::run( int cutSizeLimit ) {
 	aig::Graph & aigGraph = this->aig.getGraph();
 
 	galois::InsertBag< aig::GNode > workList;
-    typedef galois::worklists::dChunkedFIFO<5000> DC_FIFO;
+    typedef galois::worklists::PerSocketChunkFIFO<5000> DC_FIFO;
 
-    //typedef galois::worklists::dChunkedBag<5000> DC_BAG;
+    //typedef galois::worklists::PerSocketChunkBag<5000> DC_BAG;
 	//galois::do_all_local( aigGraph, Preprocess( aigGraph, workList ) );
 	//galois::for_each_local( workList, ReconvergenceDrivenCut( aigGraph, cutSizeLimit ), galois::wl< DC_BAG >() );
 

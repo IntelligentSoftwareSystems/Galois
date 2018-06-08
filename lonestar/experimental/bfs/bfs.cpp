@@ -295,9 +295,9 @@ struct AsyncAlgo {
 
   void operator()(const GNode& source) const {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
     typedef ChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<GNodeIndexer,PSchunk> OBIM;
     
     std::deque<GNode> initial;
     graph.getData(source).dist = 0;
@@ -488,7 +488,7 @@ struct DetBarrierAlgo {
     //#ifdef GALOIS_USE_EXP
     //    typedef galois::worklists::BulkSynchronousInline<> WL;
     //#else
-  typedef galois::worklists::BulkSynchronous<galois::worklists::dChunkedLIFO<256> > WL;
+  typedef galois::worklists::BulkSynchronous<galois::worklists::PerSocketChunkLIFO<256> > WL;
   //#endif
     std::deque<ItemTy> initial;
 
@@ -756,7 +756,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   using namespace galois::worklists;
-  typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+  typedef BulkSynchronous<PerSocketChunkLIFO<256> > BSWL;
 
   //#ifdef GALOIS_USE_EXP
   //  typedef BulkSynchronousInline<> BSInline;

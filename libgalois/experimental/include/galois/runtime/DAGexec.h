@@ -417,7 +417,7 @@ public:
 
     StatTimer t_exec ("Time to execute the DAG: ");
 
-    typedef galois::worklists::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef galois::worklists::PerSocketChunkFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
     t_exec.start ();
 

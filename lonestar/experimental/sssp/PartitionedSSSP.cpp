@@ -403,9 +403,9 @@ struct AsyncAlgo {
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
     //typedef PerThreadChunkFIFO<64> Chunk;
-    //typedef dChunkedFIFO<64> Chunk;
-    //typedef dChunkedFIFO<64> Chunk;
-    typedef dChunkedFIFO<128> Chunk;
+    //typedef PerSocketChunkFIFO<64> Chunk;
+    //typedef PerSocketChunkFIFO<64> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << deltaShift) << " (" << deltaShift << ")\n";
@@ -553,11 +553,11 @@ struct Algo2 {
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
     //typedef PerThreadChunkFIFO<64> Chunk;
-    //typedef dChunkedFIFO<64> Chunk;
-    //typedef dChunkedFIFO<64> Chunk;
+    //typedef PerSocketChunkFIFO<64> Chunk;
+    //typedef PerSocketChunkFIFO<64> Chunk;
     const int blockPeriod = 10;
     const int maxValue = 128;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
       ::with_block_period<blockPeriod>
       ::with_max_value<maxValue> Part;
@@ -685,7 +685,7 @@ struct Algo3 {
     using namespace galois::worklists;
     //const int blockPeriod = 10;
     const int maxValue = 128;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 0> OBIM;
 
     typedef galois::InsertBag<UpdateRequest> Bag;
@@ -844,7 +844,7 @@ struct Algo4 {
     using namespace galois::worklists;
     const int blockPeriod = 10;
     const int maxValue = 8;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
       ::with_block_period<blockPeriod>
       ::with_max_value<maxValue> Part;
@@ -989,7 +989,7 @@ struct Algo5 {
     using namespace galois::worklists;
     //const int blockPeriod = 10;
     //const int maxValue = 8;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef ThreadPartitioned<Partitioner, Chunk> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
 
@@ -1153,7 +1153,7 @@ struct Algo6 {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
     typedef galois::InsertBag<UpdateRequest> Bag;
@@ -1389,7 +1389,7 @@ struct Algo7 {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<128> Chunk;
+    typedef PerSocketChunkFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << deltaShift) << " (" << deltaShift << ")\n";

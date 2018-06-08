@@ -266,7 +266,7 @@ struct Clustering {
 
       addedNodes.reset();
 
-      using WL = galois::worklists::dChunkedFIFO<16>;
+      using WL = galois::worklists::PerSocketChunkFIFO<16>;
 
       // find matching
       galois::for_each(

@@ -587,9 +587,9 @@ struct SerialSloan {
 
 		static void go(GNode source) {
 			using namespace galois::worklists;
-			typedef dChunkedFIFO<64> dChunk;
+			typedef PerSocketChunkFIFO<64> PSchunk;
 			typedef ChunkedFIFO<64> Chunk;
-			typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
+			typedef OrderedByIntegerMetric<GNodeIndexer,PSchunk> OBIM;
 
 			graph.getData(source).dist = 0;
 			//std::cout << "max dist is " << maxDist << "\n";
@@ -938,7 +938,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   using namespace galois::worklists;
-  typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+  typedef BulkSynchronous<PerSocketChunkLIFO<256> > BSWL;
 
   //#ifdef GALOIS_USE_EXP
   //  typedef BulkSynchronousInline<> BSInline;

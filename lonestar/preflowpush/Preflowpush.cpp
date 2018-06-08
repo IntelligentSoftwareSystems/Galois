@@ -505,7 +505,7 @@ struct PreflowPush {
       return -this->graph.getData(n, galois::MethodFlag::UNPROTECTED).height;
     };
 
-    typedef galois::worklists::dChunkedFIFO<16> Chunk;
+    typedef galois::worklists::PerSocketChunkFIFO<16> Chunk;
     typedef galois::worklists::OrderedByIntegerMetric<decltype(obimIndexer), Chunk> OBIM;
 
     galois::InsertBag<GNode> initial;

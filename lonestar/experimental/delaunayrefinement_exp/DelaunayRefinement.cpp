@@ -204,7 +204,7 @@ int main(int argc, char** argv) {
   using namespace galois::worklists;
   
       //! [for_each example]
-  typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
+  typedef LocalQueue<PerSocketChunkLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef PerThreadChunkLIFO<32> Chunked;
 
   std::cout << "beginning refine\n";

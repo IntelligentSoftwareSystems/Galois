@@ -360,7 +360,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> Chunk;
+    typedef PerSocketChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk,
                                    10, false> OBIM;
 

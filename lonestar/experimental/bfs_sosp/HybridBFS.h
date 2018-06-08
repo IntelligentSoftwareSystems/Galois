@@ -140,8 +140,8 @@ struct HybridBFS {
 
   void operator()(Graph& graph, const GNode& source) {
     using namespace galois::worklists;
-    typedef dChunkedLIFO<256> WL;
-    typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
+    typedef PerSocketChunkLIFO<256> WL;
+    typedef BulkSynchronous<PerSocketChunkLIFO<256> > BSWL;
 
     int next = 0;
     Dist newDist = 1;

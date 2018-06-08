@@ -602,9 +602,9 @@ struct AsyncBFS {
 
   void operator()(Gr& graph, const GNode& source, const char* name) const {
     using namespace galois::worklists;
-    typedef dChunkedFIFO<64> dChunk;
+    typedef PerSocketChunkFIFO<64> PSchunk;
     //typedef ChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<Indexer,PSchunk> OBIM;
     
     galois::do_all(graph, [&graph] (const GNode& n) { graph.getData(n) = ~0; }, galois::loopname("init"));
 

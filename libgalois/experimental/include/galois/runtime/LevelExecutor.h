@@ -277,7 +277,7 @@ class LevelExecutor {
   static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
 
   // hack to get ChunkedMaster base class
-  using BaseWL = typename galois::worklists::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
+  using BaseWL = typename galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>::template retype<T>::type;
   using WL_ty = galois::worklists::WLsizeWrapper<BaseWL>;
   using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
@@ -497,7 +497,7 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
   constexpr unsigned chunk_size = OpFn::CHUNK_SIZE;
 
   typedef typename worklists::OrderedByIntegerMetric<>
-    ::template with_container<worklists::dChunkedFIFO<chunk_size>>::type
+    ::template with_container<worklists::PerSocketChunkFIFO<chunk_size>>::type
     ::template with_indexer<KeyFn>::type
     ::template with_barrier<true>::type
     ::template with_descending<is_greater>::type

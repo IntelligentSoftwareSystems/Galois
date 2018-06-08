@@ -281,8 +281,8 @@ GALOIS_WLCOMPILECHECK(ChunkedLIFO)
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
-GALOIS_WLCOMPILECHECK(dChunkedFIFO)
+using PerSocketChunkFIFO = internal::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
+GALOIS_WLCOMPILECHECK(PerSocketChunkFIFO)
 
 /**
  * Distributed chunked LIFO. A more scalable version of {@link ChunkedLIFO}.
@@ -290,8 +290,8 @@ GALOIS_WLCOMPILECHECK(dChunkedFIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
-GALOIS_WLCOMPILECHECK(dChunkedLIFO)
+using PerSocketChunkLIFO = internal::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
+GALOIS_WLCOMPILECHECK(PerSocketChunkLIFO)
 
 /**
  * Distributed chunked bag. A scalable and resource-efficient policy when you
@@ -300,8 +300,8 @@ GALOIS_WLCOMPILECHECK(dChunkedLIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-using dChunkedBag = internal::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
-GALOIS_WLCOMPILECHECK(dChunkedBag)
+using PerSocketChunkBag = internal::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
+GALOIS_WLCOMPILECHECK(PerSocketChunkBag)
 
 
 } // end namespace worklists

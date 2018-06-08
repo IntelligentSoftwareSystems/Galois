@@ -720,9 +720,9 @@ struct KCutOperator {
 void runKCutOperator( CutManager & cutMan ) {
 
 	galois::InsertBag< aig::GNode > workList;
-	typedef galois::worklists::dChunkedBag< 500 > DC_BAG;
-	//typedef galois::worklists::dChunkedFIFO< 200 > DC_FIFO;
-	//typedef galois::worklists::dChunkedLIFO< 200 > DC_LIFO;
+	typedef galois::worklists::PerSocketChunkBag< 500 > DC_BAG;
+	//typedef galois::worklists::PerSocketChunkFIFO< 200 > DC_FIFO;
+	//typedef galois::worklists::PerSocketChunkLIFO< 200 > DC_LIFO;
   	//typedef galois::worklists::PerThreadChunkFIFO< 200 > AC_FIFO;
 	
 	for ( auto pi : cutMan.getAig().getInputNodes() ) {

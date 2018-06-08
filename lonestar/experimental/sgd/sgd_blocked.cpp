@@ -858,8 +858,8 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
    // if(networkHostID == 0) {   
 //	std::cout << "number of node on host = " << networkHostID << " are: = " << last - first << "\n";
 	printf ("host: %u creating rest of the nodes\n", networkHostID);
-	//typedef galois::worklists::BulkSynchronous<galois::worklists::dChunkedLIFO<256> > WL;
-	//typedef galois::worklists::dChunkedFIFO<64> dChunk;
+	//typedef galois::worklists::BulkSynchronous<galois::worklists::PerSocketChunkLIFO<256> > WL;
+	//typedef galois::worklists::PerSocketChunkFIFO<64> PSchunk;
 	//typedef galois::worklists::LIFO<FileGNode, true> chunk;
 	//typedef galois::graphs::FileGraph::iterator IterTy;
 	galois::for_each(first, last, create_nodes(dgraph,lk));

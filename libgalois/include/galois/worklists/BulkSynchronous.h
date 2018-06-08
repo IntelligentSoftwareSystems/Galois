@@ -34,7 +34,7 @@ namespace worklists {
  * created work is processed after all the current work in a round is
  * completed.
  */
-template<class Container=dChunkedFIFO<>, class T=int, bool Concurrent = true>
+template<class Container=PerSocketChunkFIFO<>, class T=int, bool Concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 public:
   template<bool _concurrent>
