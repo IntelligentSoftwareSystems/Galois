@@ -129,7 +129,7 @@ struct FirstItr_BFS {
       __begin = 0;
       __end = 0;
     }
-    _graph.set_num_iter(0);
+    _graph.set_num_round(0);
   #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       std::string impl_str(_graph.get_run_identifier(
@@ -189,7 +189,7 @@ struct BFS {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {

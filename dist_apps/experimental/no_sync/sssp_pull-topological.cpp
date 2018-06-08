@@ -112,7 +112,7 @@ struct SSSP {
   void static go(Graph& _graph){
     iteration = 0;
     do{
-      _graph.set_num_iter(iteration);
+      _graph.set_num_round(iteration);
       DGAccumulator_accum.reset();
       galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, galois::loopname("SSSP"), galois::numrun(_graph.get_run_identifier()));
       ++iteration;

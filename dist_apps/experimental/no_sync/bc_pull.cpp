@@ -203,7 +203,7 @@ struct SSSP {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
       dga.reset();
 
       galois::do_all(
@@ -344,7 +344,7 @@ struct NumShortestPaths {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
       dga.reset();
 
       galois::do_all(
@@ -447,7 +447,7 @@ struct DependencyPropogation {
     uint32_t accum_result;
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
       dga.reset();
 
       auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -562,7 +562,7 @@ struct BC {
       }
       #endif
 
-      _graph.set_num_iter(0);
+      _graph.set_num_round(0);
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
@@ -572,7 +572,7 @@ struct BC {
       SSSP::go(_graph, dga);
       //galois::gDebug("SSSP done");
 
-      _graph.set_num_iter(0);
+      _graph.set_num_round(0);
 
       // calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
@@ -582,13 +582,13 @@ struct BC {
       NumShortestPaths::go(_graph, dga);
       //galois::gDebug("NumShortestPaths done");
 
-      _graph.set_num_iter(0);
+      _graph.set_num_round(0);
 
       // do between-cent calculations for this iteration 
       DependencyPropogation::go(_graph, dga);
       //galois::gDebug("DepPropogation done");
 
-      _graph.set_num_iter(0);
+      _graph.set_num_round(0);
 
       auto& allNodes = _graph.allNodesRange();
 

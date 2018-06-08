@@ -162,7 +162,7 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
                 iteration += "\nunsigned long _num_work_items = _graph.end() - _graph.begin();\n";
 
               iteration += nodesWithEdgesRange_str;
-              string do_while = firstItr_func_call + iteration + "do { \n _graph.set_num_iter(_num_iterations);\n" +  galois_distributed_accumulator_name + ".reset();\n";
+              string do_while = firstItr_func_call + iteration + "do { \n _graph.set_num_round(_num_iterations);\n" +  galois_distributed_accumulator_name + ".reset();\n";
               rewriter.InsertText(for_each_loc_begin, do_while, true, true);
 
               string iteration_inc = "\n++_num_iterations;\n";

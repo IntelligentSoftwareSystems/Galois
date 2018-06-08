@@ -616,7 +616,7 @@ namespace {
           kernelBefore << cudaKernelCall.str();
           kernelBefore << "\t\tunsigned _num_iterations = 1;\n";
           kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
-          kernelBefore << "\t\t_graph.set_num_iter(_num_iterations);\n";
+          kernelBefore << "\t\t_graph.set_num_round(_num_iterations);\n";
           kernelBefore << "\t\tStatTimer_cuda.start();\n";
           kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
           kernelBefore << "\t\tif (cuda_wl.num_in_items > cuda_wl.max_size) {\n";

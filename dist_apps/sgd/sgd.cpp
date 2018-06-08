@@ -235,7 +235,7 @@ struct SGD {
       galois::gPrint("ITERATION : ",  _num_iterations, "\n");
 
       auto step_size = getstep_size(_num_iterations);
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
       galois::do_all(
           galois::iterate(nodesWithEdges),

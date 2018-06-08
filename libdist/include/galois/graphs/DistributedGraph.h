@@ -4563,7 +4563,7 @@ public:
    *
    * @param round round number to set to
    */
-  inline void set_num_iter(const uint32_t round) {
+  inline void set_num_round(const uint32_t round) {
     num_round = round;
   }
 

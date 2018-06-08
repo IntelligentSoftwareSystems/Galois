@@ -158,7 +158,7 @@ struct PageRank {
   void static go(Graph& _graph) {
     iteration = 0;
     do{
-      _graph.set_num_iter(iteration);
+      _graph.set_num_round(iteration);
       DGAccumulator_accum.reset();
       PageRank_partial::go(_graph);
       galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, galois::loopname("PageRank")), galois::numrun(_graph.get_run_identifier());

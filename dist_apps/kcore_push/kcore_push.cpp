@@ -220,7 +220,7 @@ struct KCoreStep1 {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {

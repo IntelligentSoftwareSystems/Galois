@@ -236,7 +236,7 @@ struct PageRank {
     //unsigned int reduced = 0;
 
     do {
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
       PageRank_delta::go(_graph, dga);
       // reset residual on mirrors

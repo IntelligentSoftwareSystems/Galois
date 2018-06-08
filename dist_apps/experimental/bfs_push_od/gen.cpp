@@ -250,7 +250,7 @@ struct BFS {
 
     
     do { 
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
 
       _graph.sync_on_demand<Flags_dist_current, readSource, Reduce_min_dist_current,

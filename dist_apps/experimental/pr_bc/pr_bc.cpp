@@ -403,7 +403,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     dga.reset();
     galois::gDebug("[", galois::runtime::getSystemNetworkInterface().ID, "]", 
                    " Round ", roundNumber);
-    graph.set_num_iter(roundNumber);
+    graph.set_num_round(roundNumber);
 
     // find the message a node needs to send (if any)
     FindMessageToSend(graph, roundNumber, dga); 
@@ -458,7 +458,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
  */
 void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
   const auto& allNodes = graph.allNodesRange();
-  graph.set_num_iter(0);
+  graph.set_num_round(0);
 
   galois::do_all(
     galois::iterate(allNodes.begin(), allNodes.end()), 
@@ -520,7 +520,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   uint32_t currentRound = 0;
 
   while (currentRound <= lastRoundNumber) {
-    graph.set_num_iter(currentRound);
+    graph.set_num_round(currentRound);
 
     galois::do_all(
       galois::iterate(allNodesWithEdgesIn),
@@ -607,7 +607,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
  */
 void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
   const auto& masterNodes = graph.masterNodesRange();
-  graph.set_num_iter(0);
+  graph.set_num_round(0);
 
   galois::do_all(
     galois::iterate(masterNodes.begin(), masterNodes.end()), 
@@ -822,7 +822,7 @@ int main(int argc, char** argv) {
     if ((run + 1) != numRuns) {
       galois::runtime::getHostBarrier().wait();
       (*hg).set_num_run(run + 1);
-      (*hg).set_num_iter(0);
+      (*hg).set_num_round(0);
       offset = 0;
       macroRound = 0;
       numSourcesPerRound = origNumRoundSources;

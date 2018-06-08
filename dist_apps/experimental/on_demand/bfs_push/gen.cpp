@@ -126,7 +126,7 @@ struct FirstItr_BFS {
       __begin = 0;
       __end = 0;
     }
-    _graph.set_num_iter(0);
+    _graph.set_num_round(0);
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_dist_current, 
@@ -210,7 +210,7 @@ struct BFS {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     
     do { 
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
 
       #if __OPT_VERSION__ == 5

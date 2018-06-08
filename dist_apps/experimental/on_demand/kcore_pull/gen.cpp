@@ -373,7 +373,7 @@ struct KCore {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
 
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {

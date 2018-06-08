@@ -156,7 +156,7 @@ struct KCoreStep1 {
     auto& allNodes = _graph.allNodesRange();
 
     do {
-      _graph.set_num_iter(iterations);
+      _graph.set_num_round(iterations);
       dga.reset();
 
       galois::do_all(

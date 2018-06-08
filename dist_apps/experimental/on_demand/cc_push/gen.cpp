@@ -104,7 +104,7 @@ struct FirstItr_ConnectedComp{
 
   void static go(Graph& _graph) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    _graph.set_num_iter(0);
+    _graph.set_num_round(0);
 
     #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_comp_current, 
@@ -192,7 +192,7 @@ struct ConnectedComp {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     do { 
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
 
       #if __OPT_VERSION__ == 5

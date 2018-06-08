@@ -603,7 +603,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     std::string timer_for_each_str("FOR_EACH_IMPL_" + loopName + "_" + helper_fn.get_run_identifier());
     galois::StatTimer Timer_for_each_impl(timer_for_each_str.c_str());
 
-    helper_fn.set_num_iter(0);
+    helper_fn.set_num_round(0);
     Timer_for_each_impl.start();
     runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
@@ -630,7 +630,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     /** loop while work in the worklist **/
     unsigned num_iterations = 1;
     while(!dbag.canTerminate()) {
-      helper_fn.set_num_iter(num_iterations);
+      helper_fn.set_num_round(num_iterations);
 
       //std::cout << "["<< galois::runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iterations <<" Total items to work on : " << local_wl.size() << "\n";
 

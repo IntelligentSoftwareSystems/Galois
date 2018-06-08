@@ -282,7 +282,7 @@ struct PageRank {
     dist_wl.push_initial(nodesWithEdges.begin(), nodesWithEdges.end());
 
     do {
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       PageRank_delta::go(_graph);
       dga.reset();
       #ifdef __GALOIS_HET_CUDA__

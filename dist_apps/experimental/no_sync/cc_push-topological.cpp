@@ -110,7 +110,7 @@ struct ConnectedComp {
   void static go(Graph& _graph){
     iteration = 0;
     do{
-      _graph.set_num_iter(iteration);
+      _graph.set_num_round(iteration);
       DGAccumulator_accum.reset();
       galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, galois::loopname("ConnectedComp"), galois::numrun(_graph.get_run_identifier()));
       ++iteration;

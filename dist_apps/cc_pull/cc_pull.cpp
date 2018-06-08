@@ -107,7 +107,7 @@ struct ConnectedComp {
     
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     do { 
-      _graph.set_num_iter(_num_iterations);
+      _graph.set_num_round(_num_iterations);
       dga.reset();
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
