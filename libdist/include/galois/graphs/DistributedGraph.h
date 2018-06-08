@@ -323,7 +323,7 @@ public:
 
 private:
   uint32_t num_run; //!< Keep track of number of runs.
-  uint32_t num_iteration; //!< Keep track of number of iterations.
+  uint32_t num_round; //!< Keep track of number of rounds.
 
   /**
    * Given an OfflineGraph, compute the masters for each node by
@@ -630,7 +630,7 @@ public:
     mirrorNodes.resize(numHosts);
 
     num_run = 0;
-    num_iteration = 0;
+    num_round = 0;
     numGlobalEdges = 0;
     currentBVFlag = nullptr;
 
@@ -4559,27 +4559,27 @@ public:
   }
 
   /**
-   * Set the iteration number for use in the run identifier.
+   * Set the round number for use in the run identifier.
    *
-   * @param iteration Iteration number to set to
+   * @param round round number to set to
    */
-  inline void set_num_iter(const uint32_t iteration) {
-    num_iteration = iteration;
+  inline void set_num_iter(const uint32_t round) {
+    num_round = round;
   }
 
   /**
-   * Get a run identifier using the set run and set iteration.
+   * Get a run identifier using the set run and set round.
    * Deprecated: use the other one below where possible
    *
    * @returns a string run identifier
    */
   inline std::string get_run_identifier() const {
     return std::string(std::to_string(num_run) + "_" +
-                       std::to_string(num_iteration));
+                       std::to_string(num_round));
   }
 
   /**
-   * Get a run identifier using the set run and set iteration and
+   * Get a run identifier using the set run and set round and
    * append to the passed in string.
    *
    * @param loop_name String to append the run identifier
@@ -4587,11 +4587,11 @@ public:
    */
   inline std::string get_run_identifier(std::string loop_name) const {
     return std::string(std::string(loop_name) + "_" + std::to_string(num_run) +
-                       "_" + std::to_string(num_iteration));
+                       "_" + std::to_string(num_round));
   }
 
   /**
-   * Get a run identifier using the set run and set iteration and
+   * Get a run identifier using the set run and set round and
    * append to the passed in string in addition to the number identifier passed
    * in.
    *
@@ -4605,7 +4605,7 @@ public:
                                         unsigned alterID) const {
     return std::string(std::string(loop_name) + "_" + std::to_string(alterID) + 
                        "_" + std::to_string(num_run) + "_" + 
-                       std::to_string(num_iteration));
+                       std::to_string(num_round));
   }
 
 
