@@ -95,14 +95,14 @@ The scheduling policies are listed as follows:
 
       - \b ChunkFIFO (or ChunkLIFO) maintains a single global queue (or stack) for chunks of work items
 
-      - \b PerSocketChunkFIFO (or PerSocketChunkLIFO) maintains a queue (or stack) of chunks per each package (multi-core
-        processor) in the system. A thread tries to find a chunk in its local
-        package before stealing from other packages. 
+      - \b PerSocketChunkFIFO (or PerSocketChunkLIFO) maintains a queue (or stack)
+        of chunks per each socket (multi-core processor) in the system. A thread tries to find a chunk in its local
+        socket before stealing from other sockets. 
 
       - \b PerThreadChunkFIFO (or PerThreadChunkLIFO) maintains a queue (or stack) of chunks per each thread. Normally
-        threads steal work within their package, but not every thread can steal
-        from outside its package. Each package
-        has a leader, which steals from other packages when its own package is out
+        threads steal work within their socket, but not every thread can steal
+        from outside its socket. Each socket
+        has a leader, which steals from other sockets when its own socket is out
         of work. 
         We show an example of using chunked worklists from {@link apps/delaunayrefinement/DelaunayRefinement.cpp}
 
@@ -141,7 +141,7 @@ The scheduling policies are listed as follows:
     work items to threads. So a thread may generate a work item and specify another
     thread to process it. This functor is one of the template parameters, which
     maps each work item to the range [0:numThreads). Another
-    difference from LocalQueues is that worklists are maintained per package. 
+    difference from LocalQueues is that worklists are maintained per socket. 
     \b TODO: verify this
 
 
