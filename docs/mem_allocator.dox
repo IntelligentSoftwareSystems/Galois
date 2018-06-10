@@ -1,0 +1,95 @@
+/**
+
+@page mem_allocator Memory Allocators
+
+@section allocator Memory Allocators
+
+Memory Allocators are used by dynamic data structures whose size is either known at
+runtime or changes during execution, e.g., std::vector, std::set, etc. to manage dynamically changing memory requirements.
+
+@subsection mem_allocator-intro Why do we need custom memory allocators?
+
+The default allocators functions such as \a "malloc", \a "new", \a "delete", etc. provided in C/C++ standard library are designed to be general-purpose.
+This generality comes at the cost of performance, for example, your code could be single-threaded, but since \a malloc is designed to handle multithreaded
+paradigms just as well, this extra functionality degrades the performance. 
+For thread-safe memory allocation, these functions often use a single lock on their internal heap,
+and, therefore, do not scale with multiple threads.  As a result, parallel code that uses the
+default C/C++ allocators does not scale beyond a few threads. 
+A good memory allocator is:
+- \b Fast: Dynamic allocation and de-allocation should not slow down the code. It can be optimized certain allocation patterns that occur frequently in the code.
+- \b Robust: It should be able to handle all the case possible in the code and avoid memory leaks.
+- \b User-friendly: It should be easy to use.
+- \b Portable: It should be easily portable across system architectures.
+
+Keeping these design goals in mind, in Galois, we have designed scalable parallel allocators for some of the common usage patterns. 
+We describe some of them below:
+
+@subsection fixed-size-alloc Fixed Size Allocator
+
+A common usage pattern is to allocate objects of the same type inside the parallel
+loop. Such an allocator can be implemented easily in a scalable manner. Galois
+provides {@link galois::FixedSizeAllocator}, which takes a template parameter as the
+type of object to be allocated. It only supports objects of fixed size type and always allocates
+the chunk of memory required to store one element of that size, therefore, it cannot be used with STL data structures like std::vector and std::deque, which may need to allocate variable size chunks of memory in order to keep all the elements contiguous in memory.
+
+It can be used to allocate elements of STL data structures like std::set, and std::list, etc., which always allocate objects of fixed size type and elements are not required to be contiguous in memory. The source for {@link galois::ThreadSafeOrderedSet} shows how
+a fixed size allocator can be passed to std::set.
+
+This allocator is typically instantiated outside the parallel loop by the master
+thread and then can be used by multiple parallel loops.  An example from {@link
+include/galois/gdeque.h} is shown below:
+
+@snippet include/galois/gdeque.h Example Fixed Size Allocator
+
+
+@subsection per-iter-alloc Per Iteration Allocator
+
+Per Iteration Allocator {@link galois::PerIterAllocTy} can be used when dynamic data structures are defined inside the parallel loop and live for only one iteration of the loop. This allocator can
+be used inside the functors for galois::for_each and galois::do_all. It can be used
+with STL data structures, e.g., std::vector and std::set etc., and supports
+variable size allocations.
+
+To use per-iteration allocator, you need to pass galois::per_iter_alloc to galois::for_each. Here is an example of how to use it:
+@code
+using Graph = /* graph type definition */;
+using GNode = Graph::GraphNode;
+Graph g;
+galois::for_each(
+    galois::iterate(graph),
+    [&] (GNode n, auto& ctx) {
+      // syntax for conforming to STL allocator interface
+      using Alloc = galois::PerIterAllocTy::rebind<GNode>::other;
+
+      // fast, scalable allocation for v, a per-iteration vector
+      // get per-iteration allocator from ctx to initialize the v
+      std::vector<GNode, Alloc> v(ctx.getPerIterAlloc());
+
+      auto& d = graph.getData(n).data;
+      std::copy(d.begin(), d.end(), std::back_inserter(v));
+      // use of v below
+    }
+    , galois::per_iter_alloc()
+    , galois::loopname("per_iter_alloc_example")
+);
+@endcode
+</ol>
+
+Delaunay Mesh Refinement (DMR) is a good example to see how to use Per Iteration
+Allocator. The following snippet shows how to define an STL vector to use the Per Iteration
+Allocator (file {@link lonestar/delaunayrefinement/Cavity.h}):
+@snippet lonestar/delaunayrefinement/Cavity.h STL vector using PerIterAllocTy
+
+@subsection Pow_2_allocator Power of 2 Allocator
+Power of 2 Allocator {@link galois::Pow_2_VarSizeAlloc} is a scalable allocator for dynamic data structures that allocate objects with variable size. This is a suitable allocator for STL data structures such as std::vector, std::deque, etc. It allocates blocks of sizes in powers of 2 so that
+insertion operations on containers like std::vector get amortized over time.
+
+The following snippet shows how to define Power of 2 Allocator for a particular type T (file {@link ./libgalois/include/galois/gstl.h}): 
+@snippet ./libgalois/include/galois/gstl.h define Pow_2_VarSizeAlloc
+
+The following snippet shows how to use Power of 2 Allocator for std::vector container (file {@link ./libgalois/include/galois/gstl.h}): 
+@snippet ./libgalois/include/galois/gstl.h  STL vector using Pow_2_VarSizeAlloc
+
+\n
+
+*/
+

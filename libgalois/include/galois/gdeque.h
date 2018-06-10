@@ -89,6 +89,8 @@ private:
 
   template<typename... Args>
   Block* alloc_block(Args&&... args) {
+    // Fixed size allocator can only allocate 1 object at a time of size sizeof(Block).
+    // Argument to allocate is always 1.
     Block* b = heap.allocate(1);
     return new (b) Block(std::forward<Args>(args)...);
   }
