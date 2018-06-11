@@ -117,7 +117,7 @@ struct BFS {
       galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, galois::loopname("BFS"), galois::numrun(_graph.get_run_identifier()));
       ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
-    galois::runtime::reportStat("(NULL)", "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
+    galois::runtime::reportStat("(NULL)", "NumIterations_" + std::to_string(_graph.get_run_num()), (unsigned long)iteration, 0);
   }
 
   void operator()(GNode src) const {

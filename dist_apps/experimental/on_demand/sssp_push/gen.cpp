@@ -265,7 +265,7 @@ struct SSSP {
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
       galois::runtime::reportStat_Single("SSSP", 
-        "NUM_ITERATIONS_" + std::to_string(_graph.get_run_num()), 
+        "NumIterations_" + std::to_string(_graph.get_run_num()), 
         (unsigned long)_num_iterations);
     }
   }
