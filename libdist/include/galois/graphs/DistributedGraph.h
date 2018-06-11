@@ -3602,7 +3602,7 @@ public:
            typename ReduceFnTy, typename BroadcastFnTy,
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync(std::string loopName) {
-    std::string timer_str("SYNC_" + loopName + "_" + get_run_identifier());
+    std::string timer_str("Sync_" + loopName + "_" + get_run_identifier());
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
 
     Tsync.start();
@@ -3862,7 +3862,7 @@ public:
            typename BitsetFnTy = galois::InvalidBitsetFnTy>
   inline void sync_on_demand(galois::runtime::FieldFlags& fieldFlags, 
                              std::string loopName) {
-    std::string timer_str("SYNC_" + get_run_identifier(loopName));
+    std::string timer_str("Sync_" + get_run_identifier(loopName));
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
     Tsync.start();
 
@@ -3901,7 +3901,7 @@ private:
   template<typename FnTy>
   void syncRecvApply_ck(uint32_t from_id, galois::runtime::RecvBuffer& buf,
                         std::string loopName) {
-    std::string set_timer_str("SYNC_SET_" + get_run_identifier(loopName));
+    std::string set_timer_str("SyncSet_" + get_run_identifier(loopName));
     std::string doall_str("LAMBDA::REDUCE_RECV_APPLY_" + get_run_identifier(loopName));
     galois::StatTimer Tset(set_timer_str.c_str(), GRNAME);
     Tset.start();
