@@ -138,7 +138,7 @@ template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
 static galois::graphs::DistGraph<NodeData, EdgeData>* loadDGraph(
     std::vector<unsigned>& scaleFactor,
     struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
   dGraphTimer.start();
 
   galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
@@ -178,7 +178,7 @@ template <typename NodeData, typename EdgeData>
 static galois::graphs::DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
     std::vector<unsigned>& scaleFactor,
     struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
   dGraphTimer.start();
 
   galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
@@ -226,7 +226,7 @@ template <typename NodeData, typename EdgeData>
 static galois::graphs::DistGraph<NodeData, EdgeData, true>* 
 loadBDGraph(std::vector<unsigned>& scaleFactor,
             struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("TIMER_HG_INIT", "DistBench"); 
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
   dGraphTimer.start();
 
   galois::graphs::DistGraph<NodeData, EdgeData, true>* 
