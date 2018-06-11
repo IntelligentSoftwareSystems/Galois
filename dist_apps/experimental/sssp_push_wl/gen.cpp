@@ -211,7 +211,7 @@ struct SSSP {
             galois::steal());
 
         galois::runtime::reportStat("(NULL)", 
-            "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+            "NumWorkItems_" + (_graph.get_run_identifier()), 
             (unsigned long)dist_wl.size(), 0);
         dist_wl.sync();
       }

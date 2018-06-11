@@ -213,7 +213,7 @@ struct FirstItr_BFS{
     Flags_dist_current::set_write_dst();
 
     galois::runtime::reportStat("(NULL)", 
-       _graph.get_run_identifier("NUM_WORK_ITEMS_"), __end - __begin, 0);
+       _graph.get_run_identifier("NumWorkItems_"), __end - __begin, 0);
   }
 
   void operator()(GNode src) const {
@@ -282,7 +282,7 @@ struct BFS {
       //            Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat("(NULL)", 
-        _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
+        _graph.get_run_identifier("NumWorkItems_"), 
         (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce());

@@ -306,7 +306,7 @@ struct PageRank {
           galois::steal());
 
         galois::runtime::reportStat("(NULL)", 
-            _graph.get_run_identifier("NUM_WORK_ITEMS_"), 
+            _graph.get_run_identifier("NumWorkItems_"), 
             (unsigned long)dist_wl.size(), 0);
 
         dist_wl.sync();

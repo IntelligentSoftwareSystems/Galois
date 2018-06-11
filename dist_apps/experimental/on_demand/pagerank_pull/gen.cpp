@@ -279,7 +279,7 @@ struct PageRank {
       #endif
 
       galois::runtime::reportStat_Tsum(REGION_NAME, 
-          "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+          "NumWorkItems_" + (_graph.get_run_identifier()), 
           (unsigned long)dga.read_local());
 
       ++_num_iterations;

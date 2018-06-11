@@ -143,7 +143,7 @@ struct BFS {
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat_Tsum(regionname,
-        _graph.get_run_identifier("NUM_WORK_ITEMS"), 
+        _graph.get_run_identifier("NumWorkItems"), 
         (unsigned long)dga.read_local());
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));

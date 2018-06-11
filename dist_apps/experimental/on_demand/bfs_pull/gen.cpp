@@ -240,7 +240,7 @@ struct BFS {
       //            Broadcast_dist_current, Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat("(NULL)", 
-        "NUM_WORK_ITEMS_" + (_graph.get_run_identifier()), 
+        "NumWorkItems_" + (_graph.get_run_identifier()), 
         (unsigned long)dga.read_local(), 0);
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
