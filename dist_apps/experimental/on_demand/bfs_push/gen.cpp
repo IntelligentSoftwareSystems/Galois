@@ -410,7 +410,7 @@ int main(int argc, char** argv) {
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] BFS::go run ", run, " called\n");
-    std::string timer_str("TIMER_" + std::to_string(run));
+    std::string timer_str("Timer_" + std::to_string(run));
     galois::StatTimer StatTimer_main(timer_str.c_str(), regionname);
 
     StatTimer_main.start();
