@@ -178,7 +178,6 @@ struct SynchronousAlgo {
         
 
     while (!cur->empty()) {
-
       galois::do_all(galois::iterate(*cur), 
           [&] (const Edge& edge) {
             Node& sdata = graph.getData(edge.src, galois::MethodFlag::UNPROTECTED);
@@ -211,7 +210,6 @@ struct SynchronousAlgo {
           },
           galois::loopname("Find"));
 
-
       cur->clear();
       std::swap(cur, next);
       rounds += 1;
@@ -239,7 +237,6 @@ struct LabelPropAlgo {
 
   using GNode = Graph::GraphNode;
   using component_type = LNode::component_type;
-  
 
   template<typename G>
   void readGraph(G& graph) {
@@ -247,7 +244,7 @@ struct LabelPropAlgo {
   }
 
   void operator()(Graph& graph) {
-    galois::GAccumulator<unsigned int> changed;
+    galois::GReduceLogicalOR changed;
     do
     {
       changed.reset();
@@ -257,7 +254,7 @@ struct LabelPropAlgo {
           if (sdata.comp_old > sdata.comp_current) {
             sdata.comp_old = sdata.comp_current;
 
-            changed += 1;
+            changed.update(true);
 
             for (auto e : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
               GNode dst = graph.getEdgeDst(e);
@@ -563,15 +560,13 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
       [&] (const GNode& x) {
         auto& n = graph.getData(x, galois::MethodFlag::UNPROTECTED);
 
-        if(std::is_same<Algo, LabelPropAlgo>::value)
-        {
+        if(std::is_same<Algo, LabelPropAlgo>::value) {
           if (n.isRepComp((unsigned int)x)) {
             accumReps += 1;
             return;
           }
         }
-        else
-        {
+        else {
           if (n.isRep()) {
             accumReps += 1;
             return;

@@ -14,15 +14,15 @@ In Label Propagation, each node is marked with a unique
 label and propagating vertex labels through neighboring vertices until all the vertices in
 the same component are labelled with a unique ID.
 
-- serial: Serial pointer-jumping implementation.
-- synchronous: Bulk synchronous data-driven implementation. Alternatively execute on two 
+- Serial: Serial pointer-jumping implementation.
+- Synchronous: Bulk synchronous data-driven implementation. Alternatively execute on two 
 worklists.
-- async: asynchronous topology-driven implementation. Work unit is a node.
-- blockedasync: asynchronous topology-driven implementation with NUMA-aware optimization.
+- Async: asynchronous topology-driven implementation. Work unit is a node.
+- BlockedAsync: asynchronous topology-driven implementation with NUMA-aware optimization.
 Work unit is a node.
-- edgeasync: asynchronous topology-driven. Work unit is an edge.
-- edgetiledasync (default): asynchronous topology-driven. Work unit is an edge tile.
-labelProp: Label propagation implementation.
+- EdgeAsync: asynchronous topology-driven. Work unit is an edge.
+- EdgetiledAsync (default): asynchronous topology-driven. Work unit is an edge tile.
+- LabelProp: Label propagation implementation.
 
 Pass in a symmetric .sgr graph.
 
@@ -45,7 +45,7 @@ To run a specific algorithm, use the following:
 
 TUNING PERFORMANCE  
 ===========
-Default algorithm 'edgetiledasync' works best on rmat25, r4-2e26, roadUSA graphs.
+Default algorithm 'edgetiledasync' works best on rmat25, r4-2e26, roadUSA graphs among all algorithms.
 Two parameters 'EDGE_TILE_SIZE' and 'CHUNK_SIZE' (granularity of work stealing) are 
 crucial to performance and has to be tuned on different platforms. They are set to 
 be 512 and 1 respectively by default.

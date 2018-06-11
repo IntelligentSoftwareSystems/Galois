@@ -376,8 +376,7 @@ struct PrioAlgo {
 
           prioNode& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-          if(other.flag == (unsigned char)0xfe) //matched, highest prio
-          {
+          if(other.flag == (unsigned char)0xfe) {//matched, highest prio
             nodedata.flag = (unsigned char)0x00;
             unmatched.update(true);
             return;
@@ -385,11 +384,10 @@ struct PrioAlgo {
 
           if(nodedata.flag > other.flag)
               continue;
-          else if(nodedata.flag == other.flag){
+          else if(nodedata.flag == other.flag) {
               if(src > dst)
                   continue;
-              else if(src == dst)
-              {
+              else if(src == dst) {
                   nodedata.flag = (unsigned char)0x00; //other_matched
                   return;
               }
@@ -398,7 +396,7 @@ struct PrioAlgo {
                   return;
               }
           }
-          else{
+          else {
               unmatched.update(true);
               return;
           }
@@ -499,8 +497,7 @@ struct EdgeTiledPrioAlgo {
 
               prioNode& other = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-              if(other.flag == (unsigned char)0xfe) //permanent matched, highest prio
-              {
+              if(other.flag == (unsigned char)0xfe) {//permanent matched, highest prio
                 nodedata.flag = (unsigned char)0x00;
                 return;
               }
@@ -510,8 +507,7 @@ struct EdgeTiledPrioAlgo {
               else if(nodedata.flag == other.flag){
                   if(src > dst)
                       continue;
-                  else if(src == dst)
-                  {
+                  else if(src == dst){
                       nodedata.flag = (unsigned char)0x00; //other_matched
                       tile.flag = false;
                       return;
@@ -629,21 +625,18 @@ bool verify(Graph& graph, Algo& algo) {
   using GNode = typename Graph::GraphNode;
   using prioNode = typename Graph::node_data_type;
 
-
   if (std::is_same<Algo, PrioAlgo >::value || std::is_same<Algo, EdgeTiledPrioAlgo> :: value) {
     galois::do_all(galois::iterate(graph), 
         [&] (const GNode& src) {
-        prioNode& nodedata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
-        if(nodedata.flag == (unsigned char)0xfe){
-            nodedata.flag = MATCHED;
-        }
-        else if(nodedata.flag == (unsigned char)0x00)
-        {
-            nodedata.flag = OTHER_MATCHED;
-        }
-        else 
-            std::cout<<"error in verify_change! Some nodes are not decided."<<std::endl;
-
+            prioNode& nodedata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+            if(nodedata.flag == (unsigned char)0xfe){
+                nodedata.flag = MATCHED;
+            }
+            else if(nodedata.flag == (unsigned char)0x00) {
+                nodedata.flag = OTHER_MATCHED;
+            }
+            else 
+                std::cout<<"error in verify_change! Some nodes are not decided."<<std::endl;
         }
         , galois::loopname("verify_change"));
   }

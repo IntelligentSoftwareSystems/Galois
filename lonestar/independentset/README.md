@@ -38,7 +38,7 @@ TUNING PERFORMANCE
 ===========
 In 'prio', when a node has high priority than all of its neighbors, it is marked 
 as IN. For its neighbors, you can choose either 1) update its neighbors to OUT in 
-same round (Push), or 2) next round its neighbors check they have an IN neighbor, 
+same round (Push), or 2) next round its neighbors check if they have an IN neighbor, 
 and update themselves to OUT (Pull).
 First method works better on none-power-law graphs. Second method works better 
 on power-law graphs. 
