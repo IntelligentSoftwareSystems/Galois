@@ -140,13 +140,15 @@ public:
       scalefactor.clear();
     }
 
-    galois::StatTimer Tgraph_construct(
-      "TIME_GRAPH_CONSTRUCT", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
+      "GraphPartitioningTime", GRNAME
+    );
 
     Tgraph_construct.start();
 
-    if(readFromFile){
-      galois::gPrint("[", base_DistGraph::id, "] Reading local graph from file : ", localGraphFileName, "\n");
+    if (readFromFile) {
+      galois::gPrint("[", base_DistGraph::id, "] Reading local graph from file : ", 
+                     localGraphFileName, "\n");
       base_DistGraph::read_local_graph_from_file(localGraphFileName);
       Tgraph_construct.stop();
       return;
@@ -229,8 +231,11 @@ public:
       [&] (auto n) {
         base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
     base_DistGraph::printStatistics();
 
@@ -248,7 +253,9 @@ public:
       base_DistGraph::transposed = true;
     }
 
-    galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
+                                                          GRNAME);
+
     Tthread_ranges.start();
     base_DistGraph::determineThreadRanges();
     Tthread_ranges.stop();
@@ -264,8 +271,10 @@ public:
      * Exchange mirrors and master nodes among
      * hosts
      ****************************************/
-    galois::StatTimer Tgraph_construct_comm(
-        "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
+      "GraphCommSetupTime", GRNAME
+    );
+
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
@@ -498,8 +507,11 @@ private:
           }
         }
       },
-      galois::no_stats(),
-      galois::loopname("EdgeInspection"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeInspection"),
+      #endif
+      galois::no_stats()
+    );
 
     edgeInspectionTimer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge inspection time: ",
@@ -648,8 +660,11 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
@@ -775,8 +790,11 @@ private:
         auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         this->processReceivedEdgeBuffer(buffer, graph, edgesToReceive);
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
     // flush buffers
     for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {

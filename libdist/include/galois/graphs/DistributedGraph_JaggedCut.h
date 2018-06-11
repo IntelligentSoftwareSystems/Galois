@@ -220,10 +220,11 @@ public:
       GALOIS_DIE("Transpose not supported for jagged vertex-cuts");
     }
 
-    galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
+      "GraphPartitioningTime", GRNAME
+    );
+
     Tgraph_construct.start();
-    galois::StatTimer Tgraph_construct_comm(
-      "TIME_GRAPH_CONSTRUCT_COMM", GRNAME);
 
     // only used to determine node splits among hosts; abandonded later
     // for the FileGraph which mmaps appropriate regions of memory
@@ -282,8 +283,11 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeLoading"));
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+        #endif
+        galois::no_stats()
+      );
 
     }
 
@@ -300,8 +304,8 @@ public:
 
     fill_mirrorNodes(base_DistGraph::mirrorNodes);
 
-    galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
-
+    galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
+                                                          GRNAME);
     Tthread_ranges.start();
     base_DistGraph::determineThreadRanges();
     Tthread_ranges.stop();
@@ -312,6 +316,9 @@ public:
 
     Tgraph_construct.stop();
 
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
+      "GraphCommSetupTime", GRNAME
+    );
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
@@ -340,8 +347,11 @@ private:
           ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
         }
       },
-      galois::no_stats(),
-      galois::loopname("CalculateIndegree"));
+      #if MORE_DIST_STATS
+      galois::loopname("CalculateIndegree"),
+      #endif
+      galois::no_stats()
+    );
 
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] In-degree calculation time: ", timer.get_usec()/1000000.0f,
@@ -464,8 +474,11 @@ private:
           numOutgoingEdges[h][src - rowOffset]++;
         }
       },
-      galois::no_stats(),
-      galois::loopname("EdgeInspection"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeInspection"),
+      #endif
+      galois::no_stats()
+    );
 
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
@@ -581,8 +594,11 @@ private:
             }
           }
         },
-        galois::no_stats(),
-        galois::loopname("CreateDstNode"));
+        #if MORE_DIST_STATS
+        galois::loopname("CreateDstNode"),
+        #endif
+        galois::no_stats()
+      );
 
       for (uint64_t dst = range.first; dst < range.second; ++dst) {
         if (createNode.test(dst - range.first)) {
@@ -701,8 +717,11 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
       auto& sbr = *sb.getRemote(t);
@@ -782,8 +801,11 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         }
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {

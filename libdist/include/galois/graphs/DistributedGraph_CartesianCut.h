@@ -294,7 +294,10 @@ public:
       GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
     }
 
-    galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
+      "GraphPartitioningTime", GRNAME
+    );
+
     Tgraph_construct.start();
 
     if (readFromFile) {
@@ -369,8 +372,11 @@ public:
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeLoading"));
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+        #endif
+        galois::no_stats()
+      );
 
     } 
 
@@ -397,7 +403,8 @@ public:
 
     fillMirrorNodes(base_DistGraph::mirrorNodes);
 
-    galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime", 
+                                                          GRNAME);
     Tthread_ranges.start();
     base_DistGraph::determineThreadRanges();
     Tthread_ranges.stop();
@@ -408,8 +415,9 @@ public:
 
     Tgraph_construct.stop();
 
-    galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM",
-                                            GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
+      "GraphCommSetupTime", GRNAME
+    );
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
@@ -477,8 +485,10 @@ public:
             numOutgoingEdges[d][h][src - rowOffset]++;
           }
         },
-        galois::no_stats(),
-        galois::loopname("EdgeInspection")
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeInspection"),
+        #endif
+        galois::no_stats()
       );
     }
 
@@ -738,8 +748,11 @@ public:
           auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
           this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeLoading"));
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+        #endif
+        galois::no_stats()
+      );
 
       for (unsigned t = 0; t < sb.size(); ++t) {
         auto& sbr = *sb.getRemote(t);
@@ -822,8 +835,11 @@ public:
           auto buffer = net.recieveTagged(galois::runtime::evilPhase, nullptr);
           this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeLoading"));
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+        #endif
+        galois::no_stats()
+      );
 
       for (unsigned t = 0; t < sb.size(); ++t) {
         auto& sbr = *sb.getRemote(t);

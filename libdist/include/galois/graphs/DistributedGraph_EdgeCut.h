@@ -160,11 +160,10 @@ class DistGraph_edgeCut
                       bool readFromFile = false,
                       std::string localGraphFileName = "local_graph") 
         : base_DistGraph(host, _numHosts) {
-      galois::StatTimer Tgraph_construct("TIME_GRAPH_CONSTRUCT", 
-                                                  GRNAME);
+      galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
+        "GraphPartitioningTime", GRNAME
+      );
       Tgraph_construct.start();
-      galois::StatTimer Tgraph_construct_comm("TIME_GRAPH_CONSTRUCT_COMM", 
-                                                       GRNAME);
       // if local graph is saved, read from there
       if (readFromFile) {
         galois::gPrint("[", base_DistGraph::id, 
@@ -250,8 +249,10 @@ class DistGraph_edgeCut
           }
           prefixSumOfEdges[n - nodeBegin] = std::distance(edgeOffset, ee);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeInspection")
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeInspection"),
+        #endif
+        galois::no_stats()
       );
       timer.stop();
 
@@ -321,8 +322,10 @@ class DistGraph_edgeCut
         [&] (auto n) {
           base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
         },
-        galois::no_stats(),
-        galois::loopname("EdgeLoading")
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+        #endif
+        galois::no_stats()
       );
 
       base_DistGraph::printStatistics();
@@ -336,7 +339,8 @@ class DistGraph_edgeCut
 
       fill_mirrorNodes(base_DistGraph::mirrorNodes);
 
-      galois::StatTimer Tthread_ranges("TIME_THREAD_RANGES", GRNAME);
+      galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
+                                                            GRNAME);
       Tthread_ranges.start();
       base_DistGraph::determineThreadRanges();
       Tthread_ranges.stop();
@@ -350,6 +354,9 @@ class DistGraph_edgeCut
 
       Tgraph_construct.stop();
 
+      galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
+        "GraphCommSetupTime", GRNAME
+      );
       Tgraph_construct_comm.start();
       base_DistGraph::setup_communication();
       Tgraph_construct_comm.stop();
@@ -423,8 +430,11 @@ class DistGraph_edgeCut
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 
@@ -469,8 +479,11 @@ class DistGraph_edgeCut
         }
         assert(cur == (*graph.edge_end(lsrc)));
       },
-      galois::no_stats(),
-      galois::loopname("EdgeLoading"));
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeLoading"),
+      #endif
+      galois::no_stats()
+    );
 
 
     timer.stop();

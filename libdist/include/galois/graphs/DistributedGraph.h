@@ -643,7 +643,7 @@ protected:
    * different parts of the graph by exchanging master/mirror information.
    */
   void setup_communication() {
-    galois::CondStatTimer<MORE_DIST_STATS> Tcomm_setup("COMMUNICATION_SETUP_TIME", GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tcomm_setup("CommunicationSetupTime", GRNAME);
 
     // barrier so that all hosts start the timer together
     galois::runtime::getHostBarrier().wait();
