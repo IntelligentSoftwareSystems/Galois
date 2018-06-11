@@ -196,7 +196,7 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     galois::StatManager statManager;
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TimerTotal"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
 

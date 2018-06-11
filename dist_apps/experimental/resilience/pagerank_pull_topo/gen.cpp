@@ -465,7 +465,7 @@ int main(int argc, char** argv) {
     galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL", REGION_NAME);
+  galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
 
   StatTimer_total.start();
 

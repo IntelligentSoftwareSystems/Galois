@@ -139,7 +139,7 @@ int main(int argc, char** argv) {
     galois::runtime::reportStat("(NULL)", "Source Node ID", (unsigned long)src_node, 0);
     galois::StatManager statManager;
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+    galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TimerTotal"), StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();
 

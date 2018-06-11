@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
+  galois::StatTimer StatTimer_total("TimerTotal", regionname); 
 
   StatTimer_total.start();
 

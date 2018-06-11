@@ -1113,7 +1113,7 @@ int main(int argc, char** argv) {
     }
 
     galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
-                      StatTimer_total("TIMER_TOTAL"),
+                      StatTimer_total("TimerTotal"),
                       StatTimer_hg_init("TIMER_HG_INIT");
 
     StatTimer_total.start();

@@ -380,7 +380,7 @@ int main(int argc, char** argv) {
                                 (unsigned long long)src_node);
   }
 
-  galois::StatTimer StatTimer_total("TIMER_TOTAL", regionname); 
+  galois::StatTimer StatTimer_total("TimerTotal", regionname); 
 
   StatTimer_total.start();
   #ifdef __GALOIS_HET_CUDA__
