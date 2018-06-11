@@ -1198,13 +1198,12 @@ private:
     float replication_factor = (float)(global_total_mirror_nodes + numGlobalNodes) /
                                (float)numGlobalNodes;
     galois::runtime::reportStat_Single(GRNAME, 
-        "REPLICATION_FACTOR", replication_factor);
+        "ReplicationFactor", replication_factor);
 
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, 
-        "TOTAL_NODES_" + get_run_identifier(), numGlobalNodes);
+        "TotalNodes", numGlobalNodes);
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME, 
-        "TOTAL_GLOBAL_MIRROR_NODES_" + get_run_identifier(), 
-        global_total_mirror_nodes);
+        "TotalGlobalMirrorNodes", global_total_mirror_nodes);
   }
 
   /**
