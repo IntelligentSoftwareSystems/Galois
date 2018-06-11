@@ -308,10 +308,12 @@ class LC_CSR_Graph :
    : numNodes(_numNodes), numEdges(_numEdges) {
     //std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
+      //! [numaallocex]
       nodeData.allocateBlocked(numNodes);
       edgeIndData.allocateBlocked(numNodes);
       edgeDst.allocateBlocked(numEdges);
       edgeData.allocateBlocked(numEdges);
+      //! [numaallocex]
       this->outOfLineAllocateBlocked(numNodes, false);
     } else {
       nodeData.allocateInterleaved(numNodes);

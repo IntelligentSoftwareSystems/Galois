@@ -2,9 +2,11 @@
 
 @page numa NUMA-Awareness
 
+\tableofcontents
+
 @section numa-intro What is NUMA?
 
-Non-uniform memory architecture (NUMA) refers to a processor accessing 
+Non-uniform memory access (NUMA) refers to a processor accessing 
 memory that is not located locally; instead, it is located on another
 socket in the machine. Such a memory access generally incurs high overhead
 since it involves access to non-local memory. Therefore, for the best performance
@@ -14,16 +16,22 @@ local memory accesses occur as much as possible.
 
 @section numa-types NUMA Allocation Functions in Galois
 
-5 kinds of NUMA allocation schemes currently exist in Galois:
+5 kinds of NUMA allocation schemes currently exist in Galois. For illustration purposes
+in the figures below, assume we have 4 threads in the system, and each thread belongs
+to its own socket.
 
 @subsection numa-malloc-local Local
 
-The thread that called the alloc will bind the pages to its local socket.
+The thread that called the allocate will bind the pages to its local socket.
+
+@image html numa_local.png "Example of Local Allocation: Thread 2 allocated the memory, so it is bound to Thread 2"
 
 @subsection numa-malloc-floating Floating
 
 The allocated memory will not be pre-faulted. In other words, the first thread
 to touch the memory after it's allocated will bind the page to its own socket.
+
+@image html numa_floating.png "Example of Floating Allocation: A chunk is bound to the first thread that touches it"
 
 @subsection numa-malloc-blocked Blocked
 
@@ -31,17 +39,23 @@ Each thread will get an even contiguous chunk of pages from the allocated
 memory (e.g.  thread 0 gets the first contiguous chunk, thread 1 gets
 the next contiguous chunk, etc.).
 
+@image html numa_blocked.png "Example of Blocked Allocation: Each thread gets an equal chunk"
+
 @subsection numa-malloc-interleaved Interleaved
 
 Distribute pages among threads (and as a result, NUMA sockets) in a round-robin 
 fashion (i.e. for N threads, thread 0 gets page 0, thread 1 gets page 1, ... 
 thread N gets page N, thread 0 gets page N + 1...). 
 
+@image html numa_interleaved.png "Example of Interleaved Allocation: Each chunk gets assigned in round-robin manner"
+
 @subsection numa-malloc-specific Specific
 
 Specify exactly how pages are to be distributed among threads in contiguous
 chunks through an array (e.g. thread 0 may get first 5 pages, then thread 1
 the next 3, and so on).
+
+@image html numa_specific.png "Example of Specific Allocation: Contiguous chunks assigned to each thread in user-specified manner"
 
 @section numa-large-array NUMA and Large Arrays
 
@@ -52,6 +66,12 @@ by calling the appropriate allocate function:
 @snippet LargeArray.h allocatefunctions
 
 More details can be found in LargeArray.h.
+
+Here is an example of blocked allocation for LargeArrays storing the data 
+of nodes and edges in a graph.
+
+@snippet LC_CSR_Graph.h numaallocex
+
 
 @section numa-galois-graphs NUMA Allocation in Galois Graphs
 
@@ -73,14 +93,21 @@ can use the following pattern instead when defining the graph (taken from SSSP.c
 Note that if the numaMap parameter in galois::graphs::FileGraph::partFromFile, 
 if true, will toggle Interleaved NUMA allocation.
 
-@section numa-best-behavior Best NUMA Behavior
+@section numa-best-behavior NUMA Guidelines
 
 The best NUMA scheme for your program depends on the pattern of accesses by the
-threads in the program. If, for example, each thread will not access data by other
+threads in the program.
+
+If, for example, each thread will not access data by other
 threads and each thread gets a relatively even portion of memory, then the
 Blocked scheme will likely be best. On the other hand, if each thread may 
 potentially access any part of the allocated memory, the Interleaved allocation
-scheme may be best. Consider the pattern of accesses in your program, then
+scheme may be best. If a thread that allocates memory will be the only thread
+to use it, then Local allocation may be best. Floating allocation can be used
+if the first thread that uses a chunk of memory will be the main user of the
+chunk.
+
+Consider the pattern of accesses in your program, then
 allocate NUMA memory accordingly.
 
 */
