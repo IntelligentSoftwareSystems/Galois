@@ -23,3 +23,5 @@ tags
 
 .clang-complete
 .ycm_extra_conf.py
+
+.*
