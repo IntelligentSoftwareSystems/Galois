@@ -6,19 +6,18 @@
 
 @section numa-intro What is NUMA?
 
-Non-uniform memory access (NUMA) refers to a processor accessing 
-memory that is not located locally; instead, it is located on another
-socket in the machine. Such a memory access generally incurs high overhead
-since it involves access to non-local memory. Therefore, for the best performance
+Non-uniform memory access (NUMA) refers to the memory sytem design in which the memory access time depends on 
+the location of memory. In otherwords, a processor accessing a memory location that is placed locally (in its socket) takes 
+less time. Instead, if it accesses a non-local memory, it incurs high overhead.
+Therefore, for the best performance
 on a machine with NUMA architecture, program writers must consider how memory
 is allocated among the sockets of the machine and allocate memory such that
 local memory accesses occur as much as possible.
 
 @section numa-types NUMA Allocation Functions in Galois
 
-5 kinds of NUMA allocation schemes currently exist in Galois. For illustration purposes
-in the figures below, assume we have 4 threads in the system, and each thread belongs
-to its own socket.
+Galois supports supports five kinds of NUMA allocation schemes. To illustrate them, assume that we have 
+four threads in the system, and each thread belongs to its own socket in the following figures.
 
 @subsection numa-malloc-local Local
 
@@ -59,34 +58,33 @@ the next 3, and so on).
 
 @section numa-large-array NUMA and Large Arrays
 
-galois::LargeArray objects support NUMA aware allocation. After you
-construct a LargeArray object, you can specify the type of allocation you want 
-by calling the appropriate allocate function:
+Currently, Galois supports NUMA aware allocation for galois::LargeArray objects.
+After we construct a LargeArray object, we can specify the type of NUMA allocation  
+by calling the following appropriate function:
 
 @snippet LargeArray.h allocatefunctions
 
 More details can be found in LargeArray.h.
 
-Here is an example of blocked allocation for LargeArrays storing the data 
+Here is an example of blocked allocation of LargeArrays for storing the data 
 of nodes and edges in a graph.
 
 @snippet LC_CSR_Graph.h numaallocex
 
 
 @section numa-galois-graphs NUMA Allocation in Galois Graphs
-
-Most provided Galois graph data structures also have a NUMA-alloc template 
-parameter called UseNumaAlloc. If it is toggled, then, in general, the graph 
+Galois also supports NUMA allocation for graph data structures. 
+It provides NUMA-alloc template for graph data structures with a parameter called UseNumaAlloc. 
+If it is toggled, then the graph 
 will use Blocked NUMA allocation (galois::graphs::LC_Linear_Graph and 
 galois::graphs::LC_Morph_Graph will use Local allocation if toggled). 
 Otherwise, it will use Interleaved NUMA allocation.
 
-For example, here is the template argument from LC_CSR_Graph.h:
+The following code snippet shows the template argument for LC_CSR_Graph from LC_CSR_Graph.h:
 
 @snippet LC_CSR_Graph.h doxygennuma
 
-If you want to toggle NUMA allocation without using the template parameter, you 
-can use the following pattern instead when defining the graph (taken from SSSP.cpp):
+The NUMA allocation can also specified using the following pattern (taken from SSSP.cpp)  without using the template parameter.
 
 @snippet SSSP.cpp withnumaalloc
 
@@ -95,19 +93,15 @@ if true, will toggle Interleaved NUMA allocation.
 
 @section numa-best-behavior NUMA Guidelines
 
-The best NUMA scheme for your program depends on the pattern of accesses by the
+The best NUMA scheme for a program depends on the pattern of accesses by the
 threads in the program.
 
-If, for example, each thread will not access data by other
-threads and each thread gets a relatively even portion of memory, then the
-Blocked scheme will likely be best. On the other hand, if each thread may 
+For instance, if each thread accesses only a relative even portion of memory and does not access the other threads data, then the
+Blocked allocation scheme will likely perform the best. On the other hand, if each thread may 
 potentially access any part of the allocated memory, the Interleaved allocation
-scheme may be best. If a thread that allocates memory will be the only thread
-to use it, then Local allocation may be best. Floating allocation can be used
+scheme may be chosen. If a thread that allocates memory will be the only thread
+to use it, then Local allocation can perform better. Floating allocation can be used
 if the first thread that uses a chunk of memory will be the main user of the
 chunk.
-
-Consider the pattern of accesses in your program, then
-allocate NUMA memory accordingly.
 
 */
