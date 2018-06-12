@@ -3,6 +3,9 @@ DESCRIPTION
 
 This program partitions a given graph using the METIS algorithm:
 
+George Karypis and Vipin Kumar. Multilevel k-way Partitioning Scheme for 
+Irregular Graphs. J. Parallel Distributed Computing. 1998.
+
 George Karypis and Vipin Kumar. A fast and high quality multilevel scheme 
 for partitioning irregular graphs. International Conference on Parallel 
 Processing. 1995
