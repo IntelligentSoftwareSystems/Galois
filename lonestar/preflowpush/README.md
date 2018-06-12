@@ -2,10 +2,16 @@ DESCRIPTION
 ===========
 
 This program computes the maximum flow from a given source to a given sink 
-in a given graph using the preflow-push algorithm (also called push-relabel 
-algorithm). Please refer to the textbook for more details on the algorithm:
+in a given directed graph using the preflow-push algorithm (also called 
+push-relabel algorithm):
 
-Cormen, Leiserson, Rivest, Stein. Introduction to Algorithms. MIT Press. 2001.
+A. Goldberg. Efficient Graph Algorithms for Sequential and Parallel Computers. 
+PhD thesis. Dept. of EECS, MIT. 1987.
+
+It also incorporates global relabel and gap detection heuristics:
+
+B. Cherkassy, A. Goldberg. On implementing the push-relabel method for the 
+maximum flow problem. Algorithmica. 1997
 
 
 INPUT
