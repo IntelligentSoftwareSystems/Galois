@@ -1,14 +1,11 @@
 DESCRIPTION 
 ===========
 
-This program partitions a given graph using the METIS algorithm:
+This program computes the maximum flow from a given source to a given sink 
+in a given graph using the preflow-push algorithm (also called push-relabel 
+algorithm). Please refer to the textbook for more details on the algorithm:
 
-George Karypis and Vipin Kumar. A fast and high quality multilevel scheme 
-for partitioning irregular graphs. International Conference on Parallel 
-Processing. 1995
-
-The algorithm first coarsens the graph, partitions it, and then refines 
-the partitioning.
+Cormen, Leiserson, Rivest, Stein. Introduction to Algorithms. MIT Press. 2001.
 
 
 INPUT
@@ -22,7 +19,7 @@ BUILD
 
 1. Run cmake at BUILD directory (refer to top-level README for cmake instructions).
 
-2. Run `cd <BUILD>/lonestar/gmetis; make -j`
+2. Run `cd <BUILD>/lonestar/preflowpush; make -j`
 
 
 RUN
@@ -30,15 +27,15 @@ RUN
 
 The following are a few example command lines.
 
--`$ ./gmetis <path-to-graph> <number-of-partitions>`
--`$ ./gmetis <path-to-graph> <number-of-partitions> -t 20 -GGP`
+-`$ ./preflowpush <path-to-graph> <source-ID> <sink-ID>`
+-`$ ./preflowpush <path-to-graph> <source-ID> <sink-ID> -t=20`
 
 
 PERFORMANCE
 ===========
 
-- In our experience, the default GGGP and BKL2 algorithms for initial partitioning 
-and refining, respectively, give the best performance.
+- In our experience, the deterministic algorithms perform much slower than the 
+non-deterministic one.
 
 - The performance of all algorithms depend on an optimal choice of the compile 
 time constant, CHUNK_SIZE, the granularity of stolen work when work stealing is 
