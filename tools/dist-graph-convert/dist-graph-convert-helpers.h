@@ -130,7 +130,7 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
 
   // read lines until last byte
   edgeListFile.seekg(localStartByte);
-  while ((uint64_t)(edgeListFile.tellg() + 1) != localEndByte) {
+  while ((uint64_t(edgeListFile.tellg()) + 1ul) != localEndByte) {
     uint64_t src;
     uint64_t dst;
     edgeListFile >> src >> dst;

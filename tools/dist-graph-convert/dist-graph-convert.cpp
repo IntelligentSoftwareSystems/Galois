@@ -498,7 +498,7 @@ struct Nodemap2Binary : public Conversion {
     std::vector<uint32_t> nodesToWrite;
     // read lines until last byte
     mapFile.seekg(localStartByte);
-    while ((uint64_t)(mapFile.tellg() + 1) != localEndByte) {
+    while ((uint64_t(mapFile.tellg()) + 1ul) != localEndByte) {
       uint32_t node;
       mapFile >> node;
       nodesToWrite.emplace_back(node);
