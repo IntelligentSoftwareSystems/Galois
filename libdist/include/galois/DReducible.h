@@ -106,7 +106,7 @@ public:
   }
 
   Ty reduce(std::string runID = std::string()) {
-    std::string timer_str("REDUCE_DGACCUM_" + runID);
+    std::string timer_str("ReduceDGAccum_" + runID);
 
     galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
                                                        "DGReducible");
@@ -241,7 +241,7 @@ public:
    * @returns the max-reduced value after reducing from all hosts.
    */
   Ty reduce(std::string runID = std::string()) {
-    std::string timer_str("REDUCE_DGREDUCEMAX_" + runID);
+    std::string timer_str("ReduceDGReduceMax_" + runID);
 
     galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
                                                        "DGReduceMax");
@@ -376,7 +376,7 @@ public:
    * @returns the min-reduced value after reducing from all hosts.
    */
   Ty reduce(std::string runID = std::string()) {
-    std::string timer_str("REDUCE_DGREDUCEMIN_" + runID);
+    std::string timer_str("ReduceDGReduceMin_" + runID);
 
     galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
                                                        "DGReduceMin");
