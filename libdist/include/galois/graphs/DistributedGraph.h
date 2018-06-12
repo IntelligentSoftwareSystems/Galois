@@ -4275,14 +4275,13 @@ public:
         galois::loopname(get_run_identifier(doall_str).c_str()));
   }
 
-  /****************************************************************
-   * Checkpoint the complete structure on the node
-   *
-   ***************************************************************/
+  /**
+   * Checkpoint the complete structure on the node to disk
+   */
   void checkpointSaveNodeData(std::string checkpointFileName = "checkpoint") {
     using namespace boost::archive;
     galois::StatTimer TimerSaveCheckPoint(
-      get_run_identifier("TIMER_SAVE_CHECKPOINT").c_str(), 
+      get_run_identifier("TimerSaveCheckpoint").c_str(), 
       GRNAME
     );
 
@@ -4628,7 +4627,7 @@ public:
    */
   void save_local_graph_to_file(std::string localGraphFileName = "local_graph"){
     using namespace boost::archive;
-    galois::StatTimer dGraphTimerSaveLocalGraph("TIMER_HG_SAVE_LOCAL", GRNAME);
+    galois::StatTimer dGraphTimerSaveLocalGraph("TimerSaveLocalGraph", GRNAME);
     dGraphTimerSaveLocalGraph.start();
 
     std::string fileName = localGraphFileName + "_" + std::to_string(id);

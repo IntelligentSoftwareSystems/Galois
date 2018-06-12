@@ -97,8 +97,7 @@ template<typename GraphTy>
 void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
   if (enableFT && (recoveryScheme == CP || recoveryScheme == HR)) {
     if (_num_iterations % checkpointInterval == 0) {
-
-      galois::StatTimer TimerSaveCheckpoint(("TOTAL_TIMER_SAVE_CHECKPOINT"), "RECOVERY");
+      galois::StatTimer TimerSaveCheckpoint(("TotalTimerSaveCheckpoint"), "RECOVERY");
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::gPrint("Checkpoint for iteration: ", _num_iterations, "\n");    
       }
@@ -126,7 +125,7 @@ void saveCheckpointToDisk(unsigned _num_iterations, GraphTy& _graph){
 template<typename RecoveryTy, typename InitGraphCrashedTy, typename GraphTy>
 void crashSite(GraphTy& _graph) {
   galois::StatTimer TimerRecoveryTotal(
-    _graph.get_run_identifier("TIMER_RECOVERY_TOTAL").c_str(),
+    _graph.get_run_identifier("TimerRecoveryTotal").c_str(),
     "RECOVERY"
   );
   TimerRecoveryTotal.start();
@@ -134,31 +133,31 @@ void crashSite(GraphTy& _graph) {
   std::set<uint32_t> crashHostSet = getRandomHosts();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED_SET", 
+    galois::runtime::reportParam("RECOVERY", "NumHostCrashedSet", 
                                        (crashHostSet.size()));
-    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED",
+    galois::runtime::reportParam("RECOVERY", "NumHostCrashed",
                                        (crashNumHosts));
-    galois::runtime::reportParam("RECOVERY", "NUM_ITERATION_CRASHED", 
+    galois::runtime::reportParam("RECOVERY", "NumIterationCrashed", 
                                        (crashIteration));
   }
 
   galois::StatTimer TimerRecoveryCrashed(
-      _graph.get_run_identifier("TIMER_RECOVERY_CRASHED").c_str(),
+      _graph.get_run_identifier("TimerRecoveryCrashed").c_str(),
       "RECOVERY"
       );
   galois::StatTimer TimerRecoveryHealthy(
-      _graph.get_run_identifier("TIMER_RECOVERY_HEALTHY").c_str(),
+      _graph.get_run_identifier("TimerRecoveryHealthy").c_str(),
       "RECOVERY"
       );
   galois::StatTimer TimerGraphConstructCrashed(
-      _graph.get_run_identifier("TIMER_RECOVERY_GRAPH_CONSTRUCT").c_str(),
+      _graph.get_run_identifier("TimerRecoveryGraphConstruct").c_str(),
       "RECOVERY"
       );
 
   // Use resilience to recover
   if (recoveryScheme == RS) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+      galois::runtime::reportParam("RECOVERY", "RecoveryScheme", "RESILIENCE");
     }
     galois::gPrint("[", net.ID, "] Using RS\n");
 
@@ -185,8 +184,8 @@ void crashSite(GraphTy& _graph) {
     }
   } else if (recoveryScheme == CP) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
-      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+      galois::runtime::reportParam("RECOVERY", "RecoveryScheme", "CHECKPOINT");
+      galois::runtime::reportParam("RECOVERY", "CheckpointInterval", 
                                        (checkpointInterval));
     }
     galois::gPrint("[", net.ID, "] Using CP\n");
@@ -204,8 +203,8 @@ void crashSite(GraphTy& _graph) {
       galois::runtime::getHostBarrier().wait();
   } else if (recoveryScheme == HR) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "HYBRID");
-      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+      galois::runtime::reportParam("RECOVERY", "RecoveryScheme", "HYBRID");
+      galois::runtime::reportParam("RECOVERY", "CheckpointInterval", 
           (checkpointInterval));
     }
     galois::gPrint("[", net.ID, "] Using HR\n");
@@ -248,7 +247,7 @@ template<typename RecoveryTy, typename InitGraphCrashedTy,
          typename InitGraphHealthyTy, typename GraphTy>
 void crashSite(GraphTy& _graph) {
   galois::StatTimer TimerRecoveryTotal(
-    _graph.get_run_identifier("TIMER_RECOVERY_TOTAL").c_str(),
+    _graph.get_run_identifier("TimerRecoveryTotal").c_str(),
     "RECOVERY"
   );
   TimerRecoveryTotal.start();
@@ -256,31 +255,31 @@ void crashSite(GraphTy& _graph) {
   std::set<uint32_t> crashHostSet = getRandomHosts();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED_SET", 
+    galois::runtime::reportParam("RECOVERY", "NumHostCrashedSet", 
                                        (crashHostSet.size()));
-    galois::runtime::reportParam("RECOVERY", "NUM_HOST_CRASHED",
+    galois::runtime::reportParam("RECOVERY", "NumHostCrashed",
                                        (crashNumHosts));
-    galois::runtime::reportParam("RECOVERY", "NUM_ITERATION_CRASHED", 
+    galois::runtime::reportParam("RECOVERY", "NumIterationCrashed", 
                                        (crashIteration));
 
   }
 
   galois::StatTimer TimerRecoveryCrashed(
-    _graph.get_run_identifier("TIMER_RECOVERY_CRASHED").c_str(),
+    _graph.get_run_identifier("TimerRecoveryCrashed").c_str(),
     "RECOVERY"
   );
   galois::StatTimer TimerRecoveryHealthy(
-    _graph.get_run_identifier("TIMER_RECOVERY_HEALTHY").c_str(),
+    _graph.get_run_identifier("TimerRecoveryHealthy").c_str(),
     "RECOVERY"
   );
   galois::StatTimer TimerGraphConstructCrashed(
-      _graph.get_run_identifier("TIMER_RECOVERY_GRAPH_CONSTRUCT").c_str(),
+      _graph.get_run_identifier("TimerRecoveryGraphConstruct").c_str(),
       "RECOVERY"
       );
   // Use resilience to recover
   if (recoveryScheme == RS) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY", "RECOVERY_SCHEME", "RESILIENCE");
+      galois::runtime::reportParam("RECOVERY", "RecoveryScheme", "RESILIENCE");
     }
     galois::gPrint("[", net.ID, "] Using RS\n");
 
@@ -307,8 +306,8 @@ void crashSite(GraphTy& _graph) {
     }
   } else if (recoveryScheme == CP) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "CHECKPOINT");
-      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+      galois::runtime::reportParam("RECOVERY","RecoveryScheme", "CHECKPOINT");
+      galois::runtime::reportParam("RECOVERY", "CheckpointInterval", 
           (checkpointInterval));
     }
     galois::gPrint("[", net.ID, "] Using CP\n");
@@ -325,8 +324,8 @@ void crashSite(GraphTy& _graph) {
     galois::runtime::getHostBarrier().wait();
   } else if (recoveryScheme == HR) {
     if (net.ID == 0) {
-      galois::runtime::reportParam("RECOVERY","RECOVERY_SCHEME", "HYBRID");
-      galois::runtime::reportParam("RECOVERY", "CHECKPOINT_INTERVAL", 
+      galois::runtime::reportParam("RECOVERY","RecoveryScheme", "HYBRID");
+      galois::runtime::reportParam("RECOVERY", "CheckpointInterval", 
           (checkpointInterval));
     }
     galois::gPrint("[", net.ID, "] Using HR\n");
@@ -368,7 +367,7 @@ void crashSiteAdjust(GraphTy& _graph) {
   if (recoveryScheme == RS || recoveryScheme == HR) {
     const auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer TimerRecoveryCrashedAdjust(
-      _graph.get_run_identifier("TIMER_RECOVERY_CRASHED_ADJUST").c_str(), 
+      _graph.get_run_identifier("TimerRecoveryCrashedAdjust").c_str(), 
       "RECOVERY"
     );
 
