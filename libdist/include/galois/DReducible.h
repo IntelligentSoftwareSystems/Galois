@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file DReducible.h
+ *
+ * Implements distributed reducible objects for easy reduction of values
+ * across a distributed system.
+ */
 #ifndef GALOIS_DISTACCUMULATOR_H
 #define GALOIS_DISTACCUMULATOR_H
 
@@ -29,6 +35,12 @@
 
 namespace galois {
 
+/**
+ * Distributed sum-reducer for getting the sum of some value across multiple
+ * hosts.
+ *
+ * @tparam Ty type of value to max-reduce
+ */
 template<typename Ty>
 class DGAccumulator {
   galois::runtime::NetworkInterface& net = galois::runtime::getSystemNetworkInterface();
@@ -37,11 +49,17 @@ class DGAccumulator {
   Ty local_mdata, global_mdata;
 
 #ifdef GALOIS_USE_LWCI
+  /**
+   * Sum reduction using LWCI
+   */
   inline void reduce_lwci() {
     lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
                 &galois::runtime::internal::ompi_op_sum<Ty>, mv);
   }
 #else
+  /**
+   * Sum reduction using MPI
+   */
   inline void reduce_mpi() {
     if (typeid(Ty) == typeid(int32_t)) {
       MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::INT, MPI_SUM,
@@ -71,33 +89,66 @@ class DGAccumulator {
 #endif
 
 public:
-  // Default constructor
+  //! Default constructor
   DGAccumulator() {}
 
+  /**
+   * Adds to accumulated value
+   *
+   * @param rhs Value to add
+   * @returns reference to this object
+   */
   DGAccumulator& operator+=(const Ty& rhs) {
     mdata += rhs;
     return *this;
   }
 
+  /**
+   * Sets current value stored in accumulator.
+   *
+   * @param rhs Value to set
+   */
   void operator=(const Ty rhs) {
     mdata.reset();
     mdata += rhs;
   }
 
+  /**
+   * Sets current value stored in accumulator.
+   *
+   * @param rhs Value to set
+   */
   void set(const Ty rhs) {
     mdata.reset();
     mdata += rhs;
   }
 
+  /**
+   * Read local accumulated value.
+   *
+   * @returns locally accumulated value
+   */
   Ty read_local() {
     if (local_mdata == 0) local_mdata = mdata.reduce();
     return local_mdata;
   }
 
+  /**
+   * Read the value returned by the last reduce call.
+   * Should call reduce before calling this function if an up to date
+   * value is required
+   *
+   * @returns the value of the last reduce call
+   */
   Ty read() {
     return global_mdata;
   }
 
+  /**
+   * Reset the entire accumulator.
+   *
+   * @returns the value of the last reduce call
+   */
   Ty reset() {
     Ty retval = global_mdata;
     mdata.reset();
@@ -105,6 +156,15 @@ public:
     return retval;
   }
 
+  /**
+   * Reduce data across all hosts, saves the value, and returns the
+   * reduced value
+   *
+   * @param runID optional argument used to create a statistics timer
+   * for later reporting
+   *
+   * @returns The reduced value
+   */
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGAccum_" + runID);
 
@@ -184,6 +244,9 @@ class DGReduceMax {
   #endif
 
 public:
+  /**
+   * Default constructor; initializes everything to 0.
+   */
   DGReduceMax() {
     local_mdata = 0;
     global_mdata = 0;
@@ -318,6 +381,9 @@ class DGReduceMin {
   #endif
 
 public:
+  /**
+   * Default constructor; initializes everything to the max value of the type.
+   */
   DGReduceMin() {
     local_mdata = std::numeric_limits<Ty>::max();
     global_mdata = std::numeric_limits<Ty>::max();;

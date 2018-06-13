@@ -1,3 +1,28 @@
+/*
+ * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+ * The code is being released under the terms of XYZ License (a copy is located in
+ * LICENSE.txt at the top-level directory).
+ *
+ * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/**
+ * @file DynamicBitset.cpp
+ *
+ * Contains some implementation of the  DynamicBitSet class
+ */
+
 #include "galois/DynamicBitset.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include "galois/GaloisForwardDecl.h"
@@ -98,26 +123,29 @@ void DynamicBitSet::reset(size_t index) {
 void DynamicBitSet::bitwise_or(const DynamicBitSet& other) {
   assert(size() == other.size());
   auto& other_bitvec = other.get_vec();
-  galois::do_all(galois::iterate(0ul, bitvec.size()),
-                 [&](size_t i) {
-                    bitvec[i] |= other_bitvec[i];
-                 },
-                 galois::no_stats());
+  galois::do_all(
+    galois::iterate(0ul, bitvec.size()),
+    [&](size_t i) {
+      bitvec[i] |= other_bitvec[i];
+    },
+    galois::no_stats()
+  );
 }
 
 uint64_t DynamicBitSet::count() {
   galois::GAccumulator<uint64_t> ret;
   galois::do_all(galois::iterate(bitvec.begin(), bitvec.end()),
-                 [&](uint64_t n) {
-#ifdef __GNUC__
-                   ret += __builtin_popcountll(n);
-#else
-                   n = n - ((n >> 1) & 0x5555555555555555UL);
-                   n = (n & 0x3333333333333333UL) + ((n >> 2) & 0x3333333333333333UL);
-                   ret += (((n + (n >> 4)) & 0xF0F0F0F0F0F0F0FUL) * 0x101010101010101UL) >> 56;
-#endif
-                 },
-                 galois::no_stats());
+    [&](uint64_t n) {
+      #ifdef __GNUC__
+      ret += __builtin_popcountll(n);
+      #else
+      n = n - ((n >> 1) & 0x5555555555555555UL);
+      n = (n & 0x3333333333333333UL) + ((n >> 2) & 0x3333333333333333UL);
+      ret += (((n + (n >> 4)) & 0xF0F0F0F0F0F0F0FUL) * 0x101010101010101UL) >> 56;
+      #endif
+    },
+    galois::no_stats()
+  );
   return ret.reduce();
 }
 

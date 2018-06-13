@@ -18,9 +18,9 @@
  */
 
 /**
- * @file DynamicBitset.h
+ * @file galois/DynamicBitset.h
  *
- * Contains the DynamicBitSet class.
+ * Contains the DynamicBitSet class and most of its implementation.
  */
 
 #ifndef _GALOIS_DYNAMIC_BIT_SET_
@@ -141,21 +141,27 @@ namespace galois {
     using tt_is_copyable = int;
   };
 
+  //! An empty bitset object; used mainly by InvalidBitsetFnTy
   static galois::DynamicBitSet EmptyBitset;
 
+  //! A structure representing an empty bitset.
   struct InvalidBitsetFnTy {
+    //! Returns false as this is an empty bitset
     static constexpr bool is_vector_bitset() {
       return false;
     }
 
+    //! Returns false as this is an empty bitset (invalid)
     static constexpr bool is_valid() {
       return false;
     }
 
+    //! Returns the empty bitset
     static galois::DynamicBitSet& get() {
       return EmptyBitset;
     }
 
+    //! No-op since it's an empty bitset
     static void reset_range(size_t begin, size_t end) {
     }
   };
