@@ -1,5 +1,4 @@
-/**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+/* This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
  *
@@ -17,30 +16,47 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistributedGraph_CustomEdgeCut.h
+ *
+ * Implements the custom edge cut partitioning scheme for DistributedGraph.
+ */
 #ifndef _GALOIS_DIST_HGRAPHCUSTOMEDGCUT_H
 #define _GALOIS_DIST_HGRAPHCUSTOMEDGCUT_H
 
 #include "galois/graphs/DistributedGraph.h"
 #include <sstream>
 
-
 namespace galois {
 namespace graphs {
 
+/**
+ * Distributed graph that partitions based on a manual assignment of nodes
+ * to hosts.
+ *
+ * @tparam NodeTy type of node data for the graph
+ * @tparam EdgeTy type of edge data for the graph
+ *
+ * @todo fully document and clean up code
+ * @warning not meant for public use + not fully documented yet
+ */
 template<typename NodeTy, typename EdgeTy>
 class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_customEdgeCut";
-
   public:
-    typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
-    /** Utilities for reading partitioned graphs. **/
+    //! typedef for base DistGraph class
+    using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
+
+    // Utilities for reading partitioned graphs follow
+
+    /**
+     * Structure for storing node information
+     */
     struct NodeInfo {
-      NodeInfo() :
-        local_id(0), global_id(0), owner_id(0) {
-        }
-      NodeInfo(size_t l, size_t g, size_t o) :
-        local_id(l), global_id(g), owner_id(o) {
-        }
+      NodeInfo() 
+        : local_id(0), global_id(0), owner_id(0) { }
+      NodeInfo(size_t l, size_t g, size_t o) 
+        : local_id(l), global_id(g), owner_id(o) { }
       size_t local_id;
       size_t global_id;
       size_t owner_id;
@@ -48,10 +64,11 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
 
 
     std::vector<NodeInfo> localToGlobalMap_meta;
-    std::vector<size_t> OwnerVec; // To store the ownerIDs of sorted according to the Global IDs.
+    //! store the ownerIDs sorted according to the global IDs
+    std::vector<size_t> OwnerVec; 
     std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
 
-    std::vector<size_t> GlobalVec_ordered; //Global Id's sorted vector.
+    std::vector<size_t> GlobalVec_ordered; //!< global ids sorted vector
     // To send edges to different hosts: #Src #Dst
     std::vector<std::vector<uint64_t>> assigned_edges_perhost;
     std::vector<uint64_t> recv_assigned_edges;
@@ -59,107 +76,57 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     uint64_t num_total_edges_to_receive;
     uint64_t numOwned = 0;
 
-    // GID = localToGlobalVector[LID]
+    //! GID = localToGlobalVector[LID]
     std::vector<uint64_t> localToGlobalVector;
-    // LID = globalToLocalMap[GID]
+    //! LID = globalToLocalMap[GID]
     std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
-    //To read the custom vertexIDMap
+    //! vector that stored custom vertex ID map
     std::vector<int32_t> vertexIDMap;
-
-    //EXPERIMENT
-    std::unordered_map<uint64_t, uint32_t> GlobalVec_map;
-
-    //XXX: initialize to ~0
-    std::vector<uint64_t> numNodes_per_host;
-
-    //XXX: Use EdgeTy to determine if need to load edge weights or not.
-    using Host_edges_map_type = typename std::conditional<!std::is_void<EdgeTy>::value, std::unordered_map<uint64_t, std::vector<std::pair<uint64_t, uint32_t>>> , std::unordered_map<uint64_t, std::vector<uint64_t>>>::type;
-    Host_edges_map_type host_edges_map;
-    //std::unordered_map<uint64_t, std::vector<uint64_t>> host_edges_map;
-    std::vector<uint64_t> numEdges_per_host;
-    std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
 
     uint64_t globalOffset;
     uint32_t numNodes;
     bool isBipartite;
     uint64_t numEdges;
 
-    // TODO this is broken
+    //! @todo this is broken
+    //! @warning this is broken; use at own risk
     unsigned getHostID(uint64_t gid) const {
       auto lid = G2L(gid);
       return OwnerVec[lid];
     }
 
-    // TODO this is broken
+    //! @todo this is broken
+    //! @warning this is broken; use at own risk
     size_t getOwner_lid(size_t lid) const {
       return OwnerVec[lid];
     }
 
     bool isOwned(uint64_t gid) const {
-        //assert(isLocal(gid));
-        if(isLocal(gid) && (globalToLocalMap.at(gid) < numOwned)) {
-          return true;
-        }
-        return false;
-    }
-
-  virtual bool isLocal(uint64_t gid) const {
-    assert(gid < base_DistGraph::numGlobalNodes);
-    return (globalToLocalMap.find(gid) != globalToLocalMap.end());
-  }
-
-  virtual uint32_t G2L(uint64_t gid) const {
-    assert(isLocal(gid));
-    return globalToLocalMap.at(gid);
-  }
-
-  virtual uint64_t L2G(uint32_t lid) const {
-    return localToGlobalVector[lid];
-  }
-
-
-    std::string getMetaFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
-      std::string result = basename;
-      result+= ".META.";
-      result+=std::to_string(hostID);
-      result+= ".OF.";
-      result+=std::to_string(num_hosts);
-      return result;
-    }
-
-    bool readMetaFile(const std::string& metaFileName, std::vector<NodeInfo>& localToGlobalMap_meta){
-      std::ifstream meta_file(metaFileName, std::ifstream::binary);
-      if (!meta_file.is_open()) {
-        std::cerr << "Unable to open file " << metaFileName << "! Exiting!\n";
-        return false;
+      //assert(isLocal(gid));
+      if (isLocal(gid) && (globalToLocalMap.at(gid) < numOwned)) {
+        return true;
       }
-      size_t num_entries;
-      meta_file.read(reinterpret_cast<char*>(&num_entries), sizeof(num_entries));
-      std::cout << "Partition :: " << " Number of nodes :: " << num_entries << "\n";
-      for (size_t i = 0; i < num_entries; ++i) {
-        std::pair<size_t, size_t> entry;
-        size_t owner;
-        meta_file.read(reinterpret_cast<char*>(&entry.first), sizeof(entry.first));
-        meta_file.read(reinterpret_cast<char*>(&entry.second), sizeof(entry.second));
-        meta_file.read(reinterpret_cast<char*>(&owner), sizeof(owner));
-        localToGlobalMap_meta.push_back(NodeInfo(entry.second, entry.first, owner));
-      }
-      return true;
+      return false;
     }
 
-    std::string getPartitionFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
-      std::string result = basename;
-      result+= ".PART.";
-      result+=std::to_string(hostID);
-      result+= ".OF.";
-      result+=std::to_string(num_hosts);
-      return result;
+    virtual bool isLocal(uint64_t gid) const {
+      assert(gid < base_DistGraph::numGlobalNodes);
+      return (globalToLocalMap.find(gid) != globalToLocalMap.end());
+    }
+  
+    virtual uint32_t G2L(uint64_t gid) const {
+      assert(isLocal(gid));
+      return globalToLocalMap.at(gid);
+    }
+  
+    virtual uint64_t L2G(uint32_t lid) const {
+      return localToGlobalVector[lid];
     }
 
-
-    /* Reading vertexIDMap binary file
-    *  Assuming that vertexIDMap binary file contains int32_t entries.
-    */
+    /** 
+     * Reading vertexIDMap binary file
+     * Assuming that vertexIDMap binary file contains int32_t entries.
+     */
     bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, 
                                  std::vector<int32_t>&vertexIDMap, 
                                  uint32_t num_entries_to_read, 
@@ -179,25 +146,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       return true;
     }
 
-    ///* Reading the whole vertexIDMap binary file
-    //*  Assuming that vertexIDMap binary file contains int32_t entries.
-    //*/
-    //bool readVertexIDMappingFile(const std::string& vertexIDMap_filename, 
-    //                             std::vector<int32_t>&vertexIDMap, 
-    //                             uint32_t num_entries_to_read) {
-    //  std::ifstream meta_file(vertexIDMap_filename, std::ifstream::binary);
-    //  if (!meta_file.is_open()) {
-    //    std::cerr << "Unable to open file " << vertexIDMap_filename << "! Exiting!\n";
-    //    return false;
-    //  }
-    //  meta_file.read(reinterpret_cast<char*>(&vertexIDMap[0]), 
-    //                 sizeof(int32_t)*(num_entries_to_read));
-    //  galois::gPrint("[", base_DistGraph::id, "] Number of nodes read :: ", 
-    //                 num_entries_to_read, "\n");
-    //  return true;
-    //}
-
-
     std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
       return std::make_pair<uint32_t, uint32_t>(~0,~0);
     }
@@ -205,7 +153,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
       return std::make_pair<uint64_t, uint64_t>(~0,~0);
     }
-
 
     /**
      * Constructor for Vertex Cut
@@ -360,7 +307,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
       Tgraph_construct_comm.stop();
     }
 
-    // from https:://graphics.stanford.edu/~seander/bithacks.html
+    //! from https:://graphics.stanford.edu/~seander/bithacks.html
     unsigned int findTrailingZeros(unsigned int v) {
       unsigned int c;     // c will be the number of zero bits on the right,
                           // so if v is 1101000 (base 2), then c will be 3
@@ -464,8 +411,8 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
           mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
     }
 
-    // TODO Function way too long; split into helper functions + calls
-    // Just calculating the number of edges to send to other hosts
+    //! Calculating the number of edges to send to other hosts
+    //! @todo Function way too long; split into helper functions + calls
     void assign_edges_phase1(galois::graphs::OfflineGraph& g, 
                              galois::graphs::BufferedGraph<EdgeTy>& mpiGraph, 
                              uint64_t numEdges_distribute, 
@@ -1070,7 +1017,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
   }
 
   /**
-   * Returns the total nodes : master + slaves created on the local host.
+   * @returns the total number of nodes; master + slaves created on the local host.
    */
   uint64_t get_local_total_nodes() const {
     return (base_DistGraph::numOwned);
