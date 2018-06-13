@@ -32,7 +32,7 @@ namespace graphs {
  * @tparam EdgeTy type of edge data for the graph
  */
 template<typename NodeTy, typename EdgeTy>
-class DistGraph_vertexCut : public DistGraph<NodeTy, EdgeTy> {
+class DistGraphHybridCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
 
   // TODO doc; to send edges to different hosts: #Src #Dst
@@ -114,7 +114,7 @@ public:
    *
    * @todo split constructor into more parts? quite long at the moment
    */
-  DistGraph_vertexCut(const std::string& filename, 
+  DistGraphHybridCut(const std::string& filename, 
              const std::string&,
              unsigned host, unsigned _numHosts, 
              std::vector<unsigned>& scalefactor, 

@@ -82,7 +82,7 @@ struct NodeData {
 
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
 typedef galois::graphs::DistGraphEdgeCut<NodeData, void> Graph_edgeCut;
-typedef galois::graphs::DistGraph_vertexCut<NodeData, void> Graph_vertexCut;
+typedef galois::graphs::DistGraphHybridCut<NodeData, void> Graph_vertexCut;
 
 typedef typename Graph::GraphNode GNode;
 
