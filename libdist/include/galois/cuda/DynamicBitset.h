@@ -1,29 +1,40 @@
+/*
+ */
+
+/**
+ * @file cuda/DynamicBitset.h
+ *
+ * Contains implementation of CUDA dynamic bitset and iterators for it.
+ */
+
 // thread-safe dynamic bitset in CUDA
 #pragma once
 #include <cuda.h>
 #include <math.h>
 #include <iterator>
 
+/**
+ * Dynamic Bitset, CUDA version. See galois/DynamicBitset.h.
+ *
+ * @todo document this file
+ */
 class DynamicBitset {
   size_t num_bits_capacity;
   size_t num_bits;
   uint64_t *bit_vector;
 
 public:
-  DynamicBitset()
-  {
+  DynamicBitset() {
     num_bits_capacity = 0;
     num_bits = 0;
     bit_vector = NULL;
   }
 
-  DynamicBitset(size_t nbits)
-  {
+  DynamicBitset(size_t nbits) {
     alloc(nbits);
   }
 
-  ~DynamicBitset() 
-  {
+  ~DynamicBitset() {
     if (bit_vector != NULL) cudaFree(bit_vector);
   }
 
@@ -94,11 +105,13 @@ public:
 
   void copy_to_gpu(uint64_t * cpu_bit_vector) {
     assert(cpu_bit_vector != NULL);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(uint64_t), cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(uint64_t), 
+                   cudaMemcpyHostToDevice));
   }
 };
 
-class DynamicBitsetIterator : public std::iterator<std::random_access_iterator_tag, bool> {
+class DynamicBitsetIterator 
+    : public std::iterator<std::random_access_iterator_tag, bool> {
   DynamicBitset *bitset;
   size_t offset;
 
@@ -146,7 +159,8 @@ public:
   bool operator[](const size_t id) const { return bitset->test(offset+id); }
 };
 
-class IdentityIterator : public std::iterator<std::random_access_iterator_tag, size_t> {
+class IdentityIterator 
+    : public std::iterator<std::random_access_iterator_tag, size_t> {
   size_t offset;
 
 public:

@@ -1,3 +1,14 @@
+/*
+ */
+
+/**
+ * @file cuda/Context.h
+ *
+ * Contains definition of CUDA context structures.
+ *
+ * @todo document this file
+ */
+
 #pragma once
 #include <cuda.h>
 #include "gg.h"

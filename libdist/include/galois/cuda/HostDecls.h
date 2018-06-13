@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -15,6 +15,15 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/**
+ * @file HostDecls.h
+ *
+ * Contains forward declarations and the definition of the MarshalGraph
+ * class, which is used to marshal a graph to GPUs.
+ *
+ * @todo document this file
  */
 
 #ifndef __HOST_FORWARD_DECL__

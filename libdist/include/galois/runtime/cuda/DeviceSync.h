@@ -1,3 +1,13 @@
+/*
+ */
+
+/**
+ * @file DeviceSync.h
+ *
+ * CUDA header for GPU runtime
+ *
+ * @todo better file description + document this file
+ */
 #pragma once
 #include "galois/cuda/DynamicBitset.h"
 #include "galois/cuda/Context.h"
