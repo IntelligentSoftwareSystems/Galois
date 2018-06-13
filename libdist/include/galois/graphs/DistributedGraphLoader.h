@@ -102,9 +102,9 @@ constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   //typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
   //typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
   //      Graph_checkerboardCut; // assumes push-style
-  //typedef DistGraph_jaggedCut<NodeData, EdgeData> 
+  //typedef DistGraphJaggedCut<NodeData, EdgeData> 
   //      Graph_jaggedCut; // assumes push-style
-  //typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
+  //typedef DistGraphJaggedCut<NodeData, EdgeData, true> 
   //      Graph_jaggedBlockedCut; // assumes push-style
   //typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
   //                            Graph_cartesianCut_overDecomposeBy2;
@@ -201,8 +201,8 @@ DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
-  typedef DistGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
-  typedef DistGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
+  typedef DistGraphJaggedCut<NodeData, EdgeData> Graph_jaggedCut;
+  typedef DistGraphJaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 4> 
@@ -271,9 +271,9 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
   typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
         Graph_checkerboardCut; // assumes push-style
-  typedef DistGraph_jaggedCut<NodeData, EdgeData> 
+  typedef DistGraphJaggedCut<NodeData, EdgeData> 
         Graph_jaggedCut; // assumes push-style
-  typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
+  typedef DistGraphJaggedCut<NodeData, EdgeData, true> 
         Graph_jaggedBlockedCut; // assumes push-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
@@ -366,9 +366,9 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor
                               true> Graph_cartesianCut; // assumes pull-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, true, 
                               true> Graph_checkerboardCut; // assumes pull-style
-  typedef DistGraph_jaggedCut<NodeData, EdgeData, false, 
+  typedef DistGraphJaggedCut<NodeData, EdgeData, false, 
                            true> Graph_jaggedCut; // assumes pull-style
-  typedef DistGraph_jaggedCut<NodeData, EdgeData, true, 
+  typedef DistGraphJaggedCut<NodeData, EdgeData, true, 
                            true> Graph_jaggedBlockedCut; // assumes pull-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, true, 2> 
                               Graph_cartesianCut_overDecomposeBy2; // assumes pull-style

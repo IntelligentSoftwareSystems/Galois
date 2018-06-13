@@ -27,7 +27,7 @@ namespace graphs {
 
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
-class DistGraph_jaggedCut : public DistGraph<NodeTy, EdgeTy> {
+class DistGraphJaggedCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_jaggedCut";
 public:
   typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
@@ -212,7 +212,7 @@ public:
   /** 
    * Constructor for jagged Cut graph
    */
-  DistGraph_jaggedCut(const std::string& filename, 
+  DistGraphJaggedCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false) : base_DistGraph(host, _numHosts) {
