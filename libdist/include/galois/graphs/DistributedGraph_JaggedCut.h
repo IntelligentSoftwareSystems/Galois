@@ -19,7 +19,7 @@
 /** 
  * @file DistributedGraph_JaggedCut.h
  *
- * Implements the jagged cut partitioning scheme for DistributedGraph. 
+ * Implements the jagged cut partitioning scheme for DistGraph. 
  */
 
 #ifndef _GALOIS_DIST_HGRAPHJVC_H

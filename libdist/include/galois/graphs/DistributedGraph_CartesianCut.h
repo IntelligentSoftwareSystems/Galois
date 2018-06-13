@@ -19,7 +19,7 @@
 /** 
  * @file DistributedGraph_CartesianCut.h
  *
- * Implements the cartesian cut partitioning scheme for DistributedGraph. 
+ * Implements the cartesian cut partitioning scheme for DistGraph. 
  */
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H

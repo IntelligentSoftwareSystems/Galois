@@ -19,7 +19,7 @@
 /** 
  * @file DistributedGraph_CustomEdgeCut.h
  *
- * Implements the custom edge cut partitioning scheme for DistributedGraph.
+ * Implements the custom edge cut partitioning scheme for DistGraph. 
  */
 #ifndef _GALOIS_DIST_HGRAPHCUSTOMEDGCUT_H
 #define _GALOIS_DIST_HGRAPHCUSTOMEDGCUT_H

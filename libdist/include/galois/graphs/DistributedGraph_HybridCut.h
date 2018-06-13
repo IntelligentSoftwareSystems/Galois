@@ -19,7 +19,7 @@
 
 /**
  * @file DistributedGraph_HybridCut.h
- * Implements the hybrid-cut partitioning scheme for distributed graphs.
+ * Implements the hybrid-cut partitioning scheme for DistGraph.
  */
 
 #ifndef _GALOIS_DIST_HGRAPHHYBRID_H
