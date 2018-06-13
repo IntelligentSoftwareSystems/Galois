@@ -260,7 +260,7 @@ struct LabelPropAlgo {
               GNode dst = graph.getEdgeDst(e);
               auto& ddata = graph.getData(dst);
               unsigned int label_new = sdata.comp_current;
-              unsigned int label_old = galois::atomicMin(ddata.comp_current, label_new);
+              galois::atomicMin(ddata.comp_current, label_new);
             }
           }
         },

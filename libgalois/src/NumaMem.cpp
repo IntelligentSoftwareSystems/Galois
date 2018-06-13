@@ -86,7 +86,7 @@ static void pageInSpecified(void* _ptr, size_t len, size_t pageSize,
 
   if (numThreads > 1) {
     getThreadPool().run(numThreads,
-      [ptr, len, pageSize, numThreads, threadRanges, elementSize] () {
+      [ptr, pageSize, threadRanges, elementSize] () {
         auto myID = ThreadPool::getTID();
 
         uint64_t beginLocation = threadRanges[myID];

@@ -1231,7 +1231,7 @@ struct SortByHighDegreeParent: public Conversion {
       std::sort(ii->begin(), ii->end(), std::greater<std::pair<unsigned, GNode>>());
     }
 
-    std::sort(perm.begin(), perm.end(), [&inv, &graph](GNode lhs, GNode rhs) -> bool {
+    std::sort(perm.begin(), perm.end(), [&inv](GNode lhs, GNode rhs) -> bool {
         const auto& ll = inv[lhs].begin();
         const auto& el = inv[lhs].end();
         const auto& rr = inv[rhs].begin();

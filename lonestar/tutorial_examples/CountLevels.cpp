@@ -51,12 +51,9 @@ using GNode = Graph::GraphNode;
 static const unsigned int DIST_INFINITY =
     std::numeric_limits<unsigned int>::max();
 
-struct CountLevels {
-  Graph& graph;
-  CountLevels(Graph& g) : graph(g) {}
+const galois::gstl::Vector<size_t>& countLevels(Graph& graph) {
 
   //! [Define GReducible]
-  const galois::gstl::Vector<size_t>& count() {
     galois::GVectorPerItemReduce<size_t, std::plus<size_t>> reducer;
 
     galois::do_all(galois::iterate(graph), [&](GNode n) {
@@ -68,11 +65,11 @@ struct CountLevels {
     });
 
     return reducer.reduce();
-  }
   //! [Define GReducible]
-};
+}
 
-constexpr static const unsigned CHUNK_SIZE = 16;
+
+// constexpr static const unsigned CHUNK_SIZE = 16;
 
 void bfsSerial(Graph& graph, GNode source) {
   constexpr galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
@@ -127,7 +124,7 @@ int main(int argc, char** argv) {
                    sdata.color  = WHITE;
                    sdata.dist   = DIST_INFINITY;
                  },
-                 galois::no_stats(), galois::no_conflicts());
+                 galois::no_stats());
 
   if (startNode >= graph.size()) {
     std::cerr << "Source node index " << startNode
@@ -144,8 +141,7 @@ int main(int argc, char** argv) {
   galois::StatTimer T;
   T.start();
   bfsSerial(graph, source);
-  CountLevels cl(graph);
-  const auto& counts = cl.count();
+  const auto& counts = countLevels(graph);
   T.stop();
 
   galois::reportPageAlloc("MeminfoPost");

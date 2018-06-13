@@ -71,7 +71,6 @@ void check_forward() {
 
 template<bool NonEmpty, class Tag, class D>
 void check_backward() {
-  typedef typename D::value_type I;
   D data;
 
   for (int i = N-1; i >= 0; --i) {
@@ -131,7 +130,6 @@ void check_backward() {
 
 template<bool NonEmpty, class Tag, class D>
 void check_strided() {
-  typedef typename D::value_type I;
   D data;
 
   for (int i = 0; i < N; ++i) {
@@ -202,7 +200,6 @@ void check_strided() {
 
 template<bool NonEmpty, class Tag, class D>
 void check_random() {
-  typedef typename D::value_type I;
   D data;
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, 100);

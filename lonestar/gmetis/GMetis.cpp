@@ -66,7 +66,8 @@ static cll::opt<std::string> permutationfile("permutation", cll::desc("output pe
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size (default 0.01)"), cll::init(0.01));
-const double COARSEN_FRACTION = 0.9;
+
+//const double COARSEN_FRACTION = 0.9;
 
 /**
  * KMetis Algorithm

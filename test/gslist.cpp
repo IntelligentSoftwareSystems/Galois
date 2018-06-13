@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 
   galois::on_each([&](unsigned id, unsigned total) {
     HeapPtr& hp = *heaps.getLocal();
-    hp = std::move(HeapPtr(new Heap(sizeof(Collection::block_type))));
+    hp = HeapPtr(new Heap(sizeof(Collection::block_type)));
     for (unsigned i = 0; i < size; ++i)
       c.push_front(*hp, i);
   });
