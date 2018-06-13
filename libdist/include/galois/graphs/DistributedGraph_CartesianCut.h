@@ -48,7 +48,7 @@ class DistGraph_cartesianCut : public DistGraph<NodeTy, EdgeTy> {
   using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
 
 public:
-  //! @copydoc DistGraph_edgeCut::base_DistGraph
+  //! @copydoc DistGraphEdgeCut::base_DistGraph
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
 private:
@@ -209,7 +209,7 @@ public:
   //! number of edges on local to this host
   uint64_t numEdges;
 
-  //! @copydoc DistGraph_edgeCut::isOwned
+  //! @copydoc DistGraphEdgeCut::isOwned
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     //for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
@@ -224,7 +224,7 @@ public:
     return base_DistGraph::numHosts;
   }
 
-  //! @copydoc DistGraph_edgeCut::isOwned
+  //! @copydoc DistGraphEdgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
     for(unsigned d = 0; d < DecomposeFactor; ++d){
@@ -235,20 +235,20 @@ public:
     return false;
   }
 
-  //! @copydoc DistGraph_edgeCut::isLocal
+  //! @copydoc DistGraphEdgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
-  //! @copydoc DistGraph_edgeCut::G2L
+  //! @copydoc DistGraphEdgeCut::G2L
   virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
-  //! @copydoc DistGraph_edgeCut::L2G
+  //! @copydoc DistGraphEdgeCut::L2G
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }

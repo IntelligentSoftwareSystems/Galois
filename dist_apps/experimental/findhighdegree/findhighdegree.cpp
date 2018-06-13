@@ -33,7 +33,7 @@ struct NodeData {
 };
 
 typedef galois::graphs::DistGraph<NodeData, void> Graph;
-typedef galois::graphs::DistGraph_edgeCut<NodeData, void> Graph_edgeCut;
+typedef galois::graphs::DistGraphEdgeCut<NodeData, void> Graph_edgeCut;
 
 /******************************************************************************/
 /* Main */

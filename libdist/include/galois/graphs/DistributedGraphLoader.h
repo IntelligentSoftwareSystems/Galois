@@ -96,7 +96,7 @@ DistGraph<NodeData, EdgeData, true>*
 constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   // TODO template args for 2-way for everything that isn't edge cut
   // TODO do it for edge cut too
-  using Graph_edgeCut = DistGraph_edgeCut<NodeData, EdgeData, true>;
+  using Graph_edgeCut = DistGraphEdgeCut<NodeData, EdgeData, true>;
   //typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   //typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   //typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
@@ -197,7 +197,7 @@ DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
                "flag");
   }
 
-  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
   typedef DistGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
@@ -265,7 +265,7 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<iterateOut>::type* = nullptr>
 DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& 
                                            scaleFactor) {
-  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
@@ -360,7 +360,7 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
 template<typename NodeData, typename EdgeData, bool iterateOut = true,
          typename std::enable_if<!iterateOut>::type* = nullptr>
 DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
-  typedef DistGraph_edgeCut<NodeData, EdgeData> Graph_edgeCut;
+  typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraph_vertexCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraph_cartesianCut<NodeData, EdgeData, false, 
                               true> Graph_cartesianCut; // assumes pull-style

@@ -44,7 +44,7 @@ namespace graphs {
  */
 template<typename NodeTy, typename EdgeTy, bool WithInEdges=false, 
          bool isBipartite=false>
-class DistGraph_edgeCut 
+class DistGraphEdgeCut 
     : public DistGraph<NodeTy, EdgeTy, WithInEdges> {
   constexpr static const char* const GRNAME = "dGraph_edgeCut";
 
@@ -132,7 +132,7 @@ class DistGraph_edgeCut
     }
 
     /**
-     * Constructor for DistGraph_edgeCut.
+     * Constructor for DistGraphEdgeCut.
      *
      * Determines which nodes should be read by this local host and reads
      * only those nodes into memory. Setups communication with other hosts
@@ -151,7 +151,7 @@ class DistGraph_edgeCut
      *
      * @todo get rid of second argument (the string)
      */
-    DistGraph_edgeCut(const std::string& filename, 
+    DistGraphEdgeCut(const std::string& filename, 
                       const std::string&, 
                       unsigned host, 
                       unsigned _numHosts, 

@@ -49,7 +49,7 @@ public:
   //! LID of a node = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
-  //! @copydoc DistGraph_edgeCut::gid2host_withoutEdges
+  //! @copydoc DistGraphEdgeCut::gid2host_withoutEdges
   std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
 
   //! offset to first node that is a master on this host
@@ -62,12 +62,12 @@ public:
   //! @warning this option isn't maintained; use at own risk
   bool isBipartite;
 
-  //! @copydoc DistGraph_edgeCut::getHostID
+  //! @copydoc DistGraphEdgeCut::getHostID
   unsigned getHostID(uint64_t gid) const {
     return find_hostID(gid);
   }
 
-  //! @copydoc DistGraph_edgeCut::isOwned
+  //! @copydoc DistGraphEdgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     if (gid >= base_DistGraph::gid2host[base_DistGraph::id].first && 
         gid < base_DistGraph::gid2host[base_DistGraph::id].second)
@@ -76,7 +76,7 @@ public:
       return false;
   }
 
-  //! @copydoc DistGraph_edgeCut::isLocal
+  //! @copydoc DistGraphEdgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid))
@@ -84,13 +84,13 @@ public:
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
-  //! @copydoc DistGraph_edgeCut::G2L
+  //! @copydoc DistGraphEdgeCut::G2L
   virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
-  //! @copydoc DistGraph_edgeCut::L2G
+  //! @copydoc DistGraphEdgeCut::L2G
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }
