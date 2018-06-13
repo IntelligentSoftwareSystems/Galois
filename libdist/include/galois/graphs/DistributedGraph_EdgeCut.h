@@ -394,6 +394,7 @@ class DistGraphEdgeCut
     return ghostMap[lid - base_DistGraph::numOwned];
   }
 
+private:
   /**
    * Given a loaded graph, construct the edges in the DistGraph graph.
    * Variant that constructs edge data as well.
@@ -485,7 +486,6 @@ class DistGraphEdgeCut
       galois::no_stats()
     );
 
-
     timer.stop();
     galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 
                    timer.get_usec()/1000000.0f, " seconds to read ", 
@@ -497,7 +497,7 @@ class DistGraphEdgeCut
    * Fill in the mirror node array with mapping from local to global.
    * 
    * e.g. mirrorNodes[1][0] will tell me that the first local node I have
-   * that has a master in node 1 will have whatever ID is located at 
+   * that has a master in host 1 will have whatever ID is located at 
    * [1][0]
    *
    * @param [in,out] mirrorNodes vector to fill with mirror node mapping
@@ -512,6 +512,7 @@ class DistGraphEdgeCut
     }
   }
 
+public:
   bool is_vertex_cut() const {
     return false;
   }
@@ -537,7 +538,6 @@ class DistGraphEdgeCut
     }
     return mirrorRanges_vec;
   }
-
 
   virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, 
                                         const unsigned int version = 0) const {
