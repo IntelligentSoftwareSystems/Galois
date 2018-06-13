@@ -25,46 +25,49 @@
 namespace galois {
 namespace graphs {
 
+/**
+ * Distributed graph that implements the hybrid-vertex cut partitioning scheme.
+ *
+ * @tparam NodeTy type of node data for the graph
+ * @tparam EdgeTy type of edge data for the graph
+ */
 template<typename NodeTy, typename EdgeTy>
 class DistGraph_vertexCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_hybridCut";
 
-public:
-  typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
-  /** Utilities for reading partitioned graphs. **/
-  struct NodeInfo {
-    NodeInfo() 
-      : local_id(0), global_id(0), owner_id(0) {}
-    NodeInfo(size_t l, size_t g, size_t o) 
-      : local_id(l), global_id(g), owner_id(o) {}
-    size_t local_id;
-    size_t global_id;
-    size_t owner_id;
-  };
-
-  // To send edges to different hosts: #Src #Dst
+  // TODO doc; to send edges to different hosts: #Src #Dst
   std::vector<std::vector<uint64_t>> assigned_edges_perhost;
+  // TODO doc
   uint64_t num_total_edges_to_receive;
 
-  // GID = localToGlobalVector[LID]
+public:
+  //! typedef to base DistGraph class
+  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
+
+  //! GID of a node = localToGlobalVector[LID]
   std::vector<uint64_t> localToGlobalVector;
-  // LID = globalToLocalMap[GID]
+  //! LID of a node = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
-  std::vector<uint64_t> numEdges_per_host;
+  //! @copydoc DistGraph_edgeCut::gid2host_withoutEdges
   std::vector<std::pair<uint64_t, uint64_t>> gid2host_withoutEdges;
 
+  //! offset to first node that is a master on this host
   uint64_t globalOffset;
+  //! number of nodes that exist locally in this graph
   uint32_t numNodes;
-  bool isBipartite;
+  //! number of edges that exist locally in this graph
   uint64_t numEdges;
+  //! says if graph is bipartite
+  //! @warning this option isn't maintained; use at own risk
+  bool isBipartite;
 
-  std::vector<NodeInfo> localToGlobalMap_meta;
-
+  //! @copydoc DistGraph_edgeCut::getHostID
   unsigned getHostID(uint64_t gid) const {
     return find_hostID(gid);
   }
 
+  //! @copydoc DistGraph_edgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     if (gid >= base_DistGraph::gid2host[base_DistGraph::id].first && 
         gid < base_DistGraph::gid2host[base_DistGraph::id].second)
@@ -73,6 +76,7 @@ public:
       return false;
   }
 
+  //! @copydoc DistGraph_edgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid))
@@ -80,47 +84,35 @@ public:
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
+  //! @copydoc DistGraph_edgeCut::G2L
   virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
+  //! @copydoc DistGraph_edgeCut::L2G
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }
 
-  bool readMetaFile(const std::string& metaFileName, 
-                    std::vector<NodeInfo>& localToGlobalMap_meta) {
-    std::ifstream meta_file(metaFileName, std::ifstream::binary);
-    if (!meta_file.is_open()) {
-      std::cerr << "Unable to open file " << metaFileName << "! Exiting!\n";
-      return false;
-    }
-    size_t num_entries;
-    meta_file.read(reinterpret_cast<char*>(&num_entries), sizeof(num_entries));
-    galois::gPrint("Partition :: ", " Number of nodes :: ", num_entries, "\n");
-    for (size_t i = 0; i < num_entries; ++i) {
-      std::pair<size_t, size_t> entry;
-      size_t owner;
-      meta_file.read(reinterpret_cast<char*>(&entry.first), sizeof(entry.first));
-      meta_file.read(reinterpret_cast<char*>(&entry.second), sizeof(entry.second));
-      meta_file.read(reinterpret_cast<char*>(&owner), sizeof(owner));
-      localToGlobalMap_meta.push_back(NodeInfo(entry.second, entry.first, owner));
-    }
-    return true;
-  }
-
   /**
-   * Constructor for Vertex Cut
+   * Constructor for hybrid vertex cut: partitions the graph across
+   * hosts accordingly.
    *
    * @param filename Graph to load (must be in Galois binary format)
-   * @param unused string (originally partition folder)
    * @param host Host id of the caller
    * @param _numHosts total number of hosts currently running
+   * @param scalefactor Unsupported for vertex cuts; dummy variable
    * @param transpose Indicates if the read graph needs to be transposed
    * @param VCutThreshold Threshold for determining how to assign edges:
    * if greater than threshold, edges go to the host that has the destination
    * @param bipartite Indicates if the graph is bipartite
+   * @param readFromFile if true, reads the local graph structure from a file 
+   * instead of doing partitioning
+   * @param localGraphFileName local graph structure file to read (if readFromFile
+   * is set to true)
+   *
+   * @todo split constructor into more parts? quite long at the moment
    */
   DistGraph_vertexCut(const std::string& filename, 
              const std::string&,
@@ -130,8 +122,8 @@ public:
              uint32_t VCutThreshold = 100, 
              bool bipartite = false, 
              bool readFromFile = false, 
-             std::string localGraphFileName = "local_graph") : base_DistGraph(host, _numHosts) {
-    // TODO split constructor into more parts? quite long at the moment
+             std::string localGraphFileName = "local_graph") 
+        : base_DistGraph(host, _numHosts) {
     if (!scalefactor.empty()) {
       if (base_DistGraph::id == 0) {
         galois::gWarn("Scalefactor not supported for PowerLyra (hybrid) "
@@ -154,7 +146,6 @@ public:
       return;
     }
 
-
     galois::graphs::OfflineGraph g(filename);
     isBipartite = bipartite;
 
@@ -174,8 +165,7 @@ public:
     typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
 
-    // TODO
-    // currently not used; may not be updated
+    // TODO currently not used; may not be updated
     if (isBipartite) {
   	  uint64_t numNodes_without_edges = (g.size() - numNodes_to_divide);
   	  for (unsigned i = 0; i < base_DistGraph::numHosts; ++i) {
@@ -377,7 +367,7 @@ private:
    * Given information about what edges we have been assigned, create the 
    * master and mirror mappings.
    *
-   * @param numOutgoingEdges TODO
+   * @param numOutgoingEdges TODO doc
    * @param ghosts bitset that is marked with ghost nodes (output)
    * @param mirrorNodes Edited by this function to have information about which 
    * host the mirror nodes on this host belongs to
@@ -445,7 +435,7 @@ private:
    * accout for; used only for sanity checking
    * @param VCutThreshold If number of edges on a vertex are over the 
    * threshold, the edges go to the host that contains the destination
-   * @param mirrorNodes TODO
+   * @param mirrorNodes TODO doc
    * @param edgeInspectionTimer
    * @returns a prefix sum of edges for the nodes this host is assigned
    */
@@ -822,8 +812,6 @@ private:
   /**
    * Given a (possible) buffer, grab the edge data from it and save it
    * to the in-memory graph representation.
-   *
-   * @TODO params
    */
   template<typename GraphTy>
   void processReceivedEdgeBuffer(
@@ -851,10 +839,6 @@ private:
   /**
    * Receive the edge dest/data assigned to this host from other hosts
    * that are responsible for reading it.
-   *
-   * TODO params
-   * @param graph
-   * @param edgesToReceive
    */
   template<typename GraphTy>
   void receiveAssignedEdges(GraphTy& graph, 
@@ -871,7 +855,8 @@ private:
   }
 
   /**
-   * TODO
+   * Deserialize received edges and constructs them in our graph. Edge-data
+   * variant.
    */
   template<typename GraphTy, 
            typename std::enable_if<
@@ -891,7 +876,8 @@ private:
   }
 
   /**
-   * TODO
+   * Deserialize received edges and constructs them in our graph. No edge-data
+   * variant.
    */
   template<typename GraphTy, 
            typename std::enable_if<
@@ -908,7 +894,7 @@ private:
   }
 
   /**
-   * TODO
+   * Returns host that a particular node belongs to.
    */
   uint32_t find_hostID(const uint64_t gid) const {
     for (uint32_t h = 0; h < base_DistGraph::numHosts; ++h) {
@@ -973,29 +959,20 @@ public:
     return mirrorRanges_vec;
   }
 
-
-  /*
-   * This function serializes the local data structures using boost binary archive.
-   */
-  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const {
-
-    //unsigned ints
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, 
+                                        const unsigned int version = 0) const {
+    // unsigned ints
     ar << numNodes;
-
-    //maps and vectors
+    // maps and vectors
     ar << localToGlobalVector;
     ar << globalToLocalMap;
   }
 
-  /*
-   * This function DeSerializes the local data structures using boost binary archive.
-   */
-  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0) {
-
-    //unsigned ints
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, 
+                                          const unsigned int version = 0) {
+    // unsigned ints
     ar >> numNodes;
-
-    //maps and vectors
+    // maps and vectors
     ar >> localToGlobalVector;
     ar >> globalToLocalMap;
   }
