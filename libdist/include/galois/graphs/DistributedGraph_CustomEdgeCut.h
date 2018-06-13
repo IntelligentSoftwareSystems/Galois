@@ -41,7 +41,7 @@ namespace graphs {
  * @warning not meant for public use + not fully documented yet
  */
 template<typename NodeTy, typename EdgeTy>
-class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
+class DistGraphCustomEdgeCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_customEdgeCut";
   public:
     //! typedef for base DistGraph class
@@ -134,7 +134,7 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     /**
      * Constructor for Vertex Cut
      */
-    DistGraph_customEdgeCut(const std::string& filename, 
+    DistGraphCustomEdgeCut(const std::string& filename, 
                const std::string& partitionFolder,
                unsigned host, unsigned _numHosts, 
                std::vector<unsigned>& scalefactor, 

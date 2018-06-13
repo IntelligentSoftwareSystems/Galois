@@ -97,7 +97,7 @@ constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   // TODO template args for 2-way for everything that isn't edge cut
   // TODO do it for edge cut too
   using Graph_edgeCut = DistGraphEdgeCut<NodeData, EdgeData, true>;
-  //typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  //typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   //typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   //typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
   //typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
@@ -207,7 +207,7 @@ DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
                               Graph_cartesianCut_overDecomposeBy2;
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 4> 
                               Graph_cartesianCut_overDecomposeBy4;
-  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
   
   switch(partitionScheme) {
@@ -266,7 +266,7 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& 
                                            scaleFactor) {
   typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
-  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
@@ -374,7 +374,7 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor
                               Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
   typedef DistGraphCartesianCut<NodeData, EdgeData, false, true, 4> 
                               Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
-  typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
+  typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   // 1 host = no concept of cut; just load from edgeCut
