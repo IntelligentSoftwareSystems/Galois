@@ -90,6 +90,8 @@ namespace graphs {
  * @param scaleFactor How to split nodes among hosts
  * @returns a pointer to a newly allocated DistGraph based on the command line
  * loaded based on command line arguments
+ *
+ * @todo Add support for other cuts besides edge cut
  */
 template<typename NodeData, typename EdgeData>
 DistGraph<NodeData, EdgeData, true>* 
