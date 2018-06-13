@@ -1,7 +1,7 @@
 #include <unordered_map>
 #include <utility>
 
-#include "galois/graphs/FirstGraph.h"
+#include "galois/graphs/MorphGraph.h"
 
 #include "Verilog.h"
 
@@ -27,7 +27,7 @@ struct Edge {
   float riseDelay, fallDelay;
 };
 
-typedef galois::graphs::FirstGraph<Node, Edge, true, true> Graph;
+typedef galois::graphs::MorphGraph<Node, Edge, true, true> Graph;
 typedef Graph::GraphNode GNode;
 
 struct CircuitGraph {

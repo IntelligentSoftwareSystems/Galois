@@ -47,7 +47,7 @@ Below we will cover parallel data structures, parallel loop iterators, and workl
 
 For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with the Galois runtime system. All graphs are in namespace galois::graphs. There are two types of graphs:
 <ol>
-<li> galois::graphs::FirstGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) only insertions of nodes and edges are possible, and (2) when a node is created, its maximum degree is known.
+<li> galois::graphs::MorphGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) only insertions of nodes and edges are possible, and (2) when a node is created, its maximum degree is known.
 <li> galois::graphs::LC_CSR_Graph: It disallows creation and removal of nodes and edges. Internally, it is implemented with compressed sparse row format, as shown in the following figure. Undirected edges are represented as two directed edges. Galois also provides variants of this graph with different storage representations, e.g. galois::graphs::LC_InlineEdge_Graph, galois::graphs::LC_Linear_Graph, galois::graphs::LC_InOut_Graph.
 </ol>
 
@@ -250,22 +250,22 @@ For galois::do_all loops, only time and iterations are reported, since there are
 TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value is the sum of all threads' contributions; TMAX means it is the maximum among all threads for this statistic. TOTAL_TYPE is usually a reduction operation.
 
 
-@subsection galois_first_graph_api FirstGraph APIs
+@subsection galois_first_graph_api MorphGraph APIs
 
-If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::FirstGraph. galois::graphs::FirstGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::FirstGraph provides the following APIs to modify graph topology:
+If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::MorphGraph. galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
 
 <ol>
-<li> galois::graphs::FirstGraph::createNode allocates space for node data, and galois::graphs::FirstGraph::addNode adds a node to a graph so the node can be found later by graph APIs.
-<li> galois::graphs::FirstGraph::addEdge and galois::graphs::FirstGraph::addMultiEdge both add an edge between existing nodes to a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge.
-<li> galois::graphs::FirstGraph::removeNode removes from a graph a node and edges connecting to/from the node.
-<li> galois::graphs::FirstGraph::removeEdge removes from a graph an edge and its incoming/symmetric counterpart, if there is any.
+<li> galois::graphs::MorphGraph::createNode allocates space for node data, and galois::graphs::MorphGraph::addNode adds a node to a graph so the node can be found later by graph APIs.
+<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes to a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge.
+<li> galois::graphs::MorphGraph::removeNode removes from a graph a node and edges connecting to/from the node.
+<li> galois::graphs::MorphGraph::removeEdge removes from a graph an edge and its incoming/symmetric counterpart, if there is any.
 </ol>
 
-Let us use galois::graphs::FirstGraph to construct and represent a two-dimensional torus. To define a galois::graphs::FirstGraph, you must provide as template parameters NodeTy, the type of node data; EdgeTy, the type of edge data; and a boolean value indicating whether or not this is a directed graph. The following code snippet shows an example of defining a galois::graphs::FirstGraph. See galois::graphs::FirstGraph for details about other optional template parameters.
+Let us use galois::graphs::MorphGraph to construct and represent a two-dimensional torus. To define a galois::graphs::MorphGraph, you must provide as template parameters NodeTy, the type of node data; EdgeTy, the type of edge data; and a boolean value indicating whether or not this is a directed graph. The following code snippet shows an example of defining a galois::graphs::MorphGraph. See galois::graphs::MorphGraph for details about other optional template parameters.
 
-@snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a FirstGraph
+@snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a MorphGraph
 
-The following code snippet shows how to add nodes and edges to a galois::graphs::FirstGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::FirstGraph, and finally add edges in between the nodes.
+The following code snippet shows how to add nodes and edges to a galois::graphs::MorphGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::MorphGraph, and finally add edges in between the nodes.
 
 @snippet lonestar/tutorial_examples/TorusConstruction.cpp Construct torus
 

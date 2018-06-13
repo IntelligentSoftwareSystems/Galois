@@ -20,7 +20,7 @@
   
   @snippet apps/tutorial/SSSPsimple.cpp ReadGraph
 
-- An alternative way to read in graphs is through {@link galois::graphs::FileGraph}. {@link galois::graphs::FileGraph::structureFromFile} is used to mmap a binary format of graphs into a FileGraph object. Then {@link galois::graphs::FirstGraph} or {@link galois::graphs::LC_CSR_Graph} can be constructed from {@link galois::graphs::FileGraph}. {@link galois::graphs::LC_CSR_Graph} provides directly method {@link galois::graphs::LC_CSR_Graph::constructFrom} to create {@link galois::graphs::LC_CSR_Graph} from {@link galois::graphs::FileGraph}.     
+- An alternative way to read in graphs is through {@link galois::graphs::FileGraph}. {@link galois::graphs::FileGraph::structureFromFile} is used to mmap a binary format of graphs into a FileGraph object. Then {@link galois::graphs::MorphGraph} or {@link galois::graphs::LC_CSR_Graph} can be constructed from {@link galois::graphs::FileGraph}. {@link galois::graphs::LC_CSR_Graph} provides directly method {@link galois::graphs::LC_CSR_Graph::constructFrom} to create {@link galois::graphs::LC_CSR_Graph} from {@link galois::graphs::FileGraph}.     
 
 <hr>
 

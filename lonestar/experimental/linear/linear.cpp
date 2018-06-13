@@ -60,7 +60,7 @@ struct Jacobi {
     Node(double b, double a, double w): BaseNode(b, a, w) { }
   };
 
-  typedef galois::graphs::FirstGraph<Node,double,true> Graph;
+  typedef galois::graphs::MorphGraph<Node,double,true> Graph;
 
   Graph& graph;
 
@@ -124,7 +124,7 @@ struct ConjugateGradient {
     Node(double b, double a, double w): BaseNode(b, a, w), r(b), p(b) { }
   };
 
-  typedef galois::graphs::FirstGraph<Node,double,true> Graph;
+  typedef galois::graphs::MorphGraph<Node,double,true> Graph;
 
   Graph& graph;
 
@@ -229,7 +229,7 @@ struct GBP {
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef galois::graphs::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::graphs::MorphGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 
@@ -302,11 +302,11 @@ struct GBP {
     double weight; // A(i,i)
     double mean;   // Mh = zeros(m, m)
     double prec;   // MJ = zeros(m, m)
-    Edge() { } // FirstGraph requires this
+    Edge() { } // MorphGraph requires this
     Edge(double w): weight(w), mean(0), prec(0) { }
   };
   
-  typedef galois::graphs::FirstGraph<Node,Edge,true> Graph;
+  typedef galois::graphs::MorphGraph<Node,Edge,true> Graph;
 
   Graph& graph;
 
@@ -389,7 +389,7 @@ struct Cholesky {
     Node(double b, double a, double w): BaseNode(b, a, w) { }
   };
 
-  typedef galois::graphs::FirstGraph<Node,double,true> Graph;
+  typedef galois::graphs::MorphGraph<Node,double,true> Graph;
 
   Graph& graph;
 
@@ -424,7 +424,7 @@ struct GenerateInput {
     Node(double _x): id(0), x(_x), b(0) { }
   };
 
-  typedef galois::graphs::FirstGraph<Node,double,true> GenGraph;
+  typedef galois::graphs::MorphGraph<Node,double,true> GenGraph;
 
   GenerateInput(Graph& g, int N, int sparsity, int seed) {
     srand(seed);

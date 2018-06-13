@@ -102,8 +102,8 @@ struct SPNode {
   SPNode(int n, bool b) :isClause(b), name(n), solved(false), value(false), t(0) {}
 };
 
-typedef galois::graphs::FirstGraph<SPNode, SPEdge, false> Graph;
-typedef galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
+typedef galois::graphs::MorphGraph<SPNode, SPEdge, false> Graph;
+typedef galois::graphs::MorphGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
 
 //interesting parameters:

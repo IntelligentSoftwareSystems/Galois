@@ -1,4 +1,4 @@
-// This example shows how to manipulate FirstGraph to change graph topology
+// This example shows how to manipulate MorphGraph to change graph topology
 // 1. createNode
 // 2. addNode
 // 3. addEdge
@@ -6,12 +6,12 @@
 #include "galois/graphs/Graph.h"
 #include <iostream>
 
-//! [Define a FirstGraph]
+//! [Define a MorphGraph]
 // Graph has int node data, void edge data and is directed
-using Graph = galois::graphs::FirstGraph<int,void,true>;
+using Graph = galois::graphs::MorphGraph<int,void,true>;
 // Opaque pointer to graph node
 using GNode = Graph::GraphNode;
-//! [Define a FirstGraph]
+//! [Define a MorphGraph]
 
 //! [Construct torus]
 void constructTorus(Graph& g, int height, int width) {

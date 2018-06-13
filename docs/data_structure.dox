@@ -126,11 +126,11 @@ In {@link apps/sssp/SSSP.cpp}
 Morph graphs allow concurrent graph mutations.
 
 <hr>
-<H4> @link galois::graphs::FirstGraph </H4>
+<H4> @link galois::graphs::MorphGraph </H4>
 
    - Defining a graph
 
-     The {@link galois::graphs::FirstGraph} takes four template parameters to customize the graph:
+     The {@link galois::graphs::MorphGraph} takes four template parameters to customize the graph:
 
      \li NodeTy: the type of data stored on each node. Void can be used when no data is stored on each edge. 
      
@@ -142,23 +142,23 @@ Morph graphs allow concurrent graph mutations.
 
      Directional and HasNoLockable are optional.  
 
-     An example to define a {@link galois::graphs::FirstGraph} can be seen as follows:
+     An example to define a {@link galois::graphs::MorphGraph} can be seen as follows:
 
      In {@link apps/tutorial/Torus.cpp}
 
      @snippet apps/tutorial/Torus.cpp define a graph
      
-     @snippet apps/delaunayrefinement/Subgraph.h FirstGraph Definition in DMR
+     @snippet apps/delaunayrefinement/Subgraph.h MorphGraph Definition in DMR
 
    - Mutating a graph
     
-     A graph node can be created using {@link galois::graphs::FirstGraph::createNode}. If the node data type specified is not void, {@link galois::graphs::FirstGraph::createNode} will create a node data object internally. The parameters of {@link galois::graphs::FirstGraph::createNode} will passed to the constuctor of the node data type to create the node data instance. There are three cases: 
+     A graph node can be created using {@link galois::graphs::MorphGraph::createNode}. If the node data type specified is not void, {@link galois::graphs::MorphGraph::createNode} will create a node data object internally. The parameters of {@link galois::graphs::MorphGraph::createNode} will passed to the constuctor of the node data type to create the node data instance. There are three cases: 
      
-     \li if no parameter is passed into {@link galois::graphs::FirstGraph::createNode}, then the default constructor of the node data type will be called to create the node data instance. 
-     \li if some parameters are passed into {@link galois::graphs::FirstGraph::createNode}, the corresponding constructor of the node data type will be called to create the node data instance.
-     \li if a node data instance is passed into {@link galois::graphs::FirstGraph::createNode}, then the copy constrcutor of the node data type will be called to create the node data instance.
+     \li if no parameter is passed into {@link galois::graphs::MorphGraph::createNode}, then the default constructor of the node data type will be called to create the node data instance. 
+     \li if some parameters are passed into {@link galois::graphs::MorphGraph::createNode}, the corresponding constructor of the node data type will be called to create the node data instance.
+     \li if a node data instance is passed into {@link galois::graphs::MorphGraph::createNode}, then the copy constrcutor of the node data type will be called to create the node data instance.
      
-     if the node data type specified is void, then {@link galois::graphs::FirstGraph::createNode} should be called without paramters. {@link galois::graphs::FirstGraph::createNode} will return an instance of {galois::graphs::FistGraph::GraphNode} which stands for a reference to the created node. Through this instance, the created node can be added to the graph using {@link galois::graphs::FirstGraph::addNode}. An existing node in the graph can be removed using {@link galois::graphs::FirstGraph::removeNode}, the parameter of which is also an instace of {galois::graphs::FistGraph::GraphNode}. 
+     if the node data type specified is void, then {@link galois::graphs::MorphGraph::createNode} should be called without paramters. {@link galois::graphs::MorphGraph::createNode} will return an instance of {galois::graphs::FistGraph::GraphNode} which stands for a reference to the created node. Through this instance, the created node can be added to the graph using {@link galois::graphs::MorphGraph::addNode}. An existing node in the graph can be removed using {@link galois::graphs::MorphGraph::removeNode}, the parameter of which is also an instace of {galois::graphs::FistGraph::GraphNode}. 
      
      An example of creating nodes in the graph can be seen as follows:
       
@@ -166,7 +166,7 @@ Morph graphs allow concurrent graph mutations.
      
      @snippet apps/tutorial/Torus.cpp create and add node
 
-     A graph edge can be created and added into a graph using {@link galois::graphs::FirstGraph::addEdge}.In the directional case, the paramters src and dst of {@link galois::graphs::FirstGraph::addEdge} represents the source node and the destination node of the edge to be added. When the graph is un-directional, any order of the two ending nodes of the edge to be added will be treated as the same edge and can be passed into this function with equal effects. {@link galois::graphs::FirstGraph::addEdge} will first detect whether the edge to be added exists so that the graph does not contain multi-edges. If such edge does not exist, this function will create an edge in the graph with an edge data object initialized to the default value of the edge data type; otherwise, it will not add new edge into the graph. In either case, the function will return an edge_iterator pointing to the added edge. Passing this edge_iterator to {@link galois::graphs::FirstGraph::getEdgeData} will return a reference to the edge data object associated with the added edge. Through the returned reference, the edge data object can be modified. To add multi-edges into the graph, {@link galois::graphs::FirstGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link galois::graphs::FirstGraph::addEdge}. An edge can be removed by using {@link galois::graphs::FirstGraph::removeEdge}.
+     A graph edge can be created and added into a graph using {@link galois::graphs::MorphGraph::addEdge}.In the directional case, the paramters src and dst of {@link galois::graphs::MorphGraph::addEdge} represents the source node and the destination node of the edge to be added. When the graph is un-directional, any order of the two ending nodes of the edge to be added will be treated as the same edge and can be passed into this function with equal effects. {@link galois::graphs::MorphGraph::addEdge} will first detect whether the edge to be added exists so that the graph does not contain multi-edges. If such edge does not exist, this function will create an edge in the graph with an edge data object initialized to the default value of the edge data type; otherwise, it will not add new edge into the graph. In either case, the function will return an edge_iterator pointing to the added edge. Passing this edge_iterator to {@link galois::graphs::MorphGraph::getEdgeData} will return a reference to the edge data object associated with the added edge. Through the returned reference, the edge data object can be modified. To add multi-edges into the graph, {@link galois::graphs::MorphGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link galois::graphs::MorphGraph::addEdge}. An edge can be removed by using {@link galois::graphs::MorphGraph::removeEdge}.
 
      An example of creating edges can be seen as follows:
     
@@ -174,15 +174,15 @@ Morph graphs allow concurrent graph mutations.
    
      @snippet apps/tutorial/Torus.cpp add edges
   
-     {@link galois::graphs::FirstGraph::resizeEdges} is used to pre-allocate space for edges of a graph node.
+     {@link galois::graphs::MorphGraph::resizeEdges} is used to pre-allocate space for edges of a graph node.
 
    - Accessing graph topology
     
-     The number of nodes in the graph can be accessed by using {@link galois::graphs::FirstGraph::size}. Note that this function is not threadsafe. {@link galois::graphs::FirstGraph::sizeOfEdgeData} can be used to return size of the edge data.
+     The number of nodes in the graph can be accessed by using {@link galois::graphs::MorphGraph::size}. Note that this function is not threadsafe. {@link galois::graphs::MorphGraph::sizeOfEdgeData} can be used to return size of the edge data.
 
-     The nodes in the graph can be accessed by the node iterator {@link galois::graphs::FirstGraph::iterator} with {@link galois::graphs::FirstGraph::begin} and {@link galois::graphs::FirstGraph::end}. 
+     The nodes in the graph can be accessed by the node iterator {@link galois::graphs::MorphGraph::iterator} with {@link galois::graphs::MorphGraph::begin} and {@link galois::graphs::MorphGraph::end}. 
 
-     The outgoing edges of a node can be accessed by the edge iterator {@link galois::graphs::FirstGraph::edge_iterator} with {@link galois::graphs::FirstGraph::edge_begin} and {@link galois::graphs::FirstGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link galois::graphs::FirstGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
+     The outgoing edges of a node can be accessed by the edge iterator {@link galois::graphs::MorphGraph::edge_iterator} with {@link galois::graphs::MorphGraph::edge_begin} and {@link galois::graphs::MorphGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link galois::graphs::MorphGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
 
     An example to access the outgoing neighbors of a node can be seen as follows:
 
@@ -191,7 +191,7 @@ Morph graphs allow concurrent graph mutations.
 
    - Accessing node data and edge data   
  
-    Given a node or edge, the data on them can be accessed by {@link galois::graphs::FirstGraph::getData} or {@link galois::graphs::FirstGraph::getEdgeData} correspondingly. 
+    Given a node or edge, the data on them can be accessed by {@link galois::graphs::MorphGraph::getData} or {@link galois::graphs::MorphGraph::getEdgeData} correspondingly. 
 
     An example to access the data of a node can be seen as follows:
 
@@ -202,7 +202,7 @@ Morph graphs allow concurrent graph mutations.
 
 <H4> @link galois::graphs::LC_Morph_Graph </H4>
 
-This graph extends {@link galois::graphs::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The outgoing edges of this node should not exceed this degree. {@link galois::graphs::LC_Morph_Graph::createNode} is used to create node and its first parameter "nedges" is used to specify the maximum allowed degree. The remaining parameters of {@link galois::graphs::LC_Morph_Graph::createNode} will be passed to the constructor of the node data type to create the node data instance, same as the parameters of {@link galois::graphs::FirstGraph::createNode}. Importantly, removing nodes in the graph is not supported. Edges can be removed using {@link galois::graphs::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used. Other functionalities of {@link galois::graphs::LC_Morph_Graph} is same as {@link galois::graphs::LC_CSR_Graph} which can be seen in \ref localcompgraph 
+This graph extends {@link galois::graphs::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The outgoing edges of this node should not exceed this degree. {@link galois::graphs::LC_Morph_Graph::createNode} is used to create node and its first parameter "nedges" is used to specify the maximum allowed degree. The remaining parameters of {@link galois::graphs::LC_Morph_Graph::createNode} will be passed to the constructor of the node data type to create the node data instance, same as the parameters of {@link galois::graphs::MorphGraph::createNode}. Importantly, removing nodes in the graph is not supported. Edges can be removed using {@link galois::graphs::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used. Other functionalities of {@link galois::graphs::LC_Morph_Graph} is same as {@link galois::graphs::LC_CSR_Graph} which can be seen in \ref localcompgraph 
 
 <hr> 
 

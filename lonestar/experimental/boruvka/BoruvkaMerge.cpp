@@ -51,7 +51,7 @@ static cll::opt<bool> verify_via_kruskal("verify",cll::desc("Verify MST result v
 typedef int NodeDataType;
 typedef int EdgeDataType;
 
-typedef galois::graphs::FirstGraph<NodeDataType, EdgeDataType, false> Graph;
+typedef galois::graphs::MorphGraph<NodeDataType, EdgeDataType, false> Graph;
 typedef Graph::GraphNode GNode;
 
 using Counter = galois::GAccumulator<size_t>;

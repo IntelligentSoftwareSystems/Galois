@@ -45,7 +45,7 @@
 
 class AVIlevelExec: public AVIabstractMain {
 protected:
-  typedef galois::graphs::FirstGraph<void*,void,true> Graph;
+  typedef galois::graphs::MorphGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 

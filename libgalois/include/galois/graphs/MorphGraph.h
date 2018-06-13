@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_FIRSTGRAPH_H
-#define GALOIS_GRAPH_FIRSTGRAPH_H
+#ifndef GALOIS_GRAPH_MORPHGRAPH_H
+#define GALOIS_GRAPH_MORPHGRAPH_H
 
 //#define AUX_MAP
 
@@ -171,7 +171,7 @@ struct EdgeFactory<void, false> {
  *   ... // Definition of node data
  * };
  *
- * typedef galois::graphs::FirstGraph<Node,int,true> Graph;
+ * typedef galois::graphs::MorphGraph<Node,int,true> Graph;
  *
  * // Create graph
  * Graph g;
@@ -218,26 +218,26 @@ template<typename NodeTy, typename EdgeTy, bool Directional, bool InOut = false,
   bool SortedNeighbors=false,
   typename FileEdgeTy=EdgeTy
   >
-class FirstGraph : private boost::noncopyable {
+class MorphGraph : private boost::noncopyable {
 public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_no_lockable { typedef MorphGraph<NodeTy,EdgeTy,Directional,InOut,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_node_data { typedef MorphGraph<_node_data,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_edge_data { typedef MorphGraph<NodeTy,_edge_data,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _file_edge_data>
-  struct with_file_edge_data { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
+  struct with_file_edge_data { typedef MorphGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
 
   template<bool _directional>
-  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_directional { typedef MorphGraph<NodeTy,EdgeTy,_directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<bool _sorted_neighbors>
-  struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
+  struct with_sorted_neighbors { typedef MorphGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
 
   typedef read_with_aux_first_graph_tag read_tag;
 
@@ -288,7 +288,7 @@ private:
     public internal::NodeInfoBase<NodeTy, !HasNoLockable>,
     public gNodeTypes
   {
-    friend class FirstGraph;
+    friend class MorphGraph;
     typedef internal::NodeInfoBase<NodeTy, !HasNoLockable> NodeInfo;
     typename gNodeTypes::EdgesTy edges;
     typedef typename gNode::iterator iterator;
@@ -864,8 +864,8 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  internal::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return internal::EdgesIterator<FirstGraph>(*this, N, mflag);
+  internal::EdgesIterator<MorphGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::EdgesIterator<MorphGraph>(*this, N, mflag);
   }
 
   /**

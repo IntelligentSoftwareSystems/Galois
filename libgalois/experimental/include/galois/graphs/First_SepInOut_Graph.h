@@ -17,8 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef GALOIS_GRAPH_FIRSTGRAPH_H
-#define GALOIS_GRAPH_FIRSTGRAPH_H
+#ifndef GALOIS_GRAPH_FIRST_SEPINOUT_GRAPH_H
+#define GALOIS_GRAPH_FIRST_SEPINOUT_GRAPH_H
 
 //#define AUX_MAP
 

@@ -26,7 +26,7 @@
 #include "galois/UnionFind.h"
 #include "galois/Graph/LCGraph.h"
 #include "galois/ParallelSTL/ParallelSTL.h"
-#include "galois/Graph/Graph.h" // FirstGraph
+#include "galois/Graph/Graph.h" // MorphGraph
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -74,8 +74,8 @@ typedef double edgedata;
 // LC_Linear_Graph cannot have structure modified; not suitable for
 // symbolic factorization.
 //typedef galois::graphs::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
-typedef galois::graphs::FirstGraph<Node,edgedata,true> Graph;
-typedef galois::graphs::FirstGraph<Node,edgedata,false> SymbolicGraph;
+typedef galois::graphs::MorphGraph<Node,edgedata,true> Graph;
+typedef galois::graphs::MorphGraph<Node,edgedata,false> SymbolicGraph;
 
 typedef Graph::GraphNode GNode;
 typedef SymbolicGraph::GraphNode SGNode;
@@ -444,7 +444,7 @@ struct NumericAlgo {
   }
 };
 
-// Load a graph into a FirstGraph. Based on makeGraph from Boruvka.
+// Load a graph into a MorphGraph. Based on makeGraph from Boruvka.
 template <typename GraphType>
 static void makeGraph(GraphType &graph, const char* input) {
    std::vector<SGNode> nodes;
@@ -520,7 +520,7 @@ static void makeGraph(GraphType &graph, const char* input) {
 
 // FIXME: implement verify, etc. See SpanningTree.
 
-// Load a double[][] matrix into a FirstGraph. 
+// Load a double[][] matrix into a MorphGraph. 
 template <typename GraphType>
 static void makeGraph(GraphType &graph, double** input, int matrix_size) {
      
@@ -665,7 +665,7 @@ int main(int argc, char** argv) {
   Graph outgraph;
 
   // Load input graph. Read to an LC_Graph and then convert to a
-  // FirstGraph. (based on makeGraph from Boruvka.)
+  // MorphGraph. (based on makeGraph from Boruvka.)
   
   
 	MatrixGenerator* matrix_generator = new MatrixGenerator();

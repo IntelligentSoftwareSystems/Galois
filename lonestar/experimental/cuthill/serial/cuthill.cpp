@@ -99,7 +99,7 @@ struct Prefix {
 //typedef galois::graphs::LC_Linear_Graph<SNode, void> Graph;
 typedef galois::graphs::LC_CSR_Graph<SNode, void> Graph;
 //typedef galois::graphs::LC_CSRInline_Graph<SNode, char> Graph;
-//typedef galois::graphs::FirstGraph<SNode, void, false> Graph;
+//typedef galois::graphs::MorphGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;

@@ -23,7 +23,7 @@
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed
-typedef galois::graphs::FirstGraph<int,void,true> Graph;
+typedef galois::graphs::MorphGraph<int,void,true> Graph;
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
 

@@ -112,8 +112,8 @@ struct SPNode {
   SPNode() {}
 };
 
-using Graph = galois::graphs::FirstGraph<SPNode, SPEdge, false>;
-using GNode = galois::graphs::FirstGraph<SPNode, SPEdge, false>::GraphNode;
+using Graph = galois::graphs::MorphGraph<SPNode, SPEdge, false>;
+using GNode = galois::graphs::MorphGraph<SPNode, SPEdge, false>::GraphNode;
 
 //interesting parameters:
 static const double epsilon = 0.000001;

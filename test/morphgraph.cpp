@@ -7,9 +7,9 @@
 #include <iostream>
 #include <string>
 
-using OutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, false>;
-using InOutGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, true, true>;
-using SymGraph = galois::graphs::FirstGraph<unsigned int, unsigned int, false>;
+using OutGraph = galois::graphs::MorphGraph<unsigned int, unsigned int, true, false>;
+using InOutGraph = galois::graphs::MorphGraph<unsigned int, unsigned int, true, true>;
+using SymGraph = galois::graphs::MorphGraph<unsigned int, unsigned int, false>;
 
 std::string filename;
 std::string statfile;
@@ -59,7 +59,7 @@ void run(Graph& g, galois::StatTimer& timer, std::string prompt) {
       [&g, &f] () {
         galois::graphs::readGraphDispatch(g, typename Graph::read_tag(), f);
       },
-      "Construct FirstGraph");
+      "Construct MorphGraph");
   timer.stop();
 
   galois::reportPageAlloc("MeminfoPost");
@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   galois::SharedMemSys G;
 
   if (argc < 4) {
-    std::cout << "Usage: ./test-firstgraph <input> <num_threads> <out|in-out|symmetric> [stat_file]" << std::endl;
+    std::cout << "Usage: ./test-morphgraph <input> <num_threads> <out|in-out|symmetric> [stat_file]" << std::endl;
     return 0;
   }
 
@@ -102,8 +102,8 @@ int main(int argc, char** argv) {
     run(symG, symT, "symmetric graph");
   }
 
-  galois::runtime::reportParam("Load FirstGraph", "Threads", numThreads);
-  galois::runtime::reportParam("Load FirstGraph", "File", filename);
-  galois::runtime::reportParam("Load FirstGraph", "Graph Type", graphtype);
+  galois::runtime::reportParam("Load MorphGraph", "Threads", numThreads);
+  galois::runtime::reportParam("Load MorphGraph", "File", filename);
+  galois::runtime::reportParam("Load MorphGraph", "Graph Type", graphtype);
   return 0;
 }

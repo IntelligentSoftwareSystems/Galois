@@ -50,7 +50,7 @@ typedef galois::GAccumulator<size_t> MstWeight;
 struct Prim {
   struct Node;
 
-  typedef galois::graphs::FirstGraph<Node*, Weight, true> Graph;
+  typedef galois::graphs::MorphGraph<Node*, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
 
   struct HeapItem {
@@ -158,7 +158,7 @@ struct Prim {
 
 
 struct Boruvka {
-  typedef galois::graphs::FirstGraph<unsigned, Weight, true> Graph;
+  typedef galois::graphs::MorphGraph<unsigned, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::pair<GraphNode, Weight> Edge;
   typedef std::vector<Edge, galois::PerIterAllocTy::rebind<Edge>::other> EdgeList;
@@ -314,7 +314,7 @@ struct BoruvkaUnionFind {
     Data(): rank(0), next(-1), minWeight(std::numeric_limits<Weight>::max()) { }
   };
 
-  typedef galois::graphs::FirstGraph<Data, Weight, true> Graph;
+  typedef galois::graphs::MorphGraph<Data, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::vector<GraphNode> NodesTy;
   typedef std::pair<GraphNode,Weight> MinPairTy;

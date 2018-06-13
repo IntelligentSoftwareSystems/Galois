@@ -94,8 +94,8 @@ struct BipartiteGraph: public galois::graphs::LC_Morph_Graph<NodeTy,EdgeTy> {
 };
 
 template<typename NodeTy,typename EdgeTy>
-struct MFBipartiteGraph: public galois::graphs::FirstGraph<NodeTy,EdgeTy,true> {
-  typedef galois::graphs::FirstGraph<NodeTy,EdgeTy,true> Super;
+struct MFBipartiteGraph: public galois::graphs::MorphGraph<NodeTy,EdgeTy,true> {
+  typedef galois::graphs::MorphGraph<NodeTy,EdgeTy,true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
 
   NodeList A;

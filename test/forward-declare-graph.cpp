@@ -2,7 +2,7 @@
 #include "galois/graphs/LCGraph.h"
 
 struct Node1;
-typedef galois::graphs::FirstGraph<Node1, void, true> Graph1;
+typedef galois::graphs::MorphGraph<Node1, void, true> Graph1;
 struct Node1 {
   Graph1::edge_iterator edge;
   Graph1::GraphNode gnode;

@@ -268,7 +268,7 @@ void parallelPageRank() {
 static void transposeGraph() {
   typedef galois::graphs::LC_CSR_Graph<size_t, void> InputGraph;
   typedef InputGraph::GraphNode InputNode;
-  typedef galois::graphs::FirstGraph<size_t, double, true> OutputGraph;
+  typedef galois::graphs::MorphGraph<size_t, double, true> OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;

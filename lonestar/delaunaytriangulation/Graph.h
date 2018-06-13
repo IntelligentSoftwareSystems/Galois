@@ -28,7 +28,7 @@
 #include <vector>
 #include <deque>
 
-typedef galois::graphs::FirstGraph<Element,char,true> Graph;
+typedef galois::graphs::MorphGraph<Element,char,true> Graph;
 typedef Graph::GraphNode GNode;
 
 //! Factor out common graph traversals

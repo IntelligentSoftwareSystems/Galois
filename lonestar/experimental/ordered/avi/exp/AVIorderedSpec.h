@@ -43,7 +43,7 @@
 
 class AVIorderedSpec: public AVIabstractMain {
 protected:
-  using Graph =  galois::graphs::FirstGraph<void*,void,true>;
+  using Graph =  galois::graphs::MorphGraph<void*,void,true>;
   using Lockable =  Graph::GraphNode;
   using Locks =  std::vector<Lockable>;
 
