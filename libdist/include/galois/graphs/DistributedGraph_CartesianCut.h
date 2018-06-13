@@ -43,7 +43,7 @@ namespace graphs {
  */
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
-class DistGraph_cartesianCut : public DistGraph<NodeTy, EdgeTy> {
+class DistGraphCartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
   using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
 
@@ -284,7 +284,7 @@ public:
   /** 
    * Constructor for Cartesian Cut graph
    */
-  DistGraph_cartesianCut(const std::string& filename, 
+  DistGraphCartesianCut(const std::string& filename, 
               const std::string& partitionFolder, unsigned host, 
               unsigned _numHosts, std::vector<unsigned>& scalefactor, 
               bool transpose = false, bool readFromFile = false,

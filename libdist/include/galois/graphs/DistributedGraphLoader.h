@@ -99,16 +99,16 @@ constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   using Graph_edgeCut = DistGraphEdgeCut<NodeData, EdgeData, true>;
   //typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   //typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
-  //typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
-  //typedef DistGraph_cartesianCut<NodeData, EdgeData, true> 
+  //typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  //typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
   //      Graph_checkerboardCut; // assumes push-style
   //typedef DistGraph_jaggedCut<NodeData, EdgeData> 
   //      Graph_jaggedCut; // assumes push-style
   //typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
   //      Graph_jaggedBlockedCut; // assumes push-style
-  //typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  //typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
   //                            Graph_cartesianCut_overDecomposeBy2;
-  //typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  //typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 4> 
   //                            Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -199,13 +199,13 @@ DistGraph<NodeData, EdgeData>* constructSymmetricGraph(std::vector<unsigned>&
 
   typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
+  typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef DistGraphCartesianCut<NodeData, EdgeData, true> Graph_checkerboardCut;
   typedef DistGraph_jaggedCut<NodeData, EdgeData> Graph_jaggedCut;
   typedef DistGraph_jaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 4> 
                               Graph_cartesianCut_overDecomposeBy4;
   typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -268,16 +268,16 @@ DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>&
   typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, true> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut; // assumes push-style
+  typedef DistGraphCartesianCut<NodeData, EdgeData, true> 
         Graph_checkerboardCut; // assumes push-style
   typedef DistGraph_jaggedCut<NodeData, EdgeData> 
         Graph_jaggedCut; // assumes push-style
   typedef DistGraph_jaggedCut<NodeData, EdgeData, true> 
         Graph_jaggedBlockedCut; // assumes push-style
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 2> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 2> 
                               Graph_cartesianCut_overDecomposeBy2;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, false, 4> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, false, 4> 
                               Graph_cartesianCut_overDecomposeBy4;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -362,17 +362,17 @@ template<typename NodeData, typename EdgeData, bool iterateOut = true,
 DistGraph<NodeData, EdgeData>* constructGraph(std::vector<unsigned>& scaleFactor) {
   typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, 
                               true> Graph_cartesianCut; // assumes pull-style
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, true, 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, true, 
                               true> Graph_checkerboardCut; // assumes pull-style
   typedef DistGraph_jaggedCut<NodeData, EdgeData, false, 
                            true> Graph_jaggedCut; // assumes pull-style
   typedef DistGraph_jaggedCut<NodeData, EdgeData, true, 
                            true> Graph_jaggedBlockedCut; // assumes pull-style
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, true, 2> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, true, 2> 
                               Graph_cartesianCut_overDecomposeBy2; // assumes pull-style
-  typedef DistGraph_cartesianCut<NodeData, EdgeData, false, true, 4> 
+  typedef DistGraphCartesianCut<NodeData, EdgeData, false, true, 4> 
                               Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
   typedef DistGraph_customEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   auto& net = galois::runtime::getSystemNetworkInterface();
