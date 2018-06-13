@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,11 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistStats.cpp
+ *
+ * Contains implementations for DistStats.h.
+ */
 #include "galois/runtime/DistStats.h"
 #include "galois/runtime/Serialize.h"
 
@@ -79,7 +84,6 @@ void DistStatManager::mergeStats(void) {
 }
 
 void DistStatManager::combineAtHost_0_helper(void) {
-
     const bool IS_HOST0 = getHostID() == 0;
 
     const auto& hTotalMap = hostTotalTypes.mergedMap();

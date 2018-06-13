@@ -17,12 +17,22 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistStats.h
+ *
+ * Contains declaration of DistStatManager, which reports runtime statistics of a 
+ * distributed application in Galois.
+ */
+
 #ifndef GALOIS_RUNTIME_DIST_STATS_H
 #define GALOIS_RUNTIME_DIST_STATS_H
 
-// TODO document these defines
+//! Turn on if you want more distributed stats to be printed
 #define MORE_DIST_STATS 0
+//! Turn on if you want more communication statistics to be printed
 #define MORE_COMM_STATS 0
+//! Turn on if you want per-bulk-synchronous parallel timers to be printed
+//! (otherwise all rounds are under 1 timer)
 #define DIST_PER_ROUND_TIMER 0
 
 #include "galois/runtime/Statistics.h"
@@ -33,9 +43,17 @@
 namespace galois {
 namespace runtime {
 
+/**
+ * Helper class for the DistStatManager that aids in receiving statistics
+ */
 class StatRecvHelper;
 
+/**
+ * Class responsible for tracking all statistics of a running distributed
+ * Galois program and reporting them at the end of program execution.
+ */
 class DistStatManager: public galois::runtime::StatManager {
+  //! Friend class that helps with receiving stats
   friend class galois::runtime::StatRecvHelper;
   using Base = galois::runtime::StatManager;
   using Str = galois::gstl::Str;
@@ -48,10 +66,8 @@ class DistStatManager: public galois::runtime::StatManager {
   static bool printingHostVals(void);
 
   template <typename _UNUSED=void>
-  struct HostTotalTypesImpl { 
-
+  struct HostTotalTypesImpl {
     struct DummyStat {
-
       StatTotal::Type m_totalTy;
 
       explicit DummyStat(StatTotal::Type total): m_totalTy(total) {}
@@ -106,7 +122,6 @@ class DistStatManager: public galois::runtime::StatManager {
 
   template <typename T>
   struct HostStat: public internal::VecStat<T> {
-
     using Base = internal::VecStat<T>;
     using ThrdStats = internal::VecStat<T>;
     using PerHostThrdStats = galois::gstl::Map<unsigned, ThrdStats>;
@@ -116,7 +131,6 @@ class DistStatManager: public galois::runtime::StatManager {
     explicit HostStat(const StatTotal::Type& hTotalTy): Base(hTotalTy) {}
 
     void add(const HostStatVal<T>& val) {
-
       const auto& hostID = std::get<0>(val);
       const auto& thrdTotal  = std::get<1>(val);
       const auto& thrdTotalTy  = std::get<2>(val);
@@ -130,10 +144,10 @@ class DistStatManager: public galois::runtime::StatManager {
       for (const auto& i: thrdVals) {
         tstat.add(i);
       }
-
     }
 
-    void printHostVals(std::ostream& out, const Str& region, const Str& category) const {
+    void printHostVals(std::ostream& out, const Str& region, 
+                       const Str& category) const {
       out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID() << SEP;
       out << region << SEP << category << SEP;
       out << HSTAT_NAME << SEP;
@@ -148,7 +162,8 @@ class DistStatManager: public galois::runtime::StatManager {
       out << std::endl;
     }
 
-    void printThreadVals(std::ostream& out, const Str& region, const Str& category) const {
+    void printThreadVals(std::ostream& out, const Str& region, 
+                         const Str& category) const {
       for (const auto& p: perHostThrdStats) {
         out << StatManager::statKind<T>() << SEP << p.first << SEP;
         out << region << SEP << category << SEP;
@@ -171,14 +186,14 @@ class DistStatManager: public galois::runtime::StatManager {
   };
 
   template <typename T>
-  struct DistStatCombiner: public internal::BasicStatMap<HostStat<T> > {
+  struct DistStatCombiner: public internal::BasicStatMap<HostStat<T>> {
     using Base = internal::BasicStatMap<HostStat<T> >;
 
-#if __GNUC__ < 5
+    #if __GNUC__ < 5
     static const char* htotalName(const StatTotal::Type& type) {
-#else
+    #else
     static constexpr const char* htotalName(const StatTotal::Type& type) {
-#endif
+    #endif
       switch(type) {
         case StatTotal::SINGLE: return "HOST_0";
         case StatTotal::TSUM: return "HSUM";
@@ -216,53 +231,95 @@ class DistStatManager: public galois::runtime::StatManager {
   HostTotalTypes hostTotalTypes;
 
 protected:
+  /**
+   * Merge all stats from each individual thread as well as each individual
+   * host as prescribed the the reduction (Total) type specified for each
+   * statistic.
+   */
   void mergeStats(void);
 
+  /**
+   * Print the header of the stats file output.
+   *
+   * @param out File to print header out to
+   */
   void printHeader(std::ostream& out) const;
 
+  /**
+   * Merge all stats. Host 0 will then print out all collected stats.
+   */
   virtual void printStats(std::ostream& out);
 
 public:
-
+  //! Dist stat manager constructor
   DistStatManager(const std::string& outfile="");
 
+  /**
+   * Adds a statistic to the statistics manager.
+   *
+   * @param region Region name to give statistic
+   * @param category Category of statistic
+   * @param val Value of the statistic
+   * @param thrdTotalTy The type of reduction used to combine thread statistics
+   * of the same kind
+   * @param hTotalTy The type of reduction used to combine host statistics
+   * of the same kind
+   */
   template <typename T>
-  void addToStat(const Str& region, const Str& category, const T& val, const StatTotal::Type& thrdTotalTy, const StatTotal::Type& hTotalTy) {
-
+  void addToStat(const Str& region, const Str& category, const T& val, 
+                 const StatTotal::Type& thrdTotalTy, 
+                 const StatTotal::Type& hTotalTy) {
     Base::addToStat(region, category, val, thrdTotalTy);
     hostTotalTypes.addToStat(region, category, hTotalTy);
   }
 
 private:
-
   void combineAtHost_0_helper(void);
-
   void combineAtHost_0(void);
-
-  StatTotal::Type findHostTotalTy(const Str& region, const Str& category, const StatTotal::Type& thrdTotalTy) const; 
-
-  void addRecvdHostTotalTy(unsigned hostID, const Str& region, const Str& category, const StatTotal::Type& totalTy); 
-
-  void addRecvdStat(unsigned hostID, const Str& region, const Str& category, int64_t thrdTotal, const StatTotal::Type& thrdTotalTy, const ThrdVals<int64_t>& thrdVals); 
-
-  void addRecvdStat(unsigned hostID, const Str& region, const Str& category, double thrdTotal, const StatTotal::Type& thrdTotalTy, const ThrdVals<double>& thrdVals); 
-
-  void addRecvdParam(unsigned hostID, const Str& region, const Str& category, const Str& thrdTotal, const StatTotal::Type& thrdTotalTy, const ThrdVals<Str>& thrdVals); 
-
+  StatTotal::Type findHostTotalTy(const Str& region, const Str& category, 
+                                  const StatTotal::Type& thrdTotalTy) const; 
+  void addRecvdHostTotalTy(unsigned hostID, const Str& region, 
+                           const Str& category, const StatTotal::Type& totalTy); 
+  void addRecvdStat(unsigned hostID, const Str& region, const Str& category, 
+                    int64_t thrdTotal, const StatTotal::Type& thrdTotalTy, 
+                    const ThrdVals<int64_t>& thrdVals); 
+  void addRecvdStat(unsigned hostID, const Str& region, const Str& category, 
+                    double thrdTotal, const StatTotal::Type& thrdTotalTy, 
+                    const ThrdVals<double>& thrdVals); 
+  void addRecvdParam(unsigned hostID, const Str& region, const Str& category, 
+                     const Str& thrdTotal, const StatTotal::Type& thrdTotalTy,
+                     const ThrdVals<Str>& thrdVals); 
 };
 
 namespace internal {
+  /**
+   * Gets a pointer to the distributed stat manager.
+   * 
+   * @returns Pointer to distributed statistics manager
+   */
   DistStatManager* distSysStatManager(void);
 }
 
-
+/**
+ * Adds a statistic to the statistics manager. Calls addToStat in 
+ * DistStatManager.
+ *
+ * @param region Region name to give statistic
+ * @param category Category of statistic
+ * @param val Value of the statistic
+ * @param thrdTotalTy The type of reduction used to combine thread statistics
+ * of the same kind
+ * @param hTotalTy The type of reduction used to combine host statistics
+ * of the same kind
+ */
 template <typename S1, typename S2, typename T>
-inline void reportDistStat(const S1& region, const S2& category, const T& value, const StatTotal::Type& thrdTotalTy, const StatTotal::Type& hTotalTy) {
-
+inline void reportDistStat(const S1& region, const S2& category, const T& value,
+                           const StatTotal::Type& thrdTotalTy, 
+                           const StatTotal::Type& hTotalTy) {
   internal::distSysStatManager()->addToStat(
-      gstl::makeStr(region), gstl::makeStr(category), value, thrdTotalTy, hTotalTy);
+    gstl::makeStr(region), gstl::makeStr(category), value, thrdTotalTy, hTotalTy
+  );
 }
-
 
 } // end namespace runtime
 } // end namespace galois
