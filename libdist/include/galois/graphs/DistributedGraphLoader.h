@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,14 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file DistributedGraphLoader.h
+ *
+ * Contains definitions for the common distributed graph loading functionality
+ * of Galois.
+ *
+ * @todo Refactoring a bunch of this code is likely very possible to do
+ */
 #ifndef D_GRAPH_LOADER
 #define D_GRAPH_LOADER
 
@@ -26,19 +34,33 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 
-// TODO/FIXME Refactoring a bunch of this code is likely very possible to do
 /*******************************************************************************
  * Supported partitioning schemes
  ******************************************************************************/
 namespace galois {
 namespace graphs {
 
+//! enums of partitioning schemes supported
 enum PARTITIONING_SCHEME {
-  OEC, IEC, HOVC, HIVC, BOARD2D_VCUT, CART_VCUT, JAGGED_CYCLIC_VCUT,
-  JAGGED_BLOCKED_VCUT, OVER_DECOMPOSE_2_VCUT, OVER_DECOMPOSE_4_VCUT,
-  CEC
+  OEC, //!< outgoing edge cut
+  IEC, //!< incoming edge cut
+  HOVC, //!< outgoing hybrid vertex cut
+  HIVC, //!< incoming hybrid vertex cut
+  BOARD2D_VCUT, //!< checkerboard cut
+  CART_VCUT, //!< cartesian vertex cut
+  JAGGED_CYCLIC_VCUT, //!< cyclic jagged cut
+  JAGGED_BLOCKED_VCUT, //!< blocked jagged cut
+  OVER_DECOMPOSE_2_VCUT, //!< overdecompose cvc by 2
+  OVER_DECOMPOSE_4_VCUT, //!< overdecompose cvc by 4
+  CEC //!< custom edge cut 
 };
 
+/**
+ * Turns a PARTITIONING_SCHEME enum to a string
+ *
+ * @param e partitioning scheme enum
+ * @return string version of e
+ */
 inline const char* EnumToString(PARTITIONING_SCHEME e) {
   switch(e) {
     case OEC: return "oec";
@@ -63,15 +85,26 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
  ******************************************************************************/
 namespace cll = llvm::cl;
 
+//! input graph file
 extern cll::opt<std::string> inputFile;
+//! input graph file, but transposed
 extern cll::opt<std::string> inputFileTranspose;
+//! symmetric input graph file
 extern cll::opt<bool> inputFileSymmetric;
+//! partition folder; unused
+//! @deprecated Not being used anymore; needs to be removed in the future
 extern cll::opt<std::string> partFolder;
+//! partitioning scheme to use
 extern cll::opt<galois::graphs::PARTITIONING_SCHEME> partitionScheme;
+//! threshold to determine how hybrid vertex cut assigned edges
 extern cll::opt<unsigned int> VCutThreshold;
+//! path to vertex id map for custom edge cut
 extern cll::opt<std::string> vertexIDMapFileName;
+//! true if you want to read graph structure from a file
 extern cll::opt<bool> readFromFile;
+//! path to local graph structure to read
 extern cll::opt<std::string> localGraphFileName;
+//! if true, the local graph structure will be saved to disk after partitioning
 extern cll::opt<bool> saveLocalGraph;
 
 namespace galois {
