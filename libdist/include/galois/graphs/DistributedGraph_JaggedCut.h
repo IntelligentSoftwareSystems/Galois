@@ -1,5 +1,4 @@
-/**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+/* This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
  *
@@ -17,6 +16,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/** 
+ * @file DistributedGraph_JaggedCut.h
+ *
+ * Implements the jagged cut partitioning scheme for DistributedGraph. 
+ */
+
 #ifndef _GALOIS_DIST_HGRAPHJVC_H
 #define _GALOIS_DIST_HGRAPHJVC_H
 
@@ -25,22 +30,39 @@
 namespace galois {
 namespace graphs {
 
+/**
+ * Distributed graph class that implements a cartesian vertex cut as well
+ * as a checkboard vertex cut.
+ *
+ * @tparam NodeTy type of node data for the graph
+ * @tparam EdgeTy type of edge data for the graph
+ * @tparam columnBlocked If true, blocks the blocks (instead of cyclic 
+ * distribution)
+ * @tparam moreColumnHosts If true, swaps the number of rows and columns
+ * @tparam columnChunkSize Specifies the size of a column chunk (column chunk
+ * used to split blocks evenly; higher size means less precise splitting
+ * of blocks)
+ */
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
 class DistGraphJaggedCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_jaggedCut";
+
 public:
-  typedef DistGraph<NodeTy, EdgeTy> base_DistGraph;
+  using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
 private:
   unsigned numRowHosts;
   unsigned numColumnHosts;
 
-  uint32_t dummyOutgoingNodes; // nodes without outgoing edges that are stored with nodes having outgoing edges (to preserve original ordering locality)
+  //! nodes without outgoing edges that are stored with nodes having outgoing 
+  //! edges (to preserve original ordering locality)
+  uint32_t dummyOutgoingNodes; 
 
   std::vector<std::vector<std::pair<uint64_t, uint64_t>>> jaggedColumnMap;
 
-  // factorize numHosts such that difference between factors is minimized
+  //! Factorize numHosts into rows and columns such that difference between 
+  //! factors is minimized
   void factorize_hosts() {
     numColumnHosts = sqrt(base_DistGraph::numHosts);
     while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
@@ -117,8 +139,12 @@ private:
     return columnIndex;
   }
 
-  // called only for those hosts with which it shares nodes
-  bool isNotCommunicationPartner(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
+  //! Returns true if this host has nothing to send to the specified host
+  //! given a particular communication pattern
+  bool isNotCommunicationPartner(unsigned host, 
+                                 typename base_DistGraph::SyncType syncType, 
+                                 WriteLocation writeLocation, 
+                                 ReadLocation readLocation) {
     if (syncType == base_DistGraph::syncReduce) {
       switch(writeLocation) {
         case writeSource:
@@ -146,15 +172,17 @@ private:
   }
 
 public:
-  // GID = localToGlobalVector[LID]
+  //! GID of node = localToGlobalVector[LID]
   std::vector<uint64_t> localToGlobalVector; // TODO use LargeArray instead
-  // LID = globalToLocalMap[GID]
+  //! LID of node = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
+  //! number of nodes on local to this host
   uint32_t numNodes;
+  //! number of edges on local to this host
   uint64_t numEdges;
 
-  // Return the ID to which gid belongs after patition.
+  //! @copydoc DistGraphEdgeCut::getHostID
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
@@ -168,25 +196,27 @@ public:
     return base_DistGraph::numHosts;
   }
 
-  // Return if gid is Owned by local host.
+  //! @copydoc DistGraphEdgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
     std::tie(start, end) = base_DistGraph::gid2host[base_DistGraph::id];
     return gid >= start && gid < end;
   }
 
-  // Return if gid is present locally (owned or mirror).
+  //! @copydoc DistGraphEdgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     if (isOwned(gid)) return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
+  //! @copydoc DistGraphEdgeCut::G2L
   virtual uint32_t G2L(uint64_t gid) const {
     assert(isLocal(gid));
     return globalToLocalMap.at(gid);
   }
 
+  //! @copydoc DistGraphEdgeCut::L2G
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }
@@ -194,15 +224,24 @@ public:
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::mirrorNodes : base_DistGraph::masterNodes;
+  virtual bool nothingToSend(unsigned host, 
+                             typename base_DistGraph::SyncType syncType, 
+                             WriteLocation writeLocation, 
+                             ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
+                        base_DistGraph::mirrorNodes : base_DistGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
     return true;
   }
-  virtual bool nothingToRecv(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::masterNodes : base_DistGraph::mirrorNodes;
+
+  virtual bool nothingToRecv(unsigned host, 
+                             typename base_DistGraph::SyncType syncType, 
+                             WriteLocation writeLocation, 
+                             ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
+                        base_DistGraph::masterNodes : base_DistGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
       return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
     }
@@ -210,12 +249,21 @@ public:
   }
 
   /** 
-   * Constructor for jagged Cut graph
+   * Constructor for Jagged Cut 
+   *
+   * @param filename Graph file to read
+   * @param host the host id of the caller
+   * @param _numHosts total number of hosts in the system
+   * @param scalefactor Specifies if certain hosts should get more nodes
+   * than others
+   * @param transpose Should not be set to true (not supported by jagged-cut)
+   *
+   * @todo get rid of string argument (2nd one)
    */
-  DistGraphJaggedCut(const std::string& filename, 
-              const std::string& partitionFolder, unsigned host, 
-              unsigned _numHosts, std::vector<unsigned>& scalefactor, 
-              bool transpose = false) : base_DistGraph(host, _numHosts) {
+  DistGraphJaggedCut(const std::string& filename, const std::string&, 
+                     unsigned host, unsigned _numHosts, 
+                     std::vector<unsigned>& scalefactor, 
+                     bool transpose = false) : base_DistGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("Transpose not supported for jagged vertex-cuts");
     }
@@ -246,16 +294,6 @@ public:
     typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
       g.edge_begin(nodeEnd);
     
-    // file graph that is mmapped for much faster reading; will use this
-    // when possible from now on in the code
-    //galois::graphs::FileGraph fileGraph;
-
-    //fileGraph.partFromFile(filename,
-      //std::make_pair(boost::make_counting_iterator<uint64_t>(nodeBegin), 
-                     //boost::make_counting_iterator<uint64_t>(nodeEnd)),
-      //std::make_pair(edgeBegin, edgeEnd),
-      //true);
-
     galois::Timer edgeInspectionTimer;
     edgeInspectionTimer.start();
 
@@ -300,6 +338,12 @@ public:
 
     base_DistGraph::printStatistics();
 
+    if (columnBlocked) {
+      // like an unconstrained vertex-cut; all nodes because it is not optimized
+      // to know which nodes may have edges
+      base_DistGraph::numNodesWithEdges = numNodes; 
+    }
+
     loadEdges(base_DistGraph::graph, g, mpiGraph); // third pass of the graph file
 
     fill_mirrorNodes(base_DistGraph::mirrorNodes);
@@ -325,7 +369,6 @@ public:
   }
 
 private:
-
   void determineJaggedColumnMapping(galois::graphs::OfflineGraph& g,
                                     galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     auto activeThreads = galois::runtime::activeThreads;
@@ -334,7 +377,8 @@ private:
     galois::Timer timer;
     timer.start();
     mpiGraph.resetReadCounters();
-    size_t numColumnChunks = (base_DistGraph::numGlobalNodes + columnChunkSize - 1)/columnChunkSize;
+    size_t numColumnChunks = (base_DistGraph::numGlobalNodes + columnChunkSize - 1) / 
+                             columnChunkSize;
     std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
     galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
@@ -433,6 +477,7 @@ private:
     base_DistGraph::increment_evilPhase();
   }
 
+  //! @copydoc DistGraphCartesianCut::loadStatistics
   void loadStatistics(galois::graphs::OfflineGraph& g,
                       galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                       std::vector<uint64_t>& prefixSumOfEdges) {
@@ -570,8 +615,6 @@ private:
       assert(src == src_end);
     }
 
-    base_DistGraph::numNodesWithEdges = numNodes;
-
     uint64_t src = base_DistGraph::gid2host[leaderHostID].first;
     uint64_t src_end = base_DistGraph::gid2host[leaderHostID+numColumnHosts-1].second;
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
@@ -610,6 +653,7 @@ private:
     }
   }
 
+  //! @copydoc DistGraphCartesianCut::loadEdges
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
                  galois::graphs::OfflineGraph& g,
@@ -646,6 +690,9 @@ private:
                    mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
   }
 
+  //! Read in our assigned edges, constructing them if they belong to this host
+  //! and sending them off to the correct host otherwise
+  //! Edge data version
   template<typename GraphTy, 
            typename std::enable_if<
              !std::is_void<typename GraphTy::edge_data_type>::value
@@ -737,6 +784,9 @@ private:
     net.flush();
   }
 
+  //! Read in our assigned edges, constructing them if they belong to this host
+  //! and sending them off to the correct host otherwise
+  //! No edge data version
   template<typename GraphTy,
            typename std::enable_if<
              std::is_void<typename GraphTy::edge_data_type>::value
@@ -822,6 +872,10 @@ private:
     net.flush();
   }
 
+  /**
+   * Receive the edge dest/data assigned to this host from other hosts
+   * that were responsible for reading them.
+   */
   template<typename GraphTy>
   void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -849,9 +903,15 @@ private:
     }
   }
 
-  template<typename GraphTy, typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  /**
+   * Deserialize received edges and constructs them in our graph. No edge-data
+   * variant.
+   */
+  template<typename GraphTy, 
+           typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
-      std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur, 
+                        uint64_t& cur_end) {
     std::vector<typename GraphTy::edge_data_type> gdata_vec;
     galois::runtime::gDeserialize(b, gdata_vec);
     uint64_t i = 0;
@@ -863,9 +923,15 @@ private:
     }
   }
 
-  template<typename GraphTy, typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  /**
+   * Deserialize received edges and constructs them in our graph. No edge-data
+   * variant.
+   */
+  template<typename GraphTy, 
+           typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
-      std::vector<uint64_t>& gdst_vec, uint64_t& cur, uint64_t& cur_end) {
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur, 
+                        uint64_t& cur_end) {
     uint64_t i = 0;
     while (cur < cur_end) {
       uint64_t gdst = gdst_vec[i++];
@@ -874,6 +940,9 @@ private:
     }
   }
 
+  /**
+   * @copydoc DistGraphEdgeCut::fill_mirrorNodes
+   */
   void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
     for (uint32_t i = 0; i < numNodes; ++i) {
       uint64_t gid = localToGlobalVector[i];
@@ -884,11 +953,6 @@ private:
   }
 
 public:
-
-  std::string getPartitionFileName(const std::string& filename, const std::string & basename, unsigned hostID, unsigned num_hosts){
-    return filename;
-  }
-
   bool is_vertex_cut() const{
     if (moreColumnHosts) {
       // IEC and OEC will be reversed, so do not handle it as an edge-cut
@@ -919,8 +983,9 @@ public:
 
   std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
-    if(base_DistGraph::beginMaster > 0)
+    if (base_DistGraph::beginMaster > 0) {
       mirrorRanges_vec.push_back(std::make_pair(0, base_DistGraph::beginMaster));
+    }
     auto endMaster = base_DistGraph::beginMaster + base_DistGraph::numOwned;
     if (endMaster < numNodes) {
       mirrorRanges_vec.push_back(std::make_pair(endMaster, numNodes));

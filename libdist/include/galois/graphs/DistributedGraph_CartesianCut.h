@@ -20,8 +20,6 @@
  * @file DistributedGraph_CartesianCut.h
  *
  * Implements the cartesian cut partitioning scheme for DistributedGraph. 
- *
- * @todo document this code
  */
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
@@ -212,7 +210,7 @@ public:
   //! number of edges on local to this host
   uint64_t numEdges;
 
-  //! @copydoc DistGraphEdgeCut::isOwned
+  //! @copydoc DistGraphEdgeCut::getHostID
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     //for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
