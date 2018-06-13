@@ -1,5 +1,4 @@
-/*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
+/* This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
  *
@@ -33,18 +32,22 @@ namespace galois {
 namespace graphs {
 
 /**
- * TODO
+ * Distributed graph class that implements a cartesian vertex cut as well
+ * as a checkboard vertex cut.
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
- * @tparam columnBlocked TODO 
- * @tparam moreColumnHosts TODO 
- * @tparam DecomposeFactor TODO 
+ * @tparam columnBlocked If true, turns on checkboard partitioning
+ * @tparam moreColumnHosts If true, swaps the number of rows and columns
+ * @tparam DecomposeFactor Specifies how much further to decompose a cartesian
+ * block into. For example, if 2, then each block is decomposed into 2 more
+ * columns and 2 more rows from normal
  */
 template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
 class DistGraphCartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
+  //! Vector of Uint64 Vectors
   using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
 
 public:
@@ -58,12 +61,13 @@ private:
 
   //! Nodes without outgoing edges that are stored with nodes having outgoing 
   //! edges (to preserve original ordering locality).
-  //! Only for checkerboard partitioning, i.e. columnBlocked = true
+  //! Only used with checkerboard partitioning, i.e. columnBlocked = true
   uint32_t dummyOutgoingNodes; 
 
-  // factorize numHosts such that difference between factors is minimized
+  //! Factorize numHosts into rows and columns such that difference between 
+  //! factors is minimized
   void factorizeHosts() {
-    numVirtualHosts = base_DistGraph::numHosts*DecomposeFactor;
+    numVirtualHosts = base_DistGraph::numHosts * DecomposeFactor;
     numColumnHosts = sqrt(base_DistGraph::numHosts);
 
     while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
@@ -75,50 +79,45 @@ private:
       std::swap(numRowHosts, numColumnHosts);
     }
 
-    numRowHosts = numRowHosts*DecomposeFactor;
+    numRowHosts = numRowHosts * DecomposeFactor;
     if (base_DistGraph::id == 0) {
       galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
       galois::gPrint("Decomposition factor: ", DecomposeFactor, "\n");
     }
   }
 
-  unsigned virtual2RealHost(unsigned virutalHostID){
-    return virutalHostID%base_DistGraph::numHosts;
+  //! Maps a virtual host ID to its real host
+  unsigned virtual2RealHost(unsigned virutalHostID) {
+    return virutalHostID % base_DistGraph::numHosts;
   }
 
-  //template<bool isVirtual = false, typename std::enable_if<!isVirtual>::type* = nullptr>
+  //! Returns the grid row ID of this host
   unsigned gridRowID() const {
     return (base_DistGraph::id / numColumnHosts);
   }
 
-  //template<bool isVirtual, typename std::enable_if<isVirtual>::type* = nullptr>
-  //unsigned gridRowID() const {
-    //return (base_DistGraph::id / numColumnHosts);
-  //}
-
-
-  //template<bool isVirtual = false, typename std::enable_if<!isVirtual>::type* = nullptr>
+  //! Returns the grid row ID of the specified host
   unsigned gridRowID(unsigned id) const {
     return (id / numColumnHosts);
   }
 
-  //template<bool isVirtual, typename std::enable_if<isVirtual>::type* = nullptr>
-  //unsigned gridRowID(unsigned id) const {
-    //return (id / numColumnHosts);
-  //}
-
+  //! Returns the grid column ID of this host
   unsigned gridColumnID() const {
     return (base_DistGraph::id % numColumnHosts);
   }
 
+  //! Returns the grid column ID of the specified host
   unsigned gridColumnID(unsigned id) const {
     return (id % numColumnHosts);
   }
 
+
+  //! Returns the block that a particular node belongs to
   unsigned getBlockID(uint64_t gid) const {
-    return getHostID(gid)%base_DistGraph::numHosts;
+    return getHostID(gid) % base_DistGraph::numHosts;
   }
 
+  //! Find the column host ID of a particular block
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
     if (columnBlocked) {
       return (blockID / numRowHosts); // blocked, contiguous
@@ -127,6 +126,7 @@ private:
     }
   }
 
+  //! Find the column host ID of a particular node
   unsigned getColumnHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     uint32_t blockID = getBlockID(gid);
@@ -138,6 +138,7 @@ private:
     auto blockID = getBlockID(gid);
     auto h = getColumnHostIDOfBlock(blockID);
     uint32_t columnIndex = 0;
+
     for (auto b = 0U; b <= blockID; ++b) {
       if (getColumnHostIDOfBlock(b) == h) {
         uint64_t start, end;
@@ -150,10 +151,12 @@ private:
         }
       }
     }
+
     return columnIndex;
   }
 
-  // called only for those hosts with which it shares nodes
+  //! Returns true if this host has nothing to send to the specified host
+  //! given a particular communication pattern
   bool isNotCommunicationPartner(unsigned host,
                                  typename base_DistGraph::SyncType syncType,
                                  WriteLocation writeLocation,
@@ -199,9 +202,9 @@ private:
   }
 
 public:
-  // GID = localToGlobalVector[LID]
+  //! GID of node = localToGlobalVector[LID]
   std::vector<uint64_t> localToGlobalVector; // TODO use LargeArray instead
-  // LID = globalToLocalMap[GID]
+  //! LID of node = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
   //! number of nodes on local to this host
@@ -256,8 +259,14 @@ public:
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::mirrorNodes : base_DistGraph::masterNodes;
+  virtual bool nothingToSend(unsigned host, 
+                             typename base_DistGraph::SyncType syncType, 
+                             WriteLocation writeLocation, 
+                             ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
+                        base_DistGraph::mirrorNodes : 
+                        base_DistGraph::masterNodes;
+    
     if (sharedNodes[host].size() > 0) {
       if (columnBlocked) { // does not match processor grid
         return false;
@@ -266,10 +275,18 @@ public:
                                          readLocation);
       }
     }
+
     return true;
   }
-  virtual bool nothingToRecv(unsigned host, typename base_DistGraph::SyncType syncType, WriteLocation writeLocation, ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? base_DistGraph::masterNodes : base_DistGraph::mirrorNodes;
+
+  virtual bool nothingToRecv(unsigned host, 
+                             typename base_DistGraph::SyncType syncType, 
+                             WriteLocation writeLocation, 
+                             ReadLocation readLocation) {
+    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
+                        base_DistGraph::masterNodes : 
+                        base_DistGraph::mirrorNodes;
+
     if (sharedNodes[host].size() > 0) {
       if (columnBlocked) { // does not match processor grid
         return false;
@@ -278,17 +295,30 @@ public:
                                          readLocation);
       }
     }
+
     return true;
   }
 
   /** 
-   * Constructor for Cartesian Cut graph
+   * Constructor for cartesian cut.
+   *
+   * @param filename Graph file to read
+   * @param host the host id of the caller
+   * @param _numHosts total number of hosts in the system
+   * @param scalefactor Specifies if certain hosts should get more nodes
+   * than others
+   * @param transpose Should not be set to true (not supported by cart-cut)
+   * @param readFromFile true if you want to read the local graph from a file
+   * @param localGraphFileName the local file to read if readFromFile is set
+   * to true
+   *
+   * @todo get rid of string argument (2nd one)
    */
-  DistGraphCartesianCut(const std::string& filename, 
-              const std::string& partitionFolder, unsigned host, 
-              unsigned _numHosts, std::vector<unsigned>& scalefactor, 
-              bool transpose = false, bool readFromFile = false,
-              std::string localGraphFileName = "local_graph") 
+  DistGraphCartesianCut(const std::string& filename, const std::string&, 
+                        unsigned host, unsigned _numHosts, 
+                        std::vector<unsigned>& scalefactor, 
+                        bool transpose = false, bool readFromFile = false,
+                        std::string localGraphFileName = "local_graph") 
       : base_DistGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
@@ -345,8 +375,6 @@ public:
     std::vector<galois::graphs::BufferedGraph<EdgeTy>> bufGraph(DecomposeFactor);
 
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      //galois::gPrint("Host : ", base_DistGraph::id, " : ", nodeBegin[d], " , ", 
-      //               nodeEnd[d], "\n");
       bufGraph[d].loadPartialGraph(filename, nodeBegin[d], nodeEnd[d],
                                    *edgeBegin[d], *edgeEnd[d], 
                                    base_DistGraph::numGlobalNodes,
@@ -390,13 +418,16 @@ public:
 
     base_DistGraph::printStatistics();
 
-    loadEdges(base_DistGraph::graph, bufGraph); // second pass of the graph file
+    // second pass of the graph file
+    loadEdges(base_DistGraph::graph, bufGraph); 
 
     if (columnBlocked) {
-      // like an unconstrained vertex-cut
-      base_DistGraph::numNodesWithEdges = numNodes; // all nodes because it is not optimized
+      // like an unconstrained vertex-cut; all nodes because it is not optimized
+      // to know which nodes may have edges
+      base_DistGraph::numNodesWithEdges = numNodes; 
     }
 
+    // reclaim memory from buffered graphs
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       bufGraph[d].resetAndFree();
     }
@@ -423,6 +454,12 @@ public:
     Tgraph_construct_comm.stop();
   }
 
+private:
+  /**
+   * Pass to determine where the edges that this host will read will go and
+   * prepare metadata required to constructing the graph and sending off
+   * edges this host reads that do not belong to this host.
+   */
   void loadStatistics(
     std::vector<galois::graphs::BufferedGraph<EdgeTy>>& bufGraph,
     std::vector<uint64_t>& prefixSumOfEdges,
@@ -637,6 +674,8 @@ public:
     }
   }
 
+  //! Load our assigned edges and construct them in-memory. Receive edges read
+  //! by other hosts that belong to us and construct them as well.
   template<typename GraphTy>
   void loadEdges(GraphTy& graph, 
                  std::vector<galois::graphs::BufferedGraph<EdgeTy>>& bufGraph) {
@@ -673,6 +712,9 @@ public:
     }
   }
 
+  //! Read in our assigned edges, constructing them if they belong to this host
+  //! and sending them off to the correct host otherwise
+  //! Edge-data version
   template<typename GraphTy, 
            typename std::enable_if<
              !std::is_void<typename GraphTy::edge_data_type>::value
@@ -684,7 +726,7 @@ public:
 
     //XXX h_offset not correct
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      //h_offset is virual hostID for DecomposeFactor > 1.
+      // h_offset is virual hostID for DecomposeFactor > 1.
       unsigned h_offset = gridRowID() * numColumnHosts;
       galois::substrate::PerThreadStorage<VectorOfVector64> gdst_vecs(numColumnHosts);
       typedef std::vector<std::vector<typename GraphTy::edge_data_type>> DataVecVecTy;
@@ -768,6 +810,9 @@ public:
     net.flush();
   }
 
+  //! Read in our assigned edges, constructing them if they belong to this host
+  //! and sending them off to the correct host otherwise
+  //! No edge data version
   template<typename GraphTy, 
            typename std::enable_if<
              std::is_void<typename GraphTy::edge_data_type>::value
@@ -863,7 +908,7 @@ public:
   #else
   using optional_t = boost::optional<T>;
   #endif
-
+  //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
   template<typename GraphTy>
   void processReceivedEdgeBuffer(
     optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
@@ -888,6 +933,10 @@ public:
     }
   }
 
+  /**
+   * Receive the edge dest/data assigned to this host from other hosts
+   * that were responsible for reading them.
+   */
   template<typename GraphTy>
   void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -900,6 +949,10 @@ public:
     }
   }
 
+  /**
+   * Deserialize received edges and constructs them in our graph. No edge-data
+   * variant.
+   */
   template<typename GraphTy,
            typename std::enable_if<
              !std::is_void<typename GraphTy::edge_data_type>::value
@@ -917,6 +970,10 @@ public:
     }
   }
 
+  /**
+   * Deserialize received edges and constructs them in our graph. Edge-data
+   * variant.
+   */
   template<typename GraphTy,
            typename std::enable_if<
              std::is_void<typename GraphTy::edge_data_type>::value
@@ -931,6 +988,9 @@ public:
     }
   }
 
+  /**
+   * @copydoc DistGraphEdgeCut::fill_mirrorNodes
+   */
   void fillMirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes) {
     // mirrors for outgoing edges
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
@@ -983,7 +1043,7 @@ public:
       }
     }
   }
-
+public:
   bool is_vertex_cut() const {
     if (moreColumnHosts) {
       // IEC and OEC will be reversed, so do not handle it as an edge-cut
@@ -1030,7 +1090,6 @@ public:
     ar << numNodes;
     ar << numRowHosts;
     ar << numColumnHosts;
-
     // maps and vectors
     ar << localToGlobalVector;
     ar << globalToLocalMap;
@@ -1042,7 +1101,6 @@ public:
     ar >> numNodes;
     ar >> numRowHosts;
     ar >> numColumnHosts;
-
     // maps and vectors
     ar >> localToGlobalVector;
     ar >> globalToLocalMap;
