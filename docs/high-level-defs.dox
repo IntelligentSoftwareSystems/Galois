@@ -13,6 +13,10 @@ the user.
 @namespace galois::runtime
 Functions used by the Galois runtime. Use at your own risk.
 
+@namespace galois::runtime::internal
+Internal implementation functions used by Galois that shouldn't be called by 
+the user.
+
 @namespace galois::substrate
 TODO write a description for this.
 
