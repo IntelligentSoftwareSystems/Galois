@@ -18,7 +18,7 @@
  */
 
 /** 
- * @file DistributedGraph.h
+ * @file DistributedGraph.cpp
  * Contains command line argument defines for DistributedGraph.h.
  */
 
