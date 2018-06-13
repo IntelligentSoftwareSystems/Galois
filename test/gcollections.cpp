@@ -64,7 +64,7 @@ struct Heap<C, true> {
 };
 
 template<typename C>
-void testBasic(std::string prefix, C&& collection, int N) {
+void testBasic(std::string prefix, C&& collection, size_t N) {
   Heap<C, needs_heap<C>(0)> heap;
 
   assert(N > 0);
@@ -88,7 +88,7 @@ void testBasic(std::string prefix, C&& collection, int N) {
 }
 
 template<typename C>
-void testNormal(std::string prefix, C&& collection, int N) {
+void testNormal(std::string prefix, C&& collection, size_t N) {
   Heap<C, needs_heap<C>(0)> heap;
 
   assert(N > 0);

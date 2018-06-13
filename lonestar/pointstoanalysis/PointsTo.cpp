@@ -548,7 +548,7 @@ class PTABase {
 
       if (type == PtsToCons::AddressOf || type == PtsToCons::Copy) {
         addressCopyConstraints.push_back(cc);
-      } else if (type == PtsToCons::Load || PtsToCons::Store) {
+      } else if (type == PtsToCons::Load || type == PtsToCons::Store) {
         if (offset == 0) { // ignore load/stores with offsets
           loadStoreConstraints.push_back(cc);
         } 

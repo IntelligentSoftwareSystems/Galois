@@ -25,7 +25,6 @@ struct GetEnd {
 
 template<bool NonEmpty, class Tag, class D>
 void check_forward() {
-  typedef typename D::value_type I;
   D data;
 
   for (int i = 0; i < N; ++i) {
