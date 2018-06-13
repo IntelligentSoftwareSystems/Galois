@@ -1625,9 +1625,28 @@ private:
 
 
   /**
-   * TODO documentation
+   * Based on provided arguments, extracts the data that we are interested
+   * in sending into a send buffer. Lazy serialize variant that works with certain
+   * SeqTy.
    *
-   * Serialize lazy variant.
+   * @tparam FnTy structure that specifies how synchronization is to be done
+   * @tparam SeqTy Type of sequence that we are getting data from
+   * @tparam syncType either reduce or broadcast; used to determine if reseting
+   * the extracted field is necessary
+   * @tparam identity_offsets If this is true, then ignore the offsets
+   * array and just grab directly from indices (i.e. don't pick out
+   * particular elements, just grab contiguous chunk)
+   * @tparam parallelize Determines if parallelizing the extraction is done or
+   * not
+   *
+   * @param loopName name of loop used to name timer
+   * @param indices Local ids of nodes that we are interested in
+   * @param size Number of elements to extract
+   * @param offsets Holds offsets into "indices" of the data that we are 
+   * interested in
+   * @param b send buffer to extract data into
+   * @param lseq sequence to get data from
+   * @param start Offset into send buffer to start saving data to
    */
   template<typename FnTy, typename SeqTy, SyncType syncType, 
            bool identity_offsets = false, bool parallelize = true>
@@ -1676,10 +1695,10 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be reduce
    *
-   * @param x 
+   * @param x node id to extract from
    * @param v vector to extract data to
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1693,10 +1712,10 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be broadcast
    *
-   * @param x 
+   * @param x node id to extract from
    * @param v vector to extract data to
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -1713,14 +1732,14 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be reduce
    *
-   * @param x 
+   * @param x node id to extract from
    * @param b
    * @param o 
    * @param v
    * @param s
    * @param data_mode
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -1741,14 +1760,14 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be broadcast
    *
-   * @param x 
+   * @param x node id to extract from
    * @param b
    * @param o 
    * @param v
    * @param s
    * @param data_mode
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -2005,10 +2024,10 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be reduce
    *
-   * @param x
+   * @param x node id to set
    * @param v 
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -2022,10 +2041,10 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be broadcast
    *
-   * @param x
+   * @param x node id to set
    * @param v 
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -2040,14 +2059,14 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be reduce
    *
-   * @param x
+   * @param x node id to set
    * @param b
    * @param o
    * @param v 
    * @param s
    * @param data_mode
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
@@ -2066,14 +2085,14 @@ private:
    * @tparam FnTy structure that specifies how synchronization is to be done
    * @tparam SyncType Must be broadcast
    *
-   * @param x
+   * @param x node id to set
    * @param b
    * @param o
    * @param v 
    * @param s
    * @param data_mode
    *
-   * @returns TODO
+   * @returns true if called on GPU device
    */
   template<typename FnTy, SyncType syncType, 
            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
@@ -2601,7 +2620,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO documentation
+   * Sync using MPI instead of network layer.
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -2638,7 +2657,7 @@ private:
   }
 
   /**
-   * TODO documentation
+   * Sync put using MPI instead of network layer
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -3005,7 +3024,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO documentation
+   * MPI Irecv wrapper for sync
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -3022,7 +3041,7 @@ private:
   }
 
   /**
-   * TODO documentation
+   * MPI receive wrapper for sync
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -3047,7 +3066,7 @@ private:
   }
   
   /**
-   * TODO documentation
+   * MPI get wrapper for sync
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -3131,7 +3150,7 @@ private:
   
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
   /**
-   * TODO documentation
+   * Nonblocking MPI sync
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -3186,7 +3205,7 @@ private:
   }
 
   /**
-   * TODO documentation
+   * Onesided MPI sync
    */
   template<WriteLocation writeLocation, ReadLocation readLocation,
            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
@@ -4077,9 +4096,7 @@ public:
 #endif
 
   /**
-   * Set the run number. (contrary to what the function name is)
-   *
-   * TODO rename, then fix across apps
+   * Set the run number.
    *
    * @param runNum Number to set the run to
    */
@@ -4107,9 +4124,11 @@ public:
 
   /**
    * Get a run identifier using the set run and set round.
-   * Deprecated: use the other one below where possible
    *
    * @returns a string run identifier
+   * @deprecated We want to move away from calling this by itself; use ones
+   * that take an argument; will be removed once we eliminate all instances
+   * of its use from code
    */
   inline std::string get_run_identifier() const {
     #if DIST_PER_ROUND_TIMER
