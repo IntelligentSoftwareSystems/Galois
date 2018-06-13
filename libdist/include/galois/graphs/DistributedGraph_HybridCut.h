@@ -802,7 +802,7 @@ private:
     net.flush();
   }
 
-  // used below
+  // optional typedef used below
   template<typename T>
   #if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
   using optional_t = std::experimental::optional<T>;

@@ -265,6 +265,7 @@ public:
   virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar, const unsigned int version = 0) const{}
   //! Deserialize a graph
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar, const unsigned int version = 0){};
+  //! Gets the mirror node ranges on this graph
   //! @returns Range of mirror nodes on this graph
   virtual std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const = 0;
 
