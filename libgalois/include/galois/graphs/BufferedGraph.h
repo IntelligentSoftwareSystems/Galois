@@ -267,7 +267,7 @@ public:
    * @returns the total number of nodes in the graph (not just local loaded 
    * nodes)
    */
-  const uint32_t size() const {
+  uint32_t size() const {
     return globalSize;
   }
 
@@ -275,7 +275,7 @@ public:
    * @returns the total number of edges in the graph (not just local loaded 
    * edges)
    */
-  const uint32_t sizeEdges() const {
+  uint32_t sizeEdges() const {
     return globalEdgeSize;
   }
 
