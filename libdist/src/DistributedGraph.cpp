@@ -19,7 +19,7 @@
 
 /** 
  * @file DistributedGraph.cpp
- * Contains command line argument defines for DistributedGraph.h.
+ * Contains command line argument defines for the distributed runtime.
  */
 
 #include <galois/graphs/DistributedGraph.h>
