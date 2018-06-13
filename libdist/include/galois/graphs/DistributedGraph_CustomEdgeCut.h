@@ -47,23 +47,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     //! typedef for base DistGraph class
     using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
-    // Utilities for reading partitioned graphs follow
-
-    /**
-     * Structure for storing node information
-     */
-    struct NodeInfo {
-      NodeInfo() 
-        : local_id(0), global_id(0), owner_id(0) { }
-      NodeInfo(size_t l, size_t g, size_t o) 
-        : local_id(l), global_id(g), owner_id(o) { }
-      size_t local_id;
-      size_t global_id;
-      size_t owner_id;
-    };
-
-
-    std::vector<NodeInfo> localToGlobalMap_meta;
     //! store the ownerIDs sorted according to the global IDs
     std::vector<size_t> OwnerVec; 
     std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
@@ -92,12 +75,6 @@ class DistGraph_customEdgeCut : public DistGraph<NodeTy, EdgeTy> {
     //! @warning this is broken; use at own risk
     unsigned getHostID(uint64_t gid) const {
       auto lid = G2L(gid);
-      return OwnerVec[lid];
-    }
-
-    //! @todo this is broken
-    //! @warning this is broken; use at own risk
-    size_t getOwner_lid(size_t lid) const {
       return OwnerVec[lid];
     }
 
