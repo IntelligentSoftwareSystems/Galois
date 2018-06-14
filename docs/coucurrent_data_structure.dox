@@ -1,0 +1,138 @@
+/**
+\page concurrent_data_structure Concurrent Data Structure
+
+\tableofcontents
+
+@section galois_graphs Parallel Graphs
+
+For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with the Galois runtime system. All graphs are in namespace galois::graphs.
+
+@image html galois_parallel_graphs.png "Galois Parallel Graphs"
+
+There are two types of graphs, summarized pictorially as the above hierarchy.
+<ol>
+<li> galois::graphs::MorphGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) node removals are impossible, and (2) when a node is created, its maximum degree is known.
+<li> galois::graphs::LC_CSR_Graph: It disallows creation and removal of nodes and edges. Internally, it is implemented with compressed sparse row format, as shown in the following figure. Undirected edges are represented as two directed edges. Galois also provides variants of this graph with different storage representations, e.g. galois::graphs::LC_InlineEdge_Graph, galois::graphs::LC_Linear_Graph, galois::graphs::LC_InOut_Graph.
+</ol>
+
+@htmlonly
+<style>div.image img[src="csr_format_example.png"]{width:50%}</style>
+@endhtmlonly
+@image html csr_format_example.png "Graph in CSR Format"
+
+
+@subsection lc_graphs Label-Computation Graphs
+
+<h4>Template Parameters</h4>
+
+When defining a galois::graphs::LC_CSR_Graph, provide as template parameters the following:
+<ol>
+<li>NodeTy: the type of data stored on each node. This is a must. Use void when no data needs to be stored on nodes.
+<li>EdgeTy: the type of data stored on each edge. This is a must. Use void when no data needs to be stored on edges.
+<li>HasNoLockable: a boolean value indicating whether abstract node locks are removed. The default value is false.
+<li>UseNumaAlloc: a boolean value indicating whether NUMA-aware allocation is used. The default value is false.
+<li>HasOutOfLineLockable: a boolean variable indicating whether node locks are separated from nodes. The default value is false.
+</ol>
+
+See galois::graphs::LC_CSR_Graph for details. Below is an example of defining an LC_CSR_Graph with integer as its node data type and edge data type:
+
+@snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Define LC_CSR_Graph
+
+<h4>APIs</h4>
+
+The following code snippet shows how to instantiate and read in a graph from a file (in binary gr format):
+
+@snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Read a graph
+
+To access graph elements, use the following constructs.
+<ol>
+<li> Iteration over nodes: use the node iterator galois::graphs::LC_CSR_Graph::iterator given by galois::graphs::LC_CSR_Graph::begin and galois::graphs::LC_CSR_Graph::end.
+<li> Iteration over outgoing edges of a node: use the edge iterator galois::graphs::LC_CSR_Graph::edge_iterator given by galois::graphs::LC_CSR_Graph::edge_begin and galois::graphs::LC_CSR_Graph::edge_end. By default, the outgoing neighbors of the node are locked by these operations.
+<li> To read/write a node data: use galois::graphs::LC_CSR_Graph::getData. By default, the node is locked by this operation.
+<li> To read/write an edge data: use galois::graphs::LC_CSR_Graph::getEdgeData.
+<li> To access the destination node of an outgoing edge: use galois::graphs::LC_CSR_Graph::getEdgeDst.
+<li> To query the number of nodes: use galois::graphs::LC_CSR_Graph::size.
+<li> To query the number of outgoing edges: use galois::graphs::LC_CSR_Graph::sizeEdges.
+</ol>
+
+See galois::graphs::LC_CSR_Graph for other available APIs.
+
+The following example from {@link lonestar/tutorial_examples/GraphTraversalSerial.cpp} iterates through all nodes, and for each node, adds all outgoing edges' weights to the node data. This example is written in C++11 to avoid mentioning node iterators and edge iterators explicitly.
+
+@snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Graph traversal
+
+To avoid locking nodes and conflict detection, pass galois::MethodFlag::UNPROTECTED to getData(), edge_begin(), edge_end() or edges() as the following example from {@link lonestar/tutorial_examples/ConflictAwareTorus.cpp}:
+
+@snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Turn off conflict detection
+
+<h4>Different Storage Formats</h4>
+
+
+<h4>Track Incoming Edges</h4>
+
+
+@subsection morph_graphs Morph Graphs
+
+If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::MorphGraph.
+
+<h4>Template Parameters for galois::graphs::MorphGraph</h4>
+
+
+
+<h4>APIs for galois::graphs::MorphGraph</h4>
+
+galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
+
+<ol>
+<li> galois::graphs::MorphGraph::createNode allocates space for node data, and galois::graphs::MorphGraph::addNode adds a node to a graph so the node can be found later by graph APIs.
+<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes to a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge. When tracked, the incoming/symmetric counterpart will also be added.
+<li> galois::graphs::MorphGraph::removeNode removes from a graph a node and edges connecting to/from the node.
+<li> galois::graphs::MorphGraph::removeEdge removes from a graph an edge and its incoming/symmetric counterpart, if there is any.
+</ol>
+
+See galois::graphs::MorphGraph for other available APIs.
+
+Let us use galois::graphs::MorphGraph to construct and represent a two-dimensional torus. To define a galois::graphs::MorphGraph, you must provide as template parameters NodeTy, the type of node data; EdgeTy, the type of edge data; and a boolean value indicating whether or not this is a directed graph. The following code snippet shows an example of defining a galois::graphs::MorphGraph. See galois::graphs::MorphGraph for details about other optional template parameters.
+
+@snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a MorphGraph
+
+The following code snippet shows how to add nodes and edges to a galois::graphs::MorphGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::MorphGraph, and finally add edges in between the nodes.
+
+@snippet lonestar/tutorial_examples/TorusConstruction.cpp Construct torus
+
+See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
+
+<h4>galois::graphs::LC_Morph_Graph</h4>
+
+If node removals are not allowed and the maximum degree of a node is known when creating the node, then galois::graphs::LC_Morph_Graph can be used.
+
+Template Parameters
+
+APIs and differences from MorphGraph
+
+galois::graphs::LC_Morph_Graph::createNode will allocate node data and add the node to the graph.
+galois::graphs::LC_Morph_Graph::addEdge and galois::graphs::LC_Morph_Graph::removeEdge will not add/remove the symmetric counterpart.
+
+@section insert_bag Insert Bag
+
+galois::InsertBag is an unordered collection allowing parallel insertions. It uses customized memory allocations to achieve scalable parallel insertions. 
+
+galois::InsertBag has two template parameters:
+<ol>
+<li> T: Type of elements that the galois::InsertBag contains.
+<li> BlockSize: The maximum memory that the elements to be inserted can take per thread. In other words, BlockSize is equal to the product of the size of one element and the maximum number of elements one thread will insert into the bag. This parameter is optional and the default value is 0, which stands for one memory page.
+</ol>
+
+An example of defining a galois::InsertBag follows:
+
+@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag
+
+galois::InsertBag::emplace is used to insert copies of elements. Its parameters will be passed to the constuctor of the type of the elements to create the element in the bag. galois::InsertBag::push is a shortcut of galois::InsertBag::emplace to call the copy or move constuctor of the type of the elements. An example of inserting elements into a galois::InsertBag follows:
+
+@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag
+
+Accessing the elements is only allowed in serial. galois::InsertBag::begin and galois::InsertBag::end are used to access the elements. galois::InsertBag::empty is used to check if the bag is empty. An example of accessing elements inside a galois::InsertBag follows. Note that this example is written in C++11 to avoid mentioning galois::InsertBag::begin and galois::InsertBag::end explicitly.
+
+@snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
+
+*/
