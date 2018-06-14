@@ -33,7 +33,7 @@ Galois is different from other models in the following two ways.
 A Galois user program consists of operators, schedules and data structure API calls. The Galois library implements schedulers and data structures, which are built upon thread primitives and memory allocators. This is summarized by the following figure.
 
 @htmlonly
-<style>div.image img[src="galois_program_structure.png"]{width:40%}</style>
+<style>div.image img[src="galois_program_structure.png"]{width:50%}</style>
 @endhtmlonly
 @image html galois_program_structure.png "Structure of a Galois Program"
 
@@ -47,12 +47,12 @@ Below we will cover parallel data structures, parallel loop iterators, and workl
 
 For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with the Galois runtime system. All graphs are in namespace galois::graphs. There are two types of graphs:
 <ol>
-<li> galois::graphs::MorphGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) only insertions of nodes and edges are possible, and (2) when a node is created, its maximum degree is known.
+<li> galois::graphs::MorphGraph: It allows insertion and removal of nodes and edges. It is used in morph algorithms like delaunay mesh refinement. A variation called galois::graphs::LC_Morph_Graph can be used if (1) node removals are impossible, and (2) when a node is created, its maximum degree is known.
 <li> galois::graphs::LC_CSR_Graph: It disallows creation and removal of nodes and edges. Internally, it is implemented with compressed sparse row format, as shown in the following figure. Undirected edges are represented as two directed edges. Galois also provides variants of this graph with different storage representations, e.g. galois::graphs::LC_InlineEdge_Graph, galois::graphs::LC_Linear_Graph, galois::graphs::LC_InOut_Graph.
 </ol>
 
 @htmlonly
-<style>div.image img[src="csr_format_example.png"]{width:40%}</style>
+<style>div.image img[src="csr_format_example.png"]{width:50%}</style>
 @endhtmlonly
 @image html csr_format_example.png "Graph in CSR Format"
 
