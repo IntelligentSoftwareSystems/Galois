@@ -250,7 +250,7 @@ For galois::do_all loops, only time and iterations are reported, since there are
 TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value is the sum of all threads' contributions; TMAX means it is the maximum among all threads for this statistic. TOTAL_TYPE is usually a reduction operation.
 
 
-@subsection galois_first_graph_api MorphGraph APIs
+@subsection galois_morph_graph_api MorphGraph APIs
 
 If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::MorphGraph. galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
 
