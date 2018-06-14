@@ -13,7 +13,7 @@
 //! @todo document the enums in doxygen
 enum DataCommMode { 
   noData, //!< send no data
-  bitsetData
+  bitsetData,
   offsetsData,
   gidsData,
   onlyData,
