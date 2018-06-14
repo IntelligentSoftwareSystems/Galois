@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -15,6 +15,14 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/**
+ * @file NetworkIO.h
+ *
+ * Contains NetworkIO, a base class that is inherited by classes that want to
+ * implement the communication layer of Galois. (e.g. NetworkIOMPI and 
+ * NetworkIOLWCI)
  */
 
 #ifndef GALOIS_RUNTIME_NETWORKTHREAD_H
@@ -36,11 +44,16 @@
 
 namespace galois {
 namespace runtime {
+
+/**
+ * Class for the network IO layer which is responsible for doing sends/receives
+ * of data. Used by the network interface to do the actual communication.
+ */
 class NetworkIO {
 protected:
   /**
-   * Wrapper for dealing with MPI error codes. Dies if the error code isn't
-   * MPI_SUCCESS.
+   * Wrapper for dealing with MPI error codes. Program dies if the error code 
+   * isn't MPI_SUCCESS.
    *
    * @param rc Error code to check for success
    */
@@ -50,41 +63,63 @@ protected:
     }
   }
 
+  //! memory usage tracker
   MemUsageTracker& memUsageTracker;
 public:
+  /**
+   * Message structure for sending data across the network.
+   */
   struct message {
-    uint32_t host;
-    uint32_t tag;
-    std::vector<uint8_t> data;
+    uint32_t host; //!< destination of this message
+    uint32_t tag; //!< tag on message indicating distinct communication phases
+    std::vector<uint8_t> data; //!< data portion of message
 
-    message() :host(~0), tag(~0) {}
+    //! Default constructor initializes host and tag to large numbers.
+    message() : host(~0), tag(~0) {}
+    //! @param h Host to send message to
+    //! @param t Tag to associate with message
+    //! @param d Data to save in message
     message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) 
       : host(h), tag(t), data(d) {}
 
+    //! A message is valid if there is data to be sent
+    //! @returns true if data is non-empty
     bool valid() const { return !data.empty(); }
   };
 
+  //! The default constructor takes a memory usage tracker and saves it
+  //! @param tracker reference to a memory usage tracker used by the system
   NetworkIO(MemUsageTracker& tracker): memUsageTracker(tracker) {}
 
+  //! Default destructor does nothing.
   virtual ~NetworkIO();
-  
-  // Takes ownership of data buffer
+  //! Queues a message for sending out. Takes ownership of data buffer.
   virtual void enqueue(message m) = 0;
-  // Returns empty if no message
+  //! Checks to see if a message is here for this host to receive. If so, take
+  //! and return it
+  //! @returns an empty message if no message
   virtual message dequeue() = 0;
-  // Make progress.  other functions don't have to
+  //! Make progress. Other functions don't have to make progress.
   virtual void progress() = 0;
-
-  //void operator() () -- make progress
-  //bool readySend() -- can send
-  //bool readyRecv() -- packet waiting
-  //void send(const message&) -- send data
-  //message recv() -- receive data
 };
 
-std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
+/**
+ * Creates/returns a network IO layer that uses MPI to do communication.
+ *
+ * @returns tuple with pointer to the MPI IO layer, this host's ID, and the total
+ * number of hosts in the system
+ */
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
+makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
 #ifdef GALOIS_USE_LWCI
-std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker);
+/**
+ * Creates/returns a network IO layer that uses LWCI to do communication.
+ *
+ * @returns tuple with pointer to the LWCI IO layer, this host's ID, and the total
+ * number of hosts in the system
+ */
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
+makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker);
 #endif
 
 } //namespace runtime

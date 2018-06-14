@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file NetworkIOLWCI.cpp
+ *
+ * Contains an implementation of network IO that uses LWCI.
+ */
+
 #ifdef GALOIS_USE_LWCI
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
@@ -32,9 +38,14 @@
 #include "ittnotify.h"
 #endif
 
+// forward declaration
 class NetworkIOLWCI;
+//! Pointer to LCI channel
 lch* mv;
 
+/**
+ * Message used by the LCI network IO layer.
+ */
 struct mpiMessage {
   lc_ctx ctx;
   uint32_t rank;
@@ -47,16 +58,14 @@ struct mpiMessage {
     rank(r), tag(t), buf(std::move(b))  {};
 };
 
-void* alloc_cb(void* ctx, size_t size)
-{
+void* alloc_cb(void* ctx, size_t size) {
   lc_mem_fence();
   mpiMessage* msg = (mpiMessage*) ctx;
   msg->buf.resize(size);
   return msg->buf.data();
 }
 
-void thread_signal(void* signal) 
-{
+void thread_signal(void* signal) {
   mpiMessage* msg = (mpiMessage*) signal;
   delete msg;
 }
@@ -74,7 +83,7 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
   }
 
   /**
-   * Initializes LWCI's communication layer.
+   * Initializes LWCI's communication layer. (even though it says initMPI...)
    */
   std::pair<int, int> initMPI() {
     lc_open(&mv, 1);
@@ -86,14 +95,24 @@ class NetworkIOLWCI : public galois::runtime::NetworkIO {
   int save;
 
 public:
+  /**
+   * Constructor.
+   *
+   * @param tracker memory usage tracker
+   * @param [out] ID this machine's host id
+   * @param [out] NUM total number of hosts in the system
+   */
   NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM) 
-    : NetworkIO(tracker) {
+      : NetworkIO(tracker) {
     auto p = initMPI();
     ID = p.first;
     NUM = p.second;
     save = ID;
   }
 
+  /**
+   * Closes the LCI channel
+   */
   ~NetworkIOLWCI() {
     lc_close(mv);
   }
@@ -156,13 +175,12 @@ public:
  * @returns Tuple with a pointer to the LWCI network IO as well as the id of
  * the caller in the network layer + total number of hosts in the system.
  */
-std::tuple<std::unique_ptr<galois::runtime::NetworkIO>,
-                           uint32_t,
-                           uint32_t> galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker) {
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t> 
+galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker) {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOLWCI(tracker, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 
 void main_task(intptr_t) {}
-#endif
+#endif // end the ifdef LWCI
