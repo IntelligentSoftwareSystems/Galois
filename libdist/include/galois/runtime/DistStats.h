@@ -306,7 +306,7 @@ namespace internal {
  *
  * @param region Region name to give statistic
  * @param category Category of statistic
- * @param val Value of the statistic
+ * @param value Value of the statistic
  * @param thrdTotalTy The type of reduction used to combine thread statistics
  * of the same kind
  * @param hTotalTy The type of reduction used to combine host statistics
