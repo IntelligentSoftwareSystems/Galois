@@ -208,6 +208,7 @@ const int roundShift = 4; //! round sizes are portional to (1 << roundsShift)
 static void copyPointsFromRounds(PointList& points, Rounds& rounds) {
   for (int i = maxRounds - 1; i >= 0; --i) {
 //! [Access elements of InsertBag]
+    // PtrPoints expands to galois::InsertBag<Point*>
     PtrPoints& pptrs = *rounds[i];
     for (auto ii: pptrs) {
       points.push_back(*ii);
@@ -341,6 +342,7 @@ struct ReadInput {
     // Now, handle boundary points
     size_t last = points.size();
     //! [Insert elements into InsertBag]
+    // basePoints is of type galois::InsertBag<Point>
     Point* p1 = &(basePoints.push(points[last-1]));
     Point* p2 = &(basePoints.push(points[last-2]));
     Point* p3 = &(basePoints.push(points[last-3]));
@@ -703,6 +705,7 @@ int main(int argc, char** argv) {
 
   //! All Point* refer to elements in this bag
   //! [Define InsertBag]
+  // BasePoints expands to galois::InsertBag<Point>
   BasePoints basePoints;
   //! [Define InsertBag]
 
