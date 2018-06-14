@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -50,14 +50,14 @@ public:
   SendBlock* allocSendBlock();
   void freeSendBlock(SendBlock*);
 
-  //! send a block.  data is now owned by the Backend
+  //! Send a block; data is now owned by the Backend
   virtual void send(SendBlock* data) = 0;
   
-  //! recieve a message, data is owned by the caller
-  //1 and must be returned to this class
+  //! Recieve a message; data is now owned by the caller
+  //! and must be returned to this class
   virtual SendBlock* recv() = 0;
 
-  //! make progress
+  //! Make progress
   virtual void flush(bool block = false) = 0;
 
   //! returns size used by network
@@ -65,13 +65,43 @@ public:
 
   uint32_t ID() const { return _ID; }
   uint32_t Num() const { return _Num; }
-
 };
-
 
 NetworkBackend& getSystemNetworkBackend();
 
-}
-}
+// implementations copied over from Network.cpp
+//NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
+//  //FIXME: review for TBAA rules
+//  std::lock_guard<substrate::SimpleLock> lg(flLock);
+//  SendBlock* retval = nullptr;
+//  if (freelist.empty()) {
+//    unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());
+//    retval = new (data) SendBlock(data + sizeof(SendBlock));
+//  } else {
+//    retval = &freelist.front();
+//    freelist.pop_front();
+//    retval->size = 0;
+//    retval->dest = ~0;
+//  }
+//  return retval;
+//}
+//
+//void NetworkBackend::freeSendBlock(SendBlock* sb) {
+//  std::lock_guard<substrate::SimpleLock> lg(flLock);
+//  freelist.push_front(*sb);
+//}
+//
+//NetworkBackend::~NetworkBackend() {
+//  while (!freelist.empty()) {
+//    SendBlock* sb = &freelist.front();
+//    freelist.pop_front();
+//    sb->~SendBlock();
+//    free(sb);
+//  }
+//}
+//
+//NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
+} // end runtime
+} // end galois
 #endif

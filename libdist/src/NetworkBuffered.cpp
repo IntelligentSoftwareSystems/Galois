@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -15,6 +15,16 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+
+/**
+ * @file NetworkBuffered.cpp
+ *
+ * Contains NetworkInterfaceBuffered, an implementation of a network interface
+ * that buffers messages before sending them out.
+ *
+ * @todo document this file more
  */
 
 #include "galois/runtime/Network.h"
@@ -34,9 +44,17 @@ using namespace galois::runtime;
 using namespace galois::substrate;
 
 namespace {
+
+/**
+ * @class NetworkInterfaceBuffered
+ *
+ * Buffered network interface: messages are buffered before they are sent out.
+ * A single worker thread is initialized to send/receive messages from/to 
+ * buffers.
+ */
 class NetworkInterfaceBuffered : public NetworkInterface {
-  static const int COMM_MIN = 1400; // bytes (sligtly smaller than an ethernet packet)
-  static const int COMM_DELAY = 100; // microseconds
+  static const int COMM_MIN = 1400; //! bytes (sligtly smaller than an ethernet packet)
+  static const int COMM_DELAY = 100; //! microseconds delay
 
   unsigned long statSendNum;
   unsigned long statSendBytes;
@@ -45,6 +63,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   unsigned long statRecvBytes;
   unsigned long statRecvDequeued;
 
+  /**
+   * Receive buffers for the buffered network interface
+   */
   class recvBuffer {
     std::deque<NetworkIO::message> data;
     size_t frontOffset;
@@ -151,7 +172,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       //FIXME: This is slows things down 25%
       copyOut((char*)buf.linearData(), len);
       erase(len);
-      //      std::cerr << "p " << tag << " " << len << "\n";
+      //std::cerr << "p " << tag << " " << len << "\n";
       return optional_t<RecvBuffer>(std::move(buf));
       #else
       if (data.empty() || data.front().tag != tag)
@@ -177,13 +198,13 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         galois::runtime::trace("ADD LATEST ", m.tag);
         dataPresent = m.tag;
       }
+
       // std::cerr << m.data.size() << " " << 
       //              std::count(m.data.begin(), m.data.end(), 0) << "\n";
       // for (auto x : m.data) {
       //   std::cerr << (int) x << " ";
       // }
       // std::cerr << "\n";
-
       // std::cerr << "A " << m.host << " " << m.tag << " " << m.data.size() << "\n";
 
       data.push_back(std::move(m));
@@ -205,6 +226,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   std::vector<recvBuffer> recvData;
   std::vector<SimpleLock> recvLock;
 
+  /**
+   * Send buffers for the buffered network interface
+   */
   class sendBuffer {
     struct msg {
       uint32_t tag;
@@ -216,7 +240,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::deque<msg> messages;
     std::atomic<size_t> numBytes;
     std::atomic<unsigned> urgent;
-    //FIXME: track time since some epoch in an atomic.
+    //! @todo FIXME track time since some epoch in an atomic.
     std::chrono::high_resolution_clock::time_point time;
     SimpleLock lock, timelock;
 
@@ -328,8 +352,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   std::vector<sendBuffer> sendData;
 
   void workerThread() {
+    // Initialize LWCI or MPI depending on what was defined in CMake
     #ifdef GALOIS_USE_LWCI
-    // Initialize LWCI before MPI
+    // Initialize LWCI
     std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker);
     if (ID == 0) fprintf(stderr, "**Using LWCI Communication layer**\n");
     #else
@@ -348,9 +373,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
-    #endif
-
-    #ifndef GALOIS_USE_LWCI
     std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
     #endif
 
@@ -360,9 +382,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
-      for(unsigned i = 0; i < sendData.size(); ++i) {
+      for (unsigned i = 0; i < sendData.size(); ++i) {
         netio->progress();
-        //handle send queue i
+        // handle send queue i
         auto& sd = sendData[i];
         if (sd.ready()) {
           NetworkIO::message msg;
@@ -373,7 +395,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           ++statSendEnqueued;
           netio->enqueue(std::move(msg));
         }
-        //handle receive
+        // handle receive
         NetworkIO::message rdata = netio->dequeue();
         if (rdata.data.size()) {
           ++statRecvDequeued;
@@ -408,6 +430,17 @@ public:
   virtual ~NetworkInterfaceBuffered() {
     ready = 3;
     worker.join();
+
+    // disable MPI if LWCI wasn't used
+    #ifndef GALOIS_USE_LWCI
+    int finalizeSuccess = MPI_Finalize();
+
+    if (finalizeSuccess != MPI_SUCCESS) {
+      MPI_Abort(MPI_COMM_WORLD, finalizeSuccess);
+    }
+  
+    galois::gDebug("[", NetworkInterface::ID, "] MPI finalized");
+    #endif
   }
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;
@@ -444,7 +477,7 @@ public:
         }
       }
       galois::runtime::trace("recvTagged BLOCKED this by that", tag, rq.getPresentTag());
-#if 0
+      #if 0
       else if (rq.getPresentTag() != ~0){
         galois::runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
         if (recvLock[h].try_lock()) {
@@ -462,20 +495,21 @@ public:
           }
         }
       }
-#endif
+      #endif
     }
+
     return optional_t<std::pair<uint32_t, RecvBuffer>>();
   }
 
   virtual void flush() {
-    for (auto& sd : sendData)
-      sd.markUrgent();
+    for (auto& sd : sendData) sd.markUrgent();
   }
 
   virtual unsigned long reportSendBytes() const { return statSendBytes; }
   virtual unsigned long reportSendMsgs() const { return statSendNum; }
   virtual unsigned long reportRecvBytes() const { return statRecvBytes; }
   virtual unsigned long reportRecvMsgs() const { return statRecvNum; }
+
   virtual std::vector<unsigned long> reportExtra() const {
     std::vector<unsigned long> retval(5);
     for (auto& sd : sendData) {
@@ -526,5 +560,6 @@ NetworkInterface& galois::runtime::makeNetworkBuffered() {
       net.store(tmp);
     }
   }
+
   return *tmp;
 }
