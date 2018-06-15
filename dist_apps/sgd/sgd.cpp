@@ -101,15 +101,15 @@ double calcPrediction (const NodeData& movie_data, const NodeData& user_data) {
   double pred = galois::innerProduct(movie_data.latent_vector, 
                                      user_data.latent_vector, 
                                      0.0); 
-  double p = pred;
+  //double p = pred;
 
   pred = std::min(MAXVAL, pred);
   pred = std::max(MINVAL, pred);
 
-  #ifndef NDEBUG
-  if (p != pred)
-    std::cerr << "clamped " << p << " to " << pred << "\n";
-  #endif
+  //#ifndef NDEBUG
+  //if (p != pred)
+  //  std::cerr << "clamped " << p << " to " << pred << "\n";
+  //#endif
 
   return pred;
 }
