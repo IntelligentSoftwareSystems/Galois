@@ -7,6 +7,9 @@
 
 For graph computation, Galois provides unified, standard APIs to access graph elements and a set of graph implementations optimized for NUMA-awareness, conflict detection and interoperability with the Galois runtime system. All graphs are in namespace galois::graphs.
 
+@htmlonly
+<style>div.image img[src="galois_parallel_graphs.png"]{width:70%}</style>
+@endhtmlonly
 @image html galois_parallel_graphs.png "Galois Parallel Graphs"
 
 There are two types of graphs, summarized pictorially as the above hierarchy.
@@ -16,27 +19,31 @@ There are two types of graphs, summarized pictorially as the above hierarchy.
 </ol>
 
 @htmlonly
-<style>div.image img[src="csr_format_example.png"]{width:50%}</style>
+<style>div.image img[src="csr_format_example.png"]{width:70%}</style>
 @endhtmlonly
 @image html csr_format_example.png "Graph in CSR Format"
 
 
-@subsection lc_graphs Label-Computation Graphs
+@subsection lc_graphs Label-computation Graphs
 
 <h4>Template Parameters</h4>
 
-When defining a galois::graphs::LC_CSR_Graph, provide as template parameters the following:
+When defining a galois::graphs::LC_CSR_Graph, you must provide the following template parameters:
 <ol>
-<li>NodeTy: the type of data stored on each node. This is a must. Use void when no data needs to be stored on nodes.
-<li>EdgeTy: the type of data stored on each edge. This is a must. Use void when no data needs to be stored on edges.
-<li>HasNoLockable: a boolean value indicating whether abstract node locks are removed. The default value is false.
-<li>UseNumaAlloc: a boolean value indicating whether NUMA-aware allocation is used. The default value is false.
-<li>HasOutOfLineLockable: a boolean variable indicating whether node locks are separated from nodes. The default value is false.
+<li>NodeTy: the type of data stored on each node. Use void when no data needs to be stored on nodes.
+<li>EdgeTy: the type of data stored on each edge. Use void when no data needs to be stored on edges.
 </ol>
 
-See galois::graphs::LC_CSR_Graph for details. Below is an example of defining an LC_CSR_Graph with integer as its node data type and edge data type:
+Also you can turn on the following features by specifying them with graph declaration.
+<ol>
+<li>Use galois::graphs::LC_CSR_Graph::with_no_lockable< true >::type to remove abstract node locks and conflict detections.
+<li>Use galois::graphs::LC_CSR_Graph::with_numa_alloc< true >::type to enable NUMA-aware allocation.
+<li>Use galois::graphs::LC_CSR_Graph::with_out_of_line_lockable< true >::type to separate node locks from nodes.
+</ol>
 
-@snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Define LC_CSR_Graph
+See galois::graphs::LC_CSR_Graph for details. Below is an example of defining an LC_CSR_Graph with node data of type std::atomic<uint32_t>, edge data of type uint32_t, node locks removed and NUMA-aware allocation enabled:
+
+@snippet lonestar/sssp/SSSP.cpp withnumaalloc
 
 <h4>APIs</h4>
 
@@ -55,7 +62,7 @@ To access graph elements, use the following constructs.
 <li> To query the number of outgoing edges: use galois::graphs::LC_CSR_Graph::sizeEdges.
 </ol>
 
-See galois::graphs::LC_CSR_Graph for other available APIs.
+See galois::graphs::LC_CSR_Graph for other available APIs, e.g. those for sorting edges for a node and finding a specific edge.
 
 The following example from {@link lonestar/tutorial_examples/GraphTraversalSerial.cpp} iterates through all nodes, and for each node, adds all outgoing edges' weights to the node data. This example is written in C++11 to avoid mentioning node iterators and edge iterators explicitly.
 
@@ -67,9 +74,40 @@ To avoid locking nodes and conflict detection, pass galois::MethodFlag::UNPROTEC
 
 <h4>Different Storage Formats</h4>
 
+Galois provides two variants for galois::graphs::LC_CSR_Graph: galois::graphs::LC_InlineEdge_Graph and galois::graphs::LC_Linear_Graph. They all support the same functionalities but with different storage formats, as shown in the following figure.
+
+@htmlonly
+<style>div.image img[src="galois_lc_graphs_example.png"]{width:70%}</style>
+@endhtmlonly
+@image html galois_lc_graphs_example.png "Differences of Galois label-computation graphs"
+
+galois::graphs::LC_Adaptor_Graph can be used to create your own data representation while having the same APIs as for galois::graphs::LC_CSR_Graph.
 
 <h4>Track Incoming Edges</h4>
 
+galois::graphs::LC_InOut_Graph can be used if the desired computation needs to track incoming edges. Below is an example of defining a galois::graphs::LC_InOut_Graph:
+
+@code
+using InnerGraph = galois::graphs::LC_CSR_Graph<int, void>::with_no_lockable< true >::type;
+using Graph = galois::graphs::LC_InOut_Graph<InnerGraph>;
+using GNode = Graph::GraphNode;
+@endcode
+
+If the graph is asymmetric, then you need to provide the original and the transposed binary graphs to initialize a galois::graphs::LC_InOut_Graph, as the following code snippet shows.
+
+@code
+Graph g;
+galois::graphs::readGraph(g, original_graph_name, transposed_graph_name);
+@endcode
+
+The functionality of an LC_InOut_Graph is the same as the inner LC_Graph. Additionally, you can iterate over incoming edges/neighbors with the following methods.
+<ol>
+<li> To iterate over the incoming edges of a node: use galois::graphs::LC_InOut_Graph::in_edge_iterator given by galois::graphs::LC_InOut_Graph::in_edge_begin and galois::graphs::LC_InOut_Graph::in_edge_end.
+<li> To get access to the destination of an incoming edge: use galois::graphs::LC_InOut_Graph::getInEdgeDst.
+<li> To read/write an incoming edge's data: use galois::graphs::LC_InOut_Graph::getInEdgeData.
+</ol>
+
+Note that the data for incoming edges are stored by value, so users are responsible to maintain the consistency of outgoing edges and corresponding incoming edges.
 
 @subsection morph_graphs Morph Graphs
 
@@ -127,7 +165,7 @@ An example of defining a galois::InsertBag follows:
 
 @snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag
 
-galois::InsertBag::emplace is used to insert copies of elements. Its parameters will be passed to the constuctor of the type of the elements to create the element in the bag. galois::InsertBag::push is a shortcut of galois::InsertBag::emplace to call the copy or move constuctor of the type of the elements. An example of inserting elements into a galois::InsertBag follows:
+galois::InsertBag::emplace is used to insert elements, which are constructed in-place in the bag. galois::InsertBag::push and galois::InsertBag::push_back are shortcuts of galois::InsertBag::emplace. An example of inserting elements into a galois::InsertBag follows:
 
 @snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag
 
