@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,8 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-// TODO version 2 Galois binary graph support; currently only suppports
-// version 1
+/**
+ * @file BufferedGraph.h
+ *
+ * Contains the implementation of BufferedGraph
+ */
+
 
 #ifndef GALOIS_GRAPH_BUFGRAPH_H
 #define GALOIS_GRAPH_BUFGRAPH_H
@@ -31,28 +35,50 @@
 namespace galois {
 namespace graphs {
 
+/**
+ * Class that loads a portion of a Galois graph from disk directly into
+ * memory buffers for access.
+ *
+ * @tparam EdgeDataType type of the edge data
+ * @todo version 2 Galois binary graph support; currently only suppports
+ * version 1
+ */
 template <typename EdgeDataType>
 class BufferedGraph {
 private:
   // buffers that you load data into
+  //! buffer that tells you where a particular node's edges begin
   uint64_t* outIndexBuffer = nullptr;
+  //! buffer that tells the destination of edges
   uint32_t* edgeDestBuffer = nullptr;
+  //! buffer that stores edge data
   EdgeDataType* edgeDataBuffer = nullptr;
 
-  // size of the entire graph (not just locallly loaded portion)
+  //! size of the entire graph (not just locallly loaded portion)
   uint32_t globalSize = 0;
+  //! number of edges in the entire graph (not just locallly loaded portion)
   uint64_t globalEdgeSize = 0;
 
+  //! number of nodes loaded into this graph
   uint32_t numLocalNodes = 0;
+  //! number of edges loaded into this graph
   uint64_t numLocalEdges = 0;
 
+  //! specifies how many nodes are skipped from the beginning of the graph
+  //! in this loaded portion of it
   uint64_t nodeOffset = 0;
+  //! specifies how many edges are skipped from the beginning of the graph
+  //! in this loaded portion of it
   uint64_t edgeOffset = 0;
+  //! specifies whether or not the graph is loaded
   bool graphLoaded = false;
 
   // accumulators for tracking bytes read
+  //! number of bytes read related to the out index buffer
   galois::GAccumulator<uint64_t> numBytesReadOutIndex;
+  //! number of bytes read related to the edge dest buffer
   galois::GAccumulator<uint64_t> numBytesReadEdgeDest;
+  //! number of bytes read related to the edge data buffer
   galois::GAccumulator<uint64_t> numBytesReadEdgeData;
 
   /**
@@ -257,13 +283,18 @@ public:
   }
 
   // copy not allowed
+  //! disabled copy constructor
   BufferedGraph(const BufferedGraph&) = delete;
+  //! disabled copy constructor operator
   BufferedGraph& operator=(const BufferedGraph&) = delete;
   // move not allowed
+  //! disabled move operator
   BufferedGraph(BufferedGraph&&) = delete;
+  //! disabled move constructor operator
   BufferedGraph& operator=(BufferedGraph&&) = delete;
 
   /**
+   * Gets the number of global nodes in the graph
    * @returns the total number of nodes in the graph (not just local loaded 
    * nodes)
    */
@@ -272,6 +303,7 @@ public:
   }
 
   /**
+   * Gets the number of global edges in the graph
    * @returns the total number of edges in the graph (not just local loaded 
    * edges)
    */
@@ -350,6 +382,7 @@ public:
     graphFile.close();
   }
 
+  //! Edge iterator typedef
   using EdgeIterator = boost::counting_iterator<uint64_t>; 
   /**
    * Get the index to the first edge of the provided node THAT THIS GRAPH
