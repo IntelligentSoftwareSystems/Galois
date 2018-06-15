@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,56 +17,78 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file ConditionalReduction.h
+ *
+ * Contains conditional accumulator wrapper (conditionally reduce to provided
+ * accumulator)
+ */
+
 #ifndef __COND_REDUCTION__
 #define __COND_REDUCTION__
 
 #include "galois/Reduction.h"
 
 /**
+ * A conditional accumulator.
  *
+ * @tparam Accumulator accumulator to conditionally reduce
+ * @tparam Active determines whether or not reduction will actually do anything
  *
+ * @todo add the rest of the GSimpleReducible functions?
  */
 template<typename Accumulator, bool Active>
 class ConditionalAccumulator {
+  //! accumulator type
   typename std::conditional<Active, Accumulator, char>::type accumulator;
  public:
+  //! type of the value being accumulated
   using T = typename Accumulator::AccumType;
 
+  /**
+   * Returns true if the conditionally accumulator is active
+   */
   bool isActive() {
     return Active;
   }
 
+  /**
+   * Reset the accumulator.
+   */
   template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
   void reset() {
     accumulator.reset();
   }
 
+  //! no-op
   template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   void reset() {
     // no-op
   }
 
+  //! Update the accumulator using the accumulator's update function
   template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
   void update(T newValue) {
     accumulator.update(newValue);
   }
 
+  //! no-op
   template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   void update(T newValue) {
     // no-op
   }
 
+  //! Reduce the accumulator and return the reduced value
   template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
   T reduce() {
     return accumulator.reduce();
   }
 
+  //! no-op
+  //! @todo choose value that works better regardless of T
   template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   T reduce() {
-    return 0; // TODO choose value that works better regardless of T
+    return 0;
   }
-
-  // TODO add the rest of the GSimpleReducible functions?
 };
-
 #endif
