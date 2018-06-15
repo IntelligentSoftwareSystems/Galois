@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file B_LC_CSR_Graph.h
+ *
+ * Contains the implementation of a bidirectional LC_CS_Graph.
+ */
+
 #ifndef __B_LC_CSR_GRAPH__
 #define __B_LC_CSR_GRAPH__
 
@@ -26,7 +32,7 @@ namespace galois {
 namespace graphs {
 
 /**
- * An extended LC_CSR_Graph that allows the construction of in-edges from its
+ * An bidirectional LC_CSR_Graph that allows the construction of in-edges from its
  * outedges.
  *
  * @tparam NodeTy type of the node data
@@ -48,24 +54,32 @@ class B_LC_CSR_Graph
     : public LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
                           HasOutOfLineLockable, FileEdgeTy> {
   // typedef to make it easier to read
+  //! Typedef referring to base LC_CSR_Graph
   using BaseGraph = LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc, 
                                  HasOutOfLineLockable, FileEdgeTy>;
+  //! Typedef referring to this class itself
   using ThisGraph = B_LC_CSR_Graph<NodeTy, EdgeTy, EdgeDataByValue, 
                                    HasNoLockable, UseNumaAlloc, 
                                    HasOutOfLineLockable, FileEdgeTy>;
  protected:
   // retypedefs of base class
+  //! large array for edge data
   using EdgeData = LargeArray<EdgeTy>;
+  //! large array for edge destinations
   using EdgeDst = LargeArray<uint32_t>;
+  //! large array for edge index data
   using EdgeIndData = LargeArray<uint64_t>;
 
+  //! edge index data for the reverse edges
   EdgeIndData inEdgeIndData;
+  //! edge destination data for the reverse edges
   EdgeDst inEdgeDst;
-  // Edge data of inedges can be a value copy of the outedges (i.e. in and
-  // out edges have separate edge values) or inedges can refer to the same
-  // data as its corresponding outedge
+  //! Edge data of inedges can be a value copy of the outedges (i.e. in and
+  //! out edges have separate edge values) or inedges can refer to the same
+  //! data as its corresponding outedge; this is what this typedef is for
   using EdgeDataRep = typename std::conditional<EdgeDataByValue, EdgeData, 
                                                 EdgeIndData>::type;
+  //! The data for the reverse edges
   EdgeDataRep inEdgeData; 
 
   /**
@@ -181,18 +195,24 @@ class B_LC_CSR_Graph
   }
 
  public:
+  //! Graph node typedef
   using GraphNode = uint32_t;
+  //! iterator for edges
   using edge_iterator = 
     boost::counting_iterator<typename EdgeIndData::value_type>;
+  //! reference to edge data
   using edge_data_reference = typename EdgeData::reference;
 
+  //! default constructor
   B_LC_CSR_Graph() = default;
+  //! default move constructor
   B_LC_CSR_Graph(B_LC_CSR_Graph&& rhs) = default;
+  //! default = operator
   B_LC_CSR_Graph& operator=(B_LC_CSR_Graph&&) = default;
 
-  /*****************************************************************************
-   * Construction functions
-   ****************************************************************************/
+  /////////////////////////////////////////////////////////////////////////////
+  // Construction functions
+  /////////////////////////////////////////////////////////////////////////////
 
   /**
    * Call only after the LC_CSR_Graph part of this class is fully constructed.
@@ -218,9 +238,9 @@ class B_LC_CSR_Graph
     incomingEdgeConstructTimer.stop();
   }
 
-  /*****************************************************************************
-   * Access functions
-   ****************************************************************************/
+  /////////////////////////////////////////////////////////////////////////////
+  // Access functions
+  /////////////////////////////////////////////////////////////////////////////
 
   /**
    * Grabs in edge beginning without lock/safety.
