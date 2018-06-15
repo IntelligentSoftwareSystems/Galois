@@ -74,7 +74,7 @@ To avoid locking nodes and conflict detection, pass galois::MethodFlag::UNPROTEC
 
 @subsubsection lc_graph_storage Different Storage Formats
 
-Galois provides two variants for galois::graphs::LC_CSR_Graph: galois::graphs::LC_InlineEdge_Graph and galois::graphs::LC_Linear_Graph. They all support the same functionalities but with different storage formats, as shown in the following figure.
+Galois provides two variants for galois::graphs::LC_CSR_Graph: galois::graphs::LC_InlineEdge_Graph and galois::graphs::LC_Linear_Graph. They all support the same functionalities but with different storage formats, as shown in the following figure. The differences come from merging arrays in CSR format to enhance spatial locality for certain access patterns.
 
 @htmlonly
 <style>div.image img[src="galois_lc_graphs_example.png"]{width:70%}</style>
@@ -100,7 +100,7 @@ Graph g;
 galois::graphs::readGraph(g, original_graph_name, transposed_graph_name);
 @endcode
 
-The functionality of an LC_InOut_Graph is the same as the inner LC_Graph. Additionally, you can iterate over incoming edges/neighbors with the following methods.
+The functionality of a galois::graphs::LC_InOut_Graph is the same as the inner LC_Graph, e.g. galois::graphs::LC_CSR_Graph. Additionally, you can iterate over incoming edges/neighbors with the following methods.
 <ol>
 <li> To iterate over the incoming edges of a node: use galois::graphs::LC_InOut_Graph::in_edge_iterator given by galois::graphs::LC_InOut_Graph::in_edge_begin and galois::graphs::LC_InOut_Graph::in_edge_end.
 <li> To get access to the destination of an incoming edge: use galois::graphs::LC_InOut_Graph::getInEdgeDst.
@@ -163,12 +163,20 @@ See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
 
 If node removals are not allowed and the maximum degree of a node is known when creating the node, then galois::graphs::LC_Morph_Graph can be used.
 
-Template Parameters
+The template parameters and features of galois::graphs::LC_Morph_Graph are the same with those of galois::graphs::LC_CSR_Graph.
 
-APIs and differences from MorphGraph
-
-galois::graphs::LC_Morph_Graph::createNode will allocate node data and add the node to the graph.
-galois::graphs::LC_Morph_Graph::addEdge and galois::graphs::LC_Morph_Graph::removeEdge will not add/remove the symmetric counterpart.
+The APIs of galois::graphs::LC_Morph_Graph are the same with those of galois::graphs::MorphGraph with the following exceptions.
+<ol>
+<li> galois::graphs::LC_Morph_Graph has no method of removeNode.
+<li> galois::graphs::LC_Morph_Graph::createNode will allocate node data and add the node to the graph.
+<li> If a galois::graphs::LC_Morph_Graph is meant to be symmetric, then the user is responsible to maintain the symmetry by calling twice the following methods with proper arguments:
+  <ul> 
+  <li> galois::graphs::LC_Morph_Graph::addEdge
+  <li> galois::graphs::LC_Morph_Graph::addMultiEdge
+  <li> galois::graphs::LC_Morph_Graph::removeEdge
+  <li> galois::graphs::LC_Morph_Graph::getEdgeData for writes.
+  </ul>
+</ol>
 
 @section insert_bag Insert Bag
 
