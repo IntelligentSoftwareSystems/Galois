@@ -48,10 +48,6 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned int> maxIterations("maxIterations", 
     cll::desc("Maximum iterations: Default 10000"), 
     cll::init(10000));
-static cll::opt<bool> bipartite("bipartite", 
-    cll::desc("Is graph bipartite? if yes, it expects first N nodes to have "
-              "edges."), 
-    cll::init(false));
 static cll::opt<double> LEARNING_RATE("LEARNING_RATE", 
     cll::desc("Learning rate (GAMMA): Default 0.00001"), 
     cll::init(0.00001));
@@ -344,9 +340,6 @@ int main(int argc, char** argv) {
 
   // accumulators for use in operators
   galois::DGAccumulator<double> DGAccumulator_accum;
-  //galois::DGAccumulator<uint64_t> DGAccumulator_sum;
-  //galois::DGAccumulator<uint32_t> DGAccumulator_max;
-  //galois::GReduceMax<uint32_t> m;
 
   for (auto run = 0; run < numRuns; ++run) {
     galois::gPrint("[", net.ID, "] SGD::go run ", run, " called\n");
@@ -358,11 +351,11 @@ int main(int argc, char** argv) {
     StatTimer_main.stop();
 
     if ((run + 1) != numRuns) {
-#ifdef __GALOIS_HET_CUDA__
+      #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) { 
         //bitset_dist_current_reset_cuda(cuda_ctx);
       } else
-#endif
+      #endif
       (*hg).set_num_run(run+1);
       InitializeGraph::go((*hg));
       galois::runtime::getHostBarrier().wait();
@@ -370,7 +363,6 @@ int main(int argc, char** argv) {
   }
 
   StatTimer_total.stop();
-
 
   return 0;
 }
