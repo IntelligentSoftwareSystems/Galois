@@ -1,44 +1,8 @@
-==== Supported Compilers ====
-
-This Galois release is compatible with the following compilers:
-
-gcc 6.1
-
-It may also work with other compilers.
-
-==== Organization ====
-Lonestar benchmark applications are in 'lonestar'.
-Distributed applications are in 'dist-apps'.
-'libgalois' contains the main Galois libraries proper.
-'libdist' contains code necessary for running distributed Galois.
-'libgpu' includes GPU libraries.
-'libllvm' contains a couple pieces of llvm used by Galois.
-'tools' contain various tools that may be helpful in running Galois.
-
-==== Basic Compiling Through CMake (Shared Memory Galois) ====
-We use cmake. Run the following commands to set up a basic build configuration:
-
-  export GALOIS_ROOT=`pwd`
-  (mkdir -p build/default; cd build/default; cmake ${GALOIS_ROOT})
-
-or, for a Debug build,
-
-  (mkdir -p build/debug; cd build/debug; cmake -DCMAKE_BUILD_TYPE=Debug ${GALOIS_ROOT})
-
-More esoteric systems may require a toolchain file; check ../cmake/Toolchain
-if there is a file corresponding to your system. If so, use the following
-cmake command:
-
-  cmake -C ${GALOIS_ROOT}/cmake/Toolchain/${platform}-tryrunresults.cmake \
-    -DCMAKE_TOOLCHAIN_FILE=${GALOIS_ROOT}/cmake/Toolchain/${platform}.cmake ${GALOIS_ROOT}
-
-CMake will automatically use the default gcc and g++ that it finds. To 
-specify a particular compiler for C and C++ code, prepend the following to the
-CMake command:
-
-CC=<C compiler> CXX=<C++ compiler> cmake .....
-  
 ==== Basic Compiling Through CMake (Distributed and Heterogeneous Galois) ====
+
+The dependencies for distributed Galois are exactly the same as shared-memory
+Galois except that it requires an MPI library (e.g. mpich2) to be on the 
+system as well.
 
 To build distributed/heterogeneous Galois, certain CMake flags must be 
 specified.
@@ -51,9 +15,17 @@ For heterogeneous Galois:
 
 cmake ${GALOIS_ROOT} -DENABLE_HETERO_GALOIS=1
 
+Note that distributed Galois requires CUDA 8.0 and above.
+
+Of course, you can combine the flags as well:
+
+cmake ${GALOIS_ROOT} -DENABLE_DIST_GALOIS=1 -DENABLE_HETERO_GALOIS=1
+
 Compiling with distributed Galois will add the 'dist_apps' directory to the
 build folder. Compiling with heterogeneous Galois enabled with enable
 certain options in 'dist_apps'.
+
+
 
 ==== Compiling Provided Apps ====
 
@@ -90,7 +62,7 @@ among multiple hosts.
 
 Specifies the transpose of the provided input graph. This is used to 
 create certain partitions of the graph (and is required for some of the 
-partitioning policies).
+partitioning policies). It also makes 
 
 -runs
 
@@ -105,6 +77,23 @@ Specify the file in which to output run statistics to.
 Outputs a file with the result of running the application. For example, 
 specifying this flag on a bfs application will output the shortest distances
 to each node.
+
+==== Running Provided Apps (Heterogeneous Apps) ====
+
+Heterogeneous apps have additional command line parameters:
+
+-num_nodes=<num>
+
+Specifies the total number of PHYSICAL machines on the system. For example,
+you could have 2 machines with 8 GPUs each for a total of 16 processes,
+but you still only have 2 machines.
+
+-pset=<string>
+
+Specifies the architecture to run on on a single machine using "c" and "g". For
+example, if I have 2 multi-core machines with 8 GPUs each, but I want to run with
+3 cores and 3 GPUs on each machine, I would use -pset="cccggg". Therefore,
+I would have a total of 12 units of execution: 6 cores and 6 GPUs.
 
 ==== Basic Use (Creating Your Own Applications) ====
 
