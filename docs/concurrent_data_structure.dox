@@ -147,10 +147,10 @@ using GNode = Graph::GraphNode;
 galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size() and sizeEdges(). Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
 
 <ol>
-<li> galois::graphs::MorphGraph::createNode allocates space for node data, and galois::graphs::MorphGraph::addNode adds a node to a graph.
-<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes in a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge. The incoming/symmetric counterpart of the edge will also be added if tracked.
-<li> galois::graphs::MorphGraph::removeNode removes a node from a graph along with any incoming or outgoing edges associated with that node.
-<li> galois::graphs::MorphGraph::removeEdge removes an edge from a graph along with its incoming/symmetric counterpart, if there is one.
+<li> galois::graphs::MorphGraph::createNode allocates space for node data, and galois::graphs::MorphGraph::addNode adds to a graph a node already allocated by galois::graphs::MorphGraph::createNode.
+<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes in a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge. The incoming/symmetric counterpart of the edge will also be added if tracked. Lock for an edge's source node is always acquired, and that for the destination node is also acquired if incoming/symmetric edges are tracked.
+<li> galois::graphs::MorphGraph::removeNode removes a node from a graph along with any incoming or outgoing edges associated with that node. Only the node being removed is locked.
+<li> galois::graphs::MorphGraph::removeEdge removes an edge from a graph along with its incoming/symmetric counterpart, if there is one. Nodes are locked in the same way as in galois::graphs::MorphGraph::addEdge.
 </ol>
 
 See galois::graphs::MorphGraph for other available APIs for things like sorting the edges of a node and searching for a specific edge.
@@ -180,21 +180,19 @@ The APIs of galois::graphs::LC_Morph_Graph are the same with those of galois::gr
   </ul>
 </ol>
 
+Since symmetry is maintained by the user, only the lock for the source node of an edge is acquired when calling galois::graphs::LC_Morph_Graph::addEdge, galois::graphs::LC_Morph_Graph::addMultiEdge, and galois::graphs::LC_Morph_Graph::removeEdge.
+
 @section insert_bag Insert Bag
 
 galois::InsertBag is an unordered collection that allows parallel insertions. It uses customized memory allocations to achieve scalable parallel insertions. 
 
-galois::InsertBag has two template parameters:
-<ol>
-<li> T: Type of elements that the galois::InsertBag contains.
-<li> BlockSize: The maximum memory that the elements to be inserted can take per thread. In other words, BlockSize is equal to the product of the size of one element and the maximum number of elements one thread will insert into the bag. This parameter is optional and the default value is 0, which stands for one memory page.
-</ol>
+galois::InsertBag expects a template parameter, T, for the type of elements that the galois::InsertBag contains. See galois::InsertBag for other optional template parameters.
 
 An example of defining a galois::InsertBag follows:
 
 @snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag
 
-galois::InsertBag::emplace is used to insert elements, which are constructed in-place in the bag. galois::InsertBag::push and galois::InsertBag::push_back are shortcuts of galois::InsertBag::emplace. An example of inserting elements into a galois::InsertBag follows:
+galois::InsertBag::emplace is used to insert elements, which are constructed in-place in the bag using an appropriate constructor for the element. galois::InsertBag::push and galois::InsertBag::push_back are shortcuts of galois::InsertBag::emplace. An example of inserting elements into a galois::InsertBag follows:
 
 @snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag
 
