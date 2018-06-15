@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,11 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file Tracer.h
+ *
+ * Includes functions for tracing output and printing data.
+ */
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
@@ -31,22 +36,35 @@ namespace runtime {
 
 namespace internal {
 
+/**
+ * Base case for traceImpl; ends the line with a new line.
+ */
 static inline void traceImpl(std::ostringstream& os) {
   os << "\n";
 }
 
+/**
+ * Prints out a value to the output stream.
+ */
 template<typename T, typename... Args>
 static inline void traceImpl(std::ostringstream& os, T&& value, Args&&... args) {
   os << value << " ";
   traceImpl(os, std::forward<Args>(args)...);
 }
 
+/**
+ * Format string to os.
+ */
 static inline void traceFormatImpl(std::ostringstream& os, const char* format) {
   os << format;
 }
 
+/**
+ * Format string to os as well as something else to print.
+ */
 template<typename T, typename... Args>
-static inline void traceFormatImpl(std::ostringstream& os, const char* format, T&& value, Args&&... args) {
+static inline void traceFormatImpl(std::ostringstream& os, const char* format, 
+                                   T&& value, Args&&... args) {
   for (; *format != '\0'; format++) {
     if (*format == '%') {
       os << value;
@@ -57,6 +75,9 @@ static inline void traceFormatImpl(std::ostringstream& os, const char* format, T
   }
 }
 
+/** 
+ * Class to print a vector.
+ */
 template<typename T, typename A>
 class vecPrinter {
   const std::vector<T,A>& v;
@@ -70,27 +91,42 @@ public:
   }
 };
 
+/**
+ * Operator to print a vector given a vecPrinter object
+ */
 template<typename T, typename A>
 std::ostream& operator<<(std::ostream& os, const vecPrinter<T,A>& vp) {
   vp.print(os);
   return os;
 }
 
+/**
+ * Prints trace data (which has time data included).
+ */
 void printTrace(std::ostringstream&);
+
+/**
+ * Prints out string stream.
+ */
 void print_output_impl(std::ostringstream&);
-void print_send_impl(std::vector<uint8_t>, size_t, unsigned);
-void print_recv_impl(std::vector<uint8_t>, size_t, unsigned);
 
 extern bool doTrace;
 extern bool initTrace;
 
 } // namespace internal
 
+/**
+ * Given a vector, returns a vector printer object that is able
+ * to print the vector out onto an output stream.
+ */
 template<typename T, typename A>
 internal::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
   return internal::vecPrinter<T,A>(v);
 };
 
+/**
+ * Prints a trace log of the provided arguments if debug mode is on.
+ */
 #ifdef NDEBUG
 template<typename... Args>
 static inline void trace(Args&& ...) {}
@@ -109,17 +145,18 @@ static inline void trace(Args&&... args) {
 }
 #endif
 
+/**
+ * Prints data to an output stream.
+ *
+ * @param format Format string 
+ * @param args data to print
+ */
 template<typename... Args>
 static inline void printOutput(const char* format, Args&&... args) {
-    std::ostringstream os;
-    internal::traceFormatImpl(os, format, std::forward<Args>(args)...);
-    internal::print_output_impl(os);
+  std::ostringstream os;
+  internal::traceFormatImpl(os, format, std::forward<Args>(args)...);
+  internal::print_output_impl(os);
 }
-
-static inline void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
-  internal::print_send_impl(vec, len, host);
-}
-
 } // namespace runtime
 } // namespace galois
 
