@@ -8,15 +8,56 @@
 
 We assume the readers have read @ref tutorial and understand Galois programming model and related constructs reasonably.
 
-This guide has two parts. The first part talks about how to build a NUMA-aware data structure working with Galois; the second part talks about how to make your data structure work with Galois' conflict detection.
+This guide has two parts. The first part talks about the principles to build a NUMA-aware data structure; the second part talks about how to make your data structure work with Galois' conflict detection.
 
 
-@section numa_aware_ds NUMA-aware Galois Data Structure
+@section numa_aware_ds Principles for NUMA-aware Data Structures
 
-TBD
+@subsection array_like_ds Array-based Data Structures
+
+You can hold a fixed amount of work items, e.g. a 2D torus of fixed width and height, using an array. To allocate an array in a NUMA-aware fashion, you can use galois::LargeArray and its allocation methods.
+
+galois::LargeArray supports five ways of memory allocation (see details at @ref numa).
+<ol>
+<li> galois::LargeArray::allocateLocal: allocate the array at the calling thread's socket.
+<li> galois::LargeArray::allocateFloating: each page of the array will be allocated to the socket of the first-touching thread.
+<li> galois::LargeArray::allocateBlocked: partition the array evenly into contiguous chunks, and each thread allocates its own chunk.
+<li> galois::LargeArray::allocateInterleaved: interleave the pages of the array among threads in a round-robin fashion.
+<li> galois::LargeArray::allocateSpecified: allocate the array by a specified thread ranges.
+</ol>  
+
+Below are rule of thumb for deciding the allocation policy.
+<ol>
+<li> Use galois::LargeArray::allocateBlocked if the accesses are concentrated within evenly partitioned chunks.
+<li> Use galois::LargeArray::allocateSpecified if you know the access patterns which are different from blocked.
+<li> Use galois::LargeArray::allocateInterleaved when the access pattern is unknown or random. 
+</ol>
+
+Define local_iterator for your data structure so that the Galois runtime can better leverage the locality of accesses by using local ranges formed by local_iterators. Otherwise, Galois falls back to use global ranges given by begin() and end(), which are of type iterator.
+
+See galois::graphs::LC_CSR_Graph as an example data structure built with galois::LargeArray.
+
+@subsection per_thread_like_ds Per-thread Data Structure
+
+If work items are generated dynamically by threads, then it is better to have a per-thread data structure backed by a per-thread heap. Threads populate the data structure in their thread-local copy, and then work items are merged or iterated in another serial/parallel phase. galois::InsertBag can be used for this purpose. This design helps scalability by avoiding having a big lock around a global data structure.
+
+You can further exploit the semantics of work items when designing your own per-thread data structure.
+<ol>
+<li> If the work items can be merged by well-defined reduction operations, 
+  <ul>
+  <li> Extend from galois::GSimpleReducible if the work items are cheap to copy.
+  <li> Extend from galois::GBigReducible if the work items are expensive to copy, e.g. containers.
+  </ul>
+<li> If the work items need to be organized with a certain structure, extend from galois::PerThreadContainer.
+<li> If the work items form a multi-set and never get removed before processed, use galois::InsertBag.
+</ol>
+
+local_iterator for a per-thread data structure can be naturally defined as the iterators to thread-local containers. The global iterator should be carefully constructed from local_iterators in order to conform to the STL interface. Galois will pick up local iterators to leverage the spacial/temporal locality in work generation.
+
+See galois::InsertBag as an example data structure built with this design in mind.
 
 
-@section conflict_aware_ds Conflict-aware Galois Data Structure
+@section conflict_aware_ds Conflict-aware Galois Data Structures
 
 Suppose we want to write a program to count the number of neighbors for each node in a 2D torus using a push-style operator, where each node increments its neighbors' labels. There are conflicts among node activities, so we need the torus nodes to be conflict-aware if we do not want to handle synchronization in our operator code. 
 
