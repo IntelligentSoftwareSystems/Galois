@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,11 +17,20 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file libdist/src/Barrier.cpp
+ *
+ * Contains implementation of HostFence and HostBarrier as well as functions
+ * that get static singletons of the 2.
+ *
+ * A fence flushes out and receives all messages in the network while a barrier
+ * simply acts as a barrier in the code for all hosts.
+ */
+
 #include "galois/substrate/PerThreadStorage.h"
 #include "galois/runtime/Substrate.h"
 #include "galois/substrate/CompilerSpecific.h"
 #include "galois/runtime/Network.h"
-//#include "galois/runtime/Directory.h"
 #include "galois/runtime/LWCI.h"
 
 #include <cstdlib>
@@ -33,14 +42,13 @@
 
 namespace {
 class HostFence : public galois::substrate::Barrier {
-
 public:
   virtual const char* name() const { return "HostFence"; }
 
   virtual void reinit(unsigned val) { }
 
-  // control-flow barrier across distributed hosts
-  // acts as a distributed-memory fence as well (flushes send and receives)
+  //! control-flow barrier across distributed hosts
+  //! acts as a distributed-memory fence as well (flushes send and receives)
   virtual void wait() {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -71,23 +79,22 @@ public:
 };
 
 class HostBarrier : public galois::substrate::Barrier {
-
 public:
   virtual const char* name() const { return "HostBarrier"; }
 
   virtual void reinit(unsigned val) { }
 
-  // control-flow barrier across distributed hosts
+  //! Control-flow barrier across distributed hosts
   virtual void wait() {
-#ifdef GALOIS_USE_LWCI
+    #ifdef GALOIS_USE_LWCI
     lc_barrier(mv);
-#else
+    #else
     MPI_Barrier(MPI_COMM_WORLD); // assumes MPI_THREAD_MULTIPLE
-#endif
+    #endif
   }
 };
 
-} // end namespace ""
+} // end anonymous namespace
 
 galois::substrate::Barrier& galois::runtime::getHostBarrier() {
   static HostBarrier b;
@@ -98,4 +105,3 @@ galois::substrate::Barrier& galois::runtime::getHostFence() {
   static HostFence b;
   return b;
 }
-
