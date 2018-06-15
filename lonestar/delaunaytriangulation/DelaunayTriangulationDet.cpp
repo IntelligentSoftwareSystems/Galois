@@ -209,6 +209,7 @@ static void copyPointsFromRounds(PointList& points, Rounds& rounds) {
   for (int i = maxRounds - 1; i >= 0; --i) {
 //! [Access elements of InsertBag]
     // PtrPoints expands to galois::InsertBag<Point*>
+    // points is of type std::vector<Point>
     PtrPoints& pptrs = *rounds[i];
     for (auto ii: pptrs) {
       points.push_back(*ii);
@@ -343,6 +344,7 @@ struct ReadInput {
     size_t last = points.size();
     //! [Insert elements into InsertBag]
     // basePoints is of type galois::InsertBag<Point>
+    // points is of type std::vector<Point>
     Point* p1 = &(basePoints.push(points[last-1]));
     Point* p2 = &(basePoints.push(points[last-2]));
     Point* p3 = &(basePoints.push(points[last-3]));
