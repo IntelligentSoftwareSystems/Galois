@@ -26,7 +26,7 @@ There are two types of graphs, summarized pictorially as the above hierarchy.
 
 @subsection lc_graphs Label-computation Graphs
 
-<h4>Template Parameters</h4>
+@subsubsection lc_graph_tparam Template Parameters
 
 When defining a galois::graphs::LC_CSR_Graph, you must provide the following template parameters:
 <ol>
@@ -34,7 +34,7 @@ When defining a galois::graphs::LC_CSR_Graph, you must provide the following tem
 <li>EdgeTy: the type of data stored on each edge. Use void when no data needs to be stored on edges.
 </ol>
 
-Also you can turn on the following features by specifying them with graph declaration.
+Also you can turn on the following features by specifying them with graph type definition.
 <ol>
 <li>Use galois::graphs::LC_CSR_Graph::with_no_lockable< true >::type to remove abstract node locks and conflict detections.
 <li>Use galois::graphs::LC_CSR_Graph::with_numa_alloc< true >::type to enable NUMA-aware allocation.
@@ -45,7 +45,7 @@ See galois::graphs::LC_CSR_Graph for details. Below is an example of defining an
 
 @snippet lonestar/sssp/SSSP.cpp withnumaalloc
 
-<h4>APIs</h4>
+@subsubsection lc_graph_api APIs
 
 The following code snippet shows how to instantiate and read in a graph from a file (in binary gr format):
 
@@ -72,7 +72,7 @@ To avoid locking nodes and conflict detection, pass galois::MethodFlag::UNPROTEC
 
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Turn off conflict detection
 
-<h4>Different Storage Formats</h4>
+@subsubsection lc_graph_storage Different Storage Formats
 
 Galois provides two variants for galois::graphs::LC_CSR_Graph: galois::graphs::LC_InlineEdge_Graph and galois::graphs::LC_Linear_Graph. They all support the same functionalities but with different storage formats, as shown in the following figure.
 
@@ -83,7 +83,7 @@ Galois provides two variants for galois::graphs::LC_CSR_Graph: galois::graphs::L
 
 galois::graphs::LC_Adaptor_Graph can be used to create your own data representation while having the same APIs as for galois::graphs::LC_CSR_Graph.
 
-<h4>Track Incoming Edges</h4>
+@subsubsection lc_graph_in_edges Tracking Incoming Edges
 
 galois::graphs::LC_InOut_Graph can be used if the desired computation needs to track incoming edges. Below is an example of defining a galois::graphs::LC_InOut_Graph:
 
@@ -113,26 +113,45 @@ Note that the data for incoming edges are stored by value, so users are responsi
 
 If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::MorphGraph.
 
-<h4>Template Parameters for galois::graphs::MorphGraph</h4>
+@subsubsection morph_graph_tparam Template Parameters
 
+galois::graphs::MorphGraph takes the following template parameters:
+<ol>
+<li> NodeTy: the type of data stored on nodes. Use void if there is no data stored on nodes.
+<li> EdgeTy: the type of data stored on edges. Use void if there is no data stored on edges.
+<li> Directional: a boolean variable indicating whether this is a directed graph. If not, then each edges will have its symmetric counterpart, all represented as outgoing edges.
+<li> InOut: a boolean variable indicating whether incoming edges are tracked. If Directional and InOut are both true, then each edge will have its incoming counterpart. This is default to false.
+</ol>
 
+Note that an edge and its symmetric/incoming counterpart share the same instance of edge data.
 
-<h4>APIs for galois::graphs::MorphGraph</h4>
+You can turn on features for galois::graphs::MorphGraph by specifying them along with graph type definition.
+<ol>
+<li> Use galois::graphs::MorphGraph::with_no_lockable< true >::type to remove node locks and turn off conflict detection.
+<li> Use galois::graphs::MorphGraph::with_sorted_neighbors< true >::type to have the edge lists of nodes always sorted.
+</ol>
+
+Below is an example of defining a directed galois::graphs::MorphGraph with node data of type integer, edge data of type void, and without tracking incoming edges. Neighbors of each nodes are always sorted.
+
+@code
+// Graph has int node data, void edge data and is directed w/o tracking incoming edges. Neighbors are always sorted for each node.
+using Graph = galois::graphs::MorphGraph<int,void,true,false>::with_sorted_neighbors<true>::type;
+// Opaque pointer to graph node
+using GNode = Graph::GraphNode;
+@endcode
+
+@subsubsection morph_graph_api APIs
 
 galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
 
 <ol>
 <li> galois::graphs::MorphGraph::createNode allocates space for node data, and galois::graphs::MorphGraph::addNode adds a node to a graph so the node can be found later by graph APIs.
-<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes to a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge. When tracked, the incoming/symmetric counterpart will also be added.
+<li> galois::graphs::MorphGraph::addEdge and galois::graphs::MorphGraph::addMultiEdge both add an edge between existing nodes to a graph. The former adds an edge only when the edge does not exist, while the latter always adds the edge. The incoming/symmetric counterpart of the edge will also be added if tracked.
 <li> galois::graphs::MorphGraph::removeNode removes from a graph a node and edges connecting to/from the node.
 <li> galois::graphs::MorphGraph::removeEdge removes from a graph an edge and its incoming/symmetric counterpart, if there is any.
 </ol>
 
-See galois::graphs::MorphGraph for other available APIs.
-
-Let us use galois::graphs::MorphGraph to construct and represent a two-dimensional torus. To define a galois::graphs::MorphGraph, you must provide as template parameters NodeTy, the type of node data; EdgeTy, the type of edge data; and a boolean value indicating whether or not this is a directed graph. The following code snippet shows an example of defining a galois::graphs::MorphGraph. See galois::graphs::MorphGraph for details about other optional template parameters.
-
-@snippet lonestar/tutorial_examples/TorusConstruction.cpp Define a MorphGraph
+See galois::graphs::MorphGraph for other available APIs, e.g. sort edges for a node and finding a specific edge.
 
 The following code snippet shows how to add nodes and edges to a galois::graphs::MorphGraph. Note that you need to create nodes first, then add the nodes to a galois::graphs::MorphGraph, and finally add edges in between the nodes.
 
@@ -140,7 +159,7 @@ The following code snippet shows how to add nodes and edges to a galois::graphs:
 
 See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
 
-<h4>galois::graphs::LC_Morph_Graph</h4>
+@subsubsection lc_morph_graph LC_Morph_Graph
 
 If node removals are not allowed and the maximum degree of a node is known when creating the node, then galois::graphs::LC_Morph_Graph can be used.
 
