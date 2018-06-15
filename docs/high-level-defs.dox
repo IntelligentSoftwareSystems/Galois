@@ -18,7 +18,7 @@ Internal implementation functions used by Galois that shouldn't be called by
 the user.
 
 @namespace galois::substrate
-TODO write a description for this.
+Contains threading and machine OS support
 
 @namespace galois::worklists
 Scheduling policies for Galois.
