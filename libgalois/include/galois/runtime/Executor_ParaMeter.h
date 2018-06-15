@@ -30,7 +30,6 @@
 #include "galois/runtime/Executor_ForEach.h"
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/runtime/Executor_OnEach.h"
-#include "galois/runtime/Support.h"
 #include "galois/gIO.h"
 
 #include <algorithm>
