@@ -53,7 +53,7 @@ function(distAppNoGPU name)
   endif()
 endfunction()
 
-distApp(bc_push)
+distAppNoGPU(bc_push)
 
 distApp(bfs_pull)
 distApp(bfs_push)
