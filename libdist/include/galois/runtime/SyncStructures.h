@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,13 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file SyncStructures.h
+ *
+ * Contains macros for easily defining common Galois sync structures and the
+ * field flags class used for on-demand synchronization.
+ */
+
 #ifndef _SYNC_STRUCT_MACROS_
 #define _SYNC_STRUCT_MACROS_
 
@@ -31,16 +38,23 @@
 namespace galois {
 namespace runtime {
 
+/**
+ * Bitvector status enum specifying validness of certain things in bitvector.
+ */
 enum BITVECTOR_STATUS {
-  NONE_INVALID,
-  SRC_INVALID,
-  DST_INVALID,
-  BOTH_INVALID
+  NONE_INVALID, //!< none of the bitvector is invalid
+  SRC_INVALID, //!< sources on bitvector are invalid
+  DST_INVALID, //!< destinations on bitvector are invalid
+  BOTH_INVALID //< both source and destinations on bitvector are invalid
 };
 
+//! Return true if the sources are invalid in bitvector flag
 bool src_invalid(BITVECTOR_STATUS bv_flag);
+//! Return true if the destinations are invalid in bitvector flag
 bool dst_invalid(BITVECTOR_STATUS bv_flag);
+//! Marks sources invalid on passed in bitvector flag
 void make_src_invalid(BITVECTOR_STATUS* bv_flag);
+//! Marks destinations invalid on passed in bitvector flag
 void make_dst_invalid(BITVECTOR_STATUS* bv_flag);
 
 /**
@@ -54,9 +68,13 @@ class FieldFlags {
   uint8_t _d2s;
   uint8_t _d2d;
  public:
+  /**
+   * Status of the bitvector in terms of if it can be used to sync the field
+   */
   BITVECTOR_STATUS bitvectorStatus;
   /**
-   * Field Flags constructor. Sets all flags to false
+   * Field Flags constructor. Sets all flags to false and bitvector
+   * status to invalid.
    */
   FieldFlags() {
     _s2s = false;
@@ -66,32 +84,39 @@ class FieldFlags {
     bitvectorStatus = BITVECTOR_STATUS::NONE_INVALID;
   }
 
+  //! Return true if src2src is set
   bool src_to_src() const {
     return _s2s;
   }
 
+  //! Return true if src2dst is set
   bool src_to_dst() const {
     return _s2d;
   }
 
+  //! Return true if dst2src is set
   bool dst_to_src() const {
     return _d2s;
   }
 
+  //! Return true if dst2dst is set
   bool dst_to_dst() const {
     return _d2d;
   }
 
+  //! Sets write src flags to true
   void set_write_src() {
     _s2s = true;
     _s2d = true;
   }
 
+  //! Sets write dst flags to true
   void set_write_dst() {
     _d2s = true;
     _d2d = true;
   }
 
+  //! Sets all write flags to true
   void set_write_any() {
     _s2s = true;
     _s2d = true;
@@ -99,16 +124,19 @@ class FieldFlags {
     _d2d = true;
   }
 
+  //! Sets write src flags to false
   void clear_read_src() {
     _s2s = false;
     _d2s = false;
   }
 
+  //! Sets write dst flags to false
   void clear_read_dst() {
     _s2d = false;
     _d2d = false;
   }
 
+  //! Sets all write flags to false
   void clear_read_any() {
     _s2d = false;
     _d2d = false;
@@ -116,6 +144,7 @@ class FieldFlags {
     _d2s = false;
   }
   
+  //! Sets all write flags to false and sets bitvector stats to none invalid
   void clear_all() {
     _s2s = false;
     _s2d = false;
@@ -132,6 +161,9 @@ class FieldFlags {
 // Reduce Add
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Creates a Galois reduction sync structure that does a sum reduction.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD(fieldname, fieldtype) \
@@ -256,6 +288,10 @@ struct Reduce_add_##fieldname {\
 }
 #endif
 
+/**
+ * Creates a Galois reduction sync structure that does a sum reduction
+ * on a field that is represented by an array.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_ADD_ARRAY(fieldname, fieldtype) \
@@ -384,6 +420,9 @@ struct Reduce_add_##fieldname {\
 // Reduce Set
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Creates a Galois reduction sync structure that does a set as a reduction.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET(fieldname, fieldtype) \
@@ -497,6 +536,10 @@ struct Reduce_set_##fieldname {\
 }
 #endif
 
+/**
+ * Creates a Galois reduction sync structure that does a set as a reduction
+ * on a field represented by an array.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_SET_ARRAY(fieldname, fieldtype) \
@@ -614,6 +657,9 @@ struct Reduce_set_##fieldname {\
 // Reduce Min
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Creates a Galois reduction sync structure that does a min reduction.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN(fieldname, fieldtype) \
@@ -731,6 +777,9 @@ struct Reduce_min_##fieldname {\
 // Reduce Max
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Creates a Galois reduction sync structure that does a max reduction.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MAX(fieldname, fieldtype) \
@@ -843,9 +892,10 @@ struct Reduce_max_##fieldname {\
 }
 #endif
 
-
-// Sync structure used for reduce via min of all pairwise elements in an 
-// array/vector type.
+/**
+ * Creates a Galois reduction sync structure that does a pairwise
+ * min reduction on an array.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_MIN_ARRAY(fieldname, fieldtype) \
@@ -958,8 +1008,10 @@ struct Reduce_min_##fieldname {\
 }
 #endif
 
-// Sync structure used for reduce via average of all pairwise elements in an 
-// array/vector type.
+/**
+ * Creates a Galois reduction sync structure that does a pairwise
+ * average on an array.
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(fieldname, fieldtype) \
@@ -1075,8 +1127,10 @@ struct Reduce_pair_wise_avg_array_##fieldname {\
 }
 #endif
 
-// Sync structure used for reduce via add of all pairwise elements in an 
-// array/vector type.
+/**
+ * Creates a Galois reduction sync structure that does a pairwise
+ * sum reduction on an array.
+ */
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1120,8 +1174,10 @@ struct Reduce_pair_wise_add_array_##fieldname {\
   }\
 }
 
-// Sync structure used for reduce via average of a single element in an 
-// array/vector type (requires an index).
+/**
+ * Creates a Galois reduction sync structure that does a pairwise
+ * sum reduction on an array on a SINGLE element.
+ */
 #define GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(fieldname, fieldtype) \
 struct Reduce_pair_wise_add_array_single_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1167,6 +1223,9 @@ struct Reduce_pair_wise_add_array_single_##fieldname {\
 // Broadcast
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Creates a Galois broadcast sync structure. 
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BROADCAST(fieldname, fieldtype)\
@@ -1263,8 +1322,11 @@ struct Broadcast_##fieldname {\
 }
 #endif
 
-// Sync structure used for broadcast synchronization of a single element in a 
-// vector. The GALOIS_DIE functions are defined due a template path needing them
+/**
+ * Creates a Galois broadcast sync structure for a single element in 
+ * a vector.
+ */
+// The GALOIS_DIE functions are defined due a template path needing them
 // defined (they shouldn't ever go down that path, however)
 #define GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(fieldname, fieldtype)\
 struct Broadcast_##fieldname {\
@@ -1305,10 +1367,12 @@ struct Broadcast_##fieldname {\
 }
 
 
-// Used in a "struct of arrays" construction of data (i.e. for some field,
-// index into it with the node id to get data)
+/**
+ * Creates a Galois broadcast sync structure for a struct of arrays
+ * construction of data (for some field, index into it with the node 
+ * id to get data)
+ */
 #ifdef __GALOIS_HET_CUDA__
-// GPU code included
 #define GALOIS_SYNC_STRUCTURE_BROADCAST_ARRAY(fieldname, fieldtype)\
 struct Broadcast_##fieldname {\
   typedef fieldtype ValTy;\
@@ -1407,12 +1471,16 @@ struct Broadcast_##fieldname {\
 // Bitset struct
 ////////////////////////////////////////////////////////////////////////////////
 
-// Important: Bitsets are expected to have the following naming scheme:
-// bitset_<fieldname>
-// In addition, you will have to declare and appropriately resize the bitset 
-// in your main program as well as set the bitset appropriately (i.e. when you
-// do a write to a particular node).
-
+/**
+ * Sync structure for dynamic bitsets.
+ *
+ * Bitsets are expected to have the following naming scheme:
+ * bitset_<fieldname>
+ *
+ * In addition, you will have to declare and appropriately resize the bitset 
+ * in your main program as well as set the bitset appropriately (i.e. when you
+ * do a write to a particular node).
+ */
 #ifdef __GALOIS_HET_CUDA__
 // GPU code included
 #define GALOIS_SYNC_STRUCTURE_BITSET(fieldname)\
@@ -1461,8 +1529,17 @@ struct Bitset_##fieldname {\
 }
 #endif
 
-// Used for a vector of bitsets: function signatures now allow indexing into
-// this vector to get the correct bitset
+/**
+ * Sync structure for a vector of dynamic bitsets. Function signatures 
+ * allow indexing into this vector to get the correct bitset
+ *
+ * Bitsets are expected to have the following naming scheme:
+ * bitset_<fieldname>
+ *
+ * In addition, you will have to declare and appropriately resize the bitset 
+ * in your main program as well as set the bitset appropriately (i.e. when you
+ * do a write to a particular node).
+ */
 #define GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(fieldname)\
 struct Bitset_##fieldname {\
   static unsigned numBitsets() {\
