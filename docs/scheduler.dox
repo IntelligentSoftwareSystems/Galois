@@ -4,23 +4,23 @@
 
 @section scheduler_section Scheduler 
 
-The scheduling policy for {@link galois::for_each} can be specified by choosing
+The schedule policy for {@link galois::for_each} can be specified by choosing
 one of the types in {@link galois::worklists} namespace and providing the type-name
 as an argument to {@link galois::wl} parameter of the for_each. 
-The scheduling policies are listed as follows:
+The schedule policies are listed as follows:
 
  - \b OrderedList
 
-    implements a std::pri_queue compatible priority queue. Elements of same
+    implements a std::priority_queue compatible priority queue. Elements of same
     priority are processed in arbitrary order. 
 
  - \b FIFO and \b LIFO
-    
-    Implements std::queue and std::stack like behaviors respectively. These
-    implementations do not scale with the number of threads, and are often not
+
+    Implements std::queue and std::stack like behaviors respectively. \n
+    These implementations do not scale with the number of threads, and are often not
     suitable for parallel implementations. 
 
- - \b Chunked Worklists
+ - <b> Chunked Worklists</b>
 
     Chunked worklists assign work items to threads one chunk at a time. Similarly,
     each thread accumulates new work in a chunk before putting it on the worklist. 
@@ -43,25 +43,27 @@ The scheduling policies are listed as follows:
         from outside its socket. Each socket
         has a leader, which steals from other sockets when its own socket is out
         of work. 
-        We show an example of using chunked worklists from {@link apps/delaunayrefinement/DelaunayRefinement.cpp}
+        We show an example of using chunked worklists from {@link lonestar/delaunayrefinement/DelaunayRefinement.cpp}
+
+    \n
 
 
- - \b OrderedByIntegerMetric
+ - \b OrderedByIntegerMetric\n
    
     Implements a priority queue based on a supplied function which maps a work
     item to an integer priority. Lower values are a higher priority. An inner
     queue may be passed to control how items within the same priority bin are stored. 
-    An example to define an OrderedByIntegerMetric scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
-    The OBIM in the following example shows how to define a priority scheduling. 
-    The UpdateRequestIndexer defines the priority binning function. Internally It uses a PerSocketChunkLIFO to store the items with the same priority.
+    An example to define an OrderedByIntegerMetric scheduling in {@link lonestar/tutorial_example/SSSPPushSimple.cpp} can be seen as follows:\n
+    
 
+@snippet lonestar/tutorial_examples/SSSPPushSimple.cpp OBIM
     
-    @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
+The OBIM in the above example shows how to define a priority scheduling. 
+The UpdateRequestIndexer defines the priority binning function. Internally It uses a PerSocketChunkLIFO to store the items with the same priority.\n
     
-    
-    OBIM works well when the algorithms performance is sensitive to scheduling, and
-    the work-items can be grouped into a small number of bins, ordered by integer
-    priority (typically ~1000 bins). 
+OBIM works well when the algorithms performance is sensitive to scheduling, and
+the work-items can be grouped into a small number of bins, ordered by integer
+priority (typically ~1000 bins). 
 
 
  - \b LocalQueues
@@ -83,7 +85,6 @@ The scheduling policies are listed as follows:
     thread to process it. This functor is one of the template parameters, which
     maps each work item to the range [0:numThreads). Another
     difference from LocalQueues is that worklists are maintained per socket. 
-    \b TODO: verify this
 
 
  - \b StableIterator
@@ -93,5 +94,12 @@ The scheduling policies are listed as follows:
     {@link galois::do_all} is that this scheduling policy supports speculation and
     allows for iterations to abort. 
 
+@section workstealing Work Stealing
+
+galois::do_all devided the work items evenly to all threads. The work stealing is disabled by default. You can specify galois::steal() in galois::do_all to enable the work stealing. Work stealing is implemented hierarchically similar to PerThreadChunkFIFO.\n
+Threads steal work when they finish their local work. Normally threads steal work within their socket, but only the socket leader can steal from outside its socket. The stealing amount is half of the rest work of the stolen thread. \n
+
+Below is an example of work stealing from {@link lonestar/tutorial_examples/Torus.cpp}.
+@snippet lonestar/tutorial_examples/Torus.cpp work stealing
 
 */

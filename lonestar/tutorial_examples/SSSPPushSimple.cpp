@@ -89,12 +89,14 @@ int main(int argc, char **argv) {
     );
   } 
   else if ("obim" == schedule) {
+    //! [OBIM]
      galois::for_each(
         galois::iterate({*graph.begin()}),   // initial range using initializer list
         SSSP                                 // operator
         , galois::wl<OBIM>(reqIndexer)       // options. Pass an indexer instance for OBIM construction.
         , galois::loopname("sssp_obim")
     );
+    //! [OBIM]
   } 
   //! [Data-driven loops]
 

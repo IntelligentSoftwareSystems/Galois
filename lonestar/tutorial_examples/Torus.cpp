@@ -128,6 +128,7 @@ int main(int argc, char** argv) {
 
   // push operator with self synchronization in do_all
   initialize(graph);
+  //! [work stealing]
   galois::do_all(
       galois::iterate(graph),
       incrementNeighborsAtomically
@@ -135,6 +136,7 @@ int main(int argc, char** argv) {
       , galois::steal()
       , galois::chunk_size<32>()
   );
+  //! [work stealing]
   verify(graph, N);
 
   // push operator with self synchronization in optimized for_each
