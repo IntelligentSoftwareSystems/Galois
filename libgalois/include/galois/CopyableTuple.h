@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of XYZ License (a copy is located in
  * LICENSE.txt at the top-level directory).
@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+
+/**
+ * @file CopyableTuple.h
+ *
+ * Contains copyable tuple classes whose elements are contiguous in memory
+ */
 #ifndef __GALOIS_COPYABLE_TUPLE__
 #define __GALOIS_COPYABLE_TUPLE__
 
@@ -25,17 +31,24 @@ namespace galois {
 /**
  * Struct that contains 3 elements. Used over std::tuple as std::tuple memory
  * layout isn't guaranteed.
+ *
+ * @tparam T1 type of first element
+ * @tparam T2 type of second element
+ * @tparam T3 type of third element
  */
 template<typename T1, typename T2, typename T3>
 struct TupleOfThree {
+  //! first element
   T1 first;
+  //! second element
   T2 second;
+  //! third element
   T3 third;
 
-  // empty constructor
+  //! empty constructor
   TupleOfThree() { }
 
-  // initialize 3 fields
+  //! Constructor that initializes 3 fields
   TupleOfThree(T1 one, T2 two, T3 three) {
     first = one;
     second = two;
