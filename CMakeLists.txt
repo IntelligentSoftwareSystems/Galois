@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.2.0)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
-set(GALOIS_VERSION_MAJOR "2")
-set(GALOIS_VERSION_MINOR "3")
+set(GALOIS_VERSION_MAJOR "4")
+set(GALOIS_VERSION_MINOR "0")
 set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-set(GALOIS_COPYRIGHT_YEAR "2017") # Also in COPYRIGHT
+set(GALOIS_COPYRIGHT_YEAR "2018") # Also in COPYRIGHT
 
 #adding additional compiler flags for mpip profiling
 #set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
