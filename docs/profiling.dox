@@ -1,0 +1,51 @@
+/**
+\page profiling Profiling Galois Code
+
+\tableofcontents
+
+When optimizing Galois apps, you may need to work with an external profiling infrastructure to have an idea about the performance in micro-architectural level. Currently Galois supports profiling with Intel VTune and PAPI. For this to work, you need to include the header galois/runtime/Profile.h, and instrument your code as the following sections suggest.
+
+@section profile_w_vtune Profiling with Intel VTune
+
+<a href="https://software.intel.com/en-us/intel-vtune-amplifier-xe">Intel VTune</a> is the profiling tools offered by Intel in Intel Parallel Studio. 
+
+Turn on the use of Intel VTune by running cmake with -DUSE_VTUNE=1 option. Instrument the code region of interest with galois::runtime::profileVtune, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the node-iterator algorithm for triangle counting with Intel VTune:
+
+@snippet lonestar/triangles/Triangles.cpp profile w/ vtune
+
+Compile your code and run with VTune to collect statistics.
+
+@section profile_w_papi Profiling with PAPI
+
+<a href="http://icl.cs.utk.edt/papi/">PAPI</a> stands for "Performance Application Programming Interface". 
+
+Turn on the use of PAPI by running cmake with -DUSE_PAPI=1 option. Instrument the code region of interest with galois::runtime::profilePapi, which expects two arguments: (1) the code region to be profiled as a lambda expression, functor, etc., and (2) the name for the code region. Below is an example of profiling the edge-iterator algorithm for triangle counting with PAPI:
+
+@snippet lonestar/triangles/Triangles.cpp profile w/ papi
+
+Compile your code and run with a sequence of PAPI counters you want to collect. Below is an example command-line:
+
+$> GALOIS_PAPI_EVENTS="PAPI_L1_DCM,PAPI_L2_DCM,PAPI_BR_MSP,PAPI_TOT_INS,PAPI_TOT_CYC" ./triangles input_graph -algo edgeiterator -t 24
+
+Upon program termination, the value of PAPI counters will be reported along with other statistics in csv output, similar to the following:
+
+STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
+STAT, PageAlloc, MeminfoPre, TSUM, 53<br>
+STAT, PageAlloc, MeminfoPost, TSUM, 122<br>
+STAT, Initialize, Iterations, TSUM, 264346<br>
+STAT, Initialize, Time, TMAX, 17<br>
+STAT, edgeIteratingAlgo, Iterations, TSUM, 730100<br>
+STAT, edgeIteratingAlgo, Time, TMAX, 21<br>
+STAT, edgeIteratorAlgo, Time, TMAX, 21<br>
+STAT, edgeIteratorAlgo, PAPI_L1_DCM, TSUM, 613659<br>
+STAT, edgeIteratorAlgo, PAPI_L2_DCM, TSUM, 368932<br>
+STAT, edgeIteratorAlgo, PAPI_BR_MSP, TSUM, 1901191<br>
+STAT, edgeIteratorAlgo, PAPI_TOT_INS, TSUM, 293743102<br>
+STAT, edgeIteratorAlgo, PAPI_TOT_CYC, TSUM, 548013881<br>
+STAT, (NULL), Time, TMAX, 263<br>
+STAT, (NULL), GraphReadingTime, TMAX, 26<br>
+...
+
+Note that the PAPI counters are reported as categories for the region "edgeIteratorAlgo", the name provided to the galois::runtime::profilePapi call.
+
+*/

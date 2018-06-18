@@ -178,6 +178,7 @@ void nodeIteratingAlgo(Graph& graph) {
 
   galois::GAccumulator<size_t> numTriangles;
 
+  //! [profile w/ vtune]
   galois::runtime::profileVtune(
       [&]() {
         galois::do_all(
@@ -214,6 +215,7 @@ void nodeIteratingAlgo(Graph& graph) {
             galois::loopname("nodeIteratingAlgo"));
       },
       "nodeIteratorAlgo");
+  //! [profile w/ vtune]
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
@@ -254,6 +256,7 @@ void edgeIteratingAlgo(Graph& graph) {
                  galois::loopname("Initialize"));
 
   //  galois::runtime::profileVtune(
+  //! [profile w/ papi]
   galois::runtime::profilePapi(
       [&]() {
         galois::do_all(
@@ -285,6 +288,7 @@ void edgeIteratingAlgo(Graph& graph) {
             galois::steal());
       },
       "edgeIteratorAlgo");
+  //! [profile w/ papi]
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }

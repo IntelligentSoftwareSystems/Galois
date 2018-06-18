@@ -12,6 +12,7 @@
 - \subpage reduction
 - \subpage mem_allocator
 - \subpage your_own_ds
+- \subpage profiling
 - \subpage tuning
 
 */
