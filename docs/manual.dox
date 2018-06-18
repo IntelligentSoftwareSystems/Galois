@@ -3,17 +3,15 @@
 
 \tableofcontents
 
-- \subpage parallel_loop
-- \subpage your_own_ds
 - \subpage concurrent_data_structure
-- \subpage allocator
 - \subpage graph_io_util
-- \subpage mem_allocator
-- \subpage quickreference
-- \subpage reduction
+- \subpage parallel_loop
 - \subpage scheduler
-- \subpage tuning
 - \subpage numa
-
+- \subpage reduction
+- \subpage allocator
+- \subpage mem_allocator
+- \subpage your_own_ds
+- \subpage tuning
 
 */
