@@ -7,7 +7,7 @@
 - \subpage your_own_ds
 - \subpage concurrent_data_structure
 - \subpage allocator
-- \subpage graphio
+- \subpage graph_io_util
 - \subpage mem_allocator
 - \subpage quickreference
 - \subpage reduction

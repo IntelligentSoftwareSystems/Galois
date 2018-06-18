@@ -205,6 +205,8 @@ class SurveyPropagation {
     }
   }
 
+  //! [write to a FileGraph]
+  // Graph expands to galois::graphs::MorphGraph<SPNode, SPEdge, false>;
   void save_to_FileGraph(galois::graphs::FileGraphWriter& p, Graph& initGraph) {
     p.setNumNodes(M + N);
     p.setNumEdges(M * K);
@@ -242,6 +244,7 @@ class SurveyPropagation {
                               rawEdgeData);
     }
   }
+  //! [write to a FileGraph]
 
   void initialize_random_formula() {
     // M clauses
