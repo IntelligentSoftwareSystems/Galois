@@ -52,6 +52,8 @@ You can further exploit the semantics of work items when designing your own per-
 <li> If the work items form a multi-set and never get removed before processed, use galois::InsertBag.
 </ol>
 
+Start from galois::substrate::PerThreadStorage if none of the above fits your needs.
+
 local_iterator for a per-thread data structure can be naturally defined as the iterators to thread-local containers. The global iterator should be carefully constructed from local_iterators in order to conform to the STL interface. Galois will pick up local iterators to leverage the spacial/temporal locality in work generation.
 
 See galois::InsertBag as an example data structure built with this design in mind.
