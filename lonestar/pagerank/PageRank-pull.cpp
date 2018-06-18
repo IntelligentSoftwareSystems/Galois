@@ -52,6 +52,7 @@ typedef typename Graph::GraphNode GNode;
 using DeltaArray    = galois::LargeArray<PRTy>;
 using ResidualArray = galois::LargeArray<PRTy>;
 
+//! [example of no_stats]
 void initNodeDataTopological(Graph& g) {
   galois::do_all(galois::iterate(g),
                  [&](const GNode& n) {
@@ -61,6 +62,7 @@ void initNodeDataTopological(Graph& g) {
                  },
                  galois::no_stats(), galois::loopname("initNodeData"));
 }
+//! [example of no_stats]
 
 void initNodeDataResidual(Graph& g, DeltaArray& delta,
                           ResidualArray& residual) {

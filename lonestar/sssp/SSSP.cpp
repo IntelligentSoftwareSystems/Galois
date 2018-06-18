@@ -109,7 +109,9 @@ template <typename T, typename P, typename R>
 void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
                    const R& edgeRange) {
 
+  //! [reducible for self-defined stats]
   galois::GAccumulator<size_t> BadWork;
+  //! [reducible for self-defined stats]
   galois::GAccumulator<size_t> WLEmptyWork;
 
   namespace gwl = galois::worklists;
@@ -152,9 +154,11 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
                                  oldDist, newDist, std::memory_order_relaxed)) {
 
                            if (TRACK_WORK) {
+                             //! [per-thread contribution of self-defined stats]
                              if (oldDist != SSSP::DIST_INFINITY) {
                                BadWork += 1;
                              }
+                             //! [per-thread contribution of self-defined stats]
                            }
 
                            pushWrap(ctx, dst, newDist);
@@ -167,7 +171,9 @@ void deltaStepAlgo(Graph& graph, GNode source, const P& pushWrap,
                    galois::no_conflicts(), galois::loopname("SSSP"));
 
   if (TRACK_WORK) {
+    //! [report self-defined stats]
     galois::runtime::reportStat_Single("SSSP", "BadWork", BadWork.reduce());
+    //! [report self-defined stats]
     galois::runtime::reportStat_Single("SSSP", "WLEmptyWork",
                                        WLEmptyWork.reduce());
   }

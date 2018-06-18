@@ -26,6 +26,7 @@ int main(int argc, char* argv[]) {
   galois::graphs::readGraph(g, argv[1]); // argv[1] is the file name for graph
   //! [Read a graph]
 
+  //! [use of a StatTimer]
   //******************************************************
   // serial traversal over a graph
   // sum over nodes and edges in C++11 syntax
@@ -43,6 +44,7 @@ int main(int argc, char* argv[]) {
   }
   //! [Graph traversal]
   T.stop();
+  //! [use of a StatTimer]
 
   return 0;
 }

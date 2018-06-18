@@ -1,0 +1,124 @@
+/**
+\page output_stat Output Statistics of Galois Programs
+
+\tableofcontents
+
+
+For performance analysis, programmers need to instrument a program to collect program statistics. Galois relieves developers from this burden by providing built-in instrumentation and friendly output of statistics.
+
+@section basic_stat Basic Statistics
+
+Parallel loop iterators in Galois provide built-in instrumentation. Upon termination, Galois apps will output statistics in csv format, similar to the following:
+
+STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
+STAT, for_each_1, Iterations, TSUM, 9028387<br>
+STAT, for_each_1, Time, TMAX, 1663<br>
+STAT, for_each_1, Commits, TSUM, 9000000<br>
+STAT, for_each_1, Pushes, TSUM, 0<br>
+STAT, for_each_1, Conflicts, TSUM, 28387<br>
+
+The first row is the header of the csv output. REGION tells you which parallel loop the statistics are related. For example, "for_each_1" refers to the galois::for_each which has an option of galois::loopname("for_each_1").
+
+CATEGORY specifies what are being reported for the parallel region. For galois::for_each loops, the following five statistics are reported:
+<ol>
+<li> Iterations: the number of iterations executed
+<li> Time: the runtime, in milliseconds
+<li> Commits: the number of iterations committed
+<li> Pushes: the number of iterations generated
+<li> Conflicts: the number of iterations aborted due to conflicts
+</ol>
+
+For galois::do_all loops, only time and iterations are reported, since there are no conflicts and pushes in galois::do_all loops.
+
+TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value is the sum of all threads' contributions; TMAX means it is the maximum among all threads for this statistic. Except for TMAX and TSUM, Galois offers the following derivation of statistics:
+<ul>
+<li> TMIN: the value is the minimum among all threads for this statistic.
+<li> TAVG: the value is the avarage of all contributions to this statistic.
+<li> SINGLE: a single value is returned for this statistic. This is usually used for user-defined statistics. See @ref self__stat for examples.
+<li> ThreadValues: contribution of each thread to this statistic. See @ref advanced_stat for examples.
+</ul>
+
+For lonestar apps, pass -statFile <path_to_csv_file> as part of the command-line arguments to the program will redirect the csv output to the file <path_to_csv_file>.
+
+@section advanced_stat Advanced Control of Output Statistics 
+
+Users can overwrite the default behavior of output statistics in the following ways.
+<ol>
+<li> Turn off reporting statistics for a parallel loop by
+  <ul>
+  <li> Not passing a galois::loopname option to the galois::do_all or galois::for_each call; or
+  <li> Passing galois::no_stats as an option to the galois::do_all or galois::for_each call if the loopname is required, as shown in the following code snippet.
+
+@snippet lonestar/pagerank/PageRank-pull.cpp example of no_stats
+
+  </ul>
+<li> Report more statistics for a parallel loop by passing galois::more_stats as an option to the galois::do_all or galois::for_each call. 
+<li> Report per-thread contribution by setting the environmental variable "PRINT_PER_THREAD_STATS" before executing a Galois app. Below is an example execution asking for per-thread stats:
+
+$> PRINT_PER_THREAD_STATS=1 ./sssp <input_graph> -t <num_threads>
+
+And below is the output with per-thread stats.
+
+STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
+STAT, PageAlloc, MeminfoPre, TSUM, 21<br>
+STAT, PageAlloc, MeminfoPre, ThreadValues, 7; 2; 2; 2; 2; 2; 2; 2<br>
+STAT, PageAlloc, MeminfoPost, TSUM, 43<br>
+STAT, PageAlloc, MeminfoPost, ThreadValues, 8; 5; 5; 5; 5; 5; 5; 5<br>
+STAT, SSSP, Iterations, TSUM, 482052<br>
+STAT, SSSP, Iterations, ThreadValues, 80602; 71506; 87690; 58227; 53784; 77878; 27112; 25253<br>
+STAT, SSSP, Commits, TSUM, 482052<br>
+STAT, SSSP, Commits, ThreadValues, 80602; 71506; 87690; 58227; 53784; 77878; 27112; 25253<br>
+STAT, SSSP, Pushes, TSUM, 482051<br>
+STAT, SSSP, Pushes, ThreadValues, 81305; 71954; 87562; 57907; 54168; 77942; 26152; 25061<br>
+STAT, SSSP, Conflicts, TSUM, 0<br>
+STAT, SSSP, Conflicts, ThreadValues, 0; 0; 0; 0; 0; 0; 0; 0<br>
+STAT, SSSP, Time, TMAX, 19<br>
+STAT, SSSP, Time, ThreadValues 19<br>
+STAT, (NULL), Time, TMAX, 19<br>
+STAT, (NULL), Time, ThreadValues, 19<br>
+...
+
+Note the lines with TOTAL_TYPE of "ThreadValues" report a sequence of numbers instead of a single value for stats aggregated using TSUM.
+
+</ol>
+
+@section self_stat Self-defined Statistics
+
+Follow the following steps if you want to monitor some algorithm-specific statistics.
+<ol>
+<li> Identify the type of reduction for the statistics you are interested in.
+<li> Declare the reducible object for the statistics before the parallel loop of interest.
+<li> Collect per-thread contribution in the parallel loop of interest.
+<li> Reduce and report the statistic after the parallel loop of interest.
+</ol>
+
+Let us use single-source shortest path (SSSP) problem to illustrate the use of self-defined statistics. In SSSP, "bad works" mean the number of iterations in which the node distance is lowered more than once. Since the amount of bad works is the sum of the bad works encountered by each thread, bad works should be collected and reduced using sum operation, which calls for a galois::GAccumulator. We declare the collector before the parallel loop for SSSP as the following:
+
+@snippet lonestar/sssp/SSSP.cpp reducible for self-defined stats
+
+Then in the operator for the parallel loop for SSSP, collect per-thread contribution of bad works as the following:
+
+@snippet lonestar/sssp/SSSP.cpp per-thread contribution of self-defined stats
+
+Finally, after the parallel loop for SSSP is done, report the number of bad works as the following:
+
+@snippet lonestar/sssp/SSSP.cpp report self-defined stats 
+
+galois::runtime::reportStat_Single can be used if the value is reduced before being reported. Other reporting functions are galois::runtime::reportStat_Tmax, galois::runtime::reportStat_Tmin, galois::runtime::reportStat_Tsum, and galois::runtime::reportStat_Tavg, but they are rarely used in user code. All the stat reporting functions take three parameters: name for the region, name for the statistic, and value to be aggregated/reported.
+
+Conditional reporting of a statistic can be achieved by using conditional stat reporting functions, i.e. galois::runtime::reportStatCond_Single, galois::runtime::reportStatCond_Tmax, galois::runtime::reportStatCond_Tmin, galois::runtime::reportStatCond_Tsum, and galois::runtime::reportStatCond_Tavg. The conditional stat reporting functions accept a constant expression as a template parameter, and the reporting is turned on only when the constant expression is evaluated to true.
+
+@section stat_timer Timing Serial Code Region
+
+Serial code regions may be of interest for further optimization. Measure the runime in milliseconds for a serial code region by putting the code region in between calls to galois::StatTimer::start and galois::StatTimer::stop. The following code snippet shows an example from {@link lonestar/tutorial_examples/GraphTraversalSerial.cpp}:
+
+@snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp use of a StatTimer
+
+After program termination, the timer will output statistics like the following:
+
+STAT_TYPE, REGION, CATEGORY, TOTAL_TYPE, TOTAL<br>
+STAT, (NULL), sum_serial, TMAX, 15<br>
+
+Note that the name fed to the timer is printed as a category under the region "(NULL)".
+
+*/

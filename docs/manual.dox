@@ -7,6 +7,7 @@
 - \subpage graph_io_util
 - \subpage parallel_loop
 - \subpage scheduler
+- \subpage output_stat
 - \subpage numa
 - \subpage reduction
 - \subpage mem_allocator
