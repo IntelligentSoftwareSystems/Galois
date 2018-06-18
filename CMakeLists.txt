@@ -300,12 +300,12 @@ if(USE_LONGJMP_ABORT)
 endif()
 
 # Boost
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
+set(Boost_ADDITIONAL_VERSIONS "1.60.0" "1.61.0" "1.62.0")
 set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
-find_package(Boost 1.38.0 REQUIRED COMPONENTS serialization)
+find_package(Boost 1.60.0 REQUIRED COMPONENTS serialization)
 include_directories(${Boost_INCLUDE_DIR})
 add_definitions(-DBOOST_NO_AUTO_PTR)
 
