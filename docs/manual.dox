@@ -9,7 +9,6 @@
 - \subpage scheduler
 - \subpage numa
 - \subpage reduction
-- \subpage allocator
 - \subpage mem_allocator
 - \subpage your_own_ds
 - \subpage tuning
