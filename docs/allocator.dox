@@ -1,6 +1,7 @@
 /**
+\page allocator Allocators
 
-\page Manual Manual
+\tableofcontents
 @section allocator Allocators
 
 Allocators are used by dynamic data structures whose size is either known at

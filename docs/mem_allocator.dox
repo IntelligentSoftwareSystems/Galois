@@ -2,6 +2,8 @@
 
 @page mem_allocator Memory Allocators
 
+\tableofcontents
+
 @section allocator Memory Allocators
 
 Memory Allocators are used by dynamic data structures whose size is either known at

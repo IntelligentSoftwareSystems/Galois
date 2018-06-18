@@ -1,6 +1,8 @@
 /**
 
-\page Manual Manual
+\page data_structure Parallel Data Structures
+\tableofcontents
+
 @section data_structure Parallel Data Structures
 
 @subsection graphs Graphs

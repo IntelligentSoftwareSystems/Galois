@@ -3,4 +3,18 @@
 
 \tableofcontents
 
+- \subpage parallel_loop
+- \subpage data_structure
+- \subpage your_own_ds
+- \subpage concurrent_data_structure
+- \subpage allocator
+- \subpage graphio
+- \subpage mem_allocator
+- \subpage quickreference
+- \subpage reduction
+- \subpage scheduler
+- \subpage tuning
+- \subpage numa
+
+
 */
