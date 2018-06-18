@@ -629,7 +629,7 @@ public:
  * Scalable variable-size allocations.
  *
  * Slight misnomer as this doesn't support allocations greater than a page.
- * Users should call {@link allocate(size_t, size_t&)} multiple times to split
+ * Users should call allocate multiple times to split
  * large allocations over multiple pages.
  */
 struct VariableSizeHeap : public ThreadPrivateHeap<BumpHeap<SystemHeap>> {

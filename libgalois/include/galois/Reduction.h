@@ -58,7 +58,7 @@ public:
   using AccumType = T; // for outside access if necessary
 
   /**
-   * @param f the binary functor acting as the reduction operator
+   * @param func the binary functor acting as the reduction operator
    * @param identity is the identity value for the functor f,
    * i.e., f(x,identity) == x
    */
@@ -120,7 +120,7 @@ public:
   T peekLocal(void) const { return *m_data.getLocal(); }
 
   /**
-   * @param thread id tid
+   * @param tid thread id
    * reads (in unsynchronized manner) the value of another thread 'tid'
    * value may be incorrect and may be usafe to use as it may return an object
    * in an intermediate state while its being updated

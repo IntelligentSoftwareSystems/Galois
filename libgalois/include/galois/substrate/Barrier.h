@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting
  * parallelism. The code is being released under the terms of XYZ License (a
  * copy is located in LICENSE.txt at the top-level directory).
@@ -47,13 +47,13 @@ public:
 };
 
 /**
- * return a reference to system barrier
+ * Return a reference to system barrier
  */
 Barrier& getBarrier(unsigned activeThreads);
 
 /**
  * Create specific types of barriers.  For benchmarking only.  Use
- * getSystemBarrier() for all production code
+ * getBarrier() for all production code
  */
 std::unique_ptr<Barrier> createPthreadBarrier(unsigned);
 std::unique_ptr<Barrier> createMCSBarrier(unsigned);
@@ -65,10 +65,10 @@ std::unique_ptr<Barrier> createDisseminationBarrier(unsigned);
  * Creates a new simple barrier. This barrier is not designed to be fast but
  * does gaurantee that all threads have left the barrier before returning
  * control. Useful when the number of active threads is modified to avoid a
- * race in {@link getSystemBarrier()}.  Client is reponsible for deallocating
+ * race in {@link getBarrier()}.  Client is reponsible for deallocating
  * returned barrier.
  */
-std::unique_ptr<Barrier> createSimpleBarrier(unsigned);
+std::unique_ptr<Barrier> createSimpleBarrier(unsigned int);
 
 namespace internal {
 

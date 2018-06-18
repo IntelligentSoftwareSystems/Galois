@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting
  * parallelism. The code is being released under the terms of XYZ License (a
  * copy is located in LICENSE.txt at the top-level directory).
@@ -208,12 +208,9 @@ public:
   void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
 
   /**
-   * Allocates using default memory policy (usually first-touch)
+   * Allocates using blocked memory policy 
    *
    * @param  n         number of elements to allocate
-   * @param  prefault  Prefault/touch memory to place it local to the currently
-   * executing thread. By default, true because concurrent page-faulting can be
-   * a scalability bottleneck.
    */
   void allocateBlocked(size_type n) { allocate(n, Blocked); }
 

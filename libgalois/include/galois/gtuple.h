@@ -69,7 +69,7 @@ struct subtype_index_nodup<T, Tuple, Index1, NotFound, NotFound> {
   static const size_t value = Index1;
 };
 
-//! @section Integer Sequences
+// Integer Sequences
 template <typename T, T... Is>
 struct integer_seq {
   using type = integer_seq;
@@ -131,7 +131,7 @@ struct tuple_elements<Tuple, int_seq<Is...>> {
   typedef std::tuple<typename std::tuple_element<Is, Tuple>::type...> type;
 };
 
-//! @section Accessors
+// Accessors
 
 /**
  * Like \code std::get<T>(std::tuple<Types...> t) \endcode (C++14) except that

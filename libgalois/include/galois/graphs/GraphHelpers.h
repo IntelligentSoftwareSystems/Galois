@@ -465,6 +465,8 @@ determineUnitRangesFromGraph(GraphTy& graph, uint32_t unitsToSplit,
  *
  * @param unitsToSplit number of units to split nodes among
  * @param edgePrefixSum A prefix sum of edges
+ * @param nodeAlpha amount of weight to give to nodes when dividing work among
+ * threads
  * @returns vector that indirectly specifies how nodes are split amongs units
  * of execution
  */
@@ -529,6 +531,8 @@ std::vector<uint32_t> determineUnitRangesFromPrefixSum(uint32_t unitsToSplit,
  * @param edgePrefixSum A prefix sum of edges
  * @param beginNode Beginning of range
  * @param endNode End of range, non-inclusive
+ * @param nodeAlpha amount of weight to give to nodes when dividing work among
+ * threads
  * @returns vector that indirectly specifies how nodes are split amongs units
  * of execution
  */

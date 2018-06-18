@@ -28,7 +28,7 @@
 
 namespace galois {
 
-//! @section Trait classifications
+// Trait classifications
 
 template <typename T>
 struct trait_has_type {
@@ -51,7 +51,7 @@ struct trait_has_svalue {
   T getValue() const { return V; }
 };
 
-//! @section Utility
+// Utility
 
 /**
  * Utility function to simplify creating traits that take unnamed functions
@@ -157,7 +157,7 @@ struct function_traits<
   typedef typename T::function_traits type;
 };
 
-//! @section Traits
+// Traits
 
 /**
  * Indicate name to appear in statistics. Optional argument to {@link do_all()}

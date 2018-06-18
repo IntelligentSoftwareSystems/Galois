@@ -45,7 +45,7 @@ template <typename, typename, typename, typename, typename>
 struct EdgeSortReference;
 }
 
-//! Proxy object for {@link internal::EdgeSortIterator}
+//! Proxy object for internal EdgeSortReference
 template <typename GraphNode, typename EdgeTy>
 class EdgeSortValue : public StrictObject<EdgeTy> {
   template <typename, typename, typename, typename, typename>
@@ -67,7 +67,6 @@ public:
   }
 };
 
-//! Implementation details for graphs
 namespace internal {
 
 template <bool Enable>

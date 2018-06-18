@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting
  * parallelism. The code is being released under the terms of XYZ License (a
  * copy is located in LICENSE.txt at the top-level directory).
