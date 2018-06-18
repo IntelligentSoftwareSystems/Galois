@@ -220,10 +220,7 @@ The parallelism profile should be interpreted as follows:
 </ol>
 
 
-@section additional_notes Additional Notes
-
-
-@subsection example_output Example Output of Galois Apps
+@section example_output Example Output of Galois Apps
 
 Upon termination, Galois apps will output statistics in csv format, similar to the following:
 
@@ -250,7 +247,7 @@ For galois::do_all loops, only time and iterations are reported, since there are
 TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value is the sum of all threads' contributions; TMAX means it is the maximum among all threads for this statistic. TOTAL_TYPE is usually a reduction operation.
 
 
-@subsection galois_morph_graph_api MorphGraph APIs
+@section galois_morph_graph_api MorphGraph APIs
 
 If your application requires modifying graph topology, e.g. as in delaunay mesh refinement, you need galois::graphs::MorphGraph. galois::graphs::MorphGraph supports all the functionalities in galois::graphs::LC_CSR_Graph except for size(), reporting the number of nodes in a graph; and sizeEdges(), reporting the number of edges in a graph. Additionally, galois::graphs::MorphGraph provides the following APIs to modify graph topology:
 
@@ -277,7 +274,7 @@ See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
 How work is divided among threads in galois::do_all depends on whether work stealing is turned on. If work stealing is turned off, then the range is partitioned evenly among threads, and each threads works on its own partition independently. If work stealing is turned on, the work range is partitioned into chunks of N iterations, where N is the chunk size. Each thread is then assigned an initial set of chunks, and starts working from the beginning of the set. If a thread finishes its own chunks but other threads are still working on theirs, it will steal chunks from another thread's end of set of chunks.
 
 
-@subsection mem_alloc Memory Allocators
+@section mem_alloc Memory Allocators
 
 Memory allocation plays an important role in making parallel programs scalable. Use the following Galois memory allocators with the recommended scenarios, especially in parallel loops.
 
@@ -310,7 +307,7 @@ galois::for_each(
 </ol>
 
 
-@subsection tuning_guides Tuning Guides
+@section tuning_guides Tuning Guides
 
 Performance tuning is required to make a parallel program fast and scalable. Readers should keep the following points in mind when tuning performance:
 <ol>
