@@ -1,4 +1,4 @@
-/**
+/*
  * This file belongs to the Galois project, a C++ library for exploiting
  * parallelism. The code is being released under the terms of XYZ License (a
  * copy is located in LICENSE.txt at the top-level directory).
@@ -15,6 +15,14 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ */
+
+/**
+ * @file FileGraph.h
+ *
+ * Contains FileGraph and FileGraphWriter class declarations.
+ *
+ * @todo finish up doxygen
  */
 
 #ifndef GALOIS_GRAPH_FILEGRAPH_H
@@ -44,10 +52,12 @@ namespace galois {
 namespace graphs {
 
 // XXX(ddn): Refactor to eliminate OCFileGraph
-//! Graph serialized to a file
+
+//! Graph that mmaps Galois gr files for access
 class FileGraph {
 public:
-  typedef uint64_t GraphNode;
+  //! type of a node
+  using GraphNode = uint64_t;
 
 private:
   struct Convert32 : public std::unary_function<uint32_t, uint32_t> {
@@ -66,14 +76,21 @@ private:
   std::deque<mapping> mappings;
   std::deque<int> fds;
 
+  //! The size of edge data (on 1 edge)
   uint64_t sizeofEdge;
+  //! Number of nodes in this (sub)graph
   uint64_t numNodes;
+  //! Number of edges in this (sub)graph
   uint64_t numEdges;
 
+  //! Array specifying where a node's edges begin in memory
   uint64_t* outIdx;
+  //! Array storing outgoing edge destinations
   void* outs;
+  //! Array storing edge data (if it exists)
   char* edgeData;
 
+  //! Galois gr version of read in graph
   int graphVersion;
 
   //! adjustments to node index when we load only part of a graph
@@ -85,14 +102,51 @@ private:
   galois::GAccumulator<uint64_t> numBytesReadIndex, numBytesReadEdgeDst,
       numBytesReadEdgeData;
 
+  /**
+   * Construct a file graph by moving in structures from the passed in file graph.
+   */
   void move_assign(FileGraph&&);
+  /**
+   * Get the local edge id of the edge with a specific source and destination
+   * if it exists.
+   *
+   * @param src Global source id of edge to find
+   * @param dst Global destination id of edge to find
+   * @returns the local edge id of the edge (src, dst) if it exists, otherwise
+   * return ~0
+   */
   uint64_t getEdgeIdx(GraphNode src, GraphNode dst);
+
+  /**
+   * Gets a pointer to the first neighbor of node N.
+   *
+   * @param N global node id of neighbor begin to get
+   * @returns pointer to global id of first neighbor of node N
+   */
   void* raw_neighbor_begin(GraphNode N);
+  /**
+   * Gets a pointer to the end of node N's neighbors in the edge destination
+   * array.
+   *
+   * @param N global node id of neighbor end to get
+   * @returns pointer to end of node N's neighbors in edge destination array.
+   */
   void* raw_neighbor_end(GraphNode N);
 
-  //! Initializes a graph from block of memory
+  /**
+   * Given an mmap'd version of the graph, initialize graph from that block of
+   * memory
+   */
   void fromMem(void* m, uint64_t nodeOffset, uint64_t edgeOffset, uint64_t);
 
+  /**
+   * Loads a graph from another file graph
+   *
+   * @param g FileGraph to load from
+   * @param sizeofEdgeData Size of edge data (for 1 edge)
+   *
+   * @returns Pointer to the edge data array of the newly loaded file graph
+   */
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
   /**
@@ -104,12 +158,29 @@ private:
    *  targetSize
    *
    *  in range [lb, ub). Returns ub if unsuccessful.
+   *
+   * @param nodeSize Weight of nodes
+   * @param edgeSize Weight of edges
+   * @param targetSize Size that returned node id should attempt to hit
+   * @param lb Lower bound of nodes to consider
+   * @param ub Upper bound of nodes to consider
+   *
+   * @returns A node id that hits the target size (or gets close to it)
    */
   size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize,
                    size_t lb, size_t ub);
 
   void fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
 
+  /**
+   * Page in a portion of the loaded graph data based based on division of labor
+   * by nodes.
+   *
+   * @param id ID of unit of thread/unit of execution that will page in pages
+   * @param total Total number of threads/units of execution to split page in
+   * work among
+   * @param sizeofEdgeData Size of the loaded edge data
+   */
   void pageInByNode(size_t id, size_t total, size_t sizeofEdgeData);
 
 protected:
@@ -117,9 +188,19 @@ protected:
    * Copies graph connectivity information from arrays. Returns a pointer to
    * array to populate with edge data.
    *
-   * @param converted
-   *   whether values in arrays are in host byte ordering (false) or in
-   *   FileGraph byte ordering (true)
+   * @param outIdx Out index information in an array
+   * @param numNodes number of nodes
+   * @param outs edge destination array
+   * @param numEdges number of edges
+   * @param edgeData array of edge data
+   * @param sizeofEdgeData The size of the edge data
+   * @param nodeOffset how many nodes from the beginning will this graph start
+   * from
+   * @param edgeOffset how many edges from the beginning will this edge start 
+   * from
+   * @param converted whether values in arrays are in host byte ordering 
+   * (false) or in FileGraph byte ordering (true)
+   * @param oGraphVersion Galois graph version to use
    * @return pointer to begining of edgeData in graph
    */
   void* fromArrays(uint64_t* outIdx, uint64_t numNodes, void* outs,
@@ -153,6 +234,8 @@ public:
   }
 
   // Edge Handling
+
+  //! Get edge data of an edge between 2 nodes
   template <typename EdgeTy>
   EdgeTy& getEdgeData(GraphNode src, GraphNode dst) {
     assert(sizeofEdge == sizeof(EdgeTy));
@@ -160,9 +243,24 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[getEdgeIdx(src, dst)];
   }
 
-  // Iterators
-  typedef boost::counting_iterator<uint64_t> edge_iterator;
+  //! Edge iterators (boost iterator)
+  using edge_iterator = boost::counting_iterator<uint64_t>;
+
+  /**
+   * Returns the index to the beginning of global node N's outgoing edges
+   * in the outgoing edges array.
+   *
+   * @param N global node id of edge begin to get
+   * @returns Iterator to first edge of node N
+   */
   edge_iterator edge_begin(GraphNode N);
+  /**
+   * Returns the index to the end of global node N's outgoing edges
+   * in the outgoing edges array.
+   *
+   * @param N global node id of edge end to get
+   * @returns Iterator to end of node N's edges
+   */
   edge_iterator edge_end(GraphNode N);
 
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
@@ -282,6 +380,12 @@ public:
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
+  /**
+   * Gets the destination of some edge.
+   *
+   * @param it local edge id of edge destination to get
+   * @returns a global node id representing the destination of the edge
+   */
   GraphNode getEdgeDst(edge_iterator it);
 
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
@@ -315,26 +419,100 @@ public:
     return &r[numEdges];
   }
 
+  /**
+   * Gets the first node of the loaded graph.
+   *
+   * @returns An iterator to the first node of the graph. Note it is a GLOBAL id.
+   */
   iterator begin() const;
+  /**
+   * Gets the end of the nodes of the loaded graph.
+   *
+   * @returns An iterator to the end of the nodes of the graph (of the
+   * loaded part of the graph).
+   */
   iterator end() const;
 
   typedef std::pair<iterator, iterator> NodeRange;
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
 
-  //! Divides nodes into balanced ranges
+  /**
+   * Given a division and a total number of divisions, return a range for that
+   * particular division to work on. (i.e. this divides labor among divisions
+   * depending on how much weight is given to nodes/edges).
+   *
+   * @param nodeSize Weight of nodes
+   * @param edgeSize Weight of edges
+   * @param id Division id
+   * @param total Total number of divisions
+   *
+   * @returns A node range and an edge range specifying division "id"'s assigned
+   * nodes/edges
+   */
   GraphRange divideByNode(size_t nodeSize, size_t edgeSize, size_t id,
                           size_t total);
 
-  //! Divides edges into balanced ranges
+  /**
+   * Divides nodes only considering edges.
+   *
+   * IMPORTANT: Note that it may potentially not return all nodes in the graph
+   * (it will return up to the last node with edges).
+   *
+   * @param nodeSize Weight of nodes
+   * @param edgeSize Weight of edges
+   * @param id Division id
+   * @param total Total number of divisions
+   *
+   * @returns A node range and an edge range specifying division "id"'s assigned
+   * nodes/edges
+   */
   GraphRange divideByEdge(size_t nodeSize, size_t edgeSize, size_t id,
                           size_t total);
-
+  /**
+   * Returns an iterator to the beginning of the node destination
+   * array.
+   *
+   * @returns iterator to beginning of the node destination array of the
+   * loaded graph (local)
+   * @todo implement version 2 support
+   */
   node_id_iterator node_id_begin() const;
+  /**
+   * Returns an iterator to the end of the node destination
+   * array.
+   *
+   * @returns iterator to end of the node destination array of the loaded
+   * graph (local)
+   * @todo implement version 2 support
+   */
   node_id_iterator node_id_end() const;
+  /**
+   * Returns an iterator to the beginning of the array specifying
+   * the index into the destination array where a particular node's
+   * edges begin.
+   *
+   * @return iterator to beginning of edge index array of the loaded graph
+   */
   edge_id_iterator edge_id_begin() const;
+  /**
+   * Returns an iterator to the end of the array specifying
+   * the index into the destination array where a particular node's
+   * edges begin.
+   *
+   * @return iterator to end of edge index array of the loaded graph
+   */
   edge_id_iterator edge_id_end() const;
 
+  /**
+   * Determines if an edge with source N1 and destination N2 existed
+   * in the currently loaded (local) graph.
+   *
+   * @param N1 global node id of neighbor 1 (source)
+   * @param N2 global node id of neighbor 2 (destination)
+   *
+   * @returns true if edge (N1, N2) exists locally, false otherwise
+   */
   bool hasNeighbor(GraphNode N1, GraphNode N2);
 
   //! Returns the number of nodes in the (sub)graph
@@ -346,22 +524,55 @@ public:
   //! Returns the size of an edge
   size_t edgeSize() const { return sizeofEdge; }
 
+  /**
+   * Default file graph constructor which initializes fields to null values.
+   */
   FileGraph();
+
+  /**
+   * Construct graph from another FileGraph
+   *
+   * @param o Other filegraph to initialize from.
+   */
   FileGraph(const FileGraph&);
+  /**
+   * Copy constructor operator for FileGraph
+   */
   FileGraph& operator=(const FileGraph&);
+  /**
+   * Move constructor for FileGraph
+   */
   FileGraph(FileGraph&&);
+  /**
+   * Move constructor operator for FileGraph
+   */
   FileGraph& operator=(FileGraph&&);
+  /**
+   * Destructor. Un-mmaps mmap'd things and closes opened files.
+   */
   ~FileGraph();
 
-  //! Reads graph from file
+  /**
+   * Given a file name, mmap the entire file into memory. Should
+   * be a graph with some specific layout.
+   *
+   * @param filename Graph file to load
+   */
   void fromFile(const std::string& filename);
 
   /**
-   * Reads a subgraph corresponding to given range of nodes and edges from file.
+   * Loads/mmaps particular portions of a graph corresponding to a node
+   * range and edge range into memory.
    *
-   * An example of use:
+   * Note that it makes the object work on a LOCAL scale (i.e. there are
+   * now local ids corresponding to the subgraph). Most functions will
+   * still handle global ids, though. (see below)
    *
-   * \snippet test/filegraph.cpp Reading part of graph
+   * @param filename File to load
+   * @param nrange Node range to load
+   * @param erange Edge range to load
+   * @param numaMap if true, does interleaved numa allocation for data 
+   * structures
    */
   void partFromFile(const std::string& filename, NodeRange nrange,
                     EdgeRange erange, bool numaMap = false);
@@ -369,6 +580,8 @@ public:
   /**
    * Reads graph connectivity information from file. Tries to balance memory
    * evenly across system.  Cannot be called during parallel execution.
+   *
+   * Edge data version.
    */
   template <typename EdgeTy>
   void fromFileInterleaved(
@@ -377,6 +590,12 @@ public:
     fromFileInterleaved(filename, sizeof(EdgeTy));
   }
 
+  /**
+   * Reads graph connectivity information from file. Tries to balance memory
+   * evenly across system.  Cannot be called during parallel execution.
+   *
+   * No edge data version.
+   */
   template <typename EdgeTy>
   void fromFileInterleaved(
       const std::string& filename,
@@ -393,7 +612,12 @@ public:
     return reinterpret_cast<T*>(fromGraph(g, sizeof(T)));
   }
 
-  //! Writes graph to file
+  /**
+   * Write current contents of mappings to a file
+   *
+   * @param file File to write to
+   * @todo perform host -> le on data
+   */
   void toFile(const std::string& file);
 };
 
