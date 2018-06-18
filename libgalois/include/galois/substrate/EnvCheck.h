@@ -27,7 +27,7 @@
 namespace galois {
 namespace substrate {
 
-namespace impl {
+namespace internal {
 
 template <typename T>
 struct ConvByType {};
@@ -68,7 +68,7 @@ bool genericGetEnv(const char* varName, T& ret) {
   }
 }
 
-} // end namespace impl
+} // end namespace internal
 
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* varName);
@@ -83,7 +83,7 @@ bool EnvCheck(const std::string& varName);
  */
 template <typename T>
 bool EnvCheck(const char* varName, T& retVal) {
-  return impl::genericGetEnv(varName, retVal);
+  return internal::genericGetEnv(varName, retVal);
 }
 
 template <typename T>
