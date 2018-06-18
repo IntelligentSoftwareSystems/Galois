@@ -12,9 +12,9 @@
 #include "dmp-internal-wb.h"
 #include "dmp-internal-mot.h"
 
-__thread LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
-__thread BumpAllocator<LogEntry> DMPwbPool; // allocation pool
-__thread BumpAllocator<void*> DMPwbFreeLog; // log for calls to free()
+thread_local LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
+thread_local BumpAllocator<LogEntry> DMPwbPool; // allocation pool
+thread_local BumpAllocator<void*> DMPwbFreeLog; // log for calls to free()
 
 //-----------------------------------------------------------------------
 // Initialization

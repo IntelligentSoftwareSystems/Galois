@@ -356,7 +356,7 @@ extern atomic_int_t DMPnumRunnableThreads; // size
 extern atomic_uint64_t DMProundNumber;
 
 // The DMP info for the current thread, in thread-local storage.
-extern __thread DmpThreadInfo* DMPMAP;
+extern thread_local DmpThreadInfo* DMPMAP;
 
 #ifdef DMP_ENABLE_WB_HBSYNC
 // Global work counters.

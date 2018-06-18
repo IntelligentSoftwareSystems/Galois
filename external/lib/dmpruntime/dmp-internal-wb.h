@@ -134,8 +134,8 @@ struct LogEntry {
 #endif
 };
 
-extern __thread LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
-extern __thread BumpAllocator<LogEntry> DMPwbPool; // allocation pool
+extern thread_local LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
+extern thread_local BumpAllocator<LogEntry> DMPwbPool; // allocation pool
 
 //-----------------------------------------------------------------------
 // Write Buffer API

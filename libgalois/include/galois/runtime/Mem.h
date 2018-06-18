@@ -611,7 +611,7 @@ public:
 
 private:
   typedef std::map<size_t, SizedHeap*> HeapMap;
-  static __thread HeapMap* localHeaps;
+  static thread_local HeapMap* localHeaps;
   HeapMap heaps;
   std::list<HeapMap*> allLocalHeaps;
   substrate::SimpleLock lock;

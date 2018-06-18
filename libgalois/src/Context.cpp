@@ -24,7 +24,7 @@
 #include <stdio.h>
 
 //! Global thread context for each active thread
-static __thread galois::runtime::SimpleRuntimeContext* thread_ctx = 0;
+static thread_local galois::runtime::SimpleRuntimeContext* thread_ctx = 0;
 
 #ifdef GALOIS_USE_LONGJMP_ABORT
 

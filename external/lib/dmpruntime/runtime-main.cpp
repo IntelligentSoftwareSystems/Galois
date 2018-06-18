@@ -25,7 +25,7 @@ atomic_int_t DMPnumLiveThreads     = 0;
 atomic_int_t DMPthreadInfosSize    = 0;
 DmpThreadInfo* DMPthreadInfos[MaxThreads];
 
-__thread DmpThreadInfo* DMPMAP;
+thread_local DmpThreadInfo* DMPMAP;
 
 // The MOT.
 uint32_t DMPmot[DMP_MOT_ENTRIES];

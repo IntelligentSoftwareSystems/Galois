@@ -189,7 +189,7 @@ void PerBackend_v3::addRemote(void* ptr, uint32_t srcID, uint64_t off,
   lock.unlock();
 }
 
-__thread void* PerBackend_v3::space[dynSlots];
+thread_local void* PerBackend_v3::space[dynSlots];
 
 PerBackend_v3& galois::runtime::getPerThreadDistBackend() {
   static PerBackend_v3 be;

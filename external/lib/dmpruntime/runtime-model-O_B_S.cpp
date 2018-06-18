@@ -45,7 +45,7 @@ static inline uint32_t DMPmotOwnerFromThread(DmpThreadInfo* dmp) {
 //
 
 #ifdef DMP_ENABLE_WB_READLOG
-__thread BumpAllocator<int> DMPreadLog;
+thread_local BumpAllocator<int> DMPreadLog;
 #endif
 
 //-----------------------------------------------------------------------

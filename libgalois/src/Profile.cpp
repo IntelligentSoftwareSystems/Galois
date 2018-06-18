@@ -114,7 +114,7 @@ extern "C" {
 namespace papi {
 static bool isInit;
 static bool isSampling;
-static __thread int papiEventSet = PAPI_NULL;
+static thread_local int papiEventSet = PAPI_NULL;
 
 //static int papiEvents[2] = {PAPI_L3_TCA,PAPI_L3_TCM};
 //static const char* papiNames[2] = {"L3_ACCESSES","L3_MISSES"};

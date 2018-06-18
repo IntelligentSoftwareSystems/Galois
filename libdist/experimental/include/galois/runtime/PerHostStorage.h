@@ -157,7 +157,7 @@ public:
 
 class PerBackend_v3 {
   static const int dynSlots = 1024;
-  static __thread void* space[dynSlots];
+  static thread_local void* space[dynSlots];
 
   std::vector<bool> freelist;
   std::vector<void**> heads;

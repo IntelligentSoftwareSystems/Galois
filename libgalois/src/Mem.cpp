@@ -30,7 +30,7 @@ SystemHeap::SystemHeap() { assert(AllocSize == runtime::pagePoolSize()); }
 SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE
-__thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
+thread_local SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 
 SizedHeapFactory::SizedHeap*
 SizedHeapFactory::getHeapForSize(const size_t size) {

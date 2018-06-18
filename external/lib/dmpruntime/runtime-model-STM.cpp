@@ -54,8 +54,8 @@ uint64_t DMPstmSerialQuanta;
 
 static HashSet ToClear;
 
-__thread HashSet* DMPreadLog;
-__thread HashSet* DMPwriteLog;
+thread_local HashSet* DMPreadLog;
+thread_local HashSet* DMPwriteLog;
 
 void DMP_initRuntime() { memset(DMPmot, 0, sizeof DMPmot); }
 

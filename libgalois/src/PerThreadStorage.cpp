@@ -23,14 +23,14 @@
 #include "galois/gIO.h"
 #include <mutex>
 
-__thread char* galois::substrate::ptsBase;
+thread_local char* galois::substrate::ptsBase;
 
 galois::substrate::PerBackend& galois::substrate::getPTSBackend() {
   static galois::substrate::PerBackend b;
   return b;
 }
 
-__thread char* galois::substrate::pssBase;
+thread_local char* galois::substrate::pssBase;
 
 galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
   static galois::substrate::PerBackend b;

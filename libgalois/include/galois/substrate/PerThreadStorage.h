@@ -84,10 +84,10 @@ public:
   void* getLocal(unsigned offset, unsigned id) { return &heads[id][offset]; }
 };
 
-extern __thread char* ptsBase;
+extern thread_local char* ptsBase;
 PerBackend& getPTSBackend();
 
-extern __thread char* pssBase;
+extern thread_local char* pssBase;
 PerBackend& getPPSBackend();
 
 void initPTS(unsigned maxT);

@@ -36,7 +36,7 @@ using std::tr1::ref;
 #endif
 } // namespace Config
 
-extern __thread unsigned TID;
+extern thread_local unsigned TID;
 extern unsigned nextID;
 
 // NB(ddn): Not "DRF" for DMP but this is okay if we don't interpret the value

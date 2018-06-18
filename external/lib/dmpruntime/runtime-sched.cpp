@@ -608,8 +608,8 @@ void DMP_waitForTurnInRound();
 
 #else
 
-static __thread int64_t TotalChunkDiff;
-static __thread int64_t TotalDiffs;
+static thread_local int64_t TotalChunkDiff;
+static thread_local int64_t TotalDiffs;
 
 __attribute__((noinline)) void DMP_waitForTurnInRound() {
   // Nop if only one thread is running.

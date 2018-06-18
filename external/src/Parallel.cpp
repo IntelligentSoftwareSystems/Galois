@@ -8,7 +8,7 @@
 #include "ittnotify.h"
 #endif
 
-__thread unsigned Exp::TID = 0;
+thread_local unsigned Exp::TID = 0;
 unsigned Exp::nextID       = 0;
 
 //! Generic check for pthread functions
