@@ -34,11 +34,11 @@ TOTAL_TYPE tells you how the statistics are derived. TSUM means that the value i
 <ul>
 <li> TMIN: the value is the minimum among all threads for this statistic.
 <li> TAVG: the value is the avarage of all contributions to this statistic.
-<li> SINGLE: a single value is returned for this statistic. This is usually used for user-defined statistics. See @ref self__stat for examples.
+<li> SINGLE: a single value is returned for this statistic. This is usually used for user-defined statistics. See @ref self_stat for examples.
 <li> ThreadValues: contribution of each thread to this statistic. See @ref advanced_stat for examples.
 </ul>
 
-For lonestar apps, pass -statFile <path_to_csv_file> as part of the command-line arguments to the program will redirect the csv output to the file <path_to_csv_file>.
+For lonestar apps, pass -statFile path_to_csv_file as part of the command-line arguments to the program will redirect the csv output to the file path_to_csv_file.
 
 @section advanced_stat Advanced Control of Output Statistics 
 
@@ -55,7 +55,7 @@ Users can overwrite the default behavior of output statistics in the following w
 <li> Report more statistics for a parallel loop by passing galois::more_stats as an option to the galois::do_all or galois::for_each call. 
 <li> Report per-thread contribution by setting the environmental variable "PRINT_PER_THREAD_STATS" before executing a Galois app. Below is an example execution asking for per-thread stats:
 
-$> PRINT_PER_THREAD_STATS=1 ./sssp <input_graph> -t <num_threads>
+$> PRINT_PER_THREAD_STATS=1 ./sssp input_graph -t 8
 
 And below is the output with per-thread stats.
 
