@@ -21,7 +21,6 @@
 #include "galois/AtomicHelpers.h"
 #include "galois/Reduction.h"
 #include "galois/Bag.h"
-#include "galois/DomainSpecificExecutors.h"
 #include "galois/Timer.h"
 #include "galois/UnionFind.h"
 #include "galois/graphs/LCGraph.h"
