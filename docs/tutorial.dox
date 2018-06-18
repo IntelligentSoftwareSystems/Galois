@@ -116,6 +116,11 @@ Below is the example of paralleizing our running example in pull-style operator 
 The full example is available as {@link lonestar/tutorial_examples/GraphTraversalPullOperator.cpp}
 
 
+@subsubsection work_in_do_all Work Distribution in galois::do_all
+
+How work is divided among threads in galois::do_all depends on whether work stealing is turned on. If work stealing is turned off, then the range is partitioned evenly among threads, and each threads works on its own partition independently. If work stealing is turned on, the work range is partitioned into chunks of N iterations, where N is the chunk size. Each thread is then assigned an initial set of chunks, and starts working from the beginning of the set. If a thread finishes its own chunks but other threads are still working on theirs, it will steal chunks from another thread's end of set of chunks.
+
+
 @subsection galois_for_each galois::for_each
 
 galois::for_each can be used for parallel iterations that may generate new work items, and that may have conflicts among iterations. Operators must be cautious: All locks should be acquired successfully before the first write to user state. Optional features for galois::for_each include (1) turning off conflict detection, (2) asserting that no new work items will be created, and (3) specifying desired schedule for processing active elements. galois::for_each is suitable to implement push-style algorithms.
@@ -267,11 +272,6 @@ The following code snippet shows how to add nodes and edges to a galois::graphs:
 @snippet lonestar/tutorial_examples/TorusConstruction.cpp Construct torus
 
 See the full example at {@link lonestar/tutorial_examples/TorusConstruction.cpp}
-
-
-@subsection work_in_do_all Work Distribution in galois::do_all
-
-How work is divided among threads in galois::do_all depends on whether work stealing is turned on. If work stealing is turned off, then the range is partitioned evenly among threads, and each threads works on its own partition independently. If work stealing is turned on, the work range is partitioned into chunks of N iterations, where N is the chunk size. Each thread is then assigned an initial set of chunks, and starts working from the beginning of the set. If a thread finishes its own chunks but other threads are still working on theirs, it will steal chunks from another thread's end of set of chunks.
 
 
 @section mem_alloc Memory Allocators
