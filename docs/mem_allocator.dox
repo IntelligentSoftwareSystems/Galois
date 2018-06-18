@@ -4,7 +4,7 @@
 
 \tableofcontents
 
-@section allocator Memory Allocators
+@section mem_allocator Memory Allocators
 
 Memory Allocators are used by dynamic data structures whose size is either known at
 runtime or changes during execution, e.g., std::vector, std::set, etc. to manage dynamically changing memory requirements.
@@ -82,6 +82,7 @@ Allocator (file {@link lonestar/delaunayrefinement/Cavity.h}):
 @snippet lonestar/delaunayrefinement/Cavity.h STL vector using PerIterAllocTy
 
 @subsection Pow_2_allocator Power of 2 Allocator
+
 Power of 2 Allocator {@link galois::Pow_2_VarSizeAlloc} is a scalable allocator for dynamic data structures that allocate objects with variable size. This is a suitable allocator for STL data structures such as std::vector, std::deque, etc. It allocates blocks of sizes in powers of 2 so that
 insertion operations on containers like std::vector get amortized over time.
 
