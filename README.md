@@ -109,6 +109,12 @@ time of various sections, parallel loop iterations and memory usage, etc. These
 stats are in CSV format and can be redirected to a file using `-statFile` option.
 Please refer to the manual for details on stats. 
 
+Running Distributed Galois
+---------
+
+Please refer to README-DIST in the dist_apps directory for more details on
+running distributed benchmarks.
+
 Documentation
 ====================
 
