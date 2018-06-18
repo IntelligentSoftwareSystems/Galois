@@ -1,6 +1,6 @@
 /*
- 
- @Vinicius Possani 
+
+ @Vinicius Possani
  Parallel Rewriting January 5, 2018.
  ABC-based implementation on Galois.
 
@@ -14,245 +14,260 @@
 namespace algorithm {
 
 typedef galois::PerIterAllocTy Alloc;
-typedef std::unordered_set< aig::GNode, std::hash<aig::GNode>, std::equal_to<aig::GNode>, galois::PerIterAllocTy::rebind< aig::GNode >::other > GNodeSet;
+typedef std::unordered_set<aig::GNode, std::hash<aig::GNode>,
+                           std::equal_to<aig::GNode>,
+                           galois::PerIterAllocTy::rebind<aig::GNode>::other>
+    GNodeSet;
 
-ReconvDrivenCut::ReconvDrivenCut( aig::Aig & aig ) : aig( aig ) { }
+ReconvDrivenCut::ReconvDrivenCut(aig::Aig& aig) : aig(aig) {}
 
-ReconvDrivenCut::~ReconvDrivenCut() { }
+ReconvDrivenCut::~ReconvDrivenCut() {}
 
 struct Preprocess {
 
-	aig::Graph & aigGraph;
-	galois::InsertBag< aig::GNode > & workList;
+  aig::Graph& aigGraph;
+  galois::InsertBag<aig::GNode>& workList;
 
-	Preprocess( aig::Graph & aigGraph, galois::InsertBag< aig::GNode > & workList ) : aigGraph( aigGraph ), workList( workList ) { }
+  Preprocess(aig::Graph& aigGraph, galois::InsertBag<aig::GNode>& workList)
+      : aigGraph(aigGraph), workList(workList) {}
 
-	void operator()( aig::GNode node ) const {
+  void operator()(aig::GNode node) const {
 
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
 
-		if ( (nodeData.type == aig::NodeType::AND) && (nodeData.counter == 0) && (nodeData.nFanout < 1000) ) {
-			workList.push( node );
-		}
-	}
+    if ((nodeData.type == aig::NodeType::AND) && (nodeData.counter == 0) &&
+        (nodeData.nFanout < 1000)) {
+      workList.push(node);
+    }
+  }
 };
 
 struct ReconvergenceDrivenCut {
 
-	//typedef int tt_does_not_need_aborts;
-	//typedef int tt_needs_per_iter_alloc;
-	//typedef int tt_does_not_need_push;
+  // typedef int tt_does_not_need_aborts;
+  // typedef int tt_needs_per_iter_alloc;
+  // typedef int tt_does_not_need_push;
 
-	aig::Graph & aigGraph;
-	PerThreadRDCutData & perThreadRDCutData;
-	int cutSizeLimit;
+  aig::Graph& aigGraph;
+  PerThreadRDCutData& perThreadRDCutData;
+  int cutSizeLimit;
 
-	ReconvergenceDrivenCut( aig::Graph & aigGraph, PerThreadRDCutData & perThreadRDCutData, int cutSizeLimit ) : aigGraph( aigGraph ), perThreadRDCutData( perThreadRDCutData ), cutSizeLimit( cutSizeLimit ) { }
+  ReconvergenceDrivenCut(aig::Graph& aigGraph,
+                         PerThreadRDCutData& perThreadRDCutData,
+                         int cutSizeLimit)
+      : aigGraph(aigGraph), perThreadRDCutData(perThreadRDCutData),
+        cutSizeLimit(cutSizeLimit) {}
 
-	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) const {
-	//void operator()( aig::GNode node ) const {
+  void operator()(aig::GNode node, galois::UserContext<aig::GNode>& ctx) const {
+    // void operator()( aig::GNode node ) const {
 
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
+    aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::READ);
 
-		//if ( nodeData.type == aig::NodeType::AND ) {
-		if ( (nodeData.type == aig::NodeType::AND) && (nodeData.counter == 0) && (nodeData.nFanout < 1000) ) {
+    // if ( nodeData.type == aig::NodeType::AND ) {
+    if ((nodeData.type == aig::NodeType::AND) && (nodeData.counter == 0) &&
+        (nodeData.nFanout < 1000)) {
 
-			//galois::PerIterAllocTy & allocator = ctx.getPerIterAlloc();
+      // galois::PerIterAllocTy & allocator = ctx.getPerIterAlloc();
 
-			//GNodeSet leaves( allocator );
-			//GNodeSet visited( allocator );
-		
-			//leaves.insert( node );
-			//visited.insert( node );
-		
-			RDCutData * rdCutData = perThreadRDCutData.getLocal();
+      // GNodeSet leaves( allocator );
+      // GNodeSet visited( allocator );
 
-			rdCutData->visited.clear();
-			rdCutData->leaves.clear();
+      // leaves.insert( node );
+      // visited.insert( node );
 
-			rdCutData->visited.insert( node );
-			rdCutData->leaves.insert( node );
-	
-			//constructCut( leaves, visited );
-			constructCut_iter( rdCutData->leaves, rdCutData->visited );
+      RDCutData* rdCutData = perThreadRDCutData.getLocal();
 
-			/*	
-			std::cout << "Leaves = { ";
-			for ( auto leaf : rdCutData->leaves ) {
-				aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ );
-				std::cout << leafData.id << " ";
-			}
-			std::cout << "} " << std::endl;
-			
-			std::cout << "Visited = { ";
-			for ( auto vis : rdCutData->visited ) {
-				aig::NodeData & visData = aigGraph.getData( vis, galois::MethodFlag::READ );
-				std::cout << visData.id << " ";
-			}
-			std::cout << "} " << std::endl;
-			*/
-		}
+      rdCutData->visited.clear();
+      rdCutData->leaves.clear();
 
-		nodeData.counter = 1;
+      rdCutData->visited.insert(node);
+      rdCutData->leaves.insert(node);
 
-		for ( auto inEdge : aigGraph.in_edges( node ) ) {
+      // constructCut( leaves, visited );
+      constructCut_iter(rdCutData->leaves, rdCutData->visited);
 
-			aig::GNode inNode = aigGraph.getEdgeDst( inEdge );
-			aig::NodeData & inNodeData = aigGraph.getData( inNode, galois::MethodFlag::WRITE );
-				
-			if ( (inNodeData.type == aig::NodeType::AND) && (inNodeData.counter == 0) ) {
-				ctx.push( inNode );
-			}
-		}
+      /*
+      std::cout << "Leaves = { ";
+      for ( auto leaf : rdCutData->leaves ) {
+          aig::NodeData & leafData = aigGraph.getData( leaf,
+      galois::MethodFlag::READ ); std::cout << leafData.id << " ";
+      }
+      std::cout << "} " << std::endl;
 
-	}
+      std::cout << "Visited = { ";
+      for ( auto vis : rdCutData->visited ) {
+          aig::NodeData & visData = aigGraph.getData( vis,
+      galois::MethodFlag::READ ); std::cout << visData.id << " ";
+      }
+      std::cout << "} " << std::endl;
+      */
+    }
 
+    nodeData.counter = 1;
 
-/*
-	void constructCut( GNodeSet & leaves, GNodeSet & visited ) const {
+    for (auto inEdge : aigGraph.in_edges(node)) {
 
-		aig::GNode minCostNode = nullptr;
-		int minCost = std::numeric_limits<int>::max();
-		bool onlyPIs = true;
-		for ( aig::GNode node : leaves ) {
-			aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
-			if ( nodeData.type != aig::NodeType::PI ) {
-				int cost = leafCost( node, visited );
-				if ( minCost > cost ) {
-					minCost = cost;
-					minCostNode = node;
-					onlyPIs = false;
-				}
-			}
-		}
-		if ( onlyPIs || (leaves.size() + minCost) > cutSizeLimit ) {
-			return;
-		}
+      aig::GNode inNode = aigGraph.getEdgeDst(inEdge);
+      aig::NodeData& inNodeData =
+          aigGraph.getData(inNode, galois::MethodFlag::WRITE);
 
-		if( minCostNode == nullptr ) {
-			std::cout << "MinCostNode is null" << std::endl;
-			exit( 1 );
-		}
+      if ((inNodeData.type == aig::NodeType::AND) &&
+          (inNodeData.counter == 0)) {
+        ctx.push(inNode);
+      }
+    }
+  }
 
-		leaves.erase( minCostNode );
-		for ( auto edge : aigGraph.in_edges( minCostNode ) ) {
-			aig::GNode currentNode = aigGraph.getEdgeDst( edge );
-			leaves.insert( currentNode );
-			visited.insert( currentNode );
-		}
+  /*
+      void constructCut( GNodeSet & leaves, GNodeSet & visited ) const {
 
-		constructCut( leaves, visited );
-	}
-*/
+          aig::GNode minCostNode = nullptr;
+          int minCost = std::numeric_limits<int>::max();
+          bool onlyPIs = true;
+          for ( aig::GNode node : leaves ) {
+              aig::NodeData & nodeData = aigGraph.getData( node,
+     galois::MethodFlag::READ ); if ( nodeData.type != aig::NodeType::PI ) { int
+     cost = leafCost( node, visited ); if ( minCost > cost ) { minCost = cost;
+                      minCostNode = node;
+                      onlyPIs = false;
+                  }
+              }
+          }
+          if ( onlyPIs || (leaves.size() + minCost) > cutSizeLimit ) {
+              return;
+          }
 
-	// ITER
-	//void constructCut_iter( GNodeSet & leaves, GNodeSet & visited ) const {
-	void constructCut_iter( std::unordered_set< aig::GNode > & leaves, std::unordered_set< aig::GNode > & visited ) const {
+          if( minCostNode == nullptr ) {
+              std::cout << "MinCostNode is null" << std::endl;
+              exit( 1 );
+          }
 
-		while( true ) {
-			aig::GNode minCostNode = nullptr;
-			int minCost = std::numeric_limits<int>::max();
-			bool onlyPIs = true;
-			for ( aig::GNode node : leaves ) {
-				aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
-				if ( nodeData.type != aig::NodeType::PI ) {
-					int cost = leafCost( node, visited );
-					if ( minCost > cost ) {
-						minCost = cost;
-						minCostNode = node;
-						onlyPIs = false;
-					}
-				}
-			}
+          leaves.erase( minCostNode );
+          for ( auto edge : aigGraph.in_edges( minCostNode ) ) {
+              aig::GNode currentNode = aigGraph.getEdgeDst( edge );
+              leaves.insert( currentNode );
+              visited.insert( currentNode );
+          }
 
-			if ( onlyPIs || (leaves.size() + minCost) > cutSizeLimit ) {
-				break;
-			}
+          constructCut( leaves, visited );
+      }
+  */
 
-			if( minCostNode == nullptr ) {
-				std::cout << "MinCostNode is null" << std::endl;
-				exit( 1 );
-			}
+  // ITER
+  // void constructCut_iter( GNodeSet & leaves, GNodeSet & visited ) const {
+  void constructCut_iter(std::unordered_set<aig::GNode>& leaves,
+                         std::unordered_set<aig::GNode>& visited) const {
 
-			leaves.erase( minCostNode );
-			for ( auto edge : aigGraph.in_edges( minCostNode ) ) {
-				aig::GNode currentNode = aigGraph.getEdgeDst( edge );
-				leaves.insert( currentNode );
-				visited.insert( currentNode );
-			}
-		}
-	}
+    while (true) {
+      aig::GNode minCostNode = nullptr;
+      int minCost            = std::numeric_limits<int>::max();
+      bool onlyPIs           = true;
+      for (aig::GNode node : leaves) {
+        aig::NodeData& nodeData =
+            aigGraph.getData(node, galois::MethodFlag::READ);
+        if (nodeData.type != aig::NodeType::PI) {
+          int cost = leafCost(node, visited);
+          if (minCost > cost) {
+            minCost     = cost;
+            minCostNode = node;
+            onlyPIs     = false;
+          }
+        }
+      }
 
-	//int leafCost( aig::GNode & node, GNodeSet & visited ) const {
-	int leafCost( aig::GNode & node, std::unordered_set< aig::GNode > & visited ) const {
+      if (onlyPIs || (leaves.size() + minCost) > cutSizeLimit) {
+        break;
+      }
 
-		int cost = -1;
-		for ( auto edge : aigGraph.in_edges( node ) ) {
-			aig::GNode currentNode = aigGraph.getEdgeDst( edge );
-			auto it = visited.find( currentNode );
-			if ( it == visited.end() ) {
-				cost++;
-			}
-		}
-		return cost;
-	}
+      if (minCostNode == nullptr) {
+        std::cout << "MinCostNode is null" << std::endl;
+        exit(1);
+      }
+
+      leaves.erase(minCostNode);
+      for (auto edge : aigGraph.in_edges(minCostNode)) {
+        aig::GNode currentNode = aigGraph.getEdgeDst(edge);
+        leaves.insert(currentNode);
+        visited.insert(currentNode);
+      }
+    }
+  }
+
+  // int leafCost( aig::GNode & node, GNodeSet & visited ) const {
+  int leafCost(aig::GNode& node,
+               std::unordered_set<aig::GNode>& visited) const {
+
+    int cost = -1;
+    for (auto edge : aigGraph.in_edges(node)) {
+      aig::GNode currentNode = aigGraph.getEdgeDst(edge);
+      auto it                = visited.find(currentNode);
+      if (it == visited.end()) {
+        cost++;
+      }
+    }
+    return cost;
+  }
 };
 
-void ReconvDrivenCut::run( int cutSizeLimit ) {
+void ReconvDrivenCut::run(int cutSizeLimit) {
 
-	aig::Graph & aigGraph = this->aig.getGraph();
+  aig::Graph& aigGraph = this->aig.getGraph();
 
-	galois::InsertBag< aig::GNode > workList;
-    typedef galois::worklists::PerSocketChunkFIFO<5000> DC_FIFO;
+  galois::InsertBag<aig::GNode> workList;
+  typedef galois::worklists::PerSocketChunkFIFO<5000> DC_FIFO;
 
-    //typedef galois::worklists::PerSocketChunkBag<5000> DC_BAG;
-	//galois::do_all_local( aigGraph, Preprocess( aigGraph, workList ) );
-	//galois::for_each_local( workList, ReconvergenceDrivenCut( aigGraph, cutSizeLimit ), galois::wl< DC_BAG >() );
+  // typedef galois::worklists::PerSocketChunkBag<5000> DC_BAG;
+  // galois::do_all_local( aigGraph, Preprocess( aigGraph, workList ) );
+  // galois::for_each_local( workList, ReconvergenceDrivenCut( aigGraph,
+  // cutSizeLimit ), galois::wl< DC_BAG >() );
 
-	//galois::for_each( aigGraph.begin(), aigGraph.end(), ReconvergenceDrivenCut( aigGraph, cutSizeLimit ) );	
+  // galois::for_each( aigGraph.begin(), aigGraph.end(), ReconvergenceDrivenCut(
+  // aigGraph, cutSizeLimit ) );
 
-/*	
-	for ( aig::GNode po : this->aig.getOutputNodes() ) {
-		auto inEdge = aigGraph.in_edge_begin( po );
-		aig::GNode inNode = aigGraph.getEdgeDst( inEdge );
-		workList.push( inNode );
-	}
-	
-*/
+  /*
+      for ( aig::GNode po : this->aig.getOutputNodes() ) {
+          auto inEdge = aigGraph.in_edge_begin( po );
+          aig::GNode inNode = aigGraph.getEdgeDst( inEdge );
+          workList.push( inNode );
+      }
 
-/*
-	typedef struct FanoutComparator_ {
+  */
 
-		aig::Graph & aigGraph;
-		
-		FanoutComparator_( aig::Graph & aigGraph ) : aigGraph( aigGraph ) { }
+  /*
+      typedef struct FanoutComparator_ {
 
-        bool operator()( aig::GNode lhs, aig::GNode rhs ) const {
-        	aig::NodeData & lhsData = aigGraph.getData( lhs, galois::MethodFlag::UNPROTECTED );
-        	aig::NodeData & rhsData = aigGraph.getData( rhs, galois::MethodFlag::UNPROTECTED );
-        	return lhsData.nFanout > rhsData.nFanout;
-        }
+          aig::Graph & aigGraph;
 
-    } FanoutComparator;
-	
-	std::vector< aig::GNode > nodes = aig.getNodes();
+          FanoutComparator_( aig::Graph & aigGraph ) : aigGraph( aigGraph ) { }
 
-	std::sort( nodes.begin(), nodes.end(), FanoutComparator( aigGraph ) );
+          bool operator()( aig::GNode lhs, aig::GNode rhs ) const {
+              aig::NodeData & lhsData = aigGraph.getData( lhs,
+     galois::MethodFlag::UNPROTECTED ); aig::NodeData & rhsData =
+     aigGraph.getData( rhs, galois::MethodFlag::UNPROTECTED ); return
+     lhsData.nFanout > rhsData.nFanout;
+          }
 
-	for ( aig::GNode node : nodes ) {
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::UNPROTECTED );
-		
-		if ( (nodeData.type == aig::NodeType::AND) ) {
-			workList.push( node );
-		}
-	}
-*/
+      } FanoutComparator;
 
-	
+      std::vector< aig::GNode > nodes = aig.getNodes();
 
-	galois::for_each( galois::iterate( workList.begin(), workList.end() ), ReconvergenceDrivenCut( aigGraph, perThreadRDCutData, cutSizeLimit ) , galois::wl< DC_FIFO >(), galois::loopname( "ReconvergenceDrivenCut" ) );
+      std::sort( nodes.begin(), nodes.end(), FanoutComparator( aigGraph ) );
 
+      for ( aig::GNode node : nodes ) {
+          aig::NodeData & nodeData = aigGraph.getData( node,
+     galois::MethodFlag::UNPROTECTED );
+
+          if ( (nodeData.type == aig::NodeType::AND) ) {
+              workList.push( node );
+          }
+      }
+  */
+
+  galois::for_each(
+      galois::iterate(workList.begin(), workList.end()),
+      ReconvergenceDrivenCut(aigGraph, perThreadRDCutData, cutSizeLimit),
+      galois::wl<DC_FIFO>(), galois::loopname("ReconvergenceDrivenCut"));
 }
 
 } /* namespace algorithm */
-

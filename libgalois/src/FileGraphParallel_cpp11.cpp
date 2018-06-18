@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,27 +27,29 @@
 namespace galois {
 namespace graphs {
 
-void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
+void FileGraph::fromFileInterleaved(const std::string& filename,
+                                    size_t sizeofEdgeData) {
   fromFile(filename);
 
   std::mutex lock;
   std::condition_variable cond;
-  auto& tp = substrate::getThreadPool();
+  auto& tp            = substrate::getThreadPool();
   unsigned maxSockets = tp.getMaxSockets();
-  unsigned count = maxSockets;
+  unsigned count      = maxSockets;
 
   // Interleave across all NUMA nodes
   tp.run(tp.getMaxThreads(), [&]() {
-      std::unique_lock<std::mutex> lk(lock);
-      if (substrate::ThreadPool::isLeader()) {
-        pageInByNode(substrate::ThreadPool::getSocket(), maxSockets, sizeofEdgeData);
-        if (--count == 0)
-          cond.notify_all();
-      } else {
-        cond.wait(lk, [&](){ return count == 0; });
-      }
-    });
+    std::unique_lock<std::mutex> lk(lock);
+    if (substrate::ThreadPool::isLeader()) {
+      pageInByNode(substrate::ThreadPool::getSocket(), maxSockets,
+                   sizeofEdgeData);
+      if (--count == 0)
+        cond.notify_all();
+    } else {
+      cond.wait(lk, [&]() { return count == 0; });
+    }
+  });
 }
 
-}
-}
+} // namespace graphs
+} // namespace galois

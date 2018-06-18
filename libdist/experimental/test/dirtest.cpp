@@ -4,12 +4,11 @@
 using namespace std;
 using namespace galois::runtime;
 
-struct simple :public Lockable {
+struct simple : public Lockable {
   int member;
 };
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char* argv[]) {
 
   DirectoryNG dir;
 

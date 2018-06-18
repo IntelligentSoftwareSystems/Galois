@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,32 +31,32 @@ namespace galois {
 namespace worklists {
 
 //! Simple Container Wrapper worklist (not scalable).
-template<typename T, typename container = std::deque<T>, bool popBack = true>
+template <typename T, typename container = std::deque<T>, bool popBack = true>
 class Wrapper : private boost::noncopyable {
   substrate::PaddedLock<true> lock;
   container wl;
 
 public:
-  template<typename _T>
+  template <typename _T>
   using retype = Wrapper<_T>;
 
-  template<bool b>
+  template <bool b>
   using rethread = Wrapper;
 
   typedef T value_type;
 
   void push(const value_type& val) {
-    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
+    std::lock_guard<substrate::PaddedLock<true>> lg(lock);
     wl.push_back(val);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
-    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
-    wl.insert(wl.end(),b,e);
+    std::lock_guard<substrate::PaddedLock<true>> lg(lock);
+    wl.insert(wl.end(), b, e);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& range) {
     if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
@@ -64,7 +64,7 @@ public:
 
   galois::optional<value_type> pop() {
     galois::optional<value_type> retval;
-    std::lock_guard<substrate::PaddedLock<true> > lg(lock);
+    std::lock_guard<substrate::PaddedLock<true>> lg(lock);
     if (!wl.empty()) {
       if (popBack) {
         retval = wl.back();
@@ -78,24 +78,22 @@ public:
   }
 };
 
-template<typename T = int>
-using FIFO = Wrapper<T, std::deque<T>, false >;
+template <typename T = int>
+using FIFO = Wrapper<T, std::deque<T>, false>;
 
-template<typename T = int>
-using GFIFO = Wrapper<T, galois::gdeque<T>, false >;
+template <typename T = int>
+using GFIFO = Wrapper<T, galois::gdeque<T>, false>;
 
-template<typename T = int>
-using LIFO = Wrapper<T, std::deque<T>, true >;
+template <typename T = int>
+using LIFO = Wrapper<T, std::deque<T>, true>;
 
-template<typename T = int>
-using GLIFO = Wrapper<T, galois::gdeque<T>, true >;
-
+template <typename T = int>
+using GLIFO = Wrapper<T, galois::gdeque<T>, true>;
 
 GALOIS_WLCOMPILECHECK(FIFO)
 GALOIS_WLCOMPILECHECK(GFIFO)
 GALOIS_WLCOMPILECHECK(LIFO)
 GALOIS_WLCOMPILECHECK(GLIFO)
-
 
 } // end namespace worklists
 } // end namespace galois

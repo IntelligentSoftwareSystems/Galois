@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,9 +33,8 @@ namespace worklists {
 
 namespace internal {
 
-template<typename T,
-	 typename Scheduler = PerSocketChunkFIFO<64, T>,
-         typename Set = galois::ThreadSafeOrderedSet<T> >
+template <typename T, typename Scheduler = PerSocketChunkFIFO<64, T>,
+          typename Set = galois::ThreadSafeOrderedSet<T>>
 struct WorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;
@@ -44,44 +43,45 @@ private:
 
 public:
   typedef T value_type;
-  template<typename _T>
-  using retype = WorkSetMaster<_T, typename Scheduler::template retype<_T>, typename Set::template retype<_T> >;
+  template <typename _T>
+  using retype = WorkSetMaster<_T, typename Scheduler::template retype<_T>,
+                               typename Set::template retype<_T>>;
 
   WorkSetMaster() { duplicate = new galois::Statistic("SchedulerDuplicates"); }
 
-  template<typename... Args>
-  WorkSetMaster(galois::worklists::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
-  {
+  template <typename... Args>
+  WorkSetMaster(galois::worklists::Separator dummy, Args... args)
+      : scheduler(std::forward<Args>(args)...) {
     duplicate = new galois::Statistic("SchedulerDuplicates");
   }
 
   ~WorkSetMaster() { delete duplicate; }
 
   void push(const value_type& val) {
-    if(set.push(val)) {
+    if (set.push(val)) {
       scheduler.push(val);
     } else {
       *duplicate += 1;
     }
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
   }
 
   galois::optional<value_type> pop() {
-    auto defaultRetVal = galois::optional<value_type>();
+    auto defaultRetVal                  = galois::optional<value_type>();
     galois::optional<value_type> retval = scheduler.pop();
 
-    if(retval == defaultRetVal)
+    if (retval == defaultRetVal)
       return defaultRetVal;
 
     set.remove(retval.get());
@@ -89,22 +89,30 @@ public:
   }
 };
 
-}  // end namespace internal
+} // end namespace internal
 
-template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using PerSocketChunkOrderedSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeOrderedSet<T> >;
+template <int ChunkSize = 64, typename T = int, bool Concurrent = true>
+using PerSocketChunkOrderedSetFIFO =
+    internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize, T, Concurrent>,
+                            galois::ThreadSafeOrderedSet<T>>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkOrderedSetFIFO);
 
-template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using PerSocketChunkUnorderedSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeUnorderedSet<T> >;
+template <int ChunkSize = 64, typename T = int, bool Concurrent = true>
+using PerSocketChunkUnorderedSetFIFO =
+    internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize, T, Concurrent>,
+                            galois::ThreadSafeUnorderedSet<T>>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkUnorderedSetFIFO);
 
-template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using PerSocketChunkTwoLevelHashFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelHash<T> >;
+template <int ChunkSize = 64, typename T = int, bool Concurrent = true>
+using PerSocketChunkTwoLevelHashFIFO =
+    internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize, T, Concurrent>,
+                            galois::ThreadSafeTwoLevelHash<T>>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkTwoLevelHashFIFO);
 
-template<int ChunkSize=64, typename T=int, bool Concurrent=true>
-using PerSocketChunkTwoLevelSetFIFO = internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize,T,Concurrent>, galois::ThreadSafeTwoLevelSet<T> >;
+template <int ChunkSize = 64, typename T = int, bool Concurrent = true>
+using PerSocketChunkTwoLevelSetFIFO =
+    internal::WorkSetMaster<T, PerSocketChunkFIFO<ChunkSize, T, Concurrent>,
+                            galois::ThreadSafeTwoLevelSet<T>>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkTwoLevelSetFIFO);
 
 } // end namespace worklists

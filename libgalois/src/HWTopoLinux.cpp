@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,7 +38,6 @@
 
 using namespace galois::substrate;
 
-
 namespace {
 
 struct cpuinfo {
@@ -48,12 +47,12 @@ struct cpuinfo {
   unsigned sib;
   unsigned coreid;
   unsigned cpucores;
-  unsigned numaNode; //from libnuma
-  bool valid; // from cpuset
-  bool smt; //computed
+  unsigned numaNode; // from libnuma
+  bool valid;        // from cpuset
+  bool smt;          // computed
 };
 
-static bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
+static bool operator<(const cpuinfo& lhs, const cpuinfo& rhs) {
   if (lhs.smt != rhs.smt)
     return lhs.smt < rhs.smt;
   if (lhs.physid != rhs.physid)
@@ -65,15 +64,17 @@ static bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
 
 static unsigned getNumaNode(cpuinfo& c) {
   static bool numaAvail = false;
-  static bool warnOnce = false;
+  static bool warnOnce  = false;
   if (!warnOnce) {
     warnOnce = true;
 #ifdef GALOIS_USE_NUMA
     numaAvail = numa_available() >= 0;
     if (!numaAvail)
-      galois::gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
+      galois::gWarn("Numa support configured but not present at runtime.  "
+                    "Assuming numa topology matches socket topology.");
 #else
-    galois::gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
+    galois::gWarn("Numa Support Not configured (install libnuma-dev).  "
+                  "Assuming numa topology matches socket topology.");
 #endif
   }
 
@@ -92,21 +93,21 @@ static unsigned getNumaNode(cpuinfo& c) {
 //! Parse /proc/cpuinfo
 static std::vector<cpuinfo> parseCPUInfo() {
   std::vector<cpuinfo> vals;
-  
+
   const int len = 1024;
   std::array<char, len> line;
-  
+
   std::ifstream procInfo("/proc/cpuinfo");
   if (!procInfo)
     GALOIS_SYS_DIE("failed opening /proc/cpuinfo");
-  
+
   int cur = -1;
-  
+
   while (true) {
     procInfo.getline(line.data(), len);
     if (!procInfo)
       break;
-    
+
     int num;
     if (sscanf(line.data(), "processor : %d", &num) == 1) {
       assert(cur < num);
@@ -123,7 +124,7 @@ static std::vector<cpuinfo> parseCPUInfo() {
       vals.at(cur).cpucores = num;
     }
   }
-  
+
   for (auto& c : vals)
     c.numaNode = getNumaNode(c);
 
@@ -133,57 +134,57 @@ static std::vector<cpuinfo> parseCPUInfo() {
 //! Returns physical ids in current cpuset
 static std::vector<int> parseCPUSet() {
   std::vector<int> vals;
-  
-  //Parse: /proc/self/cpuset
+
+  // Parse: /proc/self/cpuset
   std::string name;
   {
     std::ifstream cpuSetName("/proc/self/cpuset");
     if (!cpuSetName)
       return vals;
-    
-    //TODO: this will fail to read correctly if name contains newlines
+
+    // TODO: this will fail to read correctly if name contains newlines
     std::getline(cpuSetName, name);
     if (!cpuSetName)
       return vals;
   }
-  
+
   if (name.size() <= 1)
     return vals;
-  
-  //Parse: /dev/cpuset/<name>/cpus
+
+  // Parse: /dev/cpuset/<name>/cpus
   std::string path("/dev/cpuset");
   path += name;
   path += "/cpus";
   std::ifstream cpuSet(path);
-  
+
   if (!cpuSet)
     return vals;
-  
+
   std::string buffer;
-  getline(cpuSet,buffer);
+  getline(cpuSet, buffer);
   if (!cpuSet)
     return vals;
 
   size_t current;
   size_t next = -1;
   do {
-    current = next + 1;
-    next = buffer.find_first_of(',', current );
+    current  = next + 1;
+    next     = buffer.find_first_of(',', current);
     auto buf = buffer.substr(current, next - current);
     if (buf.size()) {
       size_t dash = buf.find_first_of('-', 0);
-      if (dash != std::string::npos) { //range
-        auto first = buf.substr(0, dash);
-        auto second = buf.substr(dash+1,std::string::npos);
-        unsigned b = atoi(first.data());
-        unsigned e = atoi(second.data());
+      if (dash != std::string::npos) { // range
+        auto first  = buf.substr(0, dash);
+        auto second = buf.substr(dash + 1, std::string::npos);
+        unsigned b  = atoi(first.data());
+        unsigned e  = atoi(second.data());
         while (b <= e)
           vals.push_back(b++);
       } else { // singleton
         vals.push_back(atoi(buf.data()));
       }
-    }      
-  } while (next != std::string::npos);  
+    }
+  } while (next != std::string::npos);
   return vals;
 }
 
@@ -195,21 +196,21 @@ static unsigned countSockets(const std::vector<cpuinfo>& info) {
 }
 
 static unsigned countCores(const std::vector<cpuinfo>& info) {
-  std::set<std::pair<int, int> > cores;
+  std::set<std::pair<int, int>> cores;
   for (auto& c : info)
     cores.insert(std::make_pair(c.physid, c.coreid));
   return cores.size();
 }
 
 static unsigned countNumaNodes(const std::vector<cpuinfo>& info) {
-  std::set<unsigned > nodes;
+  std::set<unsigned> nodes;
   for (auto& c : info)
     nodes.insert(c.numaNode);
   return nodes.size();
 }
 
 static void markSMT(std::vector<cpuinfo>& info) {
-  for (unsigned int i = 1 ; i < info.size(); ++i)
+  for (unsigned int i = 1; i < info.size(); ++i)
     if (info[i - 1].physid == info[i].physid &&
         info[i - 1].coreid == info[i].coreid)
       info[i].smt = true;
@@ -229,7 +230,7 @@ static void markValid(std::vector<cpuinfo>& info) {
   }
 }
 
-//FIXME: handle MIC
+// FIXME: handle MIC
 std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
   const bool isMIC = false;
   if (isMIC) {
@@ -237,9 +238,10 @@ std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
   return info;
 }
 
-} //namespace ""
+} // namespace
 
-std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getHWTopo() {
+std::pair<machineTopoInfo, std::vector<threadTopoInfo>>
+galois::substrate::getHWTopo() {
   machineTopoInfo retMTI;
 
   auto rawInfo = parseCPUInfo();
@@ -247,20 +249,22 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getH
   markSMT(rawInfo);
   markValid(rawInfo);
 
-  //Now compute transformed (filtered, reordered, etc) version
+  // Now compute transformed (filtered, reordered, etc) version
   auto info = transform(rawInfo);
-  info.erase(std::partition(info.begin(), info.end(), [] (const cpuinfo& c) { return  c.valid; }), info.end());
+  info.erase(std::partition(info.begin(), info.end(),
+                            [](const cpuinfo& c) { return c.valid; }),
+             info.end());
 
   std::sort(info.begin(), info.end());
   markSMT(info);
-  retMTI.maxSockets = countSockets(info);
-  retMTI.maxThreads = info.size();
-  retMTI.maxCores = countCores(info);
+  retMTI.maxSockets   = countSockets(info);
+  retMTI.maxThreads   = info.size();
+  retMTI.maxCores     = countCores(info);
   retMTI.maxNumaNodes = countNumaNodes(info);
 
   std::vector<threadTopoInfo> retTTI;
   retTTI.reserve(retMTI.maxThreads);
-  //compute renumberings
+  // compute renumberings
   std::set<unsigned> sockets;
   std::set<unsigned> numaNodes;
   for (auto& i : info) {
@@ -270,21 +274,22 @@ std::pair<machineTopoInfo, std::vector<threadTopoInfo> > galois::substrate::getH
   unsigned mid = 0; // max socket id
   for (unsigned i = 0; i < info.size(); ++i) {
     unsigned pid = info[i].physid;
-    unsigned repid = std::distance(sockets.begin(), sockets.find(info[i].physid));
-    mid = std::max(mid, repid);
-    unsigned leader = std::distance(info.begin(), std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; }));
-    retTTI.push_back(threadTopoInfo{i,
-          leader,
-          repid,
-          (unsigned)std::distance(numaNodes.begin(), numaNodes.find(info[i].numaNode)),
-          mid,
-          info[i].proc,
-          info[i].numaNode
-          });
+    unsigned repid =
+        std::distance(sockets.begin(), sockets.find(info[i].physid));
+    mid             = std::max(mid, repid);
+    unsigned leader = std::distance(
+        info.begin(),
+        std::find_if(info.begin(), info.end(),
+                     [pid](const cpuinfo& c) { return c.physid == pid; }));
+    retTTI.push_back(
+        threadTopoInfo{i, leader, repid,
+                       (unsigned)std::distance(
+                           numaNodes.begin(), numaNodes.find(info[i].numaNode)),
+                       mid, info[i].proc, info[i].numaNode});
   }
 
   return std::make_pair(retMTI, retTTI);
-} 
+}
 
 //! binds current thread to OS HW context "proc"
 bool galois::substrate::bindThreadSelf(unsigned osContext) {
@@ -292,14 +297,15 @@ bool galois::substrate::bindThreadSelf(unsigned osContext) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
   CPU_ZERO(&mask);
-  
+
   /* CPU_SET sets only the bit corresponding to cpu. */
   // void to cancel unused result warning
   (void)CPU_SET(osContext, &mask);
-  
+
   /* sched_setaffinity returns 0 in success */
-  if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
-    galois::gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
+  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
+    galois::gWarn("Could not set CPU affinity to ", osContext, "(",
+                  strerror(errno), ")");
     return false;
   }
   return true;

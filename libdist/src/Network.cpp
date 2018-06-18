@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,7 +20,7 @@
 /**
  * @file Network.cpp
  *
- * Contains implementations for basic NetworkInterface functions and 
+ * Contains implementations for basic NetworkInterface functions and
  * initializations of some NetworkInterface variables.
  */
 
@@ -35,7 +35,7 @@ using namespace galois::runtime;
 
 uint32_t galois::runtime::evilPhase = 1;
 
-uint32_t galois::runtime::NetworkInterface::ID = 0;
+uint32_t galois::runtime::NetworkInterface::ID  = 0;
 uint32_t galois::runtime::NetworkInterface::Num = 1;
 
 uint32_t galois::runtime::getHostID() { return NetworkInterface::ID; }
@@ -44,7 +44,8 @@ galois::runtime::NetworkIO::~NetworkIO() {}
 
 void NetworkInterface::initializeMPI() {
   int supportProvided;
-  int initSuccess = MPI_Init_thread(NULL, NULL, MPI_THREAD_MULTIPLE, &supportProvided);
+  int initSuccess =
+      MPI_Init_thread(NULL, NULL, MPI_THREAD_MULTIPLE, &supportProvided);
   if (initSuccess != MPI_SUCCESS) {
     MPI_Abort(MPI_COMM_WORLD, initSuccess);
   }
@@ -54,17 +55,15 @@ void NetworkInterface::initializeMPI() {
   }
 }
 
-NetworkInterface::NetworkInterface() {
-}
+NetworkInterface::NetworkInterface() {}
 
-NetworkInterface::~NetworkInterface() {
-}
+NetworkInterface::~NetworkInterface() {}
 
 void NetworkInterface::reportMemUsage() const {
   std::string str("CommunicationMemUsage");
-  galois::runtime::reportStat_Tmin("dGraph", str + "Min", 
+  galois::runtime::reportStat_Tmin("dGraph", str + "Min",
                                    memUsageTracker.getMaxMemUsage());
-  galois::runtime::reportStat_Tmax("dGraph", str + "Max", 
+  galois::runtime::reportStat_Tmax("dGraph", str + "Max",
                                    memUsageTracker.getMaxMemUsage());
 }
 
@@ -80,13 +79,14 @@ static void bcastLandingPad(uint32_t src, RecvBuffer& buf) {
   recv(src, buf);
 }
 
-void NetworkInterface::sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), 
+void NetworkInterface::sendMsg(uint32_t dest,
+                               void (*recv)(uint32_t, RecvBuffer&),
                                SendBuffer& buf) {
   gSerialize(buf, recv);
   sendTagged(dest, 0, buf);
 }
 
-void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&), 
+void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&),
                                  SendBuffer& buf, bool self) {
   trace("NetworkInterface::broadcast", (void*)recv);
   auto fp = (uintptr_t)recv;
@@ -106,9 +106,9 @@ void NetworkInterface::handleReceives() {
   std::unique_lock<substrate::SimpleLock> lg;
   auto opt = recieveTagged(0, &lg);
   while (opt) {
-    uint32_t src = std::get<0>(*opt);
+    uint32_t src    = std::get<0>(*opt);
     RecvBuffer& buf = std::get<1>(*opt);
-    uintptr_t fp  = 0;
+    uintptr_t fp    = 0;
     gDeserializeRaw(buf.r_linearData() + buf.r_size() - sizeof(uintptr_t), fp);
     buf.pop_back(sizeof(uintptr_t));
     assert(fp);

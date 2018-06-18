@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 10/24/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -35,15 +35,15 @@
 #include "ElementalOperation.h"
 
 //! \brief Class to compute a diagonal mass matrix for StressWork.
-/** This class computes a diagonalized form of the (exact) mass matrix 
+/** This class computes a diagonalized form of the (exact) mass matrix
  * \f$ M[f][a][b] = \int_E \rho_0 N_a^f N_b^f. \f$
  *
  * Since a diagonal mass matrix is often desired, the entries in each
  * row of the exact mass-matrix are lumped together on the diagonal
  * entry \f$ M[f][a][a] \f$.
  *
- * A mass-vector is assembled (instead of a matrix) with each entry 
- * compued as \f$ M[f][a] = \int_E \rho_0 N_a^f \f$ 
+ * A mass-vector is assembled (instead of a matrix) with each entry
+ * compued as \f$ M[f][a] = \int_E \rho_0 N_a^f \f$
  * where \f$a\f$ runs over all degrees of freedom for
  * field \f$ f \f$.
  *
@@ -57,39 +57,35 @@
  *
  */
 
-class DiagonalMassForSW: public BaseResidue {
+class DiagonalMassForSW : public BaseResidue {
 public:
-
-  //! Constructor 
+  //! Constructor
   //! \param IElm Pointer to element over which mass is to be compued.
   //! \param SM SimpleMaterial over the element.
-  //! \param fieldsUsed vector containing ids of fields being computed starting with 0
-  inline DiagonalMassForSW (const Element& IElm, const SimpleMaterial &SM, const VecSize_t& fieldsUsed)
-  : BaseResidue (IElm, SM, fieldsUsed) {
-  assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
-}
+  //! \param fieldsUsed vector containing ids of fields being computed starting
+  //! with 0
+  inline DiagonalMassForSW(const Element& IElm, const SimpleMaterial& SM,
+                           const VecSize_t& fieldsUsed)
+      : BaseResidue(IElm, SM, fieldsUsed) {
+    assert(fieldsUsed.size() > 0 && fieldsUsed.size() <= 3);
+  }
 
   //! Destructor
-  virtual ~DiagonalMassForSW() {
-  }
+  virtual ~DiagonalMassForSW() {}
 
   //! Copy constructor
   //! \param DMM DiagonalMassForSW object to be copied.
-  inline DiagonalMassForSW(const DiagonalMassForSW & DMM) : BaseResidue (DMM) {
-
-  }
+  inline DiagonalMassForSW(const DiagonalMassForSW& DMM) : BaseResidue(DMM) {}
 
   //! Cloning mechanism
-  virtual DiagonalMassForSW * clone() const {
+  virtual DiagonalMassForSW* clone() const {
     return new DiagonalMassForSW(*this);
   }
 
-
   //! Computes the elemental contribution to the mass-vector.
-  //! \param argval See Residue. It is a dummy argument since integrations are done over the reference.
-  //! \param funcval See Residue.
-  bool getVal(const MatDouble &argval, MatDouble& funcval) const;
-
+  //! \param argval See Residue. It is a dummy argument since integrations are
+  //! done over the reference. \param funcval See Residue.
+  bool getVal(const MatDouble& argval, MatDouble& funcval) const;
 };
 
 #endif

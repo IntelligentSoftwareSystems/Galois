@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,40 +26,40 @@
 namespace galois {
 namespace worklists {
 
-template<typename QueueTy>
+template <typename QueueTy>
 galois::optional<typename QueueTy::value_type>
 stealHalfInSocket(substrate::PerThreadStorage<QueueTy>& queues) {
-  unsigned id = substrate::ThreadPool::getTID();
+  unsigned id  = substrate::ThreadPool::getTID();
   unsigned pkg = substrate::ThreadPool::getSocket();
   unsigned num = galois::getActiveThreads();
-  QueueTy* me = queues.getLocal();
+  QueueTy* me  = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
 
-  //steal from this socket
-  //Having 2 loops avoids a modulo, though this is a slow path anyway
+  // steal from this socket
+  // Having 2 loops avoids a modulo, though this is a slow path anyway
   auto& tp = substrate::getThreadPool();
   for (unsigned i = id + 1; i < num; ++i)
     if (tp.getSocket(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
-	return retval;
+        return retval;
   for (unsigned i = 0; i < id; ++i)
     if (tp.getSocket(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
-	return retval;
+        return retval;
   return retval;
 }
 
-template<typename QueueTy>
+template <typename QueueTy>
 galois::optional<typename QueueTy::value_type>
 stealRemote(substrate::PerThreadStorage<QueueTy>& queues) {
   unsigned id = substrate::ThreadPool::getTID();
   //  unsigned pkg = runtime::LL::getSocketForThread(id);
   unsigned num = galois::getActiveThreads();
-  QueueTy* me = queues.getLocal();
+  QueueTy* me  = queues.getLocal();
   galois::optional<typename QueueTy::value_type> retval;
 
-  //steal from this socket
-  //Having 2 loops avoids a modulo, though this is a slow path anyway
+  // steal from this socket
+  // Having 2 loops avoids a modulo, though this is a slow path anyway
   for (unsigned i = id + 1; i < num; ++i)
     if ((retval = me->steal(*queues.getRemote(i), true, true)))
       return retval;
@@ -69,7 +69,7 @@ stealRemote(substrate::PerThreadStorage<QueueTy>& queues) {
   return retval;
 }
 
-template<typename QueueTy>
+template <typename QueueTy>
 class PerThreadQueues : private boost::noncopyable {
 public:
   typedef typename QueueTy::value_type value_type;
@@ -84,15 +84,15 @@ private:
     return stealRemote(local);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
-    unsigned int a = galois::getActiveThreads();
+    unsigned int a  = galois::getActiveThreads();
     unsigned int id = substrate::ThreadPool::getTID();
-    unsigned dist = std::distance(b, e);
-    unsigned num = (dist + a - 1) / a; //round up
-    unsigned int A = std::min(num * id, dist);
-    unsigned int B = std::min(num * (id + 1), dist);
-    e = b;
+    unsigned dist   = std::distance(b, e);
+    unsigned num    = (dist + a - 1) / a; // round up
+    unsigned int A  = std::min(num * id, dist);
+    unsigned int B  = std::min(num * (id + 1), dist);
+    e               = b;
     std::advance(b, A);
     std::advance(e, B);
   }
@@ -100,22 +100,22 @@ private:
   // runtime::LL::SimpleLock<true> L;
   // std::vector<unsigned> sum;
 
-  template<typename Iter>
+  template <typename Iter>
   void fill_work_l1(Iter b, Iter e) {
     Iter b2 = b;
     Iter e2 = e;
     fill_work_l2(b2, e2);
     unsigned int a = galois::getActiveThreads();
     //    unsigned int id = runtime::LL::getTID();
-    std::vector<std::vector<value_type> > ranges;
+    std::vector<std::vector<value_type>> ranges;
     ranges.resize(a);
     while (b2 != e2) {
       unsigned i = getID(*b2);
       ranges[i].push_back(*b2);
       ++b2;
       if (ranges[i].size() > 128) {
-	local.getRemote(i)->push(ranges[i].begin(), ranges[i].end());
-	ranges[i].clear();
+        local.getRemote(i)->push(ranges[i].begin(), ranges[i].end());
+        ranges[i].clear();
       }
     }
     // L.lock();
@@ -137,26 +137,25 @@ private:
     // L.unlock();
     for (unsigned int x = 0; x < a; ++x)
       if (!ranges[x].empty())
-	local.getRemote(x)->push(ranges[x].begin(), ranges[x].end());
+        local.getRemote(x)->push(ranges[x].begin(), ranges[x].end());
   }
 
 public:
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = PerThreadQueues<typename QueueTy::template retype<Tnew>::type>;
 
-  template<bool newConcurrent>
-  using rethread = PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type>;
+  template <bool newConcurrent>
+  using rethread =
+      PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type>;
 
-  void push(const value_type& val) {
-    local.getLocal()->push(val);
-  }
+  void push(const value_type& val) { local.getLocal()->push(val); }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
-    local.getLocal()->push(b,e);
+    local.getLocal()->push(b, e);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     fill_work_l1(range.begin(), range.end());
   }
@@ -165,48 +164,48 @@ public:
     galois::optional<value_type> retval = local.getLocal()->pop();
     if (retval)
       return retval;
-    return doSteal();// stealHalfInSocket(local);
+    return doSteal(); // stealHalfInSocket(local);
   }
 };
-//GALOIS_WLCOMPILECHECK(LocalQueues);
+// GALOIS_WLCOMPILECHECK(LocalQueues);
 
-template<typename WLTy = GFIFO<int>, typename T = int>
+template <typename WLTy = GFIFO<int>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
   typedef typename WLTy::template rethread<false> lWLTy;
   substrate::PerThreadStorage<lWLTy> local;
 
 public:
-  template<bool newconcurrent>
-  using rethread = LocalWorklist<typename WLTy::template rethread<newconcurrent>, T>;
+  template <bool newconcurrent>
+  using rethread =
+      LocalWorklist<typename WLTy::template rethread<newconcurrent>, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = LocalWorklist<typename WLTy::template retype<Tnew>, Tnew>;
 
   typedef T value_type;
 
-  void push(const value_type& val) {
-    local.getLocal()->push(val);
-  }
+  void push(const value_type& val) { local.getLocal()->push(val); }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     local.getLocal()->push(b, e);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
-  galois::optional<value_type> pop() {
-    return local.getLocal()->pop();
-  }
+  galois::optional<value_type> pop() { return local.getLocal()->pop(); }
 };
 GALOIS_WLCOMPILECHECK(LocalWorklist)
 
-template<typename T, typename OwnerFn, template<typename, bool> class QT, bool distributed = false, bool isStack = false, int chunksize=64, bool concurrent=true>
+template <typename T, typename OwnerFn, template <typename, bool> class QT,
+          bool distributed = false, bool isStack = false, int chunksize = 64,
+          bool concurrent = true>
 class OwnerComputeChunkMaster : private boost::noncopyable {
-  class Chunk : public galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
+  class Chunk : public galois::FixedSizeRing<T, chunksize>,
+                public QT<Chunk, concurrent>::ListNode {};
 
   runtime::FixedSizeHeap heap;
   OwnerFn Fn;
@@ -221,55 +220,53 @@ class OwnerComputeChunkMaster : private boost::noncopyable {
   substrate::PerThreadStorage<p> data;
   internal::squeue<distributed, substrate::PerSocketStorage, LevelItem> Q;
 
-  Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
-  }
+  Chunk* mkChunk() { return new (heap.allocate(sizeof(Chunk))) Chunk(); }
 
   void delChunk(Chunk* C) {
     C->~Chunk();
     heap.deallocate(C);
   }
 
-  void pushChunk(Chunk* C)  {
-    unsigned int tid = substrate::ThreadPool::getTID();
+  void pushChunk(Chunk* C) {
+    unsigned int tid   = substrate::ThreadPool::getTID();
     unsigned int index = isStack ? Fn(C->back()) : Fn(C->front());
     if (tid == index) {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
       unsigned int mindex = substrate::getThreadPool().getSocket(index);
-      LevelItem& I = Q.get(mindex);
+      LevelItem& I        = Q.get(mindex);
       I.push(C);
     }
   }
 
-  Chunk* popChunkByID(unsigned int i)  {
+  Chunk* popChunkByID(unsigned int i) {
     LevelItem& I = Q.get(i);
     return I.pop();
   }
 
-  Chunk* popChunk()  {
-    int id = Q.myEffectiveID();
+  Chunk* popChunk() {
+    int id   = Q.myEffectiveID();
     Chunk* r = popChunkByID(id);
     if (r)
       return r;
 
-    for (int i = id + 1; i < (int) Q.size(); ++i) {
+    for (int i = id + 1; i < (int)Q.size(); ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     for (int i = 0; i < id; ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     return 0;
   }
 
-  T* pushi(const T& val, p* n)  {
+  T* pushi(const T& val, p* n) {
     T* retval = 0;
 
     if (n->next && (retval = n->next->push_back(val)))
@@ -277,7 +274,7 @@ class OwnerComputeChunkMaster : private boost::noncopyable {
     if (n->next)
       pushChunk(n->next);
     n->next = mkChunk();
-    retval = n->next->push_back(val);
+    retval  = n->next->push_back(val);
     assert(retval);
     return retval;
   }
@@ -285,13 +282,15 @@ class OwnerComputeChunkMaster : private boost::noncopyable {
 public:
   typedef T value_type;
 
-  template<bool newconcurrent>
-  using rethread = OwnerComputeChunkMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
+  template <bool newconcurrent>
+  using rethread = OwnerComputeChunkMaster<T, OwnerFn, QT, distributed, isStack,
+                                           chunksize, newconcurrent>;
 
-  template<typename Tnew>
-  using retype = OwnerComputeChunkMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
+  template <typename Tnew>
+  using retype = OwnerComputeChunkMaster<Tnew, OwnerFn, QT, distributed,
+                                         isStack, chunksize, concurrent>;
 
-  OwnerComputeChunkMaster() : heap(sizeof(Chunk)) { }
+  OwnerComputeChunkMaster() : heap(sizeof(Chunk)) {}
 
   void flush() {
     p& n = *data.getLocal();
@@ -303,58 +302,60 @@ public:
   //! Most worklists have void return value for push. This push returns address
   //! of placed item to facilitate some internal runtime uses. The address is
   //! generally not safe to use in the presence of concurrent pops.
-  value_type* push(const value_type& val)  {
+  value_type* push(const value_type& val) {
     p* n = data.getLocal();
     return pushi(val, n);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     p* n = data.getLocal();
     while (b != e)
       pushi(*b++, n);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
-  galois::optional<value_type> pop()  {
+  galois::optional<value_type> pop() {
     p& n = *data.getLocal();
     galois::optional<value_type> retval;
     if (isStack) {
       if (n.next && (retval = n.next->extract_back()))
-	return retval;
+        return retval;
       if (n.next)
-	delChunk(n.next);
+        delChunk(n.next);
       n.next = popChunk();
       if (n.next)
-	return n.next->extract_back();
+        return n.next->extract_back();
       return galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
-	return retval;
+        return retval;
       if (n.cur)
-	delChunk(n.cur);
+        delChunk(n.cur);
       n.cur = popChunk();
       if (!n.cur) {
-	n.cur = n.next;
-	n.next = 0;
+        n.cur  = n.next;
+        n.next = 0;
       }
       if (n.cur)
-	return n.cur->extract_front();
+        return n.cur->extract_front();
       return galois::optional<value_type>();
     }
   }
 };
 
-template<typename OwnerFn=DummyIndexer<int> , int chunksize=64, typename T = int, bool concurrent=true>
-class OwnerComputeChunkLIFO : public OwnerComputeChunkMaster<T,OwnerFn,ConExtLinkedQueue, true, true, chunksize, concurrent> {};
+template <typename OwnerFn = DummyIndexer<int>, int chunksize = 64,
+          typename T = int, bool concurrent = true>
+class OwnerComputeChunkLIFO
+    : public OwnerComputeChunkMaster<T, OwnerFn, ConExtLinkedQueue, true, true,
+                                     chunksize, concurrent> {};
 GALOIS_WLCOMPILECHECK(OwnerComputeChunkLIFO)
 
-
-}//End namespace
+} // namespace worklists
 } // end namespace galois
 
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,30 +31,28 @@
 #include <atomic>
 #include <functional>
 
-
 namespace galois {
 namespace runtime {
 
 // TODO: instead of storing partition number, store a pointer to partition meta
 // data every where
 
-struct InputDAGdataPartInOut: public InputDAGdataInOut {
+struct InputDAGdataPartInOut : public InputDAGdataInOut {
 
-  int partition = -1;
+  int partition   = -1;
   bool isBoundary = false;
 
-  explicit InputDAGdataPartInOut (unsigned id): InputDAGdataInOut (id) {}
+  explicit InputDAGdataPartInOut(unsigned id) : InputDAGdataInOut(id) {}
 };
-
 
 template <typename G, typename F, typename M>
 struct InputGraphPartDAGexecutor {
 
-  using GNode = typename G::GraphNode;
-  using Bag_ty = galois::PerThreadBag<GNode>;
-  using PartAdjMatrix = std::vector<std::vector<unsigned> >;
+  using GNode         = typename G::GraphNode;
+  using Bag_ty        = galois::PerThreadBag<GNode>;
+  using PartAdjMatrix = std::vector<std::vector<unsigned>>;
 
-  struct PartMetaData: private boost::noncopyable {
+  struct PartMetaData : private boost::noncopyable {
 
     using LocalWL = galois::gdeque<GNode, 64>;
     // using LocalWL = typename gstl::Deque<GNode>;
@@ -67,55 +65,54 @@ struct InputGraphPartDAGexecutor {
     std::vector<PartMetaData*> neighbors;
     substrate::SimpleLock mutex;
 
-    LocalWL* currInnerWL = new LocalWL ();
-    LocalWL* nextInnerWL = new LocalWL ();
-    LocalWL* currBoundaryWL = new LocalWL ();
-    LocalWL* nextBoundaryWL = new LocalWL ();
+    LocalWL* currInnerWL    = new LocalWL();
+    LocalWL* nextInnerWL    = new LocalWL();
+    LocalWL* currBoundaryWL = new LocalWL();
+    LocalWL* nextBoundaryWL = new LocalWL();
 
     unsigned flips = 0;
 
-    PartMetaData (const unsigned id, const unsigned numPart)
-      : id (id), indegree (0), incomingWLs (numPart) {
+    PartMetaData(const unsigned id, const unsigned numPart)
+        : id(id), indegree(0), incomingWLs(numPart) {}
 
+    ~PartMetaData(void) {
+      delete currInnerWL;
+      currInnerWL = nullptr;
+      delete nextInnerWL;
+      nextInnerWL = nullptr;
+      delete currBoundaryWL;
+      currBoundaryWL = nullptr;
+      delete nextBoundaryWL;
+      nextBoundaryWL = nullptr;
     }
 
-    ~PartMetaData (void) {
-      delete currInnerWL; currInnerWL = nullptr;
-      delete nextInnerWL; nextInnerWL = nullptr;
-      delete currBoundaryWL; currBoundaryWL = nullptr;
-      delete nextBoundaryWL; nextBoundaryWL = nullptr;
+    void switchWorkLists(void) {
+      assert(currInnerWL->empty());
+      assert(currBoundaryWL->empty());
+
+      std::swap(currInnerWL, nextInnerWL);
+      std::swap(currBoundaryWL, nextBoundaryWL);
     }
 
-    void switchWorkLists (void) {
-      assert (currInnerWL->empty ());
-      assert (currBoundaryWL->empty ());
-
-      std::swap (currInnerWL, nextInnerWL);
-      std::swap (currBoundaryWL, nextBoundaryWL);
-    }
-
-    void flipEdges (void) {
-      GALOIS_ASSERT (indegree == 0);
+    void flipEdges(void) {
+      GALOIS_ASSERT(indegree == 0);
 
       ++flips;
-      switchWorkLists ();
+      switchWorkLists();
       // never increment self indegree and decrement others indegree in the same
-      // loop. Increment self indegree first and then others indegree so that if a
-      // neighbor becomes source and starts flipping edges, there is no error
-      indegree += int (neighbors.size ());
+      // loop. Increment self indegree first and then others indegree so that if
+      // a neighbor becomes source and starts flipping edges, there is no error
+      indegree += int(neighbors.size());
 
-
-      for (PartMetaData* n: neighbors) {
+      for (PartMetaData* n : neighbors) {
         int x = --(n->indegree);
-        assert (n->indegree >= 0);
+        assert(n->indegree >= 0);
 
         if (x == 0) {
           // std::printf ("partition %d is now a source\n", n->id);
         }
       }
-
     }
-
   };
 
   struct ThreadWorker {
@@ -123,46 +120,37 @@ struct InputGraphPartDAGexecutor {
     substrate::SimpleLock stealLock;
     galois::gdeque<PartMetaData*> myPartitions;
 
-    size_t innerIter = 0;
+    size_t innerIter    = 0;
     size_t boundaryIter = 0;
 
-
-    PartMetaData* takeOne (void) {
+    PartMetaData* takeOne(void) {
 
       PartMetaData* p = nullptr;
       stealLock.lock();
-        if (!myPartitions.empty ()) {
-          p = myPartitions.front ();
-          myPartitions.pop_front ();
-        }
-      stealLock.unlock ();
+      if (!myPartitions.empty()) {
+        p = myPartitions.front();
+        myPartitions.pop_front();
+      }
+      stealLock.unlock();
 
       return p;
     }
 
-    void putOne (PartMetaData* p) {
-      GALOIS_ASSERT (p != nullptr);
+    void putOne(PartMetaData* p) {
+      GALOIS_ASSERT(p != nullptr);
 
       stealLock.lock();
-          myPartitions.push_back (p);
-      stealLock.unlock ();
+      myPartitions.push_back(p);
+      stealLock.unlock();
     }
-
   };
-
 
   struct Ucontext {
     InputGraphPartDAGexecutor& exec;
     PartMetaData& pusher;
 
-    void push (GNode n) {
-      exec.push (n, pusher);
-    }
-
+    void push(GNode n) { exec.push(n, pusher); }
   };
-
-
-
 
   static const unsigned PARTITION_MULT_FACTOR = 4;
 
@@ -177,54 +165,48 @@ struct InputGraphPartDAGexecutor {
   PartMetaData* partitions;
   PartAdjMatrix adjMatrix;
 
-  InputGraphPartDAGexecutor (G& graph, const F& func, M& dagManager, const char* loopname)
-    :
-      graph (graph),
-      func (func),
-      dagManager (dagManager),
-      loopname (loopname),
-      term(substrate::getSystemTermination(galois::getActiveThreads())),
-      numPart (PARTITION_MULT_FACTOR * galois::getActiveThreads ())
-  {
+  InputGraphPartDAGexecutor(G& graph, const F& func, M& dagManager,
+                            const char* loopname)
+      : graph(graph), func(func), dagManager(dagManager), loopname(loopname),
+        term(substrate::getSystemTermination(galois::getActiveThreads())),
+        numPart(PARTITION_MULT_FACTOR * galois::getActiveThreads()) {
 
     // partitions.clear ();
     // for (unsigned i = 0; i < numPart; ++i) {
-      // partitions.emplace_back (i);
-      // assert (partitions[i].id == i);
+    // partitions.emplace_back (i);
+    // assert (partitions[i].id == i);
     // }
 
-    partitions = reinterpret_cast<PartMetaData*> (malloc (numPart * sizeof (PartMetaData)));
-    GALOIS_ASSERT (partitions != nullptr);
+    partitions =
+        reinterpret_cast<PartMetaData*>(malloc(numPart * sizeof(PartMetaData)));
+    GALOIS_ASSERT(partitions != nullptr);
 
     for (unsigned i = 0; i < numPart; ++i) {
-      new (partitions + i) PartMetaData (i, numPart);
+      new (partitions + i) PartMetaData(i, numPart);
     }
 
-    adjMatrix.clear ();
-    adjMatrix.resize (numPart, std::vector<unsigned> (numPart, 0));
+    adjMatrix.clear();
+    adjMatrix.resize(numPart, std::vector<unsigned>(numPart, 0));
   }
 
+  void initCoarseDAG() {
 
-  void initCoarseDAG () {
-
-    for (size_t i = 0; i < adjMatrix.size (); ++i) {
-      partitions[i].neighbors.clear ();
-      for (size_t j = 0; j < adjMatrix [i].size (); ++j) {
+    for (size_t i = 0; i < adjMatrix.size(); ++i) {
+      partitions[i].neighbors.clear();
+      for (size_t j = 0; j < adjMatrix[i].size(); ++j) {
         if (adjMatrix[i][j] != 0) {
-          partitions [i].neighbors.push_back (&partitions [j]);
+          partitions[i].neighbors.push_back(&partitions[j]);
         }
       }
     }
-
-
 
     for (unsigned i = 0; i < numPart; ++i) {
       PartMetaData& p = partitions[i];
 
       p.indegree = 0;
 
-      for (PartMetaData* q: p.neighbors) {
-        assert (p.id != q->id);
+      for (PartMetaData* q : p.neighbors) {
+        assert(p.id != q->id);
         if (p.id > q->id) {
           ++(p.indegree);
         }
@@ -236,154 +218,146 @@ struct InputGraphPartDAGexecutor {
       PartMetaData& p = partitions[i];
 
       if (p.indegree == 0) {
-        std::printf ("Partition %d is initially a source\n", i);
+        std::printf("Partition %d is initially a source\n", i);
 
-        for (PartMetaData* q: p.neighbors) {
-          assert (q->indegree != 0);
+        for (PartMetaData* q : p.neighbors) {
+          assert(q->indegree != 0);
         }
       }
     }
   }
 
+  void push(GNode n, PartMetaData& pusher) {
+    auto& nd = graph.getData(n, galois::MethodFlag::UNPROTECTED);
 
-  void push (GNode n, PartMetaData& pusher) {
-    auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
-
-    assert (nd.partition != -1);
+    assert(nd.partition != -1);
     PartMetaData& owner = partitions[nd.partition];
 
     int expected = 0;
-    if (nd.onWL.cas (expected, 1)) {
+    if (nd.onWL.cas(expected, 1)) {
 
       if (owner.id != pusher.id) {
         // push remote
 
-        GALOIS_ASSERT (nd.isBoundary);
+        GALOIS_ASSERT(nd.isBoundary);
 
-        assert (pusher.id < owner.incomingWLs.size ());
-        owner.incomingWLs[pusher.id].push_back (n);
+        assert(pusher.id < owner.incomingWLs.size());
+        owner.incomingWLs[pusher.id].push_back(n);
 
-      }
-      else {
+      } else {
         // push local
         if (nd.isBoundary) {
-          owner.nextBoundaryWL->push_back (n);
+          owner.nextBoundaryWL->push_back(n);
 
         } else {
-          owner.nextInnerWL->push_back (n);
+          owner.nextInnerWL->push_back(n);
         }
-
       }
     } // end if cas onWL
-
   }
 
   // void push (GNode n, PartMetaData& pusher) {
-    // auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
-//
-    // assert (nd.partition != -1);
-    // PartMetaData& owner = partitions[nd.partition];
-//
-    // int expected = 0;
-    // if (nd.onWL.cas (expected, 1)) {
-//
-      // if (owner.id != pusher.id) {
-        // // push remote
-        //
-        // GALOIS_ASSERT (nd.isBoundary);
-//
-        // assert (pusher.id < owner.incomingWLs.size ());
-        // owner.incomingWLs[pusher.id].push_back (n);
-//
-//
-      // } else {
-        // // push local
-//
-        // if (nd.isBoundary) {
-          // owner.currBoundaryWL.push_back (n);
-//
-        // } else {
-          // owner.currInnerWL.push_back (n);
-        // }
-      // }
-//
-    // } // end if cas
-//
+  // auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
+  //
+  // assert (nd.partition != -1);
+  // PartMetaData& owner = partitions[nd.partition];
+  //
+  // int expected = 0;
+  // if (nd.onWL.cas (expected, 1)) {
+  //
+  // if (owner.id != pusher.id) {
+  // // push remote
+  //
+  // GALOIS_ASSERT (nd.isBoundary);
+  //
+  // assert (pusher.id < owner.incomingWLs.size ());
+  // owner.incomingWLs[pusher.id].push_back (n);
+  //
+  //
+  // } else {
+  // // push local
+  //
+  // if (nd.isBoundary) {
+  // owner.currBoundaryWL.push_back (n);
+  //
+  // } else {
+  // owner.currInnerWL.push_back (n);
+  // }
+  // }
+  //
+  // } // end if cas
+  //
   // }
 
   template <typename R>
-  void fill_initial (const R& range) {
+  void fill_initial(const R& range) {
 
-    using LocalContrib = typename galois::gstl::Vector<galois::gdeque<GNode, 64> >;
+    using LocalContrib =
+        typename galois::gstl::Vector<galois::gdeque<GNode, 64>>;
 
-    galois::on_each(
-        [this, &range] (unsigned tid, unsigned numT) {
+    galois::on_each([this, &range](unsigned tid, unsigned numT) {
+      LocalContrib localContribInner(numPart);
+      LocalContrib localContribBoundary(numPart);
 
-          LocalContrib localContribInner (numPart);
-          LocalContrib localContribBoundary (numPart);
+      for (auto i = range.local_begin(), end_i = range.local_end(); i != end_i;
+           ++i) {
 
-          for (auto i = range.local_begin (), end_i = range.local_end ();
-            i != end_i; ++i) {
+        auto& nd = graph.getData(*i, galois::MethodFlag::UNPROTECTED);
+        assert(nd.partition != -1);
 
-            auto& nd = graph.getData (*i, galois::MethodFlag::UNPROTECTED);
-            assert (nd.partition != -1);
+        if (nd.isBoundary) {
+          localContribBoundary[nd.partition].push_back(*i);
+        } else {
+          localContribInner[nd.partition].push_back(*i);
+        }
+      }
 
-            if (nd.isBoundary) {
-              localContribBoundary [nd.partition].push_back (*i);
-            } else {
-              localContribInner [nd.partition].push_back (*i);
-            }
+      for (size_t i = 0; i < numPart; ++i) {
 
+        if (!localContribInner[i].empty()) {
+          partitions[i].mutex.lock();
+          for (const auto& n : localContribInner[i]) {
+            partitions[i].currInnerWL->push_back(n);
+          }
+          partitions[i].mutex.unlock();
+        }
+
+        if (!localContribBoundary[i].empty()) {
+          partitions[i].mutex.lock();
+
+          for (const auto& n : localContribBoundary[i]) {
+            partitions[i].currBoundaryWL->push_back(n);
           }
 
-          for (size_t i = 0; i < numPart; ++i) {
-
-            if (!localContribInner [i].empty ()) {
-              partitions [i].mutex.lock ();
-              for (const auto& n: localContribInner [i]) {
-                partitions [i].currInnerWL->push_back (n);
-              }
-              partitions [i].mutex.unlock ();
-            }
-
-            if (!localContribBoundary [i].empty ()) {
-              partitions [i].mutex.lock ();
-
-              for (const auto& n: localContribBoundary [i]) {
-                partitions [i].currBoundaryWL->push_back (n);
-              }
-
-              partitions [i].mutex.unlock ();
-            }
-          }
-        });
+          partitions[i].mutex.unlock();
+        }
+      }
+    });
   }
-
-
 
   // TODO: add iteration stats
 
   template <typename W>
-  void applyOperator (Ucontext& ctxt, W& workList, bool& workHappened, size_t& iter) {
+  void applyOperator(Ucontext& ctxt, W& workList, bool& workHappened,
+                     size_t& iter) {
 
-    workHappened = workHappened || !workList.empty ();
+    workHappened = workHappened || !workList.empty();
 
-    while (!workList.empty ()) {
+    while (!workList.empty()) {
       ++iter;
 
-      GNode n = workList.front ();
-      workList.pop_front ();
+      GNode n = workList.front();
+      workList.pop_front();
 
-      auto& nd = graph.getData (n, galois::MethodFlag::UNPROTECTED);
-      assert (nd.partition == ctxt.pusher.id);
+      auto& nd = graph.getData(n, galois::MethodFlag::UNPROTECTED);
+      assert(nd.partition == ctxt.pusher.id);
       nd.onWL = 0;
-      func (n, ctxt);
+      func(n, ctxt);
     }
   }
 
-
   template <typename R>
-  void execute (const R& range) {
+  void execute(const R& range) {
     // 1. partition
     // 2. create coarsened graph
     // 3. initialize the worklists for partitions
@@ -397,156 +371,146 @@ struct InputGraphPartDAGexecutor {
     // 2. Load-balancing
     //
 
-
-    GreedyPartitioner<G, M> partitioner (graph, dagManager, numPart);
+    GreedyPartitioner<G, M> partitioner(graph, dagManager, numPart);
     // CyclicPartitioner<G, M> partitioner (graph, dagManager, numPart);
 
-    partitioner.partition ();
+    partitioner.partition();
 
-    // std::printf ("Graph has %d components\n", partitioner.countComponents ());
+    // std::printf ("Graph has %d components\n", partitioner.countComponents
+    // ());
 
-    partitioner.initCoarseAdj (adjMatrix);
+    partitioner.initCoarseAdj(adjMatrix);
 
-    initCoarseDAG ();
+    initCoarseDAG();
 
-    StatTimer texec ("InputGraphPartDAGexecutor execution time");
-    texec.start ();
-    fill_initial (range);
+    StatTimer texec("InputGraphPartDAGexecutor execution time");
+    texec.start();
+    fill_initial(range);
 
     galois::substrate::PerThreadStorage<ThreadWorker> workers;
 
-    galois::on_each(
-        [this, &workers] (const unsigned tid, const unsigned numT) {
-          ThreadWorker& w = *workers.getLocal (tid);
+    galois::on_each([this, &workers](const unsigned tid, const unsigned numT) {
+      ThreadWorker& w = *workers.getLocal(tid);
 
-          // // block assignment
-          // size_t beg = tid * PARTITION_MULT_FACTOR;
-          // size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
-//
-          // for (; beg < end; ++beg) {
-            // w.myPartitions.push_back (&partitions[beg]);
-          // }
+      // // block assignment
+      // size_t beg = tid * PARTITION_MULT_FACTOR;
+      // size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
+      //
+      // for (; beg < end; ++beg) {
+      // w.myPartitions.push_back (&partitions[beg]);
+      // }
 
-          // cyclic assignment;
-          for (unsigned i = tid; i < numPart; i += numT) {
-            w.myPartitions.push_back (&partitions[i]);
-          }
+      // cyclic assignment;
+      for (unsigned i = tid; i < numPart; i += numT) {
+        w.myPartitions.push_back(&partitions[i]);
+      }
 
-
-
-
-          term.initializeThread ();
-        });
-
+      term.initializeThread();
+    });
 
     // TODO: (a) upon picking a partition, either process all worklists
-    // and then put it back or process them one at a time, by repeatedly picking the partition.
-    // TODO: order of processing worklists? currInnerWL, local-boundary, external-boundary
+    // and then put it back or process them one at a time, by repeatedly picking
+    // the partition.
+    // TODO: order of processing worklists? currInnerWL, local-boundary,
+    // external-boundary
     //
     // TODO: stealing candidates? none, within socket only, first within socket
     // and then outside
     //
     // TODO: what to do with stolen partition? put back in original owner? keep?
 
-    galois::on_each(
-        [this, &workers] (const unsigned tid, const unsigned numT) {
+    galois::on_each([this, &workers](const unsigned tid, const unsigned numT) {
+      ThreadWorker& worker = *workers.getLocal(tid);
 
-          ThreadWorker& worker = *workers.getLocal (tid);
+      while (true) {
 
-          while (true) {
+        bool workHappened = false;
+        PartMetaData* p   = worker.takeOne();
 
-            bool workHappened = false;
-            PartMetaData* p = worker.takeOne ();
+        if (p != nullptr) {
 
-            if (p != nullptr) {
+          // LL::gDebug ("working on parition", p->id);
 
-            // LL::gDebug ("working on parition", p->id);
+          Ucontext ctxt{*this, *p};
 
-              Ucontext ctxt{*this, *p};
+          applyOperator(ctxt, *(p->currInnerWL), workHappened,
+                        worker.innerIter);
 
-              applyOperator (ctxt, *(p->currInnerWL), workHappened, worker.innerIter);
+          if (p->indegree == 0) {
 
-              if (p->indegree == 0) {
+            applyOperator(ctxt, *(p->currBoundaryWL), workHappened,
+                          worker.boundaryIter);
 
-                applyOperator (ctxt, *(p->currBoundaryWL), workHappened, worker.boundaryIter);
-
-                for (size_t i = 0; i < numPart; ++i) {
-                  applyOperator (ctxt, p->incomingWLs[i], workHappened, worker.boundaryIter);
-                }
-
-                p->flipEdges ();
-
-              }
-
+            for (size_t i = 0; i < numPart; ++i) {
+              applyOperator(ctxt, p->incomingWLs[i], workHappened,
+                            worker.boundaryIter);
             }
 
-
-            worker.putOne (p);
-
-
-            term.localTermination (workHappened);
-            bool quit = term.globalTermination ();
-
-            if (quit) {
-              break;
-            }
-
+            p->flipEdges();
           }
+        }
 
-          for (auto i = worker.myPartitions.begin ()
-              , end_i = worker.myPartitions.end (); i != end_i; ++i) {
-            std::printf ("Partition %d performed %d rounds\n", (*i)->id, (*i)->flips);
-          }
+        worker.putOne(p);
 
-          reportStat_Tsum (loopname, "Inner Iterations", worker.innerIter);
-          reportStat_Tsum (loopname, "Boundary Iterations", worker.boundaryIter);
-          reportStat_Tsum (loopname, "Total Iterations", (worker.innerIter + worker.boundaryIter));
+        term.localTermination(workHappened);
+        bool quit = term.globalTermination();
 
+        if (quit) {
+          break;
+        }
+      }
 
-        });
+      for (auto i     = worker.myPartitions.begin(),
+                end_i = worker.myPartitions.end();
+           i != end_i; ++i) {
+        std::printf("Partition %d performed %d rounds\n", (*i)->id,
+                    (*i)->flips);
+      }
 
-    texec.stop ();
+      reportStat_Tsum(loopname, "Inner Iterations", worker.innerIter);
+      reportStat_Tsum(loopname, "Boundary Iterations", worker.boundaryIter);
+      reportStat_Tsum(loopname, "Total Iterations",
+                      (worker.innerIter + worker.boundaryIter));
+    });
 
+    texec.stop();
   }
-
-
 };
 
 template <typename R, typename F, typename G, typename M>
-void for_each_det_input_part (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
+void for_each_det_input_part(const R& range, const F& func, G& graph,
+                             M& dagManager, const char* loopname) {
 
-  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
-  InputGraphPartDAGexecutor<G, F, M> executor {graph, func, dagManager, loopname};
+  InputGraphPartDAGexecutor<G, F, M> executor{graph, func, dagManager,
+                                              loopname};
 
-  executor.execute (range);
+  executor.execute(range);
 
-  galois::substrate::getThreadPool ().beKind ();
-
+  galois::substrate::getThreadPool().beKind();
 }
 
 // TODO: logic to choose correct DAG type based on graph type or some graph tag
 template <typename R, typename G, typename F>
-void for_each_det_input_part (const R& range, const F& func, G& graph, const char* loopname) {
+void for_each_det_input_part(const R& range, const F& func, G& graph,
+                             const char* loopname) {
 
-  typedef typename DAGmanagerInOut<G>::Manager  M;
-  M dagManager {graph};
+  typedef typename DAGmanagerInOut<G>::Manager M;
+  M dagManager{graph};
 
-  for_each_det_input_part (range, func, graph,
-      dagManager, loopname);
-
+  for_each_det_input_part(range, func, graph, dagManager, loopname);
 }
 
 template <>
 struct ForEachDet_InputDAG<InputDAG_ExecTy::PART> {
 
   template <typename R, typename F, typename G>
-  static void run (const R& range, const F& func, G& graph, const char* loopname) {
-    for_each_det_input_part (range, func, graph, loopname);
+  static void run(const R& range, const F& func, G& graph,
+                  const char* loopname) {
+    for_each_det_input_part(range, func, graph, loopname);
   }
 };
-
-
 
 } // end namespace runtime
 

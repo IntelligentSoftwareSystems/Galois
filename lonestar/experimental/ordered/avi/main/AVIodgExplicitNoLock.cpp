@@ -7,9 +7,8 @@
 
 #include "AVIodgExplicitNoLock.h"
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   AVIodgExplicitNoLock um;
-  um.run (argc, argv);
+  um.run(argc, argv);
   return 0;
 }
-

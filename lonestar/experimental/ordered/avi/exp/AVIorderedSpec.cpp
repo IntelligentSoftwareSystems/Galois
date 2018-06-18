@@ -7,9 +7,8 @@
 
 #include "AVIorderedSpec.h"
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   AVIorderedSpec um;
-  um.run (argc, argv);
+  um.run(argc, argv);
   return 0;
 }
-

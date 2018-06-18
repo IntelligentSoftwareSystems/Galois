@@ -40,10 +40,14 @@ struct sparseRowMajor {
   int* Starts;
   int* ColIds;
   ETYPE* Values;
-  void del() {free(Starts); free(ColIds); if (Values != NULL) free(Values);}
-  sparseRowMajor(int n, int m, int nz, int* S, int* C, ETYPE* V) :
-    numRows(n), numCols(m), nonZeros(nz), 
-    Starts(S), ColIds(C), Values(V) {}
+  void del() {
+    free(Starts);
+    free(ColIds);
+    if (Values != NULL)
+      free(Values);
+  }
+  sparseRowMajor(int n, int m, int nz, int* S, int* C, ETYPE* V)
+      : numRows(n), numCols(m), nonZeros(nz), Starts(S), ColIds(C), Values(V) {}
 };
 
 typedef sparseRowMajor<double> sparseRowMajorD;
@@ -63,9 +67,9 @@ struct edgeArray {
   int numRows;
   int numCols;
   int nonZeros;
-  void del() {free(E);}
-  edgeArray(edge *EE, int r, int c, int nz) :
-    E(EE), numRows(r), numCols(c), nonZeros(nz) {}
+  void del() { free(E); }
+  edgeArray(edge* EE, int r, int c, int nz)
+      : E(EE), numRows(r), numCols(c), nonZeros(nz) {}
   edgeArray() {}
 };
 
@@ -81,10 +85,11 @@ struct wghEdge {
 };
 
 struct wghEdgeArray {
-  wghEdge *E;
-  int n; int m;
+  wghEdge* E;
+  int n;
+  int m;
   wghEdgeArray(wghEdge* EE, int nn, int mm) : E(EE), n(nn), m(mm) {}
-  void del() { free(E);}
+  void del() { free(E); }
 };
 
 // **************************************************************
@@ -94,35 +99,37 @@ struct wghEdgeArray {
 struct vertex {
   vindex* Neighbors;
   int degree;
-  void del() {free(Neighbors);}
+  void del() { free(Neighbors); }
   vertex(vindex* N, int d) : Neighbors(N), degree(d) {}
 };
 
 struct graph {
-  vertex *V;
+  vertex* V;
   int n;
   int m;
   vindex* allocatedInplace;
-  graph(vertex* VV, int nn, int mm) 
-    : V(VV), n(nn), m(mm), allocatedInplace(NULL) {}
-  graph(vertex* VV, int nn, int mm, vindex* ai) 
-    : V(VV), n(nn), m(mm), allocatedInplace(ai) {}
+  graph(vertex* VV, int nn, int mm)
+      : V(VV), n(nn), m(mm), allocatedInplace(NULL) {}
+  graph(vertex* VV, int nn, int mm, vindex* ai)
+      : V(VV), n(nn), m(mm), allocatedInplace(ai) {}
   graph copy() {
-    vertex* VN = newA(vertex,n);
-    vindex* Edges = newA(vindex,m);
-    vindex k = 0;
-    for (int i=0; i < n; i++) {
-      VN[i] = V[i];
+    vertex* VN    = newA(vertex, n);
+    vindex* Edges = newA(vindex, m);
+    vindex k      = 0;
+    for (int i = 0; i < n; i++) {
+      VN[i]           = V[i];
       VN[i].Neighbors = Edges + k;
-      for (int j =0; j < V[i].degree; j++) 
-	Edges[k++] = V[i].Neighbors[j];
+      for (int j = 0; j < V[i].degree; j++)
+        Edges[k++] = V[i].Neighbors[j];
     }
     return graph(VN, n, m, Edges);
-  } 
+  }
   void del() {
-    if (allocatedInplace == NULL) 
-      for (int i=0; i < n; i++) V[i].del();
-    else free(allocatedInplace);
+    if (allocatedInplace == NULL)
+      for (int i = 0; i < n; i++)
+        V[i].del();
+    else
+      free(allocatedInplace);
     free(V);
   }
 };

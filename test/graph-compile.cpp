@@ -4,12 +4,13 @@
 
 struct NoDefault {
   int x;
-  explicit NoDefault(int x): x(x) { }
+  explicit NoDefault(int x) : x(x) {}
+
 private:
   NoDefault();
 };
 
-template<typename GraphTy>
+template <typename GraphTy>
 void check() {
   typedef typename GraphTy::GraphNode GNode;
   int v;
@@ -29,30 +30,30 @@ void check() {
   g.addMultiEdge(n5, n2, galois::MethodFlag::WRITE, v);
   g.addMultiEdge(n2, n3, galois::MethodFlag::WRITE, v);
   g.addMultiEdge(n2, n4, galois::MethodFlag::WRITE, v);
-  for(auto ii : g.edges(n2))
+  for (auto ii : g.edges(n2))
     std::cout << "o " << g.getData(g.getEdgeDst(ii)).x << "\n";
-  for(auto ii : g.in_edges(n2))
+  for (auto ii : g.in_edges(n2))
     std::cout << "i " << g.getData(g.getEdgeDst(ii)).x << "\n";
   std::cout << "** removing 2->3\n";
-  g.removeEdge(n2, g.findEdge(n2,n3));
-  for(auto ii : g.edges(n2))
+  g.removeEdge(n2, g.findEdge(n2, n3));
+  for (auto ii : g.edges(n2))
     std::cout << "o " << g.getData(g.getEdgeDst(ii)).x << "\n";
-  for(auto ii : g.in_edges(n2))
+  for (auto ii : g.in_edges(n2))
     std::cout << "i " << g.getData(g.getEdgeDst(ii)).x << "\n";
   std::cout << "** removing 5->1\n";
-  g.removeEdge(n5, g.findEdge(n5,n2));
-  for(auto ii : g.edges(n2))
+  g.removeEdge(n5, g.findEdge(n5, n2));
+  for (auto ii : g.edges(n2))
     std::cout << "o " << g.getData(g.getEdgeDst(ii)).x << "\n";
-  for(auto ii : g.in_edges(n2))
+  for (auto ii : g.in_edges(n2))
     std::cout << "i " << g.getData(g.getEdgeDst(ii)).x << "\n";
   std::cout << "\n\n";
 }
 
 int main() {
-  check<galois::graphs::MorphGraph<NoDefault,NoDefault,true> >();
-  check<galois::graphs::MorphGraph<NoDefault,NoDefault,false> >();
-  check<galois::graphs::MorphGraph<NoDefault,NoDefault,true,true> >();
-  check<galois::graphs::MorphGraph<NoDefault,NoDefault,false,true> >();
+  check<galois::graphs::MorphGraph<NoDefault, NoDefault, true>>();
+  check<galois::graphs::MorphGraph<NoDefault, NoDefault, false>>();
+  check<galois::graphs::MorphGraph<NoDefault, NoDefault, true, true>>();
+  check<galois::graphs::MorphGraph<NoDefault, NoDefault, false, true>>();
 
   return 0;
 }

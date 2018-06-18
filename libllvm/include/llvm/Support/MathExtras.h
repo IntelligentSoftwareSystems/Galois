@@ -28,44 +28,43 @@ inline uint32_t Hi_32(uint64_t Value) {
 }
 
 /// Lo_32 - This function returns the low 32 bits of a 64 bit value.
-inline uint32_t Lo_32(uint64_t Value) {
-  return static_cast<uint32_t>(Value);
-}
+inline uint32_t Lo_32(uint64_t Value) { return static_cast<uint32_t>(Value); }
 
 /// isInt - Checks if an integer fits into the given bit width.
-template<unsigned N>
+template <unsigned N>
 inline bool isInt(int64_t x) {
-  return N >= 64 || (-(INT64_C(1)<<(N-1)) <= x && x < (INT64_C(1)<<(N-1)));
+  return N >= 64 ||
+         (-(INT64_C(1) << (N - 1)) <= x && x < (INT64_C(1) << (N - 1)));
 }
 // Template specializations to get better code for common cases.
-template<>
+template <>
 inline bool isInt<8>(int64_t x) {
   return static_cast<int8_t>(x) == x;
 }
-template<>
+template <>
 inline bool isInt<16>(int64_t x) {
   return static_cast<int16_t>(x) == x;
 }
-template<>
+template <>
 inline bool isInt<32>(int64_t x) {
   return static_cast<int32_t>(x) == x;
 }
 
 /// isUInt - Checks if an unsigned integer fits into the given bit width.
-template<unsigned N>
+template <unsigned N>
 inline bool isUInt(uint64_t x) {
-  return N >= 64 || x < (UINT64_C(1)<<N);
+  return N >= 64 || x < (UINT64_C(1) << N);
 }
 // Template specializations to get better code for common cases.
-template<>
+template <>
 inline bool isUInt<8>(uint64_t x) {
   return static_cast<uint8_t>(x) == x;
 }
-template<>
+template <>
 inline bool isUInt<16>(uint64_t x) {
   return static_cast<uint16_t>(x) == x;
 }
-template<>
+template <>
 inline bool isUInt<32>(uint64_t x) {
   return static_cast<uint32_t>(x) == x;
 }
@@ -79,7 +78,8 @@ inline bool isUIntN(unsigned N, uint64_t x) {
 /// isIntN - Checks if an signed integer fits into the given (dynamic)
 /// bit width.
 inline bool isIntN(unsigned N, int64_t x) {
-  return N >= 64 || (-(INT64_C(1)<<(N-1)) <= x && x < (INT64_C(1)<<(N-1)));
+  return N >= 64 ||
+         (-(INT64_C(1) << (N - 1)) <= x && x < (INT64_C(1) << (N - 1)));
 }
 
 /// isMask_32 - This function returns true if the argument is a sequence of ones
@@ -148,11 +148,13 @@ inline unsigned CountLeadingZeros_32(uint32_t Value) {
 #if __GNUC__ >= 4
   // PowerPC is defined for __builtin_clz(0)
 #if !defined(__ppc__) && !defined(__ppc64__)
-  if (!Value) return 32;
+  if (!Value)
+    return 32;
 #endif
   Count = __builtin_clz(Value);
 #else
-  if (!Value) return 32;
+  if (!Value)
+    return 32;
   Count = 0;
   // bisection method for count leading zeros
   for (unsigned Shift = 32 >> 1; Shift; Shift >>= 1) {
@@ -184,12 +186,14 @@ inline unsigned CountLeadingZeros_64(uint64_t Value) {
 #if __GNUC__ >= 4
   // PowerPC is defined for __builtin_clzll(0)
 #if !defined(__ppc__) && !defined(__ppc64__)
-  if (!Value) return 64;
+  if (!Value)
+    return 64;
 #endif
   Count = __builtin_clzll(Value);
 #else
   if (sizeof(long) == sizeof(int64_t)) {
-    if (!Value) return 64;
+    if (!Value)
+      return 64;
     Count = 0;
     // bisection method for count leading zeros
     for (unsigned Shift = 64 >> 1; Shift; Shift >>= 1) {
@@ -206,13 +210,13 @@ inline unsigned CountLeadingZeros_64(uint64_t Value) {
 
     // if some bits in hi portion
     if (Hi) {
-        // leading zeros in hi portion plus all bits in lo portion
-        Count = CountLeadingZeros_32(Hi);
+      // leading zeros in hi portion plus all bits in lo portion
+      Count = CountLeadingZeros_32(Hi);
     } else {
-        // get lo portion
-        uint32_t Lo = Lo_32(Value);
-        // same as 32 bit value
-        Count = CountLeadingZeros_32(Lo)+32;
+      // get lo portion
+      uint32_t Lo = Lo_32(Value);
+      // same as 32 bit value
+      Count = CountLeadingZeros_32(Lo) + 32;
     }
   }
 #endif
@@ -236,10 +240,8 @@ inline unsigned CountTrailingZeros_32(uint32_t Value) {
   return Value ? __builtin_ctz(Value) : 32;
 #else
   static const unsigned Mod37BitPosition[] = {
-    32, 0, 1, 26, 2, 23, 27, 0, 3, 16, 24, 30, 28, 11, 0, 13,
-    4, 7, 17, 0, 25, 22, 31, 15, 29, 10, 12, 6, 0, 21, 14, 9,
-    5, 20, 8, 19, 18
-  };
+      32, 0,  1,  26, 2,  23, 27, 0,  3, 16, 24, 30, 28, 11, 0,  13, 4,  7, 17,
+      0,  25, 22, 31, 15, 29, 10, 12, 6, 0,  21, 14, 9,  5,  20, 8,  19, 18};
   return Mod37BitPosition[(-Value & Value) % 37];
 #endif
 }
@@ -261,12 +263,10 @@ inline unsigned CountTrailingZeros_64(uint64_t Value) {
   return Value ? __builtin_ctzll(Value) : 64;
 #else
   static const unsigned Mod67Position[] = {
-    64, 0, 1, 39, 2, 15, 40, 23, 3, 12, 16, 59, 41, 19, 24, 54,
-    4, 64, 13, 10, 17, 62, 60, 28, 42, 30, 20, 51, 25, 44, 55,
-    47, 5, 32, 65, 38, 14, 22, 11, 58, 18, 53, 63, 9, 61, 27,
-    29, 50, 43, 46, 31, 37, 21, 57, 52, 8, 26, 49, 45, 36, 56,
-    7, 48, 35, 6, 34, 33, 0
-  };
+      64, 0,  1,  39, 2,  15, 40, 23, 3,  12, 16, 59, 41, 19, 24, 54, 4,
+      64, 13, 10, 17, 62, 60, 28, 42, 30, 20, 51, 25, 44, 55, 47, 5,  32,
+      65, 38, 14, 22, 11, 58, 18, 53, 63, 9,  61, 27, 29, 50, 43, 46, 31,
+      37, 21, 57, 52, 8,  26, 49, 45, 36, 56, 7,  48, 35, 6,  34, 33, 0};
   return Mod67Position[(-Value & Value) % 67];
 #endif
 }
@@ -287,7 +287,7 @@ inline unsigned CountPopulation_32(uint32_t Value) {
   return __builtin_popcount(Value);
 #else
   uint32_t v = Value - ((Value >> 1) & 0x55555555);
-  v = (v & 0x33333333) + ((v >> 2) & 0x33333333);
+  v          = (v & 0x33333333) + ((v >> 2) & 0x33333333);
   return ((v + (v >> 4) & 0xF0F0F0F) * 0x1010101) >> 24;
 #endif
 }
@@ -299,8 +299,8 @@ inline unsigned CountPopulation_64(uint64_t Value) {
   return __builtin_popcountll(Value);
 #else
   uint64_t v = Value - ((Value >> 1) & 0x5555555555555555ULL);
-  v = (v & 0x3333333333333333ULL) + ((v >> 2) & 0x3333333333333333ULL);
-  v = (v + (v >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+  v          = (v & 0x3333333333333333ULL) + ((v >> 2) & 0x3333333333333333ULL);
+  v          = (v + (v >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
   return unsigned((uint64_t)(v * 0x0101010101010101ULL) >> 56);
 #endif
 }
@@ -322,13 +322,13 @@ inline unsigned Log2_64(uint64_t Value) {
 /// value, 32 if the value is zero. (32 bit edition).
 /// Ex. Log2_32_Ceil(32) == 5, Log2_32_Ceil(1) == 0, Log2_32_Ceil(6) == 3
 inline unsigned Log2_32_Ceil(uint32_t Value) {
-  return 32-CountLeadingZeros_32(Value-1);
+  return 32 - CountLeadingZeros_32(Value - 1);
 }
 
 /// Log2_64_Ceil - This function returns the ceil log base 2 of the specified
 /// value, 64 if the value is zero. (64 bit edition.)
 inline unsigned Log2_64_Ceil(uint64_t Value) {
-  return 64-CountLeadingZeros_64(Value-1);
+  return 64 - CountLeadingZeros_64(Value - 1);
 }
 
 /// GreatestCommonDivisor64 - Return the greatest common divisor of the two
@@ -336,8 +336,8 @@ inline unsigned Log2_64_Ceil(uint64_t Value) {
 inline uint64_t GreatestCommonDivisor64(uint64_t A, uint64_t B) {
   while (B) {
     uint64_t T = B;
-    B = A % B;
-    A = T;
+    B          = A % B;
+    A          = T;
   }
   return A;
 }
@@ -439,22 +439,22 @@ inline uint64_t OffsetToAlignment(uint64_t Value, uint64_t Align) {
 /// abs64 - absolute value of a 64-bit int.  Not all environments support
 /// "abs" on whatever their name for the 64-bit int type is.  The absolute
 /// value of the largest negative number is undefined, as with "abs".
-inline int64_t abs64(int64_t x) {
-  return (x < 0) ? -x : x;
-}
+inline int64_t abs64(int64_t x) { return (x < 0) ? -x : x; }
 
 /// SignExtend32 - Sign extend B-bit number x to 32-bit int.
 /// Usage int32_t r = SignExtend32<5>(x);
-template <unsigned B> inline int32_t SignExtend32(uint32_t x) {
+template <unsigned B>
+inline int32_t SignExtend32(uint32_t x) {
   return int32_t(x << (32 - B)) >> (32 - B);
 }
 
 /// SignExtend64 - Sign extend B-bit number x to 64-bit int.
 /// Usage int64_t r = SignExtend64<5>(x);
-template <unsigned B> inline int64_t SignExtend64(uint64_t x) {
+template <unsigned B>
+inline int64_t SignExtend64(uint64_t x) {
   return int64_t(x << (64 - B)) >> (64 - B);
 }
 
-} // End llvm namespace
+} // namespace llvm
 
 #endif

@@ -1,13 +1,13 @@
 /*
    ggcuda.h
 
-   Implements GG CUDA runtime bits. Part of the GGC source code. 
+   Implements GG CUDA runtime bits. Part of the GGC source code.
 
    Copyright (C) 2014--2016, The University of Texas at Austin
 
    See LICENSE.TXT for copyright license.
 
-   Author: Sreepathi Pai <sreepai@ices.utexas.edu> 
+   Author: Sreepathi Pai <sreepai@ices.utexas.edu>
 */
 
 #pragma once

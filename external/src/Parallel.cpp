@@ -9,7 +9,7 @@
 #endif
 
 __thread unsigned Exp::TID = 0;
-unsigned Exp::nextID = 0;
+unsigned Exp::nextID       = 0;
 
 //! Generic check for pthread functions
 void checkResults(int val) {
@@ -29,7 +29,7 @@ void Exp::PthreadBarrier::checkResults(int val) {
 }
 
 Exp::PthreadBarrier::PthreadBarrier() {
-  //uninitialized barriers block a lot of threads to help with debugging
+  // uninitialized barriers block a lot of threads to help with debugging
   int rc = pthread_barrier_init(&bar, 0, ~0);
   checkResults(rc);
 }
@@ -60,7 +60,7 @@ void Exp::PthreadBarrier::wait() {
 #if 1
 namespace {
 
-class Semaphore: private boost::noncopyable {
+class Semaphore : private boost::noncopyable {
   pthread_mutex_t lock;
   pthread_cond_t cond;
   int val;
@@ -82,7 +82,7 @@ public:
     pthread_mutex_init(&lock, NULL);
     pthread_cond_init(&cond, NULL);
   }
-  
+
   void destroy() {
     pthread_cond_destroy(&cond);
     pthread_mutex_destroy(&lock);
@@ -113,12 +113,12 @@ class ThreadPool_pthread {
   Semaphore idlock;
   unsigned maxThreads;
   volatile bool shutdown; // Set and start threads to have them exit
-  volatile Exp::RunCommand* workBegin; //Begin iterator for work commands
-  volatile Exp::RunCommand* workEnd; //End iterator for work commands
+  volatile Exp::RunCommand* workBegin; // Begin iterator for work commands
+  volatile Exp::RunCommand* workEnd;   // End iterator for work commands
 
   void initThread() {
-    //we use a simple pthread or atomic to avoid depending on Galois
-    //stuff too early in the initialization process
+    // we use a simple pthread or atomic to avoid depending on Galois
+    // stuff too early in the initialization process
     idlock.acquire();
     Exp::getTID();
     idlock.release();
@@ -136,9 +136,9 @@ class ThreadPool_pthread {
 
   void doWork(unsigned LocalThreadID) {
     cascade(LocalThreadID);
-    Exp::RunCommand* workPtr = (Exp::RunCommand*)workBegin;
+    Exp::RunCommand* workPtr  = (Exp::RunCommand*)workBegin;
     Exp::RunCommand* workEndL = (Exp::RunCommand*)workEnd;
-    
+
     while (workPtr != workEndL) {
       (*workPtr)();
       ++workPtr;
@@ -148,7 +148,7 @@ class ThreadPool_pthread {
   void launch(void) {
     unsigned LocalThreadID = Exp::getTID();
     while (!shutdown) {
-      starts[LocalThreadID].acquire();  
+      starts[LocalThreadID].acquire();
       doWork(LocalThreadID);
     }
   }
@@ -159,15 +159,15 @@ class ThreadPool_pthread {
     TP->launch();
     return 0;
   }
-  
+
 public:
-  ThreadPool_pthread(): shutdown(false), workBegin(0), workEnd(0) {
+  ThreadPool_pthread() : shutdown(false), workBegin(0), workEnd(0) {
     started.init(0);
     idlock.init(1);
     maxThreads = Exp::getNumThreads();
     initThread();
 
-    starts = new Semaphore[maxThreads];
+    starts  = new Semaphore[maxThreads];
     threads = new pthread_t[maxThreads];
 
     for (unsigned i = 0; i < maxThreads; ++i)
@@ -181,7 +181,7 @@ public:
   }
 
   ~ThreadPool_pthread() {
-    shutdown = true;
+    shutdown  = true;
     workBegin = workEnd = 0;
     __sync_synchronize();
     for (unsigned i = 1; i < maxThreads; ++i)
@@ -190,31 +190,31 @@ public:
       int rc = pthread_join(threads[i], NULL);
       checkResults(rc);
     }
-    //delete [] starts;
+    // delete [] starts;
     for (unsigned i = 0; i < maxThreads; ++i)
       starts[i].destroy();
     idlock.destroy();
     started.destroy();
-    delete [] threads;
+    delete[] threads;
   }
 
   void run(Exp::RunCommand* begin, Exp::RunCommand* end) {
-    //setup work
+    // setup work
     workBegin = begin;
-    workEnd = end;
-    //ensure stores happen before children are spawned
+    workEnd   = end;
+    // ensure stores happen before children are spawned
     __sync_synchronize();
-    //Do master thread work
+    // Do master thread work
     doWork(0);
-    //clean up
+    // clean up
     workBegin = workEnd = 0;
   }
 };
-}
+} // namespace
 #endif
 
 unsigned Exp::getNumThreads() {
-  char *p = getenv("GALOIS_NUM_THREADS");
+  char* p = getenv("GALOIS_NUM_THREADS");
   if (p) {
     int n = atoi(p);
     if (n > 0)
@@ -224,7 +224,7 @@ unsigned Exp::getNumThreads() {
 }
 
 int Exp::getNumRounds() {
-  char *p = getenv("EXP_NUM_ROUNDS");
+  char* p = getenv("EXP_NUM_ROUNDS");
   if (p) {
     int n = atoi(p);
     if (n > 0)
@@ -242,7 +242,7 @@ void Exp::beginSampling() {
     started = true;
   }
 #endif
-  char *p = getenv("GALOIS_EXIT_BEFORE_SAMPLING");
+  char* p = getenv("GALOIS_EXIT_BEFORE_SAMPLING");
   if (p) {
     int n = atoi(p);
     exit(n);
@@ -254,20 +254,19 @@ void Exp::endSampling() {
   __itt_pause();
   started = 0;
 #endif
-  char *p = getenv("GALOIS_EXIT_AFTER_SAMPLING");
+  char* p = getenv("GALOIS_EXIT_AFTER_SAMPLING");
   if (p) {
     int n = atoi(p);
     exit(n);
   }
 }
 
-
 #ifdef USE_SIMPLE_RUNTIME
 static void* slaunch(void* ptr) {
-  std::pair<Exp::RunCommand*,Exp::RunCommand*>* work = 
-    (std::pair<Exp::RunCommand*,Exp::RunCommand*>*) ptr;
+  std::pair<Exp::RunCommand*, Exp::RunCommand*>* work =
+      (std::pair<Exp::RunCommand*, Exp::RunCommand*>*)ptr;
   Exp::RunCommand* begin = work->first;
-  Exp::RunCommand* end = work->second;
+  Exp::RunCommand* end   = work->second;
 
   while (begin != end) {
     (*begin)();
@@ -294,9 +293,9 @@ void Exp::do_all_finish() {
 void Exp::do_all_impl(RunCommand* begin, RunCommand* end) {
 #ifdef USE_SIMPLE_RUNTIME
   unsigned maxThreads = Exp::getNumThreads();
-  pthread_t* threads = new pthread_t[maxThreads];
+  pthread_t* threads  = new pthread_t[maxThreads];
 
-  std::pair<Exp::RunCommand*,Exp::RunCommand*> work(begin, end);
+  std::pair<Exp::RunCommand*, Exp::RunCommand*> work(begin, end);
 
   for (unsigned i = 1; i < maxThreads; ++i) {
     int rc = pthread_create(&threads[i], 0, &slaunch, &work);
@@ -308,7 +307,7 @@ void Exp::do_all_impl(RunCommand* begin, RunCommand* end) {
     checkResults(rc);
   }
 #else
-//  static ThreadPool_pthread pool;
+  //  static ThreadPool_pthread pool;
   pool->run(begin, end);
 #endif
 }

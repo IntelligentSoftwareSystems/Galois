@@ -7,9 +7,8 @@
 
 #include "AVIlevelExec.h"
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   AVIlevelExec um;
-  um.run (argc, argv);
+  um.run(argc, argv);
   return 0;
 }
-

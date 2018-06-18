@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,7 +39,7 @@ struct KdTreeFactory {
     m_alloc.construct(c, std::forward<Args>(args)...);
     return c;
   }
-  
+
   void destroyCell(KdCell* c) {
     m_alloc.destruct(c);
     m_alloc.deallocate(c, 1);
@@ -47,7 +47,6 @@ struct KdTreeFactory {
 };
 
 class KdTree : public KdCell {
-
 
 protected:
   double minLightIntensity;
@@ -63,7 +62,6 @@ protected:
     maxConeCosine     = -1.0f;
   }
 
-      
 public:
   static KdTree* createTree(GVector<NodeWrapper*>& inPoints) {
     KdTree* factory = new KdTree();

@@ -4,8 +4,8 @@
 #include "Node.hpp"
 #include "EquationSystem.h"
 
-void seqAllocation(Node *node, SolverMode mode);
-void seqElimination(Node *node);
-void seqBackwardSubstitution(Node *node);
+void seqAllocation(Node* node, SolverMode mode);
+void seqElimination(Node* node);
+void seqBackwardSubstitution(Node* node);
 
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,10 +23,9 @@
 #include "abstractMain.h"
 #include "SimInit.h"
 
-
 namespace des_ord {
 
-template<des::NullEventOpt NULL_EVENT_OPT=des::NEEDS_NULL_EVENTS>
+template <des::NullEventOpt NULL_EVENT_OPT = des::NEEDS_NULL_EVENTS>
 struct TypeHelper {
   typedef des::Event<des::LogicUpdate> Event_ty;
   typedef Event_ty::BaseSimObj_ty BaseSimObj_ty;
@@ -36,9 +35,9 @@ struct TypeHelper {
   typedef des::Input<SimObj_ty> Input_ty;
   typedef des::Output<SimObj_ty> Output_ty;
 
-  typedef des::SimInit<NULL_EVENT_OPT, SimGate_ty, Input_ty, Output_ty> SimInit_ty;
-  
+  typedef des::SimInit<NULL_EVENT_OPT, SimGate_ty, Input_ty, Output_ty>
+      SimInit_ty;
 };
 
-}
+} // namespace des_ord
 #endif // DES_ORD_TYPE_HELPER_H

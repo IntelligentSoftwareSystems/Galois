@@ -6,9 +6,9 @@
 
 extern "C" {
 
-NodeDouble *analyzePagerank(Graph *g, int topK, double tolerance, const ValAltTy result);
+NodeDouble* analyzePagerank(Graph* g, int topK, double tolerance,
+                            const ValAltTy result);
 
 } // extern "C"
 
 #endif // GALOIS_PYTHON_PAGERANK_H
-

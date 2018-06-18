@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,9 +36,9 @@ bool Element::inTriangle(const Tuple& p) const {
     return false;
   }
 
-  int count = 0;
-  double px = p.x();
-  double py = p.y();
+  int count  = 0;
+  double px  = p.x();
+  double py  = p.y();
   double p1x = p1.x();
   double p1y = p1.y();
   double p2x = p2.x();
@@ -115,7 +115,8 @@ bool Element::clockwise() const {
   double t3_x = points[2]->t().x();
   double t3_y = points[2]->t().y();
 
-  double counter_clockwise = (t2_x - t1_x) * (t3_y - t1_y) - (t3_x - t1_x) * (t2_y - t1_y);
+  double counter_clockwise =
+      (t2_x - t1_x) * (t3_y - t1_y) - (t3_x - t1_x) * (t2_y - t1_y);
 
   return counter_clockwise < 0;
 }
@@ -144,7 +145,8 @@ bool Element::inCircle(const Tuple& p) const {
   // -> counter_clockwise > 0 => counter clockwise
   // -> counter_clockwise = 0 => degenerated triangle
   // -> counter_clockwise < 0 => clockwise
-  double counter_clockwise = (t2_x - t1_x) * (t3_y - t1_y) - (t3_x - t1_x) * (t2_y - t1_y);
+  double counter_clockwise =
+      (t2_x - t1_x) * (t3_y - t1_y) - (t3_x - t1_x) * (t2_y - t1_y);
 
   // If the triangle is degenerate, then the triangle should be updated
   if (counter_clockwise == 0.0) {
@@ -174,14 +176,15 @@ bool Element::inCircle(const Tuple& p) const {
   t3_p_x = t3_x - p_x;
   t3_p_y = t3_y - p_y;
 
-  det_t1_t2 = t1_p_x * t2_p_y - t2_p_x * t1_p_y;
-  det_t2_t3 = t2_p_x * t3_p_y - t3_p_x * t2_p_y;
+  det_t1_t2   = t1_p_x * t2_p_y - t2_p_x * t1_p_y;
+  det_t2_t3   = t2_p_x * t3_p_y - t3_p_x * t2_p_y;
   det_t3_t1_m = t3_p_x * t1_p_y - t1_p_x * t3_p_y;
-  t1_col3 = t1_p_x * t1_p_x + t1_p_y * t1_p_y;
-  t2_col3 = t2_p_x * t2_p_x + t2_p_y * t2_p_y;
-  t3_col3 = t3_p_x * t3_p_x + t3_p_y * t3_p_y;
+  t1_col3     = t1_p_x * t1_p_x + t1_p_y * t1_p_y;
+  t2_col3     = t2_p_x * t2_p_x + t2_p_y * t2_p_y;
+  t3_col3     = t3_p_x * t3_p_x + t3_p_y * t3_p_y;
 
-  double det = t1_col3 * det_t2_t3 + t2_col3 * det_t3_t1_m + t3_col3 * det_t1_t2;
+  double det =
+      t1_col3 * det_t2_t3 + t2_col3 * det_t3_t1_m + t3_col3 * det_t1_t2;
 
   // If the points are enumerated in clockwise, then negate the result
   if (counter_clockwise < 0) {
@@ -200,4 +203,3 @@ std::ostream& Element::print(std::ostream& out) const {
   out << ']';
   return out;
 }
-

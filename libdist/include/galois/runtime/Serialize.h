@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -60,6 +60,7 @@ class SerializeBuffer {
   using vTy = std::vector<uint8_t>;
   //! the actual data stored in this buffer
   vTy bufdata;
+
 public:
   //! default constructor
   SerializeBuffer() = default;
@@ -68,16 +69,14 @@ public:
   //! Creates a buffer from another buffer
   //! @param d buffer to create from
   //! @param len amount of copy from buffer d
-  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len) {}
+  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d + len) {}
 
   //! Push a character onto the serialize buffer
-  inline void push(const char c) {
-    bufdata.push_back(c);
-  }
+  inline void push(const char c) { bufdata.push_back(c); }
 
   //! Insert characters from a buffer into the serialize buffer
   void insert(const uint8_t* c, size_t bytes) {
-    bufdata.insert(bufdata.end(), c, c+bytes);
+    bufdata.insert(bufdata.end(), c, c + bytes);
   }
 
   //! Insert characters from a buffer into the serialize buffer at a particular
@@ -85,7 +84,7 @@ public:
   void insertAt(const uint8_t* c, size_t bytes, size_t offset) {
     std::copy_n(c, bytes, bufdata.begin() + offset);
   }
-  
+
   /**
    * Reserve space at the end for inserting new data into the serialize
    * buffer
@@ -95,7 +94,7 @@ public:
    */
   size_t encomber(size_t bytes) {
     size_t retval = bufdata.size();
-    bufdata.resize(retval+bytes);
+    bufdata.resize(retval + bytes);
     return retval;
   }
 
@@ -104,9 +103,7 @@ public:
    *
    * @param s extra space to reserve
    */
-  void reserve(size_t s) {
-    bufdata.reserve(bufdata.size() + s);
-  }
+  void reserve(size_t s) { bufdata.reserve(bufdata.size() + s); }
 
   //! Returns a pointer to the data stored in this serialize buffer
   const uint8_t* linearData() const { return bufdata.data(); }
@@ -139,9 +136,8 @@ public:
   }
 };
 
-
 /**
- * Buffer for deserialization of data. Mainly used during network 
+ * Buffer for deserialization of data. Mainly used during network
  * communication.
  */
 class DeSerializeBuffer {
@@ -150,16 +146,17 @@ class DeSerializeBuffer {
   //! the actual data stored in this buffer
   std::vector<uint8_t> bufdata;
   int offset;
+
 public:
   //! Constructor initializes offset into buffer to 0
-  DeSerializeBuffer() :offset(0) {}
+  DeSerializeBuffer() : offset(0) {}
   //! Disable copy constructor
-  DeSerializeBuffer(DeSerializeBuffer&&) = default; 
+  DeSerializeBuffer(DeSerializeBuffer&&) = default;
   //! Move constructor
   //! @param v vector to act as deserialize buffer
-  //! @param start offset to start saving data into 
-  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) 
-    : bufdata(std::move(v)), offset(start) {}
+  //! @param start offset to start saving data into
+  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0)
+      : bufdata(std::move(v)), offset(start) {}
 
   //! Constructor that takes an existing vector to use as the deserialize
   //! buffer
@@ -172,13 +169,13 @@ public:
    * Initializes the deserialize buffer with a certain size
    * @param [in] count size to initialize buffer to
    */
-  explicit DeSerializeBuffer(int count) :bufdata(count), offset(0) {}
+  explicit DeSerializeBuffer(int count) : bufdata(count), offset(0) {}
 
   /**
    * Initializes the deserialize buffer using vector initialization from
    * 2 iterators.
    */
-  template<typename Iter>
+  template <typename Iter>
   DeSerializeBuffer(Iter b, Iter e) : bufdata(b, e), offset{0} {}
 
   /**
@@ -205,19 +202,20 @@ public:
   //! Gets the current offset into the deserialize buffer
   unsigned getOffset() const { return offset; }
   //! Sets the offset into the deserialize buffer
-  void setOffset(unsigned off) { assert(off <= size()); offset = off; }
+  void setOffset(unsigned off) {
+    assert(off <= size());
+    offset = off;
+  }
 
   //! Gets the size of the deserialize buffer
   unsigned size() const { return bufdata.size(); }
 
   //! Returns true if the deserialize buffer is empty
   //! @returns true if the deserialize buffer is empty
-  bool empty() const {return bufdata.empty(); }
+  bool empty() const { return bufdata.empty(); }
 
   //! Get the next character in the deserialize buffer
-  unsigned char pop() {
-    return bufdata.at(offset++);
-  }
+  unsigned char pop() { return bufdata.at(offset++); }
 
   //! Clears the last x bytes of the deserialize buffer, resizing it as well
   //! @param x How many bytes from the end to clear
@@ -262,7 +260,8 @@ public:
   }
 
   //! Operator for printing deserialize buffer
-  friend std::ostream& operator<<(std::ostream& os, const DeSerializeBuffer& buf) {
+  friend std::ostream& operator<<(std::ostream& os,
+                                  const DeSerializeBuffer& buf) {
     buf.print(os);
     return os;
   }
@@ -271,30 +270,31 @@ public:
 namespace internal {
 
 /**
- * Returns the size necessary for an object in a buffer. 
+ * Returns the size necessary for an object in a buffer.
  * This version runs if the data is memory copyable; uses sizeof.
  *
  * @tparam T type of datato get size of
  */
-template<typename T>
-__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
-                   typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) {
+template <typename T>
+__attribute__((always_inline)) constexpr size_t
+gSizedObj(const T& data,
+          typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) {
   return sizeof(T);
 }
 
 /**
- * Returns the size necessary for an object in a buffer. 
- * This version runs if the data is not memory copyable but is serializable. 
+ * Returns the size necessary for an object in a buffer.
+ * This version runs if the data is not memory copyable but is serializable.
  * It returns the size of a uintptr_t.
  *
  * @tparam T type of datato get size of
  * @returns size of uintptr_t
  */
-template<typename T>
-__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
-                   typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
-                   typename std::enable_if<has_serialize<T>::value>::type* = 0)
-{
+template <typename T>
+__attribute__((always_inline)) constexpr size_t
+gSizedObj(const T& data,
+          typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
+          typename std::enable_if<has_serialize<T>::value>::type*       = 0) {
   return sizeof(uintptr_t);
 }
 
@@ -304,22 +304,22 @@ __attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
  *
  * @param data pair of 2 elements
  */
-template<typename T1, typename T2>
+template <typename T1, typename T2>
 inline size_t gSizedObj(const std::pair<T1, T2>& data) {
   return gSizedObj(data.first) + gSizedObj(data.second);
 }
 
 /**
- * Returns the size necessary to store a sequence in a serialize buffer. 
+ * Returns the size necessary to store a sequence in a serialize buffer.
  * This depends on if the sequence is memory copyable.
  */
-template<typename Seq>
+template <typename Seq>
 size_t gSizedSeq(const Seq& seq) {
   typename Seq::size_type size = seq.size();
   typedef typename Seq::value_type T;
-  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
-     std::integral_constant<size_t, sizeof(T)>,
-     std::integral_constant<size_t, sizeof(uintptr_t)>>::type::value;
+  size_t tsize = std::conditional<
+      is_memory_copyable<T>::value, std::integral_constant<size_t, sizeof(T)>,
+      std::integral_constant<size_t, sizeof(uintptr_t)>>::type::value;
   return sizeof(size) + tsize * size;
 }
 
@@ -329,7 +329,7 @@ size_t gSizedSeq(const Seq& seq) {
  *
  * @returns size needed to store a vector into a serialize buffer
  */
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
   return gSizedSeq(data);
 }
@@ -340,7 +340,7 @@ inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
  *
  * @returns size needed to store a deque into a serialize buffer
  */
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 inline size_t gSerializeObj(const std::deque<T, Alloc>& data) {
   return gSizedSeq(data);
 }
@@ -351,8 +351,8 @@ inline size_t gSerializeObj(const std::deque<T, Alloc>& data) {
  *
  * @returns size needed to store a Galois deque into a serialize buffer
  */
-template<typename T, unsigned CS>
-inline size_t gSizedObj(const galois::gdeque<T,CS>& data) {
+template <typename T, unsigned CS>
+inline size_t gSizedObj(const galois::gdeque<T, CS>& data) {
   return gSizedSeq(data);
 }
 
@@ -363,36 +363,32 @@ inline size_t gSizedObj(const galois::gdeque<T,CS>& data) {
  * @returns size needed to store a string into a serialize buffer
  */
 template <typename A>
-inline size_t gSizedObj(const std::basic_string<char, std::char_traits<char>, A>& data) {
+inline size_t
+gSizedObj(const std::basic_string<char, std::char_traits<char>, A>& data) {
   return data.length() + 1;
 }
-
 
 /**
  * Returns the size of the passed in serialize buffer
  *
  * @returns size of the serialize buffer passed into it
  */
-inline size_t gSizedObj(const SerializeBuffer& data) {
-  return data.size();
-}
+inline size_t gSizedObj(const SerializeBuffer& data) { return data.size(); }
 
 /**
  * Returns the size of the passed in deserialize buffer
  *
  * @returns size of the deserialize buffer passed into it
  */
-inline size_t gSizedObj(const DeSerializeBuffer& rbuf) {
-  return rbuf.r_size();
-}
+inline size_t gSizedObj(const DeSerializeBuffer& rbuf) { return rbuf.r_size(); }
 
 /**
  * Returns the size of the passed in insert bag.
  *
  * @returns size of the insert bag passed into it
  */
-template<typename T>
-inline size_t gSizedObj(const galois::InsertBag<T>& bag){
+template <typename T>
+inline size_t gSizedObj(const galois::InsertBag<T>& bag) {
   return bag.size();
 }
 
@@ -411,10 +407,12 @@ inline size_t adder(size_t a) { return a; }
  * Returns the sum of all passed in arguments.
  * @returns sum of all arguments
  */
-template<typename... Args>
-inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(args...); }
+template <typename... Args>
+inline size_t adder(size_t a, size_t b, Args&&... args) {
+  return a + b + adder(args...);
+}
 
-} // end internal namespace
+} // namespace internal
 
 /**
  * Gets the total size necessary for storing all of the passed in arguments into
@@ -422,7 +420,7 @@ inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(a
  *
  * @returns size necessary for storing all arguments into a serialize buffer
  */
-template<typename... Args>
+template <typename... Args>
 static inline size_t gSized(Args&&... args) {
   return internal::adder(internal::gSizedObj(args)...);
 }
@@ -439,26 +437,26 @@ namespace internal {
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data Data to serialize
  */
-template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, const T& data,
-                   typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
-{
+template <typename T>
+inline void gSerializeObj(
+    SerializeBuffer& buf, const T& data,
+    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) {
   uint8_t* pdata = (uint8_t*)&data;
   buf.insert(pdata, sizeof(T));
 }
 
 /**
- * Serialize a non-memory copyable but serializable object into a serialize 
+ * Serialize a non-memory copyable but serializable object into a serialize
  * buffer.
  *
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data Data to serialize
  */
-template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, const T& data,
-                   typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
-                   typename std::enable_if<has_serialize<T>::value>::type* = 0)
-{
+template <typename T>
+inline void
+gSerializeObj(SerializeBuffer& buf, const T& data,
+              typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
+              typename std::enable_if<has_serialize<T>::value>::type* = 0) {
   data.serialize(buf);
 }
 
@@ -468,7 +466,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const T& data,
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data Pair to serialize
  */
-template<typename T1, typename T2>
+template <typename T1, typename T2>
 inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
@@ -481,8 +479,8 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
  * @param [in] data Tuple of 3 to serialize
  * @todo This specialization isn't being used as expected. Figure out why.
  */
-template<typename T1, typename T2, typename T3>
-inline void gSerializeObj(SerializeBuffer& buf, 
+template <typename T1, typename T2, typename T3>
+inline void gSerializeObj(SerializeBuffer& buf,
                           const galois::TupleOfThree<T1, T2, T3>& data) {
   if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value &&
       is_memory_copyable<T3>::value) {
@@ -495,15 +493,15 @@ inline void gSerializeObj(SerializeBuffer& buf,
 }
 
 /**
- * Serialize a copyable atomic: load atomic data as a plain old 
+ * Serialize a copyable atomic: load atomic data as a plain old
  * datatype (POD) and mem copy it to the buffer.
  *
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data copyable atomic to serialize
  */
-template<typename T>
-inline void gSerializeObj(SerializeBuffer& buf, 
-                          const galois::CopyableAtomic<T>& data){
+template <typename T>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::CopyableAtomic<T>& data) {
   T temp = data.load();
   buf.insert((uint8_t*)(&temp), sizeof(T));
 }
@@ -515,14 +513,16 @@ inline void gSerializeObj(SerializeBuffer& buf,
  * @param [in] data String
  */
 template <typename A>
-inline void gSerializeObj(SerializeBuffer& buf, 
-                         const std::basic_string<char, std::char_traits<char>, A>& data) {
-  buf.insert((uint8_t*)data.data(), data.length()+1);
+inline void
+gSerializeObj(SerializeBuffer& buf,
+              const std::basic_string<char, std::char_traits<char>, A>& data) {
+  buf.insert((uint8_t*)data.data(), data.length() + 1);
 }
 
 // Forward declaration of vector serialize
-template<typename T, typename Alloc>
-inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data); 
+template <typename T, typename Alloc>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const std::vector<T, Alloc>& data);
 
 /**
  * Serialize a sequence type into a buffer.
@@ -531,7 +531,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& dat
  * @param [in] seq sequence to serialize
  * @todo specialize for Sequences with consecutive PODS
  */
-template<typename Seq>
+template <typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   gSerializeObj(buf, size);
@@ -545,14 +545,14 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] seq sequence to serialize
  */
-template<typename Seq>
+template <typename Seq>
 void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   typedef typename Seq::value_type T;
   size_t tsize = sizeof(T);
   //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
-  buf.insert((uint8_t*)seq.data(), size*tsize);
+  buf.insert((uint8_t*)seq.data(), size * tsize);
 }
 
 /**
@@ -562,9 +562,10 @@ void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data vector to serialize
  */
-template<typename T, typename Alloc>
-inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
-  if (is_memory_copyable<T>::value) 
+template <typename T, typename Alloc>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const std::vector<T, Alloc>& data) {
+  if (is_memory_copyable<T>::value)
     gSerializeLinearSeq(buf, data);
   else
     gSerializeSeq(buf, data);
@@ -576,8 +577,9 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& dat
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data deque to serialize
  */
-template<typename T, typename Alloc>
-inline void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
+template <typename T, typename Alloc>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const std::deque<T, Alloc>& data) {
   gSerializeSeq(buf, data);
 }
 
@@ -587,9 +589,10 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data deque to serialize
  */
-template<typename T, unsigned CS>
-inline void gSerializeObj(SerializeBuffer& buf, const galois::gdeque<T,CS>& data) {
-  gSerializeSeq(buf,data);
+template <typename T, unsigned CS>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::gdeque<T, CS>& data) {
+  gSerializeSeq(buf, data);
 }
 
 /**
@@ -619,13 +622,13 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
  * @param [in,out] buf Serialize buffer to serialize into
  * @param [in] data dynamic bitset to serialize
  */
-inline void gSerializeObj(SerializeBuffer& buf, 
+inline void gSerializeObj(SerializeBuffer& buf,
                           const galois::DynamicBitSet& data) {
   gSerializeObj(buf, data.size());
   gSerializeObj(buf, data.get_vec());
 }
 
-// we removed the functions in Bag.h that this function requires, so this 
+// we removed the functions in Bag.h that this function requires, so this
 // won't work
 #if 0
 /**
@@ -651,24 +654,26 @@ inline void gSerializeObj(SerializeBuffer& buf, galois::InsertBag<T>& bag){
   bag.clear();
 }
 #endif
-} // end internal namespace
+} // namespace internal
 
 /**
- * LazyRef structure; used to store both a type and an offset to begin 
- * saving data into 
+ * LazyRef structure; used to store both a type and an offset to begin
+ * saving data into
  */
-template<typename T>
-struct LazyRef { size_t off; };
+template <typename T>
+struct LazyRef {
+  size_t off;
+};
 
 /**
  * Lazy serialize: doesn't actually serialize the data itself, but only
  * reserves space for it in the serialize buffer + serializes the
  * passed in num.
  */
-template<typename Seq>
-static inline LazyRef<typename Seq::value_type> 
+template <typename Seq>
+static inline LazyRef<typename Seq::value_type>
 gSerializeLazySeq(SerializeBuffer& buf, unsigned num, Seq*) {
-  static_assert(is_memory_copyable<typename Seq::value_type>::value, 
+  static_assert(is_memory_copyable<typename Seq::value_type>::value,
                 "Not POD Sequence");
   typename Seq::size_type size = num;
   internal::gSerializeObj(buf, size);
@@ -686,10 +691,10 @@ gSerializeLazySeq(SerializeBuffer& buf, unsigned num, Seq*) {
  * @param item Number of items that need to be serialized
  * @param data Data array containing data that needs to be serialized
  */
-template<typename Ty>
-static inline void 
-gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned item, Ty&& data) {
-  size_t off = r.off + sizeof(Ty) * item;
+template <typename Ty>
+static inline void gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r,
+                                  unsigned item, Ty&& data) {
+  size_t off     = r.off + sizeof(Ty) * item;
   uint8_t* pdata = (uint8_t*)&data;
   buf.insertAt(pdata, sizeof(Ty), off);
 }
@@ -697,7 +702,7 @@ gSerializeLazy(SerializeBuffer& buf, LazyRef<Ty> r, unsigned item, Ty&& data) {
 /**
  * Serialize an entire series of datatypes into a provided serialize buffer
  */
-template<typename T1, typename... Args>
+template <typename T1, typename... Args>
 static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
   buf.reserve(gSized(t1, args...));
   internal::gSerializeObj(buf, std::forward<T1>(t1));
@@ -721,10 +726,10 @@ namespace internal {
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] Data to deserialize into
  */
-template<typename T>
-void gDeserializeObj(DeSerializeBuffer& buf, T& data,
-                     typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) 
-{
+template <typename T>
+void gDeserializeObj(
+    DeSerializeBuffer& buf, T& data,
+    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) {
   uint8_t* pdata = (uint8_t*)&data;
   buf.extract(pdata, sizeof(T));
 }
@@ -735,11 +740,11 @@ void gDeserializeObj(DeSerializeBuffer& buf, T& data,
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] Data to deserialize into
  */
-template<typename T>
-void gDeserializeObj(DeSerializeBuffer& buf, T& data,
-		     typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
-                     typename std::enable_if<has_serialize<T>::value>::type* = 0) 
-{
+template <typename T>
+void gDeserializeObj(
+    DeSerializeBuffer& buf, T& data,
+    typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
+    typename std::enable_if<has_serialize<T>::value>::type*       = 0) {
   data.deserialize(buf);
 }
 
@@ -749,7 +754,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, T& data,
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] pair to deserialize into
  */
-template<typename T1, typename T2>
+template <typename T1, typename T2>
 void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
   gDeserialize(buf, data.first, data.second);
 }
@@ -762,8 +767,8 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
  * @param data [in,out] triple to deserialize into
  * @todo This specialization isn't being used as expected. Figure out why.
  */
-template<typename T1, typename T2, typename T3>
-inline void gDeserializeObj(DeSerializeBuffer& buf, 
+template <typename T1, typename T2, typename T3>
+inline void gDeserializeObj(DeSerializeBuffer& buf,
                             galois::TupleOfThree<T1, T2, T3>& data) {
   if (is_memory_copyable<T1>::value && is_memory_copyable<T2>::value &&
       is_memory_copyable<T3>::value) {
@@ -782,19 +787,24 @@ inline void gDeserializeObj(DeSerializeBuffer& buf,
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] copyable atomic to deserialize into
  */
-template<typename T>
-void gDeserializeObj(DeSerializeBuffer& buf, galois::CopyableAtomic<T>& data){
+template <typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::CopyableAtomic<T>& data) {
   T tempData;
   uint8_t* pointerToTemp = (uint8_t*)&tempData;
   buf.extract(pointerToTemp, sizeof(T));
-  data.store(tempData); 
+  data.store(tempData);
 }
 
 namespace {
-template<int ...> struct seq {};
-template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
-template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
-}
+template <int...>
+struct seq {};
+template <int N, int... S>
+struct gens : gens<N - 1, N - 1, S...> {};
+template <int... S>
+struct gens<0, S...> {
+  typedef seq<S...> type;
+};
+} // namespace
 
 /**
  * Deserialize into a tuple.
@@ -802,8 +812,9 @@ template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] tuple to serialize into
  */
-template<typename... T, int... S>
-void gDeserializeTuple(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>) {
+template <typename... T, int... S>
+void gDeserializeTuple(DeSerializeBuffer& buf, std::tuple<T...>& data,
+                       seq<S...>) {
   gDeserialize(buf, std::get<S>(data)...);
 }
 
@@ -813,7 +824,7 @@ void gDeserializeTuple(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] tuple to serialize into
  */
-template<typename... T>
+template <typename... T>
 void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
   return gDeserializeTuple(buf, data, typename gens<sizeof...(T)>::type());
 }
@@ -825,17 +836,18 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
  * @param data [in,out] string to serialize into
  */
 template <typename A>
-inline void gDeserializeObj(DeSerializeBuffer& buf, 
-                            std::basic_string<char, std::char_traits<char>, A>& data) {
+inline void
+gDeserializeObj(DeSerializeBuffer& buf,
+                std::basic_string<char, std::char_traits<char>, A>& data) {
   char c = buf.pop();
-  while(c != '\0') {
+  while (c != '\0') {
     data.push_back(c);
     c = buf.pop();
   };
 }
 
 // Forward declaration of vector deserialize
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data);
 
 /**
@@ -844,7 +856,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data);
  * @param buf [in,out] Buffer to deserialize from
  * @param seq [in,out] sequence to deserialize into
  */
-template<typename Seq>
+template <typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
   seq.clear();
   typename Seq::size_type size;
@@ -862,13 +874,13 @@ void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
  * @param buf [in,out] Buffer to deserialize from
  * @param seq [in,out] sequence to deserialize into
  */
-template<typename Seq>
+template <typename Seq>
 void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
   typedef typename Seq::value_type T;
   //  seq.clear();
   typename Seq::size_type size;
   gDeserializeObj(buf, size);
-  //If the alignment is right, cast to a T array and insert
+  // If the alignment is right, cast to a T array and insert
   if (buf.atAlignment(alignof(T))) {
     T* src = (T*)buf.r_linearData();
     seq.assign(src, &src[size]);
@@ -880,12 +892,12 @@ void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
 }
 
 /**
- * Deserialize into a deque 
+ * Deserialize into a deque
  *
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] deque to deserialize into
  */
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
   gDeserializeSeq(buf, data);
 }
@@ -897,7 +909,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] vector to deserialize into
  */
-template<typename T, typename Alloc>
+template <typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
   if (is_memory_copyable<T>::value)
     gDeserializeLinearSeq(buf, data);
@@ -911,8 +923,8 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] galois deque to deserialize into
  */
-template<typename T, unsigned CS>
-void gDeserializeObj(DeSerializeBuffer& buf, galois::gdeque<T,CS>& data) {
+template <typename T, unsigned CS>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::gdeque<T, CS>& data) {
   gDeserializeSeq(buf, data);
 }
 
@@ -922,19 +934,20 @@ void gDeserializeObj(DeSerializeBuffer& buf, galois::gdeque<T,CS>& data) {
  * @param buf [in,out] Buffer to deserialize from
  * @param data [in,out] bitset to deserialize into
  */
-inline void gDeserializeObj(DeSerializeBuffer& buf, galois::DynamicBitSet& data) {
+inline void gDeserializeObj(DeSerializeBuffer& buf,
+                            galois::DynamicBitSet& data) {
   size_t size = 0;
   gDeserializeObj(buf, size);
   data.resize(size);
   gDeserializeObj(buf, data.get_vec());
 }
 
-}// namespace internal
+} // namespace internal
 
 /**
  * Deserialize data in a buffer into a series of objects
  */
-template<typename T1, typename... Args>
+template <typename T1, typename... Args>
 void gDeserialize(DeSerializeBuffer& buf, T1&& t1, Args&&... args) {
   internal::gDeserializeObj(buf, std::forward<T1>(t1));
   gDeserialize(buf, std::forward<Args>(args)...);
@@ -943,28 +956,28 @@ void gDeserialize(DeSerializeBuffer& buf, T1&& t1, Args&&... args) {
 /**
  * Base case for regular gDeserialize recursive call.
  */
-inline void gDeserialize(DeSerializeBuffer& buf) { }
+inline void gDeserialize(DeSerializeBuffer& buf) {}
 
 /**
  * "Deserialize" data in an iterator type into a data object.
  *
  * @tparam Iter iterator type that has objects of type T
  * @tparam T type of data to deserialize into
- * @param iter Iterator containing data that we want to save into the passed in 
+ * @param iter Iterator containing data that we want to save into the passed in
  * data reference
  * @param data Object to save data in the iterator type into
  */
-template<typename Iter, typename T>
-auto gDeserializeRaw(Iter iter, T& data) ->
-  decltype(std::declval<typename std::enable_if<is_memory_copyable<T>::value>::type>(), Iter())
-{
+template <typename Iter, typename T>
+auto gDeserializeRaw(Iter iter, T& data) -> decltype(
+    std::declval<typename std::enable_if<is_memory_copyable<T>::value>::type>(),
+    Iter()) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = *iter++;
   return iter;
 }
 
-} // end runtime namespace
-} // end galois namespace
+} // namespace runtime
+} // namespace galois
 
 #endif // SERIALIZE DEF end

@@ -1,19 +1,19 @@
 #include "GaloisDag.hpp"
 
-void galoisAllocation(Node *node, SolverMode mode)
-{
-    galois::runtime::for_each_ordered_tree(node, GaloisAllocationDivide(),
-        GaloisAllocationConquer(mode), "GaloisAllocation");
+void galoisAllocation(Node* node, SolverMode mode) {
+  galois::runtime::for_each_ordered_tree(node, GaloisAllocationDivide(),
+                                         GaloisAllocationConquer(mode),
+                                         "GaloisAllocation");
 }
 
-void galoisElimination (Node *node)
-{
-    galois::runtime::for_each_ordered_tree(node, GaloisEliminationDivide(),
-        GaloisEliminationConquer(), "GaloisElimination");
+void galoisElimination(Node* node) {
+  galois::runtime::for_each_ordered_tree(node, GaloisEliminationDivide(),
+                                         GaloisEliminationConquer(),
+                                         "GaloisElimination");
 }
 
-void galoisBackwardSubstitution(Node *node)
-{
-    galois::runtime::for_each_ordered_tree(node, GaloisBackwardSubstitutionDivide(),
-        GaloisBackwardSubstitutionConquer(), "GaloisBackwardSubstitution");
+void galoisBackwardSubstitution(Node* node) {
+  galois::runtime::for_each_ordered_tree(
+      node, GaloisBackwardSubstitutionDivide(),
+      GaloisBackwardSubstitutionConquer(), "GaloisBackwardSubstitution");
 }

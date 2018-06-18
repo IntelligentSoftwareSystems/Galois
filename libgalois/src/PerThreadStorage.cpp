@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,25 +39,22 @@ galois::substrate::PerBackend& galois::substrate::getPPSBackend() {
 
 #define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = 16*(2<<20); //galois::runtime::MM::hugePageSize * 16;
-inline void* alloc() {
-  return malloc(allocSize);
-}
+const size_t allocSize =
+    16 * (2 << 20); // galois::runtime::MM::hugePageSize * 16;
+inline void* alloc() { return malloc(allocSize); }
 
 #else
 const size_t allocSize = galois::runtime::MM::hugePageSize;
-inline void* alloc() {
-  return galois::substrate::MM::pageAlloc();
-}
+inline void* alloc() { return galois::substrate::MM::pageAlloc(); }
 #endif
 #undef MORE_MEM_HACK
 
 unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
-  while ((1U<<i) < size) {
+  while ((1U << i) < size) {
     ++i;
   }
-  if (i >= MAX_SIZE) { 
+  if (i >= MAX_SIZE) {
     abort();
   }
   return i;
@@ -65,8 +62,8 @@ unsigned galois::substrate::PerBackend::nextLog2(unsigned size) {
 
 unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
   unsigned retval = allocSize;
-  unsigned ll = nextLog2(sz);
-  unsigned size = (1 << ll);
+  unsigned ll     = nextLog2(sz);
+  unsigned size   = (1 << ll);
 
   if ((nextLoc + size) <= allocSize) {
     // simple path, where we allocate bump ptr style
@@ -80,7 +77,7 @@ unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
       retval = freeOffsets[index].back();
       freeOffsets[index].pop_back();
     } else {
-      // find a bigger size 
+      // find a bigger size
       for (; (index < MAX_SIZE) && (freeOffsets[index].empty()); ++index)
         ;
 
@@ -94,8 +91,8 @@ unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
         freeOffsets[index].pop_back();
 
         // remaining chunk
-        unsigned end = retval + (1 << index);
-        unsigned start = retval + size; 
+        unsigned end   = retval + (1 << index);
+        unsigned start = retval + size;
         for (unsigned i = index - 1; start < end; --i) {
           freeOffsets[i].push_back(start);
           start += (1 << i);
@@ -109,8 +106,9 @@ unsigned galois::substrate::PerBackend::allocOffset(const unsigned sz) {
   return retval;
 }
 
-void galois::substrate::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
-  unsigned ll = nextLog2(sz);
+void galois::substrate::PerBackend::deallocOffset(const unsigned offset,
+                                                  const unsigned sz) {
+  unsigned ll   = nextLog2(sz);
   unsigned size = (1 << ll);
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
     ; // allocation was at the end, so recovered some memory
@@ -121,7 +119,8 @@ void galois::substrate::PerBackend::deallocOffset(const unsigned offset, const u
   }
 }
 
-void* galois::substrate::PerBackend::getRemote(unsigned thread, unsigned offset) {
+void* galois::substrate::PerBackend::getRemote(unsigned thread,
+                                               unsigned offset) {
   char* rbase = heads[thread];
   assert(rbase);
   return &rbase[offset];
@@ -131,28 +130,30 @@ void galois::substrate::PerBackend::initCommon(unsigned maxT) {
   if (!heads) {
     assert(ThreadPool::getTID() == 0);
     heads = new char*[maxT];
-    memset(heads, 0, sizeof(*heads)* maxT);
+    memset(heads, 0, sizeof(*heads) * maxT);
   }
 }
 
 char* galois::substrate::PerBackend::initPerThread(unsigned maxT) {
   initCommon(maxT);
-  char* b = heads[ThreadPool::getTID()] = (char*) alloc();
+  char* b = heads[ThreadPool::getTID()] = (char*)alloc();
   memset(b, 0, allocSize);
   return b;
 }
 
 char* galois::substrate::PerBackend::initPerSocket(unsigned maxT) {
   initCommon(maxT);
-  unsigned id = ThreadPool::getTID();
+  unsigned id     = ThreadPool::getTID();
   unsigned leader = ThreadPool::getLeader();
   if (id == leader) {
-    char* b = heads[id] = (char*) alloc();
+    char* b = heads[id] = (char*)alloc();
     memset(b, 0, allocSize);
     return b;
   } else {
-    //wait for leader to fix up socket
-    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) { substrate::asmPause(); }
+    // wait for leader to fix up socket
+    while (__sync_bool_compare_and_swap(&heads[leader], 0, 0)) {
+      substrate::asmPause();
+    }
     heads[id] = heads[leader];
     return heads[id];
   }
@@ -160,12 +161,11 @@ char* galois::substrate::PerBackend::initPerSocket(unsigned maxT) {
 
 void galois::substrate::initPTS(unsigned maxT) {
   if (!ptsBase) {
-    //unguarded initialization as initPTS will run in the master thread
-    //before any other threads are generated
+    // unguarded initialization as initPTS will run in the master thread
+    // before any other threads are generated
     ptsBase = getPTSBackend().initPerThread(maxT);
   }
   if (!pssBase) {
     pssBase = getPPSBackend().initPerSocket(maxT);
   }
 }
-

@@ -21,6 +21,7 @@ template <typename T>
 struct AlignmentCalcImpl {
   char x;
   T t;
+
 private:
   AlignmentCalcImpl() {} // Never instantiate.
 };
@@ -34,8 +35,10 @@ private:
 ///  compile-time constant (e.g., for template instantiation).
 template <typename T>
 struct AlignOf {
-  enum { Alignment =
-         static_cast<unsigned int>(sizeof(AlignmentCalcImpl<T>) - sizeof(T)) };
+  enum {
+    Alignment =
+        static_cast<unsigned int>(sizeof(AlignmentCalcImpl<T>) - sizeof(T))
+  };
 
   enum { Alignment_GreaterEqual_2Bytes = Alignment >= 2 ? 1 : 0 };
   enum { Alignment_GreaterEqual_4Bytes = Alignment >= 4 ? 1 : 0 };
@@ -46,7 +49,6 @@ struct AlignOf {
   enum { Alignment_LessEqual_4Bytes = Alignment <= 4 ? 1 : 0 };
   enum { Alignment_LessEqual_8Bytes = Alignment <= 8 ? 1 : 0 };
   enum { Alignment_LessEqual_16Bytes = Alignment <= 16 ? 1 : 0 };
-
 };
 
 /// alignOf - A templated function that returns the minimum alignment of
@@ -54,7 +56,9 @@ struct AlignOf {
 ///  class besides some cosmetic cleanliness.  Example usage:
 ///  alignOf<int>() returns the alignment of an int.
 template <typename T>
-static inline unsigned alignOf() { return AlignOf<T>::Alignment; }
+static inline unsigned alignOf() {
+  return AlignOf<T>::Alignment;
+}
 
 } // end namespace llvm
 #endif

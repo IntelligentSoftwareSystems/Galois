@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,7 +24,7 @@
 
 using namespace galois::runtime;
 
-PerBackend_v2::PerBackend_v2() :nextID(0) {}
+PerBackend_v2::PerBackend_v2() : nextID(0) {}
 
 uint64_t PerBackend_v2::allocateOffset() {
   uint64_t off = __sync_add_and_fetch(&nextID, 1);
@@ -63,7 +63,8 @@ void PerBackend_v2::pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off) {
 
 void PerBackend_v2::pBe2Resolve(uint32_t dest, uint64_t off) {
   void* ptr = getPerHostBackend().resolve_i(off);
-  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, NetworkInterface::ID, off);
+  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr,
+                                      NetworkInterface::ID, off);
 }
 
 void PerBackend_v2::addRemote(void* ptr, uint32_t srcID, uint64_t off) {
@@ -76,13 +77,14 @@ void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
   if (hostID == NetworkInterface::ID) {
     return resolve_i(off);
   } else {
-    //FIXME: remote message
+    // FIXME: remote message
     lock.lock();
     void* retval = remoteCache[std::make_pair(off, hostID)];
     lock.unlock();
     if (retval)
       return retval;
-    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, off);
+    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve,
+                                        NetworkInterface::ID, off);
     do {
       if (LL::getTID() == 0)
         doNetworkWork();
@@ -115,7 +117,7 @@ uint64_t PerBackend_v3::allocateOffset() {
     *ii = true;
     return std::distance(freelist.begin(), ii);
   } else {
-    //Send message and await magic
+    // Send message and await magic
     GALOIS_DIE("not implemented");
   }
 }
@@ -126,14 +128,12 @@ void PerBackend_v3::deallocateOffset(uint64_t off) {
     assert(freelist[off] && "not allocated");
     freelist[off] = false;
   } else {
-    //Send message and await magic
+    // Send message and await magic
     GALOIS_DIE("not implemented");
   }
 }
 
-PerBackend_v3::PerBackend_v3() 
- : freelist(dynSlots)
-{
+PerBackend_v3::PerBackend_v3() : freelist(dynSlots) {
   freelist[0] = true; // protect "null"
 }
 
@@ -145,17 +145,19 @@ void PerBackend_v3::initThread() {
   lock.unlock();
 }
 
-void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t threadID) {
+void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID,
+                                     uint32_t threadID) {
   if (hostID == NetworkInterface::ID) {
     return resolveThread<void>(offset, threadID);
   } else {
-    //FIXME: remote message
+    // FIXME: remote message
     lock.lock();
     void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
     lock.unlock();
     if (retval)
       return retval;
-    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, offset, threadID);
+    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve,
+                                        NetworkInterface::ID, offset, threadID);
     do {
       if (LL::getTID() == 0)
         doNetworkWork();
@@ -168,16 +170,20 @@ void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t 
   }
 }
 
-void PerBackend_v3::pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID) {
+void PerBackend_v3::pBe2ResolveLP(void* ptr, uint32_t srcID, uint64_t off,
+                                  uint32_t threadID) {
   getPerThreadDistBackend().addRemote(ptr, srcID, off, threadID);
 }
 
-void PerBackend_v3::pBe2Resolve(uint32_t dest, uint64_t off, uint32_t threadID) {
+void PerBackend_v3::pBe2Resolve(uint32_t dest, uint64_t off,
+                                uint32_t threadID) {
   void* ptr = getPerThreadDistBackend().resolveThread<void>(off, threadID);
-  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr, NetworkInterface::ID, off, threadID);
+  getSystemNetworkInterface().sendAlt(dest, pBe2ResolveLP, ptr,
+                                      NetworkInterface::ID, off, threadID);
 }
 
-void PerBackend_v3::addRemote(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID) {
+void PerBackend_v3::addRemote(void* ptr, uint32_t srcID, uint64_t off,
+                              uint32_t threadID) {
   lock.lock();
   remoteCache[std::make_tuple(off, srcID, threadID)] = ptr;
   lock.unlock();

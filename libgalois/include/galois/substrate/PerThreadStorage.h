@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -45,7 +45,7 @@ class PerBackend {
   unsigned int nextLoc;
   char** heads;
   Lock freeOffsetsLock;
-  std::vector<std::vector<unsigned> > freeOffsets;
+  std::vector<std::vector<unsigned>> freeOffsets;
   /**
    * Guards access to non-POD objects that can be accessed after PerBackend
    * is destroyed. Access can occur through destroying PerThread/PerSocket
@@ -59,7 +59,7 @@ class PerBackend {
   static unsigned nextLog2(unsigned size);
 
 public:
-  PerBackend(): nextLoc(0), heads(0), invalid(false) {
+  PerBackend() : nextLoc(0), heads(0), invalid(false) {
     freeOffsets.resize(MAX_SIZE);
   }
 
@@ -78,14 +78,10 @@ public:
   unsigned allocOffset(const unsigned size);
   void deallocOffset(const unsigned offset, const unsigned size);
   void* getRemote(unsigned thread, unsigned offset);
-  void* getLocal(unsigned offset, char* base) {
-    return &base[offset];
-  }
+  void* getLocal(unsigned offset, char* base) { return &base[offset]; }
   // faster when (1) you already know the id and (2) shared access to heads is
   // not to expensive; otherwise use getLocal(unsigned,char*)
-  void* getLocal(unsigned offset, unsigned id) {
-    return &heads[id][offset];
-  }
+  void* getLocal(unsigned offset, unsigned id) { return &heads[id][offset]; }
 };
 
 extern __thread char* ptsBase;
@@ -96,7 +92,7 @@ PerBackend& getPPSBackend();
 
 void initPTS(unsigned maxT);
 
-template<typename T>
+template <typename T>
 class PerThreadStorage {
 protected:
   PerBackend* b;
@@ -112,13 +108,12 @@ protected:
     offset = ~0U;
   }
 
-
 public:
-  //construct on each thread
-  template<typename... Args>
-  PerThreadStorage(Args&&... args) :b(&getPTSBackend()) {
-    //in case we make one of these before initializing the thread pool
-    //This will call initPTS for each thread if it hasn't already
+  // construct on each thread
+  template <typename... Args>
+  PerThreadStorage(Args&&... args) : b(&getPTSBackend()) {
+    // in case we make one of these before initializing the thread pool
+    // This will call initPTS for each thread if it hasn't already
     auto& tp = getThreadPool();
 
     offset = b->allocOffset(sizeof(T));
@@ -126,13 +121,11 @@ public:
       new (b->getRemote(n, offset)) T(std::forward<Args>(args)...);
   }
 
-  PerThreadStorage(PerThreadStorage&& rhs) :b(rhs.b), offset(rhs.offset) {
+  PerThreadStorage(PerThreadStorage&& rhs) : b(rhs.b), offset(rhs.offset) {
     rhs.offset = ~0;
   }
 
-  ~PerThreadStorage() {
-    destruct();
-  }
+  ~PerThreadStorage() { destruct(); }
 
   PerThreadStorage& operator=(PerThreadStorage&& rhs) {
     std::swap(offset, rhs.offset);
@@ -156,7 +149,6 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
-
   const T* getLocal(unsigned int thread) const {
     void* ditem = b->getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
@@ -172,15 +164,10 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
-  unsigned size() const {
-    return getThreadPool().getMaxThreads();
-  }
+  unsigned size() const { return getThreadPool().getMaxThreads(); }
 };
 
-
-
-
-template<typename T>
+template <typename T>
 class PerSocketStorage {
 protected:
   unsigned offset;
@@ -194,20 +181,21 @@ protected:
   }
 
 public:
-
-  template<typename... Args>
-  PerSocketStorage(Args&&... args) :b(getPPSBackend()) {
-    //in case we make one of these before initializing the thread pool
-    //This will call initPTS for each thread if it hasn't already
+  template <typename... Args>
+  PerSocketStorage(Args&&... args) : b(getPPSBackend()) {
+    // in case we make one of these before initializing the thread pool
+    // This will call initPTS for each thread if it hasn't already
     getThreadPool();
 
-    offset = b.allocOffset(sizeof(T));
+    offset   = b.allocOffset(sizeof(T));
     auto& tp = getThreadPool();
     for (unsigned n = 0; n < tp.getMaxSockets(); ++n)
-      new (b.getRemote(tp.getLeaderForSocket(n), offset)) T(std::forward<Args>(args)...);
+      new (b.getRemote(tp.getLeaderForSocket(n), offset))
+          T(std::forward<Args>(args)...);
   }
 
-  PerSocketStorage(PerSocketStorage&& o): offset(std::move(o.offset)), b(getPPSBackend()) { }
+  PerSocketStorage(PerSocketStorage&& o)
+      : offset(std::move(o.offset)), b(getPPSBackend()) {}
   PerSocketStorage& operator=(PerSocketStorage&& o) {
     destruct();
     offset = std::move(o.offset);
@@ -217,9 +205,7 @@ public:
   PerSocketStorage(const PerSocketStorage&) = delete;
   PerSocketStorage& operator=(const PerSocketStorage&) = delete;
 
-  ~PerSocketStorage() {
-    destruct();
-  }
+  ~PerSocketStorage() { destruct(); }
 
   T* getLocal() {
     void* ditem = b.getLocal(offset, pssBase);
@@ -262,11 +248,9 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
-  unsigned size() const {
-    return getThreadPool().getMaxThreads();
-  }
+  unsigned size() const { return getThreadPool().getMaxThreads(); }
 };
 
-}
+} // namespace substrate
 } // end namespace galois
 #endif

@@ -6,7 +6,7 @@
 #include <cstdlib>
 #include <unistd.h>
 
-unsigned iter = 1;
+unsigned iter       = 1;
 unsigned numThreads = 2;
 
 char bname[100];
@@ -23,12 +23,12 @@ struct emp {
     // std::cout << galois::runtime::LL::getTID() << " ";
   }
 
-  template<typename T>
-  void operator()(const T& t) { 
+  template <typename T>
+  void operator()(const T& t) {
     go();
   }
 
-  template<typename T, typename C>
+  template <typename T, typename C>
   void operator()(const T& t, const C& c) {
     go();
   }
@@ -36,16 +36,18 @@ struct emp {
 
 void test(std::unique_ptr<galois::substrate::Barrier> b) {
   unsigned M = numThreads;
-  if (M > 16) M /= 2;
-  while (M) {   
-    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
+  if (M > 16)
+    M /= 2;
+  while (M) {
+    galois::setActiveThreads(M); // galois::runtime::LL::getMaxThreads());
     b->reinit(M);
     galois::Timer t;
     t.start();
     emp e{*b.get()};
     galois::on_each(e);
     t.stop();
-    std::cout << bname << "," << b->name() << "," << M << "," << t.get() << "\n";
+    std::cout << bname << "," << b->name() << "," << M << "," << t.get()
+              << "\n";
     M -= 1;
   }
 }
@@ -54,7 +56,7 @@ int main(int argc, char** argv) {
   if (argc > 1)
     iter = atoi(argv[1]);
   if (!iter)
-    iter = 16*1024;
+    iter = 16 * 1024;
   if (argc > 2)
     numThreads = galois::substrate::getThreadPool().getMaxThreads();
 

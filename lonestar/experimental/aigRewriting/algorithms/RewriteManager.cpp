@@ -1,6 +1,6 @@
 /*
 
- @Vinicius Possani 
+ @Vinicius Possani
  Parallel Rewriting January 5, 2018.
  ABC-based implementation on Galois.
 
@@ -21,930 +21,1015 @@ using namespace std::chrono;
 
 namespace algorithm {
 
-RewriteManager::RewriteManager( aig::Aig & aig, CutManager & cutMan, NPNManager & npnMan, PreCompGraphManager & pcgMan, int triesNGraphs, bool useZeros, bool updateLevel ) :
-	aig( aig ), cutMan( cutMan ), npnMan( npnMan ), pcgMan( pcgMan ), 
-	perThreadContextData(), triesNGraphs( triesNGraphs ), useZeros( useZeros ), updateLevel( updateLevel ) {
+RewriteManager::RewriteManager(aig::Aig& aig, CutManager& cutMan,
+                               NPNManager& npnMan, PreCompGraphManager& pcgMan,
+                               int triesNGraphs, bool useZeros,
+                               bool updateLevel)
+    : aig(aig), cutMan(cutMan), npnMan(npnMan), pcgMan(pcgMan),
+      perThreadContextData(), triesNGraphs(triesNGraphs), useZeros(useZeros),
+      updateLevel(updateLevel) {
 
-	nFuncs = (1<<16);
+  nFuncs = (1 << 16);
 
-	for ( int i = 0; i < cutMan.getNThreads(); i++ ) {
-		ThreadContextData * threadCtx = perThreadContextData.getRemote( i );
-		threadCtx->threadId = i;
-	}
+  for (int i = 0; i < cutMan.getNThreads(); i++) {
+    ThreadContextData* threadCtx = perThreadContextData.getRemote(i);
+    threadCtx->threadId          = i;
+  }
 
-	rewriteTime = 0;
+  rewriteTime = 0;
 }
 
 RewriteManager::~RewriteManager() {
-	// TODO
+  // TODO
 }
 
-aig::GNode RewriteManager::rewriteNode( ThreadContextData * threadCtx, aig::GNode node, GNodeVector & fanoutNodes ) {
-  
-	aig::Graph & aigGraph = this->aig.getGraph();
-	aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::WRITE );   
-    
-    // Get the node's cuts
-    this->cutMan.computeCutsRecursively( node );
-    Cut * cutsBegin = this->cutMan.getNodeCuts()[ nodeData.id ];
-    assert( cutsBegin != nullptr );
+aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
+                                       aig::GNode node,
+                                       GNodeVector& fanoutNodes) {
 
-	threadCtx->bestCutMFFCIds.clear();
-	threadCtx->bestCutMFFCPreservedIds.clear();
+  aig::Graph& aigGraph    = this->aig.getGraph();
+  aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::WRITE);
 
-	Cut * cut;
-    char * perm;
-    unsigned phase;
-    unsigned truth;
-    //unsigned bestTruth = 0;
-	bool isOutputCompl = false;
-    int requiredLevel = 0; 
-	int nodesSaved; 
-	//int bestNodesSaved;
-    int currentGain = -1, bestGain = -1;
-	int i;
-	DecGraph * currentGraph = nullptr;
-	DecGraph * bestGraph = nullptr;
+  // Get the node's cuts
+  this->cutMan.computeCutsRecursively(node);
+  Cut* cutsBegin = this->cutMan.getNodeCuts()[nodeData.id];
+  assert(cutsBegin != nullptr);
 
-	
-    // Go through the cuts to lock the fanin conee
-    for ( cut = cutsBegin; cut != nullptr; cut = cut->nextCut ) {
- 		// Consider only 4-input cuts
-        if ( cut->nLeaves != 4 ) {
-        	continue;
-        }
-		lockFaninCone( aigGraph, node, cut );
-	}
-	
+  threadCtx->bestCutMFFCIds.clear();
+  threadCtx->bestCutMFFCPreservedIds.clear();
 
-    // Go through the cuts to rewrite
-    for ( cut = cutsBegin; cut != nullptr; cut = cut->nextCut ) {
+  Cut* cut;
+  char* perm;
+  unsigned phase;
+  unsigned truth;
+  // unsigned bestTruth = 0;
+  bool isOutputCompl = false;
+  int requiredLevel  = 0;
+  int nodesSaved;
+  // int bestNodesSaved;
+  int currentGain = -1, bestGain = -1;
+  int i;
+  DecGraph* currentGraph = nullptr;
+  DecGraph* bestGraph    = nullptr;
 
-        // Consider only 4-input cuts
-        if ( cut->nLeaves != 4 ) {
-        	continue;
-        }
+  // Go through the cuts to lock the fanin conee
+  for (cut = cutsBegin; cut != nullptr; cut = cut->nextCut) {
+    // Consider only 4-input cuts
+    if (cut->nLeaves != 4) {
+      continue;
+    }
+    lockFaninCone(aigGraph, node, cut);
+  }
 
-        // Get the fanin permutation
-        truth = 0xFFFF & ( *( this->cutMan.readTruth( cut ) ) );
-        perm = this->npnMan.getPerms4()[ (int)this->npnMan.getPerms()[ truth ] ];
-        phase = this->npnMan.getPhases()[ truth ];
+  // Go through the cuts to rewrite
+  for (cut = cutsBegin; cut != nullptr; cut = cut->nextCut) {
 
-        // Collect fanins with the corresponding permutation/phase
-        for ( i = 0; i < cut->nLeaves; i++ ) {
-            aig::GNode faninNode = this->aig.getNodes()[ cut->leaves[ (int)perm[i] ] ];
-            if ( faninNode == nullptr ) {
-                break;
-            }
-            threadCtx->currentFanins[i] = faninNode;
-            threadCtx->currentFaninsPol[i] = !( ( phase & (1<<i) ) > 0 );
-        }
-
-        if ( i != cut->nLeaves ) {
-			continue;
-        }
-    
-        int counter = 0;
-        for ( aig::GNode faninNode : threadCtx->currentFanins ) {
-			aig::NodeData & faninNodeData = aigGraph.getData( faninNode, galois::MethodFlag::READ );
-            if ( faninNodeData.nFanout == 1 ) {
-                counter++;
-            }
-        }
-	
-        if ( counter > 2 ) {
-			continue;
-        }
-
-		//lockFaninCone( aigGraph, node, cut );
-	
-        // mark the fanin boundary 
-        for ( aig::GNode faninNode : threadCtx->currentFanins ) {
-            aig::NodeData & faninNodeData = aigGraph.getData( faninNode, galois::MethodFlag::WRITE );
-			faninNodeData.nFanout++;
-        }
-
-        // label MFFC with current ThreadId and the ThreadTravId 	
-	    threadCtx->travId += 1;
-       	nodesSaved = labelMFFC( threadCtx, node, threadCtx->threadId, threadCtx->travId );
-
-        // unmark the fanin boundary
-        for ( aig::GNode faninNode : threadCtx->currentFanins ) {
-			aig::NodeData & faninNodeData = aigGraph.getData( faninNode, galois::MethodFlag::WRITE );
-            faninNodeData.nFanout--;
-        }
-
-        // evaluate the cut
-        currentGraph = evaluateCut( threadCtx, node, cut, nodesSaved, requiredLevel, currentGain );
-
-		// cheeck if the cut is better than the current best one
-		if ( (currentGraph != nullptr) && (bestGain < currentGain) ) {
-		   	bestGain  = currentGain;
-		    bestGraph = currentGraph;
-		    isOutputCompl = ((phase & (1<<4)) > 0);
-		    //bestTruth = 0xFFFF & *this->cutMan.readTruth( cut );
-		    //bestNodesSaved = nodesSaved;
-		    // collect fanins in the
-			for ( i = 0; i < threadCtx->currentFanins.size(); i++ ) {
-            	threadCtx->bestFanins[i] = threadCtx->currentFanins[i];
-            	threadCtx->bestFaninsPol[i] = threadCtx->currentFaninsPol[i];
-			}
-			threadCtx->bestCutMFFCIds = threadCtx->currentCutMFFCIds;
-			threadCtx->bestCutMFFCPreservedIds = threadCtx->currentCutMFFCPreservedIds;
-        }
+    // Consider only 4-input cuts
+    if (cut->nLeaves != 4) {
+      continue;
     }
 
-	if ( !(bestGain > 0 || (bestGain == 0 && useZeros)) ) {
-    	return nullptr;
-	}
+    // Get the fanin permutation
+    truth = 0xFFFF & (*(this->cutMan.readTruth(cut)));
+    perm  = this->npnMan.getPerms4()[(int)this->npnMan.getPerms()[truth]];
+    phase = this->npnMan.getPhases()[truth];
 
-	assert( bestGraph != nullptr );
-
-	// Preparing structure/AIG tracking for updating the AIG
-    for ( int j = 0; j < 20; j++ ) {
-		if ( j < 4 ) {
-	        threadCtx->decNodeFunc[j] = threadCtx->bestFanins[j]; // Link cut leaves with the best decomposition graph
-		}
-		else {
-	        threadCtx->decNodeFunc[j] = nullptr; // Clear the link table, after leaves
-		}
+    // Collect fanins with the corresponding permutation/phase
+    for (i = 0; i < cut->nLeaves; i++) {
+      aig::GNode faninNode = this->aig.getNodes()[cut->leaves[(int)perm[i]]];
+      if (faninNode == nullptr) {
+        break;
+      }
+      threadCtx->currentFanins[i]    = faninNode;
+      threadCtx->currentFaninsPol[i] = !((phase & (1 << i)) > 0);
     }
 
-	// Define the MFFC available IDs to be reused
-	for ( int id : threadCtx->bestCutMFFCPreservedIds ) {
-		threadCtx->bestCutMFFCIds.erase( id );
-	}
+    if (i != cut->nLeaves) {
+      continue;
+    }
 
-	//std::cout << threadCtx->threadId << " - Updating AIG with gain " << bestGain << std::endl;
-	aig::GNode newRoot = updateAig( threadCtx, node, bestGraph, fanoutNodes, isOutputCompl, updateLevel, bestGain );
-	//std::cout << threadCtx->threadId << " - Update done " << std::endl;
+    int counter = 0;
+    for (aig::GNode faninNode : threadCtx->currentFanins) {
+      aig::NodeData& faninNodeData =
+          aigGraph.getData(faninNode, galois::MethodFlag::READ);
+      if (faninNodeData.nFanout == 1) {
+        counter++;
+      }
+    }
 
-	return newRoot;
+    if (counter > 2) {
+      continue;
+    }
+
+    // lockFaninCone( aigGraph, node, cut );
+
+    // mark the fanin boundary
+    for (aig::GNode faninNode : threadCtx->currentFanins) {
+      aig::NodeData& faninNodeData =
+          aigGraph.getData(faninNode, galois::MethodFlag::WRITE);
+      faninNodeData.nFanout++;
+    }
+
+    // label MFFC with current ThreadId and the ThreadTravId
+    threadCtx->travId += 1;
+    nodesSaved =
+        labelMFFC(threadCtx, node, threadCtx->threadId, threadCtx->travId);
+
+    // unmark the fanin boundary
+    for (aig::GNode faninNode : threadCtx->currentFanins) {
+      aig::NodeData& faninNodeData =
+          aigGraph.getData(faninNode, galois::MethodFlag::WRITE);
+      faninNodeData.nFanout--;
+    }
+
+    // evaluate the cut
+    currentGraph = evaluateCut(threadCtx, node, cut, nodesSaved, requiredLevel,
+                               currentGain);
+
+    // cheeck if the cut is better than the current best one
+    if ((currentGraph != nullptr) && (bestGain < currentGain)) {
+      bestGain      = currentGain;
+      bestGraph     = currentGraph;
+      isOutputCompl = ((phase & (1 << 4)) > 0);
+      // bestTruth = 0xFFFF & *this->cutMan.readTruth( cut );
+      // bestNodesSaved = nodesSaved;
+      // collect fanins in the
+      for (i = 0; i < threadCtx->currentFanins.size(); i++) {
+        threadCtx->bestFanins[i]    = threadCtx->currentFanins[i];
+        threadCtx->bestFaninsPol[i] = threadCtx->currentFaninsPol[i];
+      }
+      threadCtx->bestCutMFFCIds = threadCtx->currentCutMFFCIds;
+      threadCtx->bestCutMFFCPreservedIds =
+          threadCtx->currentCutMFFCPreservedIds;
+    }
+  }
+
+  if (!(bestGain > 0 || (bestGain == 0 && useZeros))) {
+    return nullptr;
+  }
+
+  assert(bestGraph != nullptr);
+
+  // Preparing structure/AIG tracking for updating the AIG
+  for (int j = 0; j < 20; j++) {
+    if (j < 4) {
+      threadCtx->decNodeFunc[j] =
+          threadCtx->bestFanins[j]; // Link cut leaves with the best
+                                    // decomposition graph
+    } else {
+      threadCtx->decNodeFunc[j] = nullptr; // Clear the link table, after leaves
+    }
+  }
+
+  // Define the MFFC available IDs to be reused
+  for (int id : threadCtx->bestCutMFFCPreservedIds) {
+    threadCtx->bestCutMFFCIds.erase(id);
+  }
+
+  // std::cout << threadCtx->threadId << " - Updating AIG with gain " <<
+  // bestGain << std::endl;
+  aig::GNode newRoot = updateAig(threadCtx, node, bestGraph, fanoutNodes,
+                                 isOutputCompl, updateLevel, bestGain);
+  // std::cout << threadCtx->threadId << " - Update done " << std::endl;
+
+  return newRoot;
 }
 
-void RewriteManager::lockFaninCone(  aig::Graph & aigGraph, aig::GNode node, Cut * cut ) {
+void RewriteManager::lockFaninCone(aig::Graph& aigGraph, aig::GNode node,
+                                   Cut* cut) {
 
-	aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ ); // lock
+  aig::NodeData& nodeData =
+      aigGraph.getData(node, galois::MethodFlag::READ); // lock
 
-	// If node is a cut leaf
-	if ( (nodeData.id == cut->leaves[0]) || (nodeData.id == cut->leaves[1]) || (nodeData.id == cut->leaves[2]) || (nodeData.id == cut->leaves[3]) ) {
-		return;
-	}
+  // If node is a cut leaf
+  if ((nodeData.id == cut->leaves[0]) || (nodeData.id == cut->leaves[1]) ||
+      (nodeData.id == cut->leaves[2]) || (nodeData.id == cut->leaves[3])) {
+    return;
+  }
 
-	// If node is a PI
-	if ( nodeData.type == aig::NodeType::PI ) {
-		return;
-	}
+  // If node is a PI
+  if (nodeData.type == aig::NodeType::PI) {
+    return;
+  }
 
-  	auto inEdgeIt = aigGraph.in_edge_begin( node );
-    aig::GNode lhsNode = aigGraph.getEdgeDst( inEdgeIt );
-	aig::NodeData & lhsData = aigGraph.getData( lhsNode, galois::MethodFlag::READ ); // lock
-	inEdgeIt++;
-    aig::GNode rhsNode = aigGraph.getEdgeDst( inEdgeIt );
-	aig::NodeData & rhsData = aigGraph.getData( rhsNode, galois::MethodFlag::READ ); // lock
+  auto inEdgeIt      = aigGraph.in_edge_begin(node);
+  aig::GNode lhsNode = aigGraph.getEdgeDst(inEdgeIt);
+  aig::NodeData& lhsData =
+      aigGraph.getData(lhsNode, galois::MethodFlag::READ); // lock
+  inEdgeIt++;
+  aig::GNode rhsNode = aigGraph.getEdgeDst(inEdgeIt);
+  aig::NodeData& rhsData =
+      aigGraph.getData(rhsNode, galois::MethodFlag::READ); // lock
 
-	lockFaninCone( aigGraph, lhsNode, cut );
-	lockFaninCone( aigGraph, rhsNode, cut );
-} 
-
-int RewriteManager::labelMFFC( ThreadContextData * threadCtx, aig::GNode node, int threadId, int travId ) {
-
-	aig::Graph & aigGraph = this->aig.getGraph();
-    int nConeSize1, nConeSize2;
-
-    threadCtx->currentCutMFFCIds.clear();
-
-	aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
-	if ( nodeData.type == aig::NodeType::PI ) {
-        return 0;
-    }
-	
-	threadCtx->currentCutMFFCIds.insert( nodeData.id );
-
-    nConeSize1 = refDerefMFFCNodes( threadCtx, node, threadId, travId, false, true ); // dereference
-    nConeSize2 = refDerefMFFCNodes( threadCtx, node, threadId, travId, true, false ); // reference
-    
-    assert( nConeSize1 == nConeSize2 );
-    assert( nConeSize1 > 0 );
-    
-    return nConeSize1;
+  lockFaninCone(aigGraph, lhsNode, cut);
+  lockFaninCone(aigGraph, rhsNode, cut);
 }
 
-int RewriteManager::refDerefMFFCNodes( ThreadContextData * threadCtx, aig::GNode node, int threadId, int travId, bool reference, bool label ) {
+int RewriteManager::labelMFFC(ThreadContextData* threadCtx, aig::GNode node,
+                              int threadId, int travId) {
 
-	aig::Graph & aigGraph = this->aig.getGraph();
-	aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
+  aig::Graph& aigGraph = this->aig.getGraph();
+  int nConeSize1, nConeSize2;
 
-    // label visited nodes
-    if ( label ) {
-    	this->aig.registerTravId( nodeData.id, threadId, travId );
-    }
-    // skip the CI
-    if ( nodeData.type == aig::NodeType::PI ) {
-        return 0;
-    }
+  threadCtx->currentCutMFFCIds.clear();
 
-    // process the internal node
-    auto inEdgeIt = aigGraph.in_edge_begin( node );
-    aig::GNode lhsNode = aigGraph.getEdgeDst( inEdgeIt );
-	aig::NodeData & lhsData = aigGraph.getData( lhsNode, galois::MethodFlag::WRITE );
+  aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::READ);
+  if (nodeData.type == aig::NodeType::PI) {
+    return 0;
+  }
 
-	inEdgeIt++;
-    aig::GNode rhsNode = aigGraph.getEdgeDst( inEdgeIt );
-	aig::NodeData & rhsData = aigGraph.getData( rhsNode, galois::MethodFlag::WRITE );
+  threadCtx->currentCutMFFCIds.insert(nodeData.id);
 
-    int counter = 1;
+  nConeSize1 = refDerefMFFCNodes(threadCtx, node, threadId, travId, false,
+                                 true); // dereference
+  nConeSize2 = refDerefMFFCNodes(threadCtx, node, threadId, travId, true,
+                                 false); // reference
 
-    if ( reference ) {
-        if ( lhsData.nFanout++ == 0 ) {
-            counter += refDerefMFFCNodes( threadCtx, lhsNode, threadId, travId, reference, label );
-        }
-        if ( rhsData.nFanout++ == 0 ) {
-            counter += refDerefMFFCNodes( threadCtx, rhsNode, threadId, travId, reference, label );
-        }
-    } 
-    else {
-        assert( lhsData.nFanout > 0 );
-        assert( rhsData.nFanout > 0 );
-        if ( --lhsData.nFanout == 0 ) {
-			threadCtx->currentCutMFFCIds.insert( lhsData.id );
-            counter += refDerefMFFCNodes( threadCtx, lhsNode, threadId, travId, reference, label );
-        }
-        if ( --rhsData.nFanout == 0 ) {
-			threadCtx->currentCutMFFCIds.insert( rhsData.id );
-            counter += refDerefMFFCNodes( threadCtx, rhsNode, threadId, travId, reference, label );
-        }
-    }
+  assert(nConeSize1 == nConeSize2);
+  assert(nConeSize1 > 0);
 
-    return counter;
+  return nConeSize1;
 }
 
-DecGraph * RewriteManager::evaluateCut( ThreadContextData * threadCtx, aig::GNode root, Cut * cut, int nNodesSaved, int maxLevel, int & bestGain ) {
+int RewriteManager::refDerefMFFCNodes(ThreadContextData* threadCtx,
+                                      aig::GNode node, int threadId, int travId,
+                                      bool reference, bool label) {
 
-    DecGraph * bestGraph = NULL;
-    DecGraph * currentGraph;
-    ForestNode * node;
-    int nNodesAdded;
-    unsigned uTruth;
-	bestGain = -1;
+  aig::Graph& aigGraph    = this->aig.getGraph();
+  aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::READ);
 
-	threadCtx->currentCutMFFCPreservedIds.clear();
+  // label visited nodes
+  if (label) {
+    this->aig.registerTravId(nodeData.id, threadId, travId);
+  }
+  // skip the CI
+  if (nodeData.type == aig::NodeType::PI) {
+    return 0;
+  }
 
-    // find the matching class of subgraphs
-    uTruth = 0xFFFF & *this->cutMan.readTruth( cut );
-    std::vector< ForestNode * > & subgraphs = this->pcgMan.getClasses()[ this->npnMan.getMap()[ uTruth ] ];
-    
-	aig::Graph & aigGraph = aig.getGraph();
+  // process the internal node
+  auto inEdgeIt          = aigGraph.in_edge_begin(node);
+  aig::GNode lhsNode     = aigGraph.getEdgeDst(inEdgeIt);
+  aig::NodeData& lhsData = aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
 
-	// copy the leaves
-    for ( int i = 0; i < 4; i++ ) { // each deGraph has eactly 4 inputs (vars).
-		aig::GNode fanin = threadCtx->currentFanins[i];
-		aig::NodeData & faninData = aigGraph.getData( fanin, galois::MethodFlag::READ );
-        threadCtx->decNodeFunc[i] = fanin;
-        //threadCtx->decNodeLevel[i] = faninData.level;
+  inEdgeIt++;
+  aig::GNode rhsNode     = aigGraph.getEdgeDst(inEdgeIt);
+  aig::NodeData& rhsData = aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
+
+  int counter = 1;
+
+  if (reference) {
+    if (lhsData.nFanout++ == 0) {
+      counter += refDerefMFFCNodes(threadCtx, lhsNode, threadId, travId,
+                                   reference, label);
+    }
+    if (rhsData.nFanout++ == 0) {
+      counter += refDerefMFFCNodes(threadCtx, rhsNode, threadId, travId,
+                                   reference, label);
+    }
+  } else {
+    assert(lhsData.nFanout > 0);
+    assert(rhsData.nFanout > 0);
+    if (--lhsData.nFanout == 0) {
+      threadCtx->currentCutMFFCIds.insert(lhsData.id);
+      counter += refDerefMFFCNodes(threadCtx, lhsNode, threadId, travId,
+                                   reference, label);
+    }
+    if (--rhsData.nFanout == 0) {
+      threadCtx->currentCutMFFCIds.insert(rhsData.id);
+      counter += refDerefMFFCNodes(threadCtx, rhsNode, threadId, travId,
+                                   reference, label);
+    }
+  }
+
+  return counter;
+}
+
+DecGraph* RewriteManager::evaluateCut(ThreadContextData* threadCtx,
+                                      aig::GNode root, Cut* cut,
+                                      int nNodesSaved, int maxLevel,
+                                      int& bestGain) {
+
+  DecGraph* bestGraph = NULL;
+  DecGraph* currentGraph;
+  ForestNode* node;
+  int nNodesAdded;
+  unsigned uTruth;
+  bestGain = -1;
+
+  threadCtx->currentCutMFFCPreservedIds.clear();
+
+  // find the matching class of subgraphs
+  uTruth = 0xFFFF & *this->cutMan.readTruth(cut);
+  std::vector<ForestNode*>& subgraphs =
+      this->pcgMan.getClasses()[this->npnMan.getMap()[uTruth]];
+
+  aig::Graph& aigGraph = aig.getGraph();
+
+  // copy the leaves
+  for (int i = 0; i < 4; i++) { // each deGraph has eactly 4 inputs (vars).
+    aig::GNode fanin = threadCtx->currentFanins[i];
+    aig::NodeData& faninData =
+        aigGraph.getData(fanin, galois::MethodFlag::READ);
+    threadCtx->decNodeFunc[i] = fanin;
+    // threadCtx->decNodeLevel[i] = faninData.level;
+  }
+
+  // determine the best subgrap
+  int nSubgraphs = subgraphs.size();
+  if (nSubgraphs > this->triesNGraphs) { // Pruning
+    nSubgraphs = this->triesNGraphs;
+  }
+
+  for (int i = 0; i < nSubgraphs; i++) {
+    node = subgraphs[i];
+    // get the current graph
+    currentGraph = (DecGraph*)node->pNext;
+
+    // clear link table, after leaves
+    for (int j = 4; j < 20; j++) { // each decGraph has at most 20 nodes.
+      threadCtx->decNodeFunc[j] = NULL;
     }
 
-    // determine the best subgrap
-    int nSubgraphs = subgraphs.size();
-    if ( nSubgraphs > this->triesNGraphs ) { // Pruning
-		nSubgraphs = this->triesNGraphs;
-	}
+    // detect how many unlabeled nodes will be reused
+    nNodesAdded = decGraphToAigCount(threadCtx, root, currentGraph, nNodesSaved,
+                                     maxLevel);
 
-    for ( int i = 0; i < nSubgraphs; i++ ) {
-        node = subgraphs[i];
-        // get the current graph
-        currentGraph = (DecGraph*) node->pNext;
-    
-        // clear link table, after leaves
-        for ( int j = 4; j < 20; j++ ) { // each decGraph has at most 20 nodes.
-			threadCtx->decNodeFunc[j] = NULL;
-        }
-
-        // detect how many unlabeled nodes will be reused
-        nNodesAdded = decGraphToAigCount( threadCtx, root, currentGraph, nNodesSaved, maxLevel );
-        
-		if ( nNodesAdded == -1 ) {
-            continue;
-        }
-
-        assert( nNodesSaved >= nNodesAdded );
-        
-        // count the gain at this node
-        if ( bestGain < nNodesSaved - nNodesAdded ) {
-            bestGain = nNodesSaved - nNodesAdded;
-            bestGraph = currentGraph;
-			threadCtx->currentCutMFFCPreservedIds = threadCtx->currentGraphMFFCPreservedIds;
-        }
+    if (nNodesAdded == -1) {
+      continue;
     }
 
-    if ( bestGain == -1 ) {
-        return NULL;
-    }
+    assert(nNodesSaved >= nNodesAdded);
 
-    return bestGraph;
+    // count the gain at this node
+    if (bestGain < nNodesSaved - nNodesAdded) {
+      bestGain  = nNodesSaved - nNodesAdded;
+      bestGraph = currentGraph;
+      threadCtx->currentCutMFFCPreservedIds =
+          threadCtx->currentGraphMFFCPreservedIds;
+    }
+  }
+
+  if (bestGain == -1) {
+    return NULL;
+  }
+
+  return bestGraph;
 }
 
 /*
- *   Before calling this procedure, AIG nodes should be assigned to DecNodes by 
- *   using the threadCtx->decNodeFunc[ DecNode.id ] for each leaf of the decGraph.
- *   Returns -1 if the number of nodes and levels exceeded the given limit or 
- *   the number of levels exceeded the maximum allowed level.       
-*/
-int RewriteManager::decGraphToAigCount( ThreadContextData * threadCtx, aig::GNode root, DecGraph * decGraph, int maxNode, int maxLevel ) {
+ *   Before calling this procedure, AIG nodes should be assigned to DecNodes by
+ *   using the threadCtx->decNodeFunc[ DecNode.id ] for each leaf of the
+ * decGraph. Returns -1 if the number of nodes and levels exceeded the given
+ * limit or the number of levels exceeded the maximum allowed level.
+ */
+int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
+                                       aig::GNode root, DecGraph* decGraph,
+                                       int maxNode, int maxLevel) {
 
-    DecNode * node;
-    DecNode * lhsNode;
-    DecNode * rhsNode;
-    aig::GNode curAnd;
-    aig::GNode lhsAnd;
-    aig::GNode rhsAnd;
-    bool lhsPol, rhsPol;
-	int counter = 0;
-    //int newLevel, oldLevel;
+  DecNode* node;
+  DecNode* lhsNode;
+  DecNode* rhsNode;
+  aig::GNode curAnd;
+  aig::GNode lhsAnd;
+  aig::GNode rhsAnd;
+  bool lhsPol, rhsPol;
+  int counter = 0;
+  // int newLevel, oldLevel;
 
-    aig::Graph & aigGraph = this->aig.getGraph();
+  aig::Graph& aigGraph = this->aig.getGraph();
 
-	threadCtx->currentGraphMFFCPreservedIds.clear();
+  threadCtx->currentGraphMFFCPreservedIds.clear();
 
-    // check for constant function or a literal
-    if ( decGraph->isConst() || decGraph->isVar() ) {
-        return counter;
-    }
-    
-    // compute the AIG size after adding the internal nodes
-    for ( int i = decGraph->getLeaveNum(); (i < decGraph->getNodeNum()) && (( node = decGraph->getNode( i ) ), 1); i++ ) {
-
-        // get the children of this node
-        lhsNode = decGraph->getNode( node->eEdge0.Node );
-        rhsNode = decGraph->getNode( node->eEdge1.Node );
-
-        // get the AIG nodes corresponding to the children 
-        lhsAnd = threadCtx->decNodeFunc[ lhsNode->id ];
-        rhsAnd = threadCtx->decNodeFunc[ rhsNode->id ];
-
-        // if they are both present, find the resulting node
-        if ( lhsAnd && rhsAnd ) {
-            if ( lhsNode->id < 4 ) { // If lhs is a cut leaf
-                //lhsPol = node->eEdge0.fCompl ? !(false ^ threadCtx->currentFaninsPol[ lhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ lhsNode->id ]);
-                lhsPol = node->eEdge0.fCompl ? !(threadCtx->currentFaninsPol[ lhsNode->id ]) : threadCtx->currentFaninsPol[ lhsNode->id ];
-            }
-            else {
-                lhsPol = node->eEdge0.fCompl ? false : true;
-            }
-
-            if ( rhsNode->id < 4 ) { // If rhs is a cut leaf
-                //rhsPol = node->eEdge1.fCompl ? !(false ^ threadCtx->currentFaninsPol[ rhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ rhsNode->id ]);
-                rhsPol = node->eEdge1.fCompl ? !(threadCtx->currentFaninsPol[ rhsNode->id ]) : threadCtx->currentFaninsPol[ rhsNode->id ];
-            }
-            else {
-                rhsPol = node->eEdge1.fCompl ? false : true;
-            }
-            
-			curAnd = this->aig.lookupNodeInFanoutMap( lhsAnd, rhsAnd, lhsPol, rhsPol );
-		
-            // return -1 if the node is the same as the original root
-            if ( curAnd == root ) {
-                return -1;
-            }
-        }  
-        else {
-            curAnd = nullptr;
-        }
-        
-        // count the number of new levels
-        //newLevel = 1 + std::max( threadCtx->decNodeLevel[ lhsNode->id ], threadCtx->decNodeLevel[ rhsNode->id ] );
-        
-        if ( curAnd ) {       
-            aig::NodeData & curAndData = aigGraph.getData( curAnd, galois::MethodFlag::READ );
-            bool isMFFC = this->aig.lookupTravId( curAndData.id, threadCtx->threadId, threadCtx->travId );
-
-            if ( isMFFC ) {
-				threadCtx->currentGraphMFFCPreservedIds.insert( curAndData.id );
-            	// count the number of added nodes
-                if ( ++counter > maxNode ) {
-                    return -1;
-                }
-            }
-           
-			// TODO Implement an Heuristic for levels preservation
- 			/*
-            if ( curAnd == aig.getConstZero() ) {
-                newLevel = 0;
-            }
-            else {
-                if ( curAnd == lhsAnd ) {
-            		aig::NodeData & lhsAndData = aigGraph.getData( lhsAnd, galois::MethodFlag::READ );
-                    newLevel = lhsAndData.level;
-                }
-                else {
-                    if ( curAnd == rhsAnd ) {
-            			aig::NodeData & rhsAndData = aigGraph.getData( rhsAnd, galois::MethodFlag::READ );
-                        newLevel = rhsAndData.level;
-                    }
-                }
-            }
-
-            oldLevel = curAndData.level;
-            //assert( LevelNew == LevelOld );
-            */
-        }
-        else {
-            // count the number of added nodes
-            if ( ++counter > maxNode ) {
-                return -1;
-            }
-        }
-
-        //if ( newLevel > maxLevel ) {
-        //    return -1;
-        //}
-        
-        threadCtx->decNodeFunc[ node->id ] = curAnd;
-        //threadCtx->decNodeLevel[ node->id ] = newLevel;
-    }
-
+  // check for constant function or a literal
+  if (decGraph->isConst() || decGraph->isVar()) {
     return counter;
+  }
+
+  // compute the AIG size after adding the internal nodes
+  for (int i = decGraph->getLeaveNum();
+       (i < decGraph->getNodeNum()) && ((node = decGraph->getNode(i)), 1);
+       i++) {
+
+    // get the children of this node
+    lhsNode = decGraph->getNode(node->eEdge0.Node);
+    rhsNode = decGraph->getNode(node->eEdge1.Node);
+
+    // get the AIG nodes corresponding to the children
+    lhsAnd = threadCtx->decNodeFunc[lhsNode->id];
+    rhsAnd = threadCtx->decNodeFunc[rhsNode->id];
+
+    // if they are both present, find the resulting node
+    if (lhsAnd && rhsAnd) {
+      if (lhsNode->id < 4) { // If lhs is a cut leaf
+        // lhsPol = node->eEdge0.fCompl ? !(false ^ threadCtx->currentFaninsPol[
+        // lhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ lhsNode->id ]);
+        lhsPol = node->eEdge0.fCompl
+                     ? !(threadCtx->currentFaninsPol[lhsNode->id])
+                     : threadCtx->currentFaninsPol[lhsNode->id];
+      } else {
+        lhsPol = node->eEdge0.fCompl ? false : true;
+      }
+
+      if (rhsNode->id < 4) { // If rhs is a cut leaf
+        // rhsPol = node->eEdge1.fCompl ? !(false ^ threadCtx->currentFaninsPol[
+        // rhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ rhsNode->id ]);
+        rhsPol = node->eEdge1.fCompl
+                     ? !(threadCtx->currentFaninsPol[rhsNode->id])
+                     : threadCtx->currentFaninsPol[rhsNode->id];
+      } else {
+        rhsPol = node->eEdge1.fCompl ? false : true;
+      }
+
+      curAnd = this->aig.lookupNodeInFanoutMap(lhsAnd, rhsAnd, lhsPol, rhsPol);
+
+      // return -1 if the node is the same as the original root
+      if (curAnd == root) {
+        return -1;
+      }
+    } else {
+      curAnd = nullptr;
+    }
+
+    // count the number of new levels
+    // newLevel = 1 + std::max( threadCtx->decNodeLevel[ lhsNode->id ],
+    // threadCtx->decNodeLevel[ rhsNode->id ] );
+
+    if (curAnd) {
+      aig::NodeData& curAndData =
+          aigGraph.getData(curAnd, galois::MethodFlag::READ);
+      bool isMFFC = this->aig.lookupTravId(curAndData.id, threadCtx->threadId,
+                                           threadCtx->travId);
+
+      if (isMFFC) {
+        threadCtx->currentGraphMFFCPreservedIds.insert(curAndData.id);
+        // count the number of added nodes
+        if (++counter > maxNode) {
+          return -1;
+        }
+      }
+
+      // TODO Implement an Heuristic for levels preservation
+      /*
+      if ( curAnd == aig.getConstZero() ) {
+          newLevel = 0;
+      }
+      else {
+          if ( curAnd == lhsAnd ) {
+              aig::NodeData & lhsAndData = aigGraph.getData( lhsAnd,
+      galois::MethodFlag::READ ); newLevel = lhsAndData.level;
+          }
+          else {
+              if ( curAnd == rhsAnd ) {
+                  aig::NodeData & rhsAndData = aigGraph.getData( rhsAnd,
+      galois::MethodFlag::READ ); newLevel = rhsAndData.level;
+              }
+          }
+      }
+
+      oldLevel = curAndData.level;
+      //assert( LevelNew == LevelOld );
+      */
+    } else {
+      // count the number of added nodes
+      if (++counter > maxNode) {
+        return -1;
+      }
+    }
+
+    // if ( newLevel > maxLevel ) {
+    //    return -1;
+    //}
+
+    threadCtx->decNodeFunc[node->id] = curAnd;
+    // threadCtx->decNodeLevel[ node->id ] = newLevel;
+  }
+
+  return counter;
 }
 
-aig::GNode RewriteManager::updateAig( ThreadContextData * threadCtx, aig::GNode oldRoot, DecGraph * decGraph, GNodeVector & fanoutNodes, bool isOutputCompl, bool updateLevel, int gain ) {
+aig::GNode RewriteManager::updateAig(ThreadContextData* threadCtx,
+                                     aig::GNode oldRoot, DecGraph* decGraph,
+                                     GNodeVector& fanoutNodes,
+                                     bool isOutputCompl, bool updateLevel,
+                                     int gain) {
 
-	aig::Graph & aigGraph = this->aig.getGraph();
+  aig::Graph& aigGraph = this->aig.getGraph();
 
-	// Prepare to delete nodes in the MFFC
-	for ( int id : threadCtx->bestCutMFFCIds ) {
-		aig::GNode mffcNode = this->aig.getNodes()[ id ];
-		auto inEdge = aigGraph.in_edge_begin( mffcNode );
+  // Prepare to delete nodes in the MFFC
+  for (int id : threadCtx->bestCutMFFCIds) {
+    aig::GNode mffcNode = this->aig.getNodes()[id];
+    auto inEdge         = aigGraph.in_edge_begin(mffcNode);
 
-		aig::GNode lhsNode = aigGraph.getEdgeDst( inEdge );
-		aig::NodeData & lhsNodeData = aigGraph.getData( lhsNode, galois::MethodFlag::WRITE );
-		bool lhsNodePol = aigGraph.getEdgeData( inEdge );
-		inEdge++;
-		aig::GNode rhsNode = aigGraph.getEdgeDst( inEdge );
-		aig::NodeData & rhsNodeData = aigGraph.getData( rhsNode, galois::MethodFlag::WRITE );
-		bool rhsNodePol = aigGraph.getEdgeData( inEdge );
-	
-		this->aig.removeNodeInFanoutMap( mffcNode, lhsNode, rhsNode, lhsNodePol, rhsNodePol );
-       	this->aig.getNodes()[ id ] = nullptr;
-		this->aig.getFanoutMap( id ).clear();
-    	this->cutMan.recycleNodeCuts( id );
-	}
-	
-	bool isDecGraphComplement = isOutputCompl ? (bool) decGraph->getRootEdge().fCompl ^ 1 : (bool) decGraph->getRootEdge().fCompl;
-	aig::GNode newRoot;
+    aig::GNode lhsNode = aigGraph.getEdgeDst(inEdge);
+    aig::NodeData& lhsNodeData =
+        aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
+    bool lhsNodePol = aigGraph.getEdgeData(inEdge);
+    inEdge++;
+    aig::GNode rhsNode = aigGraph.getEdgeDst(inEdge);
+    aig::NodeData& rhsNodeData =
+        aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
+    bool rhsNodePol = aigGraph.getEdgeData(inEdge);
 
-	// check for constant function
-    if ( decGraph->isConst() ) {
-        newRoot = this->aig.getConstZero();
+    this->aig.removeNodeInFanoutMap(mffcNode, lhsNode, rhsNode, lhsNodePol,
+                                    rhsNodePol);
+    this->aig.getNodes()[id] = nullptr;
+    this->aig.getFanoutMap(id).clear();
+    this->cutMan.recycleNodeCuts(id);
+  }
+
+  bool isDecGraphComplement = isOutputCompl
+                                  ? (bool)decGraph->getRootEdge().fCompl ^ 1
+                                  : (bool)decGraph->getRootEdge().fCompl;
+  aig::GNode newRoot;
+
+  // check for constant function
+  if (decGraph->isConst()) {
+    newRoot = this->aig.getConstZero();
+  } else {
+    // check for a literal
+    if (decGraph->isVar()) {
+      DecNode* decNode = decGraph->getVar();
+      isDecGraphComplement =
+          isDecGraphComplement ? (!threadCtx->bestFaninsPol[decNode->id]) ^ true
+                               : !threadCtx->bestFaninsPol[decNode->id];
+      newRoot = threadCtx->decNodeFunc[decNode->id];
+    } else {
+      newRoot = decGraphToAig(threadCtx, decGraph);
     }
-	else {
-    	// check for a literal
-    	if ( decGraph->isVar() ) {
-        	DecNode * decNode = decGraph->getVar();
-			isDecGraphComplement = isDecGraphComplement ? (!threadCtx->bestFaninsPol[ decNode->id ]) ^ true : !threadCtx->bestFaninsPol[ decNode->id ];
-        	newRoot = threadCtx->decNodeFunc[ decNode->id ];
-    	}
-		else {
-    		newRoot = decGraphToAig( threadCtx, decGraph );
-		} 
-	}
+  }
 
-	addNewSubgraph( threadCtx, oldRoot, newRoot, fanoutNodes, isDecGraphComplement, updateLevel );
-   
-   	deleteOldMFFC( aigGraph, oldRoot );
-   	
-	return newRoot;
+  addNewSubgraph(threadCtx, oldRoot, newRoot, fanoutNodes, isDecGraphComplement,
+                 updateLevel);
+
+  deleteOldMFFC(aigGraph, oldRoot);
+
+  return newRoot;
 }
 
 /*
  *   Transforms the decomposition graph into the AIG.
- *   Before calling this procedure, AIG nodes for the fanins 
- *   should be assigned to threadCtx.decNodeFun[ decNode.id ]. 
-*/
-aig::GNode RewriteManager::decGraphToAig( ThreadContextData * threadCtx, DecGraph * decGraph ) {
+ *   Before calling this procedure, AIG nodes for the fanins
+ *   should be assigned to threadCtx.decNodeFun[ decNode.id ].
+ */
+aig::GNode RewriteManager::decGraphToAig(ThreadContextData* threadCtx,
+                                         DecGraph* decGraph) {
 
-    DecNode * decNode;
-    DecNode * lhsNode;
-    DecNode * rhsNode;
-    aig::GNode curAnd;
-    aig::GNode lhsAnd;
-    aig::GNode rhsAnd;
-    bool lhsAndPol;
-    bool rhsAndPol;
+  DecNode* decNode;
+  DecNode* lhsNode;
+  DecNode* rhsNode;
+  aig::GNode curAnd;
+  aig::GNode lhsAnd;
+  aig::GNode rhsAnd;
+  bool lhsAndPol;
+  bool rhsAndPol;
 
-    // build the AIG nodes corresponding to the AND gates of the graph
-    for ( int i = decGraph->getLeaveNum(); (i < decGraph->getNodeNum()) && ( (decNode = decGraph->getNode( i ) ), 1); i++ ) {
-       	 
-        // get the children of this node
-        lhsNode = decGraph->getNode( decNode->eEdge0.Node );
-        rhsNode = decGraph->getNode( decNode->eEdge1.Node );
+  // build the AIG nodes corresponding to the AND gates of the graph
+  for (int i = decGraph->getLeaveNum();
+       (i < decGraph->getNodeNum()) && ((decNode = decGraph->getNode(i)), 1);
+       i++) {
 
-        // get the AIG nodes corresponding to the children 
-        lhsAnd = threadCtx->decNodeFunc[ lhsNode->id ];
-        rhsAnd = threadCtx->decNodeFunc[ rhsNode->id ];
+    // get the children of this node
+    lhsNode = decGraph->getNode(decNode->eEdge0.Node);
+    rhsNode = decGraph->getNode(decNode->eEdge1.Node);
 
-        if ( lhsNode->id < 4 ) { // If lhs is a cut leaf
-            //lhsAndPol = decNode->eEdge0.fCompl ? !(false ^ threadCtx->bestFaninsPol[ lhsNode->id ]) : !(true ^ threadCtx->bestFaninsPol[ lhsNode->id ]);
-            lhsAndPol = decNode->eEdge0.fCompl ? !(threadCtx->bestFaninsPol[ lhsNode->id ]) : threadCtx->bestFaninsPol[ lhsNode->id ];
-        }
-        else {
-            lhsAndPol = decNode->eEdge0.fCompl ? false : true;
-        }
+    // get the AIG nodes corresponding to the children
+    lhsAnd = threadCtx->decNodeFunc[lhsNode->id];
+    rhsAnd = threadCtx->decNodeFunc[rhsNode->id];
 
-        if ( rhsNode->id < 4 ) { // If rhs is a cut leaf
-            //rhsAndPol = decNode->eEdge1.fCompl ? !(false ^ threadCtx->bestFaninsPol[ rhsNode->id ]) : !(true ^ threadCtx->bestFaninsPol[ rhsNode->id ]);
-            rhsAndPol = decNode->eEdge1.fCompl ? !(threadCtx->bestFaninsPol[ rhsNode->id ]) : threadCtx->bestFaninsPol[ rhsNode->id ];
-        }
-        else {
-            rhsAndPol = decNode->eEdge1.fCompl ? false : true;
-        }
-
-        curAnd = this->aig.lookupNodeInFanoutMap( lhsAnd, rhsAnd, lhsAndPol, rhsAndPol );
-		
-        if ( curAnd ) {
-            threadCtx->decNodeFunc[ decNode->id ] = curAnd;
-        }
-        else {
-            threadCtx->decNodeFunc[ decNode->id ] = createAndNode( threadCtx, lhsAnd, rhsAnd, lhsAndPol, rhsAndPol );
-        }
+    if (lhsNode->id < 4) { // If lhs is a cut leaf
+      // lhsAndPol = decNode->eEdge0.fCompl ? !(false ^
+      // threadCtx->bestFaninsPol[ lhsNode->id ]) : !(true ^
+      // threadCtx->bestFaninsPol[ lhsNode->id ]);
+      lhsAndPol = decNode->eEdge0.fCompl
+                      ? !(threadCtx->bestFaninsPol[lhsNode->id])
+                      : threadCtx->bestFaninsPol[lhsNode->id];
+    } else {
+      lhsAndPol = decNode->eEdge0.fCompl ? false : true;
     }
 
-    return threadCtx->decNodeFunc[ decNode->id ];
-}
-
-aig::GNode RewriteManager::createAndNode( ThreadContextData * threadCtx, aig::GNode lhsAnd, aig::GNode rhsAnd, bool lhsAndPol, bool rhsAndPol ) {
-
-    aig::Graph & aigGraph = this->aig.getGraph();
-    aig::NodeData & lhsAndData = aigGraph.getData( lhsAnd, galois::MethodFlag::READ );
-    aig::NodeData & rhsAndData = aigGraph.getData( rhsAnd, galois::MethodFlag::READ );
-    
-    aig::NodeData newAndData;
-	
-	auto idIt = threadCtx->bestCutMFFCIds.begin(); // reuse an ID from deleted MFFC
-	int id = (*idIt);
-	threadCtx->bestCutMFFCIds.erase( idIt ); // remove the reused ID from the available IDs set
-	assert( id < this->aig.getNodes().size() );
-
-	newAndData.id = id;
-    newAndData.type = aig::NodeType::AND;
-    newAndData.level = 1 + std::max( lhsAndData.level, rhsAndData.level );
-	newAndData.counter = 0;
-
-	if ( lhsAndData.counter == 3 ) {
-	    newAndData.counter += 1;
-	}
-   
-	if ( rhsAndData.counter == 3 ) {
-	    newAndData.counter += 1;
-	}
-
-	if ( newAndData.counter == 2 ) {
-		newAndData.counter += 1;
-	}
-
-    aig::GNode newAnd = aigGraph.createNode( newAndData );
-    aigGraph.addNode( newAnd );
-   	
-    aigGraph.getEdgeData( aigGraph.addMultiEdge( lhsAnd, newAnd, galois::MethodFlag::WRITE ) ) = lhsAndPol;
-    aigGraph.getEdgeData( aigGraph.addMultiEdge( rhsAnd, newAnd, galois::MethodFlag::WRITE ) ) = rhsAndPol;
-    lhsAndData.nFanout++;
-    rhsAndData.nFanout++;
-
-	//int faninSize = std::distance( aigGraph.in_edge_begin( newAnd ), aigGraph.in_edge_begin( newAnd ) ); 
-	//assert( faninSize == 2 );
-
-    this->aig.getNodes()[ id ] = newAnd;
-	this->aig.insertNodeInFanoutMap( newAnd, lhsAnd, rhsAnd, lhsAndPol, rhsAndPol );
-
-    return newAnd;
-}
-
-void RewriteManager::addNewSubgraph( ThreadContextData * threadCtx, aig::GNode oldNode, aig::GNode newNode, GNodeVector & fanoutNodes, bool isNewRootComplement, bool updateLevel ) {
-
-	int fanoutNodesSize = fanoutNodes.size();
-    assert( oldNodeData.nFanout == fanoutNodesSize );
-
-    aig::GNode fanoutNode;
-    aig::GNode otherNode;
-    bool otherNodePol;
-    bool newNodePol;
-    bool oldNodePol;
-    
-    aig::Graph & aigGraph = this->aig.getGraph();
-    aig::NodeData & newNodeData = aigGraph.getData( newNode, galois::MethodFlag::READ );
-    aig::NodeData & oldNodeData = aigGraph.getData( oldNode, galois::MethodFlag::READ );
-   
-    // look at the fanouts of old node
-    for ( int i = 0; i < fanoutNodesSize; i++ ) {
-
-		fanoutNode = fanoutNodes[i];
-        aig::NodeData & fanoutNodeData = aigGraph.getData( fanoutNode, galois::MethodFlag::READ );
-
-		//auto outEdge = aigGraph.findEdge( oldNode, fanoutNode );
-		auto fanoutInEdge = aigGraph.findInEdge( oldNode, fanoutNode );
-
-		if ( fanoutInEdge == aigGraph.in_edge_end( fanoutNode ) ) {
-			std::cout << "Adding new subgraph, outEdge not found!" << std::endl;
-		}
-        
-        oldNodePol = aigGraph.getEdgeData( fanoutInEdge );
-        //newNodePol = isNewRootComplement ? !(false ^ oldNodePol) : !(true ^ oldNodePol);
-        newNodePol = isNewRootComplement ? !(oldNodePol) : oldNodePol;
-
-        if ( fanoutNodeData.type == aig::NodeType::PO ) {
-            // remove the oldNode from the fanoutNode fanins
-            //aigGraph.removeEdge( oldNode, fanoutEdge );
-            aigGraph.removeInEdge( fanoutNode, fanoutInEdge );
-            oldNodeData.nFanout--;
-           	// add newNode to the fanoutNode fanins
-            aigGraph.getEdgeData( aigGraph.addMultiEdge( newNode, fanoutNode, galois::MethodFlag::WRITE ) ) = newNodePol;
-        	newNodeData.nFanout++;
-            fanoutNodeData.level = newNodeData.level;
-            continue;
-        }
-
-        // find the otherNode diffetent of oldNode as a fanin of the fanoutNode
-        auto inEdge = aigGraph.in_edge_begin( fanoutNode );
-        otherNode = aigGraph.getEdgeDst( inEdge );
-        otherNodePol = aigGraph.getEdgeData( inEdge );
-
-        if ( otherNode == oldNode ) {
-            inEdge++;
-            otherNode = aigGraph.getEdgeDst( inEdge );
-            otherNodePol = aigGraph.getEdgeData( inEdge );
-        }
-
-        assert( newNode != otherNode );
-
-		// Remove fanoutNode from the fanoutMap from otherNode
-		this->aig.removeNodeInFanoutMap( fanoutNode, otherNode, oldNode, otherNodePol, oldNodePol );
-
-        // remove the oldNode from the fanoutNode fanin
-        //aigGraph.removeEdge( oldNode, fanoutEdge );
-        aigGraph.removeInEdge( fanoutNode, fanoutInEdge );
-        oldNodeData.nFanout--;
-	
-        // add newNode to the fanoutNode fanins
-        aigGraph.getEdgeData( aigGraph.addMultiEdge( newNode, fanoutNode, galois::MethodFlag::WRITE ) ) = newNodePol;
-        newNodeData.nFanout++;
-
-		aig::NodeData & otherNodeData = aigGraph.getData( otherNode, galois::MethodFlag::READ );
-        fanoutNodeData.level = 1 + std::max( newNodeData.level, otherNodeData.level );
-
-		// Insert fanoutNode in the fanoutMap from other Node with new inEdge
-		this->aig.insertNodeInFanoutMap( fanoutNode, otherNode, newNode, otherNodePol, newNodePol );
+    if (rhsNode->id < 4) { // If rhs is a cut leaf
+      // rhsAndPol = decNode->eEdge1.fCompl ? !(false ^
+      // threadCtx->bestFaninsPol[ rhsNode->id ]) : !(true ^
+      // threadCtx->bestFaninsPol[ rhsNode->id ]);
+      rhsAndPol = decNode->eEdge1.fCompl
+                      ? !(threadCtx->bestFaninsPol[rhsNode->id])
+                      : threadCtx->bestFaninsPol[rhsNode->id];
+    } else {
+      rhsAndPol = decNode->eEdge1.fCompl ? false : true;
     }
+
+    curAnd =
+        this->aig.lookupNodeInFanoutMap(lhsAnd, rhsAnd, lhsAndPol, rhsAndPol);
+
+    if (curAnd) {
+      threadCtx->decNodeFunc[decNode->id] = curAnd;
+    } else {
+      threadCtx->decNodeFunc[decNode->id] =
+          createAndNode(threadCtx, lhsAnd, rhsAnd, lhsAndPol, rhsAndPol);
+    }
+  }
+
+  return threadCtx->decNodeFunc[decNode->id];
 }
 
-void RewriteManager::deleteOldMFFC( aig::Graph & aigGraph, aig::GNode oldNode ) {
+aig::GNode RewriteManager::createAndNode(ThreadContextData* threadCtx,
+                                         aig::GNode lhsAnd, aig::GNode rhsAnd,
+                                         bool lhsAndPol, bool rhsAndPol) {
 
-	//assert( oldNode != nullptr );
+  aig::Graph& aigGraph = this->aig.getGraph();
+  aig::NodeData& lhsAndData =
+      aigGraph.getData(lhsAnd, galois::MethodFlag::READ);
+  aig::NodeData& rhsAndData =
+      aigGraph.getData(rhsAnd, galois::MethodFlag::READ);
 
-	aig::NodeData & oldNodeData = aigGraph.getData( oldNode, galois::MethodFlag::READ );
+  aig::NodeData newAndData;
 
-	if ( (oldNodeData.type == aig::NodeType::AND) && (oldNodeData.nFanout == 0) && aigGraph.containsNode( oldNode, galois::MethodFlag::WRITE ) ) {
-		deleteOldMFFCRec( aigGraph, oldNode );
-	}
+  auto idIt =
+      threadCtx->bestCutMFFCIds.begin(); // reuse an ID from deleted MFFC
+  int id = (*idIt);
+  threadCtx->bestCutMFFCIds.erase(
+      idIt); // remove the reused ID from the available IDs set
+  assert(id < this->aig.getNodes().size());
+
+  newAndData.id      = id;
+  newAndData.type    = aig::NodeType::AND;
+  newAndData.level   = 1 + std::max(lhsAndData.level, rhsAndData.level);
+  newAndData.counter = 0;
+
+  if (lhsAndData.counter == 3) {
+    newAndData.counter += 1;
+  }
+
+  if (rhsAndData.counter == 3) {
+    newAndData.counter += 1;
+  }
+
+  if (newAndData.counter == 2) {
+    newAndData.counter += 1;
+  }
+
+  aig::GNode newAnd = aigGraph.createNode(newAndData);
+  aigGraph.addNode(newAnd);
+
+  aigGraph.getEdgeData(aigGraph.addMultiEdge(
+      lhsAnd, newAnd, galois::MethodFlag::WRITE)) = lhsAndPol;
+  aigGraph.getEdgeData(aigGraph.addMultiEdge(
+      rhsAnd, newAnd, galois::MethodFlag::WRITE)) = rhsAndPol;
+  lhsAndData.nFanout++;
+  rhsAndData.nFanout++;
+
+  // int faninSize = std::distance( aigGraph.in_edge_begin( newAnd ),
+  // aigGraph.in_edge_begin( newAnd ) ); assert( faninSize == 2 );
+
+  this->aig.getNodes()[id] = newAnd;
+  this->aig.insertNodeInFanoutMap(newAnd, lhsAnd, rhsAnd, lhsAndPol, rhsAndPol);
+
+  return newAnd;
 }
 
-void RewriteManager::deleteOldMFFCRec( aig::Graph & aigGraph, aig::GNode oldNode ) {
+void RewriteManager::addNewSubgraph(ThreadContextData* threadCtx,
+                                    aig::GNode oldNode, aig::GNode newNode,
+                                    GNodeVector& fanoutNodes,
+                                    bool isNewRootComplement,
+                                    bool updateLevel) {
 
-	auto inEdge = aigGraph.in_edge_begin( oldNode );
-	aig::GNode lhsNode = aigGraph.getEdgeDst( inEdge );
-	aig::NodeData & lhsNodeData = aigGraph.getData( lhsNode, galois::MethodFlag::WRITE );
-	inEdge++;
-	aig::GNode rhsNode = aigGraph.getEdgeDst( inEdge );
-	aig::NodeData & rhsNodeData = aigGraph.getData( rhsNode, galois::MethodFlag::WRITE );
+  int fanoutNodesSize = fanoutNodes.size();
+  assert(oldNodeData.nFanout == fanoutNodesSize);
 
-	//assert( (lhsNode != nullptr) && (rhsNode != nullptr) );
+  aig::GNode fanoutNode;
+  aig::GNode otherNode;
+  bool otherNodePol;
+  bool newNodePol;
+  bool oldNodePol;
 
-	aigGraph.removeNode( oldNode );
-	lhsNodeData.nFanout--;
-	rhsNodeData.nFanout--;
+  aig::Graph& aigGraph = this->aig.getGraph();
+  aig::NodeData& newNodeData =
+      aigGraph.getData(newNode, galois::MethodFlag::READ);
+  aig::NodeData& oldNodeData =
+      aigGraph.getData(oldNode, galois::MethodFlag::READ);
 
-	if ( (lhsNodeData.type == aig::NodeType::AND) && (lhsNodeData.nFanout == 0) && aigGraph.containsNode( lhsNode, galois::MethodFlag::WRITE ) ) {
-		deleteOldMFFCRec( aigGraph, lhsNode );
-	}
+  // look at the fanouts of old node
+  for (int i = 0; i < fanoutNodesSize; i++) {
 
-	if ( (rhsNodeData.type == aig::NodeType::AND) && (rhsNodeData.nFanout == 0) && aigGraph.containsNode( rhsNode, galois::MethodFlag::WRITE ) ) {
-		deleteOldMFFCRec( aigGraph, rhsNode );
-	}
+    fanoutNode = fanoutNodes[i];
+    aig::NodeData& fanoutNodeData =
+        aigGraph.getData(fanoutNode, galois::MethodFlag::READ);
+
+    // auto outEdge = aigGraph.findEdge( oldNode, fanoutNode );
+    auto fanoutInEdge = aigGraph.findInEdge(oldNode, fanoutNode);
+
+    if (fanoutInEdge == aigGraph.in_edge_end(fanoutNode)) {
+      std::cout << "Adding new subgraph, outEdge not found!" << std::endl;
+    }
+
+    oldNodePol = aigGraph.getEdgeData(fanoutInEdge);
+    // newNodePol = isNewRootComplement ? !(false ^ oldNodePol) : !(true ^
+    // oldNodePol);
+    newNodePol = isNewRootComplement ? !(oldNodePol) : oldNodePol;
+
+    if (fanoutNodeData.type == aig::NodeType::PO) {
+      // remove the oldNode from the fanoutNode fanins
+      // aigGraph.removeEdge( oldNode, fanoutEdge );
+      aigGraph.removeInEdge(fanoutNode, fanoutInEdge);
+      oldNodeData.nFanout--;
+      // add newNode to the fanoutNode fanins
+      aigGraph.getEdgeData(aigGraph.addMultiEdge(
+          newNode, fanoutNode, galois::MethodFlag::WRITE)) = newNodePol;
+      newNodeData.nFanout++;
+      fanoutNodeData.level = newNodeData.level;
+      continue;
+    }
+
+    // find the otherNode diffetent of oldNode as a fanin of the fanoutNode
+    auto inEdge  = aigGraph.in_edge_begin(fanoutNode);
+    otherNode    = aigGraph.getEdgeDst(inEdge);
+    otherNodePol = aigGraph.getEdgeData(inEdge);
+
+    if (otherNode == oldNode) {
+      inEdge++;
+      otherNode    = aigGraph.getEdgeDst(inEdge);
+      otherNodePol = aigGraph.getEdgeData(inEdge);
+    }
+
+    assert(newNode != otherNode);
+
+    // Remove fanoutNode from the fanoutMap from otherNode
+    this->aig.removeNodeInFanoutMap(fanoutNode, otherNode, oldNode,
+                                    otherNodePol, oldNodePol);
+
+    // remove the oldNode from the fanoutNode fanin
+    // aigGraph.removeEdge( oldNode, fanoutEdge );
+    aigGraph.removeInEdge(fanoutNode, fanoutInEdge);
+    oldNodeData.nFanout--;
+
+    // add newNode to the fanoutNode fanins
+    aigGraph.getEdgeData(aigGraph.addMultiEdge(
+        newNode, fanoutNode, galois::MethodFlag::WRITE)) = newNodePol;
+    newNodeData.nFanout++;
+
+    aig::NodeData& otherNodeData =
+        aigGraph.getData(otherNode, galois::MethodFlag::READ);
+    fanoutNodeData.level = 1 + std::max(newNodeData.level, otherNodeData.level);
+
+    // Insert fanoutNode in the fanoutMap from other Node with new inEdge
+    this->aig.insertNodeInFanoutMap(fanoutNode, otherNode, newNode,
+                                    otherNodePol, newNodePol);
+  }
 }
 
-aig::Aig & RewriteManager::getAig() {
-	return this->aig;
+void RewriteManager::deleteOldMFFC(aig::Graph& aigGraph, aig::GNode oldNode) {
+
+  // assert( oldNode != nullptr );
+
+  aig::NodeData& oldNodeData =
+      aigGraph.getData(oldNode, galois::MethodFlag::READ);
+
+  if ((oldNodeData.type == aig::NodeType::AND) && (oldNodeData.nFanout == 0) &&
+      aigGraph.containsNode(oldNode, galois::MethodFlag::WRITE)) {
+    deleteOldMFFCRec(aigGraph, oldNode);
+  }
 }
 
-CutManager & RewriteManager::getCutMan() {
-	return this->cutMan;
+void RewriteManager::deleteOldMFFCRec(aig::Graph& aigGraph,
+                                      aig::GNode oldNode) {
+
+  auto inEdge        = aigGraph.in_edge_begin(oldNode);
+  aig::GNode lhsNode = aigGraph.getEdgeDst(inEdge);
+  aig::NodeData& lhsNodeData =
+      aigGraph.getData(lhsNode, galois::MethodFlag::WRITE);
+  inEdge++;
+  aig::GNode rhsNode = aigGraph.getEdgeDst(inEdge);
+  aig::NodeData& rhsNodeData =
+      aigGraph.getData(rhsNode, galois::MethodFlag::WRITE);
+
+  // assert( (lhsNode != nullptr) && (rhsNode != nullptr) );
+
+  aigGraph.removeNode(oldNode);
+  lhsNodeData.nFanout--;
+  rhsNodeData.nFanout--;
+
+  if ((lhsNodeData.type == aig::NodeType::AND) && (lhsNodeData.nFanout == 0) &&
+      aigGraph.containsNode(lhsNode, galois::MethodFlag::WRITE)) {
+    deleteOldMFFCRec(aigGraph, lhsNode);
+  }
+
+  if ((rhsNodeData.type == aig::NodeType::AND) && (rhsNodeData.nFanout == 0) &&
+      aigGraph.containsNode(rhsNode, galois::MethodFlag::WRITE)) {
+    deleteOldMFFCRec(aigGraph, rhsNode);
+  }
 }
 
-NPNManager & RewriteManager::getNPNMan() {
-	return this->npnMan;
+aig::Aig& RewriteManager::getAig() { return this->aig; }
+
+CutManager& RewriteManager::getCutMan() { return this->cutMan; }
+
+NPNManager& RewriteManager::getNPNMan() { return this->npnMan; }
+
+PreCompGraphManager& RewriteManager::getPcgMan() { return this->pcgMan; }
+
+PerThreadContextData& RewriteManager::getPerThreadContextData() {
+  return this->perThreadContextData;
 }
 
-PreCompGraphManager & RewriteManager::getPcgMan() {
-	return this->pcgMan;
-}
+bool RewriteManager::getUseZerosFlag() { return this->useZeros; }
 
-PerThreadContextData & RewriteManager::getPerThreadContextData() {
-	return this->perThreadContextData;
-}
+bool RewriteManager::getUpdateLevelFlag() { return this->updateLevel; }
 
-bool RewriteManager::getUseZerosFlag() {
-	return this->useZeros;
-}
+long double RewriteManager::getRewriteTime() { return this->rewriteTime; }
 
-bool RewriteManager::getUpdateLevelFlag() {
-	return this->updateLevel;
-}
-
-long double RewriteManager::getRewriteTime() {
-	return this->rewriteTime;
-}
-
-void RewriteManager::setRewriteTime( long double time ) {
-	this->rewriteTime = time;
+void RewriteManager::setRewriteTime(long double time) {
+  this->rewriteTime = time;
 }
 
 struct RewriteOperator {
-	
-	RewriteManager & rwtMan;
-	CutManager & cutMan;
 
-	RewriteOperator( RewriteManager & rwtMan ) : rwtMan( rwtMan ), cutMan( rwtMan.getCutMan() ) { }
+  RewriteManager& rwtMan;
+  CutManager& cutMan;
 
-	void operator()( aig::GNode node, galois::UserContext< aig::GNode > & ctx ) {
-		
-		aig::Graph & aigGraph = rwtMan.getAig().getGraph();
+  RewriteOperator(RewriteManager& rwtMan)
+      : rwtMan(rwtMan), cutMan(rwtMan.getCutMan()) {}
 
-		if ( ( node == nullptr)  || !aigGraph.containsNode( node, galois::MethodFlag::WRITE ) ) {
-			return;
-		}
+  void operator()(aig::GNode node, galois::UserContext<aig::GNode>& ctx) {
 
-		aig::NodeData & nodeData = aigGraph.getData( node, galois::MethodFlag::WRITE );
-		
-		if ( nodeData.type == aig::NodeType::AND ) {
+    aig::Graph& aigGraph = rwtMan.getAig().getGraph();
 
-			if ( ( nodeData.nFanout < 1000 ) ) {
-				
-				Alloc & alloc = ctx.getPerIterAlloc();
-				GNodeVector fanoutNodes( alloc ); 
+    if ((node == nullptr) ||
+        !aigGraph.containsNode(node, galois::MethodFlag::WRITE)) {
+      return;
+    }
 
-				// Touching outgoing neighobors to acquire their locks and their fanin node's locks.
-				for ( auto outEdge : aigGraph.out_edges( node ) ) {
-					aig::GNode fanoutNode = aigGraph.getEdgeDst( outEdge );
-					fanoutNodes.push_back( fanoutNode );
-					for ( auto inEdge : aigGraph.in_edges( fanoutNode ) ) { }
-				}
+    aig::NodeData& nodeData = aigGraph.getData(node, galois::MethodFlag::WRITE);
 
-				ThreadContextData * threadCtx = rwtMan.getPerThreadContextData().getLocal();
+    if (nodeData.type == aig::NodeType::AND) {
 
-				// Try to rewrite the node
-				aig::GNode newNode = rwtMan.rewriteNode( threadCtx, node, fanoutNodes );
-				
-				bool scheduleFanoutNodes = false;
+      if ((nodeData.nFanout < 1000)) {
 
-				if ( newNode == nullptr ) { // it means that node was not rewritten
-					if ( nodeData.counter == 2 ) {
-						nodeData.counter += 1;
-					}
-			
-					if ( nodeData.counter == 3 ) {
-						scheduleFanoutNodes = true;				
-					}
-				}
-				else {
-					aig::NodeData & newNodeData = aigGraph.getData( newNode, galois::MethodFlag::READ );
-					if ( newNodeData.counter == 3 ) {
-						scheduleFanoutNodes = true;			
-					}
-				}
+        Alloc& alloc = ctx.getPerIterAlloc();
+        GNodeVector fanoutNodes(alloc);
 
-				if ( scheduleFanoutNodes ) {
-					for ( aig::GNode nextNode : fanoutNodes ) {
-						aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );	
-						nextNodeData.counter += 1;
-						if ( nextNodeData.counter == 2 ) {
-							if ( cutMan.getNodeCuts()[ nextNodeData.id ] != nullptr ) {
-								cutMan.recycleNodeCuts( nextNodeData.id );
-							}
-							//rwtMan.nPushes += 1;
-							ctx.push( nextNode );
-						}
-					}
-				}
-			}
-			else {
-				// Touching outgoing neighobors to acquire their locks and their fanin node's locks.
-				for ( auto outEdge : aigGraph.out_edges( node ) ) { }
+        // Touching outgoing neighobors to acquire their locks and their fanin
+        // node's locks.
+        for (auto outEdge : aigGraph.out_edges(node)) {
+          aig::GNode fanoutNode = aigGraph.getEdgeDst(outEdge);
+          fanoutNodes.push_back(fanoutNode);
+          for (auto inEdge : aigGraph.in_edges(fanoutNode)) {
+          }
+        }
 
-				if ( nodeData.counter == 2 ) {
-					nodeData.counter += 1;
-				}
-				
-				if ( nodeData.counter == 3 ) {
-					// Insert nextNodes in the worklist
-					for ( auto outEdge : aigGraph.out_edges( node ) ) {
-						aig::GNode nextNode = aigGraph.getEdgeDst( outEdge );
-						aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );	
-						nextNodeData.counter += 1;
-						if ( nextNodeData.counter == 2 ) {
-							if ( cutMan.getNodeCuts()[ nextNodeData.id ] != nullptr ) {
-								cutMan.recycleNodeCuts( nextNodeData.id );
-							}
-							//rwtMan.nPushes += 1;
-							ctx.push( nextNode );
-						}
-					}
-				}
-			}
-		}
-		else {
-			if ( nodeData.type == aig::NodeType::PI ) {
-				// Touching outgoing neighobors to acquire their locks and their fanin node's locks.
-				for ( auto outEdge : aigGraph.out_edges( node ) ) { }
+        ThreadContextData* threadCtx =
+            rwtMan.getPerThreadContextData().getLocal();
 
-				// Set the trivial cut
-				nodeData.counter = 3;
-				CutPool * cutPool = cutMan.getPerThreadCutPool().getLocal();
-				Cut * trivialCut = cutPool->getMemory();
-				trivialCut->leaves[0] = nodeData.id;
-				trivialCut->nLeaves++;
-				trivialCut->sig = ( 1U << (nodeData.id % 31) );
-				if ( cutMan.getCompTruthFlag() ) {
-					unsigned * cutTruth = cutMan.readTruth( trivialCut );
-					for ( int i = 0; i < cutMan.getNWords(); i++ ) {
-						cutTruth[i] = 0xAAAAAAAA;
-					}
-				}
-				cutMan.getNodeCuts()[ nodeData.id ] = trivialCut;
+        // Try to rewrite the node
+        aig::GNode newNode = rwtMan.rewriteNode(threadCtx, node, fanoutNodes);
 
-				// Schedule next nodes
-				for ( auto edge : aigGraph.out_edges( node ) ) {
-					aig::GNode nextNode = aigGraph.getEdgeDst( edge );
-					aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );
-					nextNodeData.counter += 1;
-					if ( nextNodeData.counter == 2 ) {
-						//rwtMan.nPushes += 1;
-						ctx.push( nextNode );
-					}
-				}
-			}
-		}
-	}
+        bool scheduleFanoutNodes = false;
+
+        if (newNode == nullptr) { // it means that node was not rewritten
+          if (nodeData.counter == 2) {
+            nodeData.counter += 1;
+          }
+
+          if (nodeData.counter == 3) {
+            scheduleFanoutNodes = true;
+          }
+        } else {
+          aig::NodeData& newNodeData =
+              aigGraph.getData(newNode, galois::MethodFlag::READ);
+          if (newNodeData.counter == 3) {
+            scheduleFanoutNodes = true;
+          }
+        }
+
+        if (scheduleFanoutNodes) {
+          for (aig::GNode nextNode : fanoutNodes) {
+            aig::NodeData& nextNodeData =
+                aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
+            nextNodeData.counter += 1;
+            if (nextNodeData.counter == 2) {
+              if (cutMan.getNodeCuts()[nextNodeData.id] != nullptr) {
+                cutMan.recycleNodeCuts(nextNodeData.id);
+              }
+              // rwtMan.nPushes += 1;
+              ctx.push(nextNode);
+            }
+          }
+        }
+      } else {
+        // Touching outgoing neighobors to acquire their locks and their fanin
+        // node's locks.
+        for (auto outEdge : aigGraph.out_edges(node)) {
+        }
+
+        if (nodeData.counter == 2) {
+          nodeData.counter += 1;
+        }
+
+        if (nodeData.counter == 3) {
+          // Insert nextNodes in the worklist
+          for (auto outEdge : aigGraph.out_edges(node)) {
+            aig::GNode nextNode = aigGraph.getEdgeDst(outEdge);
+            aig::NodeData& nextNodeData =
+                aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
+            nextNodeData.counter += 1;
+            if (nextNodeData.counter == 2) {
+              if (cutMan.getNodeCuts()[nextNodeData.id] != nullptr) {
+                cutMan.recycleNodeCuts(nextNodeData.id);
+              }
+              // rwtMan.nPushes += 1;
+              ctx.push(nextNode);
+            }
+          }
+        }
+      }
+    } else {
+      if (nodeData.type == aig::NodeType::PI) {
+        // Touching outgoing neighobors to acquire their locks and their fanin
+        // node's locks.
+        for (auto outEdge : aigGraph.out_edges(node)) {
+        }
+
+        // Set the trivial cut
+        nodeData.counter      = 3;
+        CutPool* cutPool      = cutMan.getPerThreadCutPool().getLocal();
+        Cut* trivialCut       = cutPool->getMemory();
+        trivialCut->leaves[0] = nodeData.id;
+        trivialCut->nLeaves++;
+        trivialCut->sig = (1U << (nodeData.id % 31));
+        if (cutMan.getCompTruthFlag()) {
+          unsigned* cutTruth = cutMan.readTruth(trivialCut);
+          for (int i = 0; i < cutMan.getNWords(); i++) {
+            cutTruth[i] = 0xAAAAAAAA;
+          }
+        }
+        cutMan.getNodeCuts()[nodeData.id] = trivialCut;
+
+        // Schedule next nodes
+        for (auto edge : aigGraph.out_edges(node)) {
+          aig::GNode nextNode = aigGraph.getEdgeDst(edge);
+          aig::NodeData& nextNodeData =
+              aigGraph.getData(nextNode, galois::MethodFlag::WRITE);
+          nextNodeData.counter += 1;
+          if (nextNodeData.counter == 2) {
+            // rwtMan.nPushes += 1;
+            ctx.push(nextNode);
+          }
+        }
+      }
+    }
+  }
 };
 
-void runRewriteOperator( RewriteManager & rwtMan ) {
+void runRewriteOperator(RewriteManager& rwtMan) {
 
-//galois::runtime::profileVtune(
+  // galois::runtime::profileVtune(
 
+  galois::InsertBag<aig::GNode> workList;
+  typedef galois::worklists::PerSocketChunkBag<500> DC_BAG;
+  // typedef galois::worklists::PerSocketChunkFIFO< 5000 > DC_FIFO;
+  // typedef galois::worklists::PerSocketChunkLIFO< 5000 > DC_LIFO;
+  // typedef galois::worklists::PerThreadChunkFIFO< 5000 > AC_FIFO;
 
-	galois::InsertBag< aig::GNode > workList;
-	typedef galois::worklists::PerSocketChunkBag< 500 > DC_BAG;
-	//typedef galois::worklists::PerSocketChunkFIFO< 5000 > DC_FIFO;
-	//typedef galois::worklists::PerSocketChunkLIFO< 5000 > DC_LIFO;
-  	//typedef galois::worklists::PerThreadChunkFIFO< 5000 > AC_FIFO;
+  for (auto pi : rwtMan.getAig().getInputNodes()) {
+    workList.push(pi);
+  }
 
-	for ( auto pi : rwtMan.getAig().getInputNodes() ) {	
-		workList.push( pi );
-	}
+  // Galois Parallel Foreach
+  galois::for_each(galois::iterate(workList.begin(), workList.end()),
+                   RewriteOperator(rwtMan), galois::wl<DC_BAG>(),
+                   galois::loopname("RewriteOperator"),
+                   galois::per_iter_alloc());
 
-	// Galois Parallel Foreach
-	galois::for_each( galois::iterate( workList.begin(), workList.end() ), RewriteOperator( rwtMan ), galois::wl< DC_BAG >(), galois::loopname( "RewriteOperator" ), galois::per_iter_alloc() );
+  //,"REWRITING" );
 
+  /*
+  for ( auto pi : rwtMan.getAig().getInputNodes() ) {
+      aig::NodeData & piData = aigGraph.getData( pi,
+  galois::MethodFlag::UNPROTECTED ); piData.counter = 3; CutPool * cutPool =
+  cutMan.getPerThreadCutPool().getRemote( 0 ); Cut * trivialCut =
+  cutPool->getMemory(); trivialCut->leaves[0] = piData.id;
+      trivialCut->nLeaves++;
+      trivialCut->sig = ( 1U << (piData.id % 31) );
+      if ( cutMan.getCompTruthFlag() ) {
+          unsigned * cutTruth = cutMan.readTruth( trivialCut );
+          for ( int i = 0; i < cutMan.getNWords(); i++ ) {
+              cutTruth[i] = 0xAAAAAAAA;
+          }
+      }
 
-//,"REWRITING" );
+      cutMan.getNodeCuts()[ piData.id ] = trivialCut;
 
-	/*
-	for ( auto pi : rwtMan.getAig().getInputNodes() ) {	
-		aig::NodeData & piData = aigGraph.getData( pi, galois::MethodFlag::UNPROTECTED );
-		piData.counter = 3;
-		CutPool * cutPool = cutMan.getPerThreadCutPool().getRemote( 0 );
-		Cut * trivialCut = cutPool->getMemory();
-		trivialCut->leaves[0] = piData.id;
-		trivialCut->nLeaves++;
-		trivialCut->sig = ( 1U << (piData.id % 31) );
-		if ( cutMan.getCompTruthFlag() ) {
-			unsigned * cutTruth = cutMan.readTruth( trivialCut );
-			for ( int i = 0; i < cutMan.getNWords(); i++ ) {
-				cutTruth[i] = 0xAAAAAAAA;
-			}
-		}
-
-		cutMan.getNodeCuts()[ piData.id ] = trivialCut;
-
-		for ( auto edge : aigGraph.out_edges( pi ) ) {
-			aig::GNode nextNode = aigGraph.getEdgeDst( edge );
-			aig::NodeData & nextNodeData = aigGraph.getData( nextNode, galois::MethodFlag::WRITE );
-			nextNodeData.counter += 1;
-			if ( nextNodeData.counter == 2 ) {
-				//rwtMan.nPushes += 1;
-				workList.push( nextNode );
-			}
-		}
-	}
-	*/
-
+      for ( auto edge : aigGraph.out_edges( pi ) ) {
+          aig::GNode nextNode = aigGraph.getEdgeDst( edge );
+          aig::NodeData & nextNodeData = aigGraph.getData( nextNode,
+  galois::MethodFlag::WRITE ); nextNodeData.counter += 1; if (
+  nextNodeData.counter == 2 ) {
+              //rwtMan.nPushes += 1;
+              workList.push( nextNode );
+          }
+      }
+  }
+  */
 }
 
 } /* namespace algorithm */

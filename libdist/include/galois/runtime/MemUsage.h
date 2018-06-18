@@ -17,7 +17,8 @@ namespace runtime {
  * Class that tracks memory usage (mainly of send and receive buffers).
  */
 class MemUsageTracker {
-  std::atomic<int64_t> currentMemUsage; //!< mem usage of send and receive buffers
+  std::atomic<int64_t>
+      currentMemUsage; //!< mem usage of send and receive buffers
   int64_t maxMemUsage; //!< max mem usage of send and receive buffers
 
 public:
@@ -40,16 +41,14 @@ public:
    *
    * @param size amount to decrement mem usage by
    */
-  inline void decrementMemUsage(uint64_t size) {
-    currentMemUsage -= size;
-  }
+  inline void decrementMemUsage(uint64_t size) { currentMemUsage -= size; }
 
   /**
    * Reset mem usage and max mem usage to 0.
    */
   inline void resetMemUsage() {
     currentMemUsage = 0;
-    maxMemUsage = 0;
+    maxMemUsage     = 0;
   }
 
   /**
@@ -57,9 +56,7 @@ public:
    *
    * @returns maximum memory usage tracked so far
    */
-  inline int64_t getMaxMemUsage() const {
-    return maxMemUsage;
-  }
+  inline int64_t getMaxMemUsage() const { return maxMemUsage; }
 };
 
 } // namespace runtime

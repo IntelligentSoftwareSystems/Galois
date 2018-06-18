@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,7 +38,7 @@ typedef galois::graphs::DistGraphEdgeCut<NodeData, unsigned> Graph_edgeCut;
 
 constexpr static const char* const name = "Check Weight";
 constexpr static const char* const desc = "Weight check.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -50,19 +50,16 @@ int main(int argc, char** argv) {
   partitionScheme = OEC;
 
   Graph* g = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
-                                     dummyScale, false);
+                               dummyScale, false);
 
   // loop over all nodes + edges and make sure weights are between 1 and 100
-  galois::do_all(
-    galois::iterate(g->masterNodesRange()),
-    [&] (auto node) {
-      for (auto edge : g->edges(node)) {
-        unsigned edgeData = g->getEdgeData(edge);
-        GALOIS_ASSERT(1 <= edgeData && edgeData <= 100, ": ", edgeData, 
-                      " not between 1 and 100");
-      }
+  galois::do_all(galois::iterate(g->masterNodesRange()), [&](auto node) {
+    for (auto edge : g->edges(node)) {
+      unsigned edgeData = g->getEdgeData(edge);
+      GALOIS_ASSERT(1 <= edgeData && edgeData <= 100, ": ", edgeData,
+                    " not between 1 and 100");
     }
-  );
+  });
 
   return 0;
 }

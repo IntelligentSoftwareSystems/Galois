@@ -31,44 +31,45 @@
 using namespace std;
 using namespace benchIO;
 
-typedef pair<uint,int> uintPair;
+typedef pair<uint, int> uintPair;
 
 template <class T, class OT>
 void timeIntegerSort(void* In, int n, int rounds, char* outFile) {
-  T* A = (T*) In;
+  T* A = (T*)In;
   T* B = new T[n];
   for (int j = 0; j < rounds; j++) {
-//    parallel_for (int i=0; i < n; i++) B[i] = A[i];
-    parallel_doall(int, i, 0, n) { B[i] = A[i]; } parallel_doall_end
-    startTime();
-    integerSort(B,n);
+    //    parallel_for (int i=0; i < n; i++) B[i] = A[i];
+    parallel_doall(int, i, 0, n) { B[i] = A[i]; }
+    parallel_doall_end startTime();
+    integerSort(B, n);
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) 
-    writeSequenceToFile((OT*) B, n, outFile);
+  if (outFile != NULL)
+    writeSequenceToFile((OT*)B, n, outFile);
   delete A;
   delete B;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  int rounds  = P.getOptionIntValue("-r", 1);
   startTime();
-  seqData D = readSequenceFromFile(iFile);
+  seqData D      = readSequenceFromFile(iFile);
   elementType dt = D.dt;
 
   switch (dt) {
-  case intT: 
-    timeIntegerSort<uint,int>(D.A, D.n, rounds, oFile); break;
-  case intPairT: 
-    timeIntegerSort<uintPair,intPair>(D.A, D.n, rounds, oFile);  break;
+  case intT:
+    timeIntegerSort<uint, int>(D.A, D.n, rounds, oFile);
+    break;
+  case intPairT:
+    timeIntegerSort<uintPair, intPair>(D.A, D.n, rounds, oFile);
+    break;
   default:
     cout << "integer Sort: input file not of right type" << endl;
-    return(1);
+    return (1);
   }
 }
-

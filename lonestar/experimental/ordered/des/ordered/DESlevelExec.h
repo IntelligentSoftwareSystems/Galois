@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -19,7 +19,6 @@
 
 #ifndef DES_ORDERED_LEVEL_EXEC_H
 #define DES_ORDERED_LEVEL_EXEC_H
-
 
 #include "galois/Reduction.h"
 #include "galois/Timer.h"
@@ -42,7 +41,6 @@
 
 #include <cassert>
 
-
 namespace des_ord {
 
 typedef galois::GAccumulator<size_t> Accumulator_ty;
@@ -51,13 +49,11 @@ typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
 typedef galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
+class DESlevelExec : public des::AbstractMain<TypeHelper::SimInit_ty>,
+                     public TypeHelper {
 
-
-class DESlevelExec: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
-
-  using VecGNode = std::vector<GNode>;
-  using AddList_ty =  galois::PerThreadVector<TypeHelper::Event_ty>;
+  using VecGNode   = std::vector<GNode>;
+  using AddList_ty = galois::PerThreadVector<TypeHelper::Event_ty>;
 
   VecGNode nodes;
 
@@ -67,17 +63,14 @@ class DESlevelExec:
     Graph& graph;
     VecGNode& nodes;
 
-    NhoodVisitor (Graph& graph, VecGNode& nodes) 
-      : graph (graph), nodes (nodes) 
-    {}
-    
+    NhoodVisitor(Graph& graph, VecGNode& nodes) : graph(graph), nodes(nodes) {}
+
     template <typename C>
-    void operator () (const Event_ty& event, C& ctx) const {
-      GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, galois::MethodFlag::WRITE);
+    void operator()(const Event_ty& event, C& ctx) const {
+      GNode n = nodes[event.getRecvObj()->getID()];
+      graph.getData(n, galois::MethodFlag::WRITE);
     }
   };
-
 
   struct OpFunc {
 
@@ -88,80 +81,70 @@ class DESlevelExec:
     AddList_ty& newEvents;
     Accumulator_ty& nevents;
 
-    OpFunc (
-        Graph& graph,
-        VecGNode& nodes,
-        AddList_ty& newEvents,
-        Accumulator_ty& nevents)
-      :
-        graph (graph),
-        nodes (nodes),
-        newEvents (newEvents),
-        nevents (nevents)
-    {}
+    OpFunc(Graph& graph, VecGNode& nodes, AddList_ty& newEvents,
+           Accumulator_ty& nevents)
+        : graph(graph), nodes(nodes), newEvents(newEvents), nevents(nevents) {}
 
     template <typename C>
-    void operator () (const Event_ty& event, C& ctx) const {
+    void operator()(const Event_ty& event, C& ctx) const {
 
-      // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
+      // std::cout << ">>> Processing: " << event.detailedString () <<
+      // std::endl;
 
-      SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
-      GNode n = nodes[recvObj->getID ()];
+      SimObj_ty* recvObj = static_cast<SimObj_ty*>(event.getRecvObj());
+      GNode n            = nodes[recvObj->getID()];
 
-      newEvents.get ().clear ();
+      newEvents.get().clear();
 
-      recvObj->execEvent (event, graph, n, newEvents.get ());
+      recvObj->execEvent(event, graph, n, newEvents.get());
 
-      for (auto a = newEvents.get ().begin ()
-          , enda = newEvents.get ().end (); a != enda; ++a) {
-        ctx.push (*a);
+      for (auto a = newEvents.get().begin(), enda = newEvents.get().end();
+           a != enda; ++a) {
+        ctx.push(*a);
         // std::cout << "### Adding: " << a->detailedString () << std::endl;
       }
 
       nevents += 1;
     }
-
   };
 
-
   struct GetRecvTime {
-    des::SimTime operator () (const Event_ty& e) const {
-      return e.getRecvTime ();
-    }
+    des::SimTime operator()(const Event_ty& e) const { return e.getRecvTime(); }
   };
 
 protected:
-  virtual std::string getVersion () const { return "Handwritten Ordered ODG, no barrier"; }
+  virtual std::string getVersion() const {
+    return "Handwritten Ordered ODG, no barrier";
+  }
 
-  virtual void initRemaining (const SimInit_ty& simInit, Graph& graph) {
-    nodes.clear ();
-    nodes.resize (graph.size ());
+  virtual void initRemaining(const SimInit_ty& simInit, Graph& graph) {
+    nodes.clear();
+    nodes.resize(graph.size());
 
-    for (Graph::iterator n = graph.begin ()
-        , endn = graph.end (); n != endn; ++n) {
+    for (Graph::iterator n = graph.begin(), endn = graph.end(); n != endn;
+         ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, galois::MethodFlag::UNPROTECTED);
-      nodes[so->getID ()] = *n;
+      BaseSimObj_ty* so  = graph.getData(*n, galois::MethodFlag::UNPROTECTED);
+      nodes[so->getID()] = *n;
     }
   }
 
-  virtual void runLoop (const SimInit_ty& simInit, Graph& graph) {
+  virtual void runLoop(const SimInit_ty& simInit, Graph& graph) {
 
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
     // galois::for_each_ordered (
-    galois::runtime::for_each_ordered_level (
-        galois::runtime::makeStandardRange (simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
-        GetRecvTime (), std::less<des::SimTime> (), 
-        NhoodVisitor (graph, nodes),
-        OpFunc (graph, nodes, newEvents, nevents));
+    galois::runtime::for_each_ordered_level(
+        galois::runtime::makeStandardRange(simInit.getInitEvents().begin(),
+                                           simInit.getInitEvents().end()),
+        GetRecvTime(), std::less<des::SimTime>(), NhoodVisitor(graph, nodes),
+        OpFunc(graph, nodes, newEvents, nevents));
 
-    std::cout << "Number of events processed= " << 
-      nevents.reduce () << std::endl;
+    std::cout << "Number of events processed= " << nevents.reduce()
+              << std::endl;
   }
 };
-
 
 } // end namespace des_ord
 

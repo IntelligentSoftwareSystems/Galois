@@ -11,18 +11,18 @@
 #include <dlfcn.h>
 
 // Constants.
-#define DefaultSchedulingChunkSize    1000
-#define DefaultNumPhysicalProcessors  8
+#define DefaultSchedulingChunkSize 1000
+#define DefaultNumPhysicalProcessors 8
 
-int DMP_SCHEDULING_CHUNK_SIZE = DefaultSchedulingChunkSize;
+int DMP_SCHEDULING_CHUNK_SIZE   = DefaultSchedulingChunkSize;
 int DMP_NUM_PHYSICAL_PROCESSORS = DefaultNumPhysicalProcessors;
 
 // Global data.
-DmpThreadInfo* DMPfirstRunnable   = NULL;
-atomic_int_t   DMPfirstRunnableID = 0;
-atomic_int_t   DMPnumRunnableThreads = 0;
-atomic_int_t   DMPnumLiveThreads = 0;
-atomic_int_t   DMPthreadInfosSize = 0;
+DmpThreadInfo* DMPfirstRunnable    = NULL;
+atomic_int_t DMPfirstRunnableID    = 0;
+atomic_int_t DMPnumRunnableThreads = 0;
+atomic_int_t DMPnumLiveThreads     = 0;
+atomic_int_t DMPthreadInfosSize    = 0;
 DmpThreadInfo* DMPthreadInfos[MaxThreads];
 
 __thread DmpThreadInfo* DMPMAP;
@@ -39,18 +39,19 @@ cacheline_padded_int32_t DMPglobalSchedulingChunks[MaxThreads];
 // Allocators
 //-----------------------------------------------------------------------
 
-int   (*real_posix_memalign)(void**, size_t, size_t);
+int (*real_posix_memalign)(void**, size_t, size_t);
 void* (*real_malloc)(size_t);
 void* (*real_realloc)(void*, size_t);
-void  (*real_free)(void*);
+void (*real_free)(void*);
 
 static void init_allocators() {
   // When linking with libhoard, DMP code must always call the underlying
   // allocator to avoid circular dependencies between libhoard and DMP.
-  real_posix_memalign = (__typeof__(real_posix_memalign))dlsym(RTLD_NEXT, "posix_memalign");
-  real_malloc  = (__typeof__(real_malloc)) dlsym(RTLD_NEXT, "malloc");
+  real_posix_memalign =
+      (__typeof__(real_posix_memalign))dlsym(RTLD_NEXT, "posix_memalign");
+  real_malloc  = (__typeof__(real_malloc))dlsym(RTLD_NEXT, "malloc");
   real_realloc = (__typeof__(real_realloc))dlsym(RTLD_NEXT, "realloc");
-  real_free    = (__typeof__(real_free))   dlsym(RTLD_NEXT, "free");
+  real_free    = (__typeof__(real_free))dlsym(RTLD_NEXT, "free");
 }
 
 void* alloc_cache_aligned(size_t size) {
@@ -71,9 +72,10 @@ void DMPcommit(int chunkSize) {
   if (unlikely(DMPMAP->schedulingChunk <= 0))
     DMP_waitForNextQuantum();
 #ifdef DMP_ENABLE_WB_HBSYNC
-  else if (unlikely(DMPMAP->schedulingChunk <= DMPMAP->triggerGlobalSchedulingChunkUpdate)) {
+  else if (unlikely(DMPMAP->schedulingChunk <=
+                    DMPMAP->triggerGlobalSchedulingChunkUpdate)) {
     DMPglobalSchedulingChunks[DMPMAP->threadID].val = DMPMAP->schedulingChunk;
-    DMPMAP->triggerGlobalSchedulingChunkUpdate = 0;
+    DMPMAP->triggerGlobalSchedulingChunkUpdate      = 0;
   }
 #endif
 }
@@ -170,9 +172,9 @@ static inline int functionPtrHash(const char* p) {
 static void DMPinitInstrumentedFunctionsTable() {
   // Populate the hash table from the list.
   for (char** f = DMPinstrumentedFunctionsList; *f != NULL; ++f) {
-    char* p = *f;
+    char* p        = *f;
     const int hash = functionPtrHash(p);
-    TableNode** n = &DMPinstrumentedFunctionsTable[hash];
+    TableNode** n  = &DMPinstrumentedFunctionsTable[hash];
     // Look for an open slot.
     while (*n != NULL) {
       for (int i = 1; i < 4; ++i) {
@@ -195,7 +197,8 @@ static void DMPinitInstrumentedFunctionsTable() {
 void DMPprepareForIndirectCall(int chunkSize, void* fnaddr) {
   const int hash = functionPtrHash((char*)fnaddr);
   // Internal?
-  for (TableNode* n = DMPinstrumentedFunctionsTable[hash]; n != NULL; n = n->next) {
+  for (TableNode* n = DMPinstrumentedFunctionsTable[hash]; n != NULL;
+       n            = n->next) {
     for (int i = 0; i < 4; ++i) {
       if (n->functions[i] == fnaddr) {
         DMPcommit(chunkSize);
@@ -226,8 +229,8 @@ static void DMP_terminate() {
 
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  DMP_printf("EXIT DMP Thread: %d: End: %ld s + %ld ms\n",
-             DMPMAP->threadID, tv.tv_sec, tv.tv_usec);
+  DMP_printf("EXIT DMP Thread: %d: End: %ld s + %ld ms\n", DMPMAP->threadID,
+             tv.tv_sec, tv.tv_usec);
   DMP_printf("Exit called...\n");
 
   // Finalize statistics.
@@ -238,20 +241,19 @@ static void DMP_terminate() {
 }
 
 static int DMP_init_called;
-extern "C"
-void DMP_init(void) {
+extern "C" void DMP_init(void) {
   dmp_static_assert(MaxThreads < SHRT_MAX);
 
   INFO_MSG("[DMP] Invoking DMP_init()");
   init_allocators();
 
   // Read the environment.
-  char *s;
-  s = getenv( "DMP_SCHEDULING_CHUNK_SIZE" );
-  DMP_SCHEDULING_CHUNK_SIZE = s ? atoi(s) : DefaultSchedulingChunkSize ;
+  char* s;
+  s                         = getenv("DMP_SCHEDULING_CHUNK_SIZE");
+  DMP_SCHEDULING_CHUNK_SIZE = s ? atoi(s) : DefaultSchedulingChunkSize;
 
-  s = getenv( "DMP_NUM_PHYSICAL_PROCESSORS" );
-  DMP_NUM_PHYSICAL_PROCESSORS = s ? atoi(s) : DefaultNumPhysicalProcessors ;
+  s                           = getenv("DMP_NUM_PHYSICAL_PROCESSORS");
+  DMP_NUM_PHYSICAL_PROCESSORS = s ? atoi(s) : DefaultNumPhysicalProcessors;
 
   // Initialize the runtime.
   DMP_initRuntime();
@@ -262,9 +264,8 @@ void DMP_init(void) {
   DMP_init_called = 1;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   ASSERT(*((volatile int*)&DMP_init_called));
-  
 
   // Run this at program termination.
   atexit(DMP_terminate);

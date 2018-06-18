@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -61,59 +61,63 @@ namespace internal {
 
 extern thread_local SizedHeapFactory::SizedHeap* dagListHeap;
 
-template<typename T, bool UseLocalState>
+template <typename T, bool UseLocalState>
 class DItemBase {
 public:
   T val;
   unsigned long id;
 
-  DItemBase(const T& _val, unsigned long _id): val(_val), id(_id) { }
+  DItemBase(const T& _val, unsigned long _id) : val(_val), id(_id) {}
   void* getLocalState() const { return nullptr; }
-  void setLocalState(void*) { }
+  void setLocalState(void*) {}
 };
 
-template<typename T>
+template <typename T>
 class DItemBase<T, true> {
 public:
   T val;
+
 private:
-  void *localState;
+  void* localState;
+
 public:
   unsigned long id;
 
-  DItemBase(const T& _val, unsigned long _id): val(_val), localState(nullptr), id(_id) { }
+  DItemBase(const T& _val, unsigned long _id)
+      : val(_val), localState(nullptr), id(_id) {}
   void* getLocalState() const { return localState; }
   void setLocalState(void* ptr) { localState = ptr; }
 };
 
-template<typename OptionsTy>
-using DItem = DItemBase<typename OptionsTy::value_type, OptionsTy::useLocalState>;
+template <typename OptionsTy>
+using DItem =
+    DItemBase<typename OptionsTy::value_type, OptionsTy::useLocalState>;
 
-class FirstPassBase: public SimpleRuntimeContext {
+class FirstPassBase : public SimpleRuntimeContext {
 protected:
   bool firstPassFlag;
 
 public:
-  explicit FirstPassBase (bool f = true): SimpleRuntimeContext (true), firstPassFlag (f) {}
+  explicit FirstPassBase(bool f = true)
+      : SimpleRuntimeContext(true), firstPassFlag(f) {}
 
-  bool isFirstPass (void) const { return firstPassFlag; }
+  bool isFirstPass(void) const { return firstPassFlag; }
 
-  void setFirstPass (void) { firstPassFlag = true; }
+  void setFirstPass(void) { firstPassFlag = true; }
 
-  void resetFirstPass (void) { firstPassFlag = false; }
+  void resetFirstPass(void) { firstPassFlag = false; }
 
-  virtual void alwaysAcquire (Lockable*, galois::MethodFlag) = 0;
+  virtual void alwaysAcquire(Lockable*, galois::MethodFlag) = 0;
 
-  virtual void subAcquire (Lockable* lockable, galois::MethodFlag f) {
+  virtual void subAcquire(Lockable* lockable, galois::MethodFlag f) {
     if (isFirstPass()) {
       alwaysAcquire(lockable, f);
     }
   }
-
 };
 
-template<typename OptionsTy, bool HasFixedNeighborhood, bool HasIntentToRead>
-class DeterministicContextBase: public FirstPassBase {
+template <typename OptionsTy, bool HasFixedNeighborhood, bool HasIntentToRead>
+class DeterministicContextBase : public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
   Item item;
@@ -122,9 +126,10 @@ private:
   bool notReady;
 
 public:
-  DeterministicContextBase(const Item& _item): FirstPassBase (true), item(_item), notReady(false) { }
+  DeterministicContextBase(const Item& _item)
+      : FirstPassBase(true), item(_item), notReady(false) {}
 
-  void clear() { }
+  void clear() {}
 
   bool isReady() { return !notReady; }
 
@@ -155,29 +160,30 @@ public:
     }
   }
 
-  static void initialize() { }
+  static void initialize() {}
 };
 
-class HasIntentToReadContext: public FirstPassBase {
+class HasIntentToReadContext : public FirstPassBase {
 public:
   unsigned long id;
   bool notReady;
   bool isWriter;
 
-  HasIntentToReadContext(unsigned long id, bool w):
-    FirstPassBase (true), id(id), notReady(false), isWriter(w) { }
+  HasIntentToReadContext(unsigned long id, bool w)
+      : FirstPassBase(true), id(id), notReady(false), isWriter(w) {}
 
   bool isReady() { return !notReady; }
 };
 
-class ReaderContext: public galois::UnionFindNode<ReaderContext>, public HasIntentToReadContext {
-  template<typename, bool, bool>
-    friend class DeterministicContextBase;
+class ReaderContext : public galois::UnionFindNode<ReaderContext>,
+                      public HasIntentToReadContext {
+  template <typename, bool, bool>
+  friend class DeterministicContextBase;
 
 public:
-  ReaderContext(unsigned long id):
-    galois::UnionFindNode<ReaderContext>(const_cast<ReaderContext*>(this)),
-    HasIntentToReadContext(id, false) { }
+  ReaderContext(unsigned long id)
+      : galois::UnionFindNode<ReaderContext>(const_cast<ReaderContext*>(this)),
+        HasIntentToReadContext(id, false) {}
 
   void build() {
     if (this->isReady())
@@ -187,17 +193,16 @@ public:
       r->notReady = true;
   }
 
-  bool propagate() {
-    return this->find()->isReady();
-  }
+  bool propagate() { return this->find()->isReady(); }
 
-  virtual void alwaysAcquire (Lockable*, galois::MethodFlag) {
+  virtual void alwaysAcquire(Lockable*, galois::MethodFlag) {
     GALOIS_DIE("shouldn't reach here");
   }
 };
 
-template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext {
+template <typename OptionsTy>
+class DeterministicContextBase<OptionsTy, false, true>
+    : public HasIntentToReadContext {
 public:
   typedef DItem<OptionsTy> Item;
   Item item;
@@ -258,14 +263,12 @@ private:
   }
 
 public:
-  DeterministicContextBase(const Item& i):
-    HasIntentToReadContext(i.id, true), item(i), readerCtx(i.id) { }
+  DeterministicContextBase(const Item& i)
+      : HasIntentToReadContext(i.id, true), item(i), readerCtx(i.id) {}
 
-  void clear() { }
+  void clear() {}
 
-  void build() {
-    readerCtx.build();
-  }
+  void build() { readerCtx.build(); }
 
   void propagate() {
     if (this->isReady() && !readerCtx.propagate())
@@ -273,7 +276,7 @@ public:
   }
 
   virtual void alwaysAcquire(Lockable* lockable, galois::MethodFlag m) {
-    assert (m == MethodFlag::READ || m == MethodFlag::WRITE);
+    assert(m == MethodFlag::READ || m == MethodFlag::WRITE);
 
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
@@ -281,27 +284,29 @@ public:
     if (m == MethodFlag::READ) {
       acquireRead(lockable);
     } else {
-      assert (m == MethodFlag::WRITE);
+      assert(m == MethodFlag::WRITE);
       acquireWrite(lockable);
     }
   }
 
-  static void initialize() { }
+  static void initialize() {}
 };
 
-template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, true, false>: public FirstPassBase {
+template <typename OptionsTy>
+class DeterministicContextBase<OptionsTy, true, false> : public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
-  typedef galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
+  typedef galois::concurrent_gslist<DeterministicContextBase*, 8> ContextList;
   Item item;
   ContextList edges;
   ContextList succs;
   std::atomic<int> preds;
 
   struct ContextPtrLessThan {
-    bool operator()(const DeterministicContextBase* a, const DeterministicContextBase* b) const {
-      // XXX non-deterministic behavior when we have multiple items with the same id
+    bool operator()(const DeterministicContextBase* a,
+                    const DeterministicContextBase* b) const {
+      // XXX non-deterministic behavior when we have multiple items with the
+      // same id
       if (a->item.id == b->item.id)
         return a < b;
       return a->item.id < b->item.id;
@@ -309,7 +314,8 @@ public:
   };
 
 public:
-  DeterministicContextBase(const Item& _item): FirstPassBase(true), item(_item), preds(0) { }
+  DeterministicContextBase(const Item& _item)
+      : FirstPassBase(true), item(_item), preds(0) {}
 
   void clear() {
     assert(preds == 0);
@@ -326,10 +332,11 @@ public:
 
   bool isReady() { return false; }
 
-  virtual void alwaysAcquire (Lockable* lockable, galois::MethodFlag) {
+  virtual void alwaysAcquire(Lockable* lockable, galois::MethodFlag) {
 
     // First to lock becomes representative
-    DeterministicContextBase* owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
+    DeterministicContextBase* owner =
+        static_cast<DeterministicContextBase*>(this->getOwner(lockable));
     while (!owner) {
       if (this->tryLock(lockable)) {
         this->setOwner(lockable);
@@ -346,25 +353,29 @@ public:
 
   static void initialize() {
     if (!dagListHeap)
-      dagListHeap = SizedHeapFactory::getHeapForSize(sizeof(typename ContextList::block_type));
+      dagListHeap = SizedHeapFactory::getHeapForSize(
+          sizeof(typename ContextList::block_type));
   }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 class DeterministicContextBase<OptionsTy, true, true> {
   // TODO implement me
 };
 
-template<typename OptionsTy>
-using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood, OptionsTy::hasIntentToRead>;
+template <typename OptionsTy>
+using DeterministicContext =
+    DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood,
+                             OptionsTy::hasIntentToRead>;
 
-template<typename T>
+template <typename T>
 struct DNewItem {
   T val;
   unsigned long parent;
   unsigned count;
 
-  DNewItem(const T& _val, unsigned long _parent, unsigned _count): val(_val), parent(_parent), count(_count) { }
+  DNewItem(const T& _val, unsigned long _parent, unsigned _count)
+      : val(_val), parent(_parent), count(_count) {}
 
   bool operator<(const DNewItem<T>& o) const {
     if (parent < o.parent)
@@ -379,18 +390,14 @@ struct DNewItem {
     return parent == o.parent && count == o.count;
   }
 
-  bool operator!=(const DNewItem<T>& o) const {
-    return !(*this == o);
-  }
+  bool operator!=(const DNewItem<T>& o) const { return !(*this == o); }
 
-  struct GetValue: public std::unary_function<DNewItem<T>,const T&> {
-    const T& operator()(const DNewItem<T>& x) const {
-      return x.val;
-    }
+  struct GetValue : public std::unary_function<DNewItem<T>, const T&> {
+    const T& operator()(const DNewItem<T>& x) const { return x.val; }
   };
 };
 
-template<typename InputIteratorTy>
+template <typename InputIteratorTy>
 void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   if (d + cur >= dist) {
     d = dist - cur;
@@ -399,14 +406,15 @@ void safe_advance(InputIteratorTy& it, size_t d, size_t& cur, size_t dist) {
   cur += d;
 }
 
-//! Wrapper around worklists::ChunkFIFO to allow peek() and empty() and still have FIFO order
-template<int ChunkSize,typename T>
+//! Wrapper around worklists::ChunkFIFO to allow peek() and empty() and still
+//! have FIFO order
+template <int ChunkSize, typename T>
 struct FIFO {
-  worklists::ChunkFIFO<ChunkSize,T,false> m_data;
-  worklists::ChunkLIFO<16,T,false> m_buffer;
+  worklists::ChunkFIFO<ChunkSize, T, false> m_data;
+  worklists::ChunkLIFO<16, T, false> m_buffer;
   size_t m_size;
 
-  FIFO(): m_size(0) { }
+  FIFO() : m_size(0) {}
 
   ~FIFO() {
     galois::optional<T> p;
@@ -439,97 +447,110 @@ struct FIFO {
     ++m_size;
   }
 
-  size_t size() const {
-    return m_size;
-  }
+  size_t size() const { return m_size; }
 
-  bool empty() const {
-    return m_size == 0;
-  }
+  bool empty() const { return m_size == 0; }
 };
 
-template<typename T, typename FunctionTy, typename ArgsTy>
+template <typename T, typename FunctionTy, typename ArgsTy>
 struct OptionsCommon {
   typedef T value_type;
   typedef FunctionTy function2_type;
   typedef ArgsTy args_type;
 
   static const bool needStats = galois::internal::NeedStats<ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+  static const bool needsPush =
+      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static const bool needsAborts =
+      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
+  static const bool needsPia =
+      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak =
+      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
 
-  static const bool hasBreak = exists_by_supertype<det_parallel_break_tag, ArgsTy>::value;
+  static const bool hasBreak =
+      exists_by_supertype<det_parallel_break_tag, ArgsTy>::value;
   static const bool hasId = exists_by_supertype<det_id_tag, ArgsTy>::value;
 
-  static const bool useLocalState = exists_by_supertype<local_state_tag, ArgsTy>::value;
-  static const bool hasFixedNeighborhood = exists_by_supertype<fixed_neighborhood_tag, ArgsTy>::value;
-  static const bool hasIntentToRead = exists_by_supertype<intent_to_read_tag, ArgsTy>::value;
+  static const bool useLocalState =
+      exists_by_supertype<local_state_tag, ArgsTy>::value;
+  static const bool hasFixedNeighborhood =
+      exists_by_supertype<fixed_neighborhood_tag, ArgsTy>::value;
+  static const bool hasIntentToRead =
+      exists_by_supertype<intent_to_read_tag, ArgsTy>::value;
 
-  static const int ChunkSize = 32;
+  static const int ChunkSize             = 32;
   static const unsigned InitialNumRounds = 100;
-  static const size_t MinDelta = ChunkSize * 40;
+  static const size_t MinDelta           = ChunkSize * 40;
 
-  static_assert(!hasFixedNeighborhood || (hasFixedNeighborhood && hasId),
+  static_assert(
+      !hasFixedNeighborhood || (hasFixedNeighborhood && hasId),
       "Please provide id function when operator has fixed neighborhood");
 
   function2_type fn2;
   args_type args;
 
-  OptionsCommon(const FunctionTy& f, ArgsTy a): fn2(f), args(a) { }
+  OptionsCommon(const FunctionTy& f, ArgsTy a) : fn2(f), args(a) {}
 };
 
-template<typename T, typename FunctionTy, typename ArgsTy, bool Enable>
-struct OptionsBase: public OptionsCommon<T, FunctionTy, ArgsTy> {
+template <typename T, typename FunctionTy, typename ArgsTy, bool Enable>
+struct OptionsBase : public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
   typedef FunctionTy function1_type;
 
   function1_type fn1;
 
-  OptionsBase(const FunctionTy& f, ArgsTy a): SuperTy(f, a), fn1(f) { }
+  OptionsBase(const FunctionTy& f, ArgsTy a) : SuperTy(f, a), fn1(f) {}
 };
 
-template<typename T, typename FunctionTy, typename ArgsTy>
-struct OptionsBase<T, FunctionTy, ArgsTy, true>: public OptionsCommon<T, FunctionTy, ArgsTy> {
+template <typename T, typename FunctionTy, typename ArgsTy>
+struct OptionsBase<T, FunctionTy, ArgsTy, true>
+    : public OptionsCommon<T, FunctionTy, ArgsTy> {
   typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
-  typedef typename get_type_by_supertype<neighborhood_visitor_tag, ArgsTy>::type::type function1_type;
+  typedef typename get_type_by_supertype<neighborhood_visitor_tag,
+                                         ArgsTy>::type::type function1_type;
 
   function1_type fn1;
 
-  OptionsBase(const FunctionTy& f, ArgsTy a):
-    SuperTy(f, a),
-    fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) { }
+  OptionsBase(const FunctionTy& f, ArgsTy a)
+      : SuperTy(f, a),
+        fn1(get_by_supertype<neighborhood_visitor_tag>(a).value) {}
 };
 
-template<typename T, typename FunctionTy, typename ArgsTy>
-using Options = OptionsBase<T, FunctionTy, ArgsTy, exists_by_supertype<neighborhood_visitor_tag, ArgsTy>::value>;
+template <typename T, typename FunctionTy, typename ArgsTy>
+using Options =
+    OptionsBase<T, FunctionTy, ArgsTy,
+                exists_by_supertype<neighborhood_visitor_tag, ArgsTy>::value>;
 
-
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 class DAGManagerBase {
   typedef DeterministicContext<OptionsTy> Context;
+
 public:
-  void destroyDAGManager() { }
-  void pushDAGTask(Context* ctx) { }
+  void destroyDAGManager() {}
+  void pushDAGTask(Context* ctx) {}
   bool buildDAG() { return false; }
-  template<typename Executor, typename ExecutorTLD>
-  bool executeDAG(Executor&, ExecutorTLD&) { return false; }
+  template <typename Executor, typename ExecutorTLD>
+  bool executeDAG(Executor&, ExecutorTLD&) {
+    return false;
+  }
 };
 
-template<typename OptionsTy>
-class DAGManagerBase<OptionsTy,true> {
+template <typename OptionsTy>
+class DAGManagerBase<OptionsTy, true> {
   typedef DeterministicContext<OptionsTy> Context;
-  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
-  typedef worklists::PerThreadChunkLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
-  typedef worklists::PerSocketChunkFIFO<32,Context*> WL3;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize * 2, Context*> WL1;
+  typedef worklists::PerThreadChunkLIFO<OptionsTy::ChunkSize * 2, Context*> WL2;
+  typedef worklists::PerSocketChunkFIFO<32, Context*> WL3;
 
-  struct ThreadLocalData: private boost::noncopyable {
-    typedef std::vector<Context*, typename PerIterAllocTy::rebind<Context*>::other> SortBuf;
+  struct ThreadLocalData : private boost::noncopyable {
+    typedef std::vector<Context*,
+                        typename PerIterAllocTy::rebind<Context*>::other>
+        SortBuf;
     IterAllocBaseTy heap;
     PerIterAllocTy alloc;
     SortBuf sortBuf;
-    ThreadLocalData(): alloc(&heap), sortBuf(alloc) { }
+    ThreadLocalData() : alloc(&heap), sortBuf(alloc) {}
   };
 
   substrate::PerThreadStorage<ThreadLocalData> data;
@@ -540,15 +561,13 @@ class DAGManagerBase<OptionsTy,true> {
   substrate::Barrier& barrier;
 
 public:
-  DAGManagerBase(): term(substrate::getSystemTermination(activeThreads)), barrier(getBarrier(activeThreads)) { }
+  DAGManagerBase()
+      : term(substrate::getSystemTermination(activeThreads)),
+        barrier(getBarrier(activeThreads)) {}
 
-  void destroyDAGManager() {
-    data.getLocal()->heap.clear();
-  }
+  void destroyDAGManager() { data.getLocal()->heap.clear(); }
 
-  void pushDAGTask(Context* ctx) {
-    taskList.push(ctx);
-  }
+  void pushDAGTask(Context* ctx) { taskList.push(ctx); }
 
   bool buildDAG() {
     ThreadLocalData& tld = *data.getLocal();
@@ -556,12 +575,15 @@ public:
     while ((p = taskList.pop())) {
       Context* ctx = *p;
       tld.sortBuf.clear();
-      std::copy(ctx->edges.begin(), ctx->edges.end(), std::back_inserter(tld.sortBuf));
-      std::sort(tld.sortBuf.begin(), tld.sortBuf.end(), typename Context::ContextPtrLessThan());
+      std::copy(ctx->edges.begin(), ctx->edges.end(),
+                std::back_inserter(tld.sortBuf));
+      std::sort(tld.sortBuf.begin(), tld.sortBuf.end(),
+                typename Context::ContextPtrLessThan());
 
       if (!tld.sortBuf.empty()) {
         Context* last = tld.sortBuf.front();
-        for (auto ii = tld.sortBuf.begin() + 1, ei = tld.sortBuf.end(); ii != ei; ++ii) {
+        for (auto ii = tld.sortBuf.begin() + 1, ei = tld.sortBuf.end();
+             ii != ei; ++ii) {
           Context* cur = *ii;
           if (last != cur && cur != ctx)
             last->addEdge(cur);
@@ -574,7 +596,7 @@ public:
     return true;
   }
 
-  template<typename Executor, typename ExecutorTLD>
+  template <typename Executor, typename ExecutorTLD>
   bool executeDAG(Executor& e, ExecutorTLD& etld) {
     auto& local = e.getLocalWindowManager();
     galois::optional<Context*> p;
@@ -592,7 +614,7 @@ public:
     barrier.wait();
 
     size_t oldCommitted = 0;
-    size_t committed = 0;
+    size_t committed    = 0;
     do {
       galois::optional<Context*> p;
       while ((p = sourceList.pop())) {
@@ -633,74 +655,78 @@ public:
   }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 using DAGManager = DAGManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 
-
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 struct StateManagerBase {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  void allocLocalState(UserContextAccess<value_type>&, function_type& self) { }
-  void deallocLocalState(UserContextAccess<value_type>&) { }
-  void saveLocalState(UserContextAccess<value_type>&, DItem<OptionsTy>&) { }
-  void restoreLocalState(UserContextAccess<value_type>&, const DItem<OptionsTy>&) { }
-  void reuseItem(DItem<OptionsTy>& item) { }
+  void allocLocalState(UserContextAccess<value_type>&, function_type& self) {}
+  void deallocLocalState(UserContextAccess<value_type>&) {}
+  void saveLocalState(UserContextAccess<value_type>&, DItem<OptionsTy>&) {}
+  void restoreLocalState(UserContextAccess<value_type>&,
+                         const DItem<OptionsTy>&) {}
+  void reuseItem(DItem<OptionsTy>& item) {}
 
-  template<typename LWL, typename GWL>
-  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
+  template <typename LWL, typename GWL>
+  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl,
+                                           const DItem<OptionsTy>& item) const {
     return gwl.emplace(item);
   }
 
-  template<typename LWL, typename GWL>
+  template <typename LWL, typename GWL>
   typename GWL::value_type* peekContext(LWL& lwl, GWL& gwl) const {
     return gwl.peek();
   }
 
-  template<typename LWL, typename GWL>
+  template <typename LWL, typename GWL>
   void popContext(LWL& lwl, GWL& gwl) const {
     gwl.pop_peeked();
   }
 };
 
-
-template<typename OptionsTy>
+template <typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
   typedef typename OptionsTy::function2_type function_type;
-  typedef typename get_type_by_supertype<local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
+  typedef typename get_type_by_supertype<
+      local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
 
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
-    void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
+    void* p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     // new (p) LocalState(self, c.data().getPerIterAlloc());
     c.setLocalState(p);
   }
 
   void deallocLocalState(UserContextAccess<value_type>& c) {
-    LocalState *p = c.data().template getLocalState<LocalState>();
+    LocalState* p = c.data().template getLocalState<LocalState>();
     if (p)
       p->~LocalState();
   }
 
-  void saveLocalState(UserContextAccess<value_type>& c, DItem<OptionsTy>& item) {
+  void saveLocalState(UserContextAccess<value_type>& c,
+                      DItem<OptionsTy>& item) {
     item.setLocalState(c.data().template getLocalState<LocalState>());
   }
 
-  void restoreLocalState(UserContextAccess<value_type>& c, const DItem<OptionsTy>& item) {
+  void restoreLocalState(UserContextAccess<value_type>& c,
+                         const DItem<OptionsTy>& item) {
     c.setLocalState(item.getLocalState());
   }
 
-  template<typename LWL, typename GWL>
-  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
+  template <typename LWL, typename GWL>
+  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl,
+                                           const DItem<OptionsTy>& item) const {
     return lwl.emplace(item);
   }
 
-  template<typename LWL, typename GWL>
+  template <typename LWL, typename GWL>
   typename LWL::value_type* peekContext(LWL& lwl, GWL& gwl) const {
     return lwl.peek();
   }
 
-  template<typename LWL, typename GWL>
+  template <typename LWL, typename GWL>
   void popContext(LWL& lwl, GWL& gwl) const {
     lwl.pop_peeked();
   }
@@ -708,27 +734,30 @@ struct StateManagerBase<OptionsTy, true> {
   void reuseItem(DItem<OptionsTy>& item) { item.setLocalState(nullptr); }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 using StateManager = StateManagerBase<OptionsTy, OptionsTy::useLocalState>;
 
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 class BreakManagerBase {
 public:
   bool checkBreak() { return false; }
-  BreakManagerBase(const OptionsTy&) { }
+  BreakManagerBase(const OptionsTy&) {}
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
-  typedef typename get_type_by_supertype<det_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
+  typedef
+      typename get_type_by_supertype<det_parallel_break_tag,
+                                     typename OptionsTy::args_type>::type::type
+          BreakFn;
   BreakFn breakFn;
   substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
 public:
-  BreakManagerBase(const OptionsTy& o):
-    breakFn(get_by_supertype<det_parallel_break_tag>(o.args).value),
-    barrier(getBarrier(activeThreads)) { }
+  BreakManagerBase(const OptionsTy& o)
+      : breakFn(get_by_supertype<det_parallel_break_tag>(o.args).value),
+        barrier(getBarrier(activeThreads)) {}
 
   bool checkBreak() {
     if (substrate::ThreadPool::getTID() == 0)
@@ -738,19 +767,19 @@ public:
   }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 using BreakManager = BreakManagerBase<OptionsTy, OptionsTy::hasBreak>;
 
-
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 class IntentToReadManagerBase {
   typedef DeterministicContext<OptionsTy> Context;
+
 public:
-  void pushIntentToReadTask(Context* ctx) { }
+  void pushIntentToReadTask(Context* ctx) {}
   bool buildIntentToRead() { return false; }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 class IntentToReadManagerBase<OptionsTy, true> {
   typedef DeterministicContext<OptionsTy> Context;
   typedef galois::gdeque<Context*> WL;
@@ -758,7 +787,7 @@ class IntentToReadManagerBase<OptionsTy, true> {
   substrate::Barrier& barrier;
 
 public:
-  IntentToReadManagerBase(): barrier(getBarrier(activeThreads)) { }
+  IntentToReadManagerBase() : barrier(getBarrier(activeThreads)) {}
 
   void pushIntentToReadTask(Context* ctx) {
     pending.getLocal()->push_back(ctx);
@@ -777,14 +806,16 @@ public:
   }
 };
 
-template<typename OptionsTy>
-using IntentToReadManager = IntentToReadManagerBase<OptionsTy, OptionsTy::hasIntentToRead>;
+template <typename OptionsTy>
+using IntentToReadManager =
+    IntentToReadManagerBase<OptionsTy, OptionsTy::hasIntentToRead>;
 
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 class WindowManagerBase {
 public:
   class ThreadLocalData {
-    template <typename, bool> friend class WindowManagerBase;
+    template <typename, bool>
+    friend class WindowManagerBase;
     size_t window;
     size_t delta;
     size_t committed;
@@ -809,13 +840,9 @@ private:
   unsigned numActive;
 
 public:
-  WindowManagerBase() {
-    numActive = getActiveThreads();
-  }
+  WindowManagerBase() { numActive = getActiveThreads(); }
 
-  ThreadLocalData& getLocalWindowManager() {
-    return *data.getLocal();
-  }
+  ThreadLocalData& getLocalWindowManager() { return *data.getLocal(); }
 
   size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
     if (false) {
@@ -830,7 +857,7 @@ public:
 
   size_t initialWindow(size_t dist, size_t atleast, size_t base = 0) {
     ThreadLocalData& local = *data.getLocal();
-    size_t w = std::max(dist / OptionsTy::InitialNumRounds, atleast) + base;
+    size_t w     = std::max(dist / OptionsTy::InitialNumRounds, atleast) + base;
     local.window = local.delta = w;
     return w;
   }
@@ -839,7 +866,7 @@ public:
     ThreadLocalData& local = *data.getLocal();
 
     // Accumulate all threads' info
-    size_t allcommitted = 0;
+    size_t allcommitted  = 0;
     size_t alliterations = 0;
     for (unsigned i = 0; i < numActive; ++i) {
       ThreadLocalData& r = *data.getRemote(i);
@@ -847,7 +874,8 @@ public:
       alliterations += r.iterations;
     }
 
-    float commitRatio = alliterations > 0 ? allcommitted / (float) alliterations : 0.0;
+    float commitRatio =
+        alliterations > 0 ? allcommitted / (float)alliterations : 0.0;
     const float target = 0.95;
 
     if (commitRatio >= target)
@@ -870,33 +898,31 @@ public:
     if (false) {
       if (substrate::ThreadPool::getTID() == 0) {
         char buf[1024];
-        snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n",
-            inner, commitRatio, allcommitted, alliterations, local.window, local.delta);
+        snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", inner,
+                 commitRatio, allcommitted, alliterations, local.window,
+                 local.delta);
         gPrint(buf);
       }
     }
   }
 };
 
-template<typename OptionsTy>
-class WindowManagerBase<OptionsTy,true> {
+template <typename OptionsTy>
+class WindowManagerBase<OptionsTy, true> {
 public:
   class ThreadLocalData {
   public:
-    size_t nextWindow() {
-      return std::numeric_limits<size_t>::max();
-    }
+    size_t nextWindow() { return std::numeric_limits<size_t>::max(); }
 
-    void incrementIterations() { }
-    void incrementCommitted() { }
+    void incrementIterations() {}
+    void incrementCommitted() {}
   };
 
 private:
   ThreadLocalData data;
+
 public:
-  ThreadLocalData& getLocalWindowManager() {
-    return data;
-  }
+  ThreadLocalData& getLocalWindowManager() { return data; }
 
   size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
     return data.nextWindow();
@@ -906,53 +932,62 @@ public:
     return std::numeric_limits<size_t>::max();
   }
 
-  void calculateWindow(bool inner) { }
+  void calculateWindow(bool inner) {}
 };
 
-template<typename OptionsTy>
-using WindowManager = WindowManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
+template <typename OptionsTy>
+using WindowManager =
+    WindowManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 
-template<typename OptionsTy, bool Enable>
+template <typename OptionsTy, bool Enable>
 struct IdManagerBase {
   typedef typename OptionsTy::value_type value_type;
-  IdManagerBase(const OptionsTy&) { }
+  IdManagerBase(const OptionsTy&) {}
   uintptr_t id(const value_type&) { return 0; }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 class IdManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename get_type_by_supertype<det_id_tag, typename OptionsTy::args_type>::type::type IdFn;
+  typedef typename get_type_by_supertype<
+      det_id_tag, typename OptionsTy::args_type>::type::type IdFn;
   IdFn idFn;
 
 public:
-  IdManagerBase(const OptionsTy& o):
-    idFn(get_by_supertype<det_id_tag>(o.args).value) {}
+  IdManagerBase(const OptionsTy& o)
+      : idFn(get_by_supertype<det_id_tag>(o.args).value) {}
   uintptr_t id(const value_type& x) { return idFn(x); }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 using IdManager = IdManagerBase<OptionsTy, OptionsTy::hasId>;
 
-template<typename OptionsTy>
-class NewWorkManager: public IdManager<OptionsTy> {
+template <typename OptionsTy>
+class NewWorkManager : public IdManager<OptionsTy> {
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<OptionsTy> Item;
   typedef DNewItem<value_type> NewItem;
-  typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
+  typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other>
+      NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
-  typedef FIFO<1024,Item> ReserveTy;
-  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
+  typedef FIFO<1024, Item> ReserveTy;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize, NewItem> NewWork;
 
-  struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
+  struct GetNewItem : public std::unary_function<int, NewItemsTy&> {
     NewWorkManager* self;
-    GetNewItem(NewWorkManager* s = 0): self(s) { }
-    NewItemsTy& operator()(int i) const { return self->data.getRemote(i)->newItems; }
+    GetNewItem(NewWorkManager* s = 0) : self(s) {}
+    NewItemsTy& operator()(int i) const {
+      return self->data.getRemote(i)->newItems;
+    }
   };
 
-  typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int> > MergeOuterIt;
-  typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> MergeBuf;
-  typedef std::vector<value_type, typename PerIterAllocTy::rebind<value_type>::other> DistributeBuf;
+  typedef boost::transform_iterator<GetNewItem, boost::counting_iterator<int>>
+      MergeOuterIt;
+  typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other>
+      MergeBuf;
+  typedef std::vector<value_type,
+                      typename PerIterAllocTy::rebind<value_type>::other>
+      DistributeBuf;
 
   struct ThreadLocalData {
     IterAllocBaseTy heap;
@@ -963,7 +998,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
     size_t maxId;
     size_t size;
 
-    ThreadLocalData(): alloc(&heap), newItems(alloc) { }
+    ThreadLocalData() : alloc(&heap), newItems(alloc) {}
   };
 
   IterAllocBaseTy heap;
@@ -982,7 +1017,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
       return !data.getRemote(begin)->newItems.empty();
 
     bool retval = false;
-    int mid = (end - begin) / 2 + begin;
+    int mid     = (end - begin) / 2 + begin;
     retval |= merge(begin, mid);
     retval |= merge(mid, end);
 
@@ -991,9 +1026,15 @@ class NewWorkManager: public IdManager<OptionsTy> {
     MergeOuterIt bbegin(boost::make_counting_iterator(begin), fn);
     MergeOuterIt mmid(boost::make_counting_iterator(mid), fn);
     MergeOuterIt eend(boost::make_counting_iterator(end), fn);
-    auto aa = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, typename NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, mmid);
-    auto bb = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, typename NewItemsTy::iterator, GetBegin, GetEnd>(mmid, eend);
-    auto cc = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, typename NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, eend);
+    auto aa = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt,
+                                      typename NewItemsTy::iterator, GetBegin,
+                                      GetEnd>(bbegin, mmid);
+    auto bb = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt,
+                                      typename NewItemsTy::iterator, GetBegin,
+                                      GetEnd>(mmid, eend);
+    auto cc = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt,
+                                      typename NewItemsTy::iterator, GetBegin,
+                                      GetEnd>(bbegin, eend);
 
     while (aa.first != aa.second && bb.first != bb.second) {
       if (*aa.first < *bb.first)
@@ -1008,7 +1049,8 @@ class NewWorkManager: public IdManager<OptionsTy> {
     for (; bb.first != bb.second; ++bb.first)
       mergeBuf.push_back(*bb.first);
 
-    for (NewItemsIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei; ++ii)
+    for (NewItemsIterator ii = mergeBuf.begin(), ei = mergeBuf.end(); ii != ei;
+         ++ii)
       *cc.first++ = *ii;
 
     mergeBuf.clear();
@@ -1019,9 +1061,8 @@ class NewWorkManager: public IdManager<OptionsTy> {
   }
 
   /**
-   * Slightly complicated reindexing to separate out continuous elements in InputIterator.
-   * <pre>
-   * Example:
+   * Slightly complicated reindexing to separate out continuous elements in
+   * InputIterator. <pre> Example:
    *
    * blocksize: 2
    * pos:  0 1 2 3 4 5
@@ -1029,9 +1070,10 @@ class NewWorkManager: public IdManager<OptionsTy> {
    * new:  A D B E C F
    * </pre>
    */
-  template<typename InputIteratorTy>
-  void redistribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, size_t window, unsigned tid) {
-    //ThreadLocalData& local = *data.getLocal();
+  template <typename InputIteratorTy>
+  void redistribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist,
+                    size_t window, unsigned tid) {
+    // ThreadLocalData& local = *data.getLocal();
     size_t blockSize = window;
     size_t numBlocks = dist / blockSize;
 
@@ -1048,11 +1090,12 @@ class NewWorkManager: public IdManager<OptionsTy> {
     }
   }
 
-  template<typename InputIteratorTy,typename WL>
-  void copyMine(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl, size_t window, unsigned tid) {
+  template <typename InputIteratorTy, typename WL>
+  void copyMine(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl,
+                size_t window, unsigned tid) {
     ThreadLocalData& local = *data.getLocal();
-    size_t cur = 0;
-    size_t k = 0;
+    size_t cur             = 0;
+    size_t k               = 0;
     safe_advance(ii, tid, cur, dist);
     while (ii != ei) {
       unsigned long id = k * numActive + tid;
@@ -1072,8 +1115,9 @@ class NewWorkManager: public IdManager<OptionsTy> {
     }
   }
 
-  template<typename InputIteratorTy,typename WL>
-  void copyAllWithIds(InputIteratorTy ii, InputIteratorTy ei, WL* wl, size_t window) {
+  template <typename InputIteratorTy, typename WL>
+  void copyAllWithIds(InputIteratorTy ii, InputIteratorTy ei, WL* wl,
+                      size_t window) {
     ThreadLocalData& local = *data.getLocal();
     for (; ii != ei; ++ii) {
       unsigned long id = ii->parent;
@@ -1089,8 +1133,10 @@ class NewWorkManager: public IdManager<OptionsTy> {
     }
   }
 
-  template<typename InputIteratorTy,typename WL>
-  void copyMineAfterRedistribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, WL* wl, size_t window, unsigned tid) {
+  template <typename InputIteratorTy, typename WL>
+  void copyMineAfterRedistribute(InputIteratorTy ii, InputIteratorTy ei,
+                                 size_t dist, WL* wl, size_t window,
+                                 unsigned tid) {
     if (tid == 0) {
       distributeBuf.resize(dist);
     }
@@ -1100,7 +1146,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
     copyMine(distributeBuf.begin(), distributeBuf.end(), dist, wl, window, tid);
   }
 
-  template<typename WL>
+  template <typename WL>
   void parallelSort(WindowManager<OptionsTy>& wm, WL* wl, unsigned tid) {
     ThreadLocalData& local = *data.getLocal();
 
@@ -1130,67 +1176,72 @@ class NewWorkManager: public IdManager<OptionsTy> {
     barrier.wait();
 
     if (OptionsTy::hasId) {
-      size_t window = wm.nextWindow(local.maxId - local.minId, OptionsTy::MinDelta, local.minId);
+      size_t window = wm.nextWindow(local.maxId - local.minId,
+                                    OptionsTy::MinDelta, local.minId);
       copyAllWithIds(ii, ei, wl, window);
     } else {
       GetNewItem fn(this);
       MergeOuterIt bbegin(boost::make_counting_iterator(0), fn);
-      MergeOuterIt eend(boost::make_counting_iterator((int) numActive), fn);
-      auto ii = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, typename NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, eend);
+      MergeOuterIt eend(boost::make_counting_iterator((int)numActive), fn);
+      auto ii = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt,
+                                        typename NewItemsTy::iterator, GetBegin,
+                                        GetEnd>(bbegin, eend);
 
       size_t window = wm.nextWindow(local.size, OptionsTy::MinDelta);
-      copyMineAfterRedistribute(boost::make_transform_iterator(ii.first, typename NewItem::GetValue()),
-          boost::make_transform_iterator(ii.second, typename NewItem::GetValue()),
-          local.size, wl, window, tid);
+      copyMineAfterRedistribute(boost::make_transform_iterator(
+                                    ii.first, typename NewItem::GetValue()),
+                                boost::make_transform_iterator(
+                                    ii.second, typename NewItem::GetValue()),
+                                local.size, wl, window, tid);
     }
   }
 
   void broadcastLimits(ThreadLocalData& local) {
     for (unsigned i = 1; i < numActive; ++i) {
       ThreadLocalData& other = *data.getRemote(i);
-      other.minId = local.minId;
-      other.maxId = local.maxId;
-      other.size = local.size;
+      other.minId            = local.minId;
+      other.maxId            = local.maxId;
+      other.size             = local.size;
     }
   }
 
   void receiveLimits(ThreadLocalData& local) {
     for (unsigned i = 1; i < numActive; ++i) {
       ThreadLocalData& other = *data.getRemote(i);
-      local.minId = std::min(other.minId, local.minId);
-      local.maxId = std::max(other.maxId, local.maxId);
+      local.minId            = std::min(other.minId, local.minId);
+      local.maxId            = std::max(other.maxId, local.maxId);
       local.size += other.size;
     }
   }
 
   //! Update min and max from sorted iterator
-  template<typename BiIteratorTy>
+  template <typename BiIteratorTy>
   void initialLimits(BiIteratorTy ii, BiIteratorTy ei) {
     ThreadLocalData& local = *data.getLocal();
 
     local.minId = std::numeric_limits<size_t>::max();
     local.maxId = std::numeric_limits<size_t>::min();
-    local.size = std::distance(ii, ei);
+    local.size  = std::distance(ii, ei);
 
     if (ii != ei) {
       if (ii + 1 == ei) {
         local.minId = local.maxId = ii->parent;
       } else {
         local.minId = ii->parent;
-        local.maxId = (ei-1)->parent;
+        local.maxId = (ei - 1)->parent;
       }
     }
   }
 
-  template<typename InputIteratorTy>
-  void sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, ...) { }
+  template <typename InputIteratorTy>
+  void sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, ...) {}
 
-  template<typename InputIteratorTy, bool HasId = OptionsTy::hasId, bool HasFixed = OptionsTy::hasFixedNeighborhood>
-  auto sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, int)
-  -> typename std::enable_if<HasId && !HasFixed, void>::type
-  {
+  template <typename InputIteratorTy, bool HasId = OptionsTy::hasId,
+            bool HasFixed = OptionsTy::hasFixedNeighborhood>
+  auto sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, int) ->
+      typename std::enable_if<HasId && !HasFixed, void>::type {
     ThreadLocalData& local = *data.getLocal();
-    size_t dist = std::distance(ii, ei);
+    size_t dist            = std::distance(ii, ei);
 
     mergeBuf.reserve(dist);
     for (; ii != ei; ++ii)
@@ -1203,15 +1254,15 @@ class NewWorkManager: public IdManager<OptionsTy> {
   }
 
 public:
-  NewWorkManager(const OptionsTy& o):
-    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getBarrier(activeThreads))
-  {
+  NewWorkManager(const OptionsTy& o)
+      : IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc),
+        distributeBuf(alloc), barrier(getBarrier(activeThreads)) {
     numActive = getActiveThreads();
   }
 
   bool emptyReserve() { return data.getLocal()->reserve.empty(); }
 
-  template<typename WL>
+  template <typename WL>
   void pushNextWindow(WL* wl, size_t window) {
     ThreadLocalData& local = *data.getLocal();
     galois::optional<Item> p;
@@ -1225,13 +1276,14 @@ public:
 
   void clearNewWork() { data.getLocal()->heap.clear(); }
 
-  template<typename InputIteratorTy>
+  template <typename InputIteratorTy>
   void sortInitialWork(InputIteratorTy ii, InputIteratorTy ei) {
     return sortInitialWorkDispatch(ii, ei, 0);
   }
 
-  template<typename InputIteratorTy, typename WL>
-  void addInitialWork(WindowManager<OptionsTy>& wm, InputIteratorTy b, InputIteratorTy e, WL* wl) {
+  template <typename InputIteratorTy, typename WL>
+  void addInitialWork(WindowManager<OptionsTy>& wm, InputIteratorTy b,
+                      InputIteratorTy e, WL* wl) {
     size_t dist = std::distance(b, e);
     if (OptionsTy::hasId) {
       ThreadLocalData& local = *data.getLocal();
@@ -1239,57 +1291,57 @@ public:
       if (OptionsTy::hasFixedNeighborhood) {
         copyMine(b, e, dist, wl, window, substrate::ThreadPool::getTID());
       } else {
-        copyMine(
-            boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
-            boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
-            mergeBuf.size(), wl, window, substrate::ThreadPool::getTID());
+        copyMine(boost::make_transform_iterator(mergeBuf.begin(),
+                                                typename NewItem::GetValue()),
+                 boost::make_transform_iterator(mergeBuf.end(),
+                                                typename NewItem::GetValue()),
+                 mergeBuf.size(), wl, window, substrate::ThreadPool::getTID());
       }
     } else {
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta);
-      copyMineAfterRedistribute(b, e, dist, wl, window, substrate::ThreadPool::getTID());
+      copyMineAfterRedistribute(b, e, dist, wl, window,
+                                substrate::ThreadPool::getTID());
     }
   }
 
-  template<bool HasId = OptionsTy::hasId>
-  auto pushNew(const value_type& val, unsigned long parent, unsigned count)
-  -> typename std::enable_if<HasId, void>::type
-  {
+  template <bool HasId = OptionsTy::hasId>
+  auto pushNew(const value_type& val, unsigned long parent, unsigned count) ->
+      typename std::enable_if<HasId, void>::type {
     new_.push(NewItem(val, this->id(val), 1));
   }
 
-  template<bool HasId = OptionsTy::hasId>
-  auto pushNew(const value_type& val, unsigned long parent, unsigned count)
-  -> typename std::enable_if<!HasId, void>::type
-  {
+  template <bool HasId = OptionsTy::hasId>
+  auto pushNew(const value_type& val, unsigned long parent, unsigned count) ->
+      typename std::enable_if<!HasId, void>::type {
     new_.push(NewItem(val, parent, count));
   }
 
-  template<typename WL>
+  template <typename WL>
   void distributeNewWork(WindowManager<OptionsTy>& wm, WL* wl) {
     parallelSort(wm, wl, substrate::ThreadPool::getTID());
   }
 };
 
-template<typename OptionsTy>
-class Executor:
-  public BreakManager<OptionsTy>,
-  public StateManager<OptionsTy>,
-  public NewWorkManager<OptionsTy>,
-  public WindowManager<OptionsTy>,
-  public DAGManager<OptionsTy>,
-  public IntentToReadManager<OptionsTy>
-{
+template <typename OptionsTy>
+class Executor : public BreakManager<OptionsTy>,
+                 public StateManager<OptionsTy>,
+                 public NewWorkManager<OptionsTy>,
+                 public WindowManager<OptionsTy>,
+                 public DAGManager<OptionsTy>,
+                 public IntentToReadManager<OptionsTy> {
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<OptionsTy> Item;
   typedef DeterministicContext<OptionsTy> Context;
 
-  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Item> WL;
-  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize,Context> PendingWork;
-  typedef worklists::ChunkFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize, Item> WL;
+  typedef worklists::PerSocketChunkFIFO<OptionsTy::ChunkSize, Context>
+      PendingWork;
+  typedef worklists::ChunkFIFO<OptionsTy::ChunkSize, Context, false>
+      LocalPendingWork;
 
   // Truly thread-local
   using LoopStat = LoopStatistics<OptionsTy::needStats>;
-  struct ThreadLocalData: public LoopStat {
+  struct ThreadLocalData : public LoopStat {
 
     typename OptionsTy::function1_type fn1;
     typename OptionsTy::function2_type fn2;
@@ -1301,9 +1353,9 @@ class Executor:
     size_t rounds;
     size_t outerRounds;
     bool hasNewWork;
-    ThreadLocalData(const OptionsTy& o, const char* loopname):
-      LoopStat(loopname),
-      fn1(o.fn1), fn2(o.fn2), rounds(0), outerRounds(0) { }
+    ThreadLocalData(const OptionsTy& o, const char* loopname)
+        : LoopStat(loopname), fn1(o.fn1), fn2(o.fn2), rounds(0),
+          outerRounds(0) {}
   };
 
   OptionsTy options;
@@ -1328,41 +1380,36 @@ class Executor:
   }
 
 public:
-  Executor(const OptionsTy& o):
-    BreakManager<OptionsTy>(o),
-    NewWorkManager<OptionsTy>(o),
-    options(o),
-    barrier(getBarrier(activeThreads)),
-    loopname(galois::internal::getLoopName(o.args))
-  {
+  Executor(const OptionsTy& o)
+      : BreakManager<OptionsTy>(o), NewWorkManager<OptionsTy>(o), options(o),
+        barrier(getBarrier(activeThreads)),
+        loopname(galois::internal::getLoopName(o.args)) {
     static_assert(!OptionsTy::needsBreak || OptionsTy::hasBreak,
-        "need to use break function to break loop");
+                  "need to use break function to break loop");
   }
 
   bool executeTask(ThreadLocalData& tld, Context* ctx);
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void initThread(const RangeTy& range) {
     Context::initialize();
     this->addInitialWork(*this, range.begin(), range.end(), &worklists[1]);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void init(const RangeTy& range) {
     this->sortInitialWork(range.begin(), range.end());
   }
 
-  void operator()() {
-    go();
-  }
+  void operator()() { go(); }
 };
 
-template<typename OptionsTy>
+template <typename OptionsTy>
 void Executor<OptionsTy>::go() {
   ThreadLocalData tld(options, loopname);
   auto& local = this->getLocalWindowManager();
-  tld.wlcur = &worklists[0];
-  tld.wlnext = &worklists[1];
+  tld.wlcur   = &worklists[0];
+  tld.wlnext  = &worklists[1];
 
   tld.hasNewWork = false;
 
@@ -1374,7 +1421,7 @@ void Executor<OptionsTy>::go() {
 
       std::swap(tld.wlcur, tld.wlnext);
       bool nextPending = pendingLoop(tld);
-      innerDone.get() = true;
+      innerDone.get()  = true;
 
       barrier.wait();
 
@@ -1429,7 +1476,8 @@ void Executor<OptionsTy>::go() {
         break;
       this->distributeNewWork(*this, tld.wlnext);
       tld.hasNewWork = false;
-      // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
+      // NB: assumes that distributeNewWork has a barrier otherwise checking at
+      // (1) is erroneous
       hasNewWork.get() = false;
     } else {
       this->calculateWindow(false);
@@ -1449,9 +1497,8 @@ void Executor<OptionsTy>::go() {
   }
 }
 
-template<typename OptionsTy>
-bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
-{
+template <typename OptionsTy>
+bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld) {
   auto& local = this->getLocalWindowManager();
   bool retval = false;
   galois::optional<Item> p;
@@ -1478,18 +1525,28 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 #endif
       tld.fn1(ctx->item.val, tld.facing.data());
 #ifdef GALOIS_USE_LONGJMP_ABORT
-    } else { clearConflictLock(); }
+    } else {
+      clearConflictLock();
+    }
 #else
-    } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
+    } catch (const ConflictFlag& flag) {
+      clearConflictLock();
+      result = flag;
+    }
 #endif
-    //FIXME:    clearReleasable();
+    // FIXME:    clearReleasable();
     tld.facing.resetFirstPass();
     ctx->resetFirstPass();
     switch (result) {
-      case 0:
-      case REACHED_FAILSAFE: break;
-      case CONFLICT: commit = false; break;
-      default: abort(); break;
+    case 0:
+    case REACHED_FAILSAFE:
+      break;
+    case CONFLICT:
+      commit = false;
+      break;
+    default:
+      abort();
+      break;
     }
 
     // TODO only needed if fn1 needs pia
@@ -1506,9 +1563,8 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
   return retval;
 }
 
-template<typename OptionsTy>
-bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
-{
+template <typename OptionsTy>
+bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) {
   setThreadContext(ctx);
   this->restoreLocalState(tld.facing, ctx->item);
   tld.facing.resetFirstPass();
@@ -1521,20 +1577,31 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
 #endif
     tld.fn2(ctx->item.val, tld.facing.data());
 #ifdef GALOIS_USE_LONGJMP_ABORT
-  } else { clearConflictLock(); }
+  } else {
+    clearConflictLock();
+  }
 #else
-  } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
+  } catch (const ConflictFlag& flag) {
+    clearConflictLock();
+    result = flag;
+  }
 #endif
-  //FIXME: clearReleasable();
+  // FIXME: clearReleasable();
   switch (result) {
-    case 0: break;
-    case CONFLICT: return false; break;
-    default: GALOIS_DIE("Unknown conflict flag"); break;
+  case 0:
+    break;
+  case CONFLICT:
+    return false;
+    break;
+  default:
+    GALOIS_DIE("Unknown conflict flag");
+    break;
   }
 
   if (OptionsTy::needsPush) {
     unsigned long parent = ctx->item.id;
-    //    typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
+    //    typedef typename UserContextAccess<value_type>::PushBufferTy::iterator
+    //    iterator;
     unsigned count = 0;
     for (auto& item : tld.facing.getPushBuffer()) {
       this->pushNew(item, parent, ++count);
@@ -1545,15 +1612,14 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
     if (count)
       tld.hasNewWork = true;
   }
-  assert(OptionsTy::needsPush
-      || tld.facing.getPushBuffer().begin() == tld.facing.getPushBuffer().end());
+  assert(OptionsTy::needsPush || tld.facing.getPushBuffer().begin() ==
+                                     tld.facing.getPushBuffer().end());
 
   return true;
 }
 
-template<typename OptionsTy>
-bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
-{
+template <typename OptionsTy>
+bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld) {
   bool retval = false;
   auto& local = this->getLocalWindowManager();
 
@@ -1592,39 +1658,39 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   return retval;
 }
 
-}
-}
+} // namespace internal
+} // namespace runtime
 
 namespace worklists {
 
 /**
  * Deterministic execution. Operator should be cautious.
  */
-template<typename T=int>
+template <typename T = int>
 struct Deterministic {
-  template<bool _concurrent>
+  template <bool _concurrent>
   using rethread = Deterministic<T>;
 
-  template<typename _T>
+  template <typename _T>
   using retype = Deterministic<_T>;
 
   typedef T value_type;
 };
 
-}
+} // namespace worklists
 
 namespace runtime {
 
-template<class T, class FunctionTy, class ArgsTy>
-struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>:
-  public internal::Executor<internal::Options<T, FunctionTy, ArgsTy>>
-{
+template <class T, class FunctionTy, class ArgsTy>
+struct ForEachExecutor<worklists::Deterministic<T>, FunctionTy, ArgsTy>
+    : public internal::Executor<internal::Options<T, FunctionTy, ArgsTy>> {
   typedef internal::Options<T, FunctionTy, ArgsTy> OptionsTy;
   typedef internal::Executor<OptionsTy> SuperTy;
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(OptionsTy(f, args)) { }
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args)
+      : SuperTy(OptionsTy(f, args)) {}
 };
 
-}
+} // namespace runtime
 
-}
+} // namespace galois
 #endif

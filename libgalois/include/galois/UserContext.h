@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,26 +29,26 @@
 
 namespace galois {
 
-/** 
+/**
  * This is the object passed to the user's parallel loop.  This
  * provides the in-loop api.
  */
-template<typename T>
-class UserContext: private boost::noncopyable {
+template <typename T>
+class UserContext : private boost::noncopyable {
 protected:
 // TODO(ddn): move to a separate class for dedicated speculative executors
 #ifdef GALOIS_USE_EXP
-  typedef std::function<void (void)> Closure;
+  typedef std::function<void(void)> Closure;
   typedef galois::gdeque<Closure, 8> UndoLog;
   typedef UndoLog CommitLog;
 
   UndoLog undoLog;
   CommitLog commitLog;
-#endif 
+#endif
   //! push stuff
   typedef gdeque<T> PushBufferTy;
   static const unsigned int fastPushBackLimit = 64;
-  typedef std::function<void(PushBufferTy&)> FastPushBack; 
+  typedef std::function<void(PushBufferTy&)> FastPushBack;
 
   PushBufferTy pushBuffer;
   //! Allocator stuff
@@ -61,19 +61,13 @@ protected:
 
   //! some flags used by deterministic
   bool firstPassFlag = false;
-  void* localState = nullptr;
+  void* localState   = nullptr;
 
-  void __resetAlloc() {
-    IterationAllocatorBase.clear();
-  }
+  void __resetAlloc() { IterationAllocatorBase.clear(); }
 
-  void __setFirstPass (void) {
-    firstPassFlag = true;
-  }
+  void __setFirstPass(void) { firstPassFlag = true; }
 
-  void __resetFirstPass (void) {
-    firstPassFlag = false;
-  }
+  void __resetFirstPass(void) { firstPassFlag = false; }
 
 #ifdef GALOIS_USE_EXP
   void __rollback() {
@@ -88,53 +82,33 @@ protected:
     }
   }
 
-  void __resetUndoLog() {
-    undoLog.clear();
-  }
+  void __resetUndoLog() { undoLog.clear(); }
 
-  void __resetCommitLog() {
-    commitLog.clear();
-  }
-#endif 
+  void __resetCommitLog() { commitLog.clear(); }
+#endif
 
+  PushBufferTy& __getPushBuffer() { return pushBuffer; }
 
-  PushBufferTy& __getPushBuffer() {
-    return pushBuffer;
-  }
-  
-  void __resetPushBuffer() {
-    pushBuffer.clear();
-  }
+  void __resetPushBuffer() { pushBuffer.clear(); }
 
-  void __setLocalState(void *p) {
-    localState = p;
-  }
+  void __setLocalState(void* p) { localState = p; }
 
-  void __setFastPushBack(FastPushBack f) {
-    fastPushBack = f;
-  }
-
+  void __setFastPushBack(FastPushBack f) { fastPushBack = f; }
 
 public:
   UserContext()
-    :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase),
-     didBreak(0)
-  { }
+      : IterationAllocatorBase(),
+        PerIterationAllocator(&IterationAllocatorBase), didBreak(0) {}
 
   //! Signal break in parallel loop, current iteration continues
   //! untill natural termination
-  void breakLoop() {
-    *didBreak = true;
-  }
+  void breakLoop() { *didBreak = true; }
 
   //! Acquire a per-iteration allocator
-  PerIterAllocTy& getPerIterAlloc() {
-    return PerIterationAllocator;
-  }
+  PerIterAllocTy& getPerIterAlloc() { return PerIterationAllocator; }
 
-  //! Push new work 
-  template<typename... Args>
+  //! Push new work
+  template <typename... Args>
   void push(Args&&... args) {
     // galois::runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
@@ -142,14 +116,14 @@ public:
       fastPushBack(pushBuffer);
   }
 
-  //! Push new work 
-  template<typename... Args>
+  //! Push new work
+  template <typename... Args>
   inline void push_back(Args&&... args) {
     this->push(std::forward<Args>(args)...);
   }
 
-  //! Push new work 
-  template<typename... Args>
+  //! Push new work
+  template <typename... Args>
   inline void insert(Args&&... args) {
     this->push(std::forward<Args>(args)...);
   }
@@ -159,7 +133,9 @@ public:
 
   //! Store and retrieve local state for deterministic
   template <typename LS>
-  LS* getLocalState(void) { return reinterpret_cast<LS*>(localState); }
+  LS* getLocalState(void) {
+    return reinterpret_cast<LS*>(localState);
+  }
 
   template <typename LS, typename... Args>
   LS* createLocalState(Args&&... args) {
@@ -167,23 +143,17 @@ public:
     return getLocalState<LS>();
   }
 
- 
 #ifdef GALOIS_USE_EXP
-  void addUndoAction(const Closure& f) {
-    undoLog.push_front(f);
-  }
+  void addUndoAction(const Closure& f) { undoLog.push_front(f); }
 
-  void addCommitAction(const Closure& f) {
-    commitLog.push_back(f);
-  }
-#endif 
+  void addCommitAction(const Closure& f) { commitLog.push_back(f); }
+#endif
 
   //! used by deterministic and ordered
-  //! @returns true when the operator is invoked for the first time. The operator
-  //! can use this information and choose to expand the neighborhood only in the first pass. 
-  bool isFirstPass (void) const { 
-    return firstPassFlag;
-  }
+  //! @returns true when the operator is invoked for the first time. The
+  //! operator can use this information and choose to expand the neighborhood
+  //! only in the first pass.
+  bool isFirstPass(void) const { return firstPassFlag; }
 
   //! declare that the operator has crossed the cautious point.  This
   //! implies all data has been touched thus no new locks will be
@@ -193,9 +163,8 @@ public:
       galois::runtime::signalFailSafe();
     }
   }
-
 };
 
-}
+} // namespace galois
 
 #endif

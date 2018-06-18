@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -41,10 +41,10 @@ typedef galois::graphs::DistGraphEdgeCut<NodeData, void> Graph_edgeCut;
 
 constexpr static const char* const name = "FindHighDegree";
 constexpr static const char* const desc = "Find highest owned outdegree node.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 /**
- * Partitions the graph with an outgoing edges cut, then loops through owned 
+ * Partitions the graph with an outgoing edges cut, then loops through owned
  * nodes to determine which node has the highest out-degree. Prints
  * it to a line.
  */
@@ -60,18 +60,17 @@ int main(int argc, char** argv) {
   Graph* regular = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
                                      dummyScale, false);
 
-  uint32_t curMaxNode = 0;
+  uint32_t curMaxNode   = 0;
   uint64_t curHighEdges = 0;
 
   for (auto i = regular->masterNodesRange().begin();
-       i < regular->masterNodesRange().end();
-       i++) {
-    uint64_t numEdges = 
-       std::distance(regular->edge_begin(*i), regular->edge_end(*i));
-   
+       i < regular->masterNodesRange().end(); i++) {
+    uint64_t numEdges =
+        std::distance(regular->edge_begin(*i), regular->edge_end(*i));
+
     if (numEdges > curHighEdges) {
       curHighEdges = numEdges;
-      curMaxNode = *i;
+      curMaxNode   = *i;
     }
   }
 

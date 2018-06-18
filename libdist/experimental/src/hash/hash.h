@@ -9,8 +9,7 @@
 #include <string>
 
 /// abstract base class
-class Hash
-{
+class Hash {
 public:
   /// compute hash of a memory block
   virtual std::string operator()(const void* data, size_t numBytes) = 0;

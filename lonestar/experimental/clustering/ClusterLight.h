@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,7 +32,6 @@ private:
 
 public:
   ClusterLight() : boxRadius(0), coneDirection(0) {}
-
 
   // TODO: remove
   /*
@@ -88,8 +87,8 @@ public:
       //          chooseRepsWithTime(reps, this, ranVec, leftClus, (LeafLight)
       //          m_right);
       //        } else {
-      //          chooseRepsWithTime(reps, this, ranVec, leftClus, (ClusterLight)
-      //          m_right);
+      //          chooseRepsWithTime(reps, this, ranVec, leftClus,
+      //          (ClusterLight) m_right);
       //        }
       //      }
     } else {
@@ -122,9 +121,8 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
-                               V2& ranVec, LeafLight& left,
-                               LeafLight& right) {
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent, V2& ranVec,
+                               LeafLight& left, LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -137,9 +135,8 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
-                               V2& ranVec, ClusterLight& left,
-                               LeafLight& right) {
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent, V2& ranVec,
+                               ClusterLight& left, LeafLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -153,9 +150,8 @@ public:
   }
 
   template <typename V1, typename V2>
-  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent,
-                               V2& ranVec, ClusterLight& left,
-                               ClusterLight& right) {
+  static void chooseRepsNoTime(V1& repArr, AbstractLight& parent, V2& ranVec,
+                               ClusterLight& left, ClusterLight& right) {
     double totalInten = parent.getScalarTotalIntensity();
     double leftInten  = left.getScalarTotalIntensity();
     double nextTest   = ranVec[0] * totalInten;
@@ -178,17 +174,15 @@ public:
   float getConeCos() { return coneCos; }
 
   template <typename V1, typename V2>
-  void findConeDirsRecursive(V1& coordArr,
-                             V2& tempClusterArr) {
+  void findConeDirsRecursive(V1& coordArr, V2& tempClusterArr) {
     // TODO : Fix this. NodeWrapper::CONE_RECURSE_DEPTH - 1 = 3
     findConeDirsRecursive(*m_left, coordArr, 0, tempClusterArr, 3);
     findConeDirsRecursive(*m_right, coordArr, 0, tempClusterArr, 3);
   }
 
   template <typename V1, typename V2>
-  static int findConeDirsRecursive(AbstractLight& node, V1& fArr,
-                                   int numDirs, V2& cArr,
-                                   int recurseDepth) {
+  static int findConeDirsRecursive(AbstractLight& node, V1& fArr, int numDirs,
+                                   V2& cArr, int recurseDepth) {
     if (!node.isLeaf()) {
       ClusterLight& clus = (ClusterLight&)node;
       if (clus.coneCos == 1.0) {
@@ -221,15 +215,14 @@ public:
   }
 
   template <typename V1>
-  static int addConeDir(V1& fArr, int numDirs, double x, double y,
-                        double z) {
+  static int addConeDir(V1& fArr, int numDirs, double x, double y, double z) {
     // only add direction if it does not match any existing directions
     for (int i = 0; i < 3 * numDirs; i++) {
       if ((fArr[i] == x) && (fArr[i + 1] == y) && (fArr[i + 2] == z)) {
         return numDirs;
       }
     }
-    int index          = 3 * numDirs;
+    int index       = 3 * numDirs;
     fArr[index]     = x;
     fArr[index + 1] = y;
     fArr[index + 2] = z;

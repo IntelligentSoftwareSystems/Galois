@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,10 +37,10 @@ namespace galois {
 namespace runtime {
 
 enum ConflictFlag {
-  CONFLICT = -1,
-  NO_CONFLICT = 0,
+  CONFLICT         = -1,
+  NO_CONFLICT      = 0,
   REACHED_FAILSAFE = 1,
-  BREAK = 2
+  BREAK            = 2
 };
 
 #ifdef GALOIS_USE_LONGJMP_ABORT
@@ -48,7 +48,7 @@ extern thread_local jmp_buf execFrame;
 #endif
 
 //! used to release lock over exception path
-static inline void clearConflictLock() { }
+static inline void clearConflictLock() {}
 
 class LockManagerBase;
 
@@ -58,20 +58,20 @@ class LockManagerBase;
  */
 class Lockable {
   substrate::PtrLock<LockManagerBase> owner;
-  //! Use an intrusive list to track neighborhood of a context without allocation overhead.
-  //! Works for cases where a Lockable needs to be only in one context's neighborhood list
+  //! Use an intrusive list to track neighborhood of a context without
+  //! allocation overhead. Works for cases where a Lockable needs to be only in
+  //! one context's neighborhood list
   Lockable* next;
   friend class LockManagerBase;
   friend class SimpleRuntimeContext;
+
 public:
-  Lockable() :next(0) {}
+  Lockable() : next(0) {}
 };
 
-class LockManagerBase: private boost::noncopyable {
+class LockManagerBase : private boost::noncopyable {
 protected:
-  enum AcquireStatus {
-    FAIL, NEW_OWNER, ALREADY_OWNER
-  };
+  enum AcquireStatus { FAIL, NEW_OWNER, ALREADY_OWNER };
 
   AcquireStatus tryAcquire(Lockable* lockable);
 
@@ -108,7 +108,7 @@ protected:
   }
 };
 
-class SimpleRuntimeContext: public LockManagerBase {
+class SimpleRuntimeContext : public LockManagerBase {
   //! The locks we hold
   Lockable* locks;
   bool customAcquire;
@@ -126,19 +126,17 @@ protected:
   void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
     lockable->next = locks;
-    locks = lockable;
+    locks          = lockable;
   }
 
   void acquire(Lockable* lockable, galois::MethodFlag m);
   void release(Lockable* lockable);
 
 public:
-  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
-  virtual ~SimpleRuntimeContext() { }
+  SimpleRuntimeContext(bool child = false) : locks(0), customAcquire(child) {}
+  virtual ~SimpleRuntimeContext() {}
 
-  void startIteration() {
-    assert(!locks);
-  }
+  void startIteration() { assert(!locks); }
 
   unsigned cancelIteration();
   unsigned commitIteration();
@@ -148,7 +146,8 @@ public:
 #endif
 };
 
-//! get the current conflict detection class, may be null if not in parallel region
+//! get the current conflict detection class, may be null if not in parallel
+//! region
 SimpleRuntimeContext* getThreadContext();
 
 //! used by the parallel code to set up conflict detection per thread
@@ -169,7 +168,7 @@ inline bool shouldLock(const galois::MethodFlag g) {
   default:
     // XXX(ddn): Adding error checking code here either upsets the inlining
     // heuristics or icache behavior. Avoid complex code if possible.
-    //GALOIS_DIE("shouldn't get here");
+    // GALOIS_DIE("shouldn't get here");
     assert(false);
   }
   return false;
@@ -197,10 +196,8 @@ struct AlwaysLockObj {
 
 struct CheckedLockObj {
   galois::MethodFlag m;
-  CheckedLockObj(galois::MethodFlag _m) :m(_m) {}
-  void operator()(Lockable* lockable) const {
-    acquire(lockable, m);
-  }
+  CheckedLockObj(galois::MethodFlag _m) : m(_m) {}
+  void operator()(Lockable* lockable) const { acquire(lockable, m); }
 };
 
 void signalConflict(Lockable* = nullptr);
@@ -211,7 +208,7 @@ bool owns(Lockable* lockable, MethodFlag m);
 
 void signalFailSafe(void);
 
-}
+} // namespace runtime
 } // end namespace galois
 
 #endif

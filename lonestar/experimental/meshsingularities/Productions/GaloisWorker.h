@@ -19,21 +19,20 @@ typedef galois::worklists::PerSocketChunkLIFO<1> WL;
 
 struct ProductionProcess {
 public:
-	ProductionProcess() {};
+  ProductionProcess(){};
 
-	template<typename Context>
-	void operator()(Graph::GraphNode src, Context& ctx);
-	std::vector<double> *operator()(TaskDescription &td);
+  template <typename Context>
+  void operator()(Graph::GraphNode src, Context& ctx);
+  std::vector<double>* operator()(TaskDescription& td);
 
 private:
-	Graph *graph;
-	// returns effective size of memory allocated for matrices and RHS.
-	unsigned long getAllocatedSize(Vertex *root);
-	int atomic_dec(int *value);
-	//galois::runtime::PerSocketStorage<WL> pps;
-	int leftRange(int tasks, int cpus, int i);
-	int rightRange(int tasks, int cpus, int i);
+  Graph* graph;
+  // returns effective size of memory allocated for matrices and RHS.
+  unsigned long getAllocatedSize(Vertex* root);
+  int atomic_dec(int* value);
+  // galois::runtime::PerSocketStorage<WL> pps;
+  int leftRange(int tasks, int cpus, int i);
+  int rightRange(int tasks, int cpus, int i);
 };
-
 
 #endif

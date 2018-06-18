@@ -5,12 +5,13 @@
 
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> inputFilename(cll::Positional, 
-    cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> mappingFilename(cll::Positional,
-    cll::desc("<mapping file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional,
-    cll::desc("<output file>"), cll::Required);
+                                             cll::desc("<mapping file>"),
+                                             cll::Required);
+static cll::opt<std::string>
+    outputFilename(cll::Positional, cll::desc("<output file>"), cll::Required);
 
 using Writer = galois::graphs::FileGraphWriter;
 
@@ -61,14 +62,13 @@ int main(int argc, char** argv) {
   // phase 1: count degrees
   graphWriter.phase1();
   galois::gInfo("Starting degree counting");
-  size_t prevNumNodes = graphToRemap.size();
+  size_t prevNumNodes  = graphToRemap.size();
   size_t nodeIDCounter = 0;
   for (size_t i = 0; i < prevNumNodes; i++) {
     // see if current node is to be remapped, i.e. exists in the map
     if (remapper.find(i) != remapper.end()) {
       GALOIS_ASSERT(nodeIDCounter == remapper[i]);
-      for (auto e = graphToRemap.edgeBegin(i); 
-           e < graphToRemap.edgeEnd(i);
+      for (auto e = graphToRemap.edgeBegin(i); e < graphToRemap.edgeEnd(i);
            e++) {
         graphWriter.incrementDegree(nodeIDCounter);
       }
@@ -85,8 +85,7 @@ int main(int argc, char** argv) {
     // see if current node is to be remapped, i.e. exists in the map
     if (remapper.find(i) != remapper.end()) {
       GALOIS_ASSERT(nodeIDCounter == remapper[i]);
-      for (auto e = graphToRemap.edgeBegin(i); 
-           e < graphToRemap.edgeEnd(i);
+      for (auto e = graphToRemap.edgeBegin(i); e < graphToRemap.edgeEnd(i);
            e++) {
         uint32_t dst = graphToRemap.edgeDestination(*e);
         GALOIS_ASSERT(remapper.find(dst) != remapper.end());
@@ -102,9 +101,8 @@ int main(int argc, char** argv) {
   graphWriter.finish<void>();
   graphWriter.toFile(outputFilename);
 
-  galois::gInfo("new size is ", graphWriter.size(), " num edges ", 
+  galois::gInfo("new size is ", graphWriter.size(), " num edges ",
                 graphWriter.sizeEdges());
 
   return 0;
 }
-

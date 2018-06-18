@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -41,9 +41,10 @@ namespace galois {
  *
  * @tparam Ty type of value to max-reduce
  */
-template<typename Ty>
+template <typename Ty>
 class DGAccumulator {
-  galois::runtime::NetworkInterface& net = galois::runtime::getSystemNetworkInterface();
+  galois::runtime::NetworkInterface& net =
+      galois::runtime::getSystemNetworkInterface();
 
   galois::GAccumulator<Ty> mdata;
   Ty local_mdata, global_mdata;
@@ -53,7 +54,7 @@ class DGAccumulator {
    * Sum reduction using LWCI
    */
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
                 &galois::runtime::internal::ompi_op_sum<Ty>, mv);
   }
 #else
@@ -83,7 +84,8 @@ class DGAccumulator {
       MPI_Allreduce(&local_mdata, &global_mdata, 1, MPI::LONG_DOUBLE, MPI_SUM,
                     MPI_COMM_WORLD);
     } else {
-      static_assert(true, "Type of DGAccumulator not supported for MPI reduction");
+      static_assert(true,
+                    "Type of DGAccumulator not supported for MPI reduction");
     }
   }
 #endif
@@ -129,7 +131,8 @@ public:
    * @returns locally accumulated value
    */
   Ty read_local() {
-    if (local_mdata == 0) local_mdata = mdata.reduce();
+    if (local_mdata == 0)
+      local_mdata = mdata.reduce();
     return local_mdata;
   }
 
@@ -140,9 +143,7 @@ public:
    *
    * @returns the value of the last reduce call
    */
-  Ty read() {
-    return global_mdata;
-  }
+  Ty read() { return global_mdata; }
 
   /**
    * Reset the entire accumulator.
@@ -168,13 +169,14 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGAccum_" + runID);
 
-    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReducible");
     reduceTimer.start();
 
-    if (local_mdata == 0) local_mdata = mdata.reduce();
+    if (local_mdata == 0)
+      local_mdata = mdata.reduce();
 
-#ifdef GALOIS_USE_LWCI 
+#ifdef GALOIS_USE_LWCI
     reduce_lwci();
 #else
     reduce_mpi();
@@ -194,23 +196,23 @@ public:
  *
  * @tparam Ty type of value to max-reduce
  */
-template<typename Ty>
+template <typename Ty>
 class DGReduceMax {
-  galois::runtime::NetworkInterface& net = 
+  galois::runtime::NetworkInterface& net =
       galois::runtime::getSystemNetworkInterface();
 
   galois::GReduceMax<Ty> mdata; // local max reducer
   Ty local_mdata, global_mdata;
 
-  #ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LWCI
   /**
    * Use LWCI to reduce max across hosts
    */
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
                 &galois::runtime::internal::ompi_op_max<Ty>, mv);
   }
-  #else
+#else
   /**
    * Use MPI to reduce max across hosts
    */
@@ -241,14 +243,14 @@ class DGReduceMax {
                           "reduction");
     }
   }
-  #endif
+#endif
 
 public:
   /**
    * Default constructor; initializes everything to 0.
    */
   DGReduceMax() {
-    local_mdata = 0;
+    local_mdata  = 0;
     global_mdata = 0;
   }
 
@@ -257,9 +259,7 @@ public:
    *
    * @param rhs Value to max-reduce locally with
    */
-  void update(const Ty rhs) {
-    mdata.update(rhs);
-  }
+  void update(const Ty rhs) { mdata.update(rhs); }
 
   /**
    * Read the local reduced max value; if it has never been reduced, it will
@@ -270,7 +270,8 @@ public:
    * reduce has never been called
    */
   Ty read_local() {
-    if (local_mdata == 0) local_mdata = mdata.reduce();
+    if (local_mdata == 0)
+      local_mdata = mdata.reduce();
     return local_mdata;
   }
 
@@ -278,11 +279,9 @@ public:
    * Read the global reduced max value. For accurate results, you should
    * call reduce before calling this.
    *
-   * @returns the global value stored in the accumulator 
+   * @returns the global value stored in the accumulator
    */
-  Ty read() {
-    return global_mdata;
-  }
+  Ty read() { return global_mdata; }
 
   /**
    * Reset this accumulator.
@@ -306,17 +305,18 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGReduceMax_" + runID);
 
-    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReduceMax");
 
     reduceTimer.start();
-    if (local_mdata == 0) local_mdata = mdata.reduce();
+    if (local_mdata == 0)
+      local_mdata = mdata.reduce();
 
-    #ifdef GALOIS_USE_LWCI 
+#ifdef GALOIS_USE_LWCI
     reduce_lwci();
-    #else
+#else
     reduce_mpi();
-    #endif
+#endif
     reduceTimer.stop();
 
     return global_mdata;
@@ -331,23 +331,23 @@ public:
  *
  * @tparam Ty type of value to min-reduce
  */
-template<typename Ty>
+template <typename Ty>
 class DGReduceMin {
-  galois::runtime::NetworkInterface& net = 
+  galois::runtime::NetworkInterface& net =
       galois::runtime::getSystemNetworkInterface();
 
   galois::GReduceMin<Ty> mdata; // local min reducer
   Ty local_mdata, global_mdata;
 
-  #ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LWCI
   /**
    * Use LWCI to reduce min across hosts
    */
   inline void reduce_lwci() {
-    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty), 
+    lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
                 &galois::runtime::internal::ompi_op_min<Ty>, mv);
   }
-  #else
+#else
   /**
    * Use MPI to reduce min across hosts
    */
@@ -378,15 +378,16 @@ class DGReduceMin {
                           "reduction");
     }
   }
-  #endif
+#endif
 
 public:
   /**
    * Default constructor; initializes everything to the max value of the type.
    */
   DGReduceMin() {
-    local_mdata = std::numeric_limits<Ty>::max();
-    global_mdata = std::numeric_limits<Ty>::max();;
+    local_mdata  = std::numeric_limits<Ty>::max();
+    global_mdata = std::numeric_limits<Ty>::max();
+    ;
   }
 
   /**
@@ -394,9 +395,7 @@ public:
    *
    * @param rhs Value to min-reduce locally with
    */
-  void update(const Ty rhs) {
-    mdata.update(rhs);
-  }
+  void update(const Ty rhs) { mdata.update(rhs); }
 
   /**
    * Read the local reduced min value; if it has never been reduced, it will
@@ -407,7 +406,7 @@ public:
    * reduce has never been called
    */
   Ty read_local() {
-    if (local_mdata == std::numeric_limits<Ty>::max()) 
+    if (local_mdata == std::numeric_limits<Ty>::max())
       local_mdata = mdata.reduce();
     return local_mdata;
   }
@@ -416,11 +415,9 @@ public:
    * Read the global reduced min value. For accurate results, you should
    * call reduce before calling this.
    *
-   * @returns the global value stored in the accumulator 
+   * @returns the global value stored in the accumulator
    */
-  Ty read() {
-    return global_mdata;
-  }
+  Ty read() { return global_mdata; }
 
   /**
    * Reset this accumulator.
@@ -444,23 +441,23 @@ public:
   Ty reduce(std::string runID = std::string()) {
     std::string timer_str("ReduceDGReduceMin_" + runID);
 
-    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(), 
+    galois::CondStatTimer<MORE_DIST_STATS> reduceTimer(timer_str.c_str(),
                                                        "DGReduceMin");
 
     reduceTimer.start();
-    if (local_mdata == std::numeric_limits<Ty>::max()) 
+    if (local_mdata == std::numeric_limits<Ty>::max())
       local_mdata = mdata.reduce();
 
-    #ifdef GALOIS_USE_LWCI 
+#ifdef GALOIS_USE_LWCI
     reduce_lwci();
-    #else
+#else
     reduce_mpi();
-    #endif
+#endif
     reduceTimer.stop();
 
     return global_mdata;
   }
 };
 
-} // end galois namespace
+} // namespace galois
 #endif

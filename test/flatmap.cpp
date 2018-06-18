@@ -11,11 +11,10 @@
 #include <map>
 #include <random>
 
-
 struct element {
   volatile int val;
-  element(): val() { }
-  element(int x): val(x) { }
+  element() : val() {}
+  element(int x) : val(x) {}
   operator int() const { return val; }
 };
 
@@ -24,15 +23,13 @@ std::ostream& operator<<(std::ostream& out, const element& e) {
   return out;
 }
 
-template<typename MapTy>
+template <typename MapTy>
 struct Fn1 {
   MapTy* m;
-  void operator()(const int& x) const {
-    (*m)[x] = element(x);
-  }
+  void operator()(const int& x) const { (*m)[x] = element(x); }
 };
 
-template<typename MapTy>
+template <typename MapTy>
 struct Fn2 {
   MapTy* m;
   void operator()(const int& x) const {
@@ -41,20 +38,20 @@ struct Fn2 {
   }
 };
 
-template<typename MapTy>
+template <typename MapTy>
 void timeMapParallel(std::string c, const std::vector<int>& keys) {
   MapTy m;
   galois::Timer t1, t2;
   t1.start();
-  galois::do_all(galois::iterate(keys), Fn1<MapTy> { &m });
+  galois::do_all(galois::iterate(keys), Fn1<MapTy>{&m});
   t1.stop();
   t2.start();
-  galois::do_all(galois::iterate(keys), Fn2<MapTy> { &m });
+  galois::do_all(galois::iterate(keys), Fn2<MapTy>{&m});
   t2.stop();
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
 }
 
-template<typename MapTy>
+template <typename MapTy>
 void timeMap(std::string c, const std::vector<int>& keys) {
   MapTy m;
   galois::Timer t1, t2;
@@ -72,7 +69,7 @@ void timeMap(std::string c, const std::vector<int>& keys) {
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
 }
 
-template<typename MapTy>
+template <typename MapTy>
 void testMap() {
   MapTy m;
   MapTy m2(m);
@@ -80,7 +77,7 @@ void testMap() {
 
   m3.insert(std::make_pair(10, 0));
   m3.insert(std::make_pair(20, 0));
-  
+
   MapTy m4(m3.begin(), m3.end());
 
   m2 = m3;
@@ -97,8 +94,8 @@ void testMap() {
 
   std::cout << "10 == " << m.find(10)->first << "\n";
 
-  //m.erase(10);
-  //m.erase(1);
+  // m.erase(10);
+  // m.erase(1);
 
   if (m.size() != 7 || m.empty())
     abort();
@@ -136,9 +133,11 @@ void timeTests(std::string prefix, const std::vector<int>& keys) {
     timeMap<galois::flat_map<int, element>>(prefix + "flat_map", keys);
 #ifdef GALOIS_USE_EXP
   for (int i = 0; i < 3; ++i)
-    timeMap<galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map", keys);
+    timeMap<galois::concurrent_flat_map<int, element>>(
+        prefix + "concurrent_flat_map", keys);
   for (int i = 0; i < 3; ++i)
-    timeMapParallel<galois::concurrent_flat_map<int, element>>(prefix + "concurrent_flat_map (parallel)", keys);
+    timeMapParallel<galois::concurrent_flat_map<int, element>>(
+        prefix + "concurrent_flat_map (parallel)", keys);
 #endif
 }
 

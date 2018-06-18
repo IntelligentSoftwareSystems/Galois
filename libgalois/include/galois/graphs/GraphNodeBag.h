@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,7 +29,7 @@ namespace galois {
 /**
  * Stores graph nodes to execute for {@link Ligra} executor.
  */
-template<unsigned int BlockSize = 0>
+template <unsigned int BlockSize = 0>
 class GraphNodeBag {
   typedef galois::InsertBag<size_t, BlockSize> Bag;
   typedef galois::LargeArray<bool> Bitmask;
@@ -43,28 +43,26 @@ class GraphNodeBag {
 
   struct InitializeSmall {
     GraphNodeBag* self;
-    void operator()(size_t n) const {
-      self->bitmask[n] = 0;
-    }
+    void operator()(size_t n) const { self->bitmask[n] = 0; }
   };
 
   struct InitializeBig {
     GraphNodeBag* self;
     void operator()(unsigned id, unsigned total) {
       typedef typename Bitmask::iterator It;
-      std::pair<It,It> p = galois::block_range(self->bitmask.begin(), self->bitmask.end(), id, total);
+      std::pair<It, It> p = galois::block_range(self->bitmask.begin(),
+                                                self->bitmask.end(), id, total);
       std::fill(p.first, p.second, 0);
     }
   };
 
   struct Densify {
     GraphNodeBag* self;
-    void operator()(size_t n) const {
-      self->bitmask[n] = true;
-    }
+    void operator()(size_t n) const { self->bitmask[n] = true; }
   };
+
 public:
-  GraphNodeBag(size_t n): size(n), isDense(false) { }
+  GraphNodeBag(size_t n) : size(n), isDense(false) {}
 
   typedef typename Bag::iterator iterator;
   typedef typename Bag::local_iterator local_iterator;
@@ -96,10 +94,10 @@ public:
   void clear() {
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
-        InitializeSmall fn = { this };
+        InitializeSmall fn = {this};
         galois::do_all(galois::iterate(bag), fn);
       } else {
-        InitializeBig fn = { this };
+        InitializeBig fn = {this};
         galois::on_each(fn);
       }
     }
@@ -123,7 +121,7 @@ public:
       bitmask.create(size);
     }
 
-    Densify fn = { this };
+    Densify fn = {this};
     galois::do_all(galois::iterate(bag), fn);
   }
 };
@@ -133,18 +131,19 @@ public:
  * GraphNodeBag}, this class stores two bags to facilitate bulk-synchronous
  * processing.
  */
-template<unsigned int BlockSize = 0>
+template <unsigned int BlockSize = 0>
 class GraphNodeBagPair {
   GraphNodeBag<BlockSize> bag1;
   GraphNodeBag<BlockSize> bag2;
   int curp;
+
 public:
   typedef GraphNodeBag<BlockSize> bag_type;
 
-  GraphNodeBagPair(size_t n): bag1(n), bag2(n), curp(0) { }
+  GraphNodeBagPair(size_t n) : bag1(n), bag2(n), curp(0) {}
 
   GraphNodeBag<BlockSize>& cur() { return (*this)[curp]; }
-  GraphNodeBag<BlockSize>& next() { return (*this)[(curp+1) & 1]; }
+  GraphNodeBag<BlockSize>& next() { return (*this)[(curp + 1) & 1]; }
   void swap() {
     curp = (curp + 1) & 1;
     next().clear();
@@ -157,5 +156,5 @@ public:
   }
 };
 
-}
+} // namespace galois
 #endif

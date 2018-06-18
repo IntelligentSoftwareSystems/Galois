@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,18 +33,17 @@
 namespace galois {
 
 //! Unordered collection of bounded size
-template<typename T, unsigned ChunkSize, bool Concurrent>
+template <typename T, unsigned ChunkSize, bool Concurrent>
 class FixedSizeBagBase {
   LazyArray<T, ChunkSize> datac;
-  typedef typename boost::mpl::if_c<Concurrent, std::atomic<unsigned>, unsigned>::type Count;
+  typedef typename boost::mpl::if_c<Concurrent, std::atomic<unsigned>,
+                                    unsigned>::type Count;
   Count count;
 
   T* at(unsigned i) { return &datac[i]; }
   const T* at(unsigned i) const { return &datac[i]; }
 
-  bool precondition() const {
-    return count <= ChunkSize;
-  }
+  bool precondition() const { return count <= ChunkSize; }
 
 public:
   typedef T value_type;
@@ -57,10 +56,10 @@ public:
   typedef pointer reverse_iterator;
   typedef const_pointer const_reverse_iterator;
 
-  FixedSizeBagBase(): count(0) { }
+  FixedSizeBagBase() : count(0) {}
 
-  template<typename InputIterator>
-  FixedSizeBagBase(InputIterator first, InputIterator last): count(0) {
+  template <typename InputIterator>
+  FixedSizeBagBase(InputIterator first, InputIterator last) : count(0) {
     while (first != last) {
       assert(count < ChunkSize);
       datac.emplace(count++, *first++);
@@ -70,9 +69,7 @@ public:
   FixedSizeBagBase(const FixedSizeBagBase& o) = delete;
   FixedSizeBagBase& operator=(const FixedSizeBagBase& o) = delete;
 
-  ~FixedSizeBagBase() {
-    clear();
-  }
+  ~FixedSizeBagBase() { clear(); }
 
   unsigned size() const {
     assert(precondition());
@@ -96,19 +93,24 @@ public:
     count = 0;
   }
 
-  template<typename U>
-  pointer push_back(U&& val) { return push_front(std::forward<U>(val)); }
+  template <typename U>
+  pointer push_back(U&& val) {
+    return push_front(std::forward<U>(val));
+  }
 
-  template<typename... Args>
-  pointer emplace_back(Args&&... args) { return emplace_front(std::forward<Args>(args)...); }
+  template <typename... Args>
+  pointer emplace_back(Args&&... args) {
+    return emplace_front(std::forward<Args>(args)...);
+  }
 
-  template<typename U, bool C = Concurrent>
-  auto push_front(U&& val) -> typename std::enable_if<!C,pointer>::type {
+  template <typename U, bool C = Concurrent>
+  auto push_front(U&& val) -> typename std::enable_if<!C, pointer>::type {
     return emplace_front(std::forward<U>(val));
   }
 
-  template<bool C = Concurrent>
-  auto push_front(const value_type& val) -> typename std::enable_if<C,pointer>::type {
+  template <bool C = Concurrent>
+  auto push_front(const value_type& val) ->
+      typename std::enable_if<C, pointer>::type {
     unsigned top;
     do {
       top = count.load(std::memory_order_relaxed);
@@ -123,9 +125,11 @@ public:
    * possible for clients to know in advance whether insertion will succeed,
    * which will leave xvalue arguments in indeterminate state.
    */
-  template<typename... Args, bool C = Concurrent>
-  auto emplace_front(Args&&... args) -> typename std::enable_if<!C,pointer>::type {
-    if (full()) return 0;
+  template <typename... Args, bool C = Concurrent>
+  auto emplace_front(Args&&... args) ->
+      typename std::enable_if<!C, pointer>::type {
+    if (full())
+      return 0;
     unsigned top = count++;
     return datac.emplace(top, std::forward<Args>(args)...);
   }
@@ -134,9 +138,7 @@ public:
   const_reference back() const { return front(); }
   galois::optional<value_type> extract_back() { return extract_front(); }
 
-  bool pop_back() {
-    return pop_front();
-  }
+  bool pop_back() { return pop_front(); }
 
   reference front() {
     assert(precondition());
@@ -144,12 +146,11 @@ public:
     return *at(count - 1);
   }
 
-  const_reference front() const {
-    return *at(count - 1);
-  }
+  const_reference front() const { return *at(count - 1); }
 
-  template<bool C = Concurrent>
-  auto extract_front() -> typename std::enable_if<!C, galois::optional<value_type>>::type {
+  template <bool C = Concurrent>
+  auto extract_front() ->
+      typename std::enable_if<!C, galois::optional<value_type>>::type {
     if (!empty()) {
       galois::optional<value_type> retval(back());
       pop_back();
@@ -159,7 +160,7 @@ public:
   }
 
   //! returns true if something was popped
-  template<bool C = Concurrent>
+  template <bool C = Concurrent>
   auto pop_front() -> typename std::enable_if<C, bool>::type {
     unsigned top;
     do {
@@ -172,7 +173,7 @@ public:
   }
 
   //! returns true if something was popped
-  template<bool C = Concurrent>
+  template <bool C = Concurrent>
   auto pop_front() -> typename std::enable_if<!C, bool>::type {
     if (count == 0)
       return false;
@@ -192,16 +193,16 @@ public:
 };
 
 //! Unordered collection of bounded size
-template<typename T, unsigned ChunkSize = 64>
+template <typename T, unsigned ChunkSize = 64>
 using FixedSizeBag = FixedSizeBagBase<T, ChunkSize, false>;
 
-//! Unordered collection of bounded size with concurrent insertion or deletion but not
-//! both simultaneously
-template<typename T, unsigned ChunkSize = 64>
+//! Unordered collection of bounded size with concurrent insertion or deletion
+//! but not both simultaneously
+template <typename T, unsigned ChunkSize = 64>
 using ConcurrentFixedSizeBag = FixedSizeBagBase<T, ChunkSize, true>;
 
 //! Ordered collection of bounded size
-template<typename T, unsigned ChunkSize = 64>
+template <typename T, unsigned ChunkSize = 64>
 class FixedSizeRing {
   LazyArray<T, ChunkSize> datac;
   unsigned start;
@@ -210,26 +211,24 @@ class FixedSizeRing {
   T* at(unsigned i) { return &datac[i]; }
   const T* at(unsigned i) const { return &datac[i]; }
 
-  bool precondition() const {
-    return count <= ChunkSize && start <= ChunkSize;
-  }
+  bool precondition() const { return count <= ChunkSize && start <= ChunkSize; }
 
-  template<typename U>
-  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::random_access_traversal_tag> {
+  template <typename U>
+  class Iterator
+      : public boost::iterator_facade<Iterator<U>, U,
+                                      boost::random_access_traversal_tag> {
     friend class boost::iterator_core_access;
     U* base;
     unsigned cur;
     unsigned count;
 
-    template<typename OtherTy>
+    template <typename OtherTy>
     bool equal(const Iterator<OtherTy>& o) const {
       assert(base && o.base);
       return &base[cur] == &o.base[o.cur] && count == o.count;
     }
 
-    U& dereference() const {
-      return base[cur];
-    }
+    U& dereference() const { return base[cur]; }
 
     void increment() {
       assert(base && count != 0);
@@ -249,18 +248,19 @@ class FixedSizeRing {
     }
 
     ptrdiff_t distance_to(const Iterator& o) const {
-      ptrdiff_t c = count;
+      ptrdiff_t c  = count;
       ptrdiff_t oc = o.count;
       return c - oc;
     }
 
   public:
-    Iterator(): base(0), cur(0), count(0) { }
+    Iterator() : base(0), cur(0), count(0) {}
 
-    template<typename OtherTy>
-    Iterator(const Iterator<OtherTy>& o): base(o.base), cur(o.cur), count(o.count) { }
+    template <typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o)
+        : base(o.base), cur(o.cur), count(o.count) {}
 
-    Iterator(U* b, unsigned c, unsigned co): base(b), cur(c), count(co) { }
+    Iterator(U* b, unsigned c, unsigned co) : base(b), cur(c), count(co) {}
   };
 
 public:
@@ -273,10 +273,10 @@ public:
   typedef boost::reverse_iterator<Iterator<T>> reverse_iterator;
   typedef boost::reverse_iterator<Iterator<const T>> const_reverse_iterator;
 
-  FixedSizeRing(): start(0), count(0) { }
+  FixedSizeRing() : start(0), count(0) {}
 
-  template<typename InputIterator>
-  FixedSizeRing(InputIterator first, InputIterator last): start(0), count(0) {
+  template <typename InputIterator>
+  FixedSizeRing(InputIterator first, InputIterator last) : start(0), count(0) {
     while (first != last) {
       assert(count < ChunkSize);
       datac.emplace(count++, *first++);
@@ -286,9 +286,7 @@ public:
   FixedSizeRing(const FixedSizeRing& o) = delete;
   FixedSizeRing& operator=(const FixedSizeRing& o) = delete;
 
-  ~FixedSizeRing() {
-    clear();
-  }
+  ~FixedSizeRing() { clear(); }
 
   unsigned size() const {
     assert(precondition());
@@ -327,9 +325,10 @@ public:
 
   // NB(ddn): Keeping emplace_front/_back code paths separate to improve
   // branch prediction etc
-  template<typename... Args>
+  template <typename... Args>
   pointer emplace(iterator pos, Args&&... args) {
-    if (full()) return 0;
+    if (full())
+      return 0;
     unsigned i;
     if (pos == begin()) {
       i = start = (start + ChunkSize - 1) % ChunkSize;
@@ -339,7 +338,7 @@ public:
       ++count;
     } else {
       auto d = std::distance(begin(), pos);
-      i = (start + d) % ChunkSize;
+      i      = (start + d) % ChunkSize;
       emplace_back();
       std::move_backward(begin() + d, end() - 1, end());
       datac.destroy(i);
@@ -347,27 +346,29 @@ public:
     return datac.emplace(i, std::forward<Args>(args)...);
   }
 
-  template<typename U>
+  template <typename U>
   pointer push_front(U&& val) {
     return emplace_front(std::forward<U>(val));
   }
 
-  template<typename... Args>
+  template <typename... Args>
   pointer emplace_front(Args&&... args) {
-    if (full()) return 0;
+    if (full())
+      return 0;
     start = (start + ChunkSize - 1) % ChunkSize;
     ++count;
     return datac.emplace(start, std::forward<Args>(args)...);
   }
 
-  template<typename U>
+  template <typename U>
   pointer push_back(U&& val) {
     return emplace_back(std::forward<U>(val));
   }
 
-  template<typename... Args>
+  template <typename... Args>
   pointer emplace_back(Args&&... args) {
-    if (full()) return 0;
+    if (full())
+      return 0;
     unsigned end = (start + count) % ChunkSize;
     ++count;
     return datac.emplace(end, std::forward<Args>(args)...);
@@ -433,7 +434,9 @@ public:
   iterator begin() { return iterator(at(0), start, count); }
   iterator end() { return iterator(at(0), (start + count) % ChunkSize, 0); }
   const_iterator begin() const { return const_iterator(at(0), start, count); }
-  const_iterator end() const { return const_iterator(at(0), (start + count) % ChunkSize, 0); }
+  const_iterator end() const {
+    return const_iterator(at(0), (start + count) % ChunkSize, 0);
+  }
 
   reverse_iterator rbegin() { return reverse_iterator(end()); }
   reverse_iterator rend() { return reverse_iterator(begin()); }
@@ -441,5 +444,5 @@ public:
   const_iterator rend() const { const_reverse_iterator(this->begin()); }
 };
 
-}
+} // namespace galois
 #endif

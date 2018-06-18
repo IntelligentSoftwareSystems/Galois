@@ -36,41 +36,46 @@ using namespace std;
 //      in the new graph are the children in the bfs tree)
 // **************************************************************
 
-struct nonNegF{bool operator() (int a) {return (a>=0);}};
+struct nonNegF {
+  bool operator()(int a) { return (a >= 0); }
+};
 
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=1, int maxTries=-1) {
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
-  maxRoundSize = e-s;
-  S *state;
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 1,
+                     int maxTries = -1) {
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (e - s) / granularity + 1;
+  maxRoundSize     = e - s;
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
-  int failed = 0;
+  int failed     = 0;
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-//      abort();
+      //      cerr << "speculativeLoop: too many iterations, increase maxTries
+      //      parameter\n"; abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
       abort();
     } else {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-	int II = numberDone + i;
+      //      parallel_for (int i =0; i < size; i++) {
+      parallel_doall(int, i, 0, size) {
+        int II = numberDone + i;
         step.commit(II);
-      } parallel_doall_end
+      }
+      parallel_doall_end
     }
 
     // keep edges that failed to hook for next round
@@ -80,79 +85,92 @@ void speculative_for(S step, int s, int e, int granularity,
   }
   if (hasState)
     free(state);
-  //cout << "rounds = " << round << " failed = " << failed << "\n";
+  // cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
 struct BFSstep {
-  vertex *G;
+  vertex* G;
   vindex* Frontier;
   int* Visited;
   vindex* FrontierNext;
   int* Counts;
   int* Marks;
 
-  BFSstep(vertex* _G, vindex* _Frontier, int* _Visited, vindex* _FrontierNext, int* _Counts, int* _Marks):
-    G(_G), Frontier(_Frontier), Visited(_Visited), FrontierNext(_FrontierNext), Counts(_Counts), Marks(_Marks) { }
+  BFSstep(vertex* _G, vindex* _Frontier, int* _Visited, vindex* _FrontierNext,
+          int* _Counts, int* _Marks)
+      : G(_G), Frontier(_Frontier), Visited(_Visited),
+        FrontierNext(_FrontierNext), Counts(_Counts), Marks(_Marks) {}
 
   bool commit(int i) {
-    int k= 0;
+    int k    = 0;
     vindex v = Frontier[i];
-    int o = Counts[i];
-    for (int j=0; j < G[v].degree; j++) {
+    int o    = Counts[i];
+    for (int j = 0; j < G[v].degree; j++) {
       vindex ngh = G[v].Neighbors[j];
-      if (Visited[ngh] == -1 && utils::CAS(&Marks[ngh],INT_MAX,v)) {
-        Visited[ngh] = 1;
-        FrontierNext[o+j] = G[v].Neighbors[k++] = ngh;
-//        Marks[ngh] = INT_MAX;
-      } else 
-        FrontierNext[o+j] = -1;
+      if (Visited[ngh] == -1 && utils::CAS(&Marks[ngh], INT_MAX, v)) {
+        Visited[ngh]        = 1;
+        FrontierNext[o + j] = G[v].Neighbors[k++] = ngh;
+        //        Marks[ngh] = INT_MAX;
+      } else
+        FrontierNext[o + j] = -1;
     }
     G[v].degree = k;
     return true;
   }
 };
 
-pair<int,int> BFS(vindex start, graph GA) {
+pair<int, int> BFS(vindex start, graph GA) {
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds <= 0 ? 1 : numRounds;
+  numRounds     = numRounds <= 0 ? 1 : numRounds;
 
-  int numVertices = GA.n;
-  int numEdges = GA.m;
-  vertex *G = GA.V;
-  vindex* Frontier = newA(vindex,numEdges);
-  int* Visited = newA(vindex,numVertices);
-  int* Marks = newA(vindex,numVertices);
-  vindex* FrontierNext = newA(vindex,numEdges);
-  int* Counts = newA(int,numVertices);
-//  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
-  {parallel_doall(int, i, 0, numVertices) { Visited[i] = -1;} parallel_doall_end }
-  {parallel_doall(int, i, 0, numVertices) { Marks[i] = INT_MAX;} parallel_doall_end }
+  int numVertices      = GA.n;
+  int numEdges         = GA.m;
+  vertex* G            = GA.V;
+  vindex* Frontier     = newA(vindex, numEdges);
+  int* Visited         = newA(vindex, numVertices);
+  int* Marks           = newA(vindex, numVertices);
+  vindex* FrontierNext = newA(vindex, numEdges);
+  int* Counts          = newA(int, numVertices);
+  //  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
+  {parallel_doall(int, i, 0, numVertices){Visited[i] = -1;
+}
+parallel_doall_end
+}
+{parallel_doall(int, i, 0, numVertices){Marks[i] = INT_MAX;
+}
+parallel_doall_end
+}
 
-  Frontier[0] = start;
-  int frontierSize = 1;
-  Visited[start] = 1;
+Frontier[0]      = start;
+int frontierSize = 1;
+Visited[start]   = 1;
 
-  int totalVisited = 0;
-  int round = 0;
+int totalVisited = 0;
+int round        = 0;
 
-  while (frontierSize > 0) {
-    round++;
-    totalVisited += frontierSize;
+while (frontierSize > 0) {
+  round++;
+  totalVisited += frontierSize;
 
-//    {parallel_for (int i=0; i < frontierSize; i++) 
-    {
-      parallel_doall(int, i, 0, frontierSize) {
-	Counts[i] = G[Frontier[i]].degree;
-      } parallel_doall_end
+  //    {parallel_for (int i=0; i < frontierSize; i++)
+  {
+    parallel_doall(int, i, 0, frontierSize) {
+      Counts[i] = G[Frontier[i]].degree;
     }
-    int nr = sequence::scan(Counts,Counts,frontierSize,utils::addF<int>(),0);
-
-    BFSstep bfs(G, Frontier, Visited, FrontierNext, Counts, Marks);
-    speculative_for(bfs, 0, frontierSize, numRounds, 0);
-
-    // Filter out the empty slots (marked with -1)
-    frontierSize = sequence::filter(FrontierNext,Frontier,nr,nonNegF());
+    parallel_doall_end
   }
-  free(FrontierNext); free(Frontier); free(Counts); free(Visited); free(Marks);
-  return pair<int,int>(totalVisited,round);
+  int nr = sequence::scan(Counts, Counts, frontierSize, utils::addF<int>(), 0);
+
+  BFSstep bfs(G, Frontier, Visited, FrontierNext, Counts, Marks);
+  speculative_for(bfs, 0, frontierSize, numRounds, 0);
+
+  // Filter out the empty slots (marked with -1)
+  frontierSize = sequence::filter(FrontierNext, Frontier, nr, nonNegF());
+}
+free(FrontierNext);
+free(Frontier);
+free(Counts);
+free(Visited);
+free(Marks);
+return pair<int, int>(totalVisited, round);
 }

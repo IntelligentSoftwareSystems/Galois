@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 9/7/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -30,55 +30,59 @@
 #include <cmath>
 #include <iostream>
 
-bool Shape::consistencyTest (const double * X, const double Pert) const {
-  double *DValNum = new double[getNumFunctions () * getNumVariables ()];
-  double *DValAnal = new double[getNumFunctions () * getNumVariables ()];
-  double *Xpert = new double[getNumVariables ()];
-  double *Valplus = new double[getNumFunctions ()];
-  double *Valminus = new double[getNumFunctions ()];
+bool Shape::consistencyTest(const double* X, const double Pert) const {
+  double* DValNum  = new double[getNumFunctions() * getNumVariables()];
+  double* DValAnal = new double[getNumFunctions() * getNumVariables()];
+  double* Xpert    = new double[getNumVariables()];
+  double* Valplus  = new double[getNumFunctions()];
+  double* Valminus = new double[getNumFunctions()];
 
   if (Pert <= 0)
-    std::cerr << "Shape::ConsistencyTest - Pert cannot be less or equal than zero\n";
+    std::cerr
+        << "Shape::ConsistencyTest - Pert cannot be less or equal than zero\n";
 
-  for (size_t i = 0; i < getNumVariables (); i++) {
+  for (size_t i = 0; i < getNumVariables(); i++) {
     Xpert[i] = X[i];
-    for (size_t a = 0; a < getNumFunctions (); a++)
-      DValAnal[a * getNumVariables () + i] = getDVal (a, X, i);
+    for (size_t a = 0; a < getNumFunctions(); a++)
+      DValAnal[a * getNumVariables() + i] = getDVal(a, X, i);
   }
 
-  for (size_t i = 0; i < getNumVariables (); i++) {
+  for (size_t i = 0; i < getNumVariables(); i++) {
     Xpert[i] = X[i] + Pert;
-    for (size_t a = 0; a < getNumFunctions (); a++)
-      Valplus[a] = getVal (a, Xpert);
+    for (size_t a = 0; a < getNumFunctions(); a++)
+      Valplus[a] = getVal(a, Xpert);
 
     Xpert[i] = X[i] - Pert;
-    for (size_t a = 0; a < getNumFunctions (); a++)
-      Valminus[a] = getVal (a, Xpert);
+    for (size_t a = 0; a < getNumFunctions(); a++)
+      Valminus[a] = getVal(a, Xpert);
 
     Xpert[i] = X[i];
 
-    for (size_t a = 0; a < getNumFunctions (); a++)
-      DValNum[a * getNumVariables () + i] = (Valplus[a] - Valminus[a]) / (2 * Pert);
+    for (size_t a = 0; a < getNumFunctions(); a++)
+      DValNum[a * getNumVariables() + i] =
+          (Valplus[a] - Valminus[a]) / (2 * Pert);
   }
 
-  double error = 0;
-  double normX = 0;
-  double normDValNum = 0;
+  double error        = 0;
+  double normX        = 0;
+  double normDValNum  = 0;
   double normDValAnal = 0;
 
-  for (size_t i = 0; i < getNumVariables (); i++) {
+  for (size_t i = 0; i < getNumVariables(); i++) {
     normX += X[i] * X[i];
 
-    for (size_t a = 0; a < getNumFunctions (); a++) {
-      error += pow (DValAnal[a * getNumVariables () + i] - DValNum[a * getNumVariables () + i], 2.);
-      normDValAnal += pow (DValAnal[a * getNumVariables () + i], 2.);
-      normDValNum += pow (DValNum[a * getNumVariables () + i], 2.);
+    for (size_t a = 0; a < getNumFunctions(); a++) {
+      error += pow(DValAnal[a * getNumVariables() + i] -
+                       DValNum[a * getNumVariables() + i],
+                   2.);
+      normDValAnal += pow(DValAnal[a * getNumVariables() + i], 2.);
+      normDValNum += pow(DValNum[a * getNumVariables() + i], 2.);
     }
   }
-  error = sqrt (error);
-  normX = sqrt (normX);
-  normDValAnal = sqrt (normDValAnal);
-  normDValNum = sqrt (normDValNum);
+  error        = sqrt(error);
+  normX        = sqrt(normX);
+  normDValAnal = sqrt(normDValAnal);
+  normDValNum  = sqrt(normDValNum);
 
   delete[] Valplus;
   delete[] Valminus;
@@ -86,10 +90,10 @@ bool Shape::consistencyTest (const double * X, const double Pert) const {
   delete[] DValNum;
   delete[] DValAnal;
 
-  if (error * (normX + Pert) < (normDValAnal < normDValNum ? normDValNum : normDValAnal) * Pert * 10) {
+  if (error * (normX + Pert) <
+      (normDValAnal < normDValNum ? normDValNum : normDValAnal) * Pert * 10) {
     return true;
   } else {
     return false;
   }
 }
-

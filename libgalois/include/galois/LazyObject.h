@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,7 +23,8 @@
 #include "galois/gIO.h"
 #include "galois/TypeTraits.h"
 
-// For consistent name, use boost rather than C++11 std::is_trivially_constuctible
+// For consistent name, use boost rather than C++11
+// std::is_trivially_constuctible
 #include <boost/type_traits/has_trivial_constructor.hpp>
 
 #include <type_traits>
@@ -36,30 +37,31 @@ namespace galois {
  * member optimization, users should subclass this class, otherwise the
  * compiler will insert non-zero padding for fields (even when empty).
  */
-template<typename T>
+template <typename T>
 class StrictObject {
   T data;
+
 public:
   typedef T value_type;
   typedef T& reference;
   typedef const T& const_reference;
   const static bool has_value = true;
 
-  StrictObject() { }
-  StrictObject(const_reference t): data(t) { }
+  StrictObject() {}
+  StrictObject(const_reference t) : data(t) {}
   const_reference get() const { return data; }
   reference get() { return data; }
 };
 
-template<>
+template <>
 struct StrictObject<void> {
   typedef void* value_type;
   typedef void* reference;
   typedef void* const_reference;
   const static bool has_value = false;
 
-  StrictObject() { }
-  StrictObject(const_reference) { }
+  StrictObject() {}
+  StrictObject(const_reference) {}
   reference get() const { return 0; }
 };
 
@@ -69,16 +71,18 @@ struct StrictObject<void> {
  * otherwise the compiler will insert non-zero padding for fields (even when
  * empty).
  */
-template<typename T>
+template <typename T>
 class LazyObject {
-  typedef typename std::aligned_storage<sizeof(T), std::alignment_of<T>::value>::type CharData;
+  typedef
+      typename std::aligned_storage<sizeof(T),
+                                    std::alignment_of<T>::value>::type CharData;
 
   union Data {
     CharData buf;
     T value_;
 
-    Data() { }
-    ~Data() { }
+    Data() {}
+    ~Data() {}
 
     T& value() { return value_; }
     const T& value() const { return value_; }
@@ -103,14 +107,16 @@ public:
   void destroy() { cast()->~T(); }
   void construct(const_reference x) { new (cast()) T(x); }
 
-  template<typename... Args>
-  void construct(Args&&... args) { new (cast()) T(std::forward<Args>(args)...); }
+  template <typename... Args>
+  void construct(Args&&... args) {
+    new (cast()) T(std::forward<Args>(args)...);
+  }
 
   const_reference get() const { return *cast(); }
   reference get() { return *cast(); }
 };
 
-template<>
+template <>
 struct LazyObject<void> {
   typedef void* value_type;
   typedef void* reference;
@@ -120,14 +126,14 @@ struct LazyObject<void> {
     const static size_t value = 0;
   };
 
-  void destroy() { }
-  void construct(const_reference x) { }
+  void destroy() {}
+  void construct(const_reference x) {}
 
-  template<typename... Args>
-  void construct(Args&&... args) { }
+  template <typename... Args>
+  void construct(Args&&... args) {}
 
   const_reference get() const { return 0; }
 };
 
-}
+} // namespace galois
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -44,12 +44,13 @@ void* pagePoolAlloc();
 void pagePoolFree(void*);
 void pagePoolPreAlloc(unsigned);
 
-//Size of returned pages
+// Size of returned pages
 size_t pagePoolSize();
 
 //! Returns total large pages allocated by Galois memory management subsystem
 int numPagePoolAllocTotal();
-//! Returns total large pages allocated for thread by Galois memory management subsystem
+//! Returns total large pages allocated for thread by Galois memory management
+//! subsystem
 int numPagePoolAllocForThread(unsigned tid);
 
 namespace internal {
@@ -62,7 +63,7 @@ typedef galois::substrate::PtrLock<FreeNode> HeadPtr;
 typedef galois::substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
-template <typename _UNUSED=void>
+template <typename _UNUSED = void>
 class PageAllocState {
   std::deque<std::atomic<int>> counts;
   std::vector<HeadPtrStorage> pool;
@@ -86,16 +87,14 @@ public:
     pool.resize(num);
   }
 
-  int count(int tid) const {
-    return counts[tid];
-  }
+  int count(int tid) const { return counts[tid]; }
 
   int countAll() const {
     return std::accumulate(counts.begin(), counts.end(), 0);
   }
 
   void* pageAlloc() {
-    auto tid = galois::substrate::ThreadPool::getTID();
+    auto tid    = galois::substrate::ThreadPool::getTID();
     HeadPtr& hp = pool[tid].data;
     if (hp.getValue()) {
       hp.lock();
@@ -118,13 +117,11 @@ public:
     HeadPtr& hp = pool[i].data;
     hp.lock();
     FreeNode* nh = reinterpret_cast<FreeNode*>(ptr);
-    nh->next = hp.getValue();
+    nh->next     = hp.getValue();
     hp.unlock_and_set(nh);
   }
 
-  void pagePreAlloc() {
-    pageFree(allocFromOS());
-  }
+  void pagePreAlloc() { pageFree(allocFromOS()); }
 };
 
 //! Initialize PagePool, used by runtime::init();

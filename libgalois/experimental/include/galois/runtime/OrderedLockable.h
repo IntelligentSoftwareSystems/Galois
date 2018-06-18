@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,32 +34,30 @@ namespace runtime {
 using dbg = galois::debug<1>;
 
 template <typename T>
-class OrderedContextBase: public SimpleRuntimeContext {
+class OrderedContextBase : public SimpleRuntimeContext {
   using Base = SimpleRuntimeContext;
 
 protected:
-
   T active;
 
 public:
+  explicit OrderedContextBase(const T& x)
+      : Base(true), // call overriden subAcquire
+        active(x) {}
 
-  explicit OrderedContextBase (const T& x):
-    Base (true), // call overriden subAcquire
-    active (x)
-  {}
+  const T& getActive(void) const { return active; }
 
-  const T& getActive (void) const { return active; }
+  // XXX: disable this. It will only work for modifications that don't change
+  // the priority
+  T& getActive() { return active; }
 
-  // XXX: disable this. It will only work for modifications that don't change the priority
-  T& getActive () { return active; }
+  operator const T&(void)const { return getActive(); }
 
-  operator const T& (void) const { return getActive (); }
+  operator T(void) const { return getActive(); }
 
-  operator T (void) const { return getActive (); }
-
-  // XXX: disable this. It will only work for modifications that don't change the priority
-  operator T& (void) const { return getActive (); }
-
+  // XXX: disable this. It will only work for modifications that don't change
+  // the priority
+  operator T&(void)const { return getActive(); }
 };
 
 // TODO: change comparator to three valued int instead of bool
@@ -67,21 +65,19 @@ template <typename Ctxt, typename Cmp>
 struct ContextComparator {
   const Cmp& cmp;
 
-  explicit ContextComparator (const Cmp& cmp): cmp (cmp) {}
+  explicit ContextComparator(const Cmp& cmp) : cmp(cmp) {}
 
-  inline bool operator () (const Ctxt* left, const Ctxt* right) const {
-    assert (left != NULL);
-    assert (right != NULL);
-    return cmp (left->getActive (), right->getActive ());
+  inline bool operator()(const Ctxt* left, const Ctxt* right) const {
+    assert(left != NULL);
+    assert(right != NULL);
+    return cmp(left->getActive(), right->getActive());
   }
 };
 
-
 template <typename T, typename Cmp>
-class TwoPhaseContext: public OrderedContextBase<T> {
+class TwoPhaseContext : public OrderedContextBase<T> {
 
 public:
-
   using Base = OrderedContextBase<T>;
   // using NhoodList =  galois::gdeque<Lockable*, 4>;
   using CtxtCmp = ContextComparator<TwoPhaseContext, Cmp>;
@@ -89,50 +85,37 @@ public:
   CtxtCmp ctxtCmp;
   bool source = true;
 
-
   using value_type = T;
 
-  explicit TwoPhaseContext (const T& x, const Cmp& cmp)
-    :
-      Base (x),  // pass true so that Base::acquire invokes virtual subAcquire
-      ctxtCmp (cmp),
-      source (true)
-  {}
+  explicit TwoPhaseContext(const T& x, const Cmp& cmp)
+      : Base(x), // pass true so that Base::acquire invokes virtual subAcquire
+        ctxtCmp(cmp), source(true) {}
 
-  bool isSrc (void) const {
-    return source;
-  }
+  bool isSrc(void) const { return source; }
 
-  void disableSrc (void) {
-    source = false;
-  }
+  void disableSrc(void) { source = false; }
 
-  void reset () {
-    source = true;
-  }
+  void reset() { source = true; }
 
-  void enableSrc (void) {
-    source = true;
-  }
+  void enableSrc(void) { source = true; }
 
-  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
+  virtual void subAcquire(Lockable* l, galois::MethodFlag) {
 
-
-    if (Base::tryLock (l)) {
-      Base::addToNhood (l);
+    if (Base::tryLock(l)) {
+      Base::addToNhood(l);
     }
 
     TwoPhaseContext* other = nullptr;
 
     do {
-      other = static_cast<TwoPhaseContext*> (Base::getOwner (l));
+      other = static_cast<TwoPhaseContext*>(Base::getOwner(l));
 
       if (other == this) {
         return;
       }
 
       if (other) {
-        bool conflict = ctxtCmp (other, this); // *other < *this
+        bool conflict = ctxtCmp(other, this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           this->source = false;
@@ -148,41 +131,39 @@ public:
 
     return;
 
-
     // bool succ = false;
     // if (Base::tryAcquire (l) == Base::NEW_OWNER) {
-      // Base::addToNhood (l);
-      // succ = true;
+    // Base::addToNhood (l);
+    // succ = true;
     // }
-//
+    //
     // assert (Base::getOwner (l) != NULL);
-//
+    //
     // if (!succ) {
-      // while (true) {
-        // TwoPhaseContext* that = static_cast<TwoPhaseContext*> (Base::getOwner (l));
-//
-        // assert (that != NULL);
-        // assert (this != that);
-//
-        // if (PtrComparator::compare (this, that)) { // this < that
-          // if (Base::stealByCAS (that, this)) {
-            // that->source = false;
-            // break;
-          // }
-//
-        // } else { // this >= that
-          // this->source = false;
-          // break;
-        // }
-      // }
+    // while (true) {
+    // TwoPhaseContext* that = static_cast<TwoPhaseContext*> (Base::getOwner
+    // (l));
+    //
+    // assert (that != NULL);
+    // assert (this != that);
+    //
+    // if (PtrComparator::compare (this, that)) { // this < that
+    // if (Base::stealByCAS (that, this)) {
+    // that->source = false;
+    // break;
+    // }
+    //
+    // } else { // this >= that
+    // this->source = false;
+    // break;
+    // }
+    // }
     // } // end outer if
   } // end subAcquire
 
-  virtual bool owns (Lockable* l, MethodFlag m) const {
-    return (static_cast<TwoPhaseContext*> (Base::getOwner(l)) == this);
+  virtual bool owns(Lockable* l, MethodFlag m) const {
+    return (static_cast<TwoPhaseContext*>(Base::getOwner(l)) == this);
   }
-
-
 };
 
 template <typename NItem, typename Ctxt, typename CtxtCmp>
@@ -190,18 +171,18 @@ struct OrdLocFactoryBase {
 
   CtxtCmp ctxtcmp;
 
-  explicit OrdLocFactoryBase (const CtxtCmp& ctxtcmp): ctxtcmp (ctxtcmp) {}
+  explicit OrdLocFactoryBase(const CtxtCmp& ctxtcmp) : ctxtcmp(ctxtcmp) {}
 
-  void construct (NItem* ni, Lockable* l) const {
-    assert (ni != nullptr);
-    assert (l != nullptr);
+  void construct(NItem* ni, Lockable* l) const {
+    assert(ni != nullptr);
+    assert(l != nullptr);
 
-    new (ni) NItem (l, ctxtcmp);
+    new (ni) NItem(l, ctxtcmp);
   }
 };
 
 template <typename NItem, typename Ctxt, typename CtxtCmp>
-struct OrdLocBase: public LockManagerBase {
+struct OrdLocBase : public LockManagerBase {
 
   using Base = LockManagerBase;
 
@@ -209,29 +190,24 @@ struct OrdLocBase: public LockManagerBase {
 
   Lockable* lockable;
 
-  explicit OrdLocBase (Lockable* l):
-    Base (), lockable (l) {}
+  explicit OrdLocBase(Lockable* l) : Base(), lockable(l) {}
 
-  bool tryMappingTo (Lockable* l) {
-    return Base::CASowner (l, NULL);
-  }
+  bool tryMappingTo(Lockable* l) { return Base::CASowner(l, NULL); }
 
-  void clearMapping () {
+  void clearMapping() {
     // release requires having owned the lock
-    bool r = Base::tryLock (lockable);
-    assert (r);
-    Base::release (lockable);
+    bool r = Base::tryLock(lockable);
+    assert(r);
+    Base::release(lockable);
   }
 
   // just for debugging
-  const Lockable* getMapping () const {
-    return lockable;
-  }
+  const Lockable* getMapping() const { return lockable; }
 
-  static NItem* getOwner (Lockable* l) {
-    LockManagerBase* o = LockManagerBase::getOwner (l);
+  static NItem* getOwner(Lockable* l) {
+    LockManagerBase* o = LockManagerBase::getOwner(l);
     // assert (dynamic_cast<DAGnhoodItem*> (o) != nullptr);
-    return static_cast<NItem*> (o);
+    return static_cast<NItem*>(o);
   }
 };
 
@@ -246,10 +222,10 @@ struct OrdLocBase: public LockManagerBase {
  *
  * void destroy (NItem* ni);
  *
-*/
+ */
 
-template<typename NItem>
-class PtrBasedNhoodMgr: boost::noncopyable {
+template <typename NItem>
+class PtrBasedNhoodMgr : boost::noncopyable {
 public:
   typedef typename NItem::Factory NItemFactory;
 
@@ -261,86 +237,74 @@ protected:
   NItemFactory& factory;
   NItemWL allNItems;
 
-  NItem* create (Lockable* l) {
-    NItem* ni = niAlloc.allocate (1);
-    assert (ni != nullptr);
-    factory.construct (ni, l);
+  NItem* create(Lockable* l) {
+    NItem* ni = niAlloc.allocate(1);
+    assert(ni != nullptr);
+    factory.construct(ni, l);
     return ni;
   }
 
-  void destroy (NItem* ni) {
+  void destroy(NItem* ni) {
     // delete ni; ni = NULL;
-    niAlloc.destroy (ni);
-    niAlloc.deallocate (ni, 1);
+    niAlloc.destroy(ni);
+    niAlloc.deallocate(ni, 1);
     ni = NULL;
   }
 
-
 public:
-  PtrBasedNhoodMgr(NItemFactory& f): factory (f) {}
+  PtrBasedNhoodMgr(NItemFactory& f) : factory(f) {}
 
-  NItem& getNhoodItem (Lockable* l) {
+  NItem& getNhoodItem(Lockable* l) {
 
-    if (NItem::getOwner (l) == NULL) {
+    if (NItem::getOwner(l) == NULL) {
       // NItem* ni = new NItem (l, cmp);
-      NItem* ni = create (l);
+      NItem* ni = create(l);
 
-      if (ni->tryMappingTo (l)) {
-        allNItems.get ().push_back (ni);
+      if (ni->tryMappingTo(l)) {
+        allNItems.get().push_back(ni);
 
       } else {
-        destroy (ni);
+        destroy(ni);
       }
 
-      assert (NItem::getOwner (l) != NULL);
+      assert(NItem::getOwner(l) != NULL);
     }
 
-    NItem* ret = NItem::getOwner (l);
-    assert (ret != NULL);
+    NItem* ret = NItem::getOwner(l);
+    assert(ret != NULL);
     return *ret;
   }
 
-  LocalRange<NItemWL> getAllRange (void) {
-    return makeLocalRange (allNItems);
-  }
+  LocalRange<NItemWL> getAllRange(void) { return makeLocalRange(allNItems); }
 
-  NItemWL& getContainer() {
-    return allNItems;
-  }
+  NItemWL& getContainer() { return allNItems; }
 
-  ~PtrBasedNhoodMgr() {
-    resetAllNItems();
-  }
+  ~PtrBasedNhoodMgr() { resetAllNItems(); }
 
 protected:
   void resetAllNItems() {
     runtime::do_all_gen(makeLocalRange(allNItems),
-        [this] (NItem* ni) {
-          ni->clearMapping();
-          destroy(ni);
-        },
-        std::make_tuple (
-          galois::loopname ("resetNItems"),
-          galois::chunk_size<16>()));
+                        [this](NItem* ni) {
+                          ni->clearMapping();
+                          destroy(ni);
+                        },
+                        std::make_tuple(galois::loopname("resetNItems"),
+                                        galois::chunk_size<16>()));
   }
 };
 
 template <typename NItem>
-class MapBasedNhoodMgr: public PtrBasedNhoodMgr<NItem> {
+class MapBasedNhoodMgr : public PtrBasedNhoodMgr<NItem> {
 public:
   typedef MapBasedNhoodMgr MyType;
 
   // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap;
   //
-  typedef Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
+  typedef Pow_2_BlockAllocator<std::pair<Lockable*, NItem*>> MapAlloc;
 
-  typedef std::unordered_map<
-      Lockable*,
-      NItem*,
-      std::hash<Lockable*>,
-      std::equal_to<Lockable*>,
-      MapAlloc
-    > NhoodMap;
+  typedef std::unordered_map<Lockable*, NItem*, std::hash<Lockable*>,
+                             std::equal_to<Lockable*>, MapAlloc>
+      NhoodMap;
 
   typedef galois::substrate::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
@@ -350,89 +314,78 @@ protected:
   Lock_ty map_mutex;
 
 public:
-
-  MapBasedNhoodMgr (const typename Base::NItemFactory& f):
-    Base (f),
-    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), MapAlloc ())
+  MapBasedNhoodMgr(const typename Base::NItemFactory& f)
+      : Base(f), nhoodMap(8, std::hash<Lockable*>(), std::equal_to<Lockable*>(),
+                          MapAlloc())
 
   {}
 
-  NItem& getNhoodItem (Lockable* l) {
+  NItem& getNhoodItem(Lockable* l) {
 
-    map_mutex.readLock ();
-      typename NhoodMap::iterator i = nhoodMap.find (l);
+    map_mutex.readLock();
+    typename NhoodMap::iterator i = nhoodMap.find(l);
 
-      if (i == nhoodMap.end ()) {
-        // create the missing entry
+    if (i == nhoodMap.end()) {
+      // create the missing entry
 
-        map_mutex.readUnlock ();
+      map_mutex.readUnlock();
 
-        map_mutex.writeLock ();
-          // check again to avoid over-writing existing entry
-          if (nhoodMap.find (l) == nhoodMap.end ()) {
-            NItem* ni = Base::factory.create (l);
-            Base::allNItems.get ().push_back (ni);
-            nhoodMap.insert (std::make_pair (l, ni));
-
-          }
-        map_mutex.writeUnlock ();
-
-        // read again now
-        map_mutex.readLock ();
-        i = nhoodMap.find (l);
+      map_mutex.writeLock();
+      // check again to avoid over-writing existing entry
+      if (nhoodMap.find(l) == nhoodMap.end()) {
+        NItem* ni = Base::factory.create(l);
+        Base::allNItems.get().push_back(ni);
+        nhoodMap.insert(std::make_pair(l, ni));
       }
+      map_mutex.writeUnlock();
 
-    map_mutex.readUnlock ();
-    assert (i != nhoodMap.end ());
-    assert (i->second != nullptr);
+      // read again now
+      map_mutex.readLock();
+      i = nhoodMap.find(l);
+    }
+
+    map_mutex.readUnlock();
+    assert(i != nhoodMap.end());
+    assert(i->second != nullptr);
 
     return *(i->second);
-
   }
 
-
-  ~MapBasedNhoodMgr () {
-    Base::resetAllNItems ();
-  }
-
+  ~MapBasedNhoodMgr() { Base::resetAllNItems(); }
 };
-
-
 
 namespace internal {
 
-  struct DummyExecFunc {
-    static const unsigned CHUNK_SIZE = 1;
-    template <typename T, typename C>
-    void operator () (const T&, C&) const {
-      std::printf ("Warning: DummyExecFunc shouldn't be executed\n");
-    }
-  };
-}
+struct DummyExecFunc {
+  static const unsigned CHUNK_SIZE = 1;
+  template <typename T, typename C>
+  void operator()(const T&, C&) const {
+    std::printf("Warning: DummyExecFunc shouldn't be executed\n");
+  }
+};
+} // namespace internal
 
-
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc,
+          typename OpFunc, typename ArgsTuple, typename Ctxt>
 class OrderedExecutorBase {
 protected:
-
-  static const bool NEEDS_CUSTOM_LOCKING = 
+  static const bool NEEDS_CUSTOM_LOCKING =
       exists_by_supertype<needs_custom_locking_tag, ArgsTuple>::value;
-  static const bool HAS_EXEC_FUNC = 
-      exists_by_supertype<has_exec_function_tag, ArgsTuple>::value
-      || !std::is_same<ExFunc, internal::DummyExecFunc>::value;
+  static const bool HAS_EXEC_FUNC =
+      exists_by_supertype<has_exec_function_tag, ArgsTuple>::value ||
+      !std::is_same<ExFunc, internal::DummyExecFunc>::value;
 
-  static const bool ENABLE_PARAMETER = 
+  static const bool ENABLE_PARAMETER =
       get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
-  //static const bool NEEDS_PUSH = 
+  // static const bool NEEDS_PUSH =
   //    !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;
 
-  using CtxtCmp = typename Ctxt::CtxtCmp;
+  using CtxtCmp   = typename Ctxt::CtxtCmp;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadBag<Ctxt*>;
+  using CtxtWL    = PerThreadBag<Ctxt*>;
 
-  using UserCtxt = UserContextAccess<T>;
+  using UserCtxt          = UserContextAccess<T>;
   using PerThreadUserCtxt = substrate::PerThreadStorage<UserCtxt>;
-
 
   Cmp cmp;
   NhFunc nhFunc;
@@ -445,43 +398,40 @@ protected:
   CtxtAlloc ctxtAlloc;
   PerThreadUserCtxt userHandles;
 
-  OrderedExecutorBase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
-    :
-      cmp (cmp),
-      nhFunc (nhFunc),
-      exFunc (exFunc),
-      opFunc (opFunc),
-      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
-      ctxtCmp (cmp)
-  {
-    if (!loopname) { loopname = "Ordered"; }
+  OrderedExecutorBase(const Cmp& cmp, const NhFunc& nhFunc,
+                      const ExFunc& exFunc, const OpFunc& opFunc,
+                      const ArgsTuple& argsTuple)
+      : cmp(cmp), nhFunc(nhFunc), exFunc(exFunc), opFunc(opFunc),
+        loopname(get_by_supertype<loopname_tag>(argsTuple).value),
+        ctxtCmp(cmp) {
+    if (!loopname) {
+      loopname = "Ordered";
+    }
   }
 
 public:
-  const Cmp& getItemCmp () const { return cmp; }
+  const Cmp& getItemCmp() const { return cmp; }
 
-  const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
+  const CtxtCmp& getCtxtCmp() const { return ctxtCmp; }
 };
 
-
-
 template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
-void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
-  galois::runtime::setThreadContext (c);
+void runCatching(F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
+  galois::runtime::setThreadContext(c);
 
   int result = 0;
 
 #ifdef GALOIS_USE_LONGJMP
   if ((result = setjmp(hackjmp)) == 0) {
 #else
-    try {
+  try {
 #endif
-      func (c->getActive (), uhand, std::forward<Args> (args)...);
+    func(c->getActive(), uhand, std::forward<Args>(args)...);
 
 #ifdef GALOIS_USE_LONGJMP
-    } else {
-      // TODO
-    }
+  } else {
+    // TODO
+  }
 #else
   } catch (ConflictFlag f) {
     result = f;
@@ -489,25 +439,20 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
 #endif
 
   switch (result) {
-    case 0:
-      break;
-    case CONFLICT:
-      c->disableSrc ();
-      break;
-    default:
-      GALOIS_DIE ("can't handle conflict flag type");
-      break;
+  case 0:
+    break;
+  case CONFLICT:
+    c->disableSrc();
+    break;
+  default:
+    GALOIS_DIE("can't handle conflict flag type");
+    break;
   }
 
-
-  galois::runtime::setThreadContext (NULL);
+  galois::runtime::setThreadContext(NULL);
 }
-
-
 
 } // end namespace runtime
 } // end namespace galois
-
-
 
 #endif // GALOIS_RUNTIME_ORDERED_LOCKABLE_H

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,13 +38,13 @@ inline int getIndex(const Tuple& a, const Tuple& b) {
   return index;
 }
 
-inline void makeNewCenter(int index, const Tuple& center, double radius, Tuple& newCenter) {
+inline void makeNewCenter(int index, const Tuple& center, double radius,
+                          Tuple& newCenter) {
   newCenter = center;
   for (int i = 0; i < 2; ++i) {
     newCenter[i] += (index & (1 << i)) > 0 ? radius : -radius;
   }
 }
-
 
 static const int maxLeafSize = 16;
 
@@ -57,12 +57,12 @@ class PQuadTree {
     double best;
   };
 
-  struct DerefPointer: public std::unary_function<Point*,Point> {
+  struct DerefPointer : public std::unary_function<Point*, Point> {
     Point operator()(Point* p) const { return *p; }
   };
 
   struct Node {
-    typedef boost::array<Point*,maxLeafSize> PointsTy;
+    typedef boost::array<Point*, maxLeafSize> PointsTy;
     Node* child[4];
     PointsTy* points;
     int size;
@@ -76,14 +76,12 @@ class PQuadTree {
     //! Make leaf node
     Node(Point* p, PointsTy* ps) {
       memset(child, 0, sizeof(*child) * 4);
-      points = ps;
+      points        = ps;
       points->at(0) = p;
-      size = 1;
+      size          = 1;
     }
-  
-    bool isLeaf() const {
-      return points != NULL;
-    }
+
+    bool isLeaf() const { return points != NULL; }
   };
 
   void deleteNode(Node* root) {
@@ -106,17 +104,15 @@ class PQuadTree {
     return n;
   }
 
-  Node* newNode(Point *p) {
-    Node* n = nodeAlloc.allocate(1);
+  Node* newNode(Point* p) {
+    Node* n            = nodeAlloc.allocate(1);
     Node::PointsTy* ps = pointsAlloc.allocate(1);
     pointsAlloc.construct(ps, Node::PointsTy());
     nodeAlloc.construct(n, Node(p, ps));
     return n;
   }
 
-
-
-  template<typename IterTy>
+  template <typename IterTy>
   struct WorkItem {
     IterTy begin;
     IterTy end;
@@ -125,9 +121,9 @@ class PQuadTree {
     Node* root;
     PQuadTree* self;
 
-    WorkItem(PQuadTree* s, IterTy b, IterTy e, Node* n, Tuple c, double r): 
-      begin(b), end(e), center(c), radius(r), root(n), self(s) { }
-    
+    WorkItem(PQuadTree* s, IterTy b, IterTy e, Node* n, Tuple c, double r)
+        : begin(b), end(e), center(c), radius(r), root(n), self(s) {}
+
     void operator()() {
       for (; begin != end; ++begin) {
         self->add(root, *begin, center, radius);
@@ -135,23 +131,20 @@ class PQuadTree {
     }
   };
 
-  template<typename IterTy>
+  template <typename IterTy>
   struct PAdd {
-    void operator()(WorkItem<IterTy>& w) {
-      w();
-    }
-    void operator()(WorkItem<IterTy>& w, galois::UserContext<WorkItem<IterTy> >&) {
+    void operator()(WorkItem<IterTy>& w) { w(); }
+    void operator()(WorkItem<IterTy>& w,
+                    galois::UserContext<WorkItem<IterTy>>&) {
       w();
     }
   };
 
-  struct Split: public std::unary_function<Point*,bool> {
+  struct Split : public std::unary_function<Point*, bool> {
     int index;
     TupleDataTy pivot;
-    Split(int i, TupleDataTy p): index(i), pivot(p) { }
-    bool operator()(Point* p) {
-      return p->t()[index] < pivot;
-    }
+    Split(int i, TupleDataTy p) : index(i), pivot(p) {}
+    bool operator()(Point* p) { return p->t()[index] < pivot; }
   };
 
   Tuple m_center;
@@ -161,7 +154,7 @@ class PQuadTree {
   galois::FixedSizeAllocator<Node> nodeAlloc;
   galois::FixedSizeAllocator<Node::PointsTy> pointsAlloc;
 
-  template<typename IterTy>
+  template <typename IterTy>
   void init(IterTy begin, IterTy end) {
 
     galois::GReduceMin<TupleDataTy> minX;
@@ -170,33 +163,32 @@ class PQuadTree {
     galois::GReduceMax<TupleDataTy> maxX;
     galois::GReduceMax<TupleDataTy> maxY;
 
-    galois::do_all(galois::iterate(begin, end), 
-        [&] (const Point* p) {
-          minX.update(p->t().x());
-          minY.update(p->t().y());
+    galois::do_all(galois::iterate(begin, end), [&](const Point* p) {
+      minX.update(p->t().x());
+      minY.update(p->t().y());
 
-          maxX.update(p->t().x());
-          maxY.update(p->t().y());
-
-        });
+      maxX.update(p->t().x());
+      maxY.update(p->t().y());
+    });
 
     Tuple mmost(maxX.reduce(), maxY.reduce());
     Tuple lleast(minX.reduce(), minY.reduce());
-    
+
     m_radius = std::max(mmost.x() - lleast.x(), mmost.y() - lleast.y()) / 2.0;
-    
+
     m_center = lleast;
     m_center.x() += m_radius;
     m_center.y() += m_radius;
   }
 
-  template<typename IterTy,typename OutIterTy>
-  void divideWork(IterTy begin, IterTy end, Node* root, Tuple center, double radius, OutIterTy& out, int depth) {
+  template <typename IterTy, typename OutIterTy>
+  void divideWork(IterTy begin, IterTy end, Node* root, Tuple center,
+                  double radius, OutIterTy& out, int depth) {
     if (depth == 0 || std::distance(begin, end) <= 16) {
       *out++ = WorkItem<IterTy>(this, begin, end, root, center, radius);
       return;
     }
-    
+
     IterTy its[5];
     its[0] = begin;
     its[4] = end;
@@ -204,7 +196,7 @@ class PQuadTree {
     its[2] = std::partition(its[0], its[4], Split(1, center[1]));
     its[1] = std::partition(its[0], its[2], Split(0, center[0]));
     its[3] = std::partition(its[2], its[4], Split(0, center[0]));
-    
+
     radius *= 0.5;
     --depth;
 
@@ -212,43 +204,45 @@ class PQuadTree {
       Tuple newC;
       root->child[i] = newNode();
       makeNewCenter(i, center, radius, newC);
-      divideWork(its[i], its[i+1], root->child[i], newC, radius, out, depth);
+      divideWork(its[i], its[i + 1], root->child[i], newC, radius, out, depth);
     }
   }
 
-  bool couldBeCloser(const Point* p, const Tuple& center, double radius, FindResult& result) {
+  bool couldBeCloser(const Point* p, const Tuple& center, double radius,
+                     FindResult& result) {
     if (result.p == NULL)
       return true;
 
     const Tuple& t = p->t();
-    double d = 0;
+    double d       = 0;
     for (int i = 0; i < t.dim(); ++i) {
       double min = center[i] - radius - t[i];
       double max = center[i] + radius - t[i];
-      d += std::min(min*min, max*max);
+      d += std::min(min * min, max * max);
     }
     return d < result.best;
   }
 
-  bool find(Node* root, const Point* p, const Tuple& center, double radius, FindResult& result) {
+  bool find(Node* root, const Point* p, const Tuple& center, double radius,
+            FindResult& result) {
     if (root->isLeaf()) {
-      bool retval = false;
+      bool retval     = false;
       const Tuple& t0 = p->t();
       for (int i = 0; i < root->size; ++i) {
         const Point* o = root->points->at(i);
         if (!o->inMesh())
           continue;
 
-        double d = 0;
+        double d        = 0;
         const Tuple& t1 = o->t();
         for (int j = 0; j < t0.dim(); ++j) {
           double v = t0[j] - t1[j];
           d += v * v;
         }
         if (result.p == NULL || d < result.best) {
-          result.p = root->points->at(i);
+          result.p    = root->points->at(i);
           result.best = d;
-          retval = true;
+          retval      = true;
         }
       }
       return retval;
@@ -282,16 +276,17 @@ class PQuadTree {
     assert(root->isLeaf());
 
     Node::PointsTy* points = root->points;
-    root->points = NULL;
+    root->points           = NULL;
 
-    for (Node::PointsTy::iterator ii = points->begin(), ei = points->begin() + root->size;
-        ii != ei; ++ii) {
+    for (Node::PointsTy::iterator ii = points->begin(),
+                                  ei = points->begin() + root->size;
+         ii != ei; ++ii) {
       add(root, *ii, center, radius);
-    } 
+    }
     pointsAlloc.destroy(points);
     pointsAlloc.deallocate(points, 1);
   }
-  
+
   void add(Node* root, Point* p, const Tuple& center, double radius) {
     if (root->isLeaf()) {
       if (root->size < maxLeafSize) {
@@ -303,7 +298,7 @@ class PQuadTree {
       return;
     }
 
-    int index = getIndex(center, p->t());
+    int index  = getIndex(center, p->t());
     Node*& kid = root->child[index];
     if (kid == NULL) {
       kid = newNode(p);
@@ -316,12 +311,13 @@ class PQuadTree {
     }
   }
 
-  template<typename OutputTy>
+  template <typename OutputTy>
   void output(Node* root, OutputTy out) {
     if (root->isLeaf()) {
       std::copy(
           boost::make_transform_iterator(root->points->begin(), DerefPointer()),
-          boost::make_transform_iterator(root->points->begin() + root->size, DerefPointer()),
+          boost::make_transform_iterator(root->points->begin() + root->size,
+                                         DerefPointer()),
           out);
     } else {
       for (int i = 0; i < 4; ++i) {
@@ -333,8 +329,8 @@ class PQuadTree {
   }
 
 public:
-  template<typename IterTy>
-  PQuadTree(IterTy begin, IterTy end) { 
+  template <typename IterTy>
+  PQuadTree(IterTy begin, IterTy end) {
     m_root = newNode();
 
     init(begin, end);
@@ -349,14 +345,13 @@ public:
     WorkTy work;
     std::back_insert_iterator<WorkTy> it(work);
     divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
-    galois::for_each(galois::iterate(work), PAdd<PointsBufTy::iterator>(), galois::wl<WL>());
+    galois::for_each(galois::iterate(work), PAdd<PointsBufTy::iterator>(),
+                     galois::wl<WL>());
   }
 
-  ~PQuadTree() {
-    deleteNode(m_root);
-  }
+  ~PQuadTree() { deleteNode(m_root); }
 
-  template<typename OutputTy>
+  template <typename OutputTy>
   void output(OutputTy out) {
     if (m_root != NULL) {
       output(m_root, out);
@@ -387,7 +382,7 @@ class SQuadTree {
     double best;
   };
 
-  struct DerefPointer: public std::unary_function<Point*,Point> {
+  struct DerefPointer : public std::unary_function<Point*, Point> {
     Point operator()(Point* p) const { return *p; }
   };
 
@@ -396,19 +391,17 @@ class SQuadTree {
     Point** points;
     int size;
 
-    bool isLeaf() const {
-      return points != NULL;
-    }
+    bool isLeaf() const { return points != NULL; }
 
     void makeInternal(const Tuple& center, double radius) {
       memset(child, 0, sizeof(*child) * 4);
       Point** begin = points;
-      points = NULL;
+      points        = NULL;
 
       for (Point **p = begin, **end = begin + size; p != end; ++p) {
         add(*p, center, radius);
-      } 
-      delete [] begin;
+      }
+      delete[] begin;
     }
 
     void add(Point* p, const Tuple& center, double radius) {
@@ -423,13 +416,13 @@ class SQuadTree {
         return;
       }
 
-      int index = getIndex(center, p->t());
+      int index  = getIndex(center, p->t());
       Node*& kid = child[index];
       if (kid == NULL) {
-        kid = new Node();
-        kid->points = new Point*[maxLeafSize];
+        kid            = new Node();
+        kid->points    = new Point*[maxLeafSize];
         kid->points[0] = p;
-        kid->size = 1;
+        kid->size      = 1;
       } else {
         radius *= 0.5;
         assert(radius != 0.0);
@@ -439,25 +432,27 @@ class SQuadTree {
       }
     }
 
-    bool couldBeCloser(const Point* p, const Tuple& center, double radius, FindResult& result) {
+    bool couldBeCloser(const Point* p, const Tuple& center, double radius,
+                       FindResult& result) {
       if (result.p == NULL)
         return true;
 
       const Tuple& t = p->t();
-      double d = 0;
+      double d       = 0;
       for (int i = 0; i < t.dim(); ++i) {
         double min = center[i] - radius - t[i];
         double max = center[i] + radius - t[i];
-        d += std::min(min*min, max*max);
+        d += std::min(min * min, max * max);
       }
       return d < result.best;
     }
 
-    void find(const Point* p, const Tuple& center, double radius, FindResult& result) {
+    void find(const Point* p, const Tuple& center, double radius,
+              FindResult& result) {
       if (isLeaf()) {
         const Tuple& t0 = p->t();
         for (int i = 0; i < size; ++i) {
-          double d = 0;
+          double d       = 0;
           const Point* o = points[i];
           if (!o->inMesh())
             continue;
@@ -467,7 +462,7 @@ class SQuadTree {
             d += v * v;
           }
           if (result.p == NULL || d < result.best) {
-            result.p = points[i];
+            result.p    = points[i];
             result.best = d;
           }
         }
@@ -489,13 +484,12 @@ class SQuadTree {
       }
     }
 
-    template<typename OutputTy>
+    template <typename OutputTy>
     void output(OutputTy out) {
       if (isLeaf()) {
-        std::copy(
-            boost::make_transform_iterator(points, DerefPointer()),
-            boost::make_transform_iterator(points + size, DerefPointer()),
-            out);
+        std::copy(boost::make_transform_iterator(points, DerefPointer()),
+                  boost::make_transform_iterator(points + size, DerefPointer()),
+                  out);
       } else {
         for (int i = 0; i < 4; ++i) {
           Node* kid = child[i];
@@ -510,7 +504,7 @@ class SQuadTree {
     if (n == NULL)
       return;
     if (n->isLeaf()) {
-      delete [] n->points;
+      delete[] n->points;
       n->points = NULL;
     } else {
       for (int i = 0; i < 4; ++i) {
@@ -521,8 +515,8 @@ class SQuadTree {
     delete n;
     n = NULL;
   }
-  
-  template<typename Begin,typename End>
+
+  template <typename Begin, typename End>
   void computeBox(Begin begin, End end, Tuple& least, Tuple& most) {
     least.x() = least.y() = std::numeric_limits<double>::max();
     most.x() = most.y() = std::numeric_limits<double>::min();
@@ -530,16 +524,16 @@ class SQuadTree {
     for (; begin != end; ++begin) {
       const Tuple& p = (*begin)->t();
       for (int i = 0; i < 2; ++i) {
-        if (p[i] < least[i]) 
+        if (p[i] < least[i])
           least[i] = p[i];
-        
-        if (p[i] > most[i]) 
+
+        if (p[i] > most[i])
           most[i] = p[i];
       }
     }
   }
 
-  template<typename Begin,typename End>
+  template <typename Begin, typename End>
   void init(Begin begin, End end) {
     Tuple least, most;
     computeBox(begin, end, least, most);
@@ -552,7 +546,7 @@ class SQuadTree {
 
   void add(Point* p) {
     if (root == NULL) {
-      root = new Node();
+      root         = new Node();
       root->points = NULL;
       memset(root->child, 0, sizeof(*root->child) * 4);
     }
@@ -564,16 +558,14 @@ class SQuadTree {
   Node* root;
 
 public:
-  template<typename Begin,typename End>
-  SQuadTree(Begin begin, End end): root(NULL) { 
+  template <typename Begin, typename End>
+  SQuadTree(Begin begin, End end) : root(NULL) {
     init(begin, end);
     for (; begin != end; ++begin)
       add(*begin);
   }
 
-  ~SQuadTree() {
-    deleteNode(root);
-  }
+  ~SQuadTree() { deleteNode(root); }
 
   //! Find point nearby to p
   bool find(const Point* p, Point*& result) {
@@ -589,7 +581,7 @@ public:
     return false;
   }
 
-  template<typename OutputTy>
+  template <typename OutputTy>
   void output(OutputTy out) {
     if (root != NULL) {
       root->output(out);

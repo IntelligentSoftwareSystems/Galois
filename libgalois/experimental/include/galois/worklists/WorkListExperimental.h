@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -48,27 +48,25 @@
 namespace galois {
 namespace worklists {
 
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
+template <class T, class Indexer = DummyIndexer<T>,
+          typename ContainerTy = GFIFO<T>, bool concurrent = true>
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent> data[2048];
 
   Indexer I;
   substrate::PerThreadStorage<unsigned int> cursor;
 
-  int num() {
-    return 2048;
-  }
+  int num() { return 2048; }
 
 public:
   typedef T value_type;
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   struct rethread {
-    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
+    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent>
+        type;
   };
 
-  ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x)
-  {
+  ApproxOrderByIntegerMetric(const Indexer& x = Indexer()) : I(x) {
     for (int i = 0; i < cursor.size(); ++i)
       *cursor.getRemote(i) = 0;
   }
@@ -80,13 +78,13 @@ public:
     return data[index].push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -97,61 +95,61 @@ public:
     if (ret)
       return ret;
 
-    //must move cursor
+    // must move cursor
     for (int i = 0; i <= num(); ++i) {
       cur = (cur + 1) % num();
       ret = data[cur].pop();
       if (ret.first)
-	return ret;
+        return ret;
     }
     return galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
 
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
+template <class T, class Indexer = DummyIndexer<T>,
+          typename ContainerTy = GFIFO<T>, bool concurrent = true>
 class LogOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
+  typename ContainerTy::template rethread<concurrent>
+      data[sizeof(unsigned int) * 8 + 1];
 
   Indexer I;
   substrate::PerThreadStorage<unsigned int> cursor;
 
-  int num() {
-    return sizeof(unsigned int)*8 + 1;
-  }
+  int num() { return sizeof(unsigned int) * 8 + 1; }
 
   int getBin(unsigned int i) {
-    if (i == 0) return 0;
-    return sizeof(unsigned int)*8 - __builtin_clz(i);
+    if (i == 0)
+      return 0;
+    return sizeof(unsigned int) * 8 - __builtin_clz(i);
   }
 
 public:
   typedef T value_type;
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   struct rethread {
-    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
+    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent>
+        type;
   };
 
-  LogOrderByIntegerMetric(const Indexer& x = Indexer())
-    :I(x)
-  {
+  LogOrderByIntegerMetric(const Indexer& x = Indexer()) : I(x) {
     for (int i = 0; i < cursor.size(); ++i)
       *cursor.getRemote(i) = 0;
   }
 
   void push(value_type val) {
     unsigned int index = I(val);
-    index = getBin(index);
+    index              = getBin(index);
     return data[index].push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -162,11 +160,11 @@ public:
     if (ret)
       return ret;
 
-    //must move cursor
+    // must move cursor
     for (cur = 0; cur < num(); ++cur) {
       ret = data[cur].pop();
       if (ret.first)
-	return ret;
+        return ret;
     }
     cur = 0;
     return galois::optional<value_type>();
@@ -174,7 +172,8 @@ public:
 };
 GALOIS_WLCOMPILECHECK(LogOrderByIntegerMetric)
 
-template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = GFIFO<T>, typename GlobalTy = GFIFO<T> >
+template <typename T, typename Indexer = DummyIndexer<T>,
+          typename LocalTy = GFIFO<T>, typename GlobalTy = GFIFO<T>>
 class LocalFilter {
   GlobalTy globalQ;
 
@@ -194,7 +193,7 @@ public:
   }
 
   //! change the concurrency flag
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   struct rethread {
     typedef LocalFilter type;
   };
@@ -202,20 +201,20 @@ public:
   //! push a value onto the queue
   void push(value_type val) {
     unsigned int index = I(val);
-    p& me = localQs.get();
+    p& me              = localQs.get();
     if (index <= me.current)
       me.Q.push(val);
     else
       globalQ.push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       globalQ.push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -310,23 +309,24 @@ public:
 GALOIS_WLCOMPILECHECK(MP_SC_Bag)
 #endif
 
-//Per CPU and Per Level Queues, with staving flags
-template<typename T, typename LocalWL, typename GlobalWL>
+// Per CPU and Per Level Queues, with staving flags
+template <typename T, typename LocalWL, typename GlobalWL>
 class RequestHierarchy {
 public:
   typedef T value_type;
 
 private:
-  substrate::PerThreadStorage<typename LocalWL::template rethread<false> > localQueues;
+  substrate::PerThreadStorage<typename LocalWL::template rethread<false>>
+      localQueues;
   substrate::PerSocketStorage<GlobalWL> sharedQueues;
   substrate::PerSocketStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
-  //Clear the starving flag for all levels in which the thread
-  //is a master thread of a level below
+  // Clear the starving flag for all levels in which the thread
+  // is a master thread of a level below
   void clearStarving() {
-    gStarving = 0;
+    gStarving                 = 0;
     *starvingFlags.getLocal() = 0;
   }
 
@@ -340,40 +340,40 @@ public:
       localQueues.getLocal()->push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
   galois::optional<value_type> pop() {
-    //Try the local queue first
+    // Try the local queue first
     galois::optional<value_type> ret = localQueues.getLocal()->pop();
     if (ret)
       return ret;
 
-    //check parent
+    // check parent
     ret = sharedQueues.getLocal()->pop();
     if (ret) {
       clearStarving();
       return ret;
     }
 
-    //check global
+    // check global
     ret = gwl.pop();
     if (ret) {
       clearStarving();
       return ret;
     }
 
-    //Any thread can set the socket starving flag
+    // Any thread can set the socket starving flag
     *starvingFlags.getLocal() = 1;
-    //if we are master for the socket, handle flags
+    // if we are master for the socket, handle flags
     if (sharedQueues.isFirstInLevel())
       ; // TODO: ???
     return ret;
@@ -381,7 +381,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(RequestHierarchy)
 
-template<typename T, typename LocalWL, typename DistPolicy>
+template <typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
   typedef substrate::CacheLineStorage<LocalWL> paddedLocalWL;
 
@@ -392,7 +392,7 @@ class ReductionWL {
 public:
   typedef T value_type;
 
-  ReductionWL() :starving(0) {
+  ReductionWL() : starving(0) {
     WL = new paddedLocalWL[DistPolicy::getNumIslands()];
   }
 
@@ -408,19 +408,19 @@ public:
       WL[DistPolicy::getThreadIsland()].data.push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
   galois::optional<value_type> pop() {
-    int myIsland = DistPolicy::getThreadIsland();
+    int myIsland                     = DistPolicy::getThreadIsland();
     galois::optional<value_type> val = WL[myIsland].data.pop();
     if (val || !DistPolicy::isThreadMaster())
       return val;
@@ -438,7 +438,6 @@ public:
   }
 };
 GALOIS_WLCOMPILECHECK(ReductionWL)
-
 
 #if 0
 template<class T, class Indexer, typename ContainerTy = FIFO<T>, bool concurrent=true>
@@ -1031,9 +1030,8 @@ public:
 
 #endif
 
-
-template<typename T>
-class GWL_Idempotent_FIFO: private boost::noncopyable {
+template <typename T>
+class GWL_Idempotent_FIFO : private boost::noncopyable {
 
   struct TaskArrayWithSize {
     int size;
@@ -1041,7 +1039,8 @@ class GWL_Idempotent_FIFO: private boost::noncopyable {
   };
 
   TaskArrayWithSize* mkArray(int num) {
-    TaskArrayWithSize* r = (TaskArrayWithSize*)malloc(sizeof(TaskArrayWithSize)+sizeof(T[num]));
+    TaskArrayWithSize* r =
+        (TaskArrayWithSize*)malloc(sizeof(TaskArrayWithSize) + sizeof(T[num]));
     r->size = num;
     return r;
   }
@@ -1051,26 +1050,24 @@ class GWL_Idempotent_FIFO: private boost::noncopyable {
   TaskArrayWithSize* volatile tasks;
 
   inline void order() {
-    //Compiler barier
-    __asm__("":::"memory");
+    // Compiler barier
+    __asm__("" ::: "memory");
   }
 
-  bool Empty() {
-    return head == tail;
-  }
+  bool Empty() { return head == tail; }
 
   void put(T t_ask) {
-    //Order write at 4 before write at 5
+    // Order write at 4 before write at 5
     int h = head;
     int t = tail;
-    if (t == h+tasks->size) {
+    if (t == h + tasks->size) {
       expand();
       put(t_ask);
       return;
     }
-    tasks->array[t%tasks->size] = t_ask;
+    tasks->array[t % tasks->size] = t_ask;
     order();
-    tail = t+1;
+    tail = t + 1;
   }
 
   T take(bool& EMPTY) {
@@ -1081,16 +1078,16 @@ class GWL_Idempotent_FIFO: private boost::noncopyable {
       EMPTY = true;
       return T();
     }
-    T t_ask = tasks->array[h%tasks->size];
-    head = h+1;
+    T t_ask = tasks->array[h % tasks->size];
+    head    = h + 1;
     return t_ask;
   }
 
   T i_steal(bool& EMPTY) {
     EMPTY = false;
-    //Order read in 1 before read in 2
-    //Order read in 1 before read in 4
-    //Order read in 5 before CAS in 6
+    // Order read in 1 before read in 2
+    // Order read in 1 before read in 4
+    // Order read in 5 before CAS in 6
     int h = head;
     order();
     int t = tail;
@@ -1100,21 +1097,21 @@ class GWL_Idempotent_FIFO: private boost::noncopyable {
       return T();
     }
     TaskArrayWithSize* a = tasks;
-    T t_ask = a->array[h%a->size];
+    T t_ask              = a->array[h % a->size];
     order();
-    if (!__sync_bool_compare_and_swap(&head,h,h+1)) {
+    if (!__sync_bool_compare_and_swap(&head, h, h + 1)) {
       return i_steal(EMPTY);
     }
     return t_ask;
   }
 
   void expand() {
-    //Order writes in 2 and 4 before write in 5
-    //Order write in 5 before write in put:5
-    int size = tasks->size;
-    TaskArrayWithSize* a = mkArray(2*size);
+    // Order writes in 2 and 4 before write in 5
+    // Order write in 5 before write in put:5
+    int size             = tasks->size;
+    TaskArrayWithSize* a = mkArray(2 * size);
     for (int i = head; i < tail; ++i)
-      a->array[i%a->size] = tasks->array[i%tasks->size];
+      a->array[i % a->size] = tasks->array[i % tasks->size];
     order();
     tasks = a;
     order();
@@ -1124,23 +1121,21 @@ public:
   typedef T value_type;
   typedef GWL_Idempotent_FIFO<T> ConcurrentTy;
   typedef GWL_Idempotent_FIFO<T> SingleTy;
-  enum {MAYSTEAL = true};
+  enum { MAYSTEAL = true };
 
-  GWL_Idempotent_FIFO(int size = 256): head(0), tail(0) {
+  GWL_Idempotent_FIFO(int size = 256) : head(0), tail(0) {
     tasks = mkArray(size);
   }
 
-  void push(value_type val) {
-    put(val);
-  }
+  void push(value_type val) { put(val); }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1148,22 +1143,22 @@ public:
   galois::optional<value_type> pop() {
     bool Empty;
     T retval = take(Empty);
-    return !Empty ?
-      galois::optional<value_type>(retval) :
-      galois::optional<value_type>();
+    return !Empty ? galois::optional<value_type>(retval)
+                  : galois::optional<value_type>();
   }
 
-  //This can be called by any thread
+  // This can be called by any thread
   T steal(bool& succeeded) {
     bool Empty;
-    T retval = i_steal(Empty);
+    T retval  = i_steal(Empty);
     succeeded = !Empty;
     return retval;
   }
 };
 GALOIS_WLCOMPILECHECK(GWL_Idempotent_FIFO)
 
-template<typename Partitioner = DummyIndexer<int>, typename T = int, typename ChildWLTy = PerSocketChunkFIFO<>, bool concurrent=true>
+template <typename Partitioner = DummyIndexer<int>, typename T = int,
+          typename ChildWLTy = PerSocketChunkFIFO<>, bool concurrent = true>
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;
@@ -1171,28 +1166,29 @@ class PartitionedWL : private boost::noncopyable {
   int active;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent>;
 
   typedef T value_type;
 
-  PartitionedWL(const Partitioner& p = Partitioner()) :P(p), active(galois::getActiveThreads()) {
-    //std::cerr << active << "\n";
+  PartitionedWL(const Partitioner& p = Partitioner())
+      : P(p), active(galois::getActiveThreads()) {
+    // std::cerr << active << "\n";
   }
 
-  void push(value_type val)  {
+  void push(value_type val) {
     unsigned int index = P(val);
-    //std::cerr << "[" << index << "," << index % active << "]\n";
+    // std::cerr << "[" << index << "," << index % active << "]\n";
     return Items.get(index % active).push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1205,23 +1201,21 @@ public:
     return r;
   }
 
-  galois::optional<value_type> try_pop() {
-    return pop();
-  }
+  galois::optional<value_type> try_pop() { return pop(); }
 };
 GALOIS_WLCOMPILECHECK(PartitionedWL)
 
-template<class Compare = std::less<int>, typename T = int>
+template <class Compare = std::less<int>, typename T = int>
 class SkipListQueue : private boost::noncopyable {
 
-  galois::ConcurrentSkipListMap<T,int,Compare> wl;
+  galois::ConcurrentSkipListMap<T, int, Compare> wl;
   int magic;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = SkipListQueue<Compare, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = SkipListQueue<Compare, Tnew>;
 
   typedef T value_type;
@@ -1231,38 +1225,37 @@ public:
     return true;
   }
 
-  template<typename Iter>
+  template <typename Iter>
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
     return true;
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
-  galois::optional<value_type> pop() {
-    return wl.pollFirstKey();
-  }
+  galois::optional<value_type> pop() { return wl.pollFirstKey(); }
 };
 GALOIS_WLCOMPILECHECK(SkipListQueue)
 
-
-template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class SetQueue : private boost::noncopyable, private substrate::PaddedLock<concurrent> {
-  std::set<T, Compare, runtime::FixedSizeAllocator<T> > wl;
+template <class Compare = std::less<int>, typename T = int,
+          bool concurrent = true>
+class SetQueue : private boost::noncopyable,
+                 private substrate::PaddedLock<concurrent> {
+  std::set<T, Compare, runtime::FixedSizeAllocator<T>> wl;
 
   using substrate::PaddedLock<concurrent>::lock;
   using substrate::PaddedLock<concurrent>::try_lock;
   using substrate::PaddedLock<concurrent>::unlock;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = SetQueue<Compare, T, newconcurrent>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = SetQueue<Compare, Tnew, concurrent>;
 
   typedef T value_type;
@@ -1273,7 +1266,7 @@ public:
     unlock();
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     lock();
     while (b != e)
@@ -1281,7 +1274,7 @@ public:
     unlock();
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
@@ -1301,15 +1294,15 @@ public:
 };
 GALOIS_WLCOMPILECHECK(SetQueue)
 
-template<class Compare = std::less<int>, typename T = int>
+template <class Compare = std::less<int>, typename T = int>
 class FCPairingHeapQueue : private boost::noncopyable {
-  galois::FCPairingHeap<T,Compare> wl;
+  galois::FCPairingHeap<T, Compare> wl;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = FCPairingHeapQueue<Compare, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = FCPairingHeapQueue<Compare, Tnew>;
 
   typedef T value_type;
@@ -1319,31 +1312,31 @@ public:
     return true;
   }
 
-  template<typename Iter>
+  template <typename Iter>
   bool push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
     return true;
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
-  galois::optional<value_type> pop() {
-    return wl.pollMin();
-  }
+  galois::optional<value_type> pop() { return wl.pollMin(); }
 };
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
+template <class Indexer, typename ContainerTy = galois::worklists::GFIFO<>,
+          typename T = int, bool concurrent = true>
+class SimpleOrderedByIntegerMetric
+    : private boost::noncopyable,
+      private galois::substrate::PaddedLock<concurrent> {
 
-template<class Indexer, typename ContainerTy = galois::worklists::GFIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois::substrate::PaddedLock<concurrent> {
-
-   using galois::substrate::PaddedLock<concurrent>::lock;
-   using galois::substrate::PaddedLock<concurrent>::try_lock;
-   using galois::substrate::PaddedLock<concurrent>::unlock;
+  using galois::substrate::PaddedLock<concurrent>::lock;
+  using galois::substrate::PaddedLock<concurrent>::try_lock;
+  using galois::substrate::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -1353,11 +1346,12 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois:
   Indexer I;
 
   CTy* updateLocalOrCreate(int i) {
-    //Try local then try update then find again or else create and update the master log
-    //check if current bin is the right thing to use (lock-free)
+    // Try local then try update then find again or else create and update the
+    // master log check if current bin is the right thing to use (lock-free)
     if (i == cint) {
       CTy* n = current;
-      if (n) return n;
+      if (n)
+        return n;
     }
     lock();
     CTy*& lC = mapping[i];
@@ -1367,65 +1361,69 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private galois:
     return lC;
   }
 
- public:
-  template<bool newconcurrent>
-  using rethread = SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent>;
+public:
+  template <bool newconcurrent>
+  using rethread =
+      SimpleOrderedByIntegerMetric<Indexer, ContainerTy, T, newconcurrent>;
 
-  template<typename Tnew>
-  using retype = SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
+  template <typename Tnew>
+  using retype = SimpleOrderedByIntegerMetric<
+      Indexer, typename ContainerTy::template retype<Tnew>, Tnew, concurrent>;
 
   typedef T value_type;
 
   SimpleOrderedByIntegerMetric(const Indexer& x = Indexer())
-    :current(0), I(x)
-  { }
+      : current(0), I(x) {}
 
   void push(value_type val) {
     unsigned int index = I(val);
-    CTy* lC = updateLocalOrCreate(index);
+    CTy* lC            = updateLocalOrCreate(index);
     lC->push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   bool push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
     return true;
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
   galois::optional<value_type> pop() {
-    //Fastpath
+    // Fastpath
     CTy* c = current;
     galois::optional<value_type> retval;
     if (c && (retval = c->pop()))
       return retval;
 
-    //Failed, find minimum bin
+    // Failed, find minimum bin
     lock();
     if (current != c) {
       unlock();
       return pop();
     }
-    for (typename std::map<int, CTy*>::iterator ii = mapping.begin(), ee = mapping.end();
-        ii != ee; ++ii) {
+    for (typename std::map<int, CTy*>::iterator ii = mapping.begin(),
+                                                ee = mapping.end();
+         ii != ee; ++ii) {
       current = ii->second;
       if ((retval = current->pop())) {
         cint = ii->first;
         goto exit;
       }
     }
-    exit:
-      unlock();
+  exit:
+    unlock();
     return retval;
   }
 };
 
-template<class Indexer, typename ContainerTy = galois::worklists::ChunkLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
+template <class Indexer,
+          typename ContainerTy = galois::worklists::ChunkLIFO<16>,
+          bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 
@@ -1433,18 +1431,18 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     CTy* current;
     unsigned int curVersion;
     unsigned int scanStart;
-    perItem() :current(NULL), curVersion(0), scanStart(0) {}
+    perItem() : current(NULL), curVersion(0), scanStart(0) {}
   };
 
   // struct mhc {
   //   static size_t hash(int x) { return x; }
   //   static bool equal(const int& x, const int& y) { return x == y; }
   // };
-  //typedef tbb::concurrent_hash_map<int, CTy*, mhc> HM;
-  //HM wl;
+  // typedef tbb::concurrent_hash_map<int, CTy*, mhc> HM;
+  // HM wl;
   // typedef ADLSkipList<CTy> SL;
   // SL wl;
-  galois::ConcurrentSkipListMap<int,CTy> wl;
+  galois::ConcurrentSkipListMap<int, CTy> wl;
   int maxV;
 
   Indexer I;
@@ -1452,9 +1450,10 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
   CTy* getOrCreate(int index) {
     CTy* r = wl.get(index);
-    if (r) return r;
+    if (r)
+      return r;
     CTy* r2 = new CTy;
-    r = wl.putIfAbsent(index, r2);
+    r       = wl.putIfAbsent(index, r2);
     if (r)
       delete r2;
     else
@@ -1462,73 +1461,77 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     return r;
   }
 
- public:
-  template<bool newconcurrent>
-  using rethread = CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent>;
+public:
+  template <bool newconcurrent>
+  using rethread =
+      CTOrderedByIntegerMetric<Indexer, ContainerTy, BSP, T, newconcurrent>;
 
-  template<typename Tnew>
-  using retype = CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,concurrent>;
+  template <typename Tnew>
+  using retype =
+      CTOrderedByIntegerMetric<Indexer,
+                               typename ContainerTy::template retype<Tnew>, BSP,
+                               Tnew, concurrent>;
 
   typedef T value_type;
 
- CTOrderedByIntegerMetric(const Indexer& x = Indexer())
-   :maxV(1),I(x)
-  {}
+  CTOrderedByIntegerMetric(const Indexer& x = Indexer()) : maxV(1), I(x) {}
 
   void push(value_type val) {
     unsigned int index = I(val);
-    perItem& pI = *current.getLocal();
-    //fastpath
+    perItem& pI        = *current.getLocal();
+    // fastpath
     if (index == pI.curVersion && pI.current) {
       pI.current->push(val);
       return;
     }
-    //slow path
+    // slow path
     CTy* lC = getOrCreate(index);
     if (BSP && index < pI.scanStart)
       pI.scanStart = index;
-    //opportunistically move to higher priority work
+    // opportunistically move to higher priority work
     if (index < pI.curVersion) {
       pI.curVersion = index;
-      pI.current = lC;
+      pI.current    = lC;
     }
     lC->push(val);
-    //update max
+    // update max
     unsigned int oldMax;
     while ((oldMax = maxV) < index)
       __sync_bool_compare_and_swap(&maxV, oldMax, index);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
 
   galois::optional<value_type> pop() {
-    //Find a successful pop
+    // Find a successful pop
     perItem& pI = *current.getLocal();
-    CTy*& C = pI.current;
+    CTy*& C     = pI.current;
     galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 
-    //Failed, find minimum bin
+    // Failed, find minimum bin
     bool localLeader = substrate::ThreadPool::isLeader();
 
     unsigned msS = 0;
     if (BSP) {
       msS = pI.scanStart;
       if (localLeader)
-	for (int i = 0; i < (int) galois::getActiveThreads(); ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
+        for (int i = 0; i < (int)galois::getActiveThreads(); ++i)
+          msS = std::min(msS, current.getRemote(i)->scanStart);
       else
-	msS = std::min(msS, current.getRemote(substrate::ThreadPool::getLeader())->scanStart);
+        msS = std::min(
+            msS,
+            current.getRemote(substrate::ThreadPool::getLeader())->scanStart);
     }
 
     for (int i = msS; i <= maxV; ++i) {
@@ -1536,11 +1539,11 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       // if (wl.find(a, i)) {
       CTy* w = wl.get(i);
       if (w) {
-	pI.curVersion = i;
-	pI.scanStart = i;
-	C = w; //a->second;
-	if (C && (retval = C->pop()))
-	  return retval;
+        pI.curVersion = i;
+        pI.scanStart  = i;
+        C             = w; // a->second;
+        if (C && (retval = C->pop()))
+          return retval;
       }
     }
     return galois::optional<value_type>();
@@ -1549,7 +1552,8 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 
 #if _POSIX_BARRIERS > 0
-template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
+template <class Indexer, typename ContainerTy, bool concurrent = true,
+          int binmax = 1024 * 1024>
 class BarrierOBIM : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent> CTy;
 
@@ -1564,30 +1568,30 @@ class BarrierOBIM : private boost::noncopyable {
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
- public:
-  template<bool newconcurrent>
-  using rethread = BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax>;
+public:
+  template <bool newconcurrent>
+  using rethread = BarrierOBIM<Indexer, ContainerTy, newconcurrent, binmax>;
 
-  template<typename Tnew>
-  using retype = BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>,concurrent, binmax>;
+  template <typename Tnew>
+  using retype =
+      BarrierOBIM<Indexer, typename ContainerTy::template retype<Tnew>,
+                  concurrent, binmax>;
 
   typedef typename CTy::value_type value_type;
 
   BarrierOBIM(const Indexer& x = Indexer())
-    :current(0), pushmax(0), I(x), term(substrate::getSystemTermination(galois::getActiveThreads()))
-  {
+      : current(0), pushmax(0), I(x),
+        term(substrate::getSystemTermination(galois::getActiveThreads())) {
     B = new CTy[binmax];
-    //std::cerr << "$"<<getThreadPool().getActiveThreads() <<"$";
+    // std::cerr << "$"<<getThreadPool().getActiveThreads() <<"$";
     pthread_barrier_init(&barr1, NULL, galois::getActiveThreads());
     pthread_barrier_init(&barr2, NULL, galois::getActiveThreads());
   }
-  ~BarrierOBIM() {
-    delete[] B;
-  }
+  ~BarrierOBIM() { delete[] B; }
 
   void push(value_type val) {
     unsigned int index = I(val);
-    //std::cerr << "P: " << index << "\n";
+    // std::cerr << "P: " << index << "\n";
     if (index < current)
       index = current;
     if (index >= binmax)
@@ -1600,13 +1604,13 @@ class BarrierOBIM : private boost::noncopyable {
     B[index].push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     pthread_barrier_wait(&barr1);
     term.initializeThread();
@@ -1617,23 +1621,23 @@ class BarrierOBIM : private boost::noncopyable {
   galois::optional<value_type> pop() {
     do {
       if (current > pushmax)
-	return galois::optional<value_type>();
+        return galois::optional<value_type>();
       do {
-	//Find a successful pop
-	galois::optional<value_type> retval = B[current].pop();
-	if (retval) {
-	  term.localTermination(true);
-	  return retval;
-	}
-	term.localTermination(false);
+        // Find a successful pop
+        galois::optional<value_type> retval = B[current].pop();
+        if (retval) {
+          term.localTermination(true);
+          return retval;
+        }
+        term.localTermination(false);
       } while (!term.globalTermination());
 
       pthread_barrier_wait(&barr1);
       term.initializeThread();
       if (galois::substrate::ThreadPool::getTID() == 0) {
-	//std::cerr << "inc: " << current << "\n";
-	if (current <= pushmax)
-	  __sync_fetch_and_add(&current, 1);
+        // std::cerr << "inc: " << current << "\n";
+        if (current <= pushmax)
+          __sync_fetch_and_add(&current, 1);
       }
 
       pthread_barrier_wait(&barr2);
@@ -1642,28 +1646,27 @@ class BarrierOBIM : private boost::noncopyable {
 };
 #endif
 
-template<typename T = int, bool concurrent = true>
+template <typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {
-  typedef typename std::conditional<concurrent, substrate::SimpleLock, substrate::DummyLock>::type LockTy;
-  std::pair<LockTy, std::deque<T> > wl[128];
-  struct rstate { unsigned short d[3]; };
-  substrate::PerThreadStorage<rstate > seeds;
+  typedef typename std::conditional<concurrent, substrate::SimpleLock,
+                                    substrate::DummyLock>::type LockTy;
+  std::pair<LockTy, std::deque<T>> wl[128];
+  struct rstate {
+    unsigned short d[3];
+  };
+  substrate::PerThreadStorage<rstate> seeds;
 
-  unsigned int nextRand() {
-    return nrand48(seeds.getLocal()->d);
-  }
+  unsigned int nextRand() { return nrand48(seeds.getLocal()->d); }
 
-  unsigned int pickBucket() {
-    return nrand48(seeds.getLocal()->d) % 128;
-  }
+  unsigned int pickBucket() { return nrand48(seeds.getLocal()->d) % 128; }
 
 public:
-  Random() { }
+  Random() {}
 
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = Random<T, newconcurrent>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = Random<Tnew, concurrent>;
 
   typedef T value_type;
@@ -1675,13 +1678,13 @@ public:
     entry.first.unlock();
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1694,10 +1697,10 @@ public:
       if (entry.second.empty()) {
         entry.first.unlock();
       } else {
-        size_t size = entry.second.size();
+        size_t size        = entry.second.size();
         unsigned int index = nextRand() % size;
-        value_type retval = entry.second[index];
-        std::swap(entry.second[index], entry.second[size-1]);
+        value_type retval  = entry.second[index];
+        std::swap(entry.second[index], entry.second[size - 1]);
         entry.second.pop_back();
         entry.first.unlock();
         return galois::optional<value_type>(retval);
@@ -1708,61 +1711,55 @@ public:
 };
 GALOIS_WLCOMPILECHECK(Random)
 
-
-template <typename T> struct GETID {
-  int operator()(const T& v) {
-    return v.getID();
-  }
+template <typename T>
+struct GETID {
+  int operator()(const T& v) { return v.getID(); }
 };
 // This is a pointer to T specialization!
-template <typename T> struct GETID<T*> {
-  unsigned operator()(const T* v) {
-    return (unsigned)(((uintptr_t) v) >> 7);
-  }
+template <typename T>
+struct GETID<T*> {
+  unsigned operator()(const T* v) { return (unsigned)(((uintptr_t)v) >> 7); }
 };
 
 #ifdef USE_TBB
-template<typename T = int>
-class TbbFIFO : private boost::noncopyable  {
+template <typename T = int>
+class TbbFIFO : private boost::noncopyable {
   tbb::concurrent_bounded_queue<T> wl;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = TbbFIFO<T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = TbbFIFO<Tnew>;
 
   typedef T value_type;
 
-  void push(value_type val) {
-    wl.push(val);
-  }
+  void push(value_type val) { wl.push(val); }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       wl.push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     wl.push(range.local_begin(), range.local_end());
   }
 
   galois::optional<value_type> pop() {
     T V = T();
-    return wl.try_pop(V) ?
-      galois::optional<value_type>(V) :
-      galois::optional<value_type>();
+    return wl.try_pop(V) ? galois::optional<value_type>(V)
+                         : galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(TbbFIFO)
 
-//partitioned tbb
-template<class Compare = std::less<int>, typename T = int>
+// partitioned tbb
+template <class Compare = std::less<int>, typename T = int>
 class PTbb : private boost::noncopyable {
-  typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
+  typedef tbb::concurrent_priority_queue<T, Compare> TBBTy;
 
   struct PTD {
     TBBTy wl;
@@ -1779,24 +1776,23 @@ class PTbb : private boost::noncopyable {
   }
 
 public:
-
   PTbb() {
     for (size_t i = 0; i < tld.size(); ++i)
       srand48_r(i, &tld.getRemote(i)->r);
   }
 
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = PTbb<Compare, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = PTbb<Compare, Tnew>;
 
   typedef T value_type;
 
   void push(value_type val) {
-    //unsigned index = GETID<value_type>()(val);
-    //index = (index & 0x00FF) ^ ((index >> 8) & 0x00FF);
-    //index %= galois::getActiveThreads();
+    // unsigned index = GETID<value_type>()(val);
+    // index = (index & 0x00FF) ^ ((index >> 8) & 0x00FF);
+    // index %= galois::getActiveThreads();
     // PTD* N = tld.getLocal();
     // if (index == runtime::LL::getTID()) {
     //   N->wl.push(val);
@@ -1812,7 +1808,7 @@ public:
       tld.getRemote(index)->inq.push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     PTD* N = tld.getLocal();
     long int index;
@@ -1821,13 +1817,13 @@ public:
       lrand48_r(&N->r, &index);
       index %= galois::getActiveThreads();
       if (index == loc)
-	N->wl.push(*b++);
+        N->wl.push(*b++);
       else
-	tld.getRemote(index)->inq.push(*b++);
+        tld.getRemote(index)->inq.push(*b++);
     }
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1844,33 +1840,31 @@ public:
   }
 };
 
-//stealing tbb
-template<class Compare = std::less<int>, typename T = int>
+// stealing tbb
+template <class Compare = std::less<int>, typename T = int>
 class STbb : private boost::noncopyable {
-  typedef tbb::concurrent_priority_queue<T,Compare> TBBTy;
+  typedef tbb::concurrent_priority_queue<T, Compare> TBBTy;
 
   galois::runtime::PerThreadStorage<TBBTy> tld;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = STbb<Compare, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = STbb<Compare, Tnew>;
 
   typedef T value_type;
 
-  void push(value_type val) {
-    tld.getLocal()->push(val);
-  }
+  void push(value_type val) { tld.getLocal()->push(val); }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1881,36 +1875,34 @@ public:
       return retval;
     for (unsigned i = 0; i < galois::getActiveThreads(); ++i) {
       if (tld.getRemote(i)->try_pop(retval))
-	return retval;
+        return retval;
     }
     return galois::optional<value_type>();
   }
 };
 
-template<class Compare = std::less<int>, typename T = int>
+template <class Compare = std::less<int>, typename T = int>
 class TbbPriQueue : private boost::noncopyable {
-  tbb::concurrent_priority_queue<T,Compare> wl;
+  tbb::concurrent_priority_queue<T, Compare> wl;
 
 public:
-  template<bool newconcurrent>
+  template <bool newconcurrent>
   using rethread = TbbPriQueue<Compare, T>;
 
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = TbbPriQueue<Compare, Tnew>;
 
   typedef T value_type;
 
-  void push(value_type val) {
-    wl.push(val);
-  }
+  void push(value_type val) { wl.push(val); }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     push(range.local_begin(), range.local_end());
   }
@@ -1926,33 +1918,34 @@ public:
 };
 GALOIS_WLCOMPILECHECK(TbbPriQueue)
 #else
-template<typename T = int>
-class TbbFIFO;//: public AbstractWorkList<T,false> { };
+template <typename T = int>
+class TbbFIFO; //: public AbstractWorkList<T,false> { };
 
-template<class Compare = std::less<int>, typename T = int>
-class PTbb;//: public AbstractWorkList<T,false> { };
+template <class Compare = std::less<int>, typename T = int>
+class PTbb; //: public AbstractWorkList<T,false> { };
 
-template<class Compare = std::less<int>, typename T = int>
-class STbb;//: public AbstractWorkList<T,false> { };
+template <class Compare = std::less<int>, typename T = int>
+class STbb; //: public AbstractWorkList<T,false> { };
 
-template<class Compare = std::less<int>, typename T = int>
-class TbbPriQueue;//: public AbstractWorkList<T,false> { };
-#endif //TBB
+template <class Compare = std::less<int>, typename T = int>
+class TbbPriQueue; //: public AbstractWorkList<T,false> { };
+#endif // TBB
 
 namespace Alt {
 
 class ChunkHeader {
 public:
   ChunkHeader* next;
-  ChunkHeader() :next(0) {}
+  ChunkHeader() : next(0) {}
 };
 
-template<typename T, int chunksize>
+template <typename T, int chunksize>
 class Chunk : public ChunkHeader {
   T data[chunksize];
   int num;
+
 public:
-  Chunk() :num(0) {}
+  Chunk() : num(0) {}
   galois::optional<T> pop() {
     if (num)
       return galois::optional<T>(data[--num]);
@@ -1966,46 +1959,38 @@ public:
     }
     return false;
   }
-  template<typename Iter>
+  template <typename Iter>
   Iter push(Iter b, Iter e) {
     while (b != e && num < chunksize)
       data[num++] = *b++;
     return b;
   }
-  bool empty() const {
-    return num == 0;
-  }
-  bool full() const {
-    return num == chunksize;
-  }
+  bool empty() const { return num == 0; }
+  bool full() const { return num == chunksize; }
 };
 
 class LIFO_SB : private boost::noncopyable {
   substrate::PtrLock<ChunkHeader> head;
 
 public:
-
-  bool empty() const {
-    return !head.getValue();
-  }
+  bool empty() const { return !head.getValue(); }
 
   void push(ChunkHeader* val) {
     ChunkHeader* oldhead = 0;
     do {
-      oldhead = head.getValue();
+      oldhead   = head.getValue();
       val->next = oldhead;
     } while (!head.CAS(oldhead, val));
   }
 
-  void pushi(ChunkHeader* val) {
-    push(val);
-  }
+  void pushi(ChunkHeader* val) { push(val); }
 
   ChunkHeader* pop() {
-    //lock free Fast path (empty)
-    if (empty()) return 0;
+    // lock free Fast path (empty)
+    if (empty())
+      return 0;
 
-    //Disable CAS
+    // Disable CAS
     head.lock();
     ChunkHeader* C = head.getValue();
     if (!C) {
@@ -2017,12 +2002,13 @@ public:
     return C;
   }
 
-  //returns a chain
+  // returns a chain
   ChunkHeader* steal(LIFO_SB& victim) {
-    //lock free Fast path (empty)
-    if (victim.empty()) return 0;
+    // lock free Fast path (empty)
+    if (victim.empty())
+      return 0;
 
-    //Disable CAS
+    // Disable CAS
     if (!victim.head.try_lock())
       return 0;
     ChunkHeader* C = victim.head.getValue();
@@ -2040,30 +2026,20 @@ class LevelLocalAlt : private boost::noncopyable {
   substrate::PerSocketStorage<LIFO_SB> local;
 
 public:
-  void push(ChunkHeader* val) {
-    local.getLocal()->push(val);
-  }
+  void push(ChunkHeader* val) { local.getLocal()->push(val); }
 
-  void pushi(ChunkHeader* val) {
-    push(val);
-  }
+  void pushi(ChunkHeader* val) { push(val); }
 
-  ChunkHeader* pop() {
-    return local.getLocal()->pop();
-  }
+  ChunkHeader* pop() { return local.getLocal()->pop(); }
 };
 
 class LevelStealingAlt : private boost::noncopyable {
   substrate::PerSocketStorage<LIFO_SB> local;
 
 public:
-  void push(ChunkHeader* val) {
-    local.getLocal()->push(val);
-  }
+  void push(ChunkHeader* val) { local.getLocal()->push(val); }
 
-  void pushi(ChunkHeader* val) {
-    push(val);
-  }
+  void pushi(ChunkHeader* val) { push(val); }
 
   ChunkHeader* pop() {
     LIFO_SB& me = *local.getLocal();
@@ -2072,37 +2048,34 @@ public:
     if (ret)
       return ret;
 
-    //steal
+    // steal
     int id = substrate::ThreadPool::getSocket();
-    for (int i = 0; i < (int) local.size(); ++i) {
+    for (int i = 0; i < (int)local.size(); ++i) {
       ++id;
       id %= local.size();
       ret = me.steal(*local.getRemote(id));
       if (ret)
-	break;
+        break;
     }
-      // if (id) {
-      // 	--id;
-      // 	id %= local.size();
-      // 	ret = me.steal(local.get(id));
-      // }
-      //      myLock.unlock();
+    // if (id) {
+    // 	--id;
+    // 	id %= local.size();
+    // 	ret = me.steal(local.get(id));
+    // }
+    //      myLock.unlock();
     return ret;
   }
 };
 
-template<typename InitWl, typename RunningWl>
+template <typename InitWl, typename RunningWl>
 class InitialQueue : private boost::noncopyable {
   InitWl global;
   RunningWl local;
-public:
-  void push(ChunkHeader* val) {
-    local.push(val);
-  }
 
-  void pushi(ChunkHeader* val) {
-    global.pushi(val);
-  }
+public:
+  void push(ChunkHeader* val) { local.push(val); }
+
+  void pushi(ChunkHeader* val) { global.pushi(val); }
 
   ChunkHeader* pop() {
     ChunkHeader* ret = local.pop();
@@ -2112,8 +2085,7 @@ public:
   }
 };
 
-
-template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
+template <typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
@@ -2123,9 +2095,7 @@ class ChunkAdaptor : private boost::noncopyable {
 
   gWL worklist;
 
-  ChunkTy* mkChunk() {
-    return new (heap.allocate(sizeof(ChunkTy))) ChunkTy();
-  }
+  ChunkTy* mkChunk() { return new (heap.allocate(sizeof(ChunkTy))) ChunkTy(); }
 
   void delChunk(ChunkTy* C) {
     C->~ChunkTy();
@@ -2133,45 +2103,45 @@ class ChunkAdaptor : private boost::noncopyable {
   }
 
 public:
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = ChunkAdaptor<gWL, chunksize, Tnew>;
 
   typedef T value_type;
 
   ChunkAdaptor() : heap(sizeof(ChunkTy)) {
-    for (unsigned int i = 0; i  < data.size(); ++i)
+    for (unsigned int i = 0; i < data.size(); ++i)
       data.get(i) = 0;
   }
 
   void push(value_type val) {
     ChunkTy*& n = data.get();
-    //Simple case, space in current chunk
+    // Simple case, space in current chunk
     if (n && n->push(val))
       return;
-    //full chunk, push
+    // full chunk, push
     if (n)
       worklist.push(static_cast<ChunkHeader*>(n));
-    //get empty chunk;
+    // get empty chunk;
     n = mkChunk();
-    //There better be something in the new chunk
+    // There better be something in the new chunk
     n->push(val);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     ChunkTy*& n = data.get();
     while (b != e) {
       if (!n)
-	n = mkChunk();
+        n = mkChunk();
       b = n->push(b, e);
       if (b != e) {
-	worklist.push(static_cast<ChunkHeader*>(n));
-	n = 0;
+        worklist.push(static_cast<ChunkHeader*>(n));
+        n = 0;
       }
     }
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     typedef typename RangeTy::local_iterator iterator;
     iterator b = range.local_begin();
@@ -2179,7 +2149,7 @@ public:
 
     while (b != e) {
       ChunkTy* n = mkChunk();
-      b = n->push(b,e);
+      b          = n->push(b, e);
       worklist.pushi(static_cast<ChunkHeader*>(n));
     }
   }
@@ -2187,13 +2157,13 @@ public:
   galois::optional<value_type> pop() {
     ChunkTy*& n = data.get();
     galois::optional<value_type> retval;
-    //simple case, things in current chunk
+    // simple case, things in current chunk
     if (n && (retval = n->pop()))
       return retval;
-    //empty chunk, trash it
+    // empty chunk, trash it
     if (n)
       delChunk(n);
-    //get a new chunk
+    // get a new chunk
     n = static_cast<ChunkTy*>(worklist.pop());
     if (n) {
       return n->pop();
@@ -2202,11 +2172,11 @@ public:
     }
   }
 };
-//GALOIS_WLCOMPILECHECK(ChunkAdaptor)
+// GALOIS_WLCOMPILECHECK(ChunkAdaptor)
 
-}
+} // namespace Alt
 
-}
-}
+} // namespace worklists
+} // namespace galois
 
 #endif

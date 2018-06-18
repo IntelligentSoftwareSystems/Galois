@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,11 +25,11 @@
 
 #include "logicDefs.h"
 
-
 namespace des {
 
 /**
- * The Class LogicUpdate is the msg carried by events. represents a change in the value of a net.
+ * The Class LogicUpdate is the msg carried by events. represents a change in
+ * the value of a net.
  */
 class LogicUpdate {
 
@@ -40,7 +40,6 @@ class LogicUpdate {
   LogicVal netVal;
 
 public:
-
   /**
    * Instantiates a new logi update
    *
@@ -48,15 +47,16 @@ public:
    * @param netVal the net val
    */
   LogicUpdate(const std::string& netName, const LogicVal& netVal)
-    : netName (&netName), netVal (netVal) {}
+      : netName(&netName), netVal(netVal) {}
 
-  LogicUpdate (): netName (NULL), netVal(LOGIC_UNKNOWN) {}
+  LogicUpdate() : netName(NULL), netVal(LOGIC_UNKNOWN) {}
 
-  friend bool operator == (const LogicUpdate& left, const LogicUpdate& right) {
-    return ((*left.netName) == (*right.netName)) && (left.netVal == right.netVal);
+  friend bool operator==(const LogicUpdate& left, const LogicUpdate& right) {
+    return ((*left.netName) == (*right.netName)) &&
+           (left.netVal == right.netVal);
   }
 
-  friend bool operator != (const LogicUpdate& left, const LogicUpdate& right) {
+  friend bool operator!=(const LogicUpdate& left, const LogicUpdate& right) {
     return !(left == right);
   }
 
@@ -66,7 +66,7 @@ public:
   const std::string str() const {
     std::ostringstream ss;
     ss << "netName = " << *netName << " netVal = " << netVal;
-    return ss.str ();
+    return ss.str();
   }
 
   /**
@@ -74,20 +74,14 @@ public:
    *
    * @return the net name
    */
-  const std::string& getNetName() const {
-    return *netName;
-  }
-
+  const std::string& getNetName() const { return *netName; }
 
   /**
    * Gets the net val.
    *
    * @return the net val
    */
-  LogicVal getNetVal() const {
-    return netVal;
-  }
-
+  LogicVal getNetVal() const { return netVal; }
 };
 
 } // namespace des

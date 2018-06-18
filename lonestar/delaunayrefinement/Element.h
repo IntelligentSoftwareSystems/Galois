@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -40,20 +40,19 @@ class Element {
 public:
   //! Constructor for Triangles
   Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
-   :obtuse(0), bDim(true), id(_id)
-  {
+      : obtuse(0), bDim(true), id(_id) {
     coords[0] = a;
     coords[1] = b;
     coords[2] = c;
     if (b < a || c < a) {
       if (b < c) {
-	coords[0] = b;
-	coords[1] = c;
-	coords[2] = a;
+        coords[0] = b;
+        coords[1] = c;
+        coords[2] = a;
       } else {
-	coords[0] = c;
-	coords[1] = a;
-	coords[2] = b;
+        coords[0] = c;
+        coords[1] = a;
+        coords[2] = b;
       }
     }
     //    edges[0] = Edge(coords[0], coords[1]);
@@ -61,19 +60,20 @@ public:
     //    edges[2] = Edge(coords[2], coords[0]);
     for (int i = 0; i < 3; i++)
       if (angleOBCheck(i))
-	obtuse = i + 1;
-    //computeCenter();
+        obtuse = i + 1;
+    // computeCenter();
   }
 
   //! Constructor for segments
-  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false), id(_id) {
+  Element(const Tuple& a, const Tuple& b, int _id = 0)
+      : obtuse(0), bDim(false), id(_id) {
     coords[0] = a;
     coords[1] = b;
     if (b < a) {
       coords[0] = b;
       coords[1] = a;
     }
-    //computeCenter();
+    // computeCenter();
   }
 
   Tuple getCenter() const {
@@ -83,38 +83,40 @@ public:
       const Tuple& a = coords[0];
       const Tuple& b = coords[1];
       const Tuple& c = coords[2];
-      Tuple x = b - a;
-      Tuple y = c - a;
-      double xlen = a.distance(b);
-      double ylen = a.distance(c);
-      double cosine = (x * y) / (xlen * ylen);
+      Tuple x        = b - a;
+      Tuple y        = c - a;
+      double xlen    = a.distance(b);
+      double ylen    = a.distance(c);
+      double cosine  = (x * y) / (xlen * ylen);
       double sine_sq = 1.0 - cosine * cosine;
-      double plen = ylen / xlen;
-      double s = plen * cosine;
-      double t = plen * sine_sq;
-      double wp = (plen - cosine) / (2 * t);
-      double wb = 0.5 - (wp * s);
-      Tuple tmpval = a * (1 - wb - wp);
-      tmpval = tmpval + (b * wb);
+      double plen    = ylen / xlen;
+      double s       = plen * cosine;
+      double t       = plen * sine_sq;
+      double wp      = (plen - cosine) / (2 * t);
+      double wb      = 0.5 - (wp * s);
+      Tuple tmpval   = a * (1 - wb - wp);
+      tmpval         = tmpval + (b * wb);
       return tmpval + (c * wp);
     }
   }
 
-  double get_radius_squared() const {
-    return get_radius_squared(getCenter());
-  }
+  double get_radius_squared() const { return get_radius_squared(getCenter()); }
 
   double get_radius_squared(const Tuple& center) const {
     return center.distance_squared(coords[0]);
   }
 
   bool operator<(const Element& rhs) const {
-    //apparently a triangle is less than a line
-    if (dim() < rhs.dim()) return false;
-    if (dim() > rhs.dim()) return true;
+    // apparently a triangle is less than a line
+    if (dim() < rhs.dim())
+      return false;
+    if (dim() > rhs.dim())
+      return true;
     for (int i = 0; i < dim(); i++) {
-      if (coords[i] < rhs.coords[i]) return true;
-      else if (coords[i] > rhs.coords[i]) return false;
+      if (coords[i] < rhs.coords[i])
+        return true;
+      else if (coords[i] > rhs.coords[i])
+        return false;
     }
     return false;
   }
@@ -122,16 +124,16 @@ public:
   /// @return if the current triangle has a common edge with e
   bool isRelated(const Element& rhs) const {
     int num_eq = 0;
-    for(int i = 0; i < dim(); ++i)
-      for(int j = 0; j < rhs.dim(); ++j)
-	if (coords[i] == rhs.coords[j])
-	  ++num_eq;
+    for (int i = 0; i < dim(); ++i)
+      for (int j = 0; j < rhs.dim(); ++j)
+        if (coords[i] == rhs.coords[j])
+          ++num_eq;
     return num_eq == 2;
   }
 
   bool inCircle(Tuple p) const {
     Tuple center = getCenter();
-    double ds = center.distance_squared(p);
+    double ds    = center.distance_squared(p);
     return ds <= get_radius_squared(center);
   }
 
@@ -153,27 +155,27 @@ public:
     return Tuple::angleOBCheck(coords[j], coords[i], coords[k]);
   }
 
-  //Virtualize the Edges array
-  //Used only by Mesh now
+  // Virtualize the Edges array
+  // Used only by Mesh now
   Edge getEdge(int i) const {
     if (i == 0)
       return Edge(coords[0], coords[1]);
     if (!bDim) {
       if (i == 1)
-	return Edge(coords[1], coords[0]);
+        return Edge(coords[1], coords[0]);
     } else {
       if (i == 1)
-	return Edge(coords[1], coords[2]);
+        return Edge(coords[1], coords[2]);
       else if (i == 2)
-	return Edge(coords[2], coords[0]);
+        return Edge(coords[2], coords[0]);
     }
     GALOIS_DIE("unknown edge");
     return Edge(coords[0], coords[0]);
   }
 
   Edge getOppositeObtuse() const {
-    //The edge opposite the obtuse angle is the edge formed by
-    //the other indexes
+    // The edge opposite the obtuse angle is the edge formed by
+    // the other indexes
     switch (obtuse) {
     case 1:
       return getEdge(1);
@@ -192,13 +194,13 @@ public:
       return false;
     for (int i = 0; i < 3; i++)
       if (angleGTCheck(i, MINANGLE))
-	return true;
+        return true;
     return false;
   }
 
   const Tuple& getPoint(int i) const { return coords[i]; }
 
-  const Tuple& getObtuse() const { return coords[obtuse-1]; }
+  const Tuple& getObtuse() const { return coords[obtuse - 1]; }
 
   int dim() const { return bDim ? 3 : 2; }
 
@@ -215,10 +217,10 @@ public:
   Edge getRelatedEdge(const Element& e) const {
     int at = 0;
     Tuple d[2];
-    for(int i = 0; i < dim(); ++i)
-      for(int j = 0; j < e.dim(); ++j)
-	if (coords[i] == e.coords[j])
-	  d[at++] = coords[i];
+    for (int i = 0; i < dim(); ++i)
+      for (int j = 0; j < e.dim(); ++j)
+        if (coords[i] == e.coords[j])
+          d[at++] = coords[i];
     assert(at == 2);
     return Edge(d[0], d[1]);
   }

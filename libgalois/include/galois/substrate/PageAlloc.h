@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,16 +25,16 @@
 namespace galois {
 namespace substrate {
 
-//size of pages
+// size of pages
 size_t allocSize();
 
-//allocate contiguous pages, optionally faulting them in
+// allocate contiguous pages, optionally faulting them in
 void* allocPages(unsigned num, bool preFault);
 
-//free page range
+// free page range
 void freePages(void* ptr, unsigned num);
 
 } // namespace substrate
 } // namespace galois
 
-#endif //GALOIS_SUBSTRATE_PAGEALLOC_H
+#endif // GALOIS_SUBSTRATE_PAGEALLOC_H

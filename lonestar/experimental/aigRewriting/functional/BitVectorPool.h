@@ -16,27 +16,26 @@ typedef unsigned long word;
 
 class BitVectorPool {
 
-	int blockSize;
-	int nWords;
-	int index;
-	word ** currentBlock;
-	std::vector< word** > blocks;
+  int blockSize;
+  int nWords;
+  int index;
+  word** currentBlock;
+  std::vector<word**> blocks;
 
-	void alloc();
+  void alloc();
 
 public:
+  BitVectorPool(int nElements, int nWords);
 
-	BitVectorPool( int nElements, int nWords );
+  virtual ~BitVectorPool();
 
-	virtual ~BitVectorPool();
+  word* getMemory();
 
-	word * getMemory();
+  word* getCleanMemory();
 
-	word * getCleanMemory();
+  void giveBackMemory();
 
-	void giveBackMemory();
-
-	int getNumBlocks();
+  int getNumBlocks();
 };
 
 } /* namespace Functional */

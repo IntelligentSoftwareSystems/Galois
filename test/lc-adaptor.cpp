@@ -9,25 +9,21 @@ struct CSRArrays {
   int numEdges;
 };
 
-class MyGraph : public galois::graphs::LC_Adaptor_Graph<int, void, MyGraph, int, boost::counting_iterator<int>, int*> {
+class MyGraph
+    : public galois::graphs::LC_Adaptor_Graph<
+          int, void, MyGraph, int, boost::counting_iterator<int>, int*> {
   CSRArrays m_instance;
 
 public:
-  MyGraph(const CSRArrays& i): m_instance(i) { }
+  MyGraph(const CSRArrays& i) : m_instance(i) {}
 
   size_t get_id(GraphNode n) const { return n; }
 
-  node_data_reference get_data(GraphNode n) {
-    return m_instance.nodeData[n];
-  }
+  node_data_reference get_data(GraphNode n) { return m_instance.nodeData[n]; }
 
-  edge_data_reference get_edge_data(edge_iterator n) {
-    return {};
-  }
+  edge_data_reference get_edge_data(edge_iterator n) { return {}; }
 
-  GraphNode get_edge_dst(edge_iterator n) {
-    return *n;
-  }
+  GraphNode get_edge_dst(edge_iterator n) { return *n; }
 
   int get_size() const { return m_instance.numNodes; }
   int get_size_edges() const { return m_instance.numEdges; }
@@ -36,7 +32,8 @@ public:
   iterator get_end() const { return iterator(m_instance.numNodes); }
 
   edge_iterator get_edge_begin(GraphNode n) {
-    return n == 0 ? &m_instance.outs[0] : &m_instance.outs[m_instance.outIdx[n-1]];
+    return n == 0 ? &m_instance.outs[0]
+                  : &m_instance.outs[m_instance.outIdx[n - 1]];
   }
   edge_iterator get_edge_end(GraphNode n) {
     return &m_instance.outs[m_instance.outIdx[n]];

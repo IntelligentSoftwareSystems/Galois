@@ -7,22 +7,26 @@
 
 namespace dataGen {
 
-#define HASH_MAX_INT ((unsigned) 1 << 31)
+#define HASH_MAX_INT ((unsigned)1 << 31)
 
-  template <class T> T hash(int i);
-  
-  template <>
-  int hash<int>(int i) {
-    return utils::hash(i) & (HASH_MAX_INT-1);}
+template <class T>
+T hash(int i);
 
-  template <>
-  unsigned int hash<unsigned int>(int i) {
-    return utils::hash(i);}
+template <>
+int hash<int>(int i) {
+  return utils::hash(i) & (HASH_MAX_INT - 1);
+}
 
-  template <>
-  double hash<double>(int i) {
-    return ((double) hash<int>(i)/((double) HASH_MAX_INT));}
+template <>
+unsigned int hash<unsigned int>(int i) {
+  return utils::hash(i);
+}
 
-};
+template <>
+double hash<double>(int i) {
+  return ((double)hash<int>(i) / ((double)HASH_MAX_INT));
+}
+
+}; // namespace dataGen
 
 #endif // _ITEMGEN_INCLUDED

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,12 +37,12 @@ struct SparseBitVectorWithNext : public SparseBitVector {
   /**
    * Initialize fields to default.
    */
-  SparseBitVectorWithNext() : next(nullptr), id(0) { }
+  SparseBitVectorWithNext() : next(nullptr), id(0) {}
 
   /**
    * Default id
    */
-  SparseBitVectorWithNext(unsigned _id) : next(nullptr), id(_id) { }
+  SparseBitVectorWithNext(unsigned _id) : next(nullptr), id(_id) {}
 
   /**
    * Clone just this bitvector without cloning its linked list.
@@ -66,14 +66,14 @@ struct SparseBitVectorWithNext : public SparseBitVector {
   SparseBitVectorWithNext* cloneAll() const {
     SparseBitVectorWithNext* vectorBegin = clone();
 
-    SparseBitVectorWithNext* curPtr = vectorBegin;
+    SparseBitVectorWithNext* curPtr  = vectorBegin;
     SparseBitVectorWithNext* nextPtr = next;
 
     // clone down the linked list starting from this pointer
     while (nextPtr != nullptr) {
       curPtr->next = nextPtr->clone();
-      nextPtr = nextPtr->next;
-      curPtr = curPtr->next;
+      nextPtr      = nextPtr->next;
+      curPtr       = curPtr->next;
     }
 
     return vectorBegin;
@@ -83,9 +83,7 @@ struct SparseBitVectorWithNext : public SparseBitVector {
 struct SparseBVLinkedList {
   SparseBitVectorWithNext* head; // head of linked list
 
-  SparseBVLinkedList() {
-    head = nullptr;
-  }
+  SparseBVLinkedList() { head = nullptr; }
 
   /**
    * Set the bit on the bitvector with the specified id, creating the bitvector
@@ -97,20 +95,20 @@ struct SparseBVLinkedList {
    */
   bool set(unsigned id, unsigned bit) {
     SparseBitVectorWithNext* curPtr = head;
-    SparseBitVectorWithNext* prev = nullptr;
+    SparseBitVectorWithNext* prev   = nullptr;
 
-    // pointers should be in sorted order 
+    // pointers should be in sorted order
     // loop through linked list to find the correct id (if it exists)
     while (curPtr != nullptr && curPtr->id < id) {
-      prev = curPtr;
+      prev   = curPtr;
       curPtr = curPtr->next;
     }
 
     // if id already exists, then set the correct bit
     if (curPtr != nullptr && curPtr->id == id) {
       return curPtr->set(bit);
-    // else the id wasn't found; create and set, then rearrange linked list
-    // accordingly
+      // else the id wasn't found; create and set, then rearrange linked list
+      // accordingly
     } else {
       SparseBitVectorWithNext* newVector = new SparseBitVectorWithNext(id);
       newVector->set(bit);
@@ -118,15 +116,15 @@ struct SparseBVLinkedList {
       // this should point to prev's next, prev should point to this
       if (prev) {
         newVector->next = prev->next;
-        prev->next = newVector;
+        prev->next      = newVector;
       } else {
         if (curPtr == nullptr) {
-          // this is the first vector we are adding since both prev and head are 
+          // this is the first vector we are adding since both prev and head are
           // null; next is nothing
           newVector->next = nullptr;
         } else {
-          // this new vector goes before curptr; if prev is null and curptr isn't,
-          // it means it had to go before
+          // this new vector goes before curptr; if prev is null and curptr
+          // isn't, it means it had to go before
           newVector->next = head;
         }
 
@@ -147,7 +145,7 @@ struct SparseBVLinkedList {
   unsigned unify(const SparseBVLinkedList& second) {
     unsigned changed = 0;
 
-    SparseBitVectorWithNext* prev = nullptr;
+    SparseBitVectorWithNext* prev   = nullptr;
     SparseBitVectorWithNext* ptrOne = head;
     SparseBitVectorWithNext* ptrTwo = second.head;
 
@@ -156,12 +154,12 @@ struct SparseBVLinkedList {
         // merge then advance both
         changed += ptrOne->unify(*ptrTwo);
 
-        prev = ptrOne;
+        prev   = ptrOne;
         ptrOne = ptrOne->next;
         ptrTwo = ptrTwo->next;
       } else if (ptrOne->id < ptrTwo->id) {
         // advance our pointer until we reach "new" ids
-        prev = ptrOne;
+        prev   = ptrOne;
         ptrOne = ptrOne->next;
       } else { // oneBase > twoBase
         // add ptrTwo's id that we don't have (otherwise would have been
@@ -169,11 +167,11 @@ struct SparseBVLinkedList {
         SparseBitVectorWithNext* newWord = ptrTwo->clone();
         newWord->next = ptrOne; // this word comes before our current word
 
-        // if previous vector exists, make it point to this new word, 
+        // if previous vector exists, make it point to this new word,
         // else make this word the new head and prev pointer
         if (prev) {
           prev->next = newWord;
-          prev = newWord;
+          prev       = newWord;
         } else {
           head = prev = newWord;
         }
@@ -202,7 +200,6 @@ struct SparseBVLinkedList {
     return changed;
   }
 };
-
 
 } // end namespace galois
 

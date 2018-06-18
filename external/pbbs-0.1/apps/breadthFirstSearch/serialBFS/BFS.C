@@ -34,35 +34,34 @@ using namespace std;
 //      in the new graph are the children in the bfs tree)
 // **************************************************************
 
-pair<int,int> BFS(vindex start, graph GA) {
-  int numVertices = GA.n;
-  int numEdges = GA.m;
-  vertex *G = GA.V;
-  vindex* Frontier = newA(vindex,numEdges);
-  int* Visited = newA(vindex,numVertices);
-  for (int i = 0; i < numVertices; i++) 
+pair<int, int> BFS(vindex start, graph GA) {
+  int numVertices  = GA.n;
+  int numEdges     = GA.m;
+  vertex* G        = GA.V;
+  vindex* Frontier = newA(vindex, numEdges);
+  int* Visited     = newA(vindex, numVertices);
+  for (int i = 0; i < numVertices; i++)
     Visited[i] = 0;
 
-  int bot = 0;
-  int top = 1;
-  Frontier[0] = start;
+  int bot        = 0;
+  int top        = 1;
+  Frontier[0]    = start;
   Visited[start] = 1;
 
   while (top > bot) {
     vindex v = Frontier[bot++];
-    int k = 0;
-    for (int j=0; j < G[v].degree; j++) {
+    int k    = 0;
+    for (int j = 0; j < G[v].degree; j++) {
       vindex ngh = G[v].Neighbors[j];
       if (Visited[ngh] == 0) {
-	Frontier[top++] = G[v].Neighbors[k++] = ngh;
-	Visited[ngh] = 1;
+        Frontier[top++] = G[v].Neighbors[k++] = ngh;
+        Visited[ngh]                          = 1;
       }
     }
     G[v].degree = k;
   }
 
-  free(Frontier); free(Visited);
-  return pair<int,int>(0,0);
+  free(Frontier);
+  free(Visited);
+  return pair<int, int>(0, 0);
 }
-
-

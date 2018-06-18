@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,7 +28,6 @@
 struct LocalVec {
   typedef StandardAVI::BCImposedType BCImposedType;
 
-
   //! initial state as read from GlobalVec using gather
   MatDouble q;
   MatDouble v;
@@ -42,37 +41,32 @@ struct LocalVec {
   MatDouble vbinit;
   MatDouble tnew;
 
-  //! some temporaries so that we don't need to allocate memory in every iteration
+  //! some temporaries so that we don't need to allocate memory in every
+  //! iteration
   MatDouble forcefield;
   MatDouble funcval;
   MatDouble deltaV;
-
 
   /**
    *
    * @param nrows
    * @param ncols
    */
-  LocalVec (size_t nrows=0, size_t ncols=0) {
-    q = MatDouble (nrows, VecDouble (ncols, 0.0));
+  LocalVec(size_t nrows = 0, size_t ncols = 0) {
+    q = MatDouble(nrows, VecDouble(ncols, 0.0));
 
-    v          = MatDouble (q);
-    vb         = MatDouble (q);
-    ti         = MatDouble (q);
-    qnew       = MatDouble (q);
-    vnew       = MatDouble (q);
-    vbnew      = MatDouble (q);
-    vbinit     = MatDouble (q);
-    tnew       = MatDouble (q);
+    v      = MatDouble(q);
+    vb     = MatDouble(q);
+    ti     = MatDouble(q);
+    qnew   = MatDouble(q);
+    vnew   = MatDouble(q);
+    vbnew  = MatDouble(q);
+    vbinit = MatDouble(q);
+    tnew   = MatDouble(q);
 
-
-    forcefield = MatDouble (q);
-    funcval    = MatDouble (q);
-    deltaV     = MatDouble (q);
-
+    forcefield = MatDouble(q);
+    funcval    = MatDouble(q);
+    deltaV     = MatDouble(q);
   }
-
-
-
 };
 #endif /* LOCALVEC_H_ */

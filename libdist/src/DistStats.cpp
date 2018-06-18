@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -17,7 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-/** 
+/**
  * @file DistStats.cpp
  *
  * Contains implementations for DistStats.h.
@@ -43,38 +43,45 @@ inline static DistStatManager* dsm(void) {
   return internal::distSysStatManager();
 }
 
-DistStatManager::DistStatManager(const std::string& outfile): StatManager(outfile) {}
-
+DistStatManager::DistStatManager(const std::string& outfile)
+    : StatManager(outfile) {}
 
 class galois::runtime::StatRecvHelper {
 
 public:
+  static void recvAtHost_0_hostTotalTy(uint32_t hostID,
+                                       galois::gstl::Str region,
+                                       galois::gstl::Str category,
+                                       StatTotal::Type totalTy) {
 
-    static void recvAtHost_0_hostTotalTy(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
-        , StatTotal::Type totalTy) {
+    dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
+  }
 
+  static void recvAtHost_0_int(uint32_t hostID, galois::gstl::Str region,
+                               galois::gstl::Str category, int64_t thrdTotal,
+                               StatTotal::Type totalTy,
+                               const galois::gstl::Vector<int64_t> thrdVals) {
 
-      dsm()->addRecvdHostTotalTy(hostID, region, category, totalTy);
-    }
+    dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
+  }
 
-    static void recvAtHost_0_int(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
-        , int64_t thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<int64_t> thrdVals) {
+  static void recvAtHost_0_fp(uint32_t hostID, galois::gstl::Str region,
+                              galois::gstl::Str category, double thrdTotal,
+                              StatTotal::Type totalTy,
+                              const galois::gstl::Vector<double> thrdVals) {
 
-      dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
-    }
+    dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
+  }
 
-    static void recvAtHost_0_fp(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
-        , double thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<double> thrdVals) {
+  static void
+  recvAtHost_0_str(uint32_t hostID, galois::gstl::Str region,
+                   galois::gstl::Str category, galois::gstl::Str thrdTotal,
+                   StatTotal::Type totalTy,
+                   const galois::gstl::Vector<galois::gstl::Str> thrdVals) {
 
-      dsm()->addRecvdStat(hostID, region, category, thrdTotal, totalTy, thrdVals);
-    }
-
-    static void recvAtHost_0_str(uint32_t hostID, galois::gstl::Str region, galois::gstl::Str category
-        , galois::gstl::Str thrdTotal,  StatTotal::Type totalTy, const galois::gstl::Vector<galois::gstl::Str> thrdVals) {
-
-      dsm()->addRecvdParam(hostID, region, category, thrdTotal, totalTy, thrdVals);
-    }
-
+    dsm()->addRecvdParam(hostID, region, category, thrdTotal, totalTy,
+                         thrdVals);
+  }
 };
 
 void DistStatManager::mergeStats(void) {
@@ -84,74 +91,80 @@ void DistStatManager::mergeStats(void) {
 }
 
 void DistStatManager::combineAtHost_0_helper(void) {
-    const bool IS_HOST0 = getHostID() == 0;
+  const bool IS_HOST0 = getHostID() == 0;
 
-    const auto& hTotalMap = hostTotalTypes.mergedMap();
+  const auto& hTotalMap = hostTotalTypes.mergedMap();
 
-    if (!IS_HOST0) {
-      for (auto i = hTotalMap.cbegin(), end_i = hTotalMap.cend(); i != end_i; ++i) {
+  if (!IS_HOST0) {
+    for (auto i = hTotalMap.cbegin(), end_i = hTotalMap.cend(); i != end_i;
+         ++i) {
 
-        getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_hostTotalTy
-            , hTotalMap.region(i), hTotalMap.category(i), hTotalMap.stat(i).totalTy());
-      }
+      getSystemNetworkInterface().sendSimple(
+          0, StatRecvHelper::recvAtHost_0_hostTotalTy, hTotalMap.region(i),
+          hTotalMap.category(i), hTotalMap.stat(i).totalTy());
     }
+  }
 
-    for (auto i = Base::intBegin(), end_i = Base::intEnd(); i != end_i; ++i) {
-      Str ln;
-      Str cat;
-      int64_t thrdTotal;
-      StatTotal::Type totalTy;
-      galois::gstl::Vector<int64_t> thrdVals;
+  for (auto i = Base::intBegin(), end_i = Base::intEnd(); i != end_i; ++i) {
+    Str ln;
+    Str cat;
+    int64_t thrdTotal;
+    StatTotal::Type totalTy;
+    galois::gstl::Vector<int64_t> thrdVals;
 
-      Base::readIntStat(i, ln, cat, thrdTotal, totalTy, thrdVals);
+    Base::readIntStat(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      if (IS_HOST0) {
-        addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals); 
+    if (IS_HOST0) {
+      addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      } else { 
-        getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_int, ln, cat, thrdTotal, totalTy, thrdVals);
-      }
+    } else {
+      getSystemNetworkInterface().sendSimple(
+          0, StatRecvHelper::recvAtHost_0_int, ln, cat, thrdTotal, totalTy,
+          thrdVals);
     }
+  }
 
-    for (auto i = Base::fpBegin(), end_i = Base::fpEnd(); i != end_i; ++i) {
-      Str ln;
-      Str cat;
-      double thrdTotal;
-      StatTotal::Type totalTy;
-      galois::gstl::Vector<double> thrdVals;
+  for (auto i = Base::fpBegin(), end_i = Base::fpEnd(); i != end_i; ++i) {
+    Str ln;
+    Str cat;
+    double thrdTotal;
+    StatTotal::Type totalTy;
+    galois::gstl::Vector<double> thrdVals;
 
-      Base::readFPstat(i, ln, cat, thrdTotal, totalTy, thrdVals);
+    Base::readFPstat(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      if (IS_HOST0) {
-        addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals); 
+    if (IS_HOST0) {
+      addRecvdStat(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      } else { 
-        getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_fp, ln, cat, thrdTotal, totalTy, thrdVals);
-      }
+    } else {
+      getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_fp,
+                                             ln, cat, thrdTotal, totalTy,
+                                             thrdVals);
     }
+  }
 
-    for (auto i = Base::paramBegin(), end_i = Base::paramEnd(); i != end_i; ++i) {
-      Str ln;
-      Str cat;
-      Str thrdTotal;
-      StatTotal::Type totalTy;
-      galois::gstl::Vector<Str> thrdVals;
+  for (auto i = Base::paramBegin(), end_i = Base::paramEnd(); i != end_i; ++i) {
+    Str ln;
+    Str cat;
+    Str thrdTotal;
+    StatTotal::Type totalTy;
+    galois::gstl::Vector<Str> thrdVals;
 
-      Base::readParam(i, ln, cat, thrdTotal, totalTy, thrdVals);
+    Base::readParam(i, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      if (IS_HOST0) {
-        addRecvdParam(0, ln, cat, thrdTotal, totalTy, thrdVals); 
+    if (IS_HOST0) {
+      addRecvdParam(0, ln, cat, thrdTotal, totalTy, thrdVals);
 
-      } else { 
-        getSystemNetworkInterface().sendSimple(0, StatRecvHelper::recvAtHost_0_str, ln, cat, thrdTotal, totalTy, thrdVals);
-      }
+    } else {
+      getSystemNetworkInterface().sendSimple(
+          0, StatRecvHelper::recvAtHost_0_str, ln, cat, thrdTotal, totalTy,
+          thrdVals);
     }
-
+  }
 }
 
-
 void DistStatManager::combineAtHost_0(void) {
-  // first host 0 reads stats from Base class 
+  // first host 0 reads stats from Base class
   // then barrier
   // then other hosts send stats to host 0
   // another barrier
@@ -174,53 +187,66 @@ bool DistStatManager::printingHostVals(void) {
   return galois::substrate::EnvCheck(DistStatManager::HSTAT_ENV_VAR);
 }
 
-StatTotal::Type DistStatManager::findHostTotalTy(const Str& region, const Str& category, const StatTotal::Type& thrdTotalTy) const {
+StatTotal::Type
+DistStatManager::findHostTotalTy(const Str& region, const Str& category,
+                                 const StatTotal::Type& thrdTotalTy) const {
 
   StatTotal::Type hostTotalTy = thrdTotalTy;
 
   auto& mrgMap = hostTotalTypes.mergedMap();
 
   auto i = mrgMap.findStat(region, category);
-  if (i != mrgMap.cend()) { 
-    hostTotalTy = mrgMap.stat(i).totalTy(); 
-  } 
+  if (i != mrgMap.cend()) {
+    hostTotalTy = mrgMap.stat(i).totalTy();
+  }
 
   return hostTotalTy;
 }
 
-void DistStatManager::addRecvdHostTotalTy(unsigned hostID, const Str& region, const Str& category, const StatTotal::Type& totalTy) {
+void DistStatManager::addRecvdHostTotalTy(unsigned hostID, const Str& region,
+                                          const Str& category,
+                                          const StatTotal::Type& totalTy) {
   hostTotalTypes.addToStat(region, category, totalTy);
 }
 
-void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str& category, int64_t thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<int64_t>& thrdVals) {
+void DistStatManager::addRecvdStat(
+    unsigned hostID, const Str& region, const Str& category, int64_t thrdTotal,
+    const StatTotal::Type& thrdTotalTy,
+    const DistStatManager::ThrdVals<int64_t>& thrdVals) {
 
-  intDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
-      ,  findHostTotalTy(region, category, thrdTotalTy));
-
+  intDistStats.addToStat(
+      region, category,
+      std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals),
+      findHostTotalTy(region, category, thrdTotalTy));
 }
 
-void DistStatManager::addRecvdStat(unsigned hostID, const Str& region, const Str& category, double thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<double>& thrdVals) {
+void DistStatManager::addRecvdStat(
+    unsigned hostID, const Str& region, const Str& category, double thrdTotal,
+    const StatTotal::Type& thrdTotalTy,
+    const DistStatManager::ThrdVals<double>& thrdVals) {
 
-  fpDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
-      ,  findHostTotalTy(region, category, thrdTotalTy));
-
+  fpDistStats.addToStat(
+      region, category,
+      std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals),
+      findHostTotalTy(region, category, thrdTotalTy));
 }
 
-void DistStatManager::addRecvdParam(unsigned hostID, const Str& region, const Str& category, const Str& thrdTotal, const StatTotal::Type& thrdTotalTy, const DistStatManager::ThrdVals<Str>& thrdVals) {
+void DistStatManager::addRecvdParam(
+    unsigned hostID, const Str& region, const Str& category,
+    const Str& thrdTotal, const StatTotal::Type& thrdTotalTy,
+    const DistStatManager::ThrdVals<Str>& thrdVals) {
 
-  strDistStats.addToStat(region, category
-      , std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals)
-      ,  findHostTotalTy(region, category, thrdTotalTy));
-
+  strDistStats.addToStat(
+      region, category,
+      std::make_tuple(hostID, thrdTotal, thrdTotalTy, thrdVals),
+      findHostTotalTy(region, category, thrdTotalTy));
 }
 
 void DistStatManager::printHeader(std::ostream& out) const {
   out << "STAT_TYPE" << SEP;
   out << "HOST_ID" << SEP;
   out << "REGION" << SEP << "CATEGORY" << SEP;
-  out << "TOTAL_TYPE" << SEP << "TOTAL"; 
+  out << "TOTAL_TYPE" << SEP << "TOTAL";
 
   out << std::endl;
 }

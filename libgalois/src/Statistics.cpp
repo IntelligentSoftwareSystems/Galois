@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,10 +30,9 @@ boost::uuids::uuid galois::runtime::getRandUUID(void) {
   return UUID;
 }
 
-
 using galois::gstl::Str;
 
-StatManager::StatManager(const std::string& outfile): m_outfile(outfile) {}
+StatManager::StatManager(const std::string& outfile) : m_outfile(outfile) {}
 
 StatManager::~StatManager(void) {}
 
@@ -78,47 +77,55 @@ void StatManager::printHeader(std::ostream& out) const {
   out << "STAT_TYPE" << SEP << "REGION" << SEP << "CATEGORY" << SEP;
   out << "TOTAL_TYPE" << SEP << "TOTAL";
   out << std::endl;
-
-
 }
 
-StatManager::int_iterator StatManager::intBegin(void) const { return intStats.cbegin(); }
-StatManager::int_iterator StatManager::intEnd(void) const { return intStats.cend(); }
+StatManager::int_iterator StatManager::intBegin(void) const {
+  return intStats.cbegin();
+}
+StatManager::int_iterator StatManager::intEnd(void) const {
+  return intStats.cend();
+}
 
-StatManager::fp_iterator StatManager::fpBegin(void) const { return fpStats.cbegin(); }
-StatManager::fp_iterator StatManager::fpEnd(void) const { return fpStats.cend(); }
+StatManager::fp_iterator StatManager::fpBegin(void) const {
+  return fpStats.cbegin();
+}
+StatManager::fp_iterator StatManager::fpEnd(void) const {
+  return fpStats.cend();
+}
 
-StatManager::str_iterator StatManager::paramBegin(void) const { return strStats.cbegin(); }
-StatManager::str_iterator StatManager::paramEnd(void) const { return strStats.cend(); }
+StatManager::str_iterator StatManager::paramBegin(void) const {
+  return strStats.cbegin();
+}
+StatManager::str_iterator StatManager::paramEnd(void) const {
+  return strStats.cend();
+}
 
 static galois::runtime::StatManager* SM;
 
-void galois::runtime::internal::setSysStatManager(galois::runtime::StatManager* sm) {
+void galois::runtime::internal::setSysStatManager(
+    galois::runtime::StatManager* sm) {
   GALOIS_ASSERT(!(SM && sm), "StatManager.cpp: Double Initialization of SM");
   SM = sm;
 }
 
-StatManager* galois::runtime::internal::sysStatManager(void) {
-  return SM;
-}
-
+StatManager* galois::runtime::internal::sysStatManager(void) { return SM; }
 
 void galois::runtime::reportPageAlloc(const char* category) {
   galois::runtime::on_each_gen(
-      [category] (const unsigned tid, const unsigned numT) {
-        reportStat_Tsum("PageAlloc", category, numPagePoolAllocForThread(tid)); 
-      }
-      , std::make_tuple());
+      [category](const unsigned tid, const unsigned numT) {
+        reportStat_Tsum("PageAlloc", category, numPagePoolAllocForThread(tid));
+      },
+      std::make_tuple());
 }
 
 void galois::runtime::reportNumaAlloc(const char* category) {
   galois::gWarn("reportNumaAlloc NOT IMPLEMENTED YET. TBD");
   int nodes = substrate::getThreadPool().getMaxNumaNodes();
   for (int x = 0; x < nodes; ++x) {
-    //auto rStat = Stats.getRemote(x);
-    //std::lock_guard<substrate::SimpleLock> lg(rStat->first);
+    // auto rStat = Stats.getRemote(x);
+    // std::lock_guard<substrate::SimpleLock> lg(rStat->first);
     //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
   }
-  //  SC->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
+  //  SC->addNumaAllocToStat(std::string("(NULL)"), std::string(category ?
+  //  category : "(NULL)"));
 }
-

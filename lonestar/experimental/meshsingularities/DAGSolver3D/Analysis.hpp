@@ -13,18 +13,17 @@ typedef std::tuple<vertex, vertex> edge;
 typedef std::tuple<vertex, vertex> face;
 
 class Analysis {
-    private:
-        static void mergeAnaliser(Node *node);
-        
-    public:
-        static void doAnalise(Mesh *mesh);
-        static void nodeAnaliser(Node *n, std::set<uint64_t> *parent);
+private:
+  static void mergeAnaliser(Node* node);
 
-        // for debug use
-        static void debugNode(Node *n);
-        static void printTree(Node *n);
-        static void printElement(Element *e);
+public:
+  static void doAnalise(Mesh* mesh);
+  static void nodeAnaliser(Node* n, std::set<uint64_t>* parent);
 
+  // for debug use
+  static void debugNode(Node* n);
+  static void printTree(Node* n);
+  static void printElement(Element* e);
 };
 
 #endif // ANALYSIS_HPP

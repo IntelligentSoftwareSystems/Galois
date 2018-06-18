@@ -12,9 +12,9 @@
 #include "dmp-internal-wb.h"
 #include "dmp-internal-mot.h"
 
-__thread LogEntry* DMPwb[DMP_WB_HASHSIZE];      // the write buffer
-__thread BumpAllocator<LogEntry> DMPwbPool;     // allocation pool
-__thread BumpAllocator<void*>    DMPwbFreeLog;  // log for calls to free()
+__thread LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
+__thread BumpAllocator<LogEntry> DMPwbPool; // allocation pool
+__thread BumpAllocator<void*> DMPwbFreeLog; // log for calls to free()
 
 //-----------------------------------------------------------------------
 // Initialization
@@ -43,13 +43,13 @@ void DMPwbResetQuantum() {
 
 LogEntry* DMPwbLookup(void* base) {
   // Lookup the LogEntry of a base address, and move-to-front if found
-  const int hash = DMPwbHash(base);
+  const int hash  = DMPwbHash(base);
   LogEntry* first = DMPwb[hash];
   for (LogEntry *p = NULL, *e = first; e != NULL; p = e, e = e->next)
     if (e->base == base) {
       if (p != NULL) {
-        p->next = e->next;
-        e->next = first;
+        p->next     = e->next;
+        e->next     = first;
         DMPwb[hash] = e;
       }
       return e;
@@ -57,7 +57,7 @@ LogEntry* DMPwbLookup(void* base) {
   return NULL;
 }
 
-#else   // !DMP_ENABLE_WB_MOVE_TO_FRONT
+#else // !DMP_ENABLE_WB_MOVE_TO_FRONT
 
 LogEntry* DMPwbLookup(void* base) {
   // Lookup the LogEntry of a base address.
@@ -68,7 +68,7 @@ LogEntry* DMPwbLookup(void* base) {
   return NULL;
 }
 
-#endif  // DMP_ENABLE_WB_MOVE_TO_FRONT
+#endif // DMP_ENABLE_WB_MOVE_TO_FRONT
 
 LogEntry* DMPwbLookupOrAdd(void* base) {
   // Lookup the LogEntry of a base address, and add a new LogEntry if needed.
@@ -76,11 +76,11 @@ LogEntry* DMPwbLookupOrAdd(void* base) {
   if (e != NULL)
     return e;
   const int hash = DMPwbHash(base);
-  e = DMPwbPool.alloc();
-  e->base = base;
-  e->next = DMPwb[hash];
-  e->bitfield = 0;
-  DMPwb[hash] = e;
+  e              = DMPwbPool.alloc();
+  e->base        = base;
+  e->next        = DMPwb[hash];
+  e->bitfield    = 0;
+  DMPwb[hash]    = e;
   DMPwbUpdateMOT(base);
   // Prefetch the data[] from shared memory.
   memcpy(e->data, base, sizeof e->data);
@@ -131,7 +131,7 @@ static inline void DMPwbCopy8(char* to, char* from, int bitfield) {
     return;
   case 0xf0:
     // Fast path: write second 4 bytes.
-    memcpy(to+4, from+4, 4);
+    memcpy(to + 4, from + 4, 4);
     return;
   default:
     // Slow path: write each byte.
@@ -161,7 +161,8 @@ static inline void DMPwbCopyLogEntry(char* to, char* from, uint64_t bitfield) {
 
 struct LogEntryCommitLock {};
 
-bool DMPwbCommitLogEntryStart(LogEntry *e, LogEntryCommitLock** plock, bool* manyWriters) {
+bool DMPwbCommitLogEntryStart(LogEntry* e, LogEntryCommitLock** plock,
+                              bool* manyWriters) {
   // Fast path: write nothing.
   if (e->bitfield == 0)
     return true;
@@ -175,8 +176,7 @@ bool DMPwbCommitLogEntryStart(LogEntry *e, LogEntryCommitLock** plock, bool* man
   return true;
 }
 
-void DMPwbCommitLogEntryEnd(LogEntryCommitLock *lock) {
-}
+void DMPwbCommitLogEntryEnd(LogEntryCommitLock* lock) {}
 
 #endif
 
@@ -186,8 +186,8 @@ void DMPwbCommitFlush() {
 }
 
 void DMPwbCommit() {
-  for (BumpAllocator<LogEntry>::iterator
-       e = DMPwbPool.getiterator(); e.isValid(); e.next()) {
+  for (BumpAllocator<LogEntry>::iterator e = DMPwbPool.getiterator();
+       e.isValid(); e.next()) {
     LogEntryCommitLock* lock = NULL;
     DMPwbCommitLogEntryStart(e.get(), &lock, NULL);
     DMPwbCommitLogEntryEnd(lock);
@@ -208,8 +208,8 @@ void DMPwbUpdateStats() {
   DMPMAP->wb_totalquanta++;
   // Count used bytes.
   uint64_t used = 0;
-  for (BumpAllocator<LogEntry>::iterator
-       e = DMPwbPool.getiterator(); e.isValid(); e.next()) {
+  for (BumpAllocator<LogEntry>::iterator e = DMPwbPool.getiterator();
+       e.isValid(); e.next()) {
     used += countbits(e.get()->bitfield);
   }
   DMPMAP->wb_totalused += used;
@@ -217,15 +217,17 @@ void DMPwbUpdateStats() {
     DMPMAP->wb_maxused = used;
   }
   // Count hash-chain sizes.
-  uint64_t maxchain = 0;
+  uint64_t maxchain    = 0;
   uint64_t totalbucket = 0;
   for (int i = 0; i < DMP_WB_HASHSIZE; ++i) {
     int c = 0;
     for (LogEntry* e = DMPwb[i]; e != NULL; e = e->next) {
       c++;
     }
-    if (c > 0) totalbucket++;
-    if (c > maxchain) maxchain = c;
+    if (c > 0)
+      totalbucket++;
+    if (c > maxchain)
+      maxchain = c;
     DMPMAP->wb_totalhashchains += c;
   }
   DMPMAP->wb_totalhashbuckets += totalbucket;
@@ -247,18 +249,18 @@ void DMPwbUpdateStats() {
 
 struct LogEntryCommitLock {
   atomic_int_t spinlock;
-  LogEntry*    first;
+  LogEntry* first;
 };
 
-#define DMP_WB_COMMIT_LOCKS  1024
+#define DMP_WB_COMMIT_LOCKS 1024
 
 static LogEntryCommitLock DMPwbCommitLocks[DMP_WB_COMMIT_LOCKS];
 
 static inline int DMPwbCommitLockHash(void* addr) {
-  return (((uintptr_t) addr) >> DMP_WB_GRANULARITY) & (DMP_WB_COMMIT_LOCKS - 1);
+  return (((uintptr_t)addr) >> DMP_WB_GRANULARITY) & (DMP_WB_COMMIT_LOCKS - 1);
 }
 
-static inline LogEntryCommitLock* DMPwbAcquireCommitLock(LogEntry *e) {
+static inline LogEntryCommitLock* DMPwbAcquireCommitLock(LogEntry* e) {
   LogEntryCommitLock* lock = &DMPwbCommitLocks[DMPwbCommitLockHash(e->base)];
   DMP_SPINLOCK_LOCK(&lock->spinlock);
   return lock;
@@ -292,11 +294,11 @@ static inline void DMPwbCleanupMOT(void* addr) {
   // We are private, so no sync ops needed.
 #ifdef DMP_ENABLE_MODEL_B_S
   const int hash = DMPmotHash(addr);
-  DMPmot[hash] = 0;
+  DMPmot[hash]   = 0;
 #else
   const int hash = DMPmotHash(addr);
-  const int hi = DMPmot[hash] & ~DMP_WB_MOT_MASK;
-  DMPmot[hash] = hi;
+  const int hi   = DMPmot[hash] & ~DMP_WB_MOT_MASK;
+  DMPmot[hash]   = hi;
 #endif
 }
 
@@ -304,8 +306,8 @@ static inline bool DMPwbDecrementMOT(void* addr) {
   // We are locked, so no sync ops needed.
   const int hash = DMPmotHash(addr);
   const int full = DMPmot[hash];
-  const int hi = full & ~DMP_WB_MOT_MASK;
-  const int lo = full & DMP_WB_MOT_MASK;
+  const int hi   = full & ~DMP_WB_MOT_MASK;
+  const int lo   = full & DMP_WB_MOT_MASK;
   if (lo == MaxThreads) {
     DMPmot[hash] = hi;
     return true;
@@ -322,7 +324,8 @@ static inline bool DMPwbDecrementMOT(void* addr) {
 // Commit a single LogEntry
 //
 
-bool DMPwbCommitLogEntryStart(LogEntry *e, LogEntryCommitLock** plock, bool* manyWriters) {
+bool DMPwbCommitLogEntryStart(LogEntry* e, LogEntryCommitLock** plock,
+                              bool* manyWriters) {
   // Fast path: write nothing.
   if (e->bitfield == 0)
     return false;
@@ -367,24 +370,24 @@ bool DMPwbCommitLogEntryStart(LogEntry *e, LogEntryCommitLock** plock, bool* man
       DMPwbCopyLogEntry((char*)e->base, e->data, bitfield);
     // Since we wrote something, link our log entry into the hash table.
     e->threadID = DMPMAP->threadID;
-    e->next = lock->first;
+    e->next     = lock->first;
     lock->first = e;
   }
   *plock = lock;
   return islast;
 }
 
-void DMPwbCommitLogEntryEnd(LogEntryCommitLock *lock) {
+void DMPwbCommitLogEntryEnd(LogEntryCommitLock* lock) {
   if (lock != NULL)
     DMPwbReleaseCommitLock(lock);
 }
 
-#else   // !DMP_ENABLE_WB_PARALLEL_COMMIT
+#else // !DMP_ENABLE_WB_PARALLEL_COMMIT
 
 static inline void DMPwbFlushCommitLocks() {}
 static inline void DMPwbUpdateMOT(void* addr) {}
 
-#endif  // DMP_ENABLE_WB_PARALLEL_COMMIT
+#endif // DMP_ENABLE_WB_PARALLEL_COMMIT
 
 #undef MaxBitfield
 
@@ -394,8 +397,8 @@ static inline void DMPwbUpdateMOT(void* addr) {}
 
 FORCE_INLINE
 void DMPwbDoLoad(const WbIterator* iter) {
-  char* in  = iter->addr;
-  char* out = iter->buffer;
+  char* in          = iter->addr;
+  char* out         = iter->buffer;
   const ptrdiff_t d = iter->currOffset;
   const ptrdiff_t s = iter->currSize;
   // Copy from 'addr' -> 'buffer'.
@@ -414,7 +417,7 @@ void DMPwbDoStore(const WbIterator* iter) {
   // Copy from the side buffer -> the WB entry.
   const ptrdiff_t d = iter->currOffset;
   const ptrdiff_t s = iter->currSize;
-  LogEntry* e = DMPwbLookupOrAdd(iter->base);
+  LogEntry* e       = DMPwbLookupOrAdd(iter->base);
   e->bitfield |= (DMPwbBitmaskFromSize(s) << d);
   memcpy((void*)(e->data + d), iter->buffer, s);
 }
@@ -424,9 +427,9 @@ void DMPwbDoRemove(const WbIterator* iter) {
   // Make sure [addr, addr+s) has been removed from the write buffer.
   const ptrdiff_t d = iter->currOffset;
   const ptrdiff_t s = iter->currSize;
-  LogEntry* e = DMPwbLookup(iter->base);
+  LogEntry* e       = DMPwbLookup(iter->base);
   if (e != NULL)
-    e->bitfield &= ~ (DMPwbBitmaskFromSize(s) << d);
+    e->bitfield &= ~(DMPwbBitmaskFromSize(s) << d);
 }
 
 FORCE_INLINE
@@ -434,7 +437,7 @@ void DMPwbDoMemset(const WbIterator* iter, int val) {
   // Fill this write buffer entry.
   const ptrdiff_t d = iter->currOffset;
   const ptrdiff_t s = iter->currSize;
-  LogEntry* e = DMPwbLookupOrAdd(iter->base);
+  LogEntry* e       = DMPwbLookupOrAdd(iter->base);
   e->bitfield |= (DMPwbBitmaskFromSize(s) << d);
   memset((void*)(e->data + d), val, s);
 }
@@ -497,23 +500,25 @@ void DMPwbRemoveRange(void* addr, size_t size) {
 //
 
 // NOTE: LLVM occasionally lies about alignments of data larger than 4 bytes.
-// For benchmarks where this happens, define the following macro as a workaround.
+// For benchmarks where this happens, define the following macro as a
+// workaround.
 #ifdef DMP_ENABLE_WB_BAD_ALIGNMENTS
-#define WBSIZECHECK  (sizeof(T) > 4)
+#define WBSIZECHECK (sizeof(T) > 4)
 #else
-#define WBSIZECHECK  false
+#define WBSIZECHECK false
 #endif
 
-template<typename T, bool isContained>
+template <typename T, bool isContained>
 inline T DMPwbLoadTyped(T* addr) {
   // Uncontained?
-  if ((!isContained || WBSIZECHECK) && !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
+  if ((!isContained || WBSIZECHECK) &&
+      !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
     T tmp;
     DMPwbLoadRange((void*)addr, sizeof(T), &tmp);
     return tmp;
   }
   // Get the log parameters.
-  void* base = DMPwbBase((void*)addr);
+  void* base  = DMPwbBase((void*)addr);
   ptrdiff_t d = (uintptr_t)addr - (uintptr_t)base;
   ptrdiff_t s = sizeof(T);
   // Check the write buffer.
@@ -526,30 +531,31 @@ inline T DMPwbLoadTyped(T* addr) {
   return *buf;
 }
 
-template<typename T, bool isContained>
+template <typename T, bool isContained>
 inline void DMPwbStoreTyped(T* addr, T value) {
   // Uncontained?
-  if ((!isContained || WBSIZECHECK) && !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
+  if ((!isContained || WBSIZECHECK) &&
+      !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
     T tmp = value;
     DMPwbStoreRange((void*)addr, sizeof(T), &tmp);
     return;
   }
   // Get the log parameters.
-  void* base = DMPwbBase((void*)addr);
+  void* base  = DMPwbBase((void*)addr);
   ptrdiff_t d = (uintptr_t)addr - (uintptr_t)base;
   ptrdiff_t s = sizeof(T);
   // Copy 'value' into the write buffer.
   LogEntry* e = DMPwbLookupOrAdd(base);
   e->bitfield |= (DMPwbBitmaskFromSize(s) << d);
   T* buf = (T*)(e->data + d);
-  *buf = value;
+  *buf   = value;
 }
 
 // Instantiations.
-#define INSTANTIATE(T) \
-  template T    DMPwbLoadTyped<T, true> (T*);\
-  template T    DMPwbLoadTyped<T, false>(T*);\
-  template void DMPwbStoreTyped<T, true> (T*, T);\
+#define INSTANTIATE(T)                                                         \
+  template T DMPwbLoadTyped<T, true>(T*);                                      \
+  template T DMPwbLoadTyped<T, false>(T*);                                     \
+  template void DMPwbStoreTyped<T, true>(T*, T);                               \
   template void DMPwbStoreTyped<T, false>(T*, T);
 
 INSTANTIATE(uint8_t)
@@ -570,7 +576,8 @@ void DMPwbMemset(void* addr, int val, size_t size) {
   WbIterator iter(addr, size);
   for (;;) {
     DMPwbDoMemset(&iter, val);
-    if (!iter.next()) break;
+    if (!iter.next())
+      break;
   }
 }
 
@@ -580,8 +587,9 @@ void DMPwbMemcpy(void* dst, const void* src, size_t size) {
   WbIterator::initPair(&di, &si);
   for (;;) {
     DMPwbDoMemcpy(&di, &si);
-    if (!WbIterator::nextPair(&di, &si)) break;
+    if (!WbIterator::nextPair(&di, &si))
+      break;
   }
 }
 
-#endif  // DMP_ENABLE_BUFFERED_MODE
+#endif // DMP_ENABLE_BUFFERED_MODE

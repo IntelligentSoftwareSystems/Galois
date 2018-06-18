@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,7 +23,7 @@
 #include "galois/runtime/Tracer.h"
 #include "galois/DReducible.h"
 
-//For resilience
+// For resilience
 #include "resilience.h"
 
 #include <iostream>
@@ -38,12 +38,13 @@ constexpr static const char* const REGION_NAME = "PageRank";
 /******************************************************************************/
 namespace cll = llvm::cl;
 
-static cll::opt<float> tolerance("tolerance", 
-                                 cll::desc("tolerance for residual"), 
+static cll::opt<float> tolerance("tolerance",
+                                 cll::desc("tolerance for residual"),
                                  cll::init(0.000001));
-static cll::opt<unsigned int> maxIterations("maxIterations", 
-                                cll::desc("Maximum iterations: Default 1000"),
-                                cll::init(1000));
+static cll::opt<unsigned int>
+    maxIterations("maxIterations",
+                  cll::desc("Maximum iterations: Default 1000"),
+                  cll::init(1000));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -75,23 +76,22 @@ struct ResetGraph {
   const float& local_alpha;
   Graph* graph;
 
-  ResetGraph(const float& _local_alpha, Graph* _graph) : 
-      local_alpha(_local_alpha), graph(_graph) {}
+  ResetGraph(const float& _local_alpha, Graph* _graph)
+      : local_alpha(_local_alpha), graph(_graph) {}
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      ResetGraph{ alpha, &_graph },
-      galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        ResetGraph{alpha, &_graph}, galois::no_stats(),
+        galois::loopname(_graph.get_run_identifier("ResetGraph").c_str()));
   }
 
   void operator()(GNode src) const {
-    auto& sdata = graph->getData(src);
-    sdata.value = 0;
-    sdata.nout = 0;
-    sdata.delta = 0;
+    auto& sdata    = graph->getData(src);
+    sdata.value    = 0;
+    sdata.nout     = 0;
+    sdata.delta    = 0;
     sdata.residual = local_alpha;
   }
 };
@@ -109,11 +109,9 @@ struct InitializeGraph {
 
     // doing a local do all because we are looping over edges
     galois::do_all(
-      galois::iterate(nodesWithEdges),
-      InitializeGraph{ &_graph },
-      galois::steal(), 
-      galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
+        galois::iterate(nodesWithEdges), InitializeGraph{&_graph},
+        galois::steal(), galois::no_stats(),
+        galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph");
@@ -123,7 +121,7 @@ struct InitializeGraph {
   // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
     for (auto nbr : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(nbr);
+      GNode dst   = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
       galois::atomicAdd(ddata.nout, (uint32_t)1);
       bitset_nout.set(dst);
@@ -137,24 +135,24 @@ struct ResetGraph_crashed {
   const float& local_alpha;
   Graph* graph;
 
-  ResetGraph_crashed(const float& _local_alpha, Graph* _graph) : 
-      local_alpha(_local_alpha), graph(_graph) {}
+  ResetGraph_crashed(const float& _local_alpha, Graph* _graph)
+      : local_alpha(_local_alpha), graph(_graph) {}
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
 
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      ResetGraph_crashed{ alpha, &_graph },
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("ResetGraph_crashed").c_str()));
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        ResetGraph_crashed{alpha, &_graph}, galois::no_stats(),
+        galois::loopname(
+            _graph.get_run_identifier("ResetGraph_crashed").c_str()));
   }
 
   void operator()(GNode src) const {
-    auto& sdata = graph->getData(src);
-    sdata.value = local_alpha;
-    sdata.nout = 0;
-    sdata.delta = 0;
+    auto& sdata    = graph->getData(src);
+    sdata.value    = local_alpha;
+    sdata.nout     = 0;
+    sdata.delta    = 0;
     sdata.residual = 0;
   }
 };
@@ -172,11 +170,10 @@ struct InitializeGraph_crashed {
 
     // doing a local do all because we are looping over edges
     galois::do_all(
-      galois::iterate(nodesWithEdges),
-      InitializeGraph_crashed{ &_graph },
-      galois::steal(), 
-      galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph_crashed").c_str()));
+        galois::iterate(nodesWithEdges), InitializeGraph_crashed{&_graph},
+        galois::steal(), galois::no_stats(),
+        galois::loopname(
+            _graph.get_run_identifier("InitializeGraph_crashed").c_str()));
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph_crashed");
@@ -186,7 +183,7 @@ struct InitializeGraph_crashed {
   // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
     for (auto nbr : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(nbr);
+      GNode dst   = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
       galois::atomicAdd(ddata.nout, (uint32_t)1);
       bitset_nout.set(dst);
@@ -203,23 +200,22 @@ struct ResetGraph_healthy {
 
   void static go(Graph& _graph) {
     const auto& allNodes = _graph.allNodesRange();
-    
+
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      ResetGraph_healthy{ &_graph },
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("ResetGraph_healthy").c_str()));
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        ResetGraph_healthy{&_graph}, galois::no_stats(),
+        galois::loopname(
+            _graph.get_run_identifier("ResetGraph_healthy").c_str()));
   }
 
   void operator()(GNode src) const {
     auto& sdata = graph->getData(src);
-    //Reset residual on healthy nodes.
+    // Reset residual on healthy nodes.
     sdata.residual = 0;
-    sdata.delta = 0;
-    sdata.nout = 0;
+    sdata.delta    = 0;
+    sdata.nout     = 0;
   }
 };
-
 
 struct InitializeGraph_healthy {
   Graph* graph;
@@ -234,11 +230,10 @@ struct InitializeGraph_healthy {
 
     // doing a local do all because we are looping over edges
     galois::do_all(
-      galois::iterate(nodesWithEdges),
-      InitializeGraph_healthy{ &_graph },
-      galois::steal(), 
-      galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("InitializeGraph_healthy").c_str()));
+        galois::iterate(nodesWithEdges), InitializeGraph_healthy{&_graph},
+        galois::steal(), galois::no_stats(),
+        galois::loopname(
+            _graph.get_run_identifier("InitializeGraph_healthy").c_str()));
 
     _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
                 Bitset_nout>("InitializeGraph_healthy");
@@ -248,7 +243,7 @@ struct InitializeGraph_healthy {
   // the tranpose graph for pull algorithms)
   void operator()(GNode src) const {
     for (auto nbr : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(nbr);
+      GNode dst   = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
       galois::atomicAdd(ddata.nout, (uint32_t)1);
       bitset_nout.set(dst);
@@ -265,28 +260,27 @@ struct recovery {
   recovery(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-    _graph.sync<writeAny, readAny, Reduce_max_value, Broadcast_value>("RECOVERY_VALUE");
+    _graph.sync<writeAny, readAny, Reduce_max_value, Broadcast_value>(
+        "RECOVERY_VALUE");
 
-    //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    // const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      //galois::iterate(nodesWithEdges),
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      recovery{&_graph},
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
+        // galois::iterate(nodesWithEdges),
+        galois::iterate(allNodes.begin(), allNodes.end()), recovery{&_graph},
+        galois::no_stats(),
+        galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.residual = 0;
+    sdata.residual  = 0;
     if (sdata.nout > 0)
       sdata.delta = sdata.value * (1 - alpha) / sdata.nout;
   }
 };
 
-
-/** 
+/**
  * Recovery Adjust to be called by resilience based fault tolerance
  */
 struct recoveryAdjust {
@@ -295,18 +289,17 @@ struct recoveryAdjust {
   recoveryAdjust(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-    //const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    // const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     const auto& allNodes = _graph.allNodesRange();
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      //galois::iterate(nodesWithEdges),
-      recoveryAdjust{&_graph},
-      galois::no_stats(),
-      galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str())
-    );
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        // galois::iterate(nodesWithEdges),
+        recoveryAdjust{&_graph}, galois::no_stats(),
+        galois::loopname(_graph.get_run_identifier("RECOVERY_ADJUST").c_str()));
 
-    //TODO: Is this required??
-    //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY");
+    // TODO: Is this required??
+    //_graph.sync<writeSource, readAny, Reduce_add_residual,
+    //Broadcast_residual>("RECOVERY");
   }
 
   void operator()(GNode src) const {
@@ -316,28 +309,24 @@ struct recoveryAdjust {
 };
 
 struct PageRank_delta {
-  const float & local_alpha;
-  cll::opt<float> & local_tolerance;
+  const float& local_alpha;
+  cll::opt<float>& local_tolerance;
   Graph* graph;
 
   galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
 
-  PageRank_delta(const float & _local_alpha, cll::opt<float> & _local_tolerance,
-                 Graph* _graph, galois::DGAccumulator<unsigned int>& _dga) : 
-      local_alpha(_local_alpha),
-      local_tolerance(_local_tolerance),
-      graph(_graph),
-      DGAccumulator_accum(_dga) {}
+  PageRank_delta(const float& _local_alpha, cll::opt<float>& _local_tolerance,
+                 Graph* _graph, galois::DGAccumulator<unsigned int>& _dga)
+      : local_alpha(_local_alpha), local_tolerance(_local_tolerance),
+        graph(_graph), DGAccumulator_accum(_dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     const auto& allNodes = _graph.allNodesRange();
 
     galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
-      PageRank_delta{ alpha, tolerance, &_graph, dga },
-      galois::no_stats(), 
-      galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str())
-    );
+        galois::iterate(allNodes.begin(), allNodes.end()),
+        PageRank_delta{alpha, tolerance, &_graph, dga}, galois::no_stats(),
+        galois::loopname(_graph.get_run_identifier("PageRank_delta").c_str()));
   }
 
   void operator()(GNode src) const {
@@ -363,14 +352,14 @@ struct PageRank {
   PageRank(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
-    unsigned _num_iterations = 0;
+    unsigned _num_iterations   = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    //unsigned int reduced = 0;
+    // unsigned int reduced = 0;
 
     do {
-      //Checkpointing the all the node data
-      if(enableFT && (recoveryScheme == CP || recoveryScheme == HR)){
+      // Checkpointing the all the node data
+      if (enableFT && (recoveryScheme == CP || recoveryScheme == HR)) {
         saveCheckpointToDisk(_num_iterations, _graph);
       }
 
@@ -380,37 +369,35 @@ struct PageRank {
       _graph.reset_mirrorField<Reduce_add_residual>();
 
       galois::do_all(
-        galois::iterate(nodesWithEdges),
-        PageRank{ &_graph },
-        galois::steal(),
-        galois::no_stats(),
-        galois::loopname(_graph.get_run_identifier("PageRank").c_str())
-      );
+          galois::iterate(nodesWithEdges), PageRank{&_graph}, galois::steal(),
+          galois::no_stats(),
+          galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
 
-      /**************************CRASH SITE : start *****************************************/
-      if (enableFT && (_num_iterations == crashIteration)){
-        crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(_graph);
+      /**************************CRASH SITE : start
+       * *****************************************/
+      if (enableFT && (_num_iterations == crashIteration)) {
+        crashSite<recovery, InitializeGraph_crashed, InitializeGraph_healthy>(
+            _graph);
         dga += 1;
 
         const auto& net = galois::runtime::getSystemNetworkInterface();
-        if(recoveryScheme == CP){
+        if (recoveryScheme == CP) {
           galois::gPrint(net.ID, " : recovery DONE!!!\n");
         } else {
           _graph.reset_mirrorField<Reduce_add_residual>();
           galois::do_all(
-            galois::iterate(nodesWithEdges),
-            PageRank{ &_graph },
-            galois::steal(),
-            galois::no_stats(),
-            galois::loopname(_graph.get_run_identifier("RECOVERY_PageRank").c_str())
-          );
+              galois::iterate(nodesWithEdges), PageRank{&_graph},
+              galois::steal(), galois::no_stats(),
+              galois::loopname(
+                  _graph.get_run_identifier("RECOVERY_PageRank").c_str()));
 
-          //_graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
-          //Bitset_residual>("PageRank-afterCrash");
-          _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual>("RECOVERY_PageRank");
+          //_graph.sync<writeSource, readAny, Reduce_add_residual,
+          //Broadcast_residual, Bitset_residual>("PageRank-afterCrash");
+          _graph.sync<writeSource, readAny, Reduce_add_residual,
+                      Broadcast_residual>("RECOVERY_PageRank");
           bitset_residual.reset();
 
           crashSiteAdjust<recoveryAdjust>(_graph);
@@ -421,19 +408,21 @@ struct PageRank {
         //_graph.reset_mirrorField<Reduce_add_residual>();
         // Adjust delta
       }
-      /**************************CRASH SITE : end *****************************************/
+      /**************************CRASH SITE : end
+       * *****************************************/
 
-      galois::runtime::reportStat_Tsum(REGION_NAME, 
-          "NumWorkItems_" + (_graph.get_run_identifier()), 
+      galois::runtime::reportStat_Tsum(
+          REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
           (unsigned long)dga.read_local());
 
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) && dga.reduce(_graph.get_run_identifier()));
+    } while ((_num_iterations < maxIterations) &&
+             dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Single(REGION_NAME, 
-        "NumIterations_" + std::to_string(_graph.get_run_num()), 
-        (unsigned long)_num_iterations);
+      galois::runtime::reportStat_Single(
+          REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
+          (unsigned long)_num_iterations);
     }
   }
 
@@ -442,7 +431,7 @@ struct PageRank {
     auto& sdata = graph->getData(src);
 
     for (auto nbr : graph->edges(src)) {
-      GNode dst = graph->getEdgeDst(nbr);
+      GNode dst   = graph->getEdgeDst(nbr);
       auto& ddata = graph->getData(dst);
 
       if (ddata.delta > 0) {
@@ -473,32 +462,30 @@ struct PageRankSanity {
   galois::DGReduceMax<float>& max_residual;
   galois::DGReduceMin<float>& min_residual;
 
-  PageRankSanity(cll::opt<float>& _local_tolerance, Graph* _graph,
+  PageRankSanity(
+      cll::opt<float>& _local_tolerance, Graph* _graph,
       galois::DGAccumulator<float>& _DGAccumulator_sum,
       galois::DGAccumulator<float>& _DGAccumulator_sum_residual,
       galois::DGAccumulator<uint64_t>& _DGAccumulator_residual_over_tolerance,
       galois::DGReduceMax<float>& _max_value,
       galois::DGReduceMin<float>& _min_value,
       galois::DGReduceMax<float>& _max_residual,
-      galois::DGReduceMin<float>& _min_residual
-  ) : local_tolerance(_local_tolerance), graph(_graph),
-      DGAccumulator_sum(_DGAccumulator_sum),
-      DGAccumulator_sum_residual(_DGAccumulator_sum_residual),
-      DGAccumulator_residual_over_tolerance(_DGAccumulator_residual_over_tolerance),
-      max_value(_max_value),
-      min_value(_min_value),
-      max_residual(_max_residual),
-      min_residual(_min_residual) {}
+      galois::DGReduceMin<float>& _min_residual)
+      : local_tolerance(_local_tolerance), graph(_graph),
+        DGAccumulator_sum(_DGAccumulator_sum),
+        DGAccumulator_sum_residual(_DGAccumulator_sum_residual),
+        DGAccumulator_residual_over_tolerance(
+            _DGAccumulator_residual_over_tolerance),
+        max_value(_max_value), min_value(_min_value),
+        max_residual(_max_residual), min_residual(_min_residual) {}
 
-  void static go(Graph& _graph,
-    galois::DGAccumulator<float>& DGA_sum,
-    galois::DGAccumulator<float>& DGA_sum_residual,
-    galois::DGAccumulator<uint64_t>& DGA_residual_over_tolerance,
-    galois::DGReduceMax<float>& max_value,
-    galois::DGReduceMin<float>& min_value,
-    galois::DGReduceMax<float>& max_residual,
-    galois::DGReduceMin<float>& min_residual
-  ) {
+  void static go(Graph& _graph, galois::DGAccumulator<float>& DGA_sum,
+                 galois::DGAccumulator<float>& DGA_sum_residual,
+                 galois::DGAccumulator<uint64_t>& DGA_residual_over_tolerance,
+                 galois::DGReduceMax<float>& max_value,
+                 galois::DGReduceMin<float>& min_value,
+                 galois::DGReduceMax<float>& max_residual,
+                 galois::DGReduceMin<float>& min_residual) {
     DGA_sum.reset();
     DGA_sum_residual.reset();
     max_value.reset();
@@ -508,29 +495,22 @@ struct PageRankSanity {
     DGA_residual_over_tolerance.reset();
 
     {
-      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(), 
-                                     _graph.masterNodesRange().end()), 
-                     PageRankSanity(
-                       tolerance, 
-                       &_graph,
-                       DGA_sum,
-                       DGA_sum_residual,
-                       DGA_residual_over_tolerance,
-                       max_value,
-                       min_value,
-                       max_residual,
-                       min_residual
-                     ), 
+      galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
+                                     _graph.masterNodesRange().end()),
+                     PageRankSanity(tolerance, &_graph, DGA_sum,
+                                    DGA_sum_residual,
+                                    DGA_residual_over_tolerance, max_value,
+                                    min_value, max_residual, min_residual),
                      galois::no_stats(), galois::loopname("PageRankSanity"));
     }
 
-    float max_rank = max_value.reduce();
-    float min_rank = min_value.reduce();
-    float rank_sum = DGA_sum.reduce();
-    float residual_sum = DGA_sum_residual.reduce();
+    float max_rank          = max_value.reduce();
+    float min_rank          = min_value.reduce();
+    float rank_sum          = DGA_sum.reduce();
+    float residual_sum      = DGA_sum_residual.reduce();
     uint64_t over_tolerance = DGA_residual_over_tolerance.reduce();
-    float max_res = max_residual.reduce();
-    float min_res = min_residual.reduce();
+    float max_res           = max_residual.reduce();
+    float min_res           = min_residual.reduce();
 
     // Only node 0 will print data
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -538,13 +518,13 @@ struct PageRankSanity {
       galois::gPrint("Min rank is ", min_rank, "\n");
       galois::gPrint("Rank sum is ", rank_sum, "\n");
       galois::gPrint("Residual sum is ", residual_sum, "\n");
-      galois::gPrint("# nodes with residual over ", tolerance, 
+      galois::gPrint("# nodes with residual over ", tolerance,
                      " (tolerance) is ", over_tolerance, "\n");
       galois::gPrint("Max residual is ", max_res, "\n");
       galois::gPrint("Min residual is ", min_res, "\n");
     }
   }
-  
+
   /* Gets the max, min rank from all owned nodes and
    * also the sum of ranks */
   void operator()(GNode src) const {
@@ -581,14 +561,13 @@ int main(int argc, char** argv) {
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
-                                (unsigned long)maxIterations);
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
+                                 (unsigned long)maxIterations);
     std::ostringstream ss;
     ss << tolerance;
     galois::runtime::reportParam(REGION_NAME, "Tolerance", ss.str());
 
-    galois::runtime::reportParam(REGION_NAME, "ENABLE_FT", 
-                                       (enableFT));
+    galois::runtime::reportParam(REGION_NAME, "ENABLE_FT", (enableFT));
   }
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
@@ -603,7 +582,7 @@ int main(int argc, char** argv) {
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
   galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT", REGION_NAME);
   StatTimer_init.start();
-    InitializeGraph::go(*hg);
+  InitializeGraph::go(*hg);
   StatTimer_init.stop();
   galois::runtime::getHostBarrier().wait();
 
@@ -627,19 +606,17 @@ int main(int argc, char** argv) {
     StatTimer_main.stop();
 
     // sanity check
-    PageRankSanity::go(
-      *hg, DGA_sum, DGA_sum_residual,
-      DGA_residual_over_tolerance, 
-      max_value, min_value, max_residual, min_residual
-    );
+    PageRankSanity::go(*hg, DGA_sum, DGA_sum_residual,
+                       DGA_residual_over_tolerance, max_value, min_value,
+                       max_residual, min_residual);
 
     if ((run + 1) != numRuns) {
-      { 
+      {
         bitset_residual.reset();
-        bitset_nout.reset(); 
+        bitset_nout.reset();
       }
 
-      (*hg).set_num_run(run+1);
+      (*hg).set_num_run(run + 1);
       InitializeGraph::go(*hg);
       galois::runtime::getHostBarrier().wait();
     }
@@ -649,11 +626,10 @@ int main(int argc, char** argv) {
 
   // Verify
   if (verify) {
-    for (auto ii = (*hg).masterNodesRange().begin(); 
-              ii != (*hg).masterNodesRange().end(); 
-              ++ii) {
-      galois::runtime::printOutput("% %\n", (*hg).getGID(*ii), 
-        (*hg).getData(*ii).value);
+    for (auto ii = (*hg).masterNodesRange().begin();
+         ii != (*hg).masterNodesRange().end(); ++ii) {
+      galois::runtime::printOutput("% %\n", (*hg).getGID(*ii),
+                                   (*hg).getData(*ii).value);
     }
   }
 

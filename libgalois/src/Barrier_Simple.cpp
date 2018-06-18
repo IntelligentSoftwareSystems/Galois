@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,19 +25,16 @@
 
 namespace {
 
-class OneWayBarrier: public galois::substrate::Barrier {
+class OneWayBarrier : public galois::substrate::Barrier {
   std::mutex lock;
   std::condition_variable cond;
-  unsigned count; 
+  unsigned count;
   unsigned total;
 
 public:
-  OneWayBarrier(unsigned p) {
-    reinit(p);
-  }
-  
-  virtual ~OneWayBarrier() {
-  }
+  OneWayBarrier(unsigned p) { reinit(p); }
+
+  virtual ~OneWayBarrier() {}
 
   virtual void reinit(unsigned val) {
     count = 0;
@@ -47,21 +44,22 @@ public:
   virtual void wait() {
     std::unique_lock<std::mutex> tmp(lock);
     count += 1;
-    cond.wait(tmp, [this] () { return count >= total; });
+    cond.wait(tmp, [this]() { return count >= total; });
     cond.notify_all();
   }
 
   virtual const char* name() const { return "OneWayBarrier"; }
 };
 
-class SimpleBarrier: public galois::substrate::Barrier {
+class SimpleBarrier : public galois::substrate::Barrier {
   OneWayBarrier barrier1;
   OneWayBarrier barrier2;
   unsigned total;
-public:
-  SimpleBarrier(unsigned p): barrier1(p), barrier2(p), total(p) { }
 
-  virtual ~SimpleBarrier() { }
+public:
+  SimpleBarrier(unsigned p) : barrier1(p), barrier2(p), total(p) {}
+
+  virtual ~SimpleBarrier() {}
 
   virtual void reinit(unsigned val) {
     total = val;
@@ -79,12 +77,11 @@ public:
   }
 
   virtual const char* name() const { return "SimpleBarrier"; }
-
 };
 
 } // end anonymous namespace
 
-std::unique_ptr<galois::substrate::Barrier> galois::substrate::createSimpleBarrier(unsigned int v) {
+std::unique_ptr<galois::substrate::Barrier>
+galois::substrate::createSimpleBarrier(unsigned int v) {
   return std::unique_ptr<Barrier>(new SimpleBarrier(v));
 }
-

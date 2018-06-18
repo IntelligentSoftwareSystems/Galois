@@ -11,44 +11,48 @@
 
 namespace galois {
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
 ////////////////////////////////////////////////////////////////////////////////
 
 /**
  * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item
+ * is a value from the iteration range and T is the type of item.
  *
- * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code>
- * (@see galois::iterate()). rangeMaker is a functor which when called returns a range object
+ * @param rangeMaker an iterate range maker typically returned by
+ * <code>galois::iterate(...)</code>
+ * (@see galois::iterate()). rangeMaker is a functor which when called returns a
+ * range object
  * @param fn operator
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args) {
+void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
+              const Args&... args) {
   auto tpl = std::make_tuple(args...);
   runtime::for_each_gen(rangeMaker(tpl), fn, tpl);
 }
 
-
 /**
  * Standard do-all loop. All iterations should be independent.
- * Operator should conform to <code>fn(item)</code> where item is a value from the iteration range.
+ * Operator should conform to <code>fn(item)</code> where item is a value from
+ * the iteration range.
  *
- * @param rangeMaker an iterate range maker typically returned by <code>galois::iterate(...)</code>
- * (@see galois::iterate()). rangeMaker is a functor which when called returns a range object
+ * @param rangeMaker an iterate range maker typically returned by
+ * <code>galois::iterate(...)</code>
+ * (@see galois::iterate()). rangeMaker is a functor which when called returns a
+ * range object
  * @param fn operator
  * @param args optional arguments to loop
  */
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args) {
+void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn,
+            const Args&... args) {
   auto tpl = std::make_tuple(args...);
   runtime::do_all_gen(rangeMaker(tpl), fn, tpl);
 }
-
 
 /**
  * Low-level parallel loop. Operator is applied for each running thread.
@@ -59,7 +63,7 @@ void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... ar
  * @param fn operator, which is never copied
  * @param args optional arguments to loop
  */
-template<typename FunctionTy, typename... Args>
+template <typename FunctionTy, typename... Args>
 void on_each(const FunctionTy& fn, const Args&... args) {
   runtime::on_each_gen(fn, std::make_tuple(args...));
 }
@@ -73,7 +77,7 @@ void on_each(const FunctionTy& fn, const Args&... args) {
  * @param fn operator, which is never copied
  * @param args optional arguments to loop
  */
-template<typename FunctionTy, typename... Args>
+template <typename FunctionTy, typename... Args>
 void on_each(FunctionTy& fn, const Args&... args) {
   runtime::on_each_gen(fn, std::make_tuple(args...));
 }
@@ -81,7 +85,8 @@ void on_each(FunctionTy& fn, const Args&... args) {
 /**
  * Preallocates hugepages on each thread.
  *
- * @param num number of pages to allocate of size {@link galois::runtime::MM::hugePageSize}
+ * @param num number of pages to allocate of size {@link
+ * galois::runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
   static const bool DISABLE_PREALLOC = false;
@@ -94,8 +99,8 @@ static inline void preAlloc(int num) {
 }
 
 /**
- * Reports number of hugepages allocated by the Galois system so far. The value is printing using
- * the statistics infrastructure.
+ * Reports number of hugepages allocated by the Galois system so far. The value
+ * is printing using the statistics infrastructure.
  *
  * @param label Label to associated with report at this program point
  */
@@ -106,10 +111,12 @@ static inline void reportPageAlloc(const char* label) {
 /**
  * Galois ordered set iterator for stable source algorithms.
  *
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
- * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
- * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item
+ * is a value from the iteration range and T is the type of item. Comparison
+ * function should conform to <code>bool r = cmp(item1, item2)</code> where r is
+ * true if item1 is less than or equal to item2. Neighborhood function should
+ * conform to <code>nhFunc(item)</code> and should visit every element in the
+ * neighborhood of active element item.
  *
  * @param b begining of range of initial items
  * @param e end of range of initial items
@@ -118,20 +125,23 @@ static inline void reportPageAlloc(const char* label) {
  * @param fn operator
  * @param loopname string to identity loop in statistics output
  */
-template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const char* loopname=0) {
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc,
+                      const OpFunc& fn, const char* loopname = 0) {
   runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
 /**
  * Galois ordered set iterator for unstable source algorithms.
  *
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
- * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
- * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
- * The stability test should conform to <code>bool r = stabilityTest(item)</code> where r is true if
- * item is a stable source.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item
+ * is a value from the iteration range and T is the type of item. Comparison
+ * function should conform to <code>bool r = cmp(item1, item2)</code> where r is
+ * true if item1 is less than or equal to item2. Neighborhood function should
+ * conform to <code>nhFunc(item)</code> and should visit every element in the
+ * neighborhood of active element item. The stability test should conform to
+ * <code>bool r = stabilityTest(item)</code> where r is true if item is a stable
+ * source.
  *
  * @param b begining of range of initial items
  * @param e end of range of initial items
@@ -141,37 +151,46 @@ void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, cons
  * @param stabilityTest stability test
  * @param loopname string to identity loop in statistics output
  */
-template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
-  runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc,
+          typename StableTest>
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc,
+                      const OpFunc& fn, const StableTest& stabilityTest,
+                      const char* loopname = 0) {
+  runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest,
+                                 loopname);
 }
 
 /**
  * Helper functor class to invoke galois::do_all on provided args
- * Can be used to choose between galois::do_all and other equivalents such as std::for_each
+ * Can be used to choose between galois::do_all and other equivalents such as
+ * std::for_each
  */
 struct DoAll {
   template <typename RangeFunc, typename F, typename... Args>
-  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) const {
+  void operator()(const RangeFunc& rangeMaker, const F& f,
+                  Args&&... args) const {
     galois::do_all(rangeMaker, f, std::forward<Args>(args)...);
   }
 };
 
 /**
- * Helper functor to invoke std::for_each with the same interface as galois::do_all
+ * Helper functor to invoke std::for_each with the same interface as
+ * galois::do_all
  */
 
 struct StdForEach {
   template <typename RangeFunc, typename F, typename... Args>
-  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) const {
-    auto range = rangeMaker(std::make_tuple(args...)); 
+  void operator()(const RangeFunc& rangeMaker, const F& f,
+                  Args&&... args) const {
+    auto range = rangeMaker(std::make_tuple(args...));
     std::for_each(range.begin(), range.end(), f);
   }
 };
 
 struct ForEach {
   template <typename RangeFunc, typename F, typename... Args>
-  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) const {
+  void operator()(const RangeFunc& rangeMaker, const F& f,
+                  Args&&... args) const {
     galois::for_each(rangeMaker, f, std::forward<Args>(args)...);
   }
 };
@@ -180,12 +199,12 @@ template <typename Q>
 struct WhileQ {
   Q m_q;
 
-  WhileQ(Q&& q=Q()): m_q(std::move(q)) {}
+  WhileQ(Q&& q = Q()) : m_q(std::move(q)) {}
 
   template <typename RangeFunc, typename F, typename... Args>
-  void operator() (const RangeFunc& rangeMaker, const F& f, Args&&... args) {
+  void operator()(const RangeFunc& rangeMaker, const F& f, Args&&... args) {
 
-    auto range = rangeMaker(std::make_tuple(args...)); 
+    auto range = rangeMaker(std::make_tuple(args...));
 
     m_q.push(range.begin(), range.end());
 
@@ -194,11 +213,9 @@ struct WhileQ {
 
       f(val, m_q);
     }
-
   }
-
 };
 
-} //namespace galois
+} // namespace galois
 
-#endif// GALOIS_LOOPS_H
+#endif // GALOIS_LOOPS_H

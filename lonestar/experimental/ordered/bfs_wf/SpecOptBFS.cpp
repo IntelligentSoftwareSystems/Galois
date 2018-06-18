@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,42 +25,36 @@
 #include "bfs.h"
 #include "bfsParallel.h"
 
-class SpecOptBFS: public BFS {
-  
+class SpecOptBFS : public BFS {
+
 public:
+  virtual const std::string getVersion() const {
+    return "Speculative with optimizations";
+  }
 
-  virtual const std::string getVersion () const { return "Speculative with optimizations"; }
-
-  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+  virtual size_t runBFS(Graph& graph, GNode& startNode) {
 
     ParCounter numIter;
 
     // update request for root
-    Update first (startNode, 0);
+    Update first(startNode, 0);
 
     std::vector<Update> wl;
-    wl.push_back (first);
+    wl.push_back(first);
 
-    galois::runtime::for_each_ordered_kdg_spec_local_min (
-        galois::runtime::makeStandardRange(wl.begin (), wl.end ()),
-        Comparator (), 
-        VisitNhood (graph),
-        OpFuncLocalMin (graph, numIter),
-        std::make_tuple (
-          galois::loopname ("bfs_spec_local_min")));
+    galois::runtime::for_each_ordered_kdg_spec_local_min(
+        galois::runtime::makeStandardRange(wl.begin(), wl.end()), Comparator(),
+        VisitNhood(graph), OpFuncLocalMin(graph, numIter),
+        std::make_tuple(galois::loopname("bfs_spec_local_min")));
 
+    std::cout << "number of iterations: " << numIter.reduce() << std::endl;
 
-    std::cout << "number of iterations: " << numIter.reduce () << std::endl;
-
-
-    return numIter.reduce ();
+    return numIter.reduce();
   }
-
-
 };
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   SpecOptBFS wf;
-  wf.run (argc, argv);
+  wf.run(argc, argv);
   return 0;
 }

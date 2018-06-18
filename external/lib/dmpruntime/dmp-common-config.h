@@ -84,7 +84,7 @@
 // #define DMP_ENABLE_ROUND_TIMING
 
 // Debugging
-// #define DMP_ENABLE_DEBUGGING 
+// #define DMP_ENABLE_DEBUGGING
 
 // For non-libhoard builds
 // #define DMP_ENABLE_LIBHOARD
@@ -93,14 +93,12 @@
 // Implicit Options (don't define these manually!)
 //--------------------------------------------------------------
 
-#if defined(DMP_ENABLE_MODEL_O_S)   ||\
-    defined(DMP_ENABLE_MODEL_O_B_S) ||\
+#if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_O_B_S) ||        \
     defined(DMP_ENABLE_MODEL_STM)
 #define DMP_ENABLE_OWNERSHIP_MODE
 #endif
 
-#if defined(DMP_ENABLE_MODEL_B_S)  ||\
-    defined(DMP_ENABLE_MODEL_OB_S) ||\
+#if defined(DMP_ENABLE_MODEL_B_S) || defined(DMP_ENABLE_MODEL_OB_S) ||         \
     defined(DMP_ENABLE_MODEL_O_B_S)
 #define DMP_ENABLE_BUFFERED_MODE
 #endif
@@ -113,38 +111,33 @@
 // Constraints
 //--------------------------------------------------------------
 
-#if !defined(DMP_ENABLE_MODEL_O_S)   &&\
-    !defined(DMP_ENABLE_MODEL_B_S)   &&\
-    !defined(DMP_ENABLE_MODEL_OB_S)  &&\
-    !defined(DMP_ENABLE_MODEL_O_B_S) &&\
+#if !defined(DMP_ENABLE_MODEL_O_S) && !defined(DMP_ENABLE_MODEL_B_S) &&        \
+    !defined(DMP_ENABLE_MODEL_OB_S) && !defined(DMP_ENABLE_MODEL_O_B_S) &&     \
     !defined(DMP_ENABLE_MODEL_STM)
 #error "No execution model specified!"
 #endif
 
-#if !defined(DMP_ENABLE_MODEL_O_S) &&\
-    (defined(DMP_ENABLE_SLOW_HANDOFF) ||\
-     defined(DMP_ENABLE_FAST_HANDOFF) ||\
-     defined(DMP_ENABLE_FAST_HANDOFF_QUANTUM_OPT) ||\
-     defined(DMP_ENABLE_PREDICT_HANDOFF_WINDOWED) ||\
-     defined(DMP_ENABLE_PREDICT_HANDOFF_MARKOV)   ||\
-     defined(DMP_ENABLE_PREDICT_HANDOFF_BARRIER)  ||\
+#if !defined(DMP_ENABLE_MODEL_O_S) &&                                          \
+    (defined(DMP_ENABLE_SLOW_HANDOFF) || defined(DMP_ENABLE_FAST_HANDOFF) ||   \
+     defined(DMP_ENABLE_FAST_HANDOFF_QUANTUM_OPT) ||                           \
+     defined(DMP_ENABLE_PREDICT_HANDOFF_WINDOWED) ||                           \
+     defined(DMP_ENABLE_PREDICT_HANDOFF_MARKOV) ||                             \
+     defined(DMP_ENABLE_PREDICT_HANDOFF_BARRIER) ||                            \
      defined(DMP_ENABLE_DATA_GROUP_BY_MUTEX))
 #error "Options require DMP_ENABLE_MODEL_O_S"
 #endif
 
-#if !defined(DMP_ENABLE_BUFFERED_MODE) &&\
-    (defined(DMP_ENABLE_WB_MOVE_TO_FRONT) ||\
-     defined(DMP_ENABLE_WB_NONDET_COMMIT)  ||\
-     defined(DMP_ENABLE_WB_PARALLEL_COMMIT)  ||\
-     defined(DMP_ENABLE_WB_THREADLOCAL_SYNCOPS)  ||\
-     defined(DMP_ENABLE_WB_BAD_ALIGNMENTS)  ||\
-     defined(DMP_ENABLE_WB_HBSYNC))
+#if !defined(DMP_ENABLE_BUFFERED_MODE) &&                                      \
+    (defined(DMP_ENABLE_WB_MOVE_TO_FRONT) ||                                   \
+     defined(DMP_ENABLE_WB_NONDET_COMMIT) ||                                   \
+     defined(DMP_ENABLE_WB_PARALLEL_COMMIT) ||                                 \
+     defined(DMP_ENABLE_WB_THREADLOCAL_SYNCOPS) ||                             \
+     defined(DMP_ENABLE_WB_BAD_ALIGNMENTS) || defined(DMP_ENABLE_WB_HBSYNC))
 #error "Options require buffering"
 #endif
 
-#if defined(DMP_ENABLE_WB_HB_SYNC) &&\
-   !defined(DMP_ENABLE_MODEL_B_S)  &&\
-   !defined(DMP_ENABLE_MODEL_OB_S)
+#if defined(DMP_ENABLE_WB_HB_SYNC) && !defined(DMP_ENABLE_MODEL_B_S) &&        \
+    !defined(DMP_ENABLE_MODEL_OB_S)
 #error "Option requires DMP_ENABLE_MODEL_{B,OB}_S"
 #endif
 
@@ -152,7 +145,8 @@
 #error "Option requires DMP_ENABLE_MODEL_O_B_S"
 #endif
 
-#if defined(DMP_ENABLE_WB_PARALLEL_COMMIT) && defined(DMP_ENABLE_WB_NONDET_COMMIT)
+#if defined(DMP_ENABLE_WB_PARALLEL_COMMIT) &&                                  \
+    defined(DMP_ENABLE_WB_NONDET_COMMIT)
 #error "Parallel commit and nondet commit are mutually exclusive"
 #endif
 

@@ -1,39 +1,27 @@
 #ifndef TASKDESCRIPTION_H
 #define TASKDESCRIPTION_H
 
-enum Singularities
-{
-	POINT,
-	CENTRAL_POINT,
-	EDGE,
-	FACE,
-	ANISOTROPIC
-};
+enum Singularities { POINT, CENTRAL_POINT, EDGE, FACE, ANISOTROPIC };
 
-enum Schedulers
-{
-    OLD,
-    CILK,
-    GALOIS_DAG
-};
+enum Schedulers { OLD, CILK, GALOIS_DAG };
 
 struct TaskDescription {
-	int dimensions;
-	int polynomialDegree;
-	int nrOfTiers;
+  int dimensions;
+  int polynomialDegree;
+  int nrOfTiers;
 
-	double size;
-	bool quad;
+  double size;
+  bool quad;
 
-	double x;
-	double y;
-	double z;
+  double x;
+  double y;
+  double z;
 
-	double (*function)(int, ...);
+  double (*function)(int, ...);
 
-	bool performTests;
-	Singularities singularity;
-    Schedulers scheduler;
+  bool performTests;
+  Singularities singularity;
+  Schedulers scheduler;
 };
 
 #endif

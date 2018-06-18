@@ -17,10 +17,10 @@
     std::string sha2hmac = hmac<SHA256>(msg, key);
 
     Note:
-    To keep my code simple, HMAC computation currently needs the whole message at once.
-    This is in contrast to the hashes MD5, SHA1, etc. where an add() method is available
-    for incremental computation.
-    You can use any hash for HMAC as long as it provides:
+    To keep my code simple, HMAC computation currently needs the whole message
+   at once. This is in contrast to the hashes MD5, SHA1, etc. where an add()
+   method is available for incremental computation. You can use any hash for
+   HMAC as long as it provides:
     - constant HashMethod::BlockSize (typically 64)
     - constant HashMethod::HashBytes (length of hash in bytes, e.g. 20 for SHA1)
     - HashMethod::add(buffer, bufferSize)
@@ -32,19 +32,16 @@
 
 /// compute HMAC hash of data and key using MD5, SHA1 or SHA256
 template <typename HashMethod>
-std::string hmac(const void* data, size_t numDataBytes, const void* key, size_t numKeyBytes)
-{
+std::string hmac(const void* data, size_t numDataBytes, const void* key,
+                 size_t numKeyBytes) {
   // initialize key with zeros
   unsigned char usedKey[HashMethod::BlockSize] = {0};
 
   // adjust length of key: must contain exactly blockSize bytes
-  if (numKeyBytes <= HashMethod::BlockSize)
-  {
+  if (numKeyBytes <= HashMethod::BlockSize) {
     // copy key
     memcpy(usedKey, key, numKeyBytes);
-  }
-  else
-  {
+  } else {
     // shorten key: usedKey = hashed(key)
     HashMethod keyHasher;
     keyHasher.add(key, numKeyBytes);
@@ -59,7 +56,7 @@ std::string hmac(const void* data, size_t numDataBytes, const void* key, size_t 
   unsigned char inside[HashMethod::HashBytes];
   HashMethod insideHasher;
   insideHasher.add(usedKey, HashMethod::BlockSize);
-  insideHasher.add(data,    numDataBytes);
+  insideHasher.add(data, numDataBytes);
   insideHasher.getHash(inside);
 
   // undo usedKey's previous 0x36 XORing and apply a XOR by 0x5C
@@ -69,15 +66,13 @@ std::string hmac(const void* data, size_t numDataBytes, const void* key, size_t 
   // hash((usedKey ^ 0x5C) + hash((usedKey ^ 0x36) + data))
   HashMethod finalHasher;
   finalHasher.add(usedKey, HashMethod::BlockSize);
-  finalHasher.add(inside,  HashMethod::HashBytes);
+  finalHasher.add(inside, HashMethod::HashBytes);
 
   return finalHasher.getHash();
 }
 
-
 /// convenience function for std::string
 template <typename HashMethod>
-std::string hmac(const std::string& data, const std::string& key)
-{
+std::string hmac(const std::string& data, const std::string& key) {
   return hmac<HashMethod>(data.c_str(), data.size(), key.c_str(), key.size());
 }

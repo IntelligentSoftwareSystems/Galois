@@ -10,96 +10,98 @@
 #include <regex>
 #include "utilString.h"
 
-void split(const std::string& str, const std::string& delim, std::vector<std::string>& parts) {
-	size_t start, end = 0;
-	while (end < str.size()) {
-		start = end;
-		while (start < str.size() && (delim.find(str[start]) != std::string::npos)) {
-			start++;  // skip initial whitespace
-		}
-		end = start;
-		while (end < str.size() && (delim.find(str[end]) == std::string::npos)) {
-			end++; // skip to end of word
-		}
-		if (end - start != 0) {  // just ignore zero-length strings.
-			parts.push_back(std::string(str, start, end - start));
-		}
-	}
+void split(const std::string& str, const std::string& delim,
+           std::vector<std::string>& parts) {
+  size_t start, end = 0;
+  while (end < str.size()) {
+    start = end;
+    while (start < str.size() &&
+           (delim.find(str[start]) != std::string::npos)) {
+      start++; // skip initial whitespace
+    }
+    end = start;
+    while (end < str.size() && (delim.find(str[end]) == std::string::npos)) {
+      end++; // skip to end of word
+    }
+    if (end - start != 0) { // just ignore zero-length strings.
+      parts.push_back(std::string(str, start, end - start));
+    }
+  }
 }
 
 /*
-std::vector<std::string> regex_split(const std::string & s, std::string rgx_str) {
-	std::vector<std::string> elems;
+std::vector<std::string> regex_split(const std::string & s, std::string rgx_str)
+{ std::vector<std::string> elems;
 
-	std::regex rgx (rgx_str);
+    std::regex rgx (rgx_str);
 
-	std::sregex_token_iterator iter(s.begin(), s.end(), rgx, -1);
-	std::sregex_token_iterator end;
+    std::sregex_token_iterator iter(s.begin(), s.end(), rgx, -1);
+    std::sregex_token_iterator end;
 
-	while (iter != end)  {
-		//std::cout << "S43:" << *iter << std::endl;
-		elems.push_back(*iter);
-		++iter;
-	}
+    while (iter != end)  {
+        //std::cout << "S43:" << *iter << std::endl;
+        elems.push_back(*iter);
+        ++iter;
+    }
 
-	return elems;
+    return elems;
 }
 */
 
 bool startsWith(std::string str, std::string part) {
-	for (unsigned int i = 0; i < part.size(); i++)
-		if (str.at(i) != part.at(i))
-			return false;
-	return true;
+  for (unsigned int i = 0; i < part.size(); i++)
+    if (str.at(i) != part.at(i))
+      return false;
+  return true;
 }
 
 bool endsWith(std::string str, std::string part) {
-	if (str.size() < part.size())
-		return false;
-	for (unsigned int i = str.size() - part.size(), j = 0; j < part.size();
-			i++, j++)
-		if (str.at(i) != part.at(j))
-			return false;
-	return true;
+  if (str.size() < part.size())
+    return false;
+  for (unsigned int i = str.size() - part.size(), j = 0; j < part.size();
+       i++, j++)
+    if (str.at(i) != part.at(j))
+      return false;
+  return true;
 }
 
 std::string format(const std::string fmt, ...) {
-	int size = 100;
-	std::string str;
-	va_list ap;
-	while (1) {
-		str.resize(size);
-		va_start(ap, fmt);
-		int n = vsnprintf((char *) str.c_str(), size, fmt.c_str(), ap);
-		va_end(ap);
-		if (n > -1 && n < size) {
-			str.resize(n);
-			return str;
-		}
-		if (n > -1)
-			size = n + 1;
-		else
-			size *= 2;
-	}
-	return str;
+  int size = 100;
+  std::string str;
+  va_list ap;
+  while (1) {
+    str.resize(size);
+    va_start(ap, fmt);
+    int n = vsnprintf((char*)str.c_str(), size, fmt.c_str(), ap);
+    va_end(ap);
+    if (n > -1 && n < size) {
+      str.resize(n);
+      return str;
+    }
+    if (n > -1)
+      size = n + 1;
+    else
+      size *= 2;
+  }
+  return str;
 }
 
-void find_and_replace(std::string& source, std::string const& find, std::string const& replace)
-{
-    for(std::string::size_type i = 0; (i = source.find(find, i)) != std::string::npos;)
-    {
-        source.replace(i, find.length(), replace);
-        i += replace.length();
-    }
+void find_and_replace(std::string& source, std::string const& find,
+                      std::string const& replace) {
+  for (std::string::size_type i = 0;
+       (i = source.find(find, i)) != std::string::npos;) {
+    source.replace(i, find.length(), replace);
+    i += replace.length();
+  }
 }
 
 std::string get_clean_string(std::string string) {
-	find_and_replace(string,"/","_");
-	find_and_replace(string,"\\","_");
-	find_and_replace(string,".","_");
-	find_and_replace(string,"(","_");
-	find_and_replace(string,")","_");
-	find_and_replace(string,"[","_");
-	find_and_replace(string,"]","_");
-	return string;
+  find_and_replace(string, "/", "_");
+  find_and_replace(string, "\\", "_");
+  find_and_replace(string, ".", "_");
+  find_and_replace(string, "(", "_");
+  find_and_replace(string, ")", "_");
+  find_and_replace(string, "[", "_");
+  find_and_replace(string, "]", "_");
+  return string;
 }

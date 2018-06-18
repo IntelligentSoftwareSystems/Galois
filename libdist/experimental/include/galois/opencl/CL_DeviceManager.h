@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -22,8 +22,7 @@
 #else
 extern "C" {
 #include "CL/cl.h"
-}
-;
+};
 #endif
 
 #include <stdio.h>
@@ -41,12 +40,12 @@ extern "C" {
  #define AMD_OCL_COMPILE_OPTIONS "" //"-O3 -x clc++ -I."
  #define ACTIVE_OCL_COMPILE_OPTIONS AMD_OCL_COMPILE_OPTIONS
  */
-namespace galois{
-namespace opencl{
-   struct CL_Platform;
-   struct OpenCL_Setup;
-}
-}
+namespace galois {
+namespace opencl {
+struct CL_Platform;
+struct OpenCL_Setup;
+} // namespace opencl
+} // namespace galois
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,24 +67,34 @@ namespace opencl{
 #include "CL_Kernel.h"
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-namespace galois{
-namespace opencl{
+namespace galois {
+namespace opencl {
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename T>
-void CL_Device::init_on_device(cl_mem arr, size_t sz, const T & val) {
+template <typename T>
+void CL_Device::init_on_device(cl_mem arr, size_t sz, const T& val) {
 #if _GALOIS_BUILD_INITIALIZER_KERNEL_
-   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 0, sizeof(cl_mem), &arr), "Arg, compact is NOT set!");
-   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 1, sizeof(int), (void*) &sz), "Arg, compact is NOT set!");
-   galois::opencl::CHECK_CL_ERROR(clSetKernelArg(init_kernel, 2, sizeof(int), (void*) &val), "Arg, compact is NOT set!");
-   size_t local = galois::opencl::OpenCL_Setup::workgroup_size(init_kernel, this);
-   size_t global = (size_t) (ceil(sz / ((double) local)) * local);
-   galois::opencl::CHECK_CL_ERROR(clEnqueueNDRangeKernel(this->command_queue(), init_kernel, 1, NULL, &global, &local, 0, NULL, NULL), "Failed init");
+  galois::opencl::CHECK_CL_ERROR(
+      clSetKernelArg(init_kernel, 0, sizeof(cl_mem), &arr),
+      "Arg, compact is NOT set!");
+  galois::opencl::CHECK_CL_ERROR(
+      clSetKernelArg(init_kernel, 1, sizeof(int), (void*)&sz),
+      "Arg, compact is NOT set!");
+  galois::opencl::CHECK_CL_ERROR(
+      clSetKernelArg(init_kernel, 2, sizeof(int), (void*)&val),
+      "Arg, compact is NOT set!");
+  size_t local =
+      galois::opencl::OpenCL_Setup::workgroup_size(init_kernel, this);
+  size_t global = (size_t)(ceil(sz / ((double)local)) * local);
+  galois::opencl::CHECK_CL_ERROR(
+      clEnqueueNDRangeKernel(this->command_queue(), init_kernel, 1, NULL,
+                             &global, &local, 0, NULL, NULL),
+      "Failed init");
 #endif
-}//End CL_Device::init_on_device
+} // End CL_Device::init_on_device
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-}
-}
+} // namespace opencl
+} // namespace galois
 #endif /* CL_DEVICE_MANAGER_H_ */

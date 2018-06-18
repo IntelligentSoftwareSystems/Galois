@@ -17,11 +17,10 @@ void check(const char* func, const galois::optional<int>& r, int exp) {
     return;
   else if (!r)
     std::cerr << func << ": Expected element\n";
-  else 
+  else
     std::cerr << func << ": Expected " << exp << " got " << *r << "\n";
   abort();
 }
-
 
 void testPoll() {
   galois::PairingHeap<int> heap;
@@ -86,7 +85,6 @@ void testDelete() {
   }
 
   check(__func__, heap.empty());
-
 }
 
 void testParallel1() {
@@ -109,10 +107,10 @@ void testParallel1() {
 
 struct Process2 {
   galois::FCPairingHeap<int>* heap;
-  Process2(galois::FCPairingHeap<int>& h) : heap(&h) { }
+  Process2(galois::FCPairingHeap<int>& h) : heap(&h) {}
   Process2() = default;
 
-  template<typename Context>
+  template <typename Context>
   void operator()(int& item, Context& ctx) {
     heap->add(item);
   }
@@ -147,4 +145,3 @@ int main() {
   testParallel2();
   return 0;
 }
-

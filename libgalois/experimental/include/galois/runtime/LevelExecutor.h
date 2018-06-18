@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -138,7 +138,6 @@ public:
     }
   }
 };
-
 
 #ifdef USE_DENSE_LEVELS
 
@@ -473,55 +472,54 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
 namespace galois {
 namespace runtime {
 
-template<int... Is, typename R, typename OpFn, typename TupleTy>
-auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
-  -> decltype(std::declval<typename R::container_type>(), void())
-{
+template <int... Is, typename R, typename OpFn, typename TupleTy>
+auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn,
+                             const TupleTy& tpl, int)
+    -> decltype(std::declval<typename R::container_type>(), void()) {
   for_each(range.get_container(), opFn, std::get<Is>(tpl)...);
 }
 
-template<int... Is, typename R, typename OpFn, typename TupleTy>
-auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...)
-  -> void
-{
+template <int... Is, typename R, typename OpFn, typename TupleTy>
+auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn,
+                             const TupleTy& tpl, ...) -> void {
   for_each(range.begin(), range.end(), opFn, std::get<Is>(tpl)...);
 }
 
-template<typename R, typename KeyFn, typename KeyCmp, typename NhoodFn, typename OpFn>
-void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& keyCmp, NhoodFn nhoodFn, OpFn opFn, const char* ln=0) {
+template <typename R, typename KeyFn, typename KeyCmp, typename NhoodFn,
+          typename OpFn>
+void for_each_ordered_level(const R& range, const KeyFn& keyFn,
+                            const KeyCmp& keyCmp, NhoodFn nhoodFn, OpFn opFn,
+                            const char* ln = 0) {
   typedef typename R::value_type value_type;
   typedef typename std::result_of<KeyFn(value_type)>::type key_type;
   constexpr bool is_less = std::is_same<KeyCmp, std::less<key_type>>::value;
-  constexpr bool is_greater = std::is_same<KeyCmp, std::greater<key_type>>::value;
-  static_assert((is_less || is_greater) && !(is_less && is_greater), "Arbitrary key comparisons not yet supported");
+  constexpr bool is_greater =
+      std::is_same<KeyCmp, std::greater<key_type>>::value;
+  static_assert((is_less || is_greater) && !(is_less && is_greater),
+                "Arbitrary key comparisons not yet supported");
   constexpr unsigned chunk_size = OpFn::CHUNK_SIZE;
 
-  typedef typename worklists::OrderedByIntegerMetric<>
-    ::template with_container<worklists::PerSocketChunkFIFO<chunk_size>>::type
-    ::template with_indexer<KeyFn>::type
-    ::template with_barrier<true>::type
-    ::template with_descending<is_greater>::type
-    ::template with_monotonic<true>::type WL;
+  typedef typename worklists::OrderedByIntegerMetric<>::template with_container<
+      worklists::PerSocketChunkFIFO<chunk_size>>::type ::
+      template with_indexer<KeyFn>::type ::template with_barrier<true>::type ::
+          template with_descending<is_greater>::type ::template with_monotonic<
+              true>::type WL;
   auto args = std::tuple_cat(
-      typename galois::runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
-      std::make_tuple(
-              galois::loopname(ln),
-              galois::wl<WL>(keyFn)));
+      typename galois::runtime::DEPRECATED::ExtractForEachTraits<
+          OpFn>::values_type{},
+      std::make_tuple(galois::loopname(ln), galois::wl<WL>(keyFn)));
   for_each_ordered_level_(
-      make_int_seq<std::tuple_size<decltype(args)>::value>(),
-      range,
+      make_int_seq<std::tuple_size<decltype(args)>::value>(), range,
       [&](value_type& x, UserContext<value_type>& ctx) {
         nhoodFn(x, ctx);
         opFn(x, ctx);
       },
-      args,
-      0);
+      args, 0);
 }
 
-}
-}
+} // namespace runtime
+} // namespace galois
 
 #endif
-
 
 #endif // GALOIS_RUNTIME_LEVEL_EXECUTOR_H

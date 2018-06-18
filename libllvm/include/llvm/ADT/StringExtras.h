@@ -23,7 +23,8 @@
 #include <string>
 
 namespace llvm {
-template<typename T> class SmallVectorImpl;
+template <typename T>
+class SmallVectorImpl;
 
 /// hexdigit - Return the hexadecimal character for the
 /// given number \arg X (which should be less than 16).
@@ -40,18 +41,18 @@ static inline char hexdigit(unsigned X, bool LowerCase = false) {
 ///
 /// This should only be used with unsigned types.
 ///
-template<typename IntTy>
-static inline char *utohex_buffer(IntTy X, char *BufferEnd) {
-  char *BufPtr = BufferEnd;
-  *--BufPtr = 0;      // Null terminate buffer.
+template <typename IntTy>
+static inline char* utohex_buffer(IntTy X, char* BufferEnd) {
+  char* BufPtr = BufferEnd;
+  *--BufPtr    = 0; // Null terminate buffer.
   if (X == 0) {
-    *--BufPtr = '0';  // Handle special case.
+    *--BufPtr = '0'; // Handle special case.
     return BufPtr;
   }
 
   while (X) {
     unsigned char Mod = static_cast<unsigned char>(X) & 15;
-    *--BufPtr = hexdigit(Mod);
+    *--BufPtr         = hexdigit(Mod);
     X >>= 4;
   }
   return BufPtr;
@@ -59,40 +60,43 @@ static inline char *utohex_buffer(IntTy X, char *BufferEnd) {
 
 static inline std::string utohexstr(uint64_t X) {
   char Buffer[17];
-  return utohex_buffer(X, Buffer+17);
+  return utohex_buffer(X, Buffer + 17);
 }
 
 static inline std::string utostr_32(uint32_t X, bool isNeg = false) {
   char Buffer[11];
-  char *BufPtr = Buffer+11;
+  char* BufPtr = Buffer + 11;
 
-  if (X == 0) *--BufPtr = '0';  // Handle special case...
+  if (X == 0)
+    *--BufPtr = '0'; // Handle special case...
 
   while (X) {
     *--BufPtr = '0' + char(X % 10);
     X /= 10;
   }
 
-  if (isNeg) *--BufPtr = '-';   // Add negative sign...
+  if (isNeg)
+    *--BufPtr = '-'; // Add negative sign...
 
-  return std::string(BufPtr, Buffer+11);
+  return std::string(BufPtr, Buffer + 11);
 }
 
 static inline std::string utostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
-  char *BufPtr = Buffer+21;
+  char* BufPtr = Buffer + 21;
 
-  if (X == 0) *--BufPtr = '0';  // Handle special case...
+  if (X == 0)
+    *--BufPtr = '0'; // Handle special case...
 
   while (X) {
     *--BufPtr = '0' + char(X % 10);
     X /= 10;
   }
 
-  if (isNeg) *--BufPtr = '-';   // Add negative sign...
-  return std::string(BufPtr, Buffer+21);
+  if (isNeg)
+    *--BufPtr = '-'; // Add negative sign...
+  return std::string(BufPtr, Buffer + 21);
 }
-
 
 static inline std::string itostr(int64_t X) {
   if (X < 0)
@@ -104,8 +108,9 @@ static inline std::string itostr(int64_t X) {
 static inline std::string ftostr(double V) {
   char Buffer[200];
   sprintf(Buffer, "%20.6e", V);
-  char *B = Buffer;
-  while (*B == ' ') ++B;
+  char* B = Buffer;
+  while (*B == ' ')
+    ++B;
   return B;
 }
 
@@ -117,7 +122,7 @@ static inline std::string ftostr(const APFloat& V) {
   return "<unknown format in ftostr>"; // error
 }
 
-static inline std::string LowercaseString(const std::string &S) {
+static inline std::string LowercaseString(const std::string& S) {
   std::string result(S);
   for (unsigned i = 0; i < S.length(); ++i)
     if (isupper(result[i]))
@@ -125,7 +130,7 @@ static inline std::string LowercaseString(const std::string &S) {
   return result;
 }
 
-static inline std::string UppercaseString(const std::string &S) {
+static inline std::string UppercaseString(const std::string& S) {
   std::string result(S);
   for (unsigned i = 0; i < S.length(); ++i)
     if (islower(result[i]))
@@ -149,8 +154,7 @@ std::pair<StringRef, StringRef> getToken(StringRef Source,
 
 /// SplitString - Split up the specified string according to the specified
 /// delimiters, appending the result fragments to the output list.
-void SplitString(StringRef Source,
-                 SmallVectorImpl<StringRef> &OutFragments,
+void SplitString(StringRef Source, SmallVectorImpl<StringRef>& OutFragments,
                  StringRef Delimiters = " \t\n\v\f\r");
 
 /// HashString - Hash function for strings.
@@ -166,6 +170,6 @@ static inline unsigned HashString(StringRef Str, unsigned Result = 0) {
   return Result;
 }
 
-} // End llvm namespace
+} // namespace llvm
 
 #endif

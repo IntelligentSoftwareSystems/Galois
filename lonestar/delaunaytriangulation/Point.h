@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,13 +28,13 @@
 #include <ostream>
 #include <algorithm>
 
-class Point: public galois::GChecked<void> {
+class Point : public galois::GChecked<void> {
   Tuple m_t;
   GNode m_n;
   long m_id;
-  
+
 public:
-  Point(double x, double y, long id): m_t(x,y), m_n(NULL), m_id(id) {}
+  Point(double x, double y, long id) : m_t(x, y), m_n(NULL), m_id(id) {}
 
   const Tuple& t() const { return m_t; }
   long id() const { return m_id; }
@@ -42,22 +42,16 @@ public:
   Tuple& t() { return m_t; }
   long& id() { return m_id; }
 
-  void addElement(const GNode& n) {
-    m_n = n;
-  }
+  void addElement(const GNode& n) { m_n = n; }
 
   void removeElement(const GNode& n) {
     if (m_n == n)
       m_n = NULL;
   }
 
-  bool inMesh() const {
-    return m_n != NULL;
-  }
+  bool inMesh() const { return m_n != NULL; }
 
-  GNode someElement() const {
-    return m_n;
-  }
+  GNode someElement() const { return m_n; }
 
   void print(std::ostream& os) const {
     os << "(id: " << m_id << " t: ";

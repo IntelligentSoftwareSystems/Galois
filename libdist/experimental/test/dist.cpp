@@ -4,31 +4,31 @@
 
 using namespace galois::graphs;
 
-template<typename nd, typename ed, EdgeDirection dir>
-using G = ThirdGraph<nd,ed,dir>;
+template <typename nd, typename ed, EdgeDirection dir>
+using G = ThirdGraph<nd, ed, dir>;
 
-G< int,  int, EdgeDirection::Out> Giio;
-G< int, void, EdgeDirection::Out> Givo;
-G<void,  int, EdgeDirection::Out> Gvio;
+G<int, int, EdgeDirection::Out> Giio;
+G<int, void, EdgeDirection::Out> Givo;
+G<void, int, EdgeDirection::Out> Gvio;
 G<void, void, EdgeDirection::Out> Gvvo;
-G< int,  int, EdgeDirection::InOut> Giii;
-G< int, void, EdgeDirection::InOut> Givi;
-G<void,  int, EdgeDirection::InOut> Gvii;
+G<int, int, EdgeDirection::InOut> Giii;
+G<int, void, EdgeDirection::InOut> Givi;
+G<void, int, EdgeDirection::InOut> Gvii;
 G<void, void, EdgeDirection::InOut> Gvvi;
-G< int,  int, EdgeDirection::Un> Giiu;
-G< int, void, EdgeDirection::Un> Givu;
-G<void,  int, EdgeDirection::Un> Gviu;
+G<int, int, EdgeDirection::Un> Giiu;
+G<int, void, EdgeDirection::Un> Givu;
+G<void, int, EdgeDirection::Un> Gviu;
 G<void, void, EdgeDirection::Un> Gvvu;
 
 int main(int argc, const char** argv) {
   int i = 4;
 
-  //Directed out edge
+  // Directed out edge
   std::cout << Giio.createNode(2)->getData() << " "
-	    << Giio.createNode(i)->getData() << " "
-	    << Givo.createNode(2)->getData() << " "
-	    << Givo.createNode(i)->getData() << "\n";
-  
+            << Giio.createNode(i)->getData() << " "
+            << Givo.createNode(2)->getData() << " "
+            << Givo.createNode(i)->getData() << "\n";
+
   Gvio.createNode();
   Gvvo.createNode();
 
@@ -40,21 +40,21 @@ int main(int argc, const char** argv) {
   Givo.createNode()->createEdge(Givo.createNode());
   Gvvo.createNode()->createEdge(Gvvo.createNode());
   Gvvo.createNode()->createEdge(Gvvo.createNode());
-  
-  //Directed in out edge
+
+  // Directed in out edge
   std::cout << Giii.createNode(2)->getData() << " "
-	    << Giii.createNode(i)->getData() << " "
-	    << Givi.createNode(2)->getData() << " "
-	    << Givi.createNode(i)->getData() << "\n";
+            << Giii.createNode(i)->getData() << " "
+            << Givi.createNode(2)->getData() << " "
+            << Givi.createNode(i)->getData() << "\n";
 
   Gvii.createNode();
   Gvvi.createNode();
 
-  //Undirected
+  // Undirected
   std::cout << Giiu.createNode(2)->getData() << " "
-	    << Giiu.createNode(i)->getData() << " "
-	    << Givu.createNode(2)->getData() << " "
-	    << Givu.createNode(i)->getData() << "\n";
+            << Giiu.createNode(i)->getData() << " "
+            << Givu.createNode(2)->getData() << " "
+            << Givu.createNode(i)->getData() << "\n";
 
   Gviu.createNode();
   Gvvu.createNode();

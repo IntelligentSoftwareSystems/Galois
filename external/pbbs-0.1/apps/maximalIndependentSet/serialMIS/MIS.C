@@ -29,19 +29,19 @@ using namespace std;
 // **************************************************************
 
 char* maximalIndependentSet(graph Gr) {
-  int n = Gr.n;
-  vertex* G = Gr.V;
-  char* Flags = newA(char,n);
-  for (int i=0; i < n; i++) {
+  int n       = Gr.n;
+  vertex* G   = Gr.V;
+  char* Flags = newA(char, n);
+  for (int i = 0; i < n; i++) {
     Flags[i] = 0;
   }
-  for(int i=0;i<n;i++){
+  for (int i = 0; i < n; i++) {
     Flags[i] = 1;
-    for(int j=0;j<G[i].degree;j++){
+    for (int j = 0; j < G[i].degree; j++) {
       vindex ngh = G[i].Neighbors[j];
-      if(Flags[ngh] == 1) {
-	Flags[i] = 2;
-	break;
+      if (Flags[ngh] == 1) {
+        Flags[i] = 2;
+        break;
       }
     }
   }

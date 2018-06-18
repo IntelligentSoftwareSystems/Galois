@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,16 +33,16 @@ class Barrier {
 public:
   virtual ~Barrier();
 
-  //not safe if any thread is in wait
+  // not safe if any thread is in wait
   virtual void reinit(unsigned val) = 0;
 
-  //Wait at this barrier
+  // Wait at this barrier
   virtual void wait() = 0;
 
-  //wait at this barrier
+  // wait at this barrier
   void operator()(void) { wait(); }
 
-  //barrier type.
+  // barrier type.
   virtual const char* name() const = 0;
 };
 
@@ -72,18 +72,19 @@ std::unique_ptr<Barrier> createSimpleBarrier(unsigned);
 
 namespace internal {
 
-template <typename _UNUSED=void>
+template <typename _UNUSED = void>
 struct BarrierInstance {
   unsigned m_num_threads;
   std::unique_ptr<Barrier> m_barrier;
 
   BarrierInstance(void) {
     m_num_threads = getThreadPool().getMaxThreads();
-    m_barrier = createTopoBarrier(m_num_threads);
+    m_barrier     = createTopoBarrier(m_num_threads);
   }
 
   Barrier& get(unsigned numT) {
-    GALOIS_ASSERT(numT > 0, "substrate::getBarrier() number of threads must be > 0");
+    GALOIS_ASSERT(numT > 0,
+                  "substrate::getBarrier() number of threads must be > 0");
 
     numT = std::min(numT, getThreadPool().getMaxUsableThreads());
     numT = std::max(numT, 1u);
@@ -95,14 +96,11 @@ struct BarrierInstance {
 
     return *m_barrier;
   }
-
 };
 
 void setBarrierInstance(BarrierInstance<>* bi);
 
 } // end namespace internal
-
-
 
 } // end namespace substrate
 } // end namespace galois

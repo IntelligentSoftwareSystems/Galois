@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,7 +36,6 @@
 #include <boost/serialization/binary_object.hpp>
 #include <boost/serialization/serialization.hpp>
 
-
 namespace galois {
 namespace graphs {
 /**
@@ -58,75 +57,107 @@ namespace graphs {
  * @tparam EdgeTy data on out edges
  */
 //! [doxygennuma]
-template<typename NodeTy, typename EdgeTy,
-         bool HasNoLockable=false,
-         bool UseNumaAlloc=false, // true => numa-blocked, false => numa-interleaved
-         bool HasOutOfLineLockable=false,
-         typename FileEdgeTy=EdgeTy>
+template <typename NodeTy, typename EdgeTy, bool HasNoLockable = false,
+          bool UseNumaAlloc =
+              false, // true => numa-blocked, false => numa-interleaved
+          bool HasOutOfLineLockable = false, typename FileEdgeTy = EdgeTy>
 class LC_CSR_Graph :
-//! [doxygennuma]
-     private boost::noncopyable,
-     private internal::LocalIteratorFeature<UseNumaAlloc>,
-     private internal::OutOfLineLockableFeature<HasOutOfLineLockable &&
-                                                !HasNoLockable> {
-  template<typename Graph> friend class LC_InOut_Graph;
- public:
-  template<bool _has_id>
-  struct with_id { typedef LC_CSR_Graph type; };
+    //! [doxygennuma]
+    private boost::noncopyable,
+    private internal::LocalIteratorFeature<UseNumaAlloc>,
+    private internal::OutOfLineLockableFeature<HasOutOfLineLockable &&
+                                               !HasNoLockable> {
+  template <typename Graph>
+  friend class LC_InOut_Graph;
 
-  template<typename _node_data>
+public:
+  template <bool _has_id>
+  struct with_id {
+    typedef LC_CSR_Graph type;
+  };
+
+  template <typename _node_data>
   struct with_node_data {
-    typedef LC_CSR_Graph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type;
+    typedef LC_CSR_Graph<_node_data, EdgeTy, HasNoLockable, UseNumaAlloc,
+                         HasOutOfLineLockable, FileEdgeTy>
+        type;
   };
 
-  template<typename _edge_data>
+  template <typename _edge_data>
   struct with_edge_data {
-    typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type;
+    typedef LC_CSR_Graph<NodeTy, _edge_data, HasNoLockable, UseNumaAlloc,
+                         HasOutOfLineLockable, FileEdgeTy>
+        type;
   };
 
-  template<typename _file_edge_data>
-  struct with_file_edge_data { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_file_edge_data> type; };
+  template <typename _file_edge_data>
+  struct with_file_edge_data {
+    typedef LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
+                         HasOutOfLineLockable, _file_edge_data>
+        type;
+  };
 
   //! If true, do not use abstract locks in graph
-  template<bool _has_no_lockable>
-  struct with_no_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
-  template<bool _has_no_lockable>
-  using _with_no_lockable = LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy>;
+  template <bool _has_no_lockable>
+  struct with_no_lockable {
+    typedef LC_CSR_Graph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
+                         HasOutOfLineLockable, FileEdgeTy>
+        type;
+  };
+  template <bool _has_no_lockable>
+  using _with_no_lockable =
+      LC_CSR_Graph<NodeTy, EdgeTy, _has_no_lockable, UseNumaAlloc,
+                   HasOutOfLineLockable, FileEdgeTy>;
 
   //! If true, use NUMA-aware graph allocation
-  template<bool _use_numa_alloc>
-  struct with_numa_alloc { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,FileEdgeTy> type; };
-  template<bool _use_numa_alloc>
-  using _with_numa_alloc = LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,FileEdgeTy>;
+  template <bool _use_numa_alloc>
+  struct with_numa_alloc {
+    typedef LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
+                         HasOutOfLineLockable, FileEdgeTy>
+        type;
+  };
+  template <bool _use_numa_alloc>
+  using _with_numa_alloc =
+      LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, _use_numa_alloc,
+                   HasOutOfLineLockable, FileEdgeTy>;
 
   //! If true, store abstract locks separate from nodes
-  template<bool _has_out_of_line_lockable>
-  struct with_out_of_line_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,FileEdgeTy> type; };
+  template <bool _has_out_of_line_lockable>
+  struct with_out_of_line_lockable {
+    typedef LC_CSR_Graph<NodeTy, EdgeTy, HasNoLockable, UseNumaAlloc,
+                         _has_out_of_line_lockable, FileEdgeTy>
+        type;
+  };
 
   typedef read_default_graph_tag read_tag;
 
- protected:
+protected:
   typedef LargeArray<EdgeTy> EdgeData;
   typedef LargeArray<uint32_t> EdgeDst;
-  typedef internal::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
-  typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
+  typedef internal::NodeInfoBaseTypes<NodeTy,
+                                      !HasNoLockable && !HasOutOfLineLockable>
+      NodeInfoTypes;
+  typedef internal::NodeInfoBase<NodeTy,
+                                 !HasNoLockable && !HasOutOfLineLockable>
+      NodeInfo;
   typedef LargeArray<uint64_t> EdgeIndData;
   typedef LargeArray<NodeInfo> NodeData;
 
- public:
+public:
   typedef uint32_t GraphNode;
   typedef EdgeTy edge_data_type;
   typedef FileEdgeTy file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
   typedef typename NodeInfoTypes::reference node_data_reference;
-  using edge_iterator = boost::counting_iterator<typename EdgeIndData::value_type>;
+  using edge_iterator =
+      boost::counting_iterator<typename EdgeIndData::value_type>;
   using iterator = boost::counting_iterator<typename EdgeDst::value_type>;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
   typedef iterator const_local_iterator;
 
- protected:
+protected:
   NodeData nodeData;
   EdgeIndData edgeIndData;
   EdgeDst edgeDst;
@@ -135,10 +166,12 @@ class LC_CSR_Graph :
   uint64_t numNodes;
   uint64_t numEdges;
 
-  typedef internal::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
+  typedef internal::EdgeSortIterator<
+      GraphNode, typename EdgeIndData::value_type, EdgeDst, EdgeData>
+      edge_sort_iterator;
 
   edge_iterator raw_begin(GraphNode N) const {
-    return edge_iterator((N == 0) ? 0 : edgeIndData[N-1]);
+    return edge_iterator((N == 0) ? 0 : edgeIndData[N - 1]);
   }
 
   edge_iterator raw_end(GraphNode N) const {
@@ -153,87 +186,90 @@ class LC_CSR_Graph :
     return edge_sort_iterator(*raw_end(N), &edgeDst, &edgeData);
   }
 
-  template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     galois::runtime::acquire(&nodeData[N], mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A2>::type* = 0) {}
 
-  template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
-      typename std::enable_if<!_A1 || _A2>::type* = 0) {
+  template <bool _A1 = EdgeData::has_value,
+            bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph,
+                          typename FileGraph::edge_iterator nn,
+                          typename std::enable_if<!_A1 || _A2>::type* = 0) {
     typedef LargeArray<FileEdgeTy> FED;
     if (EdgeData::has_value)
       edgeData.set(*nn, graph.getEdgeData<typename FED::value_type>(nn));
   }
 
-  template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
-  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
-      typename std::enable_if<_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = EdgeData::has_value,
+            bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph,
+                          typename FileGraph::edge_iterator nn,
+                          typename std::enable_if<_A1 && !_A2>::type* = 0) {
     edgeData.set(*nn, {});
   }
 
-  size_t getId(GraphNode N) {
-    return N;
-  }
+  size_t getId(GraphNode N) { return N; }
 
-  GraphNode getNode(size_t n) {
-    return n;
-  }
+  GraphNode getNode(size_t n) { return n; }
 
- private:
+private:
   friend class boost::serialization::access;
   template <typename Archive>
-  void save(Archive &ar, const unsigned int version) const {
+  void save(Archive& ar, const unsigned int version) const {
     ar << numNodes;
     ar << numEdges;
 
-    //Large Arrays
+    // Large Arrays
     ar << edgeIndData;
     ar << edgeDst;
     ar << edgeData;
   }
 
   template <typename Archive>
-  void load(Archive &ar, const unsigned int version) {
+  void load(Archive& ar, const unsigned int version) {
     ar >> numNodes;
     ar >> numEdges;
 
-    //Large Arrays
+    // Large Arrays
     ar >> edgeIndData;
     ar >> edgeDst;
     ar >> edgeData;
 
-    if(!nodeData.data()){
+    if (!nodeData.data()) {
       if (UseNumaAlloc) {
         nodeData.allocateBlocked(numNodes);
         this->outOfLineAllocateBlocked(numNodes);
-      } else{
+      } else {
         nodeData.allocateInterleaved(numNodes);
         this->outOfLineAllocateInterleaved(numNodes);
       }
 
-      //Construct nodeData largeArray
+      // Construct nodeData largeArray
       for (size_t n = 0; n < numNodes; ++n) {
         nodeData.constructAt(n);
       }
     }
-
   }
-  //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
+  // The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes
+  // the save or load depending on whether the archive is used for saving or
+  // loading
   BOOST_SERIALIZATION_SPLIT_MEMBER()
 
-
- public:
+public:
   LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
-  LC_CSR_Graph() = default;
+  LC_CSR_Graph()                   = default;
   LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
 
   /**
@@ -242,7 +278,7 @@ class LC_CSR_Graph :
    * @param ar Boost archive to serialize to.
    */
   void serializeNodeData(boost::archive::binary_oarchive& ar) const {
-     ar << nodeData;
+    ar << nodeData;
   }
 
   /**
@@ -252,7 +288,7 @@ class LC_CSR_Graph :
    * @param ar Boost archive to deserialize from.
    */
   void deSerializeNodeData(boost::archive::binary_iarchive& ar) {
-     ar >> nodeData;
+    ar >> nodeData;
   }
 
   /**
@@ -263,7 +299,7 @@ class LC_CSR_Graph :
   void serializeGraph(boost::archive::binary_oarchive& ar) const {
     ar << numNodes;
     ar << numEdges;
- 
+
     // Large Arrays
     ar << nodeData;
     ar << edgeIndData;
@@ -298,15 +334,13 @@ class LC_CSR_Graph :
    * @returns The value that would be located at index n in an edge prefix sum
    * array
    */
-  uint64_t operator[](uint64_t n) {
-    return *(edge_end(n));
-  }
+  uint64_t operator[](uint64_t n) { return *(edge_end(n)); }
 
-  template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
-  LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
-               EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
-   : numNodes(_numNodes), numEdges(_numEdges) {
-    //std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
+  template <typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
+  LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges, EdgeNumFnTy edgeNum,
+               EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
+      : numNodes(_numNodes), numEdges(_numEdges) {
+    // std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
       //! [numaallocex]
       nodeData.allocateBlocked(numNodes);
@@ -322,20 +356,20 @@ class LC_CSR_Graph :
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-    //std::cerr << "Done Alloc\n";
+    // std::cerr << "Done Alloc\n";
     for (size_t n = 0; n < numNodes; ++n) {
       nodeData.constructAt(n);
     }
-    //std::cerr << "Done Node Construct\n";
+    // std::cerr << "Done Node Construct\n";
     uint64_t cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
       cur += edgeNum(n);
       edgeIndData[n] = cur;
     }
-    //std::cerr << "Done Edge Reserve\n";
+    // std::cerr << "Done Edge Reserve\n";
     cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
-      //if (n % (1024*128) == 0)
+      // if (n % (1024*128) == 0)
       //  std::cout << n << " " << cur << "\n";
       for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
         if (EdgeData::has_value)
@@ -345,7 +379,7 @@ class LC_CSR_Graph :
       }
     }
 
-    //std::cerr << "Done Construct\n";
+    // std::cerr << "Done Construct\n";
   }
 
   friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
@@ -371,9 +405,7 @@ class LC_CSR_Graph :
     return edgeData[*ni];
   }
 
-  GraphNode getEdgeDst(edge_iterator ni) {
-    return edgeDst[*ni];
-  }
+  GraphNode getEdgeDst(edge_iterator ni) { return edgeDst[*ni]; }
 
   size_t size() const { return numNodes; }
   size_t sizeEdges() const { return numEdges; }
@@ -413,46 +445,47 @@ class LC_CSR_Graph :
   }
 
   edge_iterator findEdge(GraphNode N1, GraphNode N2) {
-    return std::find_if(edge_begin(N1), edge_end(N1), [=] (edge_iterator e) {
-      return getEdgeDst(e) == N2;
-    });
+    return std::find_if(edge_begin(N1), edge_end(N1),
+                        [=](edge_iterator e) { return getEdgeDst(e) == N2; });
   }
 
   edge_iterator findEdgeSortedByDst(GraphNode N1, GraphNode N2) {
-    auto e = std::lower_bound(edge_begin(N1), edge_end(N1), N2,
-                [=] (edge_iterator e, GraphNode N) {
-                  return getEdgeDst(e) < N;
-                });
+    auto e = std::lower_bound(
+        edge_begin(N1), edge_end(N1), N2,
+        [=](edge_iterator e, GraphNode N) { return getEdgeDst(e) < N; });
     return (getEdgeDst(e) == N2) ? e : edge_end(N1);
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N,
-      MethodFlag mflag = MethodFlag::WRITE) {
-    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  runtime::iterable<NoDerefIterator<edge_iterator>>
+  edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::make_no_deref_range(edge_begin(N, mflag),
+                                         edge_end(N, mflag));
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N,
-      MethodFlag mflag = MethodFlag::WRITE) {
+  runtime::iterable<NoDerefIterator<edge_iterator>>
+  out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
   /**
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
-  template<typename CompTy>
+  template <typename CompTy>
   void sortEdgesByEdgeData(GraphNode N,
                            const CompTy& comp = std::less<EdgeTy>(),
-                           MethodFlag mflag = MethodFlag::WRITE) {
+                           MethodFlag mflag   = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N),
-              internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
+    std::sort(
+        edge_sort_begin(N), edge_sort_end(N),
+        internal::EdgeSortCompWrapper<EdgeSortValue<GraphNode, EdgeTy>, CompTy>(
+            comp));
   }
 
   /**
    * Sorts outgoing edges of a node.
    * Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
-  template<typename CompTy>
+  template <typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp,
                  MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
@@ -464,12 +497,11 @@ class LC_CSR_Graph :
    */
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
+    typedef EdgeSortValue<GraphNode, EdgeTy> EdgeSortVal;
     std::sort(edge_sort_begin(N), edge_sort_end(N),
-      [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) {
-        return e1.dst < e2.dst;
-      }
-    );
+              [=](const EdgeSortVal& e1, const EdgeSortVal& e2) {
+                return e1.dst < e2.dst;
+              });
   }
 
   /**
@@ -477,18 +509,16 @@ class LC_CSR_Graph :
    * getEdgeDst(e).
    */
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
-    galois::do_all(galois::iterate(*this), [=] (GraphNode N) {
-        this->sortEdgesByDst(N, mflag);
-      },
-      galois::no_stats(),
-      galois::steal());
+    galois::do_all(galois::iterate(*this),
+                   [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
+                   galois::no_stats(), galois::steal());
   }
 
   template <typename F>
   ptrdiff_t partition_neighbors(GraphNode N, const F& func) {
-    auto beg = &edgeDst[*raw_begin (N)];
-    auto end = &edgeDst[*raw_end (N)];
-    auto mid = std::partition (beg, end, func);
+    auto beg = &edgeDst[*raw_begin(N)];
+    auto end = &edgeDst[*raw_end(N)];
+    auto mid = std::partition(beg, end, func);
     return (mid - beg);
   }
 
@@ -536,12 +566,12 @@ class LC_CSR_Graph :
       this->outOfLineConstructAt(x);
     }
 #else
-    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t x) {
+    galois::do_all(galois::iterate(0ul, numNodes),
+                   [&](uint32_t x) {
                      nodeData.constructAt(x);
                      this->outOfLineConstructAt(x);
                    },
-                   galois::no_stats(),
-                   galois::loopname("CONSTRUCT_NODES"));
+                   galois::no_stats(), galois::loopname("CONSTRUCT_NODES"));
 #endif
   }
 
@@ -565,20 +595,17 @@ class LC_CSR_Graph :
     edgeDst[e] = dst;
   }
 
-  void constructEdge(uint64_t e, uint32_t dst) {
-    edgeDst[e] = dst;
-  }
+  void constructEdge(uint64_t e, uint32_t dst) { edgeDst[e] = dst; }
 
-  void fixEndEdge(uint32_t n, uint64_t e) {
-    edgeIndData[n] = e;
-  }
+  void fixEndEdge(uint32_t n, uint64_t e) { edgeIndData[n] = e; }
 
   /**
    * Perform an in-memory transpose of the graph, replacing the original
    * CSR to CSC
    */
-  void transpose(const char *regionName = NULL) {
-    galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE", regionName); timer.start();
+  void transpose(const char* regionName = NULL) {
+    galois::StatTimer timer("TIMER_GRAPH_TRANSPOSE", regionName);
+    timer.start();
 
     EdgeDst edgeDst_old;
     EdgeData edgeData_new;
@@ -598,16 +625,18 @@ class LC_CSR_Graph :
     }
 
     // Copy old node->index location + initialize the temp array
-    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
-                     edgeIndData_old[n] = edgeIndData[n];
+    galois::do_all(galois::iterate(0ul, numNodes),
+                   [&](uint32_t n) {
+                     edgeIndData_old[n]  = edgeIndData[n];
                      edgeIndData_temp[n] = 0;
                    },
                    galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_COPY"));
 
     // get destination of edge, copy to array, and
-    galois::do_all(galois::iterate(0ul, numEdges), [&](uint64_t e) {
-                     auto dst = edgeDst[e];
+    galois::do_all(galois::iterate(0ul, numEdges),
+                   [&](uint64_t e) {
+                     auto dst       = edgeDst[e];
                      edgeDst_old[e] = dst;
                      // counting outgoing edges in the tranpose graph by
                      // counting incoming edges in the original graph
@@ -619,13 +648,12 @@ class LC_CSR_Graph :
     // TODO is it worth doing parallel prefix sum?
     // prefix sum calculation of the edge index array
     for (uint32_t n = 1; n < numNodes; ++n) {
-      edgeIndData_temp[n] += edgeIndData_temp[n-1];
+      edgeIndData_temp[n] += edgeIndData_temp[n - 1];
     }
 
     // copy over the new tranposed edge index data
-    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t n) {
-                     edgeIndData[n] = edgeIndData_temp[n];
-                   },
+    galois::do_all(galois::iterate(0ul, numNodes),
+                   [&](uint32_t n) { edgeIndData[n] = edgeIndData_temp[n]; },
                    galois::no_stats(),
                    galois::loopname("TRANSPOSE_EDGEINTDATA_SET"));
 
@@ -633,24 +661,25 @@ class LC_CSR_Graph :
     // before the ith node have
     if (numNodes >= 1) {
       edgeIndData_temp[0] = 0;
-      galois::do_all(galois::iterate(1ul, numNodes), [&](uint32_t n) {
-                       edgeIndData_temp[n] = edgeIndData[n-1];
-                     },
-                     galois::no_stats(),
-                     galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
+      galois::do_all(
+          galois::iterate(1ul, numNodes),
+          [&](uint32_t n) { edgeIndData_temp[n] = edgeIndData[n - 1]; },
+          galois::no_stats(), galois::loopname("TRANSPOSE_EDGEINTDATA_TEMP"));
     }
 
-    galois::do_all(galois::iterate(0ul, numNodes), [&](uint32_t src) {
+    galois::do_all(galois::iterate(0ul, numNodes),
+                   [&](uint32_t src) {
                      // e = start index into edge array for a particular node
                      uint64_t e = (src == 0) ? 0 : edgeIndData_old[src - 1];
 
-                     // get all outgoing edges of a particular node in the non-transpose and
-                     // convert to incoming
+                     // get all outgoing edges of a particular node in the
+                     // non-transpose and convert to incoming
                      while (e < edgeIndData_old[src]) {
                        // destination nodde
                        auto dst = edgeDst_old[e];
                        // location to save edge
-                       auto e_new = __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
+                       auto e_new =
+                           __sync_fetch_and_add(&(edgeIndData_temp[dst]), 1);
                        // save src as destination
                        edgeDst[e_new] = src;
                        // copy edge data to "new" array
@@ -658,44 +687,42 @@ class LC_CSR_Graph :
                        e++;
                      }
                    },
-                   galois::no_stats(),
-                   galois::loopname("TRANSPOSE_EDGEDST"));
+                   galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDST"));
 
     // if edge weights, then overwrite edgeData with new edge data
     if (EdgeData::has_value) {
-      galois::do_all(galois::iterate(0ul, numEdges),
-                     [&](uint32_t e){
-                       edgeDataCopy(edgeData, edgeData_new, e, e);
-                     },
-                     galois::no_stats(),
-                     galois::loopname("TRANSPOSE_EDGEDATA_SET"));
+      galois::do_all(
+          galois::iterate(0ul, numEdges),
+          [&](uint32_t e) { edgeDataCopy(edgeData, edgeData_new, e, e); },
+          galois::no_stats(), galois::loopname("TRANSPOSE_EDGEDATA_SET"));
     }
 
     timer.stop();
   }
 
-  template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData,
-                    uint64_t e_new, uint64_t e,
+  template <bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, uint64_t e_new,
+                    uint64_t e,
                     typename std::enable_if<is_non_void>::type* = 0) {
     edgeData_new[e_new] = edgeData[e];
   }
 
-  template<bool is_non_void = EdgeData::has_value>
-  void edgeDataCopy(EdgeData &edgeData_new, EdgeData &edgeData,
-                    uint64_t e_new, uint64_t e,
+  template <bool is_non_void = EdgeData::has_value>
+  void edgeDataCopy(EdgeData& edgeData_new, EdgeData& edgeData, uint64_t e_new,
+                    uint64_t e,
                     typename std::enable_if<!is_non_void>::type* = 0) {
     // does nothing
   }
 
-
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     // at this point memory should already be allocated
-    auto r = graph.divideByNode(
-        NodeData::size_of::value + EdgeIndData::size_of::value +
-        LC_CSR_Graph::size_of_out_of_line::value,
-        EdgeDst::size_of::value + EdgeData::size_of::value,
-        tid, total).first;
+    auto r =
+        graph
+            .divideByNode(
+                NodeData::size_of::value + EdgeIndData::size_of::value +
+                    LC_CSR_Graph::size_of_out_of_line::value,
+                EdgeDst::size_of::value + EdgeData::size_of::value, tid, total)
+            .first;
 
     this->setLocalRange(*r.first, *r.second);
 
@@ -707,8 +734,7 @@ class LC_CSR_Graph :
 
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii),
                                     en = graph.edge_end(*ii);
-           nn != en;
-           ++nn) {
+           nn != en; ++nn) {
         constructEdgeValue(graph, nn);
         edgeDst[*nn] = graph.getEdgeDst(nn);
       }
@@ -716,16 +742,14 @@ class LC_CSR_Graph :
   }
 
   /**
-   * Returns the reference to the edgeIndData LargeArray 
+   * Returns the reference to the edgeIndData LargeArray
    * (a prefix sum of edges)
    *
    * @returns reference to LargeArray edgeIndData
    */
-  const EdgeIndData& getEdgePrefixSum() const {
-    return edgeIndData;
-  }
+  const EdgeIndData& getEdgePrefixSum() const { return edgeIndData; }
 };
-} // end namespace
-} // end namespace
+} // namespace graphs
+} // namespace galois
 
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -45,28 +45,32 @@ namespace runtime {
 
 namespace ParaMeter {
 
-
 struct StepStatsBase {
   static inline void printHeader(FILE* out) {
-    fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE, NEIGHBORHOOD_SIZE\n");
+    fprintf(out,
+            "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE, NEIGHBORHOOD_SIZE\n");
   }
 
-  static inline void dump(FILE* out, const char* loopname, size_t step, size_t parallelism, size_t wlSize, size_t nhSize) {
+  static inline void dump(FILE* out, const char* loopname, size_t step,
+                          size_t parallelism, size_t wlSize, size_t nhSize) {
     assert(out && "StepStatsBase::dump() file handle is null");
-    fprintf(out, "%s, %zu, %zu, %zu, %zu\n", loopname, step, parallelism, wlSize, nhSize);
+    fprintf(out, "%s, %zu, %zu, %zu, %zu\n", loopname, step, parallelism,
+            wlSize, nhSize);
   }
 };
 
-struct OrderedStepStats: public StepStatsBase {
+struct OrderedStepStats : public StepStatsBase {
   using Base = StepStatsBase;
 
   const size_t step;
   GAccumulator<size_t> parallelism;
   const size_t wlSize;
 
-  explicit OrderedStepStats (size_t _step, size_t _wlsz): Base(), step (_step), parallelism (),  wlSize (_wlsz) {}
+  explicit OrderedStepStats(size_t _step, size_t _wlsz)
+      : Base(), step(_step), parallelism(), wlSize(_wlsz) {}
 
-  explicit OrderedStepStats (size_t _step, size_t par, size_t _wlsz): Base(), step (_step), parallelism (), wlSize (_wlsz) {
+  explicit OrderedStepStats(size_t _step, size_t par, size_t _wlsz)
+      : Base(), step(_step), parallelism(), wlSize(_wlsz) {
     parallelism += par;
   }
 
@@ -75,8 +79,7 @@ struct OrderedStepStats: public StepStatsBase {
   }
 };
 
-
-struct UnorderedStepStats: public StepStatsBase {
+struct UnorderedStepStats : public StepStatsBase {
   using Base = StepStatsBase;
 
   size_t step;
@@ -84,10 +87,9 @@ struct UnorderedStepStats: public StepStatsBase {
   GAccumulator<size_t> wlSize;
   GAccumulator<size_t> nhSize;
 
-  UnorderedStepStats (void) : Base(), step(0)
-  {}
+  UnorderedStepStats(void) : Base(), step(0) {}
 
-  void nextStep (void) {
+  void nextStep(void) {
     ++step;
     parallelism.reset();
     wlSize.reset();
@@ -95,132 +97,125 @@ struct UnorderedStepStats: public StepStatsBase {
   }
 
   void dump(FILE* out, const char* loopname) const {
-    Base::dump(out, loopname, step, parallelism.reduce(), wlSize.reduce(), nhSize.reduce());
+    Base::dump(out, loopname, step, parallelism.reduce(), wlSize.reduce(),
+               nhSize.reduce());
   }
 };
 
 // Single ParaMeter stats file per run of an app
 // which includes all instances of for_each loops
 // run with ParaMeter Executor
-FILE* getStatsFile (void);
-void closeStatsFile (void);
-
+FILE* getStatsFile(void);
+void closeStatsFile(void);
 
 template <typename T>
 class FIFO_WL {
 
 protected:
-
   using PTcont = galois::PerThreadVector<T>;
 
   PTcont* curr;
   PTcont* next;
 
 public:
-
-  FIFO_WL(void):
-    curr (new PTcont()),
-    next (new PTcont())
-  {}
+  FIFO_WL(void) : curr(new PTcont()), next(new PTcont()) {}
 
   ~FIFO_WL(void) {
-    delete curr; curr = nullptr;
-    delete next; next = nullptr;
+    delete curr;
+    curr = nullptr;
+    delete next;
+    next = nullptr;
   }
 
-  auto iterateCurr(void) {
-    return galois::runtime::makeLocalRange(*curr);
-  }
+  auto iterateCurr(void) { return galois::runtime::makeLocalRange(*curr); }
 
-  void pushNext(const T& item) {
-    next->get().push_back(item);
-  }
+  void pushNext(const T& item) { next->get().push_back(item); }
 
   void nextStep(void) {
     std::swap(curr, next);
     next->clear_all_parallel();
   }
 
-  bool empty(void) const {
-    return next->empty_all();
-  }
+  bool empty(void) const { return next->empty_all(); }
 };
 
 template <typename T>
-class RAND_WL: public FIFO_WL<T> {
+class RAND_WL : public FIFO_WL<T> {
   using Base = FIFO_WL<T>;
 
 public:
-
   auto iterateCurr(void) {
     galois::runtime::on_each_gen(
-        [&] (int tid, int numT) {
+        [&](int tid, int numT) {
           auto& lwl = Base::curr->get();
 
           std::random_device r;
           std::mt19937 rng(r());
           std::shuffle(lwl.begin(), lwl.end(), rng);
-
-        }, std::make_tuple());
+        },
+        std::make_tuple());
 
     return galois::runtime::makeLocalRange(*Base::curr);
   }
 };
 
 template <typename T>
-class LIFO_WL: public FIFO_WL<T> {
+class LIFO_WL : public FIFO_WL<T> {
   using Base = FIFO_WL<T>;
 
 public:
-
   auto iterateCurr(void) {
 
     // TODO: use reverse iterator instead of std::reverse
     galois::runtime::on_each_gen(
-        [&] (int tid, int numT) {
+        [&](int tid, int numT) {
           auto& lwl = Base::curr->get();
           std::reverse(lwl.begin(), lwl.end());
-
-        }, std::make_tuple());
+        },
+        std::make_tuple());
 
     return galois::runtime::makeLocalRange(*Base::curr);
   }
 };
 
-enum class SchedType {
-  FIFO, RAND, LIFO
-};
+enum class SchedType { FIFO, RAND, LIFO };
 
 template <typename T, SchedType SCHED>
 struct ChooseWL {};
 
-template <typename T> struct ChooseWL<T, SchedType::FIFO> {
+template <typename T>
+struct ChooseWL<T, SchedType::FIFO> {
   using type = FIFO_WL<T>;
 };
 
-template <typename T> struct ChooseWL<T, SchedType::LIFO> {
+template <typename T>
+struct ChooseWL<T, SchedType::LIFO> {
   using type = LIFO_WL<T>;
 };
 
-template <typename T> struct ChooseWL<T, SchedType::RAND> {
+template <typename T>
+struct ChooseWL<T, SchedType::RAND> {
   using type = RAND_WL<T>;
 };
 
-
-template<class T, class FunctionTy, class ArgsTy>
+template <class T, class FunctionTy, class ArgsTy>
 class ParaMeterExecutor {
 
   using value_type = T;
-  using GenericWL = typename get_type_by_supertype<wl_tag, ArgsTy>::type::type;
+  using GenericWL  = typename get_type_by_supertype<wl_tag, ArgsTy>::type::type;
   using WorkListTy = typename GenericWL::template retype<T>;
-  using dbg = galois::debug<1>;
+  using dbg        = galois::debug<1>;
 
-  static const bool needsStats = !exists_by_supertype<no_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
-
+  static const bool needsStats =
+      !exists_by_supertype<no_stats_tag, ArgsTy>::value;
+  static const bool needsPush =
+      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static const bool needsAborts =
+      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
+  static const bool needsPia =
+      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak =
+      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
 
   struct IterationContext {
     T item;
@@ -228,7 +223,7 @@ class ParaMeterExecutor {
     galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
 
-    explicit IterationContext(const T& v): item(v), doabort(false) {}
+    explicit IterationContext(const T& v) : item(v), doabort(false) {}
 
     void reset() {
       doabort = false;
@@ -241,7 +236,6 @@ class ParaMeterExecutor {
   };
 
   using PWL = typename ChooseWL<IterationContext*, WorkListTy::SCHEDULE>::type;
-
 
 private:
   PWL m_wl;
@@ -263,7 +257,8 @@ private:
 
   unsigned abortIteration(IterationContext* it) {
     assert(it && "nullptr arg");
-    assert(it->doabort && "aborting an iteration without setting its doabort flag");
+    assert(it->doabort &&
+           "aborting an iteration without setting its doabort flag");
 
     unsigned numLocks = it->ctx.cancelIteration();
     it->reset();
@@ -276,7 +271,7 @@ private:
     assert(it && "nullptr arg");
 
     if (needsPush) {
-      for (const auto& item: it->facing.getPushBuffer()) {
+      for (const auto& item : it->facing.getPushBuffer()) {
         IterationContext* child = newIteration(item);
         m_wl.pushNext(child);
       }
@@ -292,229 +287,211 @@ private:
   }
 
 private:
-
   void runSimpleStep(UnorderedStepStats& stats) {
-    galois::runtime::do_all_gen(m_wl.iterateCurr(),
-        [&, this] (IterationContext* it) {
-
+    galois::runtime::do_all_gen(
+        m_wl.iterateCurr(),
+        [&, this](IterationContext* it) {
           stats.wlSize += 1;
 
           setThreadContext(&(it->ctx));
 
-          m_func(it->item, it->facing.data ());
+          m_func(it->item, it->facing.data());
           stats.parallelism += 1;
           unsigned nh = commitIteration(it);
           stats.nhSize += nh;
 
           setThreadContext(nullptr);
-          
         },
-        std::make_tuple(
-          galois::steal(),
-          galois::loopname("ParaM-Simple")));
-
+        std::make_tuple(galois::steal(), galois::loopname("ParaM-Simple")));
   }
 
-  void runCautiousStep(UnorderedStepStats& stats) {
-    galois::runtime::do_all_gen(m_wl.iterateCurr(),
-        [&, this] (IterationContext* it) {
+  void runCautiousStep(UnorderedStepStats& stats){galois::runtime::do_all_gen(
+      m_wl.iterateCurr(),
+      [&, this](IterationContext* it) {
+        stats.wlSize += 1;
 
-          stats.wlSize += 1;
+        setThreadContext(&(it->ctx));
+        bool broke = false;
 
-          setThreadContext(&(it->ctx));
-          bool broke = false;
-
-          if (needsBreak) {
-            it->facing.setBreakFlag(&broke);
-          }
+        if (needsBreak) {
+          it->facing.setBreakFlag(&broke);
+        }
 
 #ifdef GALOIS_USE_LONGJMP_ABORT
-          int flag = 0;
-          if ((flag = setjmp(execFrame)) == 0) {
-            m_func(it->item, it->facing.data ());
+        int flag = 0;
+        if ((flag = setjmp(execFrame)) == 0) {
+          m_func(it->item, it->facing.data());
 
-          } else {
-#else 
-          try {
-            m_func(it->item, it->facing.data ());
+        } else {
+#else
+        try {
+          m_func(it->item, it->facing.data());
 
-          } catch (const ConflictFlag& flag) {
+        } catch (const ConflictFlag& flag) {
 #endif
-            clearConflictLock();
-            switch (flag) {
-              case galois::runtime::CONFLICT:
-                it->doabort = true;
-                break;
-              default:
-                std::abort ();
-            }
+          clearConflictLock();
+          switch (flag) {
+          case galois::runtime::CONFLICT:
+            it->doabort = true;
+            break;
+          default:
+            std::abort();
           }
+        }
 
-          if (needsBreak && broke) {
-            m_broken.update(true);
-          }
+        if (needsBreak && broke) {
+          m_broken.update(true);
+        }
 
-          setThreadContext(nullptr);
-          
-        },
-        std::make_tuple(
-          galois::steal(),
-          galois::loopname("ParaM-Expand-NH")));
+        setThreadContext(nullptr);
+      },
+      std::make_tuple(galois::steal(), galois::loopname("ParaM-Expand-NH")));
 
+  galois::runtime::do_all_gen(
+      m_wl.iterateCurr(),
+      [&, this](IterationContext* it) {
+        if (it->doabort) {
+          abortIteration(it);
 
-    galois::runtime::do_all_gen(m_wl.iterateCurr(), 
-        [&, this] (IterationContext* it) {
+        } else {
+          stats.parallelism += 1;
+          unsigned nh = commitIteration(it);
+          stats.nhSize += nh;
+        }
+      },
+      std::make_tuple(galois::steal(), galois::loopname("ParaM-Commit")));
+}
 
-          if (it->doabort) {
-            abortIteration(it);
+template <typename R>
+void execute(const R& range) {
 
-          } else {
-            stats.parallelism += 1;
-            unsigned nh = commitIteration(it);
-            stats.nhSize += nh;
+  galois::runtime::on_each_gen(
+      [&, this](const unsigned tid, const unsigned numT) {
+        auto p = range.local_pair();
 
-          }
-        },
-        std::make_tuple(
-          galois::steal(),
-          galois::loopname("ParaM-Commit")));
-  }
+        for (auto i = p.first; i != p.second; ++i) {
+          IterationContext* it = newIteration(*i);
+          m_wl.pushNext(it);
+        }
+      },
+      std::make_tuple());
 
-  template <typename R>
-  void execute(const R& range) {
+  UnorderedStepStats stats;
 
+  while (!m_wl.empty()) {
 
-    galois::runtime::on_each_gen([&, this] (const unsigned tid, const unsigned numT) {
-          auto p = range.local_pair();
+    m_wl.nextStep();
 
-          for (auto i = p.first; i != p.second; ++i) {
-            IterationContext* it = newIteration(*i);
-            m_wl.pushNext(it);
-          }
-          
-        }, std::make_tuple());
+    if (needsAborts) {
+      runCautiousStep(stats);
 
-    UnorderedStepStats stats;
+    } else {
+      runSimpleStep(stats);
+    }
 
-    while (!m_wl.empty()) {
+    // dbg::print("Step: ", stats.step, ", Parallelism: ",
+    // stats.parallelism.reduce());
+    assert(stats.parallelism.reduce() && "ERROR: No Progress");
 
-      m_wl.nextStep();
+    stats.dump(m_statsFile, loopname);
+    stats.nextStep();
 
-      if (needsAborts) {
-        runCautiousStep(stats);
+    if (needsBreak && m_broken.reduce()) {
+      break;
+    }
 
-      } else {
-        runSimpleStep(stats);
-      }
+  } // end while
 
-      // dbg::print("Step: ", stats.step, ", Parallelism: ", stats.parallelism.reduce());
-      assert(stats.parallelism.reduce() && "ERROR: No Progress");
+  closeStatsFile();
+}
 
-      stats.dump(m_statsFile, loopname);
-      stats.nextStep();
-
-      if (needsBreak && m_broken.reduce()) {
-        break;
-      }
-
-          
-    } // end while
-
-    closeStatsFile();
-  }
 public:
+ParaMeterExecutor(const FunctionTy& f, const ArgsTy& args)
+    : m_func(f), loopname(galois::internal::getLoopName(args)),
+      m_statsFile(getStatsFile()) {}
 
-  ParaMeterExecutor(const FunctionTy& f, const ArgsTy& args): 
-    m_func(f),
-    loopname(galois::internal::getLoopName(args)),
-    m_statsFile(getStatsFile())
-  {}
+// called serially once
+template <typename RangeTy>
+void init(const RangeTy& range) {
+  execute(range);
+}
 
-  // called serially once
-  template<typename RangeTy>
-  void init(const RangeTy& range) {
-    execute(range);
-  }
+// called once on each thread followed by a barrier
+template <typename RangeTy>
+void initThread(const RangeTy& range) const {}
 
-  // called once on each thread followed by a barrier
-  template<typename RangeTy>
-  void initThread(const RangeTy& range) const {}
+void operator()(void) {}
 
-  void operator() (void) {}
+}; // namespace ParaMeter
 
-};
-
-
-} // end namespace ParaMeter
-} // end namespace runtime
+} // namespace runtime
+} // namespace galois
 
 namespace worklists {
 
-template<class T=int, runtime::ParaMeter::SchedType SCHED=runtime::ParaMeter::SchedType::FIFO>
+template <class T = int, runtime::ParaMeter::SchedType SCHED =
+                             runtime::ParaMeter::SchedType::FIFO>
 class ParaMeter {
 public:
-  template<bool _concurrent>
+  template <bool _concurrent>
   using rethread = ParaMeter<T, SCHED>;
 
-  template<typename _T>
+  template <typename _T>
   using retype = ParaMeter<_T, SCHED>;
 
   using value_type = T;
 
   constexpr static const runtime::ParaMeter::SchedType SCHEDULE = SCHED;
 
-  using fifo = ParaMeter<T, runtime::ParaMeter::SchedType::FIFO>;
+  using fifo   = ParaMeter<T, runtime::ParaMeter::SchedType::FIFO>;
   using random = ParaMeter<T, runtime::ParaMeter::SchedType::RAND>;
-  using lifo = ParaMeter<T, runtime::ParaMeter::SchedType::LIFO>;
-
+  using lifo   = ParaMeter<T, runtime::ParaMeter::SchedType::LIFO>;
 };
 
-} // end worklists
+} // namespace worklists
 
 namespace runtime {
 
-  // hookup into galois::for_each. Invoke galois::for_each with wl<galois::worklists::ParaMeter<> >
-template<class T, class FunctionTy, class ArgsTy>
-struct ForEachExecutor<galois::worklists::ParaMeter<T>, FunctionTy, ArgsTy>:
-  public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy>
-{
+// hookup into galois::for_each. Invoke galois::for_each with
+// wl<galois::worklists::ParaMeter<> >
+template <class T, class FunctionTy, class ArgsTy>
+struct ForEachExecutor<galois::worklists::ParaMeter<T>, FunctionTy, ArgsTy>
+    : public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> {
   using SuperTy = ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy>;
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args) : SuperTy(f, args) {}
 };
 
-
 //! invoke ParaMeter tool to execute a for_each style loop
-template<typename R, typename F, typename ArgsTuple>
-void for_each_ParaMeter (const R& range, const F& func, const ArgsTuple& argsTuple) {
+template <typename R, typename F, typename ArgsTuple>
+void for_each_ParaMeter(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
 
   using T = typename R::values_type;
 
-  auto tpl = galois::get_default_trait_values(argsTuple,
-      std::make_tuple (wl_tag {}),
-      std::make_tuple (wl<galois::worklists::ParaMeter<> >()));
+  auto tpl = galois::get_default_trait_values(
+      argsTuple, std::make_tuple(wl_tag{}),
+      std::make_tuple(wl<galois::worklists::ParaMeter<>>()));
 
-  using Tpl_ty = decltype (tpl);
+  using Tpl_ty = decltype(tpl);
 
   using Exec = runtime::ParaMeter::ParaMeterExecutor<T, F, Tpl_ty>;
-  Exec exec (func, tpl);
+  Exec exec(func, tpl);
 
-  exec.execute (range);
-
+  exec.execute(range);
 }
-
-
 
 } // end namespace runtime
 } // end namespace galois
 #endif
 
 /*
- * requirements: 
+ * requirements:
  * - support random and fifo schedules, maybe lifo
- * - write stats to a single file. 
+ * - write stats to a single file.
  * - support multi-threaded execution
  *
  * interface:
  * - file set by environment variable
- * - ParaMeter invoked by choosing wl type, e.g. ParaMeter<>::with_rand, or ParaMeter<>::fifo
+ * - ParaMeter invoked by choosing wl type, e.g. ParaMeter<>::with_rand, or
+ * ParaMeter<>::fifo
  */

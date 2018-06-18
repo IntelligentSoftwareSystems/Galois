@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -51,198 +51,203 @@ using namespace std;
 #define __GALOIS_ACCUMULATOR_TYPE__ "galois::DGAccumulator"
 
 namespace {
-  class GaloisFunctionsVisitor :
-    public RecursiveASTVisitor<GaloisFunctionsVisitor> {
-  private:
-    ASTContext* astContext;
-  public:
-    explicit GaloisFunctionsVisitor(CompilerInstance *CI) :
-      astContext(&(CI->getASTContext())) {}
+class GaloisFunctionsVisitor
+    : public RecursiveASTVisitor<GaloisFunctionsVisitor> {
+private:
+  ASTContext* astContext;
 
-    virtual ~GaloisFunctionsVisitor() {}
+public:
+  explicit GaloisFunctionsVisitor(CompilerInstance* CI)
+      : astContext(&(CI->getASTContext())) {}
 
-    virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec) {
-      Dec->dump();
-      return true;
+  virtual ~GaloisFunctionsVisitor() {}
+
+  virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec) {
+    Dec->dump();
+    return true;
+  }
+
+  virtual bool VisitFunctionDecl(FunctionDecl* func) {
+    // std::string funcName = func->getNameInfo().getName().getAsString();
+    std::string funcName = func->getNameAsString();
+
+    // foo finding test
+    if (funcName == "foo") {
+      llvm::errs() << "Found"
+                   << "\n";
     }
 
-    virtual bool VisitFunctionDecl(FunctionDecl* func) {
-      //std::string funcName = func->getNameInfo().getName().getAsString();
-      std::string funcName = func->getNameAsString();
+    return true;
+  }
+};
 
-      // foo finding test
-      if (funcName == "foo"){
-        llvm::errs() << "Found" << "\n";
-      }
-
-      return true;
-    }
-  };
-
-  class NameSpaceHandler : public MatchFinder::MatchCallback {
-    //CompilerInstance &Instance;
-    //clang::LangOptions& langOptions; //Instance.getLangOpts();
-  public:
-    NameSpaceHandler(clang::LangOptions &langOptions) {}
-    virtual void run(const MatchFinder::MatchResult &results) {
-      llvm::errs() << "It is coming here\n"
-                   << results.Nodes.getNodeAs<clang::NestedNameSpecifier>(
-                        "galoisLoop"
-                      )->getAsNamespace()->getIdentifier()->getName();
-      const NestedNameSpecifier* NSDecl = 
+class NameSpaceHandler : public MatchFinder::MatchCallback {
+  // CompilerInstance &Instance;
+  // clang::LangOptions& langOptions; //Instance.getLangOpts();
+public:
+  NameSpaceHandler(clang::LangOptions& langOptions) {}
+  virtual void run(const MatchFinder::MatchResult& results) {
+    llvm::errs() << "It is coming here\n"
+                 << results.Nodes
+                        .getNodeAs<clang::NestedNameSpecifier>("galoisLoop")
+                        ->getAsNamespace()
+                        ->getIdentifier()
+                        ->getName();
+    const NestedNameSpecifier* NSDecl =
         results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop");
 
-      if (NSDecl != NULL) {
-        llvm::errs() << "Found Galois Loop\n";
-        //NSDecl->dump(langOptions);
-      }
+    if (NSDecl != NULL) {
+      llvm::errs() << "Found Galois Loop\n";
+      // NSDecl->dump(langOptions);
     }
-  };
-
-  class ForStmtHandler : public MatchFinder::MatchCallback {
-    public:
-      virtual void run(const MatchFinder::MatchResult &results) {
-        if (const ForStmt* FS = 
-              results.Nodes.getNodeAs<clang::ForStmt>("forLoop")) {
-          llvm::errs() << "for loop found\n";
-          FS->dump();
-        }
-      }
-  };
-
-  struct Write_set {
-    string GRAPH_NAME;
-    string NODE_TYPE;
-    string FIELD_TYPE;
-    string FIELD_NAME;
-    string REDUCE_OP_EXPR;
-    string VAL_TYPE;
-    string RESET_VAL_EXPR;
-    string SYNC_TYPE;
-    string READ_FLAG;
-    string WRITE_FLAG;
-    string MODIFIED_IN_EDGE_LOOP;
-  };
-
-  struct Write_set_PULL {
-    string GRAPH_NAME;
-    string NODE_TYPE;
-    string FIELD_TYPE;
-    string FIELD_NAME;
-    string VAL_TYPE;
-  };
-
-  class InfoClass {
-    public:
-      //Global variables for synchronization to be inserted.
-      //Hack: bool is used to prevent multiple prints of the 
-      //      variable, since AST matchers visits the matched
-      //      node twice. (Find a better solution)
-      vector<std::pair<bool,std::string>> syncGlobals_vec;
-  };
-
-  /**
-   * Given an input, upper-cases + returns
-   */
-  std::string stringToUpper(std::string input){
-    std::transform(input.begin(), input.end(), input.begin(), ::toupper);
-    return input;
   }
+};
 
-  /**
-   * Creates the reduce sync structure macro given a write set containing the 
-   * variable to create the sync structure for
-   */
-  std::string getSyncer(const Write_set& i) {
-    std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) <<
-         "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
-    return s.str();
-  }
-
-
-  /**
-   * Create reduce sync structure macro given write set with variable 
-   * information + saves names of flags structure and reduce structure to a map.
-   */
-  typedef std::map<std::string, std::vector<std::string>> SyncCall_map;
-  std::string getSyncer(const Write_set& i, SyncCall_map& syncCall_map) {
-    std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) <<
-         "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
-
-    //std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
-    //std::string str_readFlags = " " + i.WRITE_FLAG + ", " + i.READ_FLAG;
-    std::string str_readFlags = i.READ_FLAG + " ";
-    std::string str_reduce_call = " Reduce_" + i.REDUCE_OP_EXPR + "_" +
-                                  i.FIELD_NAME;
-    syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
-    syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
-
-    return s.str();
-  }
-
-  // TODO separate out bitset macro from syncer pull call
-
-  /**
-   * Construct the broadcast and bitset macros given writeset with field info
-   * TODO getsyncerpull is misleading name since bitset is included
-   */
-  std::string getSyncerPull(const Write_set& i) {
-    std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME
-      << ", " << i.VAL_TYPE << ");\n";
-    s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
-
-    return s.str();
-  }
-
-
-  /**
-   * Construct the broadcast and bitset macros given writeset with field info +
-   * save the structure names into map
-   * TODO getsyncerpull is misleading name since bitset is included
-   */
-  std::string getSyncerPull(const Write_set& i, SyncCall_map& syncCall_map) {
-    std::stringstream s;
-    s << "GALOIS_SYNC_STRUCTURE_BROADCAST" << "(" << i.FIELD_NAME << ", "
-      << i.VAL_TYPE << ");\n";
-    s << "GALOIS_SYNC_STRUCTURE_BITSET" << "(" << i.FIELD_NAME << ");\n";
-
-    std::string str_broadcast_call = "Broadcast_" + i.FIELD_NAME + " ";
-    std::string str_bitset = "Bitset_" + i.FIELD_NAME ;
-    syncCall_map[i.FIELD_NAME].push_back(str_broadcast_call);
-    syncCall_map[i.FIELD_NAME].push_back(str_bitset);
-
-    return s.str();
-  }
-
-  /*
-   * To avoid duplicates in syncGlobal vector. 
-   */
-  bool syncGlobal_exists(vector<std::pair<bool, std::string>>& vec, std::string name){
-    for(auto entry : vec){
-      if((entry.second).compare(name) == 0){
-        return true;
-      }
+class ForStmtHandler : public MatchFinder::MatchCallback {
+public:
+  virtual void run(const MatchFinder::MatchResult& results) {
+    if (const ForStmt* FS =
+            results.Nodes.getNodeAs<clang::ForStmt>("forLoop")) {
+      llvm::errs() << "for loop found\n";
+      FS->dump();
     }
-    return false;
   }
+};
 
-  //XXX: Deprecated
-  //TODO: Merge code for for_each loop and do_all loop.
-  /**
-   * Handles sync additions/other things for galois::for_each calls
-   */
-  // TODO(Loc) check this for correctness/sanity
-  class FunctionForEachHandler : public MatchFinder::MatchCallback {
-    private:
-      Rewriter &rewriter;
+struct Write_set {
+  string GRAPH_NAME;
+  string NODE_TYPE;
+  string FIELD_TYPE;
+  string FIELD_NAME;
+  string REDUCE_OP_EXPR;
+  string VAL_TYPE;
+  string RESET_VAL_EXPR;
+  string SYNC_TYPE;
+  string READ_FLAG;
+  string WRITE_FLAG;
+  string MODIFIED_IN_EDGE_LOOP;
+};
 
-    public:
-      FunctionForEachHandler(Rewriter &rewriter) : rewriter(rewriter) {}
+struct Write_set_PULL {
+  string GRAPH_NAME;
+  string NODE_TYPE;
+  string FIELD_TYPE;
+  string FIELD_NAME;
+  string VAL_TYPE;
+};
 
-      virtual void run(const MatchFinder::MatchResult &results) {
+class InfoClass {
+public:
+  // Global variables for synchronization to be inserted.
+  // Hack: bool is used to prevent multiple prints of the
+  //      variable, since AST matchers visits the matched
+  //      node twice. (Find a better solution)
+  vector<std::pair<bool, std::string>> syncGlobals_vec;
+};
+
+/**
+ * Given an input, upper-cases + returns
+ */
+std::string stringToUpper(std::string input) {
+  std::transform(input.begin(), input.end(), input.begin(), ::toupper);
+  return input;
+}
+
+/**
+ * Creates the reduce sync structure macro given a write set containing the
+ * variable to create the sync structure for
+ */
+std::string getSyncer(const Write_set& i) {
+  std::stringstream s;
+  s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << "("
+    << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
+  return s.str();
+}
+
+/**
+ * Create reduce sync structure macro given write set with variable
+ * information + saves names of flags structure and reduce structure to a map.
+ */
+typedef std::map<std::string, std::vector<std::string>> SyncCall_map;
+std::string getSyncer(const Write_set& i, SyncCall_map& syncCall_map) {
+  std::stringstream s;
+  s << "GALOIS_SYNC_STRUCTURE_REDUCE_" << stringToUpper(i.REDUCE_OP_EXPR) << "("
+    << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
+
+  // std::string str_readFlags = " Flags_" + i.FIELD_NAME + " , " + i.READ_FLAG;
+  // std::string str_readFlags = " " + i.WRITE_FLAG + ", " + i.READ_FLAG;
+  std::string str_readFlags = i.READ_FLAG + " ";
+  std::string str_reduce_call =
+      " Reduce_" + i.REDUCE_OP_EXPR + "_" + i.FIELD_NAME;
+  syncCall_map[i.FIELD_NAME].push_back(str_readFlags);
+  syncCall_map[i.FIELD_NAME].push_back(str_reduce_call);
+
+  return s.str();
+}
+
+// TODO separate out bitset macro from syncer pull call
+
+/**
+ * Construct the broadcast and bitset macros given writeset with field info
+ * TODO getsyncerpull is misleading name since bitset is included
+ */
+std::string getSyncerPull(const Write_set& i) {
+  std::stringstream s;
+  s << "GALOIS_SYNC_STRUCTURE_BROADCAST"
+    << "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
+  s << "GALOIS_SYNC_STRUCTURE_BITSET"
+    << "(" << i.FIELD_NAME << ");\n";
+
+  return s.str();
+}
+
+/**
+ * Construct the broadcast and bitset macros given writeset with field info +
+ * save the structure names into map
+ * TODO getsyncerpull is misleading name since bitset is included
+ */
+std::string getSyncerPull(const Write_set& i, SyncCall_map& syncCall_map) {
+  std::stringstream s;
+  s << "GALOIS_SYNC_STRUCTURE_BROADCAST"
+    << "(" << i.FIELD_NAME << ", " << i.VAL_TYPE << ");\n";
+  s << "GALOIS_SYNC_STRUCTURE_BITSET"
+    << "(" << i.FIELD_NAME << ");\n";
+
+  std::string str_broadcast_call = "Broadcast_" + i.FIELD_NAME + " ";
+  std::string str_bitset         = "Bitset_" + i.FIELD_NAME;
+  syncCall_map[i.FIELD_NAME].push_back(str_broadcast_call);
+  syncCall_map[i.FIELD_NAME].push_back(str_bitset);
+
+  return s.str();
+}
+
+/*
+ * To avoid duplicates in syncGlobal vector.
+ */
+bool syncGlobal_exists(vector<std::pair<bool, std::string>>& vec,
+                       std::string name) {
+  for (auto entry : vec) {
+    if ((entry.second).compare(name) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// XXX: Deprecated
+// TODO: Merge code for for_each loop and do_all loop.
+/**
+ * Handles sync additions/other things for galois::for_each calls
+ */
+// TODO(Loc) check this for correctness/sanity
+class FunctionForEachHandler : public MatchFinder::MatchCallback {
+private:
+  Rewriter& rewriter;
+
+public:
+  FunctionForEachHandler(Rewriter& rewriter) : rewriter(rewriter) {}
+
+  virtual void run(const MatchFinder::MatchResult& results) {
 
 #if 0
         llvm::errs() << "for_each found\n";
@@ -634,7 +639,6 @@ namespace {
           kernelBefore << "\t} else if (personality == CPU)\n";
           kernelBefore << "#endif\n";
 
-
 #if 0
           // TODO check for sanity
           // here begins non-cuda code adding
@@ -676,69 +680,69 @@ namespace {
           }
         }
 #endif
-      }
-  };
+  }
+};
 
-  class FunctionCallHandler : public MatchFinder::MatchCallback {
-    private:
-      Rewriter &rewriter;
-      InfoClass* info;
-    public:
-      FunctionCallHandler(Rewriter &rewriter, InfoClass* _info) : rewriter(rewriter), info(_info) {}
-      virtual void run(const MatchFinder::MatchResult &results) {
-        const CallExpr* callFS = results.Nodes.getNodeAs<clang::CallExpr>(
-                                   "galoisLoop");
-        llvm::errs() << "Compiler in FunctionCallHandler with this many args:\n" << 
-                        callFS->getNumArgs() << "\n";
+class FunctionCallHandler : public MatchFinder::MatchCallback {
+private:
+  Rewriter& rewriter;
+  InfoClass* info;
 
-        auto callerStruct = results.Nodes.getNodeAs<clang::CXXRecordDecl>(
-                              "class");
+public:
+  FunctionCallHandler(Rewriter& rewriter, InfoClass* _info)
+      : rewriter(rewriter), info(_info) {}
+  virtual void run(const MatchFinder::MatchResult& results) {
+    const CallExpr* callFS =
+        results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
+    llvm::errs() << "Compiler in FunctionCallHandler with this many args:\n"
+                 << callFS->getNumArgs() << "\n";
 
-        llvm::outs() << " Inside FunctionCallHandler function\n";
-        if (callFS) {
-          callFS->dumpColor();
-          std::string OperatorStructName = callerStruct->getNameAsString();
-          llvm::errs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
+    auto callerStruct = results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
 
-          // location of string where we can insert text; this is the beginning
-          // of the structure
-          SourceLocation ST_main = callFS->getSourceRange().getBegin();
+    llvm::outs() << " Inside FunctionCallHandler function\n";
+    if (callFS) {
+      callFS->dumpColor();
+      std::string OperatorStructName = callerStruct->getNameAsString();
+      llvm::errs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
 
-          llvm::errs() << "galois::do_all loop found\n";
+      // location of string where we can insert text; this is the beginning
+      // of the structure
+      SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
+      llvm::errs() << "galois::do_all loop found\n";
 
-          /*
-          string str_first;
-          llvm::raw_string_ostream s_first(str_first);
-          callFS->getArg(0)->printPretty(s_first, 0, Policy);
-          //llvm::errs() << " //////// > " << s_first.str() << "\n";
-          callFS->getArg(0)->dump();
-          */
+      /*
+      string str_first;
+      llvm::raw_string_ostream s_first(str_first);
+      callFS->getArg(0)->printPretty(s_first, 0, Policy);
+      //llvm::errs() << " //////// > " << s_first.str() << "\n";
+      callFS->getArg(0)->dump();
+      */
 
-          vector<Write_set> write_set_vec_PUSH;
-          vector<Write_set> write_set_vec_PULL;
+      vector<Write_set> write_set_vec_PUSH;
+      vector<Write_set> write_set_vec_PULL;
 
-          // pretty print options
-          clang::LangOptions LangOpts;
-          LangOpts.CPlusPlus = true;
-          clang::PrintingPolicy Policy(LangOpts);
+      // pretty print options
+      clang::LangOptions LangOpts;
+      LangOpts.CPlusPlus = true;
+      clang::PrintingPolicy Policy(LangOpts);
 
-          // grab 1st and 2nd argument of do all call; regularly
-          // it is begin/end, but if not, then assume this is a single
-          // source do all
-          assert(callFS->getNumArgs() > 1);
-          string single_source;
+      // grab 1st and 2nd argument of do all call; regularly
+      // it is begin/end, but if not, then assume this is a single
+      // source do all
+      assert(callFS->getNumArgs() > 1);
+      string single_source;
 
-          /** Get Operator range: First field in do_all or do_all_local.
-           *                      Operator ranges could be allNodes, 
-           *                      nodesWithEdges and masterNodes.
-           **/
-          string str_range_arg;
-          llvm::raw_string_ostream s_range(str_range_arg);
-          callFS->getArg(0)->printPretty(s_range, 0, Policy);
-          string rangeType = s_range.str();
+      /** Get Operator range: First field in do_all or do_all_local.
+       *                      Operator ranges could be allNodes,
+       *                      nodesWithEdges and masterNodes.
+       **/
+      string str_range_arg;
+      llvm::raw_string_ostream s_range(str_range_arg);
+      callFS->getArg(0)->printPretty(s_range, 0, Policy);
+      string rangeType = s_range.str();
 
-          llvm::outs() << " **************** RangeType  : " << rangeType << "\n";
+      llvm::outs() << " **************** RangeType  : " << rangeType << "\n";
 
 #if 0
           string str_begin_arg;
@@ -767,159 +771,155 @@ namespace {
           }
 #endif
 
-          // Get the arguments
-          for (int i = 0, j = callFS->getNumArgs(); i < j; ++i) {
-            string str_arg;
-            llvm::raw_string_ostream s(str_arg);
-            callFS->getArg(i)->printPretty(s, 0, Policy);
+      // Get the arguments
+      for (int i = 0, j = callFS->getNumArgs(); i < j; ++i) {
+        string str_arg;
+        llvm::raw_string_ostream s(str_arg);
+        callFS->getArg(i)->printPretty(s, 0, Policy);
 
-            //callFS->getArg(i)->IgnoreParenImpCasts()->dump();
-            const CallExpr* callExpr = dyn_cast<CallExpr>(
-                callFS->getArg(i)->IgnoreParenImpCasts());
+        // callFS->getArg(i)->IgnoreParenImpCasts()->dump();
+        const CallExpr* callExpr =
+            dyn_cast<CallExpr>(callFS->getArg(i)->IgnoreParenImpCasts());
 
-            //const CallExpr* callExpr1 = callFS->getArg(i);;
-            //callExpr->dump();
-            if (callExpr) {
-              const FunctionDecl* func = callExpr->getDirectCallee();
-              //func->dump();
-              if (func) {
-                if (func->getNameInfo().getName().getAsString() == "write_set") {
-                  llvm::errs() << "Inside arg write_set: " << i << s.str() << "\n\n";
+        // const CallExpr* callExpr1 = callFS->getArg(i);;
+        // callExpr->dump();
+        if (callExpr) {
+          const FunctionDecl* func = callExpr->getDirectCallee();
+          // func->dump();
+          if (func) {
+            if (func->getNameInfo().getName().getAsString() == "write_set") {
+              llvm::errs() << "Inside arg write_set: " << i << s.str()
+                           << "\n\n";
 
-                  // Take out first argument to see if it is push or pull
+              // Take out first argument to see if it is push or pull
+              string str_sub_arg;
+              llvm::raw_string_ostream s_sub(str_sub_arg);
+              callExpr->getArg(0)->printPretty(s_sub, 0, Policy);
+
+              string str_sync_type = s_sub.str();
+              // clear " from begin and end
+              if (str_sync_type.front() == '"') {
+                str_sync_type.erase(0, 1);
+                str_sync_type.erase(str_sync_type.size() - 1);
+              }
+
+              // SYNC_PUSH
+              // if(callExpr->getNumArgs() == 8)
+              if (str_sync_type == "sync_push") {
+                vector<string> Temp_vec_PUSH;
+
+                // grab write set arguments
+                for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
                   string str_sub_arg;
                   llvm::raw_string_ostream s_sub(str_sub_arg);
-                  callExpr->getArg(0)->printPretty(s_sub, 0, Policy);
+                  callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
 
-                  string str_sync_type = s_sub.str();
-                  // clear " from begin and end
-                  if(str_sync_type.front() == '"'){
-                    str_sync_type.erase(0,1);
-                    str_sync_type.erase(str_sync_type.size()-1);
+                  string temp_str = s_sub.str();
+                  // clear unnecessary things
+                  if (temp_str.front() == '"') {
+                    temp_str.erase(0, 1);
+                    temp_str.erase(temp_str.size() - 1);
+                  }
+                  if (temp_str.front() == '&') {
+                    temp_str.erase(0, 1);
                   }
 
-                  // SYNC_PUSH
-                  // if(callExpr->getNumArgs() == 8) 
-                  if (str_sync_type == "sync_push") {
-                    vector<string> Temp_vec_PUSH;
-
-                    // grab write set arguments
-                    for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
-
-                      string temp_str = s_sub.str();
-                      // clear unnecessary things
-                      if (temp_str.front() == '"') {
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
-                      if (temp_str.front() == '&') {
-                        temp_str.erase(0,1);
-                      }
-
-                      llvm::errs() << " ------- > " << temp_str << " Size : " 
-                                   << Temp_vec_PUSH.size() <<  "\n";
-                      Temp_vec_PUSH.push_back(temp_str);
-                    }
-
-                    // save write set arguments
-                    Write_set WR_entry;
-                    WR_entry.GRAPH_NAME = Temp_vec_PUSH[1];
-                    WR_entry.NODE_TYPE = Temp_vec_PUSH[2];
-                    WR_entry.FIELD_TYPE = Temp_vec_PUSH[3];
-                    WR_entry.FIELD_NAME = Temp_vec_PUSH[4];
-                    WR_entry.VAL_TYPE = Temp_vec_PUSH[5];
-                    WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
-                    WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
-                    WR_entry.SYNC_TYPE = "sync_push";
-                    WR_entry.READ_FLAG = Temp_vec_PUSH[8];
-                    WR_entry.WRITE_FLAG = Temp_vec_PUSH[9];
-
-                    write_set_vec_PUSH.push_back(WR_entry);
-                  // SYNC_PULL
-                  } else if (str_sync_type == "sync_pull") {
-                    vector<string> Temp_vec_PULL;
-
-                    // get write set args
-                    for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
-
-                      string temp_str = s_sub.str();
-
-                      // clear unnecessary things
-                      if (temp_str.front() == '"') {
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
-                      if (temp_str.front() == '&') {
-                        temp_str.erase(0,1);
-                      }
-
-                      Temp_vec_PULL.push_back(temp_str);
-
-                    }
-
-                    // save write set args
-                    Write_set WR_entry;
-                    WR_entry.GRAPH_NAME = Temp_vec_PULL[1];
-                    WR_entry.NODE_TYPE = Temp_vec_PULL[2];
-                    WR_entry.FIELD_TYPE = Temp_vec_PULL[3];
-                    WR_entry.FIELD_NAME = Temp_vec_PULL[4];
-                    WR_entry.VAL_TYPE = Temp_vec_PULL[5];
-                    WR_entry.REDUCE_OP_EXPR = Temp_vec_PULL[6];
-                    WR_entry.RESET_VAL_EXPR = Temp_vec_PULL[7];
-                    WR_entry.SYNC_TYPE = "sync_pull";
-                    WR_entry.READ_FLAG = Temp_vec_PULL[8];
-                    WR_entry.WRITE_FLAG = Temp_vec_PULL[9];
-                    WR_entry.MODIFIED_IN_EDGE_LOOP = Temp_vec_PULL[10];
-
-                    write_set_vec_PULL.push_back(WR_entry);
-                  }
+                  llvm::errs() << " ------- > " << temp_str
+                               << " Size : " << Temp_vec_PUSH.size() << "\n";
+                  Temp_vec_PUSH.push_back(temp_str);
                 }
 
+                // save write set arguments
+                Write_set WR_entry;
+                WR_entry.GRAPH_NAME     = Temp_vec_PUSH[1];
+                WR_entry.NODE_TYPE      = Temp_vec_PUSH[2];
+                WR_entry.FIELD_TYPE     = Temp_vec_PUSH[3];
+                WR_entry.FIELD_NAME     = Temp_vec_PUSH[4];
+                WR_entry.VAL_TYPE       = Temp_vec_PUSH[5];
+                WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
+                WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
+                WR_entry.SYNC_TYPE      = "sync_push";
+                WR_entry.READ_FLAG      = Temp_vec_PUSH[8];
+                WR_entry.WRITE_FLAG     = Temp_vec_PUSH[9];
+
+                write_set_vec_PUSH.push_back(WR_entry);
+                // SYNC_PULL
+              } else if (str_sync_type == "sync_pull") {
+                vector<string> Temp_vec_PULL;
+
+                // get write set args
+                for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
+                  string str_sub_arg;
+                  llvm::raw_string_ostream s_sub(str_sub_arg);
+                  callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
+
+                  string temp_str = s_sub.str();
+
+                  // clear unnecessary things
+                  if (temp_str.front() == '"') {
+                    temp_str.erase(0, 1);
+                    temp_str.erase(temp_str.size() - 1);
+                  }
+                  if (temp_str.front() == '&') {
+                    temp_str.erase(0, 1);
+                  }
+
+                  Temp_vec_PULL.push_back(temp_str);
+                }
+
+                // save write set args
+                Write_set WR_entry;
+                WR_entry.GRAPH_NAME            = Temp_vec_PULL[1];
+                WR_entry.NODE_TYPE             = Temp_vec_PULL[2];
+                WR_entry.FIELD_TYPE            = Temp_vec_PULL[3];
+                WR_entry.FIELD_NAME            = Temp_vec_PULL[4];
+                WR_entry.VAL_TYPE              = Temp_vec_PULL[5];
+                WR_entry.REDUCE_OP_EXPR        = Temp_vec_PULL[6];
+                WR_entry.RESET_VAL_EXPR        = Temp_vec_PULL[7];
+                WR_entry.SYNC_TYPE             = "sync_pull";
+                WR_entry.READ_FLAG             = Temp_vec_PULL[8];
+                WR_entry.WRITE_FLAG            = Temp_vec_PULL[9];
+                WR_entry.MODIFIED_IN_EDGE_LOOP = Temp_vec_PULL[10];
+
+                write_set_vec_PULL.push_back(WR_entry);
               }
             }
           }
+        }
+      }
 
-          /********************************************************************
-           * Find unique one from push and pull sets to generate for vertex cut
-           ********************************************************************/
-          vector<Write_set> write_set_vec_PUSH_PULL;
+      /********************************************************************
+       * Find unique one from push and pull sets to generate for vertex cut
+       ********************************************************************/
+      vector<Write_set> write_set_vec_PUSH_PULL;
 
-          for (auto& i : write_set_vec_PUSH) {
-            bool found = false;
+      for (auto& i : write_set_vec_PUSH) {
+        bool found = false;
 
-            for (auto& j : write_set_vec_PULL) {
-              if (i.GRAPH_NAME == j.GRAPH_NAME && 
-                 i.NODE_TYPE == j.NODE_TYPE && 
-                 i.FIELD_TYPE == j.FIELD_TYPE && 
-                 i.FIELD_NAME == j.FIELD_NAME) {
-                found = true;
-              }
-            }
-
-            if (!found) write_set_vec_PUSH_PULL.push_back(i);
+        for (auto& j : write_set_vec_PULL) {
+          if (i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE &&
+              i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME) {
+            found = true;
           }
+        }
 
-          for (auto& i : write_set_vec_PULL) {
-            bool found = false;
+        if (!found)
+          write_set_vec_PUSH_PULL.push_back(i);
+      }
 
-            for (auto& j : write_set_vec_PUSH) {
-              if (i.GRAPH_NAME == j.GRAPH_NAME && 
-                  i.NODE_TYPE == j.NODE_TYPE && 
-                  i.FIELD_TYPE == j.FIELD_TYPE && 
-                  i.FIELD_NAME == j.FIELD_NAME) {
-                found = true;
-              }
-            }
+      for (auto& i : write_set_vec_PULL) {
+        bool found = false;
 
-            if(!found) write_set_vec_PUSH_PULL.push_back(i);
+        for (auto& j : write_set_vec_PUSH) {
+          if (i.GRAPH_NAME == j.GRAPH_NAME && i.NODE_TYPE == j.NODE_TYPE &&
+              i.FIELD_TYPE == j.FIELD_TYPE && i.FIELD_NAME == j.FIELD_NAME) {
+            found = true;
           }
+        }
 
+        if (!found)
+          write_set_vec_PUSH_PULL.push_back(i);
+      }
 
 #if 0
           // deal with single source case: set up do all call vars
@@ -937,119 +937,130 @@ namespace {
           }
 #endif
 
-          stringstream SSSyncer;
+      stringstream SSSyncer;
 
-          // map from FIELD_NAME -> reduce, broadcast, bitset;
-          std::map<std::string, std::vector<std::string>> syncCall_map;
+      // map from FIELD_NAME -> reduce, broadcast, bitset;
+      std::map<std::string, std::vector<std::string>> syncCall_map;
 
-          for (auto& i : write_set_vec_PUSH) {
-            /** For allNodes operator range, if only source is written, sync is not required **/
-            //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-            if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
-              continue;
-            SSSyncer << getSyncer(i, syncCall_map);
-            rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
-            SSSyncer.str(string());
-            SSSyncer.clear();
+      for (auto& i : write_set_vec_PUSH) {
+        /** For allNodes operator range, if only source is written, sync is not
+         * required **/
+        // if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+        if (i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" &&
+            rangeType.find("allNodes") != std::string::npos &&
+            i.WRITE_FLAG == "writeSource")
+          continue;
+        SSSyncer << getSyncer(i, syncCall_map);
+        rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
+        SSSyncer.str(string());
+        SSSyncer.clear();
+      }
+
+      // Addding additional structs for vertex cut
+      stringstream SSSyncer_vertexCut;
+      for (auto& i : write_set_vec_PUSH_PULL) {
+        if (i.SYNC_TYPE == "sync_pull") {
+          /** For allNodes operator range, if only source is written, sync is
+           * not required **/
+          // if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+          if (i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" &&
+              rangeType.find("allNodes") != std::string::npos &&
+              i.WRITE_FLAG == "writeSource")
+            continue;
+          SSSyncer_vertexCut << getSyncer(i, syncCall_map);
+          rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+          SSSyncer_vertexCut.str(string());
+          SSSyncer_vertexCut.clear();
+        }
+      }
+
+      // Addding structure for pull sync
+      stringstream SSSyncer_pull;
+      for (auto& i : write_set_vec_PULL) {
+        /** For allNodes operator range, if only source is written, sync is not
+         * required **/
+        // if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+        if (i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" &&
+            rangeType.find("allNodes") != std::string::npos &&
+            i.WRITE_FLAG == "writeSource")
+          continue;
+        SSSyncer_pull << getSyncerPull(i, syncCall_map);
+        rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
+        SSSyncer_pull.str(string());
+        SSSyncer_pull.clear();
+      }
+
+      // Addding additional structs for vertex cut
+      for (auto& i : write_set_vec_PUSH_PULL) {
+        if (i.SYNC_TYPE == "sync_push") {
+          /** For allNodes operator range, if only source is written, sync is
+           * not required **/
+          // if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
+          if (i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" &&
+              rangeType.find("allNodes") != std::string::npos &&
+              i.WRITE_FLAG == "writeSource")
+            continue;
+          SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
+          rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
+          SSSyncer_vertexCut.str(string());
+          SSSyncer_vertexCut.clear();
+        }
+      }
+
+      auto recordDecl = results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
+      std::string className = recordDecl->getNameAsString();
+
+      // TODO pass over this
+      // CUDA stuff
+      stringstream kernelBefore;
+      kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
+      kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+      kernelBefore << "\t\tstd::string impl_str(\"CUDA_DO_ALL_IMPL_"
+                   << className << "_\" + (_graph.get_run_identifier()));\n";
+      kernelBefore
+          << "\t\tgalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
+      kernelBefore << "\t\tStatTimer_cuda.start();\n";
+      std::string accumulator;
+      for (auto& decl : recordDecl->decls()) {
+        auto var = dyn_cast<VarDecl>(decl);
+        if (var && var->isStaticDataMember()) {
+          std::string type = var->getType().getAsString();
+          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+            assert(accumulator.empty());
+            accumulator = var->getNameAsString();
           }
+        }
+      }
+      if (!accumulator.empty()) {
+        kernelBefore << "\t\tint __retval = 0;\n";
+      }
+      if (!single_source.empty()) {
+        kernelBefore << "\t\t" << className << "_cuda(";
+        kernelBefore << "__begin, __end, ";
+      } else {
+        kernelBefore << "\t\t" << className << "_all_cuda(";
+      }
+      if (!accumulator.empty()) {
+        kernelBefore << "__retval, ";
+      }
+      for (auto field : recordDecl->fields()) {
+        std::string name = field->getNameAsString();
+        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+          kernelBefore << name.substr(std::strlen(
+                              __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__))
+                       << ", ";
+        }
+      }
+      kernelBefore << "cuda_ctx);\n";
+      if (!accumulator.empty()) {
+        kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+      }
+      kernelBefore << "\t\tStatTimer_cuda.stop();\n";
+      kernelBefore << "\t} else if (personality == CPU)\n";
+      kernelBefore << "#endif\n";
+      rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
 
-          // Addding additional structs for vertex cut
-          stringstream SSSyncer_vertexCut;
-          for (auto& i : write_set_vec_PUSH_PULL) {
-            if (i.SYNC_TYPE == "sync_pull") {
-              /** For allNodes operator range, if only source is written, sync is not required **/
-              //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-              if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
-                continue;
-              SSSyncer_vertexCut << getSyncer(i, syncCall_map);
-              rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
-              SSSyncer_vertexCut.str(string());
-              SSSyncer_vertexCut.clear();
-            }
-          }
-
-          // Addding structure for pull sync
-          stringstream SSSyncer_pull;
-          for(auto& i : write_set_vec_PULL) {
-            /** For allNodes operator range, if only source is written, sync is not required **/
-            //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-            if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
-              continue;
-            SSSyncer_pull << getSyncerPull(i, syncCall_map);
-            rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
-            SSSyncer_pull.str(string());
-            SSSyncer_pull.clear();
-          }
-
-
-          // Addding additional structs for vertex cut
-          for (auto& i : write_set_vec_PUSH_PULL) {
-            if(i.SYNC_TYPE == "sync_push"){
-              /** For allNodes operator range, if only source is written, sync is not required **/
-              //if(rangeType == "allNodes" && i.WRITE_FLAG == "writeSource")
-              if(i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE" && rangeType.find("allNodes") != std::string::npos && i.WRITE_FLAG == "writeSource")
-                continue;
-              SSSyncer_vertexCut << getSyncerPull(i, syncCall_map);
-              rewriter.InsertText(ST_main, SSSyncer_vertexCut.str(), true, true);
-              SSSyncer_vertexCut.str(string());
-              SSSyncer_vertexCut.clear();
-            }
-          }
-
-
-          auto recordDecl = results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
-          std::string className = recordDecl->getNameAsString();
-
-          // TODO pass over this
-          // CUDA stuff
-          stringstream kernelBefore;
-          kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
-          kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-          kernelBefore << "\t\tstd::string impl_str(\"CUDA_DO_ALL_IMPL_" 
-            << className << "_\" + (_graph.get_run_identifier()));\n";
-          kernelBefore << "\t\tgalois::StatTimer StatTimer_cuda(impl_str.c_str());\n";
-          kernelBefore << "\t\tStatTimer_cuda.start();\n";
-          std::string accumulator;
-          for (auto& decl : recordDecl->decls()) {
-            auto var = dyn_cast<VarDecl>(decl);
-            if (var && var->isStaticDataMember()) {
-              std::string type = var->getType().getAsString();
-              if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
-                assert(accumulator.empty());
-                accumulator = var->getNameAsString();
-              }
-            }
-          }
-          if (!accumulator.empty()) {
-            kernelBefore << "\t\tint __retval = 0;\n";
-          }
-          if (!single_source.empty()) {
-            kernelBefore << "\t\t" << className << "_cuda(";
-            kernelBefore << "__begin, __end, ";
-          } else {
-            kernelBefore << "\t\t" << className << "_all_cuda(";
-          }
-          if (!accumulator.empty()) {
-            kernelBefore << "__retval, ";
-          }
-          for (auto field : recordDecl->fields()) {
-            std::string name = field->getNameAsString();
-            if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
-              kernelBefore << name.substr(
-               std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
-            }
-          }
-          kernelBefore << "cuda_ctx);\n";
-          if (!accumulator.empty()) {
-            kernelBefore << "\t\t" << accumulator << " += __retval;\n";
-          }
-          kernelBefore << "\t\tStatTimer_cuda.stop();\n";
-          kernelBefore << "\t} else if (personality == CPU)\n";
-          kernelBefore << "#endif\n";
-          rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
-
-
-# if 0
+#if 0
           // TODO make sanity pass
           // replace do all call with single source call if necessary
           if (!single_source.empty()) {
@@ -1062,204 +1073,211 @@ namespace {
           }
 #endif
 
+      // Adding sync calls for write set
+      stringstream SSAfter;
+      for (auto& i : syncCall_map) {
+        SSAfter << "\n\t"
+                << "_graph.sync_on_demand<";
 
-          // Adding sync calls for write set
-          stringstream SSAfter;
-          for (auto& i : syncCall_map) {
-            SSAfter << "\n\t" << "_graph.sync_on_demand<";
+        uint32_t c = 0;
 
-            uint32_t c = 0;
+        // get the structures and add them to the sync on demand call
+        // template args; they should be
+        // (read location, redue, broadcast, bitset)
+        // TODO verify read location is being added
+        // TODO remove flags from this as they aren't a template argument
+        // anymore
+        for (auto& j : i.second) {
+          if ((c + 1) < i.second.size())
+            SSAfter << j << ",";
+          else
+            SSAfter << j;
+          ++c;
+        }
 
-            // get the structures and add them to the sync on demand call
-            // template args; they should be 
-            // (read location, redue, broadcast, bitset)
-            // TODO verify read location is being added
-            // TODO remove flags from this as they aren't a template argument
-            // anymore
-            for (auto& j : i.second) {
-              if((c + 1) < i.second.size())
-                SSAfter << j << ",";
-              else
-                SSAfter << j;
-              ++c;
+        llvm::outs() << " ****************** SSAfter : " << SSAfter.str()
+                     << "\n";
+
+        // TODO flags now an argument; add them
+        // TODO originally \( instead of (
+        SSAfter << ">(Flags_" << i.first << ", \"" << OperatorStructName
+                << "\");\n\n";
+        // SSAfter << ">(\"" << OperatorStructName << "\");\n\n";
+        rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+        SSAfter.str(string());
+        SSAfter.clear();
+      }
+
+      SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
+
+      // Inserting write flags after do_all
+
+      // TODO why is it only looping over push and pull and not
+      // others?
+      for (auto& i : write_set_vec_PUSH_PULL) {
+
+        if (i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull") {
+          if (i.WRITE_FLAG == "writeDestination") {
+            SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_dst();\n";
+          } else if (i.WRITE_FLAG ==
+                     "writeSource") { /**If modified inside egde loop only then,
+                                         mark it dirty **/
+            if (rangeType == "allNodes" ||
+                i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE") {
+              continue;
             }
-
-            llvm::outs() << " ****************** SSAfter : " << SSAfter.str() << "\n";
-
-            // TODO flags now an argument; add them
-            // TODO originally \( instead of (
-            SSAfter << ">(Flags_" << i.first << ", \"" << OperatorStructName << "\");\n\n";
-            //SSAfter << ">(\"" << OperatorStructName << "\");\n\n";
-            rewriter.InsertText(ST_main, SSAfter.str(), true, true);
-            SSAfter.str(string());
-            SSAfter.clear();
+            SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_src();\n";
+          } else if (i.WRITE_FLAG == "writeAny") {
+            SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_any();\n";
+          } else {
+            SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_none();\n";
           }
 
-          SourceLocation ST = callFS->
-                              getSourceRange().getEnd().getLocWithOffset(2);
+          rewriter.InsertText(ST, SSAfter.str(), true, true);
+          SSAfter.str(string());
+          SSAfter.clear();
+        }
 
-          // Inserting write flags after do_all
-
-          // TODO why is it only looping over push and pull and not
-          // others?
-          for (auto& i : write_set_vec_PUSH_PULL) {
-
-            if (i.SYNC_TYPE == "sync_push" || i.SYNC_TYPE == "sync_pull") {
-              if (i.WRITE_FLAG == "writeDestination") {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_dst();\n";
-              } else if (i.WRITE_FLAG == "writeSource") { /**If modified inside egde loop only then, mark it dirty **/
-                if(rangeType == "allNodes" || i.MODIFIED_IN_EDGE_LOOP == "__OUTSIDE"){
-                  continue;
-                }
-                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_src();\n";
-              } else if (i.WRITE_FLAG == "writeAny") {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_any();\n";
-              } else {
-                SSAfter << "\nFlags_" << i.FIELD_NAME << ".set_write_none();\n";
-              }
-
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
-              SSAfter.str(string());
-              SSAfter.clear();
-            }
-
-            if(!syncGlobal_exists(info->syncGlobals_vec, i.FIELD_NAME)){
-              info->syncGlobals_vec.push_back(make_pair(false,i.FIELD_NAME));
-            }
-          }
+        if (!syncGlobal_exists(info->syncGlobals_vec, i.FIELD_NAME)) {
+          info->syncGlobals_vec.push_back(make_pair(false, i.FIELD_NAME));
         }
       }
-  };
+    }
+  }
+};
 
-  class FunctionGlobalVarHandler : public MatchFinder::MatchCallback {
-    private:
-      Rewriter &rewriter;
-      InfoClass* info;
-    public:
-      FunctionGlobalVarHandler(Rewriter &rewriter, InfoClass* _info) : rewriter(rewriter), info(_info) {}
-      virtual void run(const MatchFinder::MatchResult &results) {
-        auto record_InitializeGraph_operator = results.Nodes.getNodeAs<clang::RecordDecl>("InitializeGraph_operator");
-        if(record_InitializeGraph_operator){
+class FunctionGlobalVarHandler : public MatchFinder::MatchCallback {
+private:
+  Rewriter& rewriter;
+  InfoClass* info;
 
-          SourceLocation ST_begin = record_InitializeGraph_operator->getSourceRange().getBegin();
+public:
+  FunctionGlobalVarHandler(Rewriter& rewriter, InfoClass* _info)
+      : rewriter(rewriter), info(_info) {}
+  virtual void run(const MatchFinder::MatchResult& results) {
+    auto record_InitializeGraph_operator =
+        results.Nodes.getNodeAs<clang::RecordDecl>("InitializeGraph_operator");
+    if (record_InitializeGraph_operator) {
 
-          for(auto& field_name : info->syncGlobals_vec){
-            if(!field_name.first){
-              //Insert Bitset vector
-              std::string bitset_vector = "//Global variable: For bistset optimization to track changes to the field.\ngalois::DynamicBitSet bitset_" + field_name.second + ";\n";
-              rewriter.InsertText(ST_begin, bitset_vector, true, true);
+      SourceLocation ST_begin =
+          record_InitializeGraph_operator->getSourceRange().getBegin();
 
-              //Insert Field flag
-              std::string field_flag = "//Global variable: For on-demand communication optimization\nFieldFlags Flags_" + field_name.second + ";\n\n";
-              rewriter.InsertText(ST_begin, field_flag, true, true);
+      for (auto& field_name : info->syncGlobals_vec) {
+        if (!field_name.first) {
+          // Insert Bitset vector
+          std::string bitset_vector =
+              "//Global variable: For bistset optimization to track changes to "
+              "the field.\ngalois::DynamicBitSet bitset_" +
+              field_name.second + ";\n";
+          rewriter.InsertText(ST_begin, bitset_vector, true, true);
 
-              //mark it done
-              field_name.first = true;
-            }
-          }
+          // Insert Field flag
+          std::string field_flag =
+              "//Global variable: For on-demand communication "
+              "optimization\nFieldFlags Flags_" +
+              field_name.second + ";\n\n";
+          rewriter.InsertText(ST_begin, field_flag, true, true);
+
+          // mark it done
+          field_name.first = true;
         }
       }
-  };
+    }
+  }
+};
 
+class GaloisFunctionsConsumer : public ASTConsumer {
+private:
+  std::set<std::string> ParsedTemplates;
+  GaloisFunctionsVisitor* Visitor;
+  MatchFinder Matchers_syncCalls, Matchers_GlobalVar;
+  ForStmtHandler forStmtHandler;
+  FunctionCallHandler functionCallHandler;
+  FunctionForEachHandler forEachHandler;
+  FunctionGlobalVarHandler globalVarHandler;
+  InfoClass info;
 
-  class GaloisFunctionsConsumer : public ASTConsumer {
-    private:
-      std::set<std::string> ParsedTemplates;
-      GaloisFunctionsVisitor* Visitor;
-      MatchFinder Matchers_syncCalls, Matchers_GlobalVar;
-      ForStmtHandler forStmtHandler;
-      FunctionCallHandler functionCallHandler;
-      FunctionForEachHandler forEachHandler;
-      FunctionGlobalVarHandler globalVarHandler;
-      InfoClass info;
-    public:
-      GaloisFunctionsConsumer(CompilerInstance &Instance, 
-                              std::set<std::string> ParsedTemplates, 
-                              Rewriter &R) : 
-            ParsedTemplates(ParsedTemplates), 
-            Visitor(new GaloisFunctionsVisitor(&Instance)), 
-            functionCallHandler(R, &info), 
-            forEachHandler(R),
-            globalVarHandler(R, &info) {}
+public:
+  GaloisFunctionsConsumer(CompilerInstance& Instance,
+                          std::set<std::string> ParsedTemplates, Rewriter& R)
+      : ParsedTemplates(ParsedTemplates),
+        Visitor(new GaloisFunctionsVisitor(&Instance)),
+        functionCallHandler(R, &info), forEachHandler(R),
+        globalVarHandler(R, &info) {}
 
-      virtual void HandleTranslationUnit(ASTContext &Context) {
-        // do all loop matcher
-        Matchers_syncCalls.addMatcher(
-          callExpr(
-            isExpansionInMainFile(), 
-            callee(
-              functionDecl(
-                anyOf(
-                  hasName("galois::do_all"),
-                  hasName("galois::do_all_local")
-                )
-              )
-            ), 
-            hasAncestor(recordDecl().bind("class"))
-          ).bind("galoisLoop"), &functionCallHandler
-        );
+  virtual void HandleTranslationUnit(ASTContext& Context) {
+    // do all loop matcher
+    Matchers_syncCalls.addMatcher(
+        callExpr(isExpansionInMainFile(),
+                 callee(functionDecl(anyOf(hasName("galois::do_all"),
+                                           hasName("galois::do_all_local")))),
+                 hasAncestor(recordDecl().bind("class")))
+            .bind("galoisLoop"),
+        &functionCallHandler);
 
-        // TODO for each needed?
-        /** for galois::for_each. Needs different treatment. **/
-        Matchers_syncCalls.addMatcher(
-          callExpr(
-            isExpansionInMainFile(), 
-            callee(functionDecl(hasName("galois::for_each"))), 
-            hasDescendant(
-              declRefExpr(to(functionDecl(hasName("workList_version"))))
-            ), 
-            hasAncestor(recordDecl().bind("class"))
-          ).bind("galoisLoop_forEach"), &forEachHandler
-        );
+    // TODO for each needed?
+    /** for galois::for_each. Needs different treatment. **/
+    Matchers_syncCalls.addMatcher(
+        callExpr(isExpansionInMainFile(),
+                 callee(functionDecl(hasName("galois::for_each"))),
+                 hasDescendant(declRefExpr(
+                     to(functionDecl(hasName("workList_version"))))),
+                 hasAncestor(recordDecl().bind("class")))
+            .bind("galoisLoop_forEach"),
+        &forEachHandler);
 
-        Matchers_syncCalls.matchAST(Context);
+    Matchers_syncCalls.matchAST(Context);
 
-        /* Matchers for inserting global variables required for sync.
-         *
-         * Globals are: Bitset vector
-         *              Field flags
-         *
-         * Assumption: Every compiler input will have function named InitializeGraph.
-         */
+    /* Matchers for inserting global variables required for sync.
+     *
+     * Globals are: Bitset vector
+     *              Field flags
+     *
+     * Assumption: Every compiler input will have function named
+     * InitializeGraph.
+     */
 
-        Matchers_GlobalVar.addMatcher(recordDecl(isExpansionInMainFile(), hasName("InitializeGraph")).bind("InitializeGraph_operator"), &globalVarHandler);
-        Matchers_GlobalVar.matchAST(Context);
-      }
-  };
+    Matchers_GlobalVar.addMatcher(
+        recordDecl(isExpansionInMainFile(), hasName("InitializeGraph"))
+            .bind("InitializeGraph_operator"),
+        &globalVarHandler);
+    Matchers_GlobalVar.matchAST(Context);
+  }
+};
 
-  class GaloisFunctionsAction : public PluginASTAction {
-    private:
-      std::set<std::string> ParsedTemplates;
-      Rewriter TheRewriter;
-    protected:
-      /**
-       * Write changes to file at end
-       */
-      void EndSourceFileAction() override {
-        TheRewriter.getEditBuffer(
-          TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs()
-        );
-        if (!TheRewriter.overwriteChangedFiles()) {
-          llvm::errs() << "Successfully saved changes\n";
-        }
-      }
+class GaloisFunctionsAction : public PluginASTAction {
+private:
+  std::set<std::string> ParsedTemplates;
+  Rewriter TheRewriter;
 
-      /**
-       * Register the AST matcher
-       */
-      std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, 
-                                                     llvm::StringRef) override {
-        TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
-        return llvm::make_unique<GaloisFunctionsConsumer>(CI, ParsedTemplates,
-                                                          TheRewriter);
-      }
+protected:
+  /**
+   * Write changes to file at end
+   */
+  void EndSourceFileAction() override {
+    TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID())
+        .write(llvm::outs());
+    if (!TheRewriter.overwriteChangedFiles()) {
+      llvm::errs() << "Successfully saved changes\n";
+    }
+  }
 
-      bool ParseArgs(const CompilerInstance &CI, 
-                     const std::vector<std::string> &args) override {
-        return true;
-      }
-  };
-}
+  /**
+   * Register the AST matcher
+   */
+  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance& CI,
+                                                 llvm::StringRef) override {
+    TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
+    return llvm::make_unique<GaloisFunctionsConsumer>(CI, ParsedTemplates,
+                                                      TheRewriter);
+  }
 
-static FrontendPluginRegistry::Add<GaloisFunctionsAction> X("galois-fns", 
-                                              "Add synchronization constructs");
+  bool ParseArgs(const CompilerInstance& CI,
+                 const std::vector<std::string>& args) override {
+    return true;
+  }
+};
+} // namespace
+
+static FrontendPluginRegistry::Add<GaloisFunctionsAction>
+    X("galois-fns", "Add synchronization constructs");

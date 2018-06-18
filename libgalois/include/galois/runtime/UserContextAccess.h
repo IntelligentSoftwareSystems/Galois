@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,7 +26,7 @@ namespace galois {
 namespace runtime {
 
 //! Backdoor to allow runtime methods to access private data in UserContext
-template<typename T>
+template <typename T>
 class UserContextAccess : public galois::UserContext<T> {
 public:
   typedef galois::UserContext<T> SuperTy;
@@ -37,18 +37,18 @@ public:
   PushBufferTy& getPushBuffer() { return SuperTy::__getPushBuffer(); }
   void resetPushBuffer() { SuperTy::__resetPushBuffer(); }
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
-  void setLocalState(void *p) { SuperTy::__setLocalState(p); }
+  void setLocalState(void* p) { SuperTy::__setLocalState(p); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
-  void setBreakFlag(bool *b) { SuperTy::didBreak = b; }
+  void setBreakFlag(bool* b) { SuperTy::didBreak = b; }
 
-  void setFirstPass (void) { SuperTy::__setFirstPass(); }
-  void resetFirstPass (void) { SuperTy::__resetFirstPass(); }
+  void setFirstPass(void) { SuperTy::__setFirstPass(); }
+  void resetFirstPass(void) { SuperTy::__resetFirstPass(); }
 
 // TODO: move to a separate class dedicated for speculative executors
 #ifdef GALOIS_USE_EXP
-  void rollback() { SuperTy::__rollback (); }
+  void rollback() { SuperTy::__rollback(); }
 
-  void commit() { SuperTy::__commit (); }
+  void commit() { SuperTy::__commit(); }
 
   void reset() {
     SuperTy::__resetPushBuffer();
@@ -59,7 +59,7 @@ public:
 #endif
 };
 
-}
+} // namespace runtime
 } // end namespace galois
 
 #endif

@@ -8,7 +8,7 @@
 typedef double LatentValue;
 
 // Purdue, CSGD: 100; Intel: 20
-//static const int LATENT_VECTOR_SIZE = 100; 
+// static const int LATENT_VECTOR_SIZE = 100;
 static const int LATENT_VECTOR_SIZE = 20; // Purdue, CSGD: 100; Intel: 20
 
 /**
@@ -26,8 +26,8 @@ static const int LATENT_VECTOR_SIZE = 20; // Purdue, CSGD: 100; Intel: 20
  * @returns init + the inner product (i.e. the inner product if init is 0, error
  * if init is -"ground truth"
  */
-template<typename T>
-T innerProduct(T* __restrict__ first1, T* __restrict__ last1, 
+template <typename T>
+T innerProduct(T* __restrict__ first1, T* __restrict__ last1,
                T* __restrict__ first2, T init) {
   assert(first1 + LATENT_VECTOR_SIZE == last1);
   for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
@@ -36,14 +36,12 @@ T innerProduct(T* __restrict__ first1, T* __restrict__ last1,
   return init;
 }
 
-template<typename T>
-T predictionError(
-    T* __restrict__ itemLatent,
-    T* __restrict__ userLatent,
-    double actual)
-{
+template <typename T>
+T predictionError(T* __restrict__ itemLatent, T* __restrict__ userLatent,
+                  double actual) {
   T v = actual;
-  return innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE, userLatent, -v);
+  return innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE, userLatent,
+                      -v);
 }
 
 /**
@@ -56,19 +54,19 @@ T predictionError(
  * @param lambda learning parameter
  * @param edgeRating Data on the edge, i.e. the number that the inner product
  * of the 2 latent vectors should eventually get to
- * @param stepSize learning parameter: how much to adjust vectors by to 
+ * @param stepSize learning parameter: how much to adjust vectors by to
  * correct for erro
  *
  * @return Error before gradient update
  */
-template<typename T>
+template <typename T>
 T doGradientUpdate(T* __restrict__ itemLatent, T* __restrict__ userLatent,
                    double lambda, double edgeRating, double stepSize) {
   // Implicit cast to type T
-  T l = lambda;
-  T step = stepSize;
+  T l      = lambda;
+  T step   = stepSize;
   T rating = edgeRating;
-  T error = innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE, 
+  T error  = innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE,
                          userLatent, -rating);
 
   // Take gradient step to reduce error
@@ -84,13 +82,13 @@ T doGradientUpdate(T* __restrict__ itemLatent, T* __restrict__ userLatent,
 
 struct StepFunction {
   virtual LatentValue stepSize(int round) const = 0;
-  virtual std::string name() const = 0;
+  virtual std::string name() const              = 0;
   virtual bool isBold() const { return false; }
 };
 
 StepFunction* newStepFunction();
 
-template<typename Graph>
+template <typename Graph>
 size_t initializeGraphData(Graph& g);
 
 #endif

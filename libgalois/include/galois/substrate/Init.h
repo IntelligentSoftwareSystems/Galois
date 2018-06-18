@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,11 +33,10 @@ class SharedMemSubstrate {
   // Order is critical here
   ThreadPool m_tpool;
 
-  internal::LocalTerminationDetection<>*  m_termPtr;
-  internal::BarrierInstance<>*  m_biPtr;
+  internal::LocalTerminationDetection<>* m_termPtr;
+  internal::BarrierInstance<>* m_biPtr;
 
 public:
-
   /**
    * Initializes the Substrate library components
    */
@@ -47,11 +46,9 @@ public:
    * Destroys the Substrate library components
    */
   ~SharedMemSubstrate();
-
 };
 
-
-}
-}
+} // namespace substrate
+} // namespace galois
 
 #endif // GALOIS_SUBSTRATE_INIT_H

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -40,32 +40,35 @@
 static const char* const name = "Betweeness Centrality - "
                                 "Distributed Heterogeneous.";
 static const char* const desc = "Betweeness Centrality on Distributed Galois.";
-static const char* const url = 0;
+static const char* const url  = 0;
 
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
 namespace cll = llvm::cl;
-static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 10000"), 
-                               cll::init(10000));
-static cll::opt<bool> verify("verify", 
+static cll::opt<unsigned int>
+    maxIterations("maxIterations",
+                  cll::desc("Maximum iterations: Default 10000"),
+                  cll::init(10000));
+static cll::opt<bool> verify("verify",
                              cll::desc("Verify ranks by printing to "
                                        "'page_ranks.#hid.csv' file"),
                              cll::init(false));
-static cll::opt<bool> singleSourceBC("singleSource", 
-                                cll::desc("Use for single source BC"),
-                                cll::init(false));
-static cll::opt<unsigned int> startSource("startNode", 
-                                cll::desc("Starting source node used for "
-                                          "betweeness-centrality"),
-                                cll::init(0));
-static cll::opt<unsigned int> numberOfSources("numOfSources", 
-                                cll::desc("Number of sources to use for "
-                                          "betweeness-centraility"),
-                                cll::init(0));
+static cll::opt<bool> singleSourceBC("singleSource",
+                                     cll::desc("Use for single source BC"),
+                                     cll::init(false));
+static cll::opt<unsigned int>
+    startSource("startNode",
+                cll::desc("Starting source node used for "
+                          "betweeness-centrality"),
+                cll::init(0));
+static cll::opt<unsigned int>
+    numberOfSources("numOfSources",
+                    cll::desc("Number of sources to use for "
+                              "betweeness-centraility"),
+                    cll::init(0));
 
-const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
+const uint32_t infinity          = std::numeric_limits<uint32_t>::max() / 4;
 static uint64_t current_src_node = 0;
 
 /******************************************************************************/
@@ -100,26 +103,22 @@ typedef typename Graph::GraphNode GNode;
 
 // second type (unsigned int) is for edge weights
 // uncomment this along with graph load below if you want to use sssp
-//typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
-
+// typedef galois::graphs::DistGraph<NodeData, unsigned int> Graph;
 
 /******************************************************************************/
 /* Functors for running the algorithm */
 /******************************************************************************/
 struct InitializeGraph {
-  Graph *graph;
+  Graph* graph;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+  InitializeGraph(Graph* _graph) : graph(_graph) {}
 
   /* Initialize the graph */
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
-    galois::do_all(
-      allNodes.begin(), allNodes.end(), 
-      InitializeGraph{&_graph}, 
-      galois::no_stats(),
-      galois::loopname("InitializeGraph"));
+    galois::do_all(allNodes.begin(), allNodes.end(), InitializeGraph{&_graph},
+                   galois::no_stats(), galois::loopname("InitializeGraph"));
   }
 
   /* Functor passed into the Galois operator to carry out initialization;
@@ -130,35 +129,31 @@ struct InitializeGraph {
     src_data.betweeness_centrality = 0;
 
     src_data.num_shortest_paths = 0;
-    src_data.num_successors = 0;
-    src_data.num_predecessors = 0;
-    src_data.dependency = 0;
-    src_data.propogation_flag = false;
+    src_data.num_successors     = 0;
+    src_data.num_predecessors   = 0;
+    src_data.dependency         = 0;
+    src_data.propogation_flag   = false;
   }
 };
 
 /* This is used to reset node data when switching to a difference source */
 struct InitializeIteration {
-  const uint32_t &local_infinity;
-  const uint64_t &local_current_src_node;
-  Graph *graph;
+  const uint32_t& local_infinity;
+  const uint64_t& local_current_src_node;
+  Graph* graph;
 
-  InitializeIteration(const uint32_t &_local_infinity,
-                      const uint64_t &_local_current_src_node,
-                      Graph* _graph) : 
-                       local_infinity(_local_infinity),
-                       local_current_src_node(_local_current_src_node),
-                       graph(_graph){}
+  InitializeIteration(const uint32_t& _local_infinity,
+                      const uint64_t& _local_current_src_node, Graph* _graph)
+      : local_infinity(_local_infinity),
+        local_current_src_node(_local_current_src_node), graph(_graph) {}
 
   /* Reset necessary graph metadata for next iteration of SSSP/BFS */
   void static go(Graph& _graph) {
     auto& allNodes = _graph.allNodesRange();
 
-    galois::do_all(
-      allNodes.begin(), allNodes.end(), 
-      InitializeIteration{infinity, current_src_node, &_graph},
-      galois::no_stats(),
-      galois::loopname("InitializeIteration"));
+    galois::do_all(allNodes.begin(), allNodes.end(),
+                   InitializeIteration{infinity, current_src_node, &_graph},
+                   galois::no_stats(), galois::loopname("InitializeIteration"));
   }
 
   /* Functor passed into the Galois operator to carry out reset of node data
@@ -169,14 +164,14 @@ struct InitializeIteration {
     bool is_source = graph->getGID(src) == local_current_src_node;
 
     if (!is_source) {
-      src_data.current_length = local_infinity;
-      src_data.old_length = local_infinity;
+      src_data.current_length   = local_infinity;
+      src_data.old_length       = local_infinity;
       src_data.propogation_flag = false;
     } else {
-      src_data.current_length = 0;
-      src_data.old_length = 0; 
+      src_data.current_length     = 0;
+      src_data.old_length         = 0;
       src_data.num_shortest_paths = 1;
-      src_data.propogation_flag = true;
+      src_data.propogation_flag   = true;
     }
 
     // this is read on dst too, and since this operator loops over all
@@ -194,41 +189,38 @@ struct InitializeIteration {
   }
 };
 
-/* Need a separate call for the first iteration as the condition check is 
+/* Need a separate call for the first iteration as the condition check is
  * different */
 struct FirstIterationSSSP {
   Graph* graph;
-  FirstIterationSSSP(Graph* _graph) : graph(_graph){}
+  FirstIterationSSSP(Graph* _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph){
+  void static go(Graph& _graph) {
     unsigned int __begin, __end;
     if (_graph.isLocal(current_src_node)) {
       __begin = _graph.getLID(current_src_node);
-      __end = __begin + 1;
+      __end   = __begin + 1;
     } else {
       __begin = 0;
-      __end = 0;
+      __end   = 0;
     }
 
-    galois::do_all(
-      boost::make_counting_iterator(__begin), 
-      boost::make_counting_iterator(__end), 
-      FirstIterationSSSP(&_graph),
-      galois::no_stats(),
-      galois::loopname("FirstIterationSSSP"));
+    galois::do_all(boost::make_counting_iterator(__begin),
+                   boost::make_counting_iterator(__end),
+                   FirstIterationSSSP(&_graph), galois::no_stats(),
+                   galois::loopname("FirstIterationSSSP"));
   }
 
   /* Does SSSP, push/filter based (actually it does BFS...) */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
-    for (auto current_edge = graph->edge_begin(src), 
-              end_edge = graph->edge_end(src); 
-         current_edge != end_edge; 
-         ++current_edge) {
-      GNode dst = graph->getEdgeDst(current_edge);
+    for (auto current_edge = graph->edge_begin(src),
+              end_edge     = graph->edge_end(src);
+         current_edge != end_edge; ++current_edge) {
+      GNode dst      = graph->getEdgeDst(current_edge);
       auto& dst_data = graph->getData(dst);
 
-      // BFS 
+      // BFS
       uint32_t new_dist = 1 + src_data.current_length;
 
       galois::atomicMin(dst_data.current_length, new_dist);
@@ -241,8 +233,8 @@ struct SSSP {
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  SSSP(Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
-    graph(_graph), DGAccumulator_accum(dga) { }
+  SSSP(Graph* _graph, galois::DGAccumulator<uint32_t>& dga)
+      : graph(_graph), DGAccumulator_accum(dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     FirstIterationSSSP::go(_graph);
@@ -256,12 +248,8 @@ struct SSSP {
       _graph.set_num_round(iterations);
       dga.reset();
 
-      galois::do_all(
-        nodesWithEdges,
-        SSSP(&_graph, dga), 
-        galois::no_stats(),
-        galois::loopname("SSSP"), 
-        galois::steal());
+      galois::do_all(nodesWithEdges, SSSP(&_graph, dga), galois::no_stats(),
+                     galois::loopname("SSSP"), galois::steal());
 
       iterations++;
 
@@ -275,12 +263,11 @@ struct SSSP {
     if (src_data.old_length > src_data.current_length) {
       src_data.old_length = src_data.current_length;
 
-      for (auto current_edge = graph->edge_begin(src), 
-                end_edge = graph->edge_end(src); 
-           current_edge != end_edge; 
-           ++current_edge) {
+      for (auto current_edge = graph->edge_begin(src),
+                end_edge     = graph->edge_end(src);
+           current_edge != end_edge; ++current_edge) {
 
-        GNode dst = graph->getEdgeDst(current_edge);
+        GNode dst      = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
         // BFS
@@ -297,45 +284,42 @@ struct SSSP {
 
 /* Struct to get pred and succ on the SSSP DAG */
 struct PredAndSucc {
-  const uint32_t &local_infinity;
+  const uint32_t& local_infinity;
   Graph* graph;
 
-  PredAndSucc(const uint32_t &_local_infinity, Graph* _graph) : 
-      local_infinity(_local_infinity), graph(_graph) {}
+  PredAndSucc(const uint32_t& _local_infinity, Graph* _graph)
+      : local_infinity(_local_infinity), graph(_graph) {}
 
-  void static go(Graph& _graph){
+  void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
-    
+
     {
-    galois::do_all(
-      nodesWithEdges,
-      PredAndSucc(infinity, &_graph), 
-      galois::no_stats(),
-      galois::loopname("PredAndSucc"),
-      galois::steal());
+      galois::do_all(nodesWithEdges, PredAndSucc(infinity, &_graph),
+                     galois::no_stats(), galois::loopname("PredAndSucc"),
+                     galois::steal());
     }
   }
 
   /* Summary:
    * Look at outgoing edges; see if dest is on a shortest path from src node.
    * If it is, increment the number of successors on src by 1 and
-   * increment # of pred on dest by 1 
+   * increment # of pred on dest by 1
    */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.current_length != local_infinity) {
-      for (auto current_edge = graph->edge_begin(src),  
-                end_edge = graph->edge_end(src); 
-           current_edge != end_edge; 
-           ++current_edge) {
-        GNode dst = graph->getEdgeDst(current_edge);
+      for (auto current_edge = graph->edge_begin(src),
+                end_edge     = graph->edge_end(src);
+           current_edge != end_edge; ++current_edge) {
+        GNode dst      = graph->getEdgeDst(current_edge);
         auto& dst_data = graph->getData(dst);
 
         // BFS
         uint32_t edge_weight = 1;
 
-        if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+        if ((src_data.current_length + edge_weight) ==
+            dst_data.current_length) {
           galois::add(src_data.num_successors, (unsigned int)1);
           galois::atomicAdd(dst_data.num_predecessors, (unsigned int)1);
         }
@@ -347,16 +331,14 @@ struct PredAndSucc {
 struct NumShortestPathsChanges {
   Graph* graph;
 
-  NumShortestPathsChanges(Graph* _graph) : graph(_graph){}
+  NumShortestPathsChanges(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    galois::do_all(
-      nodesWithEdges.begin(), nodesWithEdges.end(), 
-      NumShortestPathsChanges{&_graph}, 
-      galois::no_stats(),
-      galois::loopname("NumShortestPathsChanges"));
+    galois::do_all(nodesWithEdges.begin(), nodesWithEdges.end(),
+                   NumShortestPathsChanges{&_graph}, galois::no_stats(),
+                   galois::loopname("NumShortestPathsChanges"));
   }
 
   void operator()(GNode src) const {
@@ -365,7 +347,7 @@ struct NumShortestPathsChanges {
     // decrement predecessor by trim then reset
     if (src_data.trim > 0) {
       src_data.num_predecessors = src_data.num_predecessors - src_data.trim;
-      src_data.trim = 0;
+      src_data.trim             = 0;
 
       // if I hit 0 predecessors after trim, set the flag to true (i.e. says
       // I need to propogate my value)
@@ -380,19 +362,19 @@ struct NumShortestPathsChanges {
       src_data.num_shortest_paths += src_data.to_add;
       src_data.to_add = 0;
     }
-
   }
 };
 
 /* Calculate the number of shortest paths for each node */
 struct NumShortestPaths {
-  const uint32_t &local_infinity;
+  const uint32_t& local_infinity;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  NumShortestPaths(const uint32_t &_local_infinity,
-                   Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
-     local_infinity(_local_infinity), graph(_graph), DGAccumulator_accum(dga) {}
+  NumShortestPaths(const uint32_t& _local_infinity, Graph* _graph,
+                   galois::DGAccumulator<uint32_t>& dga)
+      : local_infinity(_local_infinity), graph(_graph),
+        DGAccumulator_accum(dga) {}
 
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint32_t iterations = 0;
@@ -404,14 +386,12 @@ struct NumShortestPaths {
       _graph.set_num_round(iterations);
       dga.reset();
 
-      { 
+      {
         galois::do_all(
-          nodesWithEdges,
-          NumShortestPaths(infinity, &_graph, dga), 
-          galois::no_stats(),
-          galois::loopname("NumShortestPaths"),
-          //galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
-          galois::steal());
+            nodesWithEdges, NumShortestPaths(infinity, &_graph, dga),
+            galois::no_stats(), galois::loopname("NumShortestPaths"),
+            // galois::loopname(_graph.get_run_identifier("NumShortestPaths").c_str()),
+            galois::steal());
       }
 
       // do predecessor decrementing using trim + dependency changes with
@@ -441,27 +421,26 @@ struct NumShortestPaths {
 
     if (src_data.current_length != local_infinity) {
       if (src_data.propogation_flag && src_data.num_successors > 0) {
-        for (auto current_edge = graph->edge_begin(src), 
-                  end_edge = graph->edge_end(src); 
-             current_edge != end_edge; 
-             ++current_edge) {
-          GNode dst = graph->getEdgeDst(current_edge);
+        for (auto current_edge = graph->edge_begin(src),
+                  end_edge     = graph->edge_end(src);
+             current_edge != end_edge; ++current_edge) {
+          GNode dst      = graph->getEdgeDst(current_edge);
           auto& dst_data = graph->getData(dst);
 
           // SSSP
-          //uint32_t edge_weight = graph->getEdgeData(current_edge);
+          // uint32_t edge_weight = graph->getEdgeData(current_edge);
 
           // BFS
           uint32_t edge_weight = 1;
 
           uint32_t paths_to_add = src_data.num_shortest_paths;
 
-          if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+          if ((src_data.current_length + edge_weight) ==
+              dst_data.current_length) {
             // need to add my num_short_paths to dest
             galois::atomicAdd(dst_data.to_add, paths_to_add);
             // increment dst trim so it can decrement predecessor
             galois::atomicAdd(dst_data.trim, (unsigned int)1);
-
 
             DGAccumulator_accum += 1;
           }
@@ -478,20 +457,18 @@ struct NumShortestPaths {
  * has to be synchronized across ALL nodes (including mirrors)
  * Use to_add_float to increment the dependency value */
 struct DependencyPropChanges {
-  const uint32_t &local_infinity;
+  const uint32_t& local_infinity;
   Graph* graph;
 
-  DependencyPropChanges(const uint32_t &_local_infinity,
-               Graph* _graph) : local_infinity(_local_infinity), graph(_graph){}
+  DependencyPropChanges(const uint32_t& _local_infinity, Graph* _graph)
+      : local_infinity(_local_infinity), graph(_graph) {}
 
   void static go(Graph& _graph) {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    galois::do_all(
-      nodesWithEdges.begin(), nodesWithEdges.end(),
-      DependencyPropChanges{infinity, &_graph}, 
-      galois::no_stats(),
-      galois::loopname("DependencyPropChanges"));
+    galois::do_all(nodesWithEdges.begin(), nodesWithEdges.end(),
+                   DependencyPropChanges{infinity, &_graph}, galois::no_stats(),
+                   galois::loopname("DependencyPropChanges"));
   }
 
   void operator()(GNode src) const {
@@ -502,7 +479,6 @@ struct DependencyPropChanges {
       if (src_data.to_add_float > 0.0) {
         src_data.dependency += src_data.to_add_float;
         src_data.to_add_float = 0.0;
-
       }
 
       if (src_data.num_successors == 0 && src_data.propogation_flag) {
@@ -517,7 +493,7 @@ struct DependencyPropChanges {
         assert(src_data.trim <= src_data.num_successors);
 
         src_data.num_successors = src_data.num_successors - src_data.trim;
-        src_data.trim = 0;
+        src_data.trim           = 0;
 
         if (src_data.num_successors == 0) {
           assert(!src_data.propogation_flag);
@@ -531,18 +507,17 @@ struct DependencyPropChanges {
 /* Do dependency propogation which is required for betweeness centraility
  * calculation */
 struct DependencyPropogation {
-  const uint32_t &local_infinity;
-  const uint64_t &local_current_src_node;
+  const uint32_t& local_infinity;
+  const uint64_t& local_current_src_node;
   Graph* graph;
   galois::DGAccumulator<uint32_t>& DGAccumulator_accum;
 
-  DependencyPropogation(const uint32_t &_local_infinity,
-                        const uint64_t &_local_current_src_node,
-                        Graph* _graph, galois::DGAccumulator<uint32_t>& dga) : 
-      local_infinity(_local_infinity),
-      local_current_src_node(_local_current_src_node),
-      graph(_graph),
-      DGAccumulator_accum(dga) {}
+  DependencyPropogation(const uint32_t& _local_infinity,
+                        const uint64_t& _local_current_src_node, Graph* _graph,
+                        galois::DGAccumulator<uint32_t>& dga)
+      : local_infinity(_local_infinity),
+        local_current_src_node(_local_current_src_node), graph(_graph),
+        DGAccumulator_accum(dga) {}
 
   /* Look at all nodes to do propogation until no more work is done */
   void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
@@ -555,16 +530,14 @@ struct DependencyPropogation {
 
       auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    {
-      galois::do_all(
-        nodesWithEdges,
-        DependencyPropogation(infinity, current_src_node, &_graph, dga), 
-        galois::no_stats(),
-        galois::loopname("DependencyPropogation"),
-        //galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
-        galois::steal());
-    }
-                    
+      {
+        galois::do_all(
+            nodesWithEdges,
+            DependencyPropogation(infinity, current_src_node, &_graph, dga),
+            galois::no_stats(), galois::loopname("DependencyPropogation"),
+            // galois::loopname(_graph.get_run_identifier("DependencyPropogation").c_str()),
+            galois::steal());
+      }
 
       // use trim + to add to do appropriate changes
       DependencyPropChanges::go(_graph);
@@ -576,10 +549,10 @@ struct DependencyPropogation {
 
   /* Summary:
    * if we have outgoing edges...
-   * for each node, check if dest of edge has no successors + check if on 
+   * for each node, check if dest of edge has no successors + check if on
    * shortest path with src as predeccesor
    *
-   * if yes, then decrement src successors by 1 + grab dest delta + dest num 
+   * if yes, then decrement src successors by 1 + grab dest delta + dest num
    * shortest * paths and use it to increment src own delta
    **/
   void operator()(GNode src) const {
@@ -590,16 +563,15 @@ struct DependencyPropogation {
     if (src_data.current_length != local_infinity) {
       if (src_data.num_successors > 0) {
         if (graph->getGID(src) != local_current_src_node) {
-          for (auto current_edge = graph->edge_begin(src), 
-                    end_edge = graph->edge_end(src); 
-               current_edge != end_edge; 
-               ++current_edge) {
+          for (auto current_edge = graph->edge_begin(src),
+                    end_edge     = graph->edge_end(src);
+               current_edge != end_edge; ++current_edge) {
 
-            GNode dst = graph->getEdgeDst(current_edge);
+            GNode dst      = graph->getEdgeDst(current_edge);
             auto& dst_data = graph->getData(dst);
 
             // SSSP
-            //unsigned int edge_weight = graph->getEdgeData(current_edge);
+            // unsigned int edge_weight = graph->getEdgeData(current_edge);
             // BFS
             uint32_t edge_weight = 1;
 
@@ -607,16 +579,17 @@ struct DependencyPropogation {
             // dependency to take)
             if (dst_data.propogation_flag) {
               // dest on shortest path with this node as predecessor
-              if ((src_data.current_length + edge_weight) == dst_data.current_length) {
+              if ((src_data.current_length + edge_weight) ==
+                  dst_data.current_length) {
                 // increment my trim for later use to decrement successor
                 galois::atomicAdd(src_data.trim, (unsigned int)1);
 
-                // update my to_add_float (which is later used to update dependency)
-                galois::add(src_data.to_add_float, 
-                (((float)src_data.num_shortest_paths / 
-                      (float)dst_data.num_shortest_paths) * 
-                 (float)(1.0 + dst_data.dependency)));
-
+                // update my to_add_float (which is later used to update
+                // dependency)
+                galois::add(src_data.to_add_float,
+                            (((float)src_data.num_shortest_paths /
+                              (float)dst_data.num_shortest_paths) *
+                             (float)(1.0 + dst_data.dependency)));
 
                 DGAccumulator_accum += 1;
               }
@@ -634,17 +607,17 @@ struct DependencyPropogation {
 struct BC {
   Graph* graph;
 
-  BC(Graph* _graph) : graph(_graph){}
+  BC(Graph* _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga){
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
     uint64_t loop_end = 1;
-    bool use_random = false;
+    bool use_random   = false;
 
     auto random_sources_iterator = random_sources.begin();
 
     if (!singleSourceBC) {
       if (numberOfSources != 0) {
-        loop_end = numberOfSources;
+        loop_end   = numberOfSources;
         use_random = true;
       } else {
         loop_end = _graph.totalNodes;
@@ -668,55 +641,51 @@ struct BC {
 
       galois::gDebug("Current source node for BC is ", current_src_node);
 
-      #ifndef NDEBUG
+#ifndef NDEBUG
       if (_graph.id == 0) {
         if (i % 5000 == 0) {
           std::cout << "SSSP source node " << i << "\n";
         }
       }
-      #endif
+#endif
 
       _graph.set_num_round(0);
 
       // reset the graph aside from the between-cent measure
       InitializeIteration::go(_graph);
-      //galois::gDebug("Init done");
+      // galois::gDebug("Init done");
 
       // get SSSP on the current graph
       SSSP::go(_graph, dga);
-      //galois::gDebug("SSSP done");
+      // galois::gDebug("SSSP done");
 
       _graph.set_num_round(0);
 
       // calculate the succ/pred for all nodes in the SSSP DAG
       PredAndSucc::go(_graph);
-      //galois::gDebug("PredAndSucc done");
+      // galois::gDebug("PredAndSucc done");
 
       // calculate the number of shortest paths for each node
       NumShortestPaths::go(_graph, dga);
-      //galois::gDebug("NumShortestPaths done");
+      // galois::gDebug("NumShortestPaths done");
 
       _graph.set_num_round(0);
 
-      // do between-cent calculations for this iteration 
+      // do between-cent calculations for this iteration
       DependencyPropogation::go(_graph, dga);
-      //galois::gDebug("DepPropogation done");
+      // galois::gDebug("DepPropogation done");
 
       _graph.set_num_round(0);
 
       auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-      // finally, since dependencies are finalized for this round at this 
+      // finally, since dependencies are finalized for this round at this
       // point, add them to the betweeness centrality measure on each node
-      // TODO all nodes here? would remove unnecessary dep sync later, 
+      // TODO all nodes here? would remove unnecessary dep sync later,
       // but will cause destinations (which don't need to increment bc)
       // to do extra work on each host
-      galois::do_all(
-        nodesWithEdges.begin(), 
-        nodesWithEdges.end(), 
-        BC(&_graph), 
-        galois::no_stats(),
-        galois::loopname("BC"));
+      galois::do_all(nodesWithEdges.begin(), nodesWithEdges.end(), BC(&_graph),
+                     galois::no_stats(), galois::loopname("BC"));
     }
   }
 
@@ -727,10 +696,10 @@ struct BC {
 
     galois::add(src_data.betweeness_centrality, src_data.dependency);
     // done with it, reset
-    //src_data.dependency = 0;
+    // src_data.dependency = 0;
   }
 };
- 
+
 /******************************************************************************/
 /* Main method for running */
 /******************************************************************************/
@@ -741,79 +710,76 @@ int main(int argc, char** argv) {
     DistBenchStart(argc, argv, name, desc, url);
 
     {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-    if (net.ID == 0) {
-      galois::runtime::reportStat("(NULL)", "Max Iterations", 
-                                  (unsigned long)maxIterations, 0);
-    }
-
-    galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
-                      StatTimer_total("TimerTotal"),
-                      StatTimer_hg_init("TIMER_HG_INIT");
-
-    StatTimer_total.start();
-
-    std::vector<unsigned> scalefactor;
-
-    StatTimer_hg_init.start();
-
-    Graph* h_graph = nullptr;
-    // uses sssp
-    //h_graph = constructGraph<NodeData, unsigned int>(scalefactor);
-    // uses bfs
-    h_graph = constructGraph<NodeData, void>(scalefactor);
-
-    // random num generate for sources
-    std::minstd_rand0 r_generator;
-    r_generator.seed(100);
-    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->size() - 1);
-
-    if (numberOfSources != 0) {
-      random_sources.insert(startSource);
-
-      while (random_sources.size() < numberOfSources) {
-        random_sources.insert(r_dist(r_generator));
+      auto& net = galois::runtime::getSystemNetworkInterface();
+      if (net.ID == 0) {
+        galois::runtime::reportStat("(NULL)", "Max Iterations",
+                                    (unsigned long)maxIterations, 0);
       }
-    }
 
+      galois::StatTimer StatTimer_graph_init("TIMER_GRAPH_INIT"),
+          StatTimer_total("TimerTotal"), StatTimer_hg_init("TIMER_HG_INIT");
 
-    StatTimer_hg_init.stop();
+      StatTimer_total.start();
 
-    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+      std::vector<unsigned> scalefactor;
 
-    StatTimer_graph_init.start();
+      StatTimer_hg_init.start();
+
+      Graph* h_graph = nullptr;
+      // uses sssp
+      // h_graph = constructGraph<NodeData, unsigned int>(scalefactor);
+      // uses bfs
+      h_graph = constructGraph<NodeData, void>(scalefactor);
+
+      // random num generate for sources
+      std::minstd_rand0 r_generator;
+      r_generator.seed(100);
+      std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->size() - 1);
+
+      if (numberOfSources != 0) {
+        random_sources.insert(startSource);
+
+        while (random_sources.size() < numberOfSources) {
+          random_sources.insert(r_dist(r_generator));
+        }
+      }
+
+      StatTimer_hg_init.stop();
+
+      std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
+
+      StatTimer_graph_init.start();
       InitializeGraph::go((*h_graph));
-    StatTimer_graph_init.stop();
+      StatTimer_graph_init.stop();
 
-    // shared DG accumulator among all steps
-    galois::DGAccumulator<uint32_t> dga;
+      // shared DG accumulator among all steps
+      galois::DGAccumulator<uint32_t> dga;
 
-    for (auto run = 0; run < numRuns; ++run) {
-      std::cout << "[" << net.ID << "] BC::go run " << run << " called\n";
-      std::string timer_str("Timer_" + std::to_string(run));
-      galois::StatTimer StatTimer_main(timer_str.c_str());
+      for (auto run = 0; run < numRuns; ++run) {
+        std::cout << "[" << net.ID << "] BC::go run " << run << " called\n";
+        std::string timer_str("Timer_" + std::to_string(run));
+        galois::StatTimer StatTimer_main(timer_str.c_str());
 
-      StatTimer_main.start();
+        StatTimer_main.start();
         BC::go(*h_graph, dga);
-      StatTimer_main.stop();
+        StatTimer_main.stop();
 
-      // TODO sanity check setup
+        // TODO sanity check setup
 
-      // re-init graph for next run
-      if ((run + 1) != numRuns) {
-        galois::runtime::getHostBarrier().wait();
-        (*h_graph).reset_num_iter(run + 1);
+        // re-init graph for next run
+        if ((run + 1) != numRuns) {
+          galois::runtime::getHostBarrier().wait();
+          (*h_graph).reset_num_iter(run + 1);
 
-
-        InitializeGraph::go((*h_graph));
+          InitializeGraph::go((*h_graph));
+        }
       }
-    }
 
-    StatTimer_total.stop();
+      StatTimer_total.stop();
 
-    // Verify, i.e. print out graph data for examination
-    if (verify) {
-      char *v_out = (char*)malloc(40);
+      // Verify, i.e. print out graph data for examination
+      if (verify) {
+        char* v_out = (char*)malloc(40);
         for (auto ii = (*h_graph).begin(); ii != (*h_graph).end(); ++ii) {
           if ((*h_graph).isOwned((*h_graph).getGID(*ii))) {
             // outputs betweenness centrality
@@ -822,13 +788,13 @@ int main(int argc, char** argv) {
             galois::runtime::printOutput(v_out);
           }
         }
-      free(v_out);
-    }
+        free(v_out);
+      }
     }
     galois::runtime::getHostBarrier().wait();
 
     return 0;
-  } catch(const char* c) {
+  } catch (const char* c) {
     std::cout << "Error: " << c << "\n";
     return 1;
   }

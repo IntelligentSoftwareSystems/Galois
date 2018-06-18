@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,29 +39,29 @@
 namespace galois {
 
 enum DoAllTypes {
-  DO_ALL_OLD, DO_ALL_OLD_STEAL, DOALL_GALOIS_FOREACH, DO_ALL,
-  DOALL_CILK, DOALL_OPENMP 
+  DO_ALL_OLD,
+  DO_ALL_OLD_STEAL,
+  DOALL_GALOIS_FOREACH,
+  DO_ALL,
+  DOALL_CILK,
+  DOALL_OPENMP
 };
 
 namespace cll = llvm::cl;
-//extern cll::opt<DoAllTypes> doAllKind;
-static cll::opt<DoAllTypes> doAllKind (
-        "doAllKind",
-        cll::desc ("DoAll Implementation"),
-        cll::values (
-          clEnumVal (DO_ALL_OLD, "DO_ALL_OLD"),
-          clEnumVal (DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
-          clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
-          clEnumVal (DO_ALL, "DO_ALL"),
-          clEnumVal (DOALL_CILK, "DOALL_CILK"),
-          clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
-          clEnumValEnd),
-        cll::init (DO_ALL_OLD)); // default is regular DOALL
+// extern cll::opt<DoAllTypes> doAllKind;
+static cll::opt<DoAllTypes> doAllKind(
+    "doAllKind", cll::desc("DoAll Implementation"),
+    cll::values(clEnumVal(DO_ALL_OLD, "DO_ALL_OLD"),
+                clEnumVal(DO_ALL_OLD_STEAL, "DO_ALL_OLD_STEAL"),
+                clEnumVal(DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
+                clEnumVal(DO_ALL, "DO_ALL"),
+                clEnumVal(DOALL_CILK, "DOALL_CILK"),
+                clEnumVal(DOALL_OPENMP, "DOALL_OPENMP"), clEnumValEnd),
+    cll::init(DO_ALL_OLD)); // default is regular DOALL
 
+void setDoAllImpl(const DoAllTypes& type);
 
-void setDoAllImpl (const DoAllTypes& type);
-
-DoAllTypes getDoAllImpl (void);
+DoAllTypes getDoAllImpl(void);
 
 template <DoAllTypes TYPE>
 struct DoAllImpl {
@@ -75,10 +75,10 @@ struct DoAllImpl {
 template <>
 struct DoAllImpl<DO_ALL_OLD> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func,
-                         const ArgsTuple& argsTuple) {
-    galois::runtime::do_all_gen_old(range, func,
-        std::tuple_cat(std::make_tuple(steal()), argsTuple));
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
+    galois::runtime::do_all_gen_old(
+        range, func, std::tuple_cat(std::make_tuple(steal()), argsTuple));
   }
 };
 
@@ -87,8 +87,8 @@ struct DoAllImpl<DO_ALL_OLD_STEAL> {
   template <typename R, typename F, typename ArgsTuple>
   static inline void go(const R& range, const F& func,
                         const ArgsTuple& argsTuple) {
-    galois::runtime::do_all_gen_old (range, func,
-        std::tuple_cat(std::make_tuple(steal()), argsTuple));
+    galois::runtime::do_all_gen_old(
+        range, func, std::tuple_cat(std::make_tuple(steal()), argsTuple));
   }
 };
 
@@ -100,34 +100,36 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     _F func;
 
     template <typename C>
-    void operator () (T& x, C&) {
-      func (x);
+    void operator()(T& x, C&) {
+      func(x);
     }
   };
 
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
 
     using T = typename R::value_type;
 
     const unsigned CHUNK_SIZE = 128;
-    //const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value;
+    // const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag,
+    // ArgsTuple>::type::value;
 
-    using WL_ty =  galois::worklists::PerThreadChunkLIFO<CHUNK_SIZE, T>;
+    using WL_ty = galois::worklists::PerThreadChunkLIFO<CHUNK_SIZE, T>;
 
-    galois::runtime::for_each_gen(range, FuncWrap<T, F> {func},
+    galois::runtime::for_each_gen(
+        range, FuncWrap<T, F>{func},
         std::tuple_cat(
-          std::make_tuple(galois::wl<WL_ty>(),
-             no_pushes(),
-             no_conflicts()),
-          argsTuple));
+            std::make_tuple(galois::wl<WL_ty>(), no_pushes(), no_conflicts()),
+            argsTuple));
   }
 };
 
 template <>
 struct DoAllImpl<DO_ALL> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
     galois::runtime::do_all_gen(range, func, argsTuple);
   }
 };
@@ -136,17 +138,20 @@ struct DoAllImpl<DO_ALL> {
 template <>
 struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-    CilkInit ();
-    cilk_for(auto it = range.begin (), end = range.end (); it != end; ++it) {
-      func (*it);
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
+    CilkInit();
+    cilk_for(auto it = range.begin(), end = range.end(); it != end; ++it) {
+      func(*it);
     }
   }
 };
 #else
-template <> struct DoAllImpl<DOALL_CILK> {
+template <>
+struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
     GALOIS_DIE("Cilk not found\n");
   }
 };
@@ -155,11 +160,12 @@ template <> struct DoAllImpl<DOALL_CILK> {
 template <>
 struct DoAllImpl<DOALL_OPENMP> {
   template <typename R, typename F, typename ArgsTuple>
-  static inline void go (const R& range, const F& func, const ArgsTuple& argsTuple) {
-  const auto end = range.end ();
+  static inline void go(const R& range, const F& func,
+                        const ArgsTuple& argsTuple) {
+    const auto end = range.end();
 #pragma omp parallel for schedule(guided)
-    for (auto it = range.begin (); it < end; ++it) {
-      func (*it);
+    for (auto it = range.begin(); it < end; ++it) {
+      func(*it);
     }
   }
 };
@@ -168,34 +174,34 @@ template <typename R, typename F, typename ArgsTuple>
 void do_all_choice(const R& range, const F& func, const DoAllTypes& type,
                    const ArgsTuple& argsTuple) {
   switch (type) {
-    case DO_ALL_OLD_STEAL:
-      DoAllImpl<DO_ALL_OLD_STEAL>::go(range, func, argsTuple);
-      break;
-    case DOALL_GALOIS_FOREACH:
-      DoAllImpl<DOALL_GALOIS_FOREACH>::go(range, func, argsTuple);
-      break;
-    case DO_ALL_OLD:
-      DoAllImpl<DO_ALL_OLD>::go(range, func, argsTuple);
-      break;
-    case DO_ALL:
-      DoAllImpl<DO_ALL>::go(range, func, argsTuple);
-      break;
-    case DOALL_CILK:
-      DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
-      break;
-    case DOALL_OPENMP:
-      // DoAllImpl<DOALL_OPENMP>::go(range, func, argsTuple);
-      std::abort ();
-      break;
-    default:
-      abort ();
-      break;
+  case DO_ALL_OLD_STEAL:
+    DoAllImpl<DO_ALL_OLD_STEAL>::go(range, func, argsTuple);
+    break;
+  case DOALL_GALOIS_FOREACH:
+    DoAllImpl<DOALL_GALOIS_FOREACH>::go(range, func, argsTuple);
+    break;
+  case DO_ALL_OLD:
+    DoAllImpl<DO_ALL_OLD>::go(range, func, argsTuple);
+    break;
+  case DO_ALL:
+    DoAllImpl<DO_ALL>::go(range, func, argsTuple);
+    break;
+  case DOALL_CILK:
+    DoAllImpl<DOALL_CILK>::go(range, func, argsTuple);
+    break;
+  case DOALL_OPENMP:
+    // DoAllImpl<DOALL_OPENMP>::go(range, func, argsTuple);
+    std::abort();
+    break;
+  default:
+    abort();
+    break;
   }
 }
 
 template <typename R, typename F, typename ArgsTuple>
-void do_all_choice (const R& range, const F& func, const ArgsTuple& argsTuple) {
-  do_all_choice (range, func, doAllKind, argsTuple);
+void do_all_choice(const R& range, const F& func, const ArgsTuple& argsTuple) {
+  do_all_choice(range, func, doAllKind, argsTuple);
 }
 
 } // end namespace galois

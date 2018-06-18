@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,61 +29,64 @@
 namespace galois {
 namespace worklists {
 
-template<typename T>
+template <typename T>
 class ConExtListNode {
   T* next;
+
 public:
-  ConExtListNode() :next(0) {}
+  ConExtListNode() : next(0) {}
   T*& getNext() { return next; }
-  T*const& getNext() const { return next; }
+  T* const& getNext() const { return next; }
 };
 
-template<typename T>
-class ConExtIterator: public boost::iterator_facade<
-                      ConExtIterator<T>, T, boost::forward_traversal_tag> {
+template <typename T>
+class ConExtIterator
+    : public boost::iterator_facade<ConExtIterator<T>, T,
+                                    boost::forward_traversal_tag> {
   friend class boost::iterator_core_access;
   T* at;
 
-  template<typename OtherTy>
-  bool equal(const ConExtIterator<OtherTy>& o) const { return at == o.at; }
+  template <typename OtherTy>
+  bool equal(const ConExtIterator<OtherTy>& o) const {
+    return at == o.at;
+  }
 
   T& dereference() const { return *at; }
   void increment() { at = at->getNext(); }
 
 public:
-  ConExtIterator(): at(0) { }
+  ConExtIterator() : at(0) {}
 
-  template<typename OtherTy>
-  ConExtIterator(const ConExtIterator<OtherTy>& o): at(o.at) { }
+  template <typename OtherTy>
+  ConExtIterator(const ConExtIterator<OtherTy>& o) : at(o.at) {}
 
-  explicit ConExtIterator(T* x): at(x) { }
+  explicit ConExtIterator(T* x) : at(x) {}
 };
 
-template<typename T, bool concurrent>
+template <typename T, bool concurrent>
 class ConExtLinkedStack {
-  //fixme: deal with concurrent
+  // fixme: deal with concurrent
   substrate::PtrLock<T> head;
 
 public:
   typedef ConExtListNode<T> ListNode;
 
-  bool empty() const {
-    return !head.getValue();
-  }
+  bool empty() const { return !head.getValue(); }
 
   void push(T* C) {
     T* oldhead(0);
     do {
-      oldhead = head.getValue();
+      oldhead      = head.getValue();
       C->getNext() = oldhead;
     } while (!head.CAS(oldhead, C));
   }
 
   T* pop() {
-    //lock free Fast path (empty)
-    if (empty()) return 0;
+    // lock free Fast path (empty)
+    if (empty())
+      return 0;
 
-    //Disable CAS
+    // Disable CAS
     head.lock();
     T* C = head.getValue();
     if (!C) {
@@ -108,28 +111,26 @@ public:
   const_iterator end() const { return const_iterator(); }
 };
 
-template<typename T, bool concurrent>
+template <typename T, bool concurrent>
 class ConExtLinkedQueue {
-  //Fixme: deal with concurrent
+  // Fixme: deal with concurrent
   substrate::PtrLock<T> head;
   T* tail;
 
 public:
   typedef ConExtListNode<T> ListNode;
 
-  ConExtLinkedQueue() :tail(0) { }
+  ConExtLinkedQueue() : tail(0) {}
 
-  bool empty() const {
-    return !tail;
-  }
+  bool empty() const { return !tail; }
 
   void push(T* C) {
     head.lock();
-    //std::cerr << "in(" << C << ") ";
+    // std::cerr << "in(" << C << ") ";
     C->getNext() = 0;
     if (tail) {
       tail->getNext() = C;
-      tail = C;
+      tail            = C;
       head.unlock();
     } else {
       assert(!head.getValue());
@@ -139,8 +140,9 @@ public:
   }
 
   T* pop() {
-    //lock free Fast path empty case
-    if (empty()) return 0;
+    // lock free Fast path empty case
+    if (empty())
+      return 0;
 
     head.lock();
     T* C = head.getValue();
@@ -172,12 +174,12 @@ public:
   const_iterator end() const { return const_iterator(); }
 };
 
-template<typename T>
-struct DummyIndexer: public std::unary_function<const T&,unsigned> {
+template <typename T>
+struct DummyIndexer : public std::unary_function<const T&, unsigned> {
   unsigned operator()(const T& x) { return 0; }
 };
 
-}
+} // namespace worklists
 } // end namespace galois
 
 #endif

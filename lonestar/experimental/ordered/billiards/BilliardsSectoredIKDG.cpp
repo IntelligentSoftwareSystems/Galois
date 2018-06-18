@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,33 +24,33 @@
 
 #include "galois/runtime/KDGtwoPhase.h"
 
-class BilliardsSectoredIKDG: public Billiards<BilliardsSectoredIKDG>  {
+class BilliardsSectoredIKDG : public Billiards<BilliardsSectoredIKDG> {
 
 public:
-
-  virtual const std::string version () const { return "IKDG with custom safety test"; }
+  virtual const std::string version() const {
+    return "IKDG with custom safety test";
+  }
 
   template <typename Tbl_t>
-  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
+  size_t runSim(Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime,
+                bool enablePrints = false, bool logEvents = false) {
 
     AddListTy addList;
     Accumulator iter;
 
-    galois::runtime::for_each_ordered_ikdg_custom_safety (
-        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
-        Event::Comparator (),
-        SectorLocalTest<Tbl_t> {table},
-        ExecSources (),
-        AddEvents<Tbl_t> (table, endtime, addList, iter),
+    galois::runtime::for_each_ordered_ikdg_custom_safety(
+        galois::runtime::makeStandardRange(initEvents.begin(),
+                                           initEvents.end()),
+        Event::Comparator(), SectorLocalTest<Tbl_t>{table}, ExecSources(),
+        AddEvents<Tbl_t>(table, endtime, addList, iter),
         "sectored-ikdg-custom-safety");
 
-    return iter.reduce ();
-
+    return iter.reduce();
   }
 };
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   BilliardsSectoredIKDG s;
-  s.run (argc, argv);
+  s.run(argc, argv);
   return 0;
 }

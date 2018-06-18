@@ -23,8 +23,9 @@
 void DMPcommit(int chunkSize);
 void DMPprepareForExternalCall(int chunkSize);
 void DMPprepareForIndirectCall(int chunkSize, void* fnaddr);
-void DMPmembarrier(void);          // user memory barrier (send to next quantum)
-void DMPmembarrierResource(void);  // resource memory barrier (send to serial mode)
+void DMPmembarrier(void); // user memory barrier (send to next quantum)
+void DMPmembarrierResource(
+    void); // resource memory barrier (send to serial mode)
 
 // for debugging (see runtime-profiling.cpp)
 void DMPsetCodeLocation(int loc);
@@ -45,35 +46,35 @@ void DMPremoveBufferedRange(void* addr, size_t size);
 
 // Type specializations
 // Note that Int8* can never be an uncontained access.
-uint8_t  DMPloadBufferedContainedInt8  (uint8_t*  addr);
-uint16_t DMPloadBufferedContainedInt16 (uint16_t* addr);
-uint32_t DMPloadBufferedContainedInt32 (uint32_t* addr);
-uint64_t DMPloadBufferedContainedInt64 (uint64_t* addr);
-float    DMPloadBufferedContainedFloat (float*    addr);
-double   DMPloadBufferedContainedDouble(double*   addr);
-void*    DMPloadBufferedContainedPtr   (void**    addr);
+uint8_t DMPloadBufferedContainedInt8(uint8_t* addr);
+uint16_t DMPloadBufferedContainedInt16(uint16_t* addr);
+uint32_t DMPloadBufferedContainedInt32(uint32_t* addr);
+uint64_t DMPloadBufferedContainedInt64(uint64_t* addr);
+float DMPloadBufferedContainedFloat(float* addr);
+double DMPloadBufferedContainedDouble(double* addr);
+void* DMPloadBufferedContainedPtr(void** addr);
 
-uint16_t DMPloadBufferedRangeInt16 (uint16_t* addr);
-uint32_t DMPloadBufferedRangeInt32 (uint32_t* addr);
-uint64_t DMPloadBufferedRangeInt64 (uint64_t* addr);
-float    DMPloadBufferedRangeFloat (float*    addr);
-double   DMPloadBufferedRangeDouble(double*   addr);
-void*    DMPloadBufferedRangePtr   (void**    addr);
+uint16_t DMPloadBufferedRangeInt16(uint16_t* addr);
+uint32_t DMPloadBufferedRangeInt32(uint32_t* addr);
+uint64_t DMPloadBufferedRangeInt64(uint64_t* addr);
+float DMPloadBufferedRangeFloat(float* addr);
+double DMPloadBufferedRangeDouble(double* addr);
+void* DMPloadBufferedRangePtr(void** addr);
 
-void DMPstoreBufferedContainedInt8  (uint8_t*  addr, uint8_t  value);
-void DMPstoreBufferedContainedInt16 (uint16_t* addr, uint16_t value);
-void DMPstoreBufferedContainedInt32 (uint32_t* addr, uint32_t value);
-void DMPstoreBufferedContainedInt64 (uint64_t* addr, uint64_t value);
-void DMPstoreBufferedContainedFloat (float*    addr, float    value);
-void DMPstoreBufferedContainedDouble(double*   addr, double   value);
-void DMPstoreBufferedContainedPtr   (void**    addr, void*    value);
+void DMPstoreBufferedContainedInt8(uint8_t* addr, uint8_t value);
+void DMPstoreBufferedContainedInt16(uint16_t* addr, uint16_t value);
+void DMPstoreBufferedContainedInt32(uint32_t* addr, uint32_t value);
+void DMPstoreBufferedContainedInt64(uint64_t* addr, uint64_t value);
+void DMPstoreBufferedContainedFloat(float* addr, float value);
+void DMPstoreBufferedContainedDouble(double* addr, double value);
+void DMPstoreBufferedContainedPtr(void** addr, void* value);
 
-void DMPstoreBufferedRangeInt16 (uint16_t* addr, uint16_t value);
-void DMPstoreBufferedRangeInt32 (uint32_t* addr, uint32_t value);
-void DMPstoreBufferedRangeInt64 (uint64_t* addr, uint64_t value);
-void DMPstoreBufferedRangeFloat (float*    addr, float    value);
-void DMPstoreBufferedRangeDouble(double*   addr, double   value);
-void DMPstoreBufferedRangePtr   (void**    addr, void*    value);
+void DMPstoreBufferedRangeInt16(uint16_t* addr, uint16_t value);
+void DMPstoreBufferedRangeInt32(uint32_t* addr, uint32_t value);
+void DMPstoreBufferedRangeInt64(uint64_t* addr, uint64_t value);
+void DMPstoreBufferedRangeFloat(float* addr, float value);
+void DMPstoreBufferedRangeDouble(double* addr, double value);
+void DMPstoreBufferedRangePtr(void** addr, void* value);
 
 #else
 
@@ -147,9 +148,9 @@ typedef struct DMPsemaphore DMPsemaphore;
 int DMPmain(int argc, char** argv);
 
 // library-thread.cpp
-int DMPthread_create(pthread_t*, pthread_attr_t*,
-                     void *(*start_routine)(void*), void *arg);
-int DMPthread_join(pthread_t thread, void **value_ptr);
+int DMPthread_create(pthread_t*, pthread_attr_t*, void* (*start_routine)(void*),
+                     void* arg);
+int DMPthread_join(pthread_t thread, void** value_ptr);
 int DMPthread_cancel(pthread_t thread);
 
 // library-once.cpp
@@ -157,7 +158,8 @@ struct DMPonce {
   int done;
   DMPresource resource;
 };
-#define DMP_THREAD_ONCE_INITIALIZER  {0,DMP_RESOURCE_ONCE_INIT}
+#define DMP_THREAD_ONCE_INITIALIZER                                            \
+  { 0, DMP_RESOURCE_ONCE_INIT }
 int DMPonce_once(DMPonce* once, void (*init_routine)(void));
 
 // library-mutex.cpp
@@ -165,7 +167,8 @@ struct DMPmutex {
   int spinlock;
   DMPresource resource;
 };
-#define DMP_THREAD_MUTEX_INITIALIZER  {0,DMP_RESOURCE_MUTEX_INIT}
+#define DMP_THREAD_MUTEX_INITIALIZER                                           \
+  { 0, DMP_RESOURCE_MUTEX_INIT }
 int DMPmutex_init(DMPmutex* mutex, void* attr);
 int DMPmutex_destroy(DMPmutex* mutex);
 int DMPmutex_lock(DMPmutex* mutex);
@@ -174,13 +177,15 @@ int DMPmutex_unlock(DMPmutex* mutex);
 
 // library-rwlock.cpp
 struct DMPrwlock {
-  int state;           // 0 = free, -1 = owned by a writer, >1 = number of readers
-  int waiting_writers; // number of waiting writers, to prevent writer starvation
+  int state; // 0 = free, -1 = owned by a writer, >1 = number of readers
+  int waiting_writers; // number of waiting writers, to prevent writer
+                       // starvation
   DMPresource resource;
 };
-#define DMP_THREAD_RWLOCK_INITIALIZER  {0,0,DMP_RESOURCE_RWLOCK_INIT}
+#define DMP_THREAD_RWLOCK_INITIALIZER                                          \
+  { 0, 0, DMP_RESOURCE_RWLOCK_INIT }
 int DMPrwlock_init(DMPrwlock* rwlock, void* attr);
-int DMPrwlock_destroy(DMPrwlock* rwlock );
+int DMPrwlock_destroy(DMPrwlock* rwlock);
 int DMPrwlock_rdlock(DMPrwlock* rwlock);
 int DMPrwlock_wrlock(DMPrwlock* rwlock);
 int DMPrwlock_tryrdlock(DMPrwlock* rwlock);
@@ -192,7 +197,8 @@ struct DMPcondvar {
   DMPwaiter* first;
   DMPresource resource;
 };
-#define DMP_THREAD_COND_INITIALIZER  {NULL,DMP_RESOURCE_CONDVAR_INIT}
+#define DMP_THREAD_COND_INITIALIZER                                            \
+  { NULL, DMP_RESOURCE_CONDVAR_INIT }
 int DMPcondvar_init(DMPcondvar* C, void* attr);
 int DMPcondvar_destroy(DMPcondvar* C);
 int DMPcondvar_wait(DMPcondvar* C, DMPmutex* lock);
@@ -206,11 +212,11 @@ struct DMPbarrier {
   DMPwaiter* first;
   DMPresource resource;
 };
-int DMPbarrier_init(DMPbarrier *B, void* attr, unsigned needed);
-int DMPbarrier_destroy(DMPbarrier *B);
-int DMPbarrier_wait(DMPbarrier *B);
-int DMPbarrier_init_splash(DMPbarrier *B);
-int DMPbarrier_wait_splash(DMPbarrier *B, unsigned needed);
+int DMPbarrier_init(DMPbarrier* B, void* attr, unsigned needed);
+int DMPbarrier_destroy(DMPbarrier* B);
+int DMPbarrier_wait(DMPbarrier* B);
+int DMPbarrier_init_splash(DMPbarrier* B);
+int DMPbarrier_wait_splash(DMPbarrier* B, unsigned needed);
 
 // library-semaphore.cpp
 struct DMPsemaphore {
@@ -221,4 +227,4 @@ int DMPsemaphore_init(DMPsemaphore* sem, int pshared, unsigned value);
 int DMPsemaphore_wait(DMPsemaphore* sem);
 int DMPsemaphore_post(DMPsemaphore* sem);
 
-#endif  // _DMP_COMMON_H_
+#endif // _DMP_COMMON_H_

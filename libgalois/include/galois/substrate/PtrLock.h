@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,22 +37,23 @@ void ptr_slow_lock(std::atomic<uintptr_t>& l);
 /// uses the low order bit for the lock flag Copying a lock is
 /// unsynchronized (relaxed ordering)
 
-template<typename T>
+template <typename T>
 class PtrLock {
   std::atomic<uintptr_t> _lock;
 
   //  static_assert(alignof(T) > 1, "Bad data type alignment for PtrLock");
 
-
 public:
   constexpr PtrLock() : _lock(0) {}
-  //relaxed order for copy
+  // relaxed order for copy
   PtrLock(const PtrLock& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
 
   PtrLock& operator=(const PtrLock& p) {
-    if (&p == this) return *this;
-    //relaxed order for initialization
-    _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    if (&p == this)
+      return *this;
+    // relaxed order for initialization
+    _lock.store(p._lock.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
     return *this;
   }
 
@@ -60,7 +61,9 @@ public:
     uintptr_t oldval = _lock.load(std::memory_order_relaxed);
     if (oldval & 1)
       goto slow_path;
-    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+    if (!_lock.compare_exchange_weak(oldval, oldval | 1,
+                                     std::memory_order_acq_rel,
+                                     std::memory_order_relaxed))
       goto slow_path;
     assert(is_locked());
     return;
@@ -71,7 +74,8 @@ public:
 
   inline void unlock() {
     assert(is_locked());
-    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1, std::memory_order_release);
+    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1,
+                std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
@@ -82,7 +86,7 @@ public:
   inline void unlock_and_set(T* val) {
     assert(is_locked());
     assert(!((uintptr_t)val & 1));
-    _lock.store((uintptr_t) val, std::memory_order_release);
+    _lock.store((uintptr_t)val, std::memory_order_release);
   }
 
   inline T* getValue() const {
@@ -92,7 +96,7 @@ public:
   inline void setValue(T* val) {
     uintptr_t nval = (uintptr_t)val;
     nval |= (_lock & 1);
-    //relaxed OK since this doesn't clear lock
+    // relaxed OK since this doesn't clear lock
     _lock.store(nval, std::memory_order_relaxed);
   }
 
@@ -124,9 +128,10 @@ public:
   }
 };
 
-template<typename T>
+template <typename T>
 class DummyPtrLock {
   T* _lock;
+
 public:
   DummyPtrLock() : _lock() {}
 
@@ -145,9 +150,7 @@ public:
     }
     return false;
   }
-  inline bool stealing_CAS(T* oldval, T* newval) {
-    return CAS(oldval, newval);
-  }
+  inline bool stealing_CAS(T* oldval, T* newval) { return CAS(oldval, newval); }
 };
 
 } // end namespace substrate

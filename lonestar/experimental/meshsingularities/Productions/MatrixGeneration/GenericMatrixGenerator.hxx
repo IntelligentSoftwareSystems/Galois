@@ -18,55 +18,45 @@
 
 class GenericMatrixGenerator {
 
-	protected:
-		double** matrix;
-		double* rhs;
-		int matrix_size;
-		std::vector<EquationSystem*>* tier_vector;
+protected:
+  double** matrix;
+  double* rhs;
+  int matrix_size;
+  std::vector<EquationSystem*>* tier_vector;
 
-	public:
-		virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description) = 0;
-		virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...)) = 0;
+public:
+  virtual std::vector<EquationSystem*>*
+  CreateMatrixAndRhs(TaskDescription& task_description) = 0;
+  virtual void checkSolution(std::map<int, double>* solution_map,
+                             double (*f)(int dim, ...)) = 0;
 
-		double** GetMatrix()
-		{
-			return matrix;
-		}
+  double** GetMatrix() { return matrix; }
 
-		double* GetRhs()
-		{
-			return rhs;
-		}
+  double* GetRhs() { return rhs; }
 
-		int GetMatrixSize()
-		{
-			return matrix_size;
-		}
+  int GetMatrixSize() { return matrix_size; }
 
-		virtual std::vector<int>* GetProductionParameters(int polynomial_degree)
-		{
-			return new std::vector<int>();
-		}
+  virtual std::vector<int>* GetProductionParameters(int polynomial_degree) {
+    return new std::vector<int>();
+  }
 
-		virtual bool GetMumpsArrays(int*& in, int*& jn, double*& a, double*& rhs, int& n, int& nz)
-		{
-			return false;
-		}
+  virtual bool GetMumpsArrays(int*& in, int*& jn, double*& a, double*& rhs,
+                              int& n, int& nz) {
+    return false;
+  }
 
-		virtual ~GenericMatrixGenerator(){
-			for(int i = 0; i<matrix_size; i++)
-				delete[] matrix[i];
-			delete[] matrix;
-			delete[] rhs;
+  virtual ~GenericMatrixGenerator() {
+    for (int i = 0; i < matrix_size; i++)
+      delete[] matrix[i];
+    delete[] matrix;
+    delete[] rhs;
 
-			std::vector<EquationSystem*>::iterator it_t = tier_vector->begin();
-			for(; it_t != tier_vector->end(); ++it_t)
-				delete *it_t;
+    std::vector<EquationSystem*>::iterator it_t = tier_vector->begin();
+    for (; it_t != tier_vector->end(); ++it_t)
+      delete *it_t;
 
-			delete tier_vector;
-		}
-
+    delete tier_vector;
+  }
 };
-
 
 #endif /* MATRIXGENERATOR_HXX_ */

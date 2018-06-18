@@ -21,22 +21,22 @@ namespace llvm {
 
 /// SmallString - A SmallString is just a SmallVector with methods and accessors
 /// that make it work better as a string (e.g. operator+ etc).
-template<unsigned InternalLen>
+template <unsigned InternalLen>
 class SmallString : public SmallVector<char, InternalLen> {
 public:
   // Default ctor - Initialize to empty.
   SmallString() {}
 
   // Initialize from a StringRef.
-  SmallString(StringRef S) : SmallVector<char, InternalLen>(S.begin(), S.end()) {}
+  SmallString(StringRef S)
+      : SmallVector<char, InternalLen>(S.begin(), S.end()) {}
 
   // Initialize with a range.
-  template<typename ItTy>
+  template <typename ItTy>
   SmallString(ItTy S, ItTy E) : SmallVector<char, InternalLen>(S, E) {}
 
   // Copy ctor.
-  SmallString(const SmallString &RHS) : SmallVector<char, InternalLen>(RHS) {}
-
+  SmallString(const SmallString& RHS) : SmallVector<char, InternalLen>(RHS) {}
 
   // Extra methods.
   StringRef str() const { return StringRef(this->begin(), this->size()); }
@@ -52,21 +52,21 @@ public:
   operator StringRef() const { return str(); }
 
   // Extra operators.
-  const SmallString &operator=(StringRef RHS) {
+  const SmallString& operator=(StringRef RHS) {
     this->clear();
     return *this += RHS;
   }
 
-  SmallString &operator+=(StringRef RHS) {
+  SmallString& operator+=(StringRef RHS) {
     this->append(RHS.begin(), RHS.end());
     return *this;
   }
-  SmallString &operator+=(char C) {
+  SmallString& operator+=(char C) {
     this->push_back(C);
     return *this;
   }
 };
 
-}
+} // namespace llvm
 
 #endif

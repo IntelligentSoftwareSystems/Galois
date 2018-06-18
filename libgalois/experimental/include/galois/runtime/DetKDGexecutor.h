@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,14 +31,10 @@
 namespace galois {
 namespace runtime {
 
-enum KDGexecType {
-  KDG_R_ALT,
-  KDG_R,
-  KDG_AR,
-  IKDG
-};
+enum KDGexecType { KDG_R_ALT, KDG_R, KDG_AR, IKDG };
 
-template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
+template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc,
+          typename G>
 struct DetKDGexecutorAddRem {
 
   typedef galois::PerThreadBag<T> Bag_ty;
@@ -53,48 +49,38 @@ struct DetKDGexecutorAddRem {
   const char* loopname;
   unsigned rounds = 0;
 
-
   Bag_ty* currWL;
   Bag_ty* nextWL;
 
-
-  DetKDGexecutorAddRem (
-      const Cmp& cmp,
-      const NhoodFunc& nhoodVisitor,
-      const OpFunc& opFunc,
-      G& graph,
-      const char* loopname)
-    :
-      cmp (cmp),
-      nhoodVisitor (nhoodVisitor),
-      opFunc (opFunc),
-      graph (graph),
-      loopname (loopname)
-  {
-    currWL = new Bag_ty ();
-    nextWL = new Bag_ty ();
+  DetKDGexecutorAddRem(const Cmp& cmp, const NhoodFunc& nhoodVisitor,
+                       const OpFunc& opFunc, G& graph, const char* loopname)
+      : cmp(cmp), nhoodVisitor(nhoodVisitor), opFunc(opFunc), graph(graph),
+        loopname(loopname) {
+    currWL = new Bag_ty();
+    nextWL = new Bag_ty();
   }
 
-  ~DetKDGexecutorAddRem (void) {
-    delete currWL; currWL = nullptr;
-    delete nextWL; nextWL = nullptr;
+  ~DetKDGexecutorAddRem(void) {
+    delete currWL;
+    currWL = nullptr;
+    delete nextWL;
+    nextWL = nullptr;
   }
 
+  void push(const T& elem) {
 
-  void push (const T& elem) {
+    auto& elemData = graph.getData(elem, galois::MethodFlag::UNPROTECTED);
 
-    auto& elemData = graph.getData (elem, galois::MethodFlag::UNPROTECTED);
-
-    unsigned expected = rounds;
+    unsigned expected     = rounds;
     const unsigned update = rounds + 1;
-    if (elemData.onWL.cas (expected, update)) {
-      nextWL->get ().push_back (elem);
+    if (elemData.onWL.cas(expected, update)) {
+      nextWL->get().push_back(elem);
     }
   }
 
   struct ApplyOperator {
 
-    static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
+    static const unsigned CHUNK_SIZE    = OpFunc::CHUNK_SIZE;
     static const unsigned UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
 
     typedef int tt_does_not_need_push;
@@ -102,59 +88,43 @@ struct DetKDGexecutorAddRem {
     DetKDGexecutorAddRem& outer;
 
     template <typename C>
-    void operator () (const T& elem, C& ctx) {
-      outer.opFunc (elem, outer);
+    void operator()(const T& elem, C& ctx) {
+      outer.opFunc(elem, outer);
     }
   };
 
   template <typename R>
-  void execute (const R& range, KDGexecType kdgType) {
+  void execute(const R& range, KDGexecType kdgType) {
 
-    galois::runtime::do_all_gen (
-        range,
-        [this] (const T& elem) {
-          push (elem);
-        },
-        "push_initial",
-        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+    galois::runtime::do_all_gen(range, [this](const T& elem) { push(elem); },
+                                "push_initial",
+                                galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     rounds = 0;
     galois::Timer t_exec;
-    while (!nextWL->empty_all ()) {
+    while (!nextWL->empty_all()) {
       ++rounds;
-      std::swap (currWL, nextWL);
-      nextWL->clear_all_parallel ();
+      std::swap(currWL, nextWL);
+      nextWL->clear_all_parallel();
 
-      t_exec.start ();
+      t_exec.start();
       switch (kdgType) {
-        case KDG_R_ALT:
-          for_each_ordered_dag_alt (
-              galois::runtime::makeLocalRange (*currWL),
-              cmp,
-              nhoodVisitor,
-              ApplyOperator{*this},
-              "kdg_r");
-          break;
+      case KDG_R_ALT:
+        for_each_ordered_dag_alt(galois::runtime::makeLocalRange(*currWL), cmp,
+                                 nhoodVisitor, ApplyOperator{*this}, "kdg_r");
+        break;
 
-        case KDG_R:
-          for_each_ordered_dag (
-              galois::runtime::makeLocalRange (*currWL),
-              cmp,
-              nhoodVisitor,
-              ApplyOperator{*this},
-              "kdg_r");
-          break;
+      case KDG_R:
+        for_each_ordered_dag(galois::runtime::makeLocalRange(*currWL), cmp,
+                             nhoodVisitor, ApplyOperator{*this}, "kdg_r");
+        break;
 
-        case KDG_AR:
-          for_each_ordered_lc (
-              galois::runtime::makeLocalRange (*currWL),
-              cmp,
-              nhoodVisitor,
-              ApplyOperator{*this},
-              "kdg_ar");
-          break;
+      case KDG_AR:
+        for_each_ordered_lc(galois::runtime::makeLocalRange(*currWL), cmp,
+                            nhoodVisitor, ApplyOperator{*this}, "kdg_ar");
+        break;
 
-        //case IKDG:
+        // case IKDG:
         //  for_each_ordered_2p_win (
         //      galois::runtime::makeLocalRange (*currWL),
         //      cmp,
@@ -163,43 +133,45 @@ struct DetKDGexecutorAddRem {
         //      "ikdg", false); // false to avoid toggling threadPool wakeup
         //  break;
 
-        default:
-          std::abort ();
+      default:
+        std::abort();
 
       } // end switch
-      t_exec.stop ();
+      t_exec.stop();
 
       if (rounds >= 2) {
         // break; // TODO: remove
       }
-      // std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds, t_exec.get ());
+      // std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds,
+      // t_exec.get ());
 
     } // end while
 
-    std::printf ("DetKDGexecutorAddRem: performed %d rounds\n", rounds);
-
+    std::printf("DetKDGexecutorAddRem: performed %d rounds\n", rounds);
   }
-
-
 };
 
+template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc,
+          typename G>
+void for_each_det_kdg(const R& initRange, const Cmp& cmp,
+                      const NhoodFunc& nhoodVisitor, const OpFunc& opFunc,
+                      G& graph, const char* loopname,
+                      const KDGexecType& kdgType) {
 
-template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor,
-    const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
-
-  galois::substrate::getThreadPool ().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   typedef typename R::value_type T;
 
-  DetKDGexecutorAddRem<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
+  DetKDGexecutorAddRem<T, Cmp, NhoodFunc, OpFunc, G> executor{
+      cmp, nhoodVisitor, opFunc, graph, loopname};
 
-  executor.execute (initRange, kdgType);
+  executor.execute(initRange, kdgType);
 
-  galois::substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool().beKind();
 }
 
-template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
+template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc,
+          typename G>
 struct DetKDG_AddRem_reuseDAG {
 
   typedef galois::PerThreadBag<T> Bag_ty;
@@ -215,24 +187,13 @@ struct DetKDG_AddRem_reuseDAG {
   unsigned rounds = 0;
   galois::GAccumulator<size_t> numPushes;
 
-
-  DetKDG_AddRem_reuseDAG (
-      const Cmp& cmp,
-      const NhoodFunc& nhoodVisitor,
-      const OpFunc& opFunc,
-      G& graph,
-      const char* loopname)
-    :
-      cmp (cmp),
-      nhoodVisitor (nhoodVisitor),
-      opFunc (opFunc),
-      graph (graph),
-      loopname (loopname)
-  {
-  }
+  DetKDG_AddRem_reuseDAG(const Cmp& cmp, const NhoodFunc& nhoodVisitor,
+                         const OpFunc& opFunc, G& graph, const char* loopname)
+      : cmp(cmp), nhoodVisitor(nhoodVisitor), opFunc(opFunc), graph(graph),
+        loopname(loopname) {}
 
   struct ApplyOperator {
-    static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
+    static const unsigned CHUNK_SIZE    = OpFunc::CHUNK_SIZE;
     static const unsigned UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
 
     typedef int tt_does_not_need_push;
@@ -240,83 +201,82 @@ struct DetKDG_AddRem_reuseDAG {
     DetKDG_AddRem_reuseDAG& outer;
 
     template <typename C>
-    void operator () (T elem, C& ctx) {
-      auto& edata = outer.graph.getData (elem, galois::MethodFlag::UNPROTECTED);
+    void operator()(T elem, C& ctx) {
+      auto& edata = outer.graph.getData(elem, galois::MethodFlag::UNPROTECTED);
 
       if (edata.onWL > 0) {
-        outer.opFunc (elem, outer);
+        outer.opFunc(elem, outer);
         --(edata.onWL);
       }
     }
   };
 
-  void push (const T& elem) {
+  void push(const T& elem) {
     numPushes += 1;
-    auto& edata = graph.getData (elem, galois::MethodFlag::UNPROTECTED);
+    auto& edata = graph.getData(elem, galois::MethodFlag::UNPROTECTED);
     ++(edata.onWL);
   }
 
   template <typename R>
-  void execute (const R& initRange) {
+  void execute(const R& initRange) {
 
-    galois::runtime::do_all_gen (
-        initRange,
-        [this] (T node) {
-          push (node);
-        },
-        "push_initial",
-        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+    galois::runtime::do_all_gen(initRange, [this](T node) { push(node); },
+                                "push_initial",
+                                galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
-    auto* dagExec = make_dag_executor (initRange, cmp, nhoodVisitor, ApplyOperator{*this}, loopname);
+    auto* dagExec = make_dag_executor(initRange, cmp, nhoodVisitor,
+                                      ApplyOperator{*this}, loopname);
 
     dagExec->initialize(initRange);
-
 
     galois::Timer t_exec;
     rounds = 0;
     while (true) {
       ++rounds;
 
-      t_exec.start ();
-      dagExec->execute ();
-      t_exec.stop ();
+      t_exec.start();
+      dagExec->execute();
+      t_exec.stop();
 
-      if (numPushes.reduceRO () == 0) {
+      if (numPushes.reduceRO() == 0) {
         break;
       }
-      // std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
+      // std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n",
+      // rounds, t_exec.get ());
 
       abort();
-      //FIXME:      dagExec->reinitDAG ();
-      numPushes.reset ();
+      // FIXME:      dagExec->reinitDAG ();
+      numPushes.reset();
     }
 
     // destroy_dag_executor (dagExec);
-    delete dagExec; dagExec = nullptr;
+    delete dagExec;
+    dagExec = nullptr;
 
-    std::printf ("DetKDG_AddRem_reuseDAG: performed %d rounds\n", rounds);
+    std::printf("DetKDG_AddRem_reuseDAG: performed %d rounds\n", rounds);
   }
-
-
 };
 
+template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc,
+          typename G>
+void for_each_det_kdg_ar_reuse(const R& initRange, const Cmp& cmp,
+                               const NhoodFunc& nhoodVisitor,
+                               const OpFunc& opFunc, G& graph,
+                               const char* loopname) {
 
-template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor,
-    const OpFunc& opFunc, G& graph, const char* loopname) {
-
-  galois::substrate::getThreadPool().burnPower (galois::getActiveThreads ());
+  galois::substrate::getThreadPool().burnPower(galois::getActiveThreads());
 
   typedef typename R::value_type T;
 
-  DetKDG_AddRem_reuseDAG<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
+  DetKDG_AddRem_reuseDAG<T, Cmp, NhoodFunc, OpFunc, G> executor{
+      cmp, nhoodVisitor, opFunc, graph, loopname};
 
-  executor.execute (initRange);
+  executor.execute(initRange);
 
-  galois::substrate::getThreadPool ().beKind ();
+  galois::substrate::getThreadPool().beKind();
 }
 
-} //end namespace runtime
+} // end namespace runtime
 } // end namespace galois
 
 #endif // GALOIS_RUNTIME_DET_KDG_EXECUTOR_H

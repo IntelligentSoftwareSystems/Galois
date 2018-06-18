@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,46 +23,47 @@
 
 namespace {
 
-class CountingBarrier: public galois::substrate::Barrier {
+class CountingBarrier : public galois::substrate::Barrier {
   std::atomic<unsigned> count;
   std::atomic<bool> sense;
   unsigned num;
-  std::vector<galois::substrate::CacheLineStorage<bool> > local_sense;
+  std::vector<galois::substrate::CacheLineStorage<bool>> local_sense;
 
   void _reinit(unsigned val) {
     count = num = val;
-    sense = false;
+    sense       = false;
     local_sense.resize(val);
     for (unsigned i = 0; i < val; ++i)
       local_sense.at(i).get() = false;
   }
 
 public:
-  CountingBarrier(unsigned int activeT) {
-    _reinit(activeT);
-  }
+  CountingBarrier(unsigned int activeT) { _reinit(activeT); }
 
   virtual ~CountingBarrier() {}
 
   virtual void reinit(unsigned val) { _reinit(val); }
 
   virtual void wait() {
-    bool& lsense = local_sense.at(galois::substrate::ThreadPool::getTID()).get();
+    bool& lsense =
+        local_sense.at(galois::substrate::ThreadPool::getTID()).get();
     lsense = !lsense;
     if (--count == 0) {
       count = num;
       sense = lsense;
     } else {
-      while (sense != lsense) { galois::substrate::asmPause(); }
+      while (sense != lsense) {
+        galois::substrate::asmPause();
+      }
     }
   }
 
   virtual const char* name() const { return "CountingBarrier"; }
 };
 
-}
+} // namespace
 
-std::unique_ptr<galois::substrate::Barrier> galois::substrate::createCountingBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier>
+galois::substrate::createCountingBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new CountingBarrier(activeThreads));
 }
-

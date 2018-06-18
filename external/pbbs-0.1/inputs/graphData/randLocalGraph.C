@@ -31,55 +31,60 @@ using namespace benchIO;
 using namespace dataGen;
 using namespace std;
 
-// Generates an undirected graph with n vertices with approximately degree 
+// Generates an undirected graph with n vertices with approximately degree
 // neighbors per vertex.
 // Edges  are distributed so they appear to come from
 // a dim-dimensional space.   In particular an edge (i,j) will have
-// probability roughly proportional to (1/|i-j|)^{(d+1)/d}, giving 
-// separators of size about n^{(d-1)/d}.    
+// probability roughly proportional to (1/|i-j|)^{(d+1)/d}, giving
+// separators of size about n^{(d-1)/d}.
 edgeArray edgeRandomWithDimension(int dim, int degree, int numRows) {
-  int nonZeros = numRows*degree;
-  edge *E = newA(edge,nonZeros);
+  int nonZeros = numRows * degree;
+  edge* E      = newA(edge, nonZeros);
 
-//  parallel_for (int k=0; k < nonZeros; k++) {
-  parallel_doall(int, k, 0, nonZeros)  {
+  //  parallel_for (int k=0; k < nonZeros; k++) {
+  parallel_doall(int, k, 0, nonZeros) {
     int i = k / degree;
     int j;
-    if (dim==0) {
+    if (dim == 0) {
       unsigned int h = k;
       do {
-	j = ((h = dataGen::hash<int>(h)) % numRows);
+        j = ((h = dataGen::hash<int>(h)) % numRows);
       } while (j == i);
     } else {
-      int pow = dim+2;
+      int pow        = dim + 2;
       unsigned int h = k;
       do {
-	while ((((h = dataGen::hash<int>(h)) % 1000003) < 500001)) pow += dim;
-	j = (i + ((h = dataGen::hash<int>(h)) % (((long) 1) << pow))) % numRows;
+        while ((((h = dataGen::hash<int>(h)) % 1000003) < 500001))
+          pow += dim;
+        j = (i + ((h = dataGen::hash<int>(h)) % (((long)1) << pow))) % numRows;
       } while (j == i);
     }
-    E[k].u = i;  E[k].v = j;
-  } parallel_doall_end
-  return edgeArray(E,numRows,numRows,nonZeros);
+    E[k].u = i;
+    E[k].v = j;
+  }
+  parallel_doall_end return edgeArray(E, numRows, numRows, nonZeros);
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-m <numedges>] [-d <dims>] [-o] [-j] n <outFile>");
-  pair<int,char*> in = P.sizeAndFileName();
-  int n = in.first;
-  char* fname = in.second;
-  int dim = P.getOptionIntValue("-d", 0);
-  int m = P.getOptionIntValue("-m", 10*n);
-  bool ordered = P.getOption("-o");
-  bool adjArray = P.getOption("-j");
-  edgeArray EA = edgeRandomWithDimension(dim, m/n, n);
+  commandLine P(argc, argv,
+                "[-m <numedges>] [-d <dims>] [-o] [-j] n <outFile>");
+  pair<int, char*> in = P.sizeAndFileName();
+  int n               = in.first;
+  char* fname         = in.second;
+  int dim             = P.getOptionIntValue("-d", 0);
+  int m               = P.getOptionIntValue("-m", 10 * n);
+  bool ordered        = P.getOption("-o");
+  bool adjArray       = P.getOption("-j");
+  edgeArray EA        = edgeRandomWithDimension(dim, m / n, n);
   if (adjArray) {
-    graph G = graphFromEdges(EA,1);
-    if (!ordered) G = graphReorder(G, NULL);
+    graph G = graphFromEdges(EA, 1);
+    if (!ordered)
+      G = graphReorder(G, NULL);
     return writeGraphToFile(G, fname);
   } else {
-    if (!ordered) std::random_shuffle(EA.E, EA.E + EA.nonZeros);
+    if (!ordered)
+      std::random_shuffle(EA.E, EA.E + EA.nonZeros);
     return writeEdgeArrayToFile(EA, fname);
   }
 }

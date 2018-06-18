@@ -31,52 +31,55 @@ using namespace std;
 using namespace benchIO;
 
 struct strLess {
-  bool operator() (char* s1c, char* s2c) {
-    char* s1 = s1c, *s2 = s2c;
-    while (*s1 && *s1==*s2) {s1++; s2++;};
+  bool operator()(char* s1c, char* s2c) {
+    char *s1 = s1c, *s2 = s2c;
+    while (*s1 && *s1 == *s2) {
+      s1++;
+      s2++;
+    };
     return (*s1 < *s2);
   }
 };
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<infile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  seqData In = readSequenceFromFile(fnames.first);
-  seqData Out = readSequenceFromFile(fnames.second);
-  int n = In.n;
-  elementType dt = In.dt;
+  commandLine P(argc, argv, "<infile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  seqData In                = readSequenceFromFile(fnames.first);
+  seqData Out               = readSequenceFromFile(fnames.second);
+  int n                     = In.n;
+  elementType dt            = In.dt;
   if (dt != Out.dt) {
     cout << "compSortCheck: types don't match" << endl;
-    return(1);
+    return (1);
   }
   if (n != Out.n) {
     cout << "compSortCheck: lengths dont' match" << endl;
-    return(1);
+    return (1);
   }
 
   if (dt == doubleT) {
-    double* A = (double*) In.A;
-    double* B = (double*) Out.A;
+    double* A = (double*)In.A;
+    double* B = (double*)Out.A;
     compSort(A, n, less<double>());
-    for(int i=0; i < n; i++) {
+    for (int i = 0; i < n; i++) {
       if (A[i] != B[i]) {
-	cout << "compSortCheck: check failed at i=" << i << endl;
-	abort();
+        cout << "compSortCheck: check failed at i=" << i << endl;
+        abort();
       }
     }
   } else if (dt == stringT) {
-    char** A = (char**) In.A;
-    char** B = (char**) Out.A;
+    char** A = (char**)In.A;
+    char** B = (char**)Out.A;
     compSort(A, n, strLess());
-    for(int i=0; i < n; i++) {
-      if (strcmp(A[i],B[i])) {
-	cout << "compSortCheck: check failed at i=" << i << endl;
-	abort();
+    for (int i = 0; i < n; i++) {
+      if (strcmp(A[i], B[i])) {
+        cout << "compSortCheck: check failed at i=" << i << endl;
+        abort();
       }
     }
   } else {
     cout << "CompSortCheck: input files not of right type" << endl;
-    return(1);
+    return (1);
   }
 }

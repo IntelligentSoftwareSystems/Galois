@@ -17,53 +17,57 @@ const char* desc = "Performs inclusion-based points-to analysis over the input "
                    "constraints.";
 const char* url = NULL;
 
-static cll::opt<std::string> input(cll::Positional, 
-                                   cll::desc("Constraints file"), 
-                                   cll::Required);
+static cll::opt<std::string>
+    input(cll::Positional, cll::desc("Constraints file"), cll::Required);
 
-static cll::opt<bool> useSerial("serial",
-                                cll::desc("Runs serial version of the algorithm "
-                                          "(i.e. 1 thread, no galois::for_each) "
-                                          "(default false)"), 
-                                cll::init(false));
+static cll::opt<bool>
+    useSerial("serial",
+              cll::desc("Runs serial version of the algorithm "
+                        "(i.e. 1 thread, no galois::for_each) "
+                        "(default false)"),
+              cll::init(false));
 
-static cll::opt<bool> printAnswer("printAnswer",
-                                cll::desc("If set, prints all points to facts "
-                                          "at the end"),
-                                cll::init(false));
+static cll::opt<bool>
+    printAnswer("printAnswer",
+                cll::desc("If set, prints all points to facts "
+                          "at the end"),
+                cll::init(false));
 
-static cll::opt<bool> useCycleDetection("ocd",
-                                cll::desc("If set, online cycle detection is"
-                                          " used in algorithm (serial only) "
-                                          "(default false)"),
-                                cll::init(false));
+static cll::opt<bool>
+    useCycleDetection("ocd",
+                      cll::desc("If set, online cycle detection is"
+                                " used in algorithm (serial only) "
+                                "(default false)"),
+                      cll::init(false));
 
-static cll::opt<unsigned> THRESHOLD_LS("lsThreshold",
-                            cll::desc("Determines how many constraints to "
-                                      "process before load/store constraints "
-                                      "are reprocessed (serial only) "
-                                      "(default 500000)"),
-                            cll::init(500000));
+static cll::opt<unsigned>
+    THRESHOLD_LS("lsThreshold",
+                 cll::desc("Determines how many constraints to "
+                           "process before load/store constraints "
+                           "are reprocessed (serial only) "
+                           "(default 500000)"),
+                 cll::init(500000));
 
 ////////////////////////////////////////////////////////////////////////////////
 // Declaration of strutures, types, and variables
 ////////////////////////////////////////////////////////////////////////////////
 
-
 /**
  * Class representing a points-to constraint.
  */
 class PtsToCons {
- public:
-  using ConstraintType = enum {AddressOf = 0, Copy, Load, Store};
- private:
+public:
+  using ConstraintType = enum { AddressOf = 0, Copy, Load, Store };
+
+private:
   unsigned src;
   unsigned dst;
   ConstraintType type;
- public:
+
+public:
   PtsToCons(ConstraintType tt, unsigned ss, unsigned dd) {
-    src = ss;
-    dst = dd;
+    src  = ss;
+    dst  = dd;
     type = tt;
   }
 
@@ -77,9 +81,7 @@ class PtsToCons {
   /**
    * @returns The type of this constraint
    */
-  ConstraintType getType() const {
-    return type;
-  }
+  ConstraintType getType() const { return type; }
 
   /**
    * Print out this constraint to stderr
@@ -116,30 +118,32 @@ class PTABase {
   using SparseBitVector = galois::SparseBitVector<IsConcurrent>;
 
   using PointsToConstraints = std::vector<PtsToCons>;
-  using PointsToInfo = std::vector<SparseBitVector>;
-  using EdgeVector = std::vector<SparseBitVector>;
+  using PointsToInfo        = std::vector<SparseBitVector>;
+  using EdgeVector          = std::vector<SparseBitVector>;
 
-  using NodeAllocator = galois::FixedSizeAllocator<typename SparseBitVector::Node>;
+  using NodeAllocator =
+      galois::FixedSizeAllocator<typename SparseBitVector::Node>;
 
- protected:
+protected:
   PointsToInfo pointsToResult; // pointsTo results for nodes
-  EdgeVector outgoingEdges; // holds outgoing edges of a node
+  EdgeVector outgoingEdges;    // holds outgoing edges of a node
 
-  PointsToConstraints addressCopyConstraints; 
+  PointsToConstraints addressCopyConstraints;
   PointsToConstraints loadStoreConstraints;
 
   size_t numNodes = 0;
 
-////////////////////////////////////////////////////////////////////////////////
-  /** 
+  ////////////////////////////////////////////////////////////////////////////////
+  /**
    * Online Cycle Detection and elimination structure + functions.
    */
   struct OnlineCycleDetection {
-   private:
-    PTABase<IsConcurrent>& outerPTA; // reference to outer PTA instance to get runtime info
+  private:
+    PTABase<IsConcurrent>&
+        outerPTA; // reference to outer PTA instance to get runtime info
 
     galois::gstl::Vector<unsigned> ancestors; // TODO find better representation
-    galois::gstl::Vector<bool> visited; // TODO use better representation
+    galois::gstl::Vector<bool> visited;       // TODO use better representation
     galois::gstl::Vector<unsigned> representative;
 
     unsigned NoRepresentative; // "constant" that represents no representative
@@ -163,7 +167,7 @@ class PTABase {
      * then collapsed, i.e. all nodes in the cycle have their representative
      * changed to the representative of the node where the cycle starts.
      *
-     * Note it is okay not to detect all cycles as it is only an efficiency 
+     * Note it is okay not to detect all cycles as it is only an efficiency
      * concern.
      *
      * @param nodeid nodeid to check the existance of a cycle
@@ -172,7 +176,7 @@ class PTABase {
      * @returns true if a cycle has been detected (i.e. a node has a path
      * to an ancestor), false otherwise
      */
-    bool cycleDetect(unsigned nodeID, unsigned &cycleNode) {  
+    bool cycleDetect(unsigned nodeID, unsigned& cycleNode) {
       unsigned nodeRep = getFinalRepresentative(nodeID);
 
       // if the node is an ancestor, that means there's a path from the ancestor
@@ -193,8 +197,8 @@ class PTABase {
 
       // don't use an iterator here because outgoing edges might get updated
       // during this loop
-      std::vector<unsigned> repOutgoingEdges = 
-        outerPTA.outgoingEdges[nodeRep].getAllSetBits();
+      std::vector<unsigned> repOutgoingEdges =
+          outerPTA.outgoingEdges[nodeRep].getAllSetBits();
 
       for (auto dst : repOutgoingEdges) {
         // recursive depth first cycle detection; if a cycle is found,
@@ -225,7 +229,7 @@ class PTABase {
           // cycle exists between nodes ancestors[*ii..end].
           for (auto jj = ii; jj != ancestors.end(); ++jj) {
             // jjRepr has no representative.
-            unsigned jjRepr = getFinalRepresentative(*jj);  
+            unsigned jjRepr = getFinalRepresentative(*jj);
             makeRepr(jjRepr, repToChangeTo);
           }
 
@@ -249,18 +253,20 @@ class PTABase {
         // the representative needs to have all of the items that the nodes
         // it is representing has, so if the node has more than the rep,
         // unify
-        if (!outerPTA.pointsToResult[nodeID].isSubsetEq(outerPTA.pointsToResult[repr])) {
+        if (!outerPTA.pointsToResult[nodeID].isSubsetEq(
+                outerPTA.pointsToResult[repr])) {
           outerPTA.pointsToResult[repr].unify(outerPTA.pointsToResult[nodeID]);
         }
 
         // unify edges as well if necessary since rep represents it now
-        if (!outerPTA.outgoingEdges[nodeID].isSubsetEq(outerPTA.outgoingEdges[repr])) {
+        if (!outerPTA.outgoingEdges[nodeID].isSubsetEq(
+                outerPTA.outgoingEdges[repr])) {
           outerPTA.outgoingEdges[repr].unify(outerPTA.outgoingEdges[nodeID]);
         }
       }
     }
 
-   public:
+  public:
     OnlineCycleDetection(PTABase<IsConcurrent>& o) : outerPTA(o) {}
 
     /**
@@ -297,8 +303,8 @@ class PTABase {
 
       while (curRep != NoRepresentative) {
         representative[nodeid] = finalRep;
-        nodeid = curRep;
-        curRep = representative[nodeid];
+        nodeid                 = curRep;
+        curRep                 = representative[nodeid];
       }
 
       return finalRep;
@@ -310,7 +316,7 @@ class PTABase {
      *
      * @param updates vector of nodes that are sources of new edges.
      */
-    template<typename VecType>
+    template <typename VecType>
     void process(VecType& updates) {
       if (!useCycleDetection) {
         return;
@@ -321,7 +327,7 @@ class PTABase {
         visited[ii] = false;
       }
 
-      unsigned cycleNode = NoRepresentative;  // set to invalid id.
+      unsigned cycleNode = NoRepresentative; // set to invalid id.
 
       for (unsigned update : updates) {
         galois::gDebug("cycle process ", update);
@@ -332,15 +338,15 @@ class PTABase {
       }
     }
   }; // end struct OnlineCycleDetection
-////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
 
-  OnlineCycleDetection ocd; // cycle detector/squasher; only works with serial 
+  OnlineCycleDetection ocd; // cycle detector/squasher; only works with serial
 
   /**
    * Adds edges to the graph based on load/store constraints.
    *
    * A load from src -> dst means anything that src points to must also
-   * point to dst. 
+   * point to dst.
    *
    * A store from src -> dst means src must point to anything
    * that dst points to.
@@ -355,60 +361,55 @@ class PTABase {
    * @param updates output variable that will have updated nodes added to it
    */
   template <typename LoopInvoker, typename VecType>
-  void processLoadStore(const PointsToConstraints &constraints,
+  void processLoadStore(const PointsToConstraints& constraints,
                         VecType& updates) {
-    
-    LoopInvoker() (
-      galois::iterate(constraints),
-      [&] (auto constraint) {
-        unsigned src;
-        unsigned dst;
-        std::tie(src, dst) = constraint.getSrcDst();
 
-        unsigned srcRepr = ocd.getFinalRepresentative(src);
-        unsigned dstRepr = ocd.getFinalRepresentative(dst);
+    LoopInvoker()(galois::iterate(constraints), [&](auto constraint) {
+      unsigned src;
+      unsigned dst;
+      std::tie(src, dst) = constraint.getSrcDst();
 
-        if (constraint.getType() == PtsToCons::Load) { 
-          for (auto pointee = pointsToResult[srcRepr].begin();
-               pointee != pointsToResult[srcRepr].end();
-               pointee++) {
-            unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
+      unsigned srcRepr = ocd.getFinalRepresentative(src);
+      unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
-            // add edge from pointee to dst if it doesn't already exist
-            if (pointeeRepr != dstRepr && 
-                !outgoingEdges[pointeeRepr].test(dstRepr)) {
-              outgoingEdges[pointeeRepr].set(dstRepr);
+      if (constraint.getType() == PtsToCons::Load) {
+        for (auto pointee = pointsToResult[srcRepr].begin();
+             pointee != pointsToResult[srcRepr].end(); pointee++) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
 
-              updates.push_back(pointeeRepr);
-            }
-          }
-        } else {  // store whatever src has into whatever dst points to
-          bool newEdgeAdded = false;
+          // add edge from pointee to dst if it doesn't already exist
+          if (pointeeRepr != dstRepr &&
+              !outgoingEdges[pointeeRepr].test(dstRepr)) {
+            outgoingEdges[pointeeRepr].set(dstRepr);
 
-          for (auto pointee = pointsToResult[dstRepr].begin();
-               pointee != pointsToResult[dstRepr].end();
-               pointee++) {
-            unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
-
-            // add edge from src -> pointee if it doesn't exist
-            if (srcRepr != pointeeRepr && 
-                !outgoingEdges[srcRepr].test(pointeeRepr)) {
-              outgoingEdges[srcRepr].set(pointeeRepr);
-
-              newEdgeAdded = true;
-            }
-          }
-
-          if (newEdgeAdded) {
-            updates.push_back(srcRepr);
+            updates.push_back(pointeeRepr);
           }
         }
+      } else { // store whatever src has into whatever dst points to
+        bool newEdgeAdded = false;
+
+        for (auto pointee = pointsToResult[dstRepr].begin();
+             pointee != pointsToResult[dstRepr].end(); pointee++) {
+          unsigned pointeeRepr = ocd.getFinalRepresentative(*pointee);
+
+          // add edge from src -> pointee if it doesn't exist
+          if (srcRepr != pointeeRepr &&
+              !outgoingEdges[srcRepr].test(pointeeRepr)) {
+            outgoingEdges[srcRepr].set(pointeeRepr);
+
+            newEdgeAdded = true;
+          }
+        }
+
+        if (newEdgeAdded) {
+          updates.push_back(srcRepr);
+        }
       }
-    );
+    });
   }
 
   /**
-   * Processes the AddressOf, Copy constraints. 
+   * Processes the AddressOf, Copy constraints.
    *
    * Sets the bitvector for AddressOf constraints, i.e. a set bit means
    * that you point to whatever that bit represents.
@@ -428,22 +429,19 @@ class PTABase {
   VecType processAddressOfCopy(const PointsToConstraints& constraints) {
     VecType updates;
 
-    LoopInvoker() (
-      galois::iterate(constraints),
-      [&] (auto ii) {
-        unsigned src;
-        unsigned dst;
+    LoopInvoker()(galois::iterate(constraints), [&](auto ii) {
+      unsigned src;
+      unsigned dst;
 
-        std::tie(src, dst) = ii.getSrcDst();
+      std::tie(src, dst) = ii.getSrcDst();
 
-        if (ii.getType() == PtsToCons::AddressOf) { // addressof; save point info
-          pointsToResult[dst].set(src);
-        } else if (src != dst) {  // copy constraint; add an edge
-          outgoingEdges[src].set(dst);
-          updates.push_back(src);
-        }
+      if (ii.getType() == PtsToCons::AddressOf) { // addressof; save point info
+        pointsToResult[dst].set(src);
+      } else if (src != dst) { // copy constraint; add an edge
+        outgoingEdges[src].set(dst);
+        updates.push_back(src);
       }
-    );
+    });
 
     return updates;
   }
@@ -463,21 +461,21 @@ class PTABase {
       unsigned srcRepr = ocd.getFinalRepresentative(src);
       unsigned dstRepr = ocd.getFinalRepresentative(dst);
 
-      // if src is a not subset of dst... (i.e. src has more), then 
+      // if src is a not subset of dst... (i.e. src has more), then
       // propogate src's points to info to dst
-      if (srcRepr != dstRepr && 
+      if (srcRepr != dstRepr &&
           !pointsToResult[srcRepr].isSubsetEq(pointsToResult[dstRepr])) {
         galois::gDebug("unifying ", dstRepr, " by ", srcRepr);
         // newPtsTo is positive if changes are made
         newPtsTo += pointsToResult[dstRepr].unify(pointsToResult[srcRepr]);
-      } 
+      }
     }
 
     return newPtsTo;
   }
 
- public:
-  PTABase() : ocd(*this) { }
+public:
+  PTABase() : ocd(*this) {}
 
   /**
    * Given the number of nodes in the constraint graph, initialize the
@@ -509,23 +507,23 @@ class PTABase {
    * @param file filename to read
    * @returns number of nodes in the constraint graph
    */
-  unsigned readConstraints(const char *file) {
+  unsigned readConstraints(const char* file) {
     galois::gInfo("GEP constraints (constraint type 4) and any constraints "
                   "with offsets are ignored.");
 
-    unsigned numNodes = 0;
+    unsigned numNodes     = 0;
     unsigned nconstraints = 0;
 
     std::ifstream cfile(file);
     std::string cstr;
 
-    getline(cfile, cstr);   // # of vars.
+    getline(cfile, cstr); // # of vars.
     sscanf(cstr.c_str(), "%d", &numNodes);
 
-    getline(cfile, cstr);   // # of constraints.
+    getline(cfile, cstr); // # of constraints.
     sscanf(cstr.c_str(), "%d", &nconstraints);
 
-    addressCopyConstraints.clear(); 
+    addressCopyConstraints.clear();
     loadStoreConstraints.clear();
 
     unsigned constraintNum;
@@ -538,9 +536,12 @@ class PTABase {
     // Create constraint objects and save them to appropriate location
     for (unsigned ii = 0; ii < nconstraints; ++ii) {
       getline(cfile, cstr);
-      union { int as_int; PtsToCons::ConstraintType as_ctype; } type_converter;
-      sscanf(cstr.c_str(), "%d,%d,%d,%d,%d", 
-             &constraintNum, &src, &dst, &type_converter.as_int, &offset);
+      union {
+        int as_int;
+        PtsToCons::ConstraintType as_ctype;
+      } type_converter;
+      sscanf(cstr.c_str(), "%d,%d,%d,%d,%d", &constraintNum, &src, &dst,
+             &type_converter.as_int, &offset);
 
       type = type_converter.as_ctype;
 
@@ -551,8 +552,8 @@ class PTABase {
       } else if (type == PtsToCons::Load || type == PtsToCons::Store) {
         if (offset == 0) { // ignore load/stores with offsets
           loadStoreConstraints.push_back(cc);
-        } 
-      } 
+        }
+      }
       // ignore GEP constraints
     }
 
@@ -570,7 +571,7 @@ class PTABase {
    *
    * @param constraints vector of PtsToCons
    */
-  void printConstraints(PointsToConstraints &constraints) {
+  void printConstraints(PointsToConstraints& constraints) {
     for (auto ii = constraints.begin(); ii != constraints.end(); ++ii) {
       ii->print();
     }
@@ -585,8 +586,10 @@ class PTABase {
     for (unsigned ii = 0; ii < pointsToResult.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
       if (repr != ii && !pointsToResult[ii].isSubsetEq(pointsToResult[repr])) {
-        galois::gError("pointsto(", ii, ") is not less than its "
-                       "representative pointsto(", repr, ").");
+        galois::gError("pointsto(", ii,
+                       ") is not less than its "
+                       "representative pointsto(",
+                       repr, ").");
       }
     }
   }
@@ -599,12 +602,13 @@ class PTABase {
     for (unsigned ii = 0; ii < outgoingEdges.size(); ++ii) {
       unsigned repr = ocd.getFinalRepresentative(ii);
       if (repr != ii && !outgoingEdges[ii].isSubsetEq(outgoingEdges[repr])) {
-        galois::gError("edges(", ii, ") is not less than its "
-                       "representative edges(", repr, ").");
+        galois::gError("edges(", ii,
+                       ") is not less than its "
+                       "representative edges(",
+                       repr, ").");
       }
     }
   }
-
 
   /**
    * @returns The total number of points to facts in the system.
@@ -638,20 +642,19 @@ class PTABase {
  * Serial points to executor.
  */
 class PTASerial : public PTABase<false> {
- public:
+public:
   /**
    * Run points-to-analysis on a single thread.
    */
   void run() {
-    galois::gDebug("no of addr+copy constraints = ", 
-                   addressCopyConstraints.size(), 
-                   ", no of load+store constraints = ", 
-                   loadStoreConstraints.size());
+    galois::gDebug(
+        "no of addr+copy constraints = ", addressCopyConstraints.size(),
+        ", no of load+store constraints = ", loadStoreConstraints.size());
     galois::gDebug("no of nodes = ", numNodes);
 
     std::deque<unsigned> updates;
-    updates = processAddressOfCopy<galois::StdForEach, 
-                                   std::deque<unsigned>>(addressCopyConstraints);
+    updates = processAddressOfCopy<galois::StdForEach, std::deque<unsigned>>(
+        addressCopyConstraints);
     processLoadStore<galois::StdForEach>(loadStoreConstraints, updates);
 
     unsigned numUps = 0;
@@ -661,9 +664,8 @@ class PTASerial : public PTABase<false> {
       unsigned src = updates.front();
       updates.pop_front();
 
-      for (auto dst = outgoingEdges[src].begin(); 
-           dst != outgoingEdges[src].end();
-           dst++) {
+      for (auto dst = outgoingEdges[src].begin();
+           dst != outgoingEdges[src].end(); dst++) {
         unsigned newPtsTo = propagate(src, *dst);
 
         if (newPtsTo) { // newPtsTo is positive if dst changed
@@ -674,7 +676,8 @@ class PTASerial : public PTABase<false> {
       }
 
       if (updates.empty() || numUps >= THRESHOLD_LS) {
-        galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
+        galois::gDebug("No of points-to facts computed = ",
+                       countPointsToFacts());
         numUps = 0;
 
         // After propagating all constraints, see if load/store
@@ -692,56 +695,54 @@ class PTASerial : public PTABase<false> {
  * Concurrent points to executor.
  */
 class PTAConcurrent : public PTABase<true> {
- public:
+public:
   /**
    * Run points-to-analysis using galois::for_each as the main loop.
    */
   void run() {
-    galois::gDebug("no of addr+copy constraints = ", 
-                   addressCopyConstraints.size(), 
-                   ", no of load+store constraints = ", 
-                   loadStoreConstraints.size());
+    galois::gDebug(
+        "no of addr+copy constraints = ", addressCopyConstraints.size(),
+        ", no of load+store constraints = ", loadStoreConstraints.size());
     galois::gDebug("no of nodes = ", numNodes);
 
     galois::InsertBag<unsigned> updates;
     updates = processAddressOfCopy<galois::DoAll, galois::InsertBag<unsigned>>(
-      addressCopyConstraints
-    );
+        addressCopyConstraints);
     processLoadStore<galois::DoAll>(loadStoreConstraints, updates);
 
     while (!updates.empty()) {
       galois::for_each(
-        galois::iterate(updates),
-        [this] (unsigned req, auto& ctx) {
-          for (auto dst = this->outgoingEdges[req].begin();
-               dst != this->outgoingEdges[req].end();
-               dst++) {
-            unsigned newPtsTo = this->propagate(req, *dst); 
+          galois::iterate(updates),
+          [this](unsigned req, auto& ctx) {
+            for (auto dst = this->outgoingEdges[req].begin();
+                 dst != this->outgoingEdges[req].end(); dst++) {
+              unsigned newPtsTo = this->propagate(req, *dst);
 
-            if (newPtsTo) ctx.push(this->ocd.getFinalRepresentative(*dst));
-          }
-        },
-        galois::loopname("PointsToMainUpdateLoop"),
-        galois::no_conflicts(),
-        galois::wl<galois::worklists::PerSocketChunkFIFO<8>>() // TODO exp with this
+              if (newPtsTo)
+                ctx.push(this->ocd.getFinalRepresentative(*dst));
+            }
+          },
+          galois::loopname("PointsToMainUpdateLoop"), galois::no_conflicts(),
+          galois::wl<galois::worklists::PerSocketChunkFIFO<8>>() // TODO exp
+                                                                 // with this
       );
 
       galois::gDebug("No of points-to facts computed = ", countPointsToFacts());
 
       updates.clear();
 
-      // After propagating all constraints, see if load/store constraints need 
+      // After propagating all constraints, see if load/store constraints need
       // to be added in since graph was potentially updated
       processLoadStore<galois::DoAll>(loadStoreConstraints, updates);
 
       // do cycle squashing
-      //ocd.process(updates); // TODO have parallel OCD, if possible
+      // ocd.process(updates); // TODO have parallel OCD, if possible
     }
   }
 };
 
 /**
- * Method from running PTA. 
+ * Method from running PTA.
  */
 template <typename PTAClass, typename Alloc>
 void runPTA(PTAClass& pta, Alloc nodeAllocator) {
@@ -774,21 +775,24 @@ int main(int argc, char** argv) {
   // depending on serial or concurrent, create the correct class and pass it
   // into the run harness which takes care of the rest
   if (!useSerial) {
-    galois::gInfo("-------- Parallel version: ", galois::getActiveThreads(), " threads.");
+    galois::gInfo("-------- Parallel version: ", galois::getActiveThreads(),
+                  " threads.");
     galois::gInfo("Note correctness of this version is relative to the serial "
                   "version.");
-    
+
     PTAConcurrent p;
-    galois::FixedSizeAllocator<typename galois::SparseBitVector<true>::Node> 
-      nodeAllocator;
+    galois::FixedSizeAllocator<typename galois::SparseBitVector<true>::Node>
+        nodeAllocator;
     runPTA(p, nodeAllocator);
   } else {
     galois::gInfo("-------- Sequential version.");
-    galois::gInfo("The load store threshold (-lsThreshold) may need tweaking for "
-                  "best performance; its current setting may not be the best for "
-                  "your input and may actually degrade performance.");
+    galois::gInfo(
+        "The load store threshold (-lsThreshold) may need tweaking for "
+        "best performance; its current setting may not be the best for "
+        "your input and may actually degrade performance.");
     PTASerial p;
-    galois::FixedSizeAllocator<typename galois::SparseBitVector<false>::Node> nodeAllocator;
+    galois::FixedSizeAllocator<typename galois::SparseBitVector<false>::Node>
+        nodeAllocator;
     runPTA(p, nodeAllocator);
   }
 

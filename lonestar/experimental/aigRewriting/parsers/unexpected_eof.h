@@ -12,14 +12,15 @@
 #include <sstream>
 #include <string>
 
-class unexpected_eof: public std::exception {
-	unsigned l, c;
-	std::string msg;
+class unexpected_eof : public std::exception {
+  unsigned l, c;
+  std::string msg;
+
 public:
-	unexpected_eof(unsigned l, unsigned c);
-	unexpected_eof(unsigned l, unsigned c, std::string msg);
-	virtual const char * what() const throw ();
-	virtual ~unexpected_eof() throw ();
+  unexpected_eof(unsigned l, unsigned c);
+  unexpected_eof(unsigned l, unsigned c, std::string msg);
+  virtual const char* what() const throw();
+  virtual ~unexpected_eof() throw();
 };
 
 #endif /* UNEXPECTED_EOF_H_ */

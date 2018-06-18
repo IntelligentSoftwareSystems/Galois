@@ -7,7 +7,7 @@ using namespace galois::runtime;
 
 int main(int argc, char** argv) {
   NetworkBackend& net = getSystemNetworkBackend();
-  
+
   for (int i = 1; i < net.Num(); ++i) {
     auto* sb = net.allocSendBlock();
     sb->size = net.size();
@@ -23,8 +23,9 @@ int main(int argc, char** argv) {
     NetworkBackend::SendBlock* rb = nullptr;
     while (!rb)
       rb = net.recv();
-    
-    std::cout << rb->dest << ":" << rb->size << "|" << rb->data << "| at " << net.ID() << "\n";
+
+    std::cout << rb->dest << ":" << rb->size << "|" << rb->data << "| at "
+              << net.ID() << "\n";
     net.freeSendBlock(rb);
     ++seen;
   }

@@ -27,11 +27,12 @@
 
 template <class E, class BinPred>
 void insertionSort(E* A, int n, BinPred f) {
-  for (int i=0; i < n; i++) {
-    E v = A[i];
+  for (int i = 0; i < n; i++) {
+    E v  = A[i];
     E* B = A + i;
-    while (--B >= A && f(v,*B)) *(B+1) = *B;
-    *(B+1) = v;
+    while (--B >= A && f(v, *B))
+      *(B + 1) = *B;
+    *(B + 1) = v;
   }
 }
 
@@ -39,15 +40,16 @@ void insertionSort(E* A, int n, BinPred f) {
 // on small inputs
 template <class E, class BinPred>
 void shellSort(E* A, int n, BinPred f) {
-  int stride = n/2;
+  int stride = n / 2;
   while (stride > 0) {
-    for (int i=0; i < n; i++) {
-      E v = A[i];
+    for (int i = 0; i < n; i++) {
+      E v  = A[i];
       E* B = A + i;
-      while ((B=B-stride) >= A && f(v,*B)) *(B+stride) = *B;
-      *(B+stride) = v;
+      while ((B = B - stride) >= A && f(v, *B))
+        *(B + stride) = *B;
+      *(B + stride) = v;
     }
-    stride = (int) stride/3.5;
+    stride = (int)stride / 3.5;
   }
 }
 
@@ -55,35 +57,41 @@ void shellSort(E* A, int n, BinPred f) {
 
 template <class E, class BinPred>
 E median(E a, E b, E c, BinPred f) {
-  return  f(a,b) ? (f(b,c) ? b : (f(a,c) ? c : a)) 
-           : (f(a,c) ? a : (f(b,c) ? c : b));
+  return f(a, b) ? (f(b, c) ? b : (f(a, c) ? c : a))
+                 : (f(a, c) ? a : (f(b, c) ? c : b));
 }
 
 // Quicksort based on median of three elements as pivot
 //  and uses insertionSort for small inputs
 template <class E, class BinPred>
 void quickSort(E* A, int n, BinPred f) {
-  if (n < ISORT) insertionSort(A, n, f);
+  if (n < ISORT)
+    insertionSort(A, n, f);
   else {
-    //E p = std::__median(A[n/4],A[n/2],A[(3*n)/4],f);
-    E p = median(A[n/4],A[n/2],A[(3*n)/4],f);
-    E* L = A;   // below L are less than pivot
-    E* M = A;   // between L and M are equal to pivot
-    E* R = A+n-1; // above R are greater than pivot
+    // E p = std::__median(A[n/4],A[n/2],A[(3*n)/4],f);
+    E p  = median(A[n / 4], A[n / 2], A[(3 * n) / 4], f);
+    E* L = A;         // below L are less than pivot
+    E* M = A;         // between L and M are equal to pivot
+    E* R = A + n - 1; // above R are greater than pivot
     while (1) {
-      while (!f(p,*M)) {
-	if (f(*M,p)) swap(*M,*(L++));
-	if (M >= R) break; 
-	M++;
+      while (!f(p, *M)) {
+        if (f(*M, p))
+          swap(*M, *(L++));
+        if (M >= R)
+          break;
+        M++;
       }
-      while (f(p,*R)) R--;
-      if (M >= R) break; 
-      swap(*M,*R--); 
-      if (f(*M,p)) swap(*M,*(L++));
+      while (f(p, *R))
+        R--;
+      if (M >= R)
+        break;
+      swap(*M, *R--);
+      if (f(*M, p))
+        swap(*M, *(L++));
       M++;
     }
-    cilk_spawn quickSort(A, L-A, f);
-    quickSort(M, A+n-M, f); // Exclude all elts that equal pivot
+    cilk_spawn quickSort(A, L - A, f);
+    quickSort(M, A + n - M, f); // Exclude all elts that equal pivot
     cilk_sync;
   }
 }

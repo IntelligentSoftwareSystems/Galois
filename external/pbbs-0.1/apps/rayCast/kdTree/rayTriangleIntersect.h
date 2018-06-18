@@ -3,7 +3,7 @@
 
 // There are 3 versions in here
 // The second is definitely slower than the first
-// The third is broken into two parts, where the first only depends 
+// The third is broken into two parts, where the first only depends
 //   on the triangle (slow) and the second adds the ray
 
 #define EPSILON 0.00000001
@@ -12,12 +12,12 @@
 // Fast, Minimum Storage Ray/Triangle Intersection
 // Tomas Moller and Ben Trumbore
 template <class floatT>
-inline floatT rayTriangleIntersect(ray<_point3d<floatT> > R, 
-				   _point3d<floatT> m[]) {
+inline floatT rayTriangleIntersect(ray<_point3d<floatT>> R,
+                                   _point3d<floatT> m[]) {
   typedef _point3d<floatT> pointT;
   typedef _vect3d<floatT> vectT;
   pointT o = R.o;
-  vectT d = R.d;
+  vectT d  = R.d;
   vectT e1 = m[1] - m[0];
   vectT e2 = m[2] - m[0];
 
@@ -26,8 +26,9 @@ inline floatT rayTriangleIntersect(ray<_point3d<floatT> > R,
 
   // if determinant is zero then ray is
   // parallel with the triangle plane
-  if (det > -EPSILON && det < EPSILON) return 0;
-  floatT invDet = 1.0/det;
+  if (det > -EPSILON && det < EPSILON)
+    return 0;
+  floatT invDet = 1.0 / det;
 
   // calculate distance from m[0] to origin
   vectT tvec = o - m[0];
@@ -37,17 +38,19 @@ inline floatT rayTriangleIntersect(ray<_point3d<floatT> > R,
   floatT u = tvec.dot(pvec) * invDet;
 
   // check against one edge and opposite point
-  if (u < 0.0 || u > 1.0) return 0;
+  if (u < 0.0 || u > 1.0)
+    return 0;
 
   vectT qvec = tvec.cross(e1);
-  floatT v = d.dot(qvec) * invDet;
+  floatT v   = d.dot(qvec) * invDet;
 
   // check against other edges
-  if (v < 0.0 || u + v > 1.0) return 0;
+  if (v < 0.0 || u + v > 1.0)
+    return 0;
 
-  //distance along the ray, i.e. intersect at o + t * d
+  // distance along the ray, i.e. intersect at o + t * d
   floatT t = e2.dot(qvec) * invDet;
-  
+
   return t;
 }
 /*
@@ -116,7 +119,7 @@ inline floatT rayTriangleIntersect2(ray R, point3d T[] )
 // although it takes more space and including preprocessing takes more time
 // It also seems to return true in some "near cases" in which I believe
 // false is correct.   This might be OK for some applications
-  
+
 int invert3x3(vect3d *m, vect3d *mInv) {
   vect3d c12 = m[1].cross(m[2]);
   floatT determinant = m[0].dot(c12);

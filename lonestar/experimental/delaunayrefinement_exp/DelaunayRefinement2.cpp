@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,10 +39,12 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Mesh Refinement";
-static const char* desc = "Refines a Delaunay triangulation mesh such that no angle in the mesh is less than 30 degrees\n";
+static const char* desc = "Refines a Delaunay triangulation mesh such that no "
+                          "angle in the mesh is less than 30 degrees\n";
 static const char* url = "delaunay_mesh_refinement";
 
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
 
 /*
 struct Process : public galois::runtime::Lockable {
@@ -78,8 +80,8 @@ struct Preprocess : public galois::runtime::Lockable {
   Graphp   graph;
   galois::graphs::Bag<GNode>::pointer wl;
 
-  Preprocess(Graphp g, galois::graphs::Bag<GNode>::pointer wlg): graph(g), wl(wlg) {}
-  Preprocess() {}
+  Preprocess(Graphp g, galois::graphs::Bag<GNode>::pointer wlg): graph(g),
+wl(wlg) {} Preprocess() {}
 
   void operator()(GNode item, galois::UserContext<GNode>& ctx) const {
     if (graph->getData(item).isBad())
@@ -144,9 +146,9 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
   galois::StatManager statManager;
 
-  //check the host id and initialise the network
+  // check the host id and initialise the network
   galois::runtime::getSystemNetworkInterface().start();
-  //galois::runtime::setTrace(false);
+  // galois::runtime::setTrace(false);
   Graphp g;
   g = Graph::allocate();
   {
@@ -154,9 +156,10 @@ int main(int argc, char** argv) {
     m.read(g, filename.c_str());
   }
 
-  //  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
-  //  std::cout << galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
-  //ThirdGraphSize(graph);
+  //  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total
+  //  triangles, "; std::cout << galois::ParallelSTL::count_if_local(graph,
+  //  is_bad(graph)) << " bad triangles\n";
+  // ThirdGraphSize(graph);
 
   // master_terminate();
   galois::runtime::getSystemNetworkInterface().terminate();

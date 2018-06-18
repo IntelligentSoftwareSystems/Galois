@@ -45,24 +45,26 @@
 
 namespace llvm {
 
-template<typename NodeTy, typename Traits> class iplist;
-template<typename NodeTy> class ilist_iterator;
+template <typename NodeTy, typename Traits>
+class iplist;
+template <typename NodeTy>
+class ilist_iterator;
 
 /// ilist_nextprev_traits - A fragment for template traits for intrusive list
 /// that provides default next/prev implementations for common operations.
 ///
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_nextprev_traits {
-  static NodeTy *getPrev(NodeTy *N) { return N->getPrev(); }
-  static NodeTy *getNext(NodeTy *N) { return N->getNext(); }
-  static const NodeTy *getPrev(const NodeTy *N) { return N->getPrev(); }
-  static const NodeTy *getNext(const NodeTy *N) { return N->getNext(); }
+  static NodeTy* getPrev(NodeTy* N) { return N->getPrev(); }
+  static NodeTy* getNext(NodeTy* N) { return N->getNext(); }
+  static const NodeTy* getPrev(const NodeTy* N) { return N->getPrev(); }
+  static const NodeTy* getNext(const NodeTy* N) { return N->getNext(); }
 
-  static void setPrev(NodeTy *N, NodeTy *Prev) { N->setPrev(Prev); }
-  static void setNext(NodeTy *N, NodeTy *Next) { N->setNext(Next); }
+  static void setPrev(NodeTy* N, NodeTy* Prev) { N->setPrev(Prev); }
+  static void setNext(NodeTy* N, NodeTy* Next) { N->setNext(Next); }
 };
 
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_traits;
 
 /// ilist_sentinel_traits - A fragment for template traits for intrusive list
@@ -71,23 +73,23 @@ struct ilist_traits;
 /// ilist_sentinel_traits implements a lazy dynamic sentinel allocation
 /// strategy. The sentinel is stored in the prev field of ilist's Head.
 ///
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_sentinel_traits {
   /// createSentinel - create the dynamic sentinel
-  static NodeTy *createSentinel() { return new NodeTy(); }
+  static NodeTy* createSentinel() { return new NodeTy(); }
 
   /// destroySentinel - deallocate the dynamic sentinel
-  static void destroySentinel(NodeTy *N) { delete N; }
+  static void destroySentinel(NodeTy* N) { delete N; }
 
   /// provideInitialHead - when constructing an ilist, provide a starting
   /// value for its Head
   /// @return null node to indicate that it needs to be allocated later
-  static NodeTy *provideInitialHead() { return 0; }
+  static NodeTy* provideInitialHead() { return 0; }
 
   /// ensureHead - make sure that Head is either already
   /// initialized or assigned a fresh sentinel
   /// @return the sentinel
-  static NodeTy *ensureHead(NodeTy *&Head) {
+  static NodeTy* ensureHead(NodeTy*& Head) {
     if (!Head) {
       Head = ilist_traits<NodeTy>::createSentinel();
       ilist_traits<NodeTy>::noteHead(Head, Head);
@@ -98,7 +100,7 @@ struct ilist_sentinel_traits {
   }
 
   /// noteHead - stash the sentinel into its default location
-  static void noteHead(NodeTy *NewHead, NodeTy *Sentinel) {
+  static void noteHead(NodeTy* NewHead, NodeTy* Sentinel) {
     ilist_traits<NodeTy>::setPrev(NewHead, Sentinel);
   }
 };
@@ -106,14 +108,14 @@ struct ilist_sentinel_traits {
 /// ilist_node_traits - A fragment for template traits for intrusive list
 /// that provides default node related operations.
 ///
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_node_traits {
-  static NodeTy *createNode(const NodeTy &V) { return new NodeTy(V); }
-  static void deleteNode(NodeTy *V) { delete V; }
+  static NodeTy* createNode(const NodeTy& V) { return new NodeTy(V); }
+  static void deleteNode(NodeTy* V) { delete V; }
 
-  void addNodeToList(NodeTy *) {}
-  void removeNodeFromList(NodeTy *) {}
-  void transferNodesFromList(ilist_node_traits &    /*SrcTraits*/,
+  void addNodeToList(NodeTy*) {}
+  void removeNodeFromList(NodeTy*) {}
+  void transferNodesFromList(ilist_node_traits& /*SrcTraits*/,
                              ilist_iterator<NodeTy> /*first*/,
                              ilist_iterator<NodeTy> /*last*/) {}
 };
@@ -122,37 +124,37 @@ struct ilist_node_traits {
 /// By inheriting from this, you can easily use default implementations
 /// for all common operations.
 ///
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_default_traits : public ilist_nextprev_traits<NodeTy>,
                               public ilist_sentinel_traits<NodeTy>,
-                              public ilist_node_traits<NodeTy> {
-};
+                              public ilist_node_traits<NodeTy> {};
 
 // Template traits for intrusive list.  By specializing this template class, you
 // can change what next/prev fields are used to store the links...
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist_traits : public ilist_default_traits<NodeTy> {};
 
 // Const traits are the same as nonconst traits...
-template<typename Ty>
+template <typename Ty>
 struct ilist_traits<const Ty> : public ilist_traits<Ty> {};
 
 //===----------------------------------------------------------------------===//
 // ilist_iterator<Node> - Iterator for intrusive list.
 //
-template<typename NodeTy>
+template <typename NodeTy>
 class ilist_iterator
-  : public std::iterator<std::bidirectional_iterator_tag, NodeTy, ptrdiff_t> {
+    : public std::iterator<std::bidirectional_iterator_tag, NodeTy, ptrdiff_t> {
 
 public:
   typedef ilist_traits<NodeTy> Traits;
-  typedef std::iterator<std::bidirectional_iterator_tag,
-                        NodeTy, ptrdiff_t> super;
+  typedef std::iterator<std::bidirectional_iterator_tag, NodeTy, ptrdiff_t>
+      super;
 
   typedef typename super::value_type value_type;
   typedef typename super::difference_type difference_type;
   typedef typename super::pointer pointer;
   typedef typename super::reference reference;
+
 private:
   pointer NodePtr;
 
@@ -165,65 +167,66 @@ private:
   void operator-(difference_type) const;
   void operator+=(difference_type) const;
   void operator-=(difference_type) const;
-  template<class T> void operator<(T) const;
-  template<class T> void operator<=(T) const;
-  template<class T> void operator>(T) const;
-  template<class T> void operator>=(T) const;
-  template<class T> void operator-(T) const;
-public:
+  template <class T>
+  void operator<(T) const;
+  template <class T>
+  void operator<=(T) const;
+  template <class T>
+  void operator>(T) const;
+  template <class T>
+  void operator>=(T) const;
+  template <class T>
+  void operator-(T) const;
 
+public:
   ilist_iterator(pointer NP) : NodePtr(NP) {}
   ilist_iterator(reference NR) : NodePtr(&NR) {}
   ilist_iterator() : NodePtr(0) {}
 
   // This is templated so that we can allow constructing a const iterator from
   // a nonconst iterator...
-  template<class node_ty>
-  ilist_iterator(const ilist_iterator<node_ty> &RHS)
-    : NodePtr(RHS.getNodePtrUnchecked()) {}
+  template <class node_ty>
+  ilist_iterator(const ilist_iterator<node_ty>& RHS)
+      : NodePtr(RHS.getNodePtrUnchecked()) {}
 
   // This is templated so that we can allow assigning to a const iterator from
   // a nonconst iterator...
-  template<class node_ty>
-  const ilist_iterator &operator=(const ilist_iterator<node_ty> &RHS) {
+  template <class node_ty>
+  const ilist_iterator& operator=(const ilist_iterator<node_ty>& RHS) {
     NodePtr = RHS.getNodePtrUnchecked();
     return *this;
   }
 
   // Accessors...
-  operator pointer() const {
-    return NodePtr;
-  }
+  operator pointer() const { return NodePtr; }
 
-  reference operator*() const {
-    return *NodePtr;
-  }
+  reference operator*() const { return *NodePtr; }
   pointer operator->() const { return &operator*(); }
 
   // Comparison operators
-  bool operator==(const ilist_iterator &RHS) const {
+  bool operator==(const ilist_iterator& RHS) const {
     return NodePtr == RHS.NodePtr;
   }
-  bool operator!=(const ilist_iterator &RHS) const {
+  bool operator!=(const ilist_iterator& RHS) const {
     return NodePtr != RHS.NodePtr;
   }
 
   // Increment and decrement operators...
-  ilist_iterator &operator--() {      // predecrement - Back up
+  ilist_iterator& operator--() { // predecrement - Back up
     NodePtr = Traits::getPrev(NodePtr);
     assert(NodePtr && "--'d off the beginning of an ilist!");
     return *this;
   }
-  ilist_iterator &operator++() {      // preincrement - Advance
+  ilist_iterator& operator++() { // preincrement - Advance
     NodePtr = Traits::getNext(NodePtr);
     return *this;
   }
-  ilist_iterator operator--(int) {    // postdecrement operators...
+  ilist_iterator operator--(int) { // postdecrement operators...
     ilist_iterator tmp = *this;
     --*this;
     return tmp;
   }
-  ilist_iterator operator++(int) {    // postincrement operators...
+  ilist_iterator operator++(int) { // postincrement operators...
     ilist_iterator tmp = *this;
     ++*this;
     return tmp;
@@ -235,63 +238,64 @@ public:
 
 // do not implement. this is to catch errors when people try to use
 // them as random access iterators
-template<typename T>
+template <typename T>
 void operator-(int, ilist_iterator<T>);
-template<typename T>
-void operator-(ilist_iterator<T>,int);
+template <typename T>
+void operator-(ilist_iterator<T>, int);
 
-template<typename T>
+template <typename T>
 void operator+(int, ilist_iterator<T>);
-template<typename T>
-void operator+(ilist_iterator<T>,int);
+template <typename T>
+void operator+(ilist_iterator<T>, int);
 
 // operator!=/operator== - Allow mixed comparisons without dereferencing
 // the iterator, which could very likely be pointing to end().
-template<typename T>
-bool operator!=(const T* LHS, const ilist_iterator<const T> &RHS) {
+template <typename T>
+bool operator!=(const T* LHS, const ilist_iterator<const T>& RHS) {
   return LHS != RHS.getNodePtrUnchecked();
 }
-template<typename T>
-bool operator==(const T* LHS, const ilist_iterator<const T> &RHS) {
+template <typename T>
+bool operator==(const T* LHS, const ilist_iterator<const T>& RHS) {
   return LHS == RHS.getNodePtrUnchecked();
 }
-template<typename T>
-bool operator!=(T* LHS, const ilist_iterator<T> &RHS) {
+template <typename T>
+bool operator!=(T* LHS, const ilist_iterator<T>& RHS) {
   return LHS != RHS.getNodePtrUnchecked();
 }
-template<typename T>
-bool operator==(T* LHS, const ilist_iterator<T> &RHS) {
+template <typename T>
+bool operator==(T* LHS, const ilist_iterator<T>& RHS) {
   return LHS == RHS.getNodePtrUnchecked();
 }
-
 
 // Allow ilist_iterators to convert into pointers to a node automatically when
 // used by the dyn_cast, cast, isa mechanisms...
 
-template<typename From> struct simplify_type;
+template <typename From>
+struct simplify_type;
 
-template<typename NodeTy> struct simplify_type<ilist_iterator<NodeTy> > {
+template <typename NodeTy>
+struct simplify_type<ilist_iterator<NodeTy>> {
   typedef NodeTy* SimpleType;
 
-  static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy> &Node) {
+  static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy>& Node) {
     return &*Node;
   }
 };
-template<typename NodeTy> struct simplify_type<const ilist_iterator<NodeTy> > {
+template <typename NodeTy>
+struct simplify_type<const ilist_iterator<NodeTy>> {
   typedef NodeTy* SimpleType;
 
-  static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy> &Node) {
+  static SimpleType getSimplifiedValue(const ilist_iterator<NodeTy>& Node) {
     return &*Node;
   }
 };
-
 
 //===----------------------------------------------------------------------===//
 //
 /// iplist - The subset of list functionality that can safely be used on nodes
-/// of polymorphic types, i.e. a heterogeneous list with a common base class that
-/// holds the next/prev pointers.  The only state of the list itself is a single
-/// pointer to the head of the list.
+/// of polymorphic types, i.e. a heterogeneous list with a common base class
+/// that holds the next/prev pointers.  The only state of the list itself is a
+/// single pointer to the head of the list.
 ///
 /// This list can be in one of three interesting states:
 /// 1. The list may be completely unconstructed.  In this case, the head
@@ -308,48 +312,47 @@ template<typename NodeTy> struct simplify_type<const ilist_iterator<NodeTy> > {
 ///    and the successor pointer for the sentinel (which always stays at the
 ///    end of the list) is always null.
 ///
-template<typename NodeTy, typename Traits=ilist_traits<NodeTy> >
+template <typename NodeTy, typename Traits = ilist_traits<NodeTy>>
 class iplist : public Traits {
-  mutable NodeTy *Head;
+  mutable NodeTy* Head;
 
   // Use the prev node pointer of 'head' as the tail pointer.  This is really a
   // circularly linked list where we snip the 'next' link from the sentinel node
   // back to the first node in the list (to preserve assertions about going off
   // the end of the list).
-  NodeTy *getTail() { return this->ensureHead(Head); }
-  const NodeTy *getTail() const { return this->ensureHead(Head); }
-  void setTail(NodeTy *N) const { this->noteHead(Head, N); }
+  NodeTy* getTail() { return this->ensureHead(Head); }
+  const NodeTy* getTail() const { return this->ensureHead(Head); }
+  void setTail(NodeTy* N) const { this->noteHead(Head, N); }
 
   /// CreateLazySentinel - This method verifies whether the sentinel for the
   /// list has been created and lazily makes it if not.
-  void CreateLazySentinel() const {
-    this->ensureHead(Head);
-  }
+  void CreateLazySentinel() const { this->ensureHead(Head); }
 
-  static bool op_less(NodeTy &L, NodeTy &R) { return L < R; }
-  static bool op_equal(NodeTy &L, NodeTy &R) { return L == R; }
+  static bool op_less(NodeTy& L, NodeTy& R) { return L < R; }
+  static bool op_equal(NodeTy& L, NodeTy& R) { return L == R; }
 
   // No fundamental reason why iplist can't be copyable, but the default
   // copy/copy-assign won't do.
-  iplist(const iplist &);         // do not implement
-  void operator=(const iplist &); // do not implement
+  iplist(const iplist&);         // do not implement
+  void operator=(const iplist&); // do not implement
 
 public:
-  typedef NodeTy *pointer;
-  typedef const NodeTy *const_pointer;
-  typedef NodeTy &reference;
-  typedef const NodeTy &const_reference;
+  typedef NodeTy* pointer;
+  typedef const NodeTy* const_pointer;
+  typedef NodeTy& reference;
+  typedef const NodeTy& const_reference;
   typedef NodeTy value_type;
   typedef ilist_iterator<NodeTy> iterator;
   typedef ilist_iterator<const NodeTy> const_iterator;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef std::reverse_iterator<const_iterator>  const_reverse_iterator;
-  typedef std::reverse_iterator<iterator>  reverse_iterator;
+  typedef std::reverse_iterator<const_iterator> const_reverse_iterator;
+  typedef std::reverse_iterator<iterator> reverse_iterator;
 
   iplist() : Head(this->provideInitialHead()) {}
   ~iplist() {
-    if (!Head) return;
+    if (!Head)
+      return;
     clear();
     Traits::destroySentinel(getTail());
   }
@@ -373,11 +376,14 @@ public:
   }
 
   // reverse iterator creation methods.
-  reverse_iterator rbegin()            { return reverse_iterator(end()); }
-  const_reverse_iterator rbegin() const{ return const_reverse_iterator(end()); }
-  reverse_iterator rend()              { return reverse_iterator(begin()); }
-  const_reverse_iterator rend() const { return const_reverse_iterator(begin());}
-
+  reverse_iterator rbegin() { return reverse_iterator(end()); }
+  const_reverse_iterator rbegin() const {
+    return const_reverse_iterator(end());
+  }
+  reverse_iterator rend() { return reverse_iterator(begin()); }
+  const_reverse_iterator rend() const {
+    return const_reverse_iterator(begin());
+  }
 
   // Miscellaneous inspection routines.
   size_type max_size() const { return size_type(-1); }
@@ -401,47 +407,47 @@ public:
     return *this->getPrev(getTail());
   }
 
-  void swap(iplist &RHS) {
+  void swap(iplist& RHS) {
     assert(0 && "Swap does not use list traits callback correctly yet!");
     std::swap(Head, RHS.Head);
   }
 
-  iterator insert(iterator where, NodeTy *New) {
-    NodeTy *CurNode = where.getNodePtrUnchecked();
-    NodeTy *PrevNode = this->getPrev(CurNode);
+  iterator insert(iterator where, NodeTy* New) {
+    NodeTy* CurNode  = where.getNodePtrUnchecked();
+    NodeTy* PrevNode = this->getPrev(CurNode);
     this->setNext(New, CurNode);
     this->setPrev(New, PrevNode);
 
-    if (CurNode != Head)  // Is PrevNode off the beginning of the list?
+    if (CurNode != Head) // Is PrevNode off the beginning of the list?
       this->setNext(PrevNode, New);
     else
       Head = New;
     this->setPrev(CurNode, New);
 
-    this->addNodeToList(New);  // Notify traits that we added a node...
+    this->addNodeToList(New); // Notify traits that we added a node...
     return New;
   }
 
-  iterator insertAfter(iterator where, NodeTy *New) {
+  iterator insertAfter(iterator where, NodeTy* New) {
     if (empty())
       return insert(begin(), New);
     else
       return insert(++where, New);
   }
 
-  NodeTy *remove(iterator &IT) {
+  NodeTy* remove(iterator& IT) {
     assert(IT != end() && "Cannot remove end of list!");
-    NodeTy *Node = &*IT;
-    NodeTy *NextNode = this->getNext(Node);
-    NodeTy *PrevNode = this->getPrev(Node);
+    NodeTy* Node     = &*IT;
+    NodeTy* NextNode = this->getNext(Node);
+    NodeTy* PrevNode = this->getPrev(Node);
 
-    if (Node != Head)  // Is PrevNode off the beginning of the list?
+    if (Node != Head) // Is PrevNode off the beginning of the list?
       this->setNext(PrevNode, NextNode);
     else
       Head = NextNode;
     this->setPrev(NextNode, PrevNode);
     IT = NextNode;
-    this->removeNodeFromList(Node);  // Notify traits that we removed a node...
+    this->removeNodeFromList(Node); // Notify traits that we removed a node...
 
     // Set the next/prev pointers of the current node to null.  This isn't
     // strictly required, but this catches errors where a node is removed from
@@ -453,7 +459,7 @@ public:
     return Node;
   }
 
-  NodeTy *remove(const iterator &IT) {
+  NodeTy* remove(const iterator& IT) {
     iterator MutIt = IT;
     return remove(MutIt);
   }
@@ -464,20 +470,19 @@ public:
     return where;
   }
 
-
 private:
   // transfer - The heart of the splice function.  Move linked list nodes from
   // [first, last) into position.
   //
-  void transfer(iterator position, iplist &L2, iterator first, iterator last) {
+  void transfer(iterator position, iplist& L2, iterator first, iterator last) {
     assert(first != last && "Should be checked by callers");
 
     if (position != last) {
       // Note: we have to be careful about the case when we move the first node
       // in the list.  This node is the list sentinel node and we can't move it.
-      NodeTy *ThisSentinel = getTail();
+      NodeTy* ThisSentinel = getTail();
       setTail(0);
-      NodeTy *L2Sentinel = L2.getTail();
+      NodeTy* L2Sentinel = L2.getTail();
       L2.setTail(0);
 
       // Remove [first, last) from its old position.
@@ -490,8 +495,8 @@ private:
       this->setPrev(Next, Prev);
 
       // Splice [first, last) into its new position.
-      NodeTy *PosNext = position.getNodePtrUnchecked();
-      NodeTy *PosPrev = this->getPrev(PosNext);
+      NodeTy* PosNext = position.getNodePtrUnchecked();
+      NodeTy* PosPrev = this->getPrev(PosNext);
 
       // Fix head of list...
       if (PosPrev)
@@ -513,13 +518,13 @@ private:
   }
 
 public:
-
   //===----------------------------------------------------------------------===
   // Functionality derived from other functions defined above...
   //
 
   size_type size() const {
-    if (Head == 0) return 0; // Don't require construction of sentinel if empty.
+    if (Head == 0)
+      return 0; // Don't require construction of sentinel if empty.
     return std::distance(begin(), end());
   }
 
@@ -529,40 +534,47 @@ public:
     return last;
   }
 
-  void clear() { if (Head) erase(begin(), end()); }
+  void clear() {
+    if (Head)
+      erase(begin(), end());
+  }
 
   // Front and back inserters...
-  void push_front(NodeTy *val) { insert(begin(), val); }
-  void push_back(NodeTy *val) { insert(end(), val); }
+  void push_front(NodeTy* val) { insert(begin(), val); }
+  void push_back(NodeTy* val) { insert(end(), val); }
   void pop_front() {
     assert(!empty() && "pop_front() on empty list!");
     erase(begin());
   }
   void pop_back() {
     assert(!empty() && "pop_back() on empty list!");
-    iterator t = end(); erase(--t);
+    iterator t = end();
+    erase(--t);
   }
 
   // Special forms of insert...
-  template<class InIt> void insert(iterator where, InIt first, InIt last) {
-    for (; first != last; ++first) insert(where, *first);
+  template <class InIt>
+  void insert(iterator where, InIt first, InIt last) {
+    for (; first != last; ++first)
+      insert(where, *first);
   }
 
   // Splice members - defined in terms of transfer...
-  void splice(iterator where, iplist &L2) {
+  void splice(iterator where, iplist& L2) {
     if (!L2.empty())
       transfer(where, L2, L2.begin(), L2.end());
   }
-  void splice(iterator where, iplist &L2, iterator first) {
-    iterator last = first; ++last;
-    if (where == first || where == last) return; // No change
+  void splice(iterator where, iplist& L2, iterator first) {
+    iterator last = first;
+    ++last;
+    if (where == first || where == last)
+      return; // No change
     transfer(where, L2, first, last);
   }
-  void splice(iterator where, iplist &L2, iterator first, iterator last) {
-    if (first != last) transfer(where, L2, first, last);
+  void splice(iterator where, iplist& L2, iterator first, iterator last) {
+    if (first != last)
+      transfer(where, L2, first, last);
   }
-
-
 
   //===----------------------------------------------------------------------===
   // High-Level Functionality that shouldn't really be here, but is part of list
@@ -571,23 +583,30 @@ public:
   // These two functions are actually called remove/remove_if in list<>, but
   // they actually do the job of erase, rename them accordingly.
   //
-  void erase(const NodeTy &val) {
-    for (iterator I = begin(), E = end(); I != E; ) {
-      iterator next = I; ++next;
-      if (*I == val) erase(I);
+  void erase(const NodeTy& val) {
+    for (iterator I = begin(), E = end(); I != E;) {
+      iterator next = I;
+      ++next;
+      if (*I == val)
+        erase(I);
       I = next;
     }
   }
-  template<class Pr1> void erase_if(Pr1 pred) {
-    for (iterator I = begin(), E = end(); I != E; ) {
-      iterator next = I; ++next;
-      if (pred(*I)) erase(I);
+  template <class Pr1>
+  void erase_if(Pr1 pred) {
+    for (iterator I = begin(), E = end(); I != E;) {
+      iterator next = I;
+      ++next;
+      if (pred(*I))
+        erase(I);
       I = next;
     }
   }
 
-  template<class Pr2> void unique(Pr2 pred) {
-    if (empty()) return;
+  template <class Pr2>
+  void unique(Pr2 pred) {
+    if (empty())
+      return;
     for (iterator I = begin(), E = end(), Next = begin(); ++Next != E;) {
       if (pred(*I))
         erase(Next);
@@ -598,7 +617,8 @@ public:
   }
   void unique() { unique(op_equal); }
 
-  template<class Pr3> void merge(iplist &right, Pr3 pred) {
+  template <class Pr3>
+  void merge(iplist& right, Pr3 pred) {
     iterator first1 = begin(), last1 = end();
     iterator first2 = right.begin(), last2 = right.end();
     while (first1 != last1 && first2 != last2)
@@ -609,31 +629,31 @@ public:
       } else {
         ++first1;
       }
-    if (first2 != last2) transfer(last1, right, first2, last2);
+    if (first2 != last2)
+      transfer(last1, right, first2, last2);
   }
-  void merge(iplist &right) { return merge(right, op_less); }
+  void merge(iplist& right) { return merge(right, op_less); }
 
-  template<class Pr3> void sort(Pr3 pred);
+  template <class Pr3>
+  void sort(Pr3 pred);
   void sort() { sort(op_less); }
 };
 
-
-template<typename NodeTy>
+template <typename NodeTy>
 struct ilist : public iplist<NodeTy> {
   typedef typename iplist<NodeTy>::size_type size_type;
   typedef typename iplist<NodeTy>::iterator iterator;
 
   ilist() {}
-  ilist(const ilist &right) {
+  ilist(const ilist& right) {
     insert(this->begin(), right.begin(), right.end());
   }
-  explicit ilist(size_type count) {
-    insert(this->begin(), count, NodeTy());
-  }
-  ilist(size_type count, const NodeTy &val) {
+  explicit ilist(size_type count) { insert(this->begin(), count, NodeTy()); }
+  ilist(size_type count, const NodeTy& val) {
     insert(this->begin(), count, val);
   }
-  template<class InIt> ilist(InIt first, InIt last) {
+  template <class InIt>
+  ilist(InIt first, InIt last) {
     insert(this->begin(), first, last);
   }
 
@@ -643,25 +663,27 @@ struct ilist : public iplist<NodeTy> {
   using iplist<NodeTy>::push_back;
 
   // Main implementation here - Insert for a node passed by value...
-  iterator insert(iterator where, const NodeTy &val) {
+  iterator insert(iterator where, const NodeTy& val) {
     return insert(where, this->createNode(val));
   }
 
-
   // Front and back inserters...
-  void push_front(const NodeTy &val) { insert(this->begin(), val); }
-  void push_back(const NodeTy &val) { insert(this->end(), val); }
+  void push_front(const NodeTy& val) { insert(this->begin(), val); }
+  void push_back(const NodeTy& val) { insert(this->end(), val); }
 
   // Special forms of insert...
-  template<class InIt> void insert(iterator where, InIt first, InIt last) {
-    for (; first != last; ++first) insert(where, *first);
+  template <class InIt>
+  void insert(iterator where, InIt first, InIt last) {
+    for (; first != last; ++first)
+      insert(where, *first);
   }
-  void insert(iterator where, size_type count, const NodeTy &val) {
-    for (; count != 0; --count) insert(where, val);
+  void insert(iterator where, size_type count, const NodeTy& val) {
+    for (; count != 0; --count)
+      insert(where, val);
   }
 
   // Assign special forms...
-  void assign(size_type count, const NodeTy &val) {
+  void assign(size_type count, const NodeTy& val) {
     iterator I = this->begin();
     for (; I != this->end() && count != 0; ++I, --count)
       *I = val;
@@ -670,9 +692,10 @@ struct ilist : public iplist<NodeTy> {
     else
       erase(I, this->end());
   }
-  template<class InIt> void assign(InIt first1, InIt last1) {
+  template <class InIt>
+  void assign(InIt first1, InIt last1) {
     iterator first2 = this->begin(), last2 = this->end();
-    for ( ; first1 != last1 && first2 != last2; ++first1, ++first2)
+    for (; first1 != last1 && first2 != last2; ++first1, ++first2)
       *first1 = *first2;
     if (first2 == last2)
       erase(first1, last1);
@@ -680,29 +703,29 @@ struct ilist : public iplist<NodeTy> {
       insert(last1, first2, last2);
   }
 
-
   // Resize members...
   void resize(size_type newsize, NodeTy val) {
-    iterator i = this->begin();
+    iterator i    = this->begin();
     size_type len = 0;
-    for ( ; i != this->end() && len < newsize; ++i, ++len) /* empty*/ ;
+    for (; i != this->end() && len < newsize; ++i, ++len) /* empty*/
+      ;
 
     if (len == newsize)
       erase(i, this->end());
-    else                                          // i == end()
+    else // i == end()
       insert(this->end(), newsize - len, val);
   }
   void resize(size_type newsize) { resize(newsize, NodeTy()); }
 };
 
-} // End llvm namespace
+} // namespace llvm
 
 namespace std {
-  // Ensure that swap uses the fast list swap...
-  template<class Ty>
-  void swap(llvm::iplist<Ty> &Left, llvm::iplist<Ty> &Right) {
-    Left.swap(Right);
-  }
-}  // End 'std' extensions...
+// Ensure that swap uses the fast list swap...
+template <class Ty>
+void swap(llvm::iplist<Ty>& Left, llvm::iplist<Ty>& Right) {
+  Left.swap(Right);
+}
+} // namespace std
 
 #endif // LLVM_ADT_ILIST_H

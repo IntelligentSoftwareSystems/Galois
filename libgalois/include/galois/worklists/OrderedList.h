@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,8 +25,10 @@
 namespace galois {
 namespace worklists {
 
-template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class OrderedList : private boost::noncopyable, private substrate::PaddedLock<concurrent> {
+template <class Compare = std::less<int>, typename T = int,
+          bool concurrent = true>
+class OrderedList : private boost::noncopyable,
+                    private substrate::PaddedLock<concurrent> {
   typedef galois::flat_map<T, std::deque<T>, Compare> Map;
 
   Map map;
@@ -36,10 +38,10 @@ class OrderedList : private boost::noncopyable, private substrate::PaddedLock<co
   using substrate::PaddedLock<concurrent>::unlock;
 
 public:
-  template<typename Tnew>
+  template <typename Tnew>
   using retype = OrderedList<Compare, Tnew, concurrent>;
 
-  template<bool b>
+  template <bool b>
   using rethread = OrderedList<Compare, T, b>;
 
   typedef T value_type;
@@ -51,7 +53,7 @@ public:
     unlock();
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     lock();
     while (b != e) {
@@ -62,7 +64,7 @@ public:
     unlock();
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     if (substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
@@ -74,7 +76,7 @@ public:
       unlock();
       return galois::optional<value_type>();
     }
-    auto ii = map.begin();
+    auto ii             = map.begin();
     std::deque<T>& list = ii->second;
     galois::optional<value_type> v(list.front());
     list.pop_front();
@@ -85,6 +87,6 @@ public:
   }
 };
 GALOIS_WLCOMPILECHECK(OrderedList)
-}
-}
+} // namespace worklists
+} // namespace galois
 #endif

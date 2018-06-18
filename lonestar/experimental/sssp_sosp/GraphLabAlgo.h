@@ -11,9 +11,8 @@
 #include "SSSP.h"
 
 struct GraphLabAlgo {
-  typedef galois::graphs::LC_CSR_Graph<SNode,uint32_t>
-    ::with_no_lockable<true>::type
-    ::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<SNode, uint32_t>::with_no_lockable<
+      true>::type ::with_numa_alloc<true>::type InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -23,7 +22,7 @@ struct GraphLabAlgo {
 
   struct Initialize {
     Graph& g;
-    Initialize(Graph& g): g(g) { }
+    Initialize(Graph& g) : g(g) {}
     void operator()(Graph::GraphNode n) const {
       g.getData(n).dist = DIST_INFINITY;
     }
@@ -33,12 +32,12 @@ struct GraphLabAlgo {
     Dist min_dist;
     bool changed;
 
-    struct gather_type { };
+    struct gather_type {};
     typedef int tt_needs_scatter_out_edges;
 
     struct message_type {
       Dist dist;
-      message_type(Dist d = DIST_INFINITY): dist(d) { }
+      message_type(Dist d = DIST_INFINITY) : dist(d) {}
 
       message_type& operator+=(const message_type& other) {
         dist = std::min(dist, other.dist);
@@ -51,20 +50,19 @@ struct GraphLabAlgo {
     }
 
     void apply(Graph& graph, GNode node, const gather_type&) {
-      changed = false;
+      changed     = false;
       SNode& data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       if (data.dist > min_dist) {
-        changed = true;
+        changed   = true;
         data.dist = min_dist;
       }
     }
 
-    bool needsScatter(Graph& graph, GNode node) {
-      return changed;
-    }
-    
+    bool needsScatter(Graph& graph, GNode node) { return changed; }
+
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::graphsLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
+                 galois::graphsLab::Context<Graph, Program>& ctx,
+                 Graph::edge_data_reference edgeValue) {
       SNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       SNode& sdata = graph.getData(src, galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + edgeValue;
@@ -73,11 +71,12 @@ struct GraphLabAlgo {
       }
     }
 
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, Graph::edge_data_reference) { }
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&,
+                Graph::edge_data_reference) {}
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph, Program> engine(graph, Program());
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }

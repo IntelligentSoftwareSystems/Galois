@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,9 +26,9 @@ namespace galois {
 namespace graphs {
 
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_segmented)
-template<typename T>
-struct is_segmented: public has_tt_is_segmented<T> {};
+template <typename T>
+struct is_segmented : public has_tt_is_segmented<T> {};
 
-}
-}
+} // namespace graphs
+} // namespace galois
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,62 +32,78 @@ namespace galois {
 namespace graphs {
 
 /**
- * Local computation graph (i.e., graph structure does not change). The data representation
- * is a modification of {@link LC_CSR_Graph} where the edge data is stored inline with the
- * adjacency information. 
+ * Local computation graph (i.e., graph structure does not change). The data
+ * representation is a modification of {@link LC_CSR_Graph} where the edge data
+ * is stored inline with the adjacency information.
  *
  * The position of template parameters may change between Galois releases; the
  * most robust way to specify them is through the with_XXX nested templates.
  */
-template<typename NodeTy, typename EdgeTy,
-  bool HasNoLockable=false,
-  bool UseNumaAlloc=false,
-  bool HasOutOfLineLockable=false,
-  bool HasCompressedNodePtr=false>
-class LC_PartitionedInlineEdge_Graph:
-    boost::noncopyable,
-    detail::LocalIteratorFeature<UseNumaAlloc>,
-    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
-  template<typename Graph> friend class LC_InOut_Graph;
+template <typename NodeTy, typename EdgeTy, bool HasNoLockable = false,
+          bool UseNumaAlloc = false, bool HasOutOfLineLockable = false,
+          bool HasCompressedNodePtr = false>
+class LC_PartitionedInlineEdge_Graph
+    : boost::noncopyable,
+      detail::LocalIteratorFeature<UseNumaAlloc>,
+      detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+  template <typename Graph>
+  friend class LC_InOut_Graph;
 
 public:
-  template<bool _has_id>
+  template <bool _has_id>
   using with_id = LC_PartitionedInlineEdge_Graph;
 
-  template<typename _node_data>
+  template <typename _node_data>
   using with_node_data =
-    LC_PartitionedInlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+      LC_PartitionedInlineEdge_Graph<_node_data, EdgeTy, HasNoLockable,
+                                     UseNumaAlloc, HasOutOfLineLockable,
+                                     HasCompressedNodePtr>;
 
-  template<bool _has_no_lockable>
+  template <bool _has_no_lockable>
   using with_no_lockable =
-    LC_PartitionedInlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+      LC_PartitionedInlineEdge_Graph<NodeTy, EdgeTy, _has_no_lockable,
+                                     UseNumaAlloc, HasOutOfLineLockable,
+                                     HasCompressedNodePtr>;
 
-  template<bool _use_numa_alloc>
+  template <bool _use_numa_alloc>
   using with_numa_alloc =
-    LC_PartitionedInlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+      LC_PartitionedInlineEdge_Graph<NodeTy, EdgeTy, HasNoLockable,
+                                     _use_numa_alloc, HasOutOfLineLockable,
+                                     HasCompressedNodePtr>;
 
-  template<bool _has_out_of_line_lockable>
+  template <bool _has_out_of_line_lockable>
   using with_out_of_line_lockable =
-    LC_PartitionedInlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr>;
+      LC_PartitionedInlineEdge_Graph<NodeTy, EdgeTy, HasNoLockable,
+                                     UseNumaAlloc, _has_out_of_line_lockable,
+                                     HasCompressedNodePtr>;
 
   /**
-   * Compress representation of graph at the expense of one level of indirection on accessing
-   * neighbors of a node
+   * Compress representation of graph at the expense of one level of indirection
+   * on accessing neighbors of a node
    */
-  template<bool _has_compressed_node_ptr>
+  template <bool _has_compressed_node_ptr>
   using with_compressed_node_ptr =
-    LC_PartitionedInlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr>;
+      LC_PartitionedInlineEdge_Graph<NodeTy, EdgeTy, HasNoLockable,
+                                     UseNumaAlloc, HasOutOfLineLockable,
+                                     _has_compressed_node_ptr>;
 
   typedef read_default_graph_tag read_tag;
 
 protected:
   struct NodeInfo;
-  typedef detail::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
+  typedef detail::EdgeInfoBase<
+      typename boost::mpl::if_c<HasCompressedNodePtr, uint32_t,
+                                NodeInfo*>::type,
+      EdgeTy>
+      EdgeInfo;
   typedef LargeArray<EdgeInfo> EdgeData;
 
-  class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
+  class NodeInfo
+      : public detail::NodeInfoBase<NodeTy,
+                                    !HasNoLockable && !HasOutOfLineLockable> {
     EdgeInfo* m_edgeBegin;
     EdgeInfo* m_edgeEnd;
+
   public:
     EdgeInfo*& edgeBegin() { return m_edgeBegin; }
     EdgeInfo*& edgeEnd() { return m_edgeEnd; }
@@ -113,61 +129,66 @@ protected:
   uint64_t numNodes;
   uint64_t numEdges;
 
-  template<bool _C = HasCompressedNodePtr>
-  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<_C>::type* x = 0) const {
+  template <bool _C = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii,
+                   typename std::enable_if<_C>::type* x = 0) const {
     return const_cast<NodeInfo*>(&nodeData[ii->dst]);
   }
 
-  template<bool _C = HasCompressedNodePtr>
-  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<!_C>::type* x = 0) const {
+  template <bool _C = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii,
+                   typename std::enable_if<!_C>::type* x = 0) const {
     return ii->dst;
   }
 
-  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<_C>::type* = 0) {
+  template <typename Container, typename Index, bool _C = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx,
+                  typename std::enable_if<_C>::type* = 0) {
     edge->dst = idx;
   }
 
-  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<!_C>::type* = 0) {
+  template <typename Container, typename Index, bool _C = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx,
+                  typename std::enable_if<!_C>::type* = 0) {
     edge->dst = &c[idx];
   }
 
-  template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     galois::runtime::acquire(N, mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A2>::type* = 0) {}
 
   edge_iterator raw_begin(GraphNode N) {
     return nodeData[getId(N)].edgeBegin();
   }
 
-  edge_iterator raw_end(GraphNode N) {
-    return nodeData[getId(N)].edgeEnd();
-  }
+  edge_iterator raw_end(GraphNode N) { return nodeData[getId(N)].edgeEnd(); }
 
-  size_t getId(GraphNode N) {
-    return std::distance(this->nodeData.data(), N);
-  }
+  size_t getId(GraphNode N) { return std::distance(this->nodeData.data(), N); }
 
-  GraphNode getNode(size_t n) {
-    return &nodeData[n];
-  }
+  GraphNode getNode(size_t n) { return &nodeData[n]; }
 
 public:
   ~LC_PartitionedInlineEdge_Graph() {
-    if (!EdgeInfo::has_value) return;
-    if (numNodes == 0) return;
+    if (!EdgeInfo::has_value)
+      return;
+    if (numNodes == 0)
+      return;
 
-    for (edge_iterator ii = nodeData[0].edgeBegin(), ei = nodeData[numNodes-1].edgeEnd(); ii != ei; ++ii) {
+    for (edge_iterator ii = nodeData[0].edgeBegin(),
+                       ei = nodeData[numNodes - 1].edgeEnd();
+         ii != ei; ++ii) {
       ii->destroy();
     }
   }
@@ -178,14 +199,13 @@ public:
     return N->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ni,
+                                  MethodFlag mflag = MethodFlag::NONE) const {
     galois::runtime::checkWrite(mflag, false);
     return ni->get();
-   }
-
-  GraphNode getEdgeDst(edge_iterator ni) const {
-    return getDst(ni);
   }
+
+  GraphNode getEdgeDst(edge_iterator ni) const { return getDst(ni); }
 
   uint64_t size() const { return numNodes; }
   uint64_t sizeEdges() const { return numEdges; }
@@ -195,15 +215,24 @@ public:
   iterator begin() { return iterator(nodeData.data()); }
   iterator end() { return iterator(nodeData.end()); }
 
-  local_iterator local_begin() { return local_iterator(&nodeData[this->localBegin(numNodes)]); }
-  local_iterator local_end() { return local_iterator(&nodeData[this->localEnd(numNodes)]); }
-  const_local_iterator local_begin() const { return const_local_iterator(&nodeData[this->localBegin(numNodes)]); }
-  const_local_iterator local_end() const { return const_local_iterator(&nodeData[this->localEnd(numNodes)]); }
+  local_iterator local_begin() {
+    return local_iterator(&nodeData[this->localBegin(numNodes)]);
+  }
+  local_iterator local_end() {
+    return local_iterator(&nodeData[this->localEnd(numNodes)]);
+  }
+  const_local_iterator local_begin() const {
+    return const_local_iterator(&nodeData[this->localBegin(numNodes)]);
+  }
+  const_local_iterator local_end() const {
+    return const_local_iterator(&nodeData[this->localEnd(numNodes)]);
+  }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquireNode(N, mflag);
     if (galois::runtime::shouldLock(mflag)) {
-      for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
+      for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee;
+           ++ii) {
         acquireNode(getDst(ii), mflag);
       }
     }
@@ -215,17 +244,15 @@ public:
     return N->edgeEnd();
   }
 
-  detail::EdgesIterator<LC_PartitionedInlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    return detail::EdgesIterator<LC_PartitionedInlineEdge_Graph>(*this, N, mflag);
+  detail::EdgesIterator<LC_PartitionedInlineEdge_Graph>
+  out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<LC_PartitionedInlineEdge_Graph>(*this, N,
+                                                                 mflag);
   }
 
-  size_t idFromNode(GraphNode N) {
-    return getId(N);
-  }
+  size_t idFromNode(GraphNode N) { return getId(N); }
 
-  GraphNode nodeFromId(size_t N) {
-    return getNode(N);
-  }
+  GraphNode nodeFromId(size_t N) { return getNode(N); }
 
   void allocateFrom(FileGraph& graph) {
     numNodes = graph.size();
@@ -246,9 +273,9 @@ public:
     typedef typename EdgeInfo::value_type EDV;
     // XXX
     auto r = graph.divideBy(
-        NodeData::size_of::value + LC_PartitionedInlineEdge_Graph::size_of_out_of_line::value,
-        EdgeData::size_of::value,
-        tid, total);
+        NodeData::size_of::value +
+            LC_PartitionedInlineEdge_Graph::size_of_out_of_line::value,
+        EdgeData::size_of::value, tid, total);
 
     EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);
 
@@ -258,7 +285,9 @@ public:
       nodeData.constructAt(*ii);
       this->outOfLineConstructAt(*ii);
       nodeData[*ii].edgeBegin() = curEdge;
-      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii),
+                                    en = graph.edge_end(*ii);
+           nn != en; ++nn) {
         if (EdgeInfo::has_value)
           curEdge->construct(graph.getEdgeData<EDV>(nn));
         setEdgeDst(nodeData, curEdge, graph.getEdgeDst(nn));
@@ -269,7 +298,7 @@ public:
   }
 };
 
-} // end namespace
-} // end namespace
+} // namespace graphs
+} // namespace galois
 
 #endif

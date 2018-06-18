@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,24 +35,25 @@
 namespace galois {
 /**
  * Scheduling policies for Galois iterators. Unless you have very specific
- * scheduling requirement, {@link PerSocketChunkLIFO} or {@link PerSocketChunkFIFO} is a
- * reasonable scheduling policy. If you need approximate priority scheduling,
- * use {@link OrderedByIntegerMetric}. For debugging, you may be interested
- * in {@link FIFO} or {@link LIFO}, which try to follow serial order exactly.
+ * scheduling requirement, {@link PerSocketChunkLIFO} or {@link
+ * PerSocketChunkFIFO} is a reasonable scheduling policy. If you need
+ * approximate priority scheduling, use {@link OrderedByIntegerMetric}. For
+ * debugging, you may be interested in {@link FIFO} or {@link LIFO}, which try
+ * to follow serial order exactly.
  *
  * The way to use a worklist is to pass it as a template parameter to
  * {@link for_each()}. For example,
  *
  * \code
- * galois::for_each(galois::iterate(beg,end), fn, galois::wl<galois::worklists::PerSocketChunkFIFO<32>>());
- * \endcode
+ * galois::for_each(galois::iterate(beg,end), fn,
+ * galois::wl<galois::worklists::PerSocketChunkFIFO<32>>()); \endcode
  */
 namespace worklists {
 namespace { // don't pollute the symbol table with the example
 
 // Worklists may not be copied.
 // All classes (should) conform to:
-template<typename T>
+template <typename T>
 class AbstractWorkList {
   AbstractWorkList(const AbstractWorkList&) = delete;
   const AbstractWorkList& operator=(const AbstractWorkList&) = delete;
@@ -68,21 +69,21 @@ public:
   typedef T value_type;
 
   //! Changes the type the worklist holds
-  template<typename _T>
+  template <typename _T>
   using retype = AbstractWorkList<_T>;
 
   //! Pushes a value onto the queue
   void push(const value_type& val);
 
   //! Pushes a range onto the queue
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e);
 
   /**
    * Pushes initial range onto the queue. Called with the same b and e on each
    * thread
    */
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy&);
 
   //! Pops a value from the queue.
@@ -96,7 +97,7 @@ public:
   bool empty();
 };
 
-} // end namespace anonymous
+} // namespace
 } // end namespace worklists
 } // end namespace galois
 

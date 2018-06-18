@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -19,30 +19,38 @@
 
 #include "galois/OnlineStats.h"
 
-struct AsyncPriSet{
+struct AsyncPriSet {
   struct LNode {
     PRTy value;
-    std::atomic<PRTy> residual; 
+    std::atomic<PRTy> residual;
     std::atomic<int> inWL; // tracking wl occupancy
-    void init() { value = 1.0 - alpha; residual = 0.0; inWL = 1; }
+    void init() {
+      value    = 1.0 - alpha;
+      residual = 0.0;
+      inWL     = 1;
+    }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
-      os << "{PR " << n.value << ", residual " << n.residual << ", inWL " << n.inWL << "}";
+      os << "{PR " << n.value << ", residual " << n.residual << ", inWL "
+         << n.inWL << "}";
       return os;
     }
   };
 
-  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
+      InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncPriSet"; }
 
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
+  void readGraph(Graph& graph, std::string filename,
+                 std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      galois::graphs::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName);
     } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
+      std::cerr
+          << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
     }
   }
@@ -54,15 +62,20 @@ struct AsyncPriSet{
     galois::substrate::PerThreadStorage<galois::OnlineStat>& stats;
     PRTy limit;
 
-    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl, galois::substrate::PerThreadStorage<galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
+    Process(Graph& g, PRTy t, galois::InsertBag<GNode>& wl,
+            galois::substrate::PerThreadStorage<galois::OnlineStat>& s, PRTy l)
+        : graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) {}
 
-    //    void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
+    //    void operator()(const GNode& src, galois::UserContext<GNode>& ctx)
+    //    const {
     void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
-      sdata.inWL = 0;
+      sdata.inWL   = 0;
 
-      auto resScale = outOnly ? nout(graph, src, galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, src, galois::MethodFlag::UNPROTECTED);
-      if ( sdata.residual / resScale < limit) {
+      auto resScale =
+          outOnly ? nout(graph, src, galois::MethodFlag::UNPROTECTED) + 1
+                  : ninout(graph, src, galois::MethodFlag::UNPROTECTED);
+      if (sdata.residual / resScale < limit) {
         double R = sdata.residual;
         if (R >= tolerance) {
           if (0 == sdata.inWL.exchange(1)) {
@@ -78,23 +91,27 @@ struct AsyncPriSet{
 
       // the node is processed
       PRTy oldResidual = sdata.residual.exchange(0.0);
-      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy diff = std::fabs(pr - sdata.value);
-      sdata.value = pr;
-      auto src_nout = nout(graph, src, galois::MethodFlag::UNPROTECTED);
-      PRTy delta = diff*alpha/src_nout;
+      PRTy pr          = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff        = std::fabs(pr - sdata.value);
+      sdata.value      = pr;
+      auto src_nout    = nout(graph, src, galois::MethodFlag::UNPROTECTED);
+      PRTy delta       = diff * alpha / src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
+      for (auto jj = graph.edge_begin(src, lockflag),
+                ej = graph.edge_end(src, lockflag);
            jj != ej; ++jj) {
-        GNode dst = graph.getEdgeDst(jj);
+        GNode dst    = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
-        PRTy old = atomicAdd(ddata.residual, delta);
-        // if the node is not in the worklist and the residual is greater than tolerance
+        PRTy old     = atomicAdd(ddata.residual, delta);
+        // if the node is not in the worklist and the residual is greater than
+        // tolerance
         if (old + delta >= tolerance && !ddata.inWL) {
-          if (0 ==ddata.inWL.exchange(1)) {
+          if (0 == ddata.inWL.exchange(1)) {
             nextWL.push(dst);
-            auto rs = outOnly ? nout(graph, dst, galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, dst, galois::MethodFlag::UNPROTECTED);
-            stats.getLocal()->insert(old+delta / rs);
+            auto rs =
+                outOnly ? nout(graph, dst, galois::MethodFlag::UNPROTECTED) + 1
+                        : ninout(graph, dst, galois::MethodFlag::UNPROTECTED);
+            stats.getLocal()->insert(old + delta / rs);
           }
         }
       }
@@ -108,8 +125,9 @@ struct AsyncPriSet{
     galois::InsertBag<GNode> nextWL;
     galois::substrate::PerThreadStorage<galois::OnlineStat> stats;
 
-    //First do all the nodes once
-    galois::do_all(graph, Process(graph, tolerance, nextWL, stats, 0.0), galois::steal());
+    // First do all the nodes once
+    galois::do_all(graph, Process(graph, tolerance, nextWL, stats, 0.0),
+                   galois::steal());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -120,7 +138,7 @@ struct AsyncPriSet{
       for (int i = 0; i < stats.size(); ++i) {
         auto* s = stats.getRemote(i);
         if (s->getCount()) {
-          //std::cout << *s << "\n";
+          // std::cout << *s << "\n";
           count += s->getCount();
           limit += s->getMean() * s->getCount();
           max = std::max(max, s->getMax());
@@ -134,13 +152,12 @@ struct AsyncPriSet{
       //      limit += sdev / nonzero;
       if (count < 5000)
         limit = 0.0;
-      //std::cout << "Count is " << count << " next limit is " << limit << " max is " << max << "\n";
-      galois::do_all(curWL, Process(graph, tolerance, nextWL, stats, limit), galois::steal());
+      // std::cout << "Count is " << count << " next limit is " << limit << "
+      // max is " << max << "\n";
+      galois::do_all(curWL, Process(graph, tolerance, nextWL, stats, limit),
+                     galois::steal());
     }
   }
 
-  void verify(Graph& graph, PRTy tolerance) {    
-    verifyInOut(graph, tolerance);
-  }
+  void verify(Graph& graph, PRTy tolerance) { verifyInOut(graph, tolerance); }
 };
-

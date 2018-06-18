@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,22 +31,25 @@
 #include <iostream>
 
 class Verifier {
-  struct inconsistent: public std::unary_function<GNode,bool> {
+  struct inconsistent : public std::unary_function<GNode, bool> {
     Graph* graph;
-    inconsistent(Graph* g): graph(g) { }
+    inconsistent(Graph* g) : graph(g) {}
 
     bool operator()(const GNode& node) const {
       Element& e = graph->getData(node);
 
-      size_t dist = std::distance(graph->edge_begin(node), graph->edge_end(node));
+      size_t dist =
+          std::distance(graph->edge_begin(node), graph->edge_end(node));
       if (e.dim() == 2) {
         if (dist != 1) {
-          std::cerr << "Error: Segment " << e << " has " << dist << " relation(s)\n";
+          std::cerr << "Error: Segment " << e << " has " << dist
+                    << " relation(s)\n";
           return true;
         }
       } else if (e.dim() == 3) {
         if (dist != 3) {
-          std::cerr << "Error: Triangle " << e << " has " << dist << " relation(s)\n";
+          std::cerr << "Error: Triangle " << e << " has " << dist
+                    << " relation(s)\n";
           return true;
         }
       } else {
@@ -57,16 +60,16 @@ class Verifier {
     }
   };
 
-  struct not_delaunay: public std::unary_function<GNode,bool> {
+  struct not_delaunay : public std::unary_function<GNode, bool> {
     Graph* graph;
-    not_delaunay(Graph* g): graph(g) { }
+    not_delaunay(Graph* g) : graph(g) {}
 
     bool operator()(const GNode& node) {
       Element& e1 = graph->getData(node);
 
-      for (auto jj: graph->edges(node)) {
+      for (auto jj : graph->edges(node)) {
         const GNode& n = graph->getEdgeDst(jj);
-        Element& e2 = graph->getData(n);
+        Element& e2    = graph->getData(n);
         if (e1.dim() == 3 && e2.dim() == 3) {
           Tuple t2;
           if (!getTupleT2OfRelatedEdge(e1, e2, t2)) {
@@ -74,7 +77,8 @@ class Verifier {
             return true;
           }
           if (e1.inCircle(t2)) {
-            std::cerr << "Delaunay property violated: point " << t2 << " in element " << e1 << "\n";
+            std::cerr << "Delaunay property violated: point " << t2
+                      << " in element " << e1 << "\n";
             return true;
           }
         }
@@ -82,21 +86,22 @@ class Verifier {
       return false;
     }
 
-    bool getTupleT2OfRelatedEdge(const Element& e1, const Element& e2, Tuple& t) {
-      int e2_0 = -1;
-      int e2_1 = -1;
+    bool getTupleT2OfRelatedEdge(const Element& e1, const Element& e2,
+                                 Tuple& t) {
+      int e2_0  = -1;
+      int e2_1  = -1;
       int phase = 0;
 
       for (int i = 0; i < e1.dim(); i++) {
         for (int j = 0; j < e2.dim(); j++) {
-          if (e1.getPoint(i) != e2.getPoint(j)) 
+          if (e1.getPoint(i) != e2.getPoint(j))
             continue;
 
           if (phase == 0) {
-            e2_0 = j;
+            e2_0  = j;
             phase = 1;
             break;
-          } 
+          }
 
           e2_1 = j;
           for (int k = 0; k < 3; k++) {
@@ -125,7 +130,7 @@ class Verifier {
         }
         found.insert(node);
         int i = 0;
-        for (auto ii: graph->edges(node)) {
+        for (auto ii : graph->edges(node)) {
           GNode n = graph->getEdgeDst(ii);
           assert(i < 3);
           assert(graph->containsNode(n));
@@ -138,7 +143,8 @@ class Verifier {
 
     if (found.size() != graph->size()) {
       std::cerr << "Error: Not all elements are reachable. ";
-      std::cerr << "Found: " << found.size() << " needed: " << graph->size() << ".\n";
+      std::cerr << "Found: " << found.size() << " needed: " << graph->size()
+                << ".\n";
       return false;
     }
     return true;
@@ -146,9 +152,11 @@ class Verifier {
 
 public:
   bool verify(Graph* g) {
-    return galois::ParallelSTL::find_if(g->begin(), g->end(), inconsistent(g)) == g->end()
-      && galois::ParallelSTL::find_if(g->begin(), g->end(), not_delaunay(g)) == g->end()
-      && checkReachability(g);
+    return galois::ParallelSTL::find_if(g->begin(), g->end(),
+                                        inconsistent(g)) == g->end() &&
+           galois::ParallelSTL::find_if(g->begin(), g->end(),
+                                        not_delaunay(g)) == g->end() &&
+           checkReachability(g);
   }
 };
 

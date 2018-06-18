@@ -33,7 +33,7 @@
 //   have touched the corresponding cacheline.
 //--------------------------------------------------------------
 
-#define DMP_MOT_OWNER_SHARED  (1 << 31)
+#define DMP_MOT_OWNER_SHARED (1 << 31)
 
 static inline uint32_t DMPmotOwnerFromThread(DmpThreadInfo* dmp) {
   return dmp->threadID;
@@ -54,7 +54,7 @@ __thread BumpAllocator<int> DMPreadLog;
 
 void DMP_initRuntime() {
   dmp_static_assert(DMP_MOT_GRANULARITY == DMP_WB_GRANULARITY);
-  dmp_static_assert(DMP_MOT_ENTRY_SIZE  == DMP_WB_ENTRY_SIZE);
+  dmp_static_assert(DMP_MOT_ENTRY_SIZE == DMP_WB_ENTRY_SIZE);
   dmp_static_assert(MaxThreads < (uint32_t)DMP_MOT_OWNER_SHARED);
   // LLVM runs out of memory if we use a static initializer for this !!! :-(
   for (int i = 0; i < DMP_MOT_ENTRIES; ++i)
@@ -74,11 +74,11 @@ void DMP_commitBufferedWrites() {
   //
 #ifdef DMP_ENABLE_WB_READLOG
 #ifndef DMP_DISABLE_SINGLE_THREADED_ALWAYS_SHARE
-  if(likely(DMPnumLiveThreads > 1)) {
-    for (BumpAllocator<int>::iterator
-         h = DMPreadLog.getiterator(); h.isValid(); h.next()) {
-      const int me = DMPmotOwnerFromThread(DMPMAP);
-      const int hash = *h.get();
+  if (likely(DMPnumLiveThreads > 1)) {
+    for (BumpAllocator<int>::iterator h = DMPreadLog.getiterator(); h.isValid();
+         h.next()) {
+      const int me    = DMPmotOwnerFromThread(DMPMAP);
+      const int hash  = *h.get();
       const int owner = DMPmot[hash];
       if (owner != me && owner != DMP_MOT_OWNER_SHARED) {
         DMPmot[hash] = DMP_MOT_OWNER_SHARED;
@@ -93,17 +93,17 @@ void DMP_commitBufferedWrites() {
   // Commit all writes
   // Also, take ownership of all writes.
   //
-  for (BumpAllocator<LogEntry>::iterator
-       e = DMPwbPool.getiterator(); e.isValid(); e.next()) {
+  for (BumpAllocator<LogEntry>::iterator e = DMPwbPool.getiterator();
+       e.isValid(); e.next()) {
     // Start the commit.
     LogEntryCommitLock* lock = NULL;
-    bool manyWriters = false;
+    bool manyWriters         = false;
     if (DMPwbCommitLogEntryStart(e.get(), &lock, &manyWriters)) {
       // The current MOT[x] should be shared.  Take ownership
       // of that location iff we have been its only writer.
 #ifndef DMP_DISABLE_SINGLE_THREADED_ALWAYS_SHARE
-      if(likely(DMPnumLiveThreads > 1)) {
-        const int me = DMPmotOwnerFromThread(DMPMAP);
+      if (likely(DMPnumLiveThreads > 1)) {
+        const int me   = DMPmotOwnerFromThread(DMPMAP);
         const int hash = DMPmotHash(e.get()->base);
         if (manyWriters == false)
           DMPmot[hash] = me;
@@ -126,7 +126,7 @@ struct LoadStoreTraits {
     if (likely(DMPMAP->state == RunOwnership)) {
       // If we own it, we can read it directly.
       // Otherwise, we must block.
-      const int me = DMPmotOwnerFromThread(DMPMAP);
+      const int me    = DMPmotOwnerFromThread(DMPMAP);
       const int hash  = DMPmotHash(iter->base);
       const int owner = DMPmot[hash];
       if (likely(owner == me || (owner & DMP_MOT_OWNER_SHARED) != 0)) {
@@ -146,7 +146,7 @@ struct LoadStoreTraits {
     if (likely(DMPMAP->state == RunOwnership)) {
       // If we own it, we can write it directly.
       // Otherwise, we must block.
-      const int me = DMPmotOwnerFromThread(DMPMAP);
+      const int me    = DMPmotOwnerFromThread(DMPMAP);
       const int hash  = DMPmotHash(iter->base);
       const int owner = DMPmot[hash];
       if (likely(owner == me)) {
@@ -163,7 +163,7 @@ struct LoadStoreTraits {
     if (likely(DMPMAP->state == RunOwnership)) {
       // If we own it, we can write it directly.
       // Otherwise, we must block.
-      const int me = DMPmotOwnerFromThread(DMPMAP);
+      const int me    = DMPmotOwnerFromThread(DMPMAP);
       const int hash  = DMPmotHash(iter->base);
       const int owner = DMPmot[hash];
       if (likely(owner == me)) {
@@ -180,13 +180,13 @@ struct LoadStoreTraits {
     if (likely(DMPMAP->state == RunOwnership)) {
       // If we have ownership, we can copy directly.
       // Otherwise, we must block.
-      const int me = DMPmotOwnerFromThread(DMPMAP);
-      const int dsthash = DMPmotHash(dst->base);
-      const int srchash = DMPmotHash(src->base);
+      const int me       = DMPmotOwnerFromThread(DMPMAP);
+      const int dsthash  = DMPmotHash(dst->base);
+      const int srchash  = DMPmotHash(src->base);
       const int dstowner = DMPmot[dsthash];
       const int srcowner = DMPmot[srchash];
       if (likely((srcowner == me || (srcowner & DMP_MOT_OWNER_SHARED) != 0)) &&
-                 (dstowner == me)) {
+          (dstowner == me)) {
         memcpy(dst->addr, src->addr, dst->currSize);
         return;
       }
@@ -206,24 +206,24 @@ struct LoadStoreTraits {
     const int me = DMPmotOwnerFromThread(DMPMAP);
     if (unlikely(owner != me)) {
 #ifndef DMP_DISABLE_SINGLE_THREADED_ALWAYS_SHARE
-      if(unlikely(DMPnumLiveThreads == 1)) {
+      if (unlikely(DMPnumLiveThreads == 1)) {
         DMPmot[hash] = DMP_MOT_OWNER_SHARED;
       } else
 #endif
-      DMPmot[hash] = me;
+        DMPmot[hash] = me;
     }
   }
 };
 
-__attribute__((noinline))
-static void doSerialLoad(void* addr, size_t size, void* outbuffer) {
-  MotIterator<LoadStoreTraits::doChangeOwnerForLoad>::foreach(addr, size);
+__attribute__((noinline)) static void doSerialLoad(void* addr, size_t size,
+                                                   void* outbuffer) {
+  MotIterator<LoadStoreTraits::doChangeOwnerForLoad>::foreach (addr, size);
   memcpy(outbuffer, addr, size);
 }
 
-__attribute__((noinline))
-static void doSerialStore(void* addr, size_t size, void* inbuffer) {
-  MotIterator<LoadStoreTraits::doChangeOwnerForStore>::foreach(addr, size);
+__attribute__((noinline)) static void doSerialStore(void* addr, size_t size,
+                                                    void* inbuffer) {
+  MotIterator<LoadStoreTraits::doChangeOwnerForStore>::foreach (addr, size);
   memcpy(addr, inbuffer, size);
 }
 
@@ -279,7 +279,7 @@ void DMPremoveBufferedRange(void* addr, size_t size) {
 // Type specializations
 //
 
-template<typename T, bool isContained>
+template <typename T, bool isContained>
 static inline T doLoadTyped(T* addr) {
   // Uncontained?
   if (!isContained && !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
@@ -290,7 +290,7 @@ static inline T doLoadTyped(T* addr) {
   // In ownership mode, if we own it, we can read it directly.
   // Otherwise, we must block.
   if (likely(DMPMAP->state == RunOwnership)) {
-    const int me = DMPmotOwnerFromThread(DMPMAP);
+    const int me    = DMPmotOwnerFromThread(DMPMAP);
     const int hash  = DMPmotHash(addr);
     const int owner = DMPmot[hash];
     if (likely(owner == me || owner == DMP_MOT_OWNER_SHARED)) {
@@ -303,7 +303,7 @@ static inline T doLoadTyped(T* addr) {
 #ifdef DMP_ENABLE_WB_READLOG
     *(DMPreadLog.alloc()) = DMPmotHash(addr);
 #endif
-    return DMPwbLoadTyped<T,isContained>(addr);
+    return DMPwbLoadTyped<T, isContained>(addr);
   }
   // Serial mode.
   const int hash  = DMPmotHash(addr);
@@ -312,7 +312,7 @@ static inline T doLoadTyped(T* addr) {
   return *addr;
 }
 
-template<typename T, bool isContained>
+template <typename T, bool isContained>
 static inline void doStoreTyped(T* addr, T value) {
   // Uncontained?
   if (!isContained && !DMPwbMemoryIsContained((void*)addr, sizeof(T))) {
@@ -323,7 +323,7 @@ static inline void doStoreTyped(T* addr, T value) {
   // In ownership mode, if we own it, we can write it directly.
   // Otherwise, we must block.
   if (likely(DMPMAP->state == RunOwnership)) {
-    const int me = DMPmotOwnerFromThread(DMPMAP);
+    const int me    = DMPmotOwnerFromThread(DMPMAP);
     const int hash  = DMPmotHash(addr);
     const int owner = DMPmot[hash];
     if (likely(owner == me)) {
@@ -334,7 +334,7 @@ static inline void doStoreTyped(T* addr, T value) {
   }
   // In buffering mode, everything gets buffered.
   if (likely(DMPMAP->state == RunBuffered)) {
-    DMPwbStoreTyped<T,isContained>(addr, value);
+    DMPwbStoreTyped<T, isContained>(addr, value);
     return;
   }
   // Serial mode.
@@ -344,28 +344,28 @@ static inline void doStoreTyped(T* addr, T value) {
   *addr = value;
 }
 
-#define INSTANTIATE(T, TNAME, KIND, CONTAINED)\
-  T DMPloadBuffered ## KIND ## TNAME(T* addr) {\
-    return doLoadTyped<T,CONTAINED>(addr);\
-  }\
-  void DMPstoreBuffered ## KIND ## TNAME(T* addr, T value) {\
-    doStoreTyped<T,CONTAINED>(addr, value);\
+#define INSTANTIATE(T, TNAME, KIND, CONTAINED)                                 \
+  T DMPloadBuffered##KIND##TNAME(T* addr) {                                    \
+    return doLoadTyped<T, CONTAINED>(addr);                                    \
+  }                                                                            \
+  void DMPstoreBuffered##KIND##TNAME(T* addr, T value) {                       \
+    doStoreTyped<T, CONTAINED>(addr, value);                                   \
   }
 
-INSTANTIATE(uint8_t,  Int8,   Contained, true)
-INSTANTIATE(uint16_t, Int16,  Contained, true)
-INSTANTIATE(uint32_t, Int32,  Contained, true)
-INSTANTIATE(uint64_t, Int64,  Contained, true)
-INSTANTIATE(float,    Float,  Contained, true)
-INSTANTIATE(double,   Double, Contained, true)
-INSTANTIATE(void*,    Ptr,    Contained, true)
+INSTANTIATE(uint8_t, Int8, Contained, true)
+INSTANTIATE(uint16_t, Int16, Contained, true)
+INSTANTIATE(uint32_t, Int32, Contained, true)
+INSTANTIATE(uint64_t, Int64, Contained, true)
+INSTANTIATE(float, Float, Contained, true)
+INSTANTIATE(double, Double, Contained, true)
+INSTANTIATE(void*, Ptr, Contained, true)
 
-INSTANTIATE(uint16_t, Int16,  Range, false)
-INSTANTIATE(uint32_t, Int32,  Range, false)
-INSTANTIATE(uint64_t, Int64,  Range, false)
-INSTANTIATE(float,    Float,  Range, false)
-INSTANTIATE(double,   Double, Range, false)
-INSTANTIATE(void*,    Ptr,    Range, false)
+INSTANTIATE(uint16_t, Int16, Range, false)
+INSTANTIATE(uint32_t, Int32, Range, false)
+INSTANTIATE(uint64_t, Int64, Range, false)
+INSTANTIATE(float, Float, Range, false)
+INSTANTIATE(double, Double, Range, false)
+INSTANTIATE(void*, Ptr, Range, false)
 
 #undef INSTANTIATE
 
@@ -378,7 +378,8 @@ void DMPmemset(void* addr, int val, size_t size) {
     WbIterator iter(addr, size);
     for (;;) {
       LoadStoreTraits::doMemset(&iter, val);
-      if (!iter.next()) break;
+      if (!iter.next())
+        break;
     }
   } else {
     memset(addr, val, size);
@@ -392,11 +393,12 @@ void DMPmemcpy(void* dst, const void* src, size_t size) {
     WbIterator::initPair(&di, &si);
     for (;;) {
       LoadStoreTraits::doMemcpy(&di, &si);
-      if (!WbIterator::nextPair(&di, &si)) break;
+      if (!WbIterator::nextPair(&di, &si))
+        break;
     }
   } else {
     memcpy(dst, src, size);
   }
 }
 
-#endif  // DMP_ENABLE_MODEL_O_B_S
+#endif // DMP_ENABLE_MODEL_O_B_S

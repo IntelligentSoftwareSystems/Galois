@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,15 +37,18 @@
 #include <set>
 #include <vector>
 
-
 namespace cll = llvm::cl;
 
 static const char* name = "Boruvka's Minimum Spanning Tree Algorithm";
 static const char* desc = "Computes a minimum weight spanning tree of a graph";
-static const char* url = "mst";
+static const char* url  = "mst";
 
-static cll::opt<std::string> inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<bool> verify_via_kruskal("verify",cll::desc("Verify MST result via Serial Kruskal"), cll::Optional,cll::init(false));
+static cll::opt<std::string>
+    inputfile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<bool>
+    verify_via_kruskal("verify",
+                       cll::desc("Verify MST result via Serial Kruskal"),
+                       cll::Optional, cll::init(false));
 
 ///////////////////////////////////////////////////////////////////////////////////////
 typedef int NodeDataType;
@@ -60,33 +63,34 @@ using Counter = galois::GAccumulator<size_t>;
 
 ///////////////////////////////////////////////////////////////////////////////////////
 
-std::ostream& operator << (std::ostream& out, std::tuple<NodeDataType, NodeDataType, EdgeDataType>& etpl) {
-  out << "(" << std::get<0>(etpl) << ", " << std::get<1>(etpl) << ", " << std::get<2>(etpl) << ")";
+std::ostream&
+operator<<(std::ostream& out,
+           std::tuple<NodeDataType, NodeDataType, EdgeDataType>& etpl) {
+  out << "(" << std::get<0>(etpl) << ", " << std::get<1>(etpl) << ", "
+      << std::get<2>(etpl) << ")";
   return out;
 }
 
 EdgeDataType runBodyParallel(Graph& graph) {
 
-  auto indexer = [&] (const GNode& n) {
-    return std::distance( graph.edge_begin(n, galois::MethodFlag::UNPROTECTED)
-                          , graph.edge_begin(n, galois::MethodFlag::UNPROTECTED));
-
+  auto indexer = [&](const GNode& n) {
+    return std::distance(graph.edge_begin(n, galois::MethodFlag::UNPROTECTED),
+                         graph.edge_begin(n, galois::MethodFlag::UNPROTECTED));
   };
-
 
   using namespace galois::worklists;
   typedef PerSocketChunkFIFO<64> PSchunk;
-  typedef OrderedByIntegerMetric< decltype(indexer), PSchunk> OBIM;
+  typedef OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
   Counter MSTWeight;
 
   galois::StatTimer T;
   T.start();
 
-  galois::for_each(galois::iterate(graph), 
+  galois::for_each(
+      galois::iterate(graph),
 
-      [&graph, &MSTWeight] (const GNode& src, auto& lwl) {
-
+      [&graph, &MSTWeight](const GNode& src, auto& lwl) {
         if (graph.containsNode(src) == false)
           return;
         graph.getData(src, galois::MethodFlag::WRITE);
@@ -95,78 +99,85 @@ EdgeDataType runBodyParallel(Graph& graph) {
         std::cout << "Processing " << graph.getData(src) << std::endl;
 #endif
         EdgeDataType minEdgeWeight = std::numeric_limits<EdgeDataType>::max();
-        //Acquire locks on neighborhood.
+        // Acquire locks on neighborhood.
         for (auto dit : graph.edges(src, galois::MethodFlag::WRITE)) {
           graph.getData(graph.getEdgeDst(dit));
         }
-        //Find minimum neighbor
+        // Find minimum neighbor
         for (auto e_it : graph.edges(src, galois::MethodFlag::UNPROTECTED)) {
-          EdgeDataType w = graph.getEdgeData(e_it, galois::MethodFlag::UNPROTECTED);
-          assert(w>=0);
+          EdgeDataType w =
+              graph.getEdgeData(e_it, galois::MethodFlag::UNPROTECTED);
+          assert(w >= 0);
           auto dst = graph.getEdgeDst(e_it);
 
           if (dst != src && w < minEdgeWeight) {
-            minNeighbor = graph.getEdgeDst(e_it);
+            minNeighbor   = graph.getEdgeDst(e_it);
             minEdgeWeight = w;
           }
         }
-        //If there are no outgoing neighbors.
+        // If there are no outgoing neighbors.
         if (minEdgeWeight == std::numeric_limits<EdgeDataType>::max()) {
           graph.removeNode(src, galois::MethodFlag::UNPROTECTED);
           return;
         }
 #ifdef BORUVKA_DEBUG
-        auto tpl = std::make_tuple( 
+        auto tpl = std::make_tuple(
             graph.getData(src, galois::MethodFlag::UNPROTECTED),
             graph.getData(minNeighbor, galois::MethodFlag::UNPROTECTED),
             minEdgeWeight);
         std::cout << " Boruvka edge added: " << tpl << std::endl;
 #endif
-        //Acquire locks on neighborhood of min neighbor.
+        // Acquire locks on neighborhood of min neighbor.
         for (auto e_it : graph.edges(minNeighbor, galois::MethodFlag::WRITE)) {
           graph.getData(graph.getEdgeDst(e_it));
         }
-        assert(minEdgeWeight>=0);
-        //update MST weight.
+        assert(minEdgeWeight >= 0);
+        // update MST weight.
         MSTWeight += minEdgeWeight;
 
         using DstEdgePair = std::pair<GNode, EdgeDataType>;
-        using DstEdgeSet = galois::gstl::Set<DstEdgePair>;
+        using DstEdgeSet  = galois::gstl::Set<DstEdgePair>;
 
         DstEdgeSet toAdd;
 
-        for (auto dit : graph.edges(minNeighbor, galois::MethodFlag::UNPROTECTED)) {
+        for (auto dit :
+             graph.edges(minNeighbor, galois::MethodFlag::UNPROTECTED)) {
 
           GNode dstNode = graph.getEdgeDst(dit);
-          int edgeWeight = graph.getEdgeData(dit,galois::MethodFlag::UNPROTECTED);
+          int edgeWeight =
+              graph.getEdgeData(dit, galois::MethodFlag::UNPROTECTED);
 
-          if (dstNode != src) { //Do not add the edge being contracted
+          if (dstNode != src) { // Do not add the edge being contracted
 
-            Graph::edge_iterator dup_edge = graph.findEdge(src, dstNode, galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator dup_edge =
+                graph.findEdge(src, dstNode, galois::MethodFlag::UNPROTECTED);
 
-            if (dup_edge != graph.edge_end(src, galois::MethodFlag::UNPROTECTED)) {
+            if (dup_edge !=
+                graph.edge_end(src, galois::MethodFlag::UNPROTECTED)) {
 
-              EdgeDataType dup_wt = graph.getEdgeData(dup_edge,galois::MethodFlag::UNPROTECTED);
-              graph.getEdgeData(dup_edge,galois::MethodFlag::UNPROTECTED) = std::min<EdgeDataType>(edgeWeight, dup_wt);
-              assert(std::min<EdgeDataType>(edgeWeight, dup_wt)>=0);
+              EdgeDataType dup_wt =
+                  graph.getEdgeData(dup_edge, galois::MethodFlag::UNPROTECTED);
+              graph.getEdgeData(dup_edge, galois::MethodFlag::UNPROTECTED) =
+                  std::min<EdgeDataType>(edgeWeight, dup_wt);
+              assert(std::min<EdgeDataType>(edgeWeight, dup_wt) >= 0);
 
             } else {
               toAdd.insert(DstEdgePair(dstNode, edgeWeight));
-              assert(edgeWeight>=0);
+              assert(edgeWeight >= 0);
             }
           }
         }
 
         graph.removeNode(minNeighbor, galois::MethodFlag::UNPROTECTED);
 
-        for (const auto& p: toAdd) {
-          graph.getEdgeData(graph.addEdge(src, p.first, galois::MethodFlag::UNPROTECTED)) = p.second;
+        for (const auto& p : toAdd) {
+          graph.getEdgeData(graph.addEdge(
+              src, p.first, galois::MethodFlag::UNPROTECTED)) = p.second;
         }
 
         lwl.push(src);
       },
-      galois::wl<OBIM>(indexer), 
-      galois::loopname("Main"));
+      galois::wl<OBIM>(indexer), galois::loopname("Main"));
 
   T.stop();
 
@@ -181,7 +192,7 @@ void makeGraph(Graph& graph) {
 
   size_t numEdges = 0;
 
-  for (GNode n: graph) {
+  for (GNode n : graph) {
     graph.getData(n) = id++;
 
     numEdges += std::distance(graph.edge_begin(n), graph.edge_end(n));
@@ -189,8 +200,9 @@ void makeGraph(Graph& graph) {
   numEdges /= 2;
 
   // TODO: sort graph by edge data
-  
-  std::cout << inputfile << " read with nodes = " << graph.size() << ", edges = " << numEdges << std::endl;
+
+  std::cout << inputfile << " read with nodes = " << graph.size()
+            << ", edges = " << numEdges << std::endl;
 }
 
 ////////////////////////////Kruskal////////////////////////////////////////////////
@@ -202,63 +214,61 @@ EdgeDataType runKruskal(Graph& graph) {
     EdgeDataType wt;
   };
 
-  auto kEdgeCmp = [] (const KEdgeTuple& o1, const KEdgeTuple& o2) {
-    return (o1.wt==o2.wt)? o1.src < o2.src : o1.wt<o2.wt;
+  auto kEdgeCmp = [](const KEdgeTuple& o1, const KEdgeTuple& o2) {
+    return (o1.wt == o2.wt) ? o1.src < o2.src : o1.wt < o2.wt;
   };
 
   std::vector<KEdgeTuple> kruskalEdges;
 
-  for (GNode src: graph) {
+  for (GNode src : graph) {
 
     auto sd = graph.getData(src);
 
-    for (auto e: graph.edges(src)) {
+    for (auto e : graph.edges(src)) {
       GNode dst = graph.getEdgeDst(e);
-      auto dd = graph.getData(dst);
+      auto dd   = graph.getData(dst);
 
       auto wt = graph.getEdgeData(e);
-      
-      kruskalEdges.push_back (KEdgeTuple {sd, dd, wt});
+
+      kruskalEdges.push_back(KEdgeTuple{sd, dd, wt});
     }
   }
 
-   size_t num_nodes = graph.size();
+  size_t num_nodes = graph.size();
 
-   std::sort(kruskalEdges.begin(), kruskalEdges.end(), kEdgeCmp);
+  std::sort(kruskalEdges.begin(), kruskalEdges.end(), kEdgeCmp);
 
-   UnionFind<NodeDataType,-1> uf(num_nodes);
+  UnionFind<NodeDataType, -1> uf(num_nodes);
 
-   size_t mst_size = 0;
+  size_t mst_size = 0;
 
-   EdgeDataType mst_sum = 0;
+  EdgeDataType mst_sum = 0;
 
-   for(size_t i = 0; i < kruskalEdges.size(); ++i){
+  for (size_t i = 0; i < kruskalEdges.size(); ++i) {
 
-      const KEdgeTuple& e  = kruskalEdges[i];
-      NodeDataType src = uf.uf_find(e.src);
-      NodeDataType dst = uf.uf_find(e.dst);
+    const KEdgeTuple& e = kruskalEdges[i];
+    NodeDataType src    = uf.uf_find(e.src);
+    NodeDataType dst    = uf.uf_find(e.dst);
 
-
-      if (src != dst) {
-         uf.uf_union(src,dst);
-         mst_sum += e.wt;
-         mst_size++;
+    if (src != dst) {
+      uf.uf_union(src, dst);
+      mst_sum += e.wt;
+      mst_size++;
 
 #ifdef BORUVKA_DEBUG
-         auto tpl = std::make_tuple(e.src, e.dst, e.wt);
-         std::cout << "Kruskal Edge added: " << tpl << std::endl;
+      auto tpl = std::make_tuple(e.src, e.dst, e.wt);
+      std::cout << "Kruskal Edge added: " << tpl << std::endl;
 #endif
+    }
 
-      }
-
-      if (mst_size >= num_nodes - 1)
-        return mst_sum;
-   }
-   return -1;
+    if (mst_size >= num_nodes - 1)
+      return mst_sum;
+  }
+  return -1;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
@@ -266,7 +276,6 @@ int main(int argc, char **argv) {
   Graph graph;
 
   makeGraph(graph);
-
 
   EdgeDataType krusk_wt = 0;
 
@@ -284,14 +293,17 @@ int main(int argc, char **argv) {
 
   T.stop();
 
-  std::cout<<"Boruvka MST Result is " << mst_wt <<"\n";
+  std::cout << "Boruvka MST Result is " << mst_wt << "\n";
 
   galois::reportPageAlloc("MeminfoPost");
 
-  if(!skipVerify) {
+  if (!skipVerify) {
     if (krusk_wt != mst_wt) {
-      std::cerr << "ERROR: Boruvka's mst weight doesn't match Kruskal's mst weight" << std::endl;
-      std::cerr << "Boruvka's weight = " << mst_wt << ", Kruskal's weight = " << krusk_wt << std::endl;
+      std::cerr
+          << "ERROR: Boruvka's mst weight doesn't match Kruskal's mst weight"
+          << std::endl;
+      std::cerr << "Boruvka's weight = " << mst_wt
+                << ", Kruskal's weight = " << krusk_wt << std::endl;
 
       std::abort();
     }

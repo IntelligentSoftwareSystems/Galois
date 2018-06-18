@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Mark Potts on 3/25/09.
- *  
+ *
  * Copyright (c) 2009 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -30,52 +30,47 @@
 
 #include "util.h"
 
-
-
-bool StandardAVI::gather ( const LocalToGlobalMap& L2G, const VecDouble& Qval, const VecDouble& Vval,
-    const VecDouble& Vbval, const VecDouble& Tval,
-    MatDouble& q,
-    MatDouble& v,
-    MatDouble& vb,
-    MatDouble& ti) const {
+bool StandardAVI::gather(const LocalToGlobalMap& L2G, const VecDouble& Qval,
+                         const VecDouble& Vval, const VecDouble& Vbval,
+                         const VecDouble& Tval, MatDouble& q, MatDouble& v,
+                         MatDouble& vb, MatDouble& ti) const {
 
   // double *Q, *V, *Vb, *T;
-// 
+  //
   // VecGetArray (Qval,& Q);
   // VecGetArray (Vval,& V);
   // VecGetArray (Vbval,& Vb);
   // VecGetArray (Tval,& T);
 
-
-  if (q.size () < nfields)
-    q.resize (nfields);
-  if (v.size () < nfields)
-    v.resize (nfields);
-  if (vb.size () < nfields)
-    vb.resize (nfields);
-  if (ti.size () < nfields)
-    ti.resize (nfields);
+  if (q.size() < nfields)
+    q.resize(nfields);
+  if (v.size() < nfields)
+    v.resize(nfields);
+  if (vb.size() < nfields)
+    vb.resize(nfields);
+  if (ti.size() < nfields)
+    ti.resize(nfields);
 
   for (size_t f = 0; f < nfields; f++) {
-    size_t fieldDof = getFieldDof (f);
-    if (q[f].size () < fieldDof)
-      q[f].resize (fieldDof);
+    size_t fieldDof = getFieldDof(f);
+    if (q[f].size() < fieldDof)
+      q[f].resize(fieldDof);
 
-    if (v[f].size () < fieldDof)
-      v[f].resize (fieldDof);
+    if (v[f].size() < fieldDof)
+      v[f].resize(fieldDof);
 
-    if (vb[f].size () < fieldDof)
-      vb[f].resize (fieldDof);
+    if (vb[f].size() < fieldDof)
+      vb[f].resize(fieldDof);
 
-    if (ti[f].size () < fieldDof)
-      ti[f].resize (fieldDof);
+    if (ti[f].size() < fieldDof)
+      ti[f].resize(fieldDof);
 
     for (size_t a = 0; a < fieldDof; a++) {
-      size_t index = L2G.map (f, a, this->globalIdx);
-      q[f][a] = Qval[index];
-      v[f][a] = Vval[index];
-      vb[f][a] = Vbval[index];
-      ti[f][a] = Tval[index];
+      size_t index = L2G.map(f, a, this->globalIdx);
+      q[f][a]      = Qval[index];
+      v[f][a]      = Vval[index];
+      vb[f][a]     = Vbval[index];
+      ti[f][a]     = Tval[index];
     }
   }
 
@@ -84,49 +79,44 @@ bool StandardAVI::gather ( const LocalToGlobalMap& L2G, const VecDouble& Qval, c
   // VecRestoreArray (Vbval,& Vb);
   // VecRestoreArray (Tval,& T);
 
-
   return (true);
 }
 
-void StandardAVI::computeLocalTvec (MatDouble& tnew) const {
-  assert (tnew.size () == nfields);
+void StandardAVI::computeLocalTvec(MatDouble& tnew) const {
+  assert(tnew.size() == nfields);
 
   for (size_t f = 0; f < nfields; f++) {
-    size_t fieldDof = getFieldDof (f);
-    assert (tnew[f].size () == fieldDof);
+    size_t fieldDof = getFieldDof(f);
+    assert(tnew[f].size() == fieldDof);
 
     for (size_t a = 0; a < fieldDof; a++) {
-      tnew[f][a] = getNextTimeStamp ();
+      tnew[f][a] = getNextTimeStamp();
     }
   }
 }
 
-
-bool StandardAVI::assemble (const LocalToGlobalMap& L2G, 
-    const MatDouble& qnew,
-    const MatDouble& vnew,
-    const MatDouble& vbnew, 
-    const MatDouble& tnew,
-    VecDouble& Qval, VecDouble& Vval,
-    VecDouble& Vbval, VecDouble& Tval, VecDouble& LUpdate) const {
+bool StandardAVI::assemble(const LocalToGlobalMap& L2G, const MatDouble& qnew,
+                           const MatDouble& vnew, const MatDouble& vbnew,
+                           const MatDouble& tnew, VecDouble& Qval,
+                           VecDouble& Vval, VecDouble& Vbval, VecDouble& Tval,
+                           VecDouble& LUpdate) const {
 
   // double * resvals = new double[localsize];
   // double * vvals = new double[localsize];
   // double * vbvals = new double[localsize];
   // double * tvals = new double[localsize];
- 
+
   // size_t * indices = new size_t[localsize];
   // double * updates = new double[localsize];
 
-
   for (size_t f = 0, i = 0; f < nfields; f++) {
-    for (size_t a = 0; a < getFieldDof (f); a++, i++) {
-      size_t index = L2G.map (f, a, globalIdx);
-      Qval[index] = qnew[f][a];
-      Vval[index] = vnew[f][a];
-      Vbval[index] = vbnew[f][a];
-      Tval[index] = tnew[f][a];
-      LUpdate[index] = (double) globalIdx;
+    for (size_t a = 0; a < getFieldDof(f); a++, i++) {
+      size_t index   = L2G.map(f, a, globalIdx);
+      Qval[index]    = qnew[f][a];
+      Vval[index]    = vnew[f][a];
+      Vbval[index]   = vbnew[f][a];
+      Tval[index]    = tnew[f][a];
+      LUpdate[index] = (double)globalIdx;
     }
   }
 
@@ -146,21 +136,15 @@ bool StandardAVI::assemble (const LocalToGlobalMap& L2G,
   return (true);
 }
 
-bool StandardAVI::update (const MatDouble& q,
-    const MatDouble& v,
-    const MatDouble& vb,
-    const MatDouble& ti,
-    const MatDouble& tnew,
-    MatDouble& qnew,
-    MatDouble& vnew,
-    MatDouble& vbnew,
-    MatDouble& forcefield,
-    MatDouble& funcval,
-    MatDouble& deltaV
-    ) const {
+bool StandardAVI::update(const MatDouble& q, const MatDouble& v,
+                         const MatDouble& vb, const MatDouble& ti,
+                         const MatDouble& tnew, MatDouble& qnew,
+                         MatDouble& vnew, MatDouble& vbnew,
+                         MatDouble& forcefield, MatDouble& funcval,
+                         MatDouble& deltaV) const {
 
   for (size_t f = 0; f < nfields; f++) {
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < getFieldDof(f); a++) {
 #if 0
       if(imposedFlags[f][a] == true) {
         qnew[f][a]=imposedValues[f][a];
@@ -170,10 +154,9 @@ bool StandardAVI::update (const MatDouble& q,
       }
 #else
       if (imposedTypes[f][a] == ONE) {
-        double t = ti[f][a];
-        qnew[f][a] = ((avi_bc_func)[a]) (f, a, t);
-      }
-      else {
+        double t   = ti[f][a];
+        qnew[f][a] = ((avi_bc_func)[a])(f, a, t);
+      } else {
         qnew[f][a] = q[f][a] + (tnew[f][a] - ti[f][a]) * vb[f][a];
       }
 #endif
@@ -181,41 +164,39 @@ bool StandardAVI::update (const MatDouble& q,
   }
 
   // MatDouble funcval (nfields);
-  getForceField (qnew, forcefield);
+  getForceField(qnew, forcefield);
 
-  if (funcval.size () != nfields) {
-    funcval.resize (nfields);
+  if (funcval.size() != nfields) {
+    funcval.resize(nfields);
   }
 
   for (size_t f = 0; f < nfields; f++) {
-    size_t fieldDof = getFieldDof (f);
+    size_t fieldDof = getFieldDof(f);
 
-    if (funcval[f].size () != fieldDof) {
-      funcval[f].resize (fieldDof);
+    if (funcval[f].size() != fieldDof) {
+      funcval[f].resize(fieldDof);
     }
 
     for (size_t a = 0; a < fieldDof; a++) {
-      funcval[f][a] = -(getTimeStep ()) * (forcefield)[f][a];
+      funcval[f][a] = -(getTimeStep()) * (forcefield)[f][a];
     }
   }
 
   // MatDouble DeltaV;
-  computeDeltaV (funcval, deltaV);
+  computeDeltaV(funcval, deltaV);
 
   for (size_t f = 0; f < nfields; f++) {
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < getFieldDof(f); a++) {
       if (imposedTypes[f][a] == ZERO) {
-        vnew[f][a] = vb[f][a] + deltaV[f][a] / 2.0;
+        vnew[f][a]  = vb[f][a] + deltaV[f][a] / 2.0;
         vbnew[f][a] = vb[f][a] + deltaV[f][a];
-      }
-      else if (imposedTypes[f][a] == ONE) {
-        vnew[f][a] = 0.0;
+      } else if (imposedTypes[f][a] == ONE) {
+        vnew[f][a]  = 0.0;
         vbnew[f][a] = 0.0;
-      }
-      else if (imposedTypes[f][a] == TWO) {
-        double t = ti[f][a];
-        vnew[f][a] = ((avi_bc_func)[a]) (f, a, t);
-        vbnew[f][a] = ((avi_bc_func)[a]) (f, a, t);
+      } else if (imposedTypes[f][a] == TWO) {
+        double t    = ti[f][a];
+        vnew[f][a]  = ((avi_bc_func)[a])(f, a, t);
+        vbnew[f][a] = ((avi_bc_func)[a])(f, a, t);
       }
     }
   }
@@ -226,40 +207,32 @@ bool StandardAVI::update (const MatDouble& q,
   return (true);
 }
 
-bool StandardAVI::vbInit (
-    const MatDouble& q,
-    const MatDouble& v,
-    const MatDouble& vb,
-    const MatDouble& ti,
-    const MatDouble& tnew,
-    MatDouble& qnew,
-    MatDouble& vbinit,
-    MatDouble& forcefield,
-    MatDouble& funcval,
-    MatDouble& deltaV
-    ) const {
+bool StandardAVI::vbInit(const MatDouble& q, const MatDouble& v,
+                         const MatDouble& vb, const MatDouble& ti,
+                         const MatDouble& tnew, MatDouble& qnew,
+                         MatDouble& vbinit, MatDouble& forcefield,
+                         MatDouble& funcval, MatDouble& deltaV) const {
 
   // MatDouble qnew;
 
   // qnew.resize ((q).size ());
 
-  assert (qnew.size () == q.size ());
+  assert(qnew.size() == q.size());
 
   for (size_t f = 0; f < nfields; f++) {
 
-    assert (qnew[f].size () == q[f].size ());
+    assert(qnew[f].size() == q[f].size());
 
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < getFieldDof(f); a++) {
       if (imposedFlags[f][a] == true) {
         qnew[f][a] = imposedValues[f][a];
-      }
-      else {
-        qnew[f][a] =  (q)[f][a] + (tnew[f][a] - ti[f][a]) / 2.0 * vb[f][a];
+      } else {
+        qnew[f][a] = (q)[f][a] + (tnew[f][a] - ti[f][a]) / 2.0 * vb[f][a];
       }
     }
   }
 
-  getForceField ((qnew), forcefield);
+  getForceField((qnew), forcefield);
 
 #ifdef DEBUG
   std::cerr << "forcefield = ";
@@ -269,24 +242,24 @@ bool StandardAVI::vbInit (
 #endif
 
   // MatDouble funcval (nfields);
-  if (funcval.size () != nfields) {
-    funcval.resize (nfields);
+  if (funcval.size() != nfields) {
+    funcval.resize(nfields);
   }
 
   for (size_t f = 0; f < nfields; f++) {
-    size_t fieldDof = getFieldDof (f);
+    size_t fieldDof = getFieldDof(f);
 
-    if (funcval[f].size () != fieldDof) {
-      funcval[f].resize (fieldDof);
+    if (funcval[f].size() != fieldDof) {
+      funcval[f].resize(fieldDof);
     }
 
     for (size_t a = 0; a < fieldDof; a++) {
-      funcval[f][a] = -(getTimeStep ()) * (forcefield)[f][a];
+      funcval[f][a] = -(getTimeStep()) * (forcefield)[f][a];
     }
   }
 
   // MatDouble DeltaV;
-  computeDeltaV (funcval, deltaV);
+  computeDeltaV(funcval, deltaV);
 
 #ifdef DEBUG
   std::cerr << "funcval = ";
@@ -300,104 +273,102 @@ bool StandardAVI::vbInit (
 #endif
 
   for (size_t f = 0; f < nfields; f++) {
-    for (size_t a = 0; a < getFieldDof (f); a++) {
+    for (size_t a = 0; a < getFieldDof(f); a++) {
       vbinit[f][a] = (vb[f][a] + deltaV[f][a] / 2.0);
     }
   }
   return (true);
 }
 
-
 void StandardAVI::computeDeltaV(const MatDouble& funcval,
-    MatDouble& DeltaV) const {
+                                MatDouble& DeltaV) const {
 
-  if(DeltaV.size()<nfields) {
+  if (DeltaV.size() < nfields) {
     DeltaV.resize(nfields);
   }
 
-  for(size_t f=0;f<nfields;f++) {
-    size_t fieldDof = getFieldDof (f);
+  for (size_t f = 0; f < nfields; f++) {
+    size_t fieldDof = getFieldDof(f);
 
-    if(DeltaV[f].size() < fieldDof) {
-      DeltaV[f].resize (fieldDof);
-    } 
-    for(size_t a=0;a<fieldDof;a++) {
-      DeltaV[f][a] = funcval[f][a]/(MMdiag[f][a]);
+    if (DeltaV[f].size() < fieldDof) {
+      DeltaV[f].resize(fieldDof);
+    }
+    for (size_t a = 0; a < fieldDof; a++) {
+      DeltaV[f][a] = funcval[f][a] / (MMdiag[f][a]);
     }
   }
 }
 
-bool StandardAVI::getImposedValues (const GlobalElementIndex& ElementIndex,
-    const LocalToGlobalMap& L2G, size_t field, size_t dof,
-    double& qvalue, double& vvalue) const {
+bool StandardAVI::getImposedValues(const GlobalElementIndex& ElementIndex,
+                                   const LocalToGlobalMap& L2G, size_t field,
+                                   size_t dof, double& qvalue,
+                                   double& vvalue) const {
 
   if (imposedFlags[field][dof] == true) {
     qvalue = imposedValues[field][dof];
-    vvalue = 0.0; //this needs to be re-worked
+    vvalue = 0.0; // this needs to be re-worked
     return (true);
-  }
-  else {
+  } else {
     return (false);
   }
 }
 
-void StandardAVI::setBCs (const MatBool& IFlag,
-    const MatDouble& IVal) {
+void StandardAVI::setBCs(const MatBool& IFlag, const MatDouble& IVal) {
 
-  if (imposedFlags.size () != IFlag.size ()) {
-    imposedFlags.resize (IFlag.size ());
+  if (imposedFlags.size() != IFlag.size()) {
+    imposedFlags.resize(IFlag.size());
   }
 
-  if (imposedValues.size () != IVal.size ()) {
-    imposedValues.resize (IVal.size ());
+  if (imposedValues.size() != IVal.size()) {
+    imposedValues.resize(IVal.size());
   }
 
-  for (size_t f = 0; f < IFlag.size (); f++) {
-    if (imposedFlags[f].size () != IFlag[f].size ()) {
-      imposedFlags[f].resize (IFlag[f].size ());
+  for (size_t f = 0; f < IFlag.size(); f++) {
+    if (imposedFlags[f].size() != IFlag[f].size()) {
+      imposedFlags[f].resize(IFlag[f].size());
     }
-    if (imposedValues[f].size () != IVal[f].size ()) {
-      imposedValues[f].resize (IVal[f].size ());
+    if (imposedValues[f].size() != IVal[f].size()) {
+      imposedValues[f].resize(IVal[f].size());
     }
-    for (size_t a = 0; a < IFlag[f].size (); a++) {
+    for (size_t a = 0; a < IFlag[f].size(); a++) {
       imposedValues[f][a] = IVal[f][a];
-      imposedFlags[f][a] = IFlag[f][a];
+      imposedFlags[f][a]  = IFlag[f][a];
     }
   }
 }
 
-void StandardAVI::setDiagVals (const VecDouble& MassVec,
-    const LocalToGlobalMap& L2G, const GlobalElementIndex& elem_index) {
+void StandardAVI::setDiagVals(const VecDouble& MassVec,
+                              const LocalToGlobalMap& L2G,
+                              const GlobalElementIndex& elem_index) {
 
   size_t localsize = 0;
 
   // double *MMVec;
-// 
+  //
   // VecGetArray (MassVec,& MMVec);
   const VecDouble& MMVec = MassVec;
 
-  MMdiag.resize (getFields ().size ());
+  MMdiag.resize(getFields().size());
 
-  for (size_t f = 0; f < getFields ().size (); f++) {
-    size_t fieldDof = getFieldDof (f);
+  for (size_t f = 0; f < getFields().size(); f++) {
+    size_t fieldDof = getFieldDof(f);
 
     localsize += fieldDof;
 
-    MMdiag[f].resize (fieldDof, 0.);
+    MMdiag[f].resize(fieldDof, 0.);
     for (size_t a = 0; a < fieldDof; a++) {
-      MMdiag[f][a] = MMVec[L2G.map (f, a, elem_index)];
+      MMdiag[f][a] = MMVec[L2G.map(f, a, elem_index)];
     }
   }
 
 #ifdef DEBUG
   std::cerr << "MMdiag = " << std::endl;
   for (size_t f = 0; f < getFields().size(); ++f) {
-    printIter (std::cerr, MMdiag[f].begin(), MMdiag[f].end());
+    printIter(std::cerr, MMdiag[f].begin(), MMdiag[f].end());
   }
 #endif
 
   // VecRestoreArray (MassVec,& MMVec);
-
 }
 
 /*
@@ -432,6 +403,3 @@ void StandardAVI::setDiagVals (const VecDouble& MassVec,
  };
 
  */
-
-
-

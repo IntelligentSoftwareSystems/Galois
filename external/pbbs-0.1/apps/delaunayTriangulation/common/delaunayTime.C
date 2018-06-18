@@ -40,27 +40,29 @@ bool CheckResult;
 
 void timeDelaunay(point2d* pts, int n, int rounds, char* outFile) {
   triangles<point2d> R;
-  for (int i=0; i < rounds; i++) {
-    if (i != 0) R.del();
+  for (int i = 0; i < rounds; i++) {
+    if (i != 0)
+      R.del();
     startTime();
     R = delaunay(pts, n);
     nextTimeN();
   }
   cout << endl;
 
-  if (outFile != NULL) writeTrianglesToFile(R, outFile);
+  if (outFile != NULL)
+    writeTrianglesToFile(R, outFile);
   R.del();
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  int rounds  = P.getOptionIntValue("-r", 1);
   CheckResult = P.getOption("-c");
 
   _seq<point2d> PIn = readPointsFromFile<point2d>(iFile);
-  //std::random_shuffle(PIn.A, PIn.A+PIn.n);
+  // std::random_shuffle(PIn.A, PIn.A+PIn.n);
   timeDelaunay(PIn.A, PIn.n, rounds, oFile);
 }

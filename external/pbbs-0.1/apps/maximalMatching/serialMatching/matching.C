@@ -27,14 +27,14 @@ using namespace std;
 typedef int eindex;
 
 int maxMatchSerial(edge* E, vindex* vertices, int* out, int m) {
-  int k=0;
+  int k = 0;
   for (int i = 0; i < m; i++) {
     vindex v = E[i].v;
     vindex u = E[i].u;
-    if(vertices[v] < 0 && vertices[u] < 0){
+    if (vertices[v] < 0 && vertices[u] < 0) {
       vertices[v] = u;
       vertices[u] = v;
-      out[k++] = i;
+      out[k++]    = i;
     }
   }
   return k;
@@ -42,17 +42,17 @@ int maxMatchSerial(edge* E, vindex* vertices, int* out, int m) {
 
 // Finds a maximal matching of the graph
 // Returns cross pointers between vertices, or -1 if unmatched
-pair<int*,int> maximalMatching(edgeArray EA) {
+pair<int*, int> maximalMatching(edgeArray EA) {
   int m = EA.nonZeros;
   int n = EA.numRows;
   cout << "n=" << n << "m=" << m << endl;
 
-  vindex* vertices = newA(vindex,n);
-  for(int i=0; i<n; i++) vertices[i] = -1;
-  int* out = newA(int,m);
+  vindex* vertices = newA(vindex, n);
+  for (int i = 0; i < n; i++)
+    vertices[i] = -1;
+  int* out = newA(int, m);
   int size = maxMatchSerial(EA.E, vertices, out, m);
   free(vertices);
 
-  return pair<int*,int>(out,size);
-}  
-
+  return pair<int*, int>(out, size);
+}

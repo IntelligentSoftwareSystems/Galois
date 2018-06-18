@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,51 +31,51 @@ namespace galois {
 namespace runtime {
 namespace exp {
 
-template<typename T, bool isLIFO, unsigned ChunkSize>
-struct FixedSizeRingAdaptor: public galois::FixedSizeRing<T,ChunkSize> {
+template <typename T, bool isLIFO, unsigned ChunkSize>
+struct FixedSizeRingAdaptor : public galois::FixedSizeRing<T, ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
 
-  reference cur() { return isLIFO ? this->front() : this->back();  }
+  reference cur() { return isLIFO ? this->front() : this->back(); }
 
-  template<typename U>
+  template <typename U>
   void push(U&& val) {
     this->push_front(std::forward<U>(val));
   }
 
-  void pop()  {
-    if (isLIFO) this->pop_front();
-    else this->pop_back();
+  void pop() {
+    if (isLIFO)
+      this->pop_front();
+    else
+      this->pop_back();
   }
 
 #ifdef _DO_OUTER_PREFETCH
-  typename FixedSizeRingAdaptor::const_reference  lookAhead (unsigned off) const {
-    assert (!this->empty ());
+  typename FixedSizeRingAdaptor::const_reference lookAhead(unsigned off) const {
+    assert(!this->empty());
     if (isLIFO) {
-      return this->getAt (off);
+      return this->getAt(off);
     } else {
-      return this->getAt (this->size () - off);
+      return this->getAt(this->size() - off);
     }
   }
 #endif
-
-
 };
 
 struct WID {
   unsigned tid;
   unsigned pid;
-  WID(unsigned t): tid(t) {
-    pid = substrate::getThreadPool().getLeader(tid);
-  }
+  WID(unsigned t) : tid(t) { pid = substrate::getThreadPool().getLeader(tid); }
   WID() {
     tid = substrate::ThreadPool::getTID();
     pid = substrate::ThreadPool::getLeader();
   }
 };
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
 class PerSocketChunkMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
+  class Chunk : public FixedSizeRingAdaptor<T, isLIFO, ChunkSize>,
+                public OuterTy<Chunk, true>::ListNode {};
 
   FixedSizeAllocator<Chunk> alloc;
 
@@ -99,19 +99,19 @@ class PerSocketChunkMaster : private boost::noncopyable {
     alloc.deallocate(ptr, 1);
   }
 
-  void pushChunk(const WID& id, Chunk* C)  {
+  void pushChunk(const WID& id, Chunk* C) {
     LevelItem& I = *Q.getLocal(id.pid);
     I.push(C);
   }
 
-  Chunk* popChunkByID(unsigned int i)  {
+  Chunk* popChunkByID(unsigned int i) {
     LevelItem* I = Q.getRemote(i);
     if (I)
       return I->pop();
     return 0;
   }
 
-  Chunk* popChunk(const WID& id)  {
+  Chunk* popChunk(const WID& id) {
     Chunk* r = popChunkByID(id.pid);
     if (r)
       return r;
@@ -119,13 +119,13 @@ class PerSocketChunkMaster : private boost::noncopyable {
     for (unsigned int i = id.pid + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     for (unsigned int i = 0; i < id.pid; ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     return 0;
@@ -140,18 +140,18 @@ public:
 
   PerSocketChunkMaster() {
     for (unsigned int i = 0; i < data.size(); ++i) {
-      p& r = *data.getRemote(i);
+      p& r   = *data.getRemote(i);
       r.next = 0;
     }
   }
 
   // exp
-  inline void push (const value_type& val) {
+  inline void push(const value_type& val) {
     WID id;
-    push (id, val);
+    push(id, val);
   }
 
-  void push(const WID& id, const value_type& val)  {
+  void push(const WID& id, const value_type& val) {
     p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->full()) {
       n.next->push(val);
@@ -168,13 +168,13 @@ public:
     return 0;
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(const WID& id, Iter b, Iter e) {
     while (b != e)
       push(id, *b++);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push_initial(const WID& id, Iter b, Iter e) {
     push(id, b, e);
   }
@@ -185,9 +185,9 @@ public:
   }
 
 #ifdef _DO_OUTER_PREFETCH
-  const value_type& lookAhead (const WID& id, unsigned off) const {
-    p& n = *data.getLocal (id.tid);
-    return n.next->lookAhead (off);
+  const value_type& lookAhead(const WID& id, unsigned off) const {
+    p& n = *data.getLocal(id.tid);
+    return n.next->lookAhead(off);
   }
 #endif // _DO_OUTER_PREFETCH
 
@@ -209,7 +209,7 @@ public:
     return true;
   }
 
-  void pop(const WID& id)  {
+  void pop(const WID& id) {
     p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->empty()) {
       n.next->pop();
@@ -219,8 +219,10 @@ public:
   }
 };
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+void PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::popSP(const WID& id,
+                                                                p& n) {
   while (true) {
     if (n.next && !n.next->empty()) {
       n.next->pop();
@@ -234,8 +236,10 @@ void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n
   }
 }
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-bool PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+bool PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::emptySP(const WID& id,
+                                                                  p& n) {
   while (true) {
     if (n.next && !n.next->empty())
       return false;
@@ -247,29 +251,35 @@ bool PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p&
   }
 }
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, const T& val) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+void PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::pushSP(const WID& id,
+                                                                 p& n,
+                                                                 const T& val) {
   if (n.next)
     pushChunk(id, n.next);
   n.next = mkChunk();
   n.next->push(val);
 }
 
-template<typename T,int ChunkSize>
-// class Worklist: public PerSocketChunkMaster<T, worklists::ConExtLinkedStack, true, ChunkSize> { };
-class Worklist: public PerSocketChunkMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
+template <typename T, int ChunkSize>
+// class Worklist: public PerSocketChunkMaster<T, worklists::ConExtLinkedStack,
+// true, ChunkSize> { };
+class Worklist : public PerSocketChunkMaster<T, worklists::ConExtLinkedQueue,
+                                             true, ChunkSize> {};
 
-template<class T, class FunctionTy, typename PreFunc=FunctionTy>
+template <class T, class FunctionTy, typename PreFunc = FunctionTy>
 class BSInlineExecutor {
   typedef T value_type;
   static const unsigned CHUNK_SIZE = FunctionTy::CHUNK_SIZE;
-  typedef Worklist<value_type,CHUNK_SIZE> WLTy;
+  typedef Worklist<value_type, CHUNK_SIZE> WLTy;
 
   struct ThreadLocalData {
     galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
-    LoopStatistics<runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const char* ln): stat(ln) { }
+    LoopStatistics<runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats>
+        stat;
+    ThreadLocalData(const char* ln) : stat(ln) {}
   };
 
   WLTy wls[2];
@@ -279,12 +289,11 @@ class BSInlineExecutor {
   galois::substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
-  bool empty(WLTy* wl) {
-    return wl->sempty();
-  }
+  bool empty(WLTy* wl) { return wl->sempty(); }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur,
+                      WLTy* next) {
     tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
     if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush) {
@@ -295,7 +304,8 @@ class BSInlineExecutor {
     cur->pop(wid);
   }
 
-  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur,
+                         WLTy* next) {
     int result = 0;
 #ifdef GALOIS_USE_LONGJMP
     if ((result = setjmp(hackjmp)) == 0) {
@@ -304,13 +314,19 @@ class BSInlineExecutor {
 #endif
       process(tld, wid, cur, next);
 #ifdef GALOIS_USE_LONGJMP
-    } else { clearConflictLock(); }
+    } else {
+      clearConflictLock();
+    }
 #else
-    } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
+    } catch (const ConflictFlag& flag) {
+      clearConflictLock();
+      result = flag;
+    }
 #endif
-    //FIXME: clearReleasable();
+    // FIXME: clearReleasable();
     switch (result) {
-    case 0: break;
+    case 0:
+      break;
     case galois::runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
@@ -324,54 +340,50 @@ class BSInlineExecutor {
     int cs = std::max(cur->currentChunkSize(wid), 1U);
     for (int i = 0; i < cs; ++i) {
 
-
-// #ifdef _DO_OUTER_PREFETCH
+      // #ifdef _DO_OUTER_PREFETCH
       // const unsigned l1_pftch_dist = 1;
       // if ((i + l1_pftch_dist) < cs) {
-        // const value_type& next = cur->lookAhead (wid, l1_pftch_dist);
-        // preFunc (next, _MM_HINT_T0);
+      // const value_type& next = cur->lookAhead (wid, l1_pftch_dist);
+      // preFunc (next, _MM_HINT_T0);
       // }
-// #endif
+      // #endif
       value_type& val = cur->cur(wid);
-// #ifdef _DO_OUTER_PREFETCH
+      // #ifdef _DO_OUTER_PREFETCH
       // preFunc (val, _MM_HINT_T0);
-// #endif
+      // #endif
 
       tld.stat.inc_iterations();
       function(val, *next);
 
       // function(val, tld.facing);
-//
+      //
       // if (ForEachTraits<FunctionTy>::NeedsPush) {
-        // next->push(wid,
-            // tld.facing.getPushBuffer().begin(),
-            // tld.facing.getPushBuffer().end());
-        // tld.facing.resetPushBuffer();
+      // next->push(wid,
+      // tld.facing.getPushBuffer().begin(),
+      // tld.facing.getPushBuffer().end());
+      // tld.facing.resetPushBuffer();
       // }
 
       cur->pop(wid);
 
-// #ifdef _DO_OUTER_PREFETCH
+      // #ifdef _DO_OUTER_PREFETCH
       // const unsigned l2_pftch_dist = 1;
       // if ((i + l2_pftch_dist) < cs) {
-        // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
-        // preFunc (next, _MM_HINT_T1);
+      // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
+      // preFunc (next, _MM_HINT_T1);
       // }
-// #endif
+      // #endif
 
-
-// #ifdef _DO_OUTER_PREFETCH
+      // #ifdef _DO_OUTER_PREFETCH
       // const unsigned l2_pftch_dist = 2;
       // if ((i + l2_pftch_dist) < cs) {
-        // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
-        // preFunc (next, _MM_HINT_T1);
+      // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
+      // preFunc (next, _MM_HINT_T1);
       // }
-// #endif
+      // #endif
 
       if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts)
         tld.ctx.commitIteration();
-
-
     }
   }
 
@@ -381,7 +393,7 @@ class BSInlineExecutor {
     unsigned tid = substrate::ThreadPool::getTID();
     WID wid;
 
-    WLTy* cur = &wls[0];
+    WLTy* cur  = &wls[0];
     WLTy* next = &wls[1];
 
     while (true) {
@@ -414,61 +426,55 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(runtime::getBarrier(activeThreads)) {
+  BSInlineExecutor(const FunctionTy& f, const char* ln)
+      : function(f), preFunc(f), loopname(ln),
+        barrier(runtime::getBarrier(activeThreads)) {
     if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
   }
 
-  BSInlineExecutor (const FunctionTy& f, const PreFunc& preFunc, const char* ln)
-    :
-      function(f),
-      preFunc (preFunc),
-      loopname(ln),
-      barrier(runtime::getBarrier (activeThreads)),
-      done (false)
-  {
+  BSInlineExecutor(const FunctionTy& f, const PreFunc& preFunc, const char* ln)
+      : function(f), preFunc(preFunc), loopname(ln),
+        barrier(runtime::getBarrier(activeThreads)), done(false) {
     if (runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void AddInitialWork(RangeTy range) {
     wls[0].push_initial(WID(), range.local_begin(), range.local_end());
   }
 
   void initThread() {}
 
-  void operator()() {
-    go();
-  }
+  void operator()() { go(); }
 };
 
-
-} // end namespace Exp
+} // namespace exp
 
 template <typename R, typename OpFunc, typename PreFunc>
-void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, const char* loopname=nullptr) {
+void for_each_bs(const R& range, const OpFunc& opFunc, const PreFunc& preFunc,
+                 const char* loopname = nullptr) {
   typedef typename R::value_type T;
 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
-  Executor e (opFunc, preFunc, loopname);
-  substrate::Barrier& barrier = runtime::getBarrier (activeThreads);
+  Executor e(opFunc, preFunc, loopname);
+  substrate::Barrier& barrier = runtime::getBarrier(activeThreads);
 
-  substrate::getThreadPool ().run (activeThreads,
-    std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
-    std::ref (barrier),
-    std::ref (e));
+  substrate::getThreadPool().run(
+      activeThreads,
+      std::bind(&Executor::template AddInitialWork<R>, std::ref(e), range),
+      std::ref(barrier), std::ref(e));
 }
 
+} // namespace runtime
 
-} // end runtime
-
-} //galois
+} // namespace galois
 
 #undef _DO_OUTER_PREFETCH
 

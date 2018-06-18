@@ -37,686 +37,707 @@ typedef unsigned long word;
 
 enum Order { SMALLER, LARGER, NOTCOMPARABLE, EQUAL };
 
-static void createLiterals( std::vector< std::string > & varSet, std::unordered_map< std::string, std::pair< word*, unsigned int > > & literals, BitVectorPool & functionPool );
-static bool less( word * lhs, word * rhs, int nWords );
-static bool equals( word * lhs, word * rhs, int nWords );
-static bool diff( word * lhs, word * rhs, int nWords );
-static void copy( word * result, word * original, int nWords );
-static void NOT( word * result, word * original, int nWords );
-static void AND( word * result, word * lhs, word * rhs, int nWords );
-static void OR( word * result, word * lhs, word * rhs, int nWords );
-static void XOR( word * result, word * lhs, word * rhs, int nWords );
-static void MUX( word * result, word * zero, word * one, word * sel, int nWords );
-static void cofactor0( word * result, word * original, int nWords, int iVar );
-static void cofactor1( word * result, word * original, int nWords, int iVar );
-static int getSupport( word * function, int nVars );
-static int getPolarizedSupport( word * function, int nVars );
-static bool hasVar( word * functin, int nVars, int iVar );
-static bool hasVarTruth6( word * function, int iVar );
+static void createLiterals(
+    std::vector<std::string>& varSet,
+    std::unordered_map<std::string, std::pair<word*, unsigned int>>& literals,
+    BitVectorPool& functionPool);
+static bool less(word* lhs, word* rhs, int nWords);
+static bool equals(word* lhs, word* rhs, int nWords);
+static bool diff(word* lhs, word* rhs, int nWords);
+static void copy(word* result, word* original, int nWords);
+static void NOT(word* result, word* original, int nWords);
+static void AND(word* result, word* lhs, word* rhs, int nWords);
+static void OR(word* result, word* lhs, word* rhs, int nWords);
+static void XOR(word* result, word* lhs, word* rhs, int nWords);
+static void MUX(word* result, word* zero, word* one, word* sel, int nWords);
+static void cofactor0(word* result, word* original, int nWords, int iVar);
+static void cofactor1(word* result, word* original, int nWords, int iVar);
+static int getSupport(word* function, int nVars);
+static int getPolarizedSupport(word* function, int nVars);
+static bool hasVar(word* functin, int nVars, int iVar);
+static bool hasVarTruth6(word* function, int iVar);
 static bool posVar6(word t, int iVar);
 static bool negVar6(word t, int iVar);
-static bool posVar( word * function, int nVars, int iVar);
-static bool negVar( word * function, int nVars, int iVar);
-static bool isUnate( word * function, int nVars );
-static bool isPosUnate( word * function, int nVars );
-static bool isConstZero( word * function, int nVars );
-static bool isConstOne( word * function, int nVars );
-static Order order( word * sub, word * target, int nWords );
-static int getHammingDist( word * f1, word * f2, int nWords );
-static int oneCounter( unsigned long int word );
+static bool posVar(word* function, int nVars, int iVar);
+static bool negVar(word* function, int nVars, int iVar);
+static bool isUnate(word* function, int nVars);
+static bool isPosUnate(word* function, int nVars);
+static bool isConstZero(word* function, int nVars);
+static bool isConstOne(word* function, int nVars);
+static Order order(word* sub, word* target, int nWords);
+static int getHammingDist(word* f1, word* f2, int nWords);
+static int oneCounter(unsigned long int word);
 static int wordNum(int nVars);
-static bool isOdd( word * function );
-static std::string toBin( word * function, int nWords );
-static std::string toHex( word * function, int nWords );
-static std::string supportToBin( unsigned int support );
+static bool isOdd(word* function);
+static std::string toBin(word* function, int nWords);
+static std::string toHex(word* function, int nWords);
+static std::string supportToBin(unsigned int support);
 
-const word truths6[6] = {
-    0xAAAAAAAAAAAAAAAA,
-    0xCCCCCCCCCCCCCCCC,
-    0xF0F0F0F0F0F0F0F0,
-    0xFF00FF00FF00FF00,
-    0xFFFF0000FFFF0000,
-    0xFFFFFFFF00000000
-};
+const word truths6[6] = {0xAAAAAAAAAAAAAAAA, 0xCCCCCCCCCCCCCCCC,
+                         0xF0F0F0F0F0F0F0F0, 0xFF00FF00FF00FF00,
+                         0xFFFF0000FFFF0000, 0xFFFFFFFF00000000};
 
-const word truths6Neg[6] = {
-    0x5555555555555555,
-    0x3333333333333333,
-    0x0F0F0F0F0F0F0F0F,
-    0x00FF00FF00FF00FF,
-    0x0000FFFF0000FFFF,
-    0x00000000FFFFFFFF
-};
+const word truths6Neg[6] = {0x5555555555555555, 0x3333333333333333,
+                            0x0F0F0F0F0F0F0F0F, 0x00FF00FF00FF00FF,
+                            0x0000FFFF0000FFFF, 0x00000000FFFFFFFF};
 
 class FunctionHasher {
-    int nWords;
-    size_t TRUTH_WORDS_BYTE_COUNT;
+  int nWords;
+  size_t TRUTH_WORDS_BYTE_COUNT;
 
-	public:
-    	FunctionHasher( int nWords ) : nWords( nWords ) {
-        	TRUTH_WORDS_BYTE_COUNT = sizeof(Functional::word) * nWords;
-        }
+public:
+  FunctionHasher(int nWords) : nWords(nWords) {
+    TRUTH_WORDS_BYTE_COUNT = sizeof(Functional::word) * nWords;
+  }
 
-		size_t operator()( const Functional::word * function ) const {
+  size_t operator()(const Functional::word* function) const {
 
-			if ( nWords == 1 ) {
-				return function[0];
-			}
-			else {
-				return XXH64( function, TRUTH_WORDS_BYTE_COUNT, 0 );
-			}
-		}
+    if (nWords == 1) {
+      return function[0];
+    } else {
+      return XXH64(function, TRUTH_WORDS_BYTE_COUNT, 0);
+    }
+  }
 };
 
 class FunctionComparator {
-    int nWords;
+  int nWords;
 
-	public:
-    	FunctionComparator( int nWords ) : nWords( nWords ) { }
+public:
+  FunctionComparator(int nWords) : nWords(nWords) {}
 
-		bool operator()( Functional::word * f1, Functional::word * f2 ) const {
-			return Functional::equals( f1, f2, nWords );
-		}
+  bool operator()(Functional::word* f1, Functional::word* f2) const {
+    return Functional::equals(f1, f2, nWords);
+  }
 };
 
 typedef struct functionData {
-	unsigned int support;
-	unsigned int occurrences;
+  unsigned int support;
+  unsigned int occurrences;
 } FunctionData;
 
-using FunctionSet = std::unordered_set< Functional::word*, FunctionHasher, FunctionComparator >;
-using FunctionDataMap = std::unordered_map< word*, FunctionData, FunctionHasher, FunctionComparator >;
+using FunctionSet =
+    std::unordered_set<Functional::word*, FunctionHasher, FunctionComparator>;
+using FunctionDataMap =
+    std::unordered_map<word*, FunctionData, FunctionHasher, FunctionComparator>;
 
-static void computeAllCubeCofactors( BitVectorPool & functionPool, FunctionSet & cubeCofactors, word * function, int nVars );
-static void computeAllCubeCofactorsRec( BitVectorPool & functionPool, FunctionSet & cubeCofactors, word * function, int nVars, int nWords, int iVar, bool isPrevVarCofactored );
-static void computeAllCubeCofactorsWithSupport( BitVectorPool & functionPool, FunctionDataMap & cubeCofactorData, word * function, int nVars );
-static void computeAllCubeCofactorsWithSupportRec( BitVectorPool & functionPool, FunctionDataMap & cubeCofactorData, word * function, int nVars, int nWords, int iVar );
-static void registerFunction( FunctionDataMap & cubeCofactorData, word * function, int nVars, unsigned int occurencesInc );
+static void computeAllCubeCofactors(BitVectorPool& functionPool,
+                                    FunctionSet& cubeCofactors, word* function,
+                                    int nVars);
+static void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
+                                       FunctionSet& cubeCofactors,
+                                       word* function, int nVars, int nWords,
+                                       int iVar, bool isPrevVarCofactored);
+static void
+computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
+                                   FunctionDataMap& cubeCofactorData,
+                                   word* function, int nVars);
+static void computeAllCubeCofactorsWithSupportRec(
+    BitVectorPool& functionPool, FunctionDataMap& cubeCofactorData,
+    word* function, int nVars, int nWords, int iVar);
+static void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
+                             int nVars, unsigned int occurencesInc);
 
-void createLiterals( std::vector< std::string > & varSet, std::unordered_map< std::string, std::pair< word*, unsigned int > > & literals, BitVectorPool & functionPool ) {
+void createLiterals(
+    std::vector<std::string>& varSet,
+    std::unordered_map<std::string, std::pair<word*, unsigned int>>& literals,
+    BitVectorPool& functionPool) {
 
-    int nVars = varSet.size();
-    int nWords = wordNum( nVars );
+  int nVars  = varSet.size();
+  int nWords = wordNum(nVars);
 
-    for ( int iVar = 0; iVar < nVars; iVar++ ) {
+  for (int iVar = 0; iVar < nVars; iVar++) {
 
-    	word * currentFunction = functionPool.getMemory();
+    word* currentFunction = functionPool.getMemory();
 
-        if ( iVar < 6 ) {
-            for ( int k = 0; k < nWords; k++ ) {
-            	currentFunction[k] = truths6[iVar];
-            }
-        }
-        else {
-            for ( int k = 0; k < nWords; k++ ) {
-            	currentFunction[k] = (k & (1 << (iVar-6))) ? ~(word)0 : 0;
-            }
-        }
-
-        unsigned int support = getPolarizedSupport( currentFunction, nVars );
-        literals.insert( std::make_pair( varSet[ iVar ], std::make_pair( currentFunction, support ) ) );
-
-        // Create negative literals
-        std::string negLit = "!"+varSet[ iVar ];
-		word * negFunction = functionPool.getMemory();
-		NOT( negFunction, currentFunction, nWords );
-		unsigned int negSupport = (support >> 1);
-		literals.insert( std::make_pair( negLit, std::make_pair( negFunction, negSupport ) ) );
+    if (iVar < 6) {
+      for (int k = 0; k < nWords; k++) {
+        currentFunction[k] = truths6[iVar];
+      }
+    } else {
+      for (int k = 0; k < nWords; k++) {
+        currentFunction[k] = (k & (1 << (iVar - 6))) ? ~(word)0 : 0;
+      }
     }
 
-    // Create constant zero and constant one
-    word * constZero = functionPool.getMemory();
-    word * constOne = functionPool.getMemory();
-    for ( int k = 0; k < nWords; k++ ) {
-		constZero[k] = 0UL;
-		constOne[k] = ~0UL;
-	}
-    literals.insert( std::make_pair( "0", std::make_pair( constZero, 0 ) ) );
-    literals.insert( std::make_pair( "1", std::make_pair( constOne, 0 ) ) );
+    unsigned int support = getPolarizedSupport(currentFunction, nVars);
+    literals.insert(
+        std::make_pair(varSet[iVar], std::make_pair(currentFunction, support)));
 
-//	std::cout << std::endl << "############################## Literals ##############################" << std::endl;
-//	for ( auto lit : literals ) {
-//		std::cout << lit.first << " = " << toHex( lit.second.first, nWords ) << " | " << supportToBin( lit.second.second ) << std::endl;
-//	}
-//	std::cout << std::endl;
+    // Create negative literals
+    std::string negLit = "!" + varSet[iVar];
+    word* negFunction  = functionPool.getMemory();
+    NOT(negFunction, currentFunction, nWords);
+    unsigned int negSupport = (support >> 1);
+    literals.insert(
+        std::make_pair(negLit, std::make_pair(negFunction, negSupport)));
+  }
+
+  // Create constant zero and constant one
+  word* constZero = functionPool.getMemory();
+  word* constOne  = functionPool.getMemory();
+  for (int k = 0; k < nWords; k++) {
+    constZero[k] = 0UL;
+    constOne[k]  = ~0UL;
+  }
+  literals.insert(std::make_pair("0", std::make_pair(constZero, 0)));
+  literals.insert(std::make_pair("1", std::make_pair(constOne, 0)));
+
+  //	std::cout << std::endl << "############################## Literals
+  //##############################" << std::endl; 	for ( auto lit : literals ) {
+  //		std::cout << lit.first << " = " << toHex( lit.second.first, nWords )
+  //<< " | " << supportToBin( lit.second.second ) << std::endl;
+  //	}
+  //	std::cout << std::endl;
 }
 
-bool less( word * lhs, word * rhs, int nWords ) {
+bool less(word* lhs, word* rhs, int nWords) {
 
-	if ( ( lhs == nullptr ) || ( rhs == nullptr ) ) {
-		return false;
-	}
+  if ((lhs == nullptr) || (rhs == nullptr)) {
+    return false;
+  }
 
-	for (int i = nWords-1; i >= 0; --i) {
-		if ( lhs[i] < rhs[i] ) {
-			return true;
-		}
-		if ( lhs[i] > rhs[i] ) {
-			return false;
-		}
-	}
-
-	return false;
-}
-
-bool equals( word * lhs, word * rhs, int nWords ) {
-
-	if ( ( lhs == nullptr ) || ( rhs == nullptr ) ) {
-		return false;
-	}
-
-	for ( int i = 0; i < nWords; i++ ) {
-		if ( lhs[i] != rhs[i])  {
-			return false;
-		}
-	}
-
-	return true;
-}
-
-bool diff( word * lhs, word * rhs, int nWords ) {
-
-	if ( ( lhs == nullptr ) || ( rhs == nullptr ) ) {
-		return false;
-	}
-
-	for ( int i = 0; i < nWords; i++ ) {
-		if ( lhs[i] != rhs[i] )  {
-			return true;
-		}
-	}
-
-	return false;
-}
-
-void copy( word * result, word * original, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = original[i];
-	}
-}
-
-void NOT( word * result, word * original, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = ~(original[i]);
-	}
-}
-
-void AND( word * result, word * lhs, word * rhs, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = lhs[i] & rhs[i];
-	}
-}
-
-void OR( word * result, word * lhs, word * rhs, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = lhs[i] | rhs[i];
-	}
-}
-
-void XOR( word * result, word * lhs, word * rhs, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = lhs[i] ^ rhs[i];
-	}
-}
-
-void MUX( word * result, word * zero, word * one, word * sel, int nWords ) {
-
-	for ( int i = 0; i < nWords; i++ ) {
-		result[i] = (zero[i] & ~sel[i]) | (one[i] & sel[i]);
-	}
-}
-
-void cofactor0( word * result, word * original, int nWords, int iVar ) {
-
-    if ( nWords == 1 ) {
-    	result[0] = ((original[0] & truths6Neg[iVar]) << (1 << iVar)) | (original[0] & truths6Neg[iVar]);
+  for (int i = nWords - 1; i >= 0; --i) {
+    if (lhs[i] < rhs[i]) {
+      return true;
     }
-	else {
-		if ( iVar <= 5 ) {
-			int w, shift = (1 << iVar);
-			for ( w = 0; w < nWords; w++ ) {
-				result[w] = ((original[w] & truths6Neg[iVar]) << shift) | (original[w] & truths6Neg[iVar]);
-	        }
-	    }
-		else { // if ( iVar > 5 )
-			word * pOriginal = original;
-			word * pResult = result;
-
-	        word * pLimit = pOriginal + nWords;
-			int i, iStep = wordNum( iVar );
-			for ( ; pOriginal < pLimit; pOriginal += 2*iStep, pResult += 2*iStep ) {
-				for ( i = 0; i < iStep; i++ ) {
-					pResult[i] = pOriginal[i];
-					pResult[i + iStep] = pOriginal[i];
-	            }
-	        }
-	    }
-	}
-}
-
-void cofactor1( word * result, word * original, int nWords, int iVar ) {
-
-    if ( nWords == 1 ) {
-        result[0] = (original[0] & truths6[iVar]) | ((original[0] & truths6[iVar]) >> (1 << iVar));
+    if (lhs[i] > rhs[i]) {
+      return false;
     }
-	else {
-		if ( iVar <= 5 ) {
-			int w, shift = (1 << iVar);
-			for ( w = 0; w < nWords; w++ ) {
-				result[w] = (original[w] & truths6[iVar]) | ((original[w] & truths6[iVar]) >> shift);
-	        }
-		}
-		else { // if ( iVar > 5 )
-			word * pOriginal = original;
-			word * pResult = result;
+  }
 
-	        word * pLimit = pOriginal + nWords;
-			int i, iStep = wordNum( iVar );
-			for ( ; pOriginal < pLimit; pOriginal += 2*iStep, pResult += 2*iStep ) {
-				for ( i = 0; i < iStep; i++ ) {
-					pResult[i] = pOriginal[i + iStep];
-					pResult[i + iStep] = pOriginal[i + iStep];
-	            }
-	        }
-	    }
-	}
+  return false;
 }
 
-void computeAllCubeCofactors( BitVectorPool & functionPool, FunctionSet & cubeCofactors, word * function, int nVars ) {
-	bool isPrevVarCofactored = true;
-	int nWords = wordNum( nVars );
-	int iVar = nVars-1;
-	computeAllCubeCofactorsRec( functionPool, cubeCofactors, function, nVars, nWords, iVar, isPrevVarCofactored );
+bool equals(word* lhs, word* rhs, int nWords) {
+
+  if ((lhs == nullptr) || (rhs == nullptr)) {
+    return false;
+  }
+
+  for (int i = 0; i < nWords; i++) {
+    if (lhs[i] != rhs[i]) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-void computeAllCubeCofactorsRec( BitVectorPool & functionPool, FunctionSet & cubeCofactors, word * function, int nVars, int nWords, int iVar, bool isPrevVarCofactored ) {
+bool diff(word* lhs, word* rhs, int nWords) {
 
-	// ignoring constants
-	if ( isConstZero( function, nVars ) || isConstOne( function, nVars ) ) {
-		return;
-	}
+  if ((lhs == nullptr) || (rhs == nullptr)) {
+    return false;
+  }
 
-	if ( isPrevVarCofactored ) {
-		// inserting the current function to the unique set
-		auto status = cubeCofactors.insert( function );
-		// When the function was already visited
-		if ( status.second == false ) {
-			functionPool.giveBackMemory();
-			return;
-		}
-	}
+  for (int i = 0; i < nWords; i++) {
+    if (lhs[i] != rhs[i]) {
+      return true;
+    }
+  }
 
-	// When the terminal case is found
-	if ( iVar < 0 ) {
-		return;
-	}
-
-	// Calling recursing with iVar as dont care
-	computeAllCubeCofactorsRec( functionPool, cubeCofactors, function, nVars, nWords, iVar - 1, false );
-
-	// When iVar is dont care
-	if ( hasVar( function, nVars, iVar ) == false ) {
-		return;
-	}
-
-	// Calling recursing with iVar = 0
-	word * negCof = functionPool.getMemory();
-	cofactor0( negCof, function, nWords, iVar );
-	computeAllCubeCofactorsRec( functionPool, cubeCofactors, negCof, nVars, nWords, iVar - 1, true );
-
-	// Calling recursing with iVar = 1
-	word * posCof = functionPool.getMemory();
-	cofactor1( posCof, function, nWords, iVar );
-	computeAllCubeCofactorsRec( functionPool, cubeCofactors, posCof, nVars, nWords, iVar - 1, true );
+  return false;
 }
 
-void computeAllCubeCofactorsWithSupport( BitVectorPool & functionPool, FunctionDataMap & cubeCofactorData, word * function, int nVars ) {
-	int nWords = wordNum( nVars );
-	int iVar = nVars-1;
-	computeAllCubeCofactorsWithSupportRec( functionPool, cubeCofactorData, function, nVars, nWords, iVar );
+void copy(word* result, word* original, int nWords) {
+
+  for (int i = 0; i < nWords; i++) {
+    result[i] = original[i];
+  }
 }
 
-void computeAllCubeCofactorsWithSupportRec( BitVectorPool & functionPool, FunctionDataMap & cubeCofactorData, word * function, int nVars, int nWords, int iVar ) {
+void NOT(word* result, word* original, int nWords) {
 
-	// When the constants are found
-	if ( isConstZero( function, nVars ) || isConstOne( function, nVars ) ) {
-		unsigned int occurrencesInc = ( unsigned int) pow( 3, iVar+1 );
-		registerFunction( cubeCofactorData, function, nVars, occurrencesInc );
-		return;
-	}
-
-	// When the terminal case is found
-	if ( iVar < 0 ) {
-		unsigned int occurrencesInc = 1;
-		registerFunction( cubeCofactorData, function, nVars, occurrencesInc );
-		return;
-	}
-
-	// Calling recursing with iVar as dont care
-	computeAllCubeCofactorsWithSupportRec( functionPool, cubeCofactorData, function, nVars, nWords, iVar - 1 );
-
-	// Calling recursing with iVar = 0
-	word * negCof = functionPool.getMemory();
-	cofactor0( negCof, function, nWords, iVar );
-	computeAllCubeCofactorsWithSupportRec( functionPool, cubeCofactorData, negCof, nVars, nWords, iVar - 1 );
-
-	// Calling recursing with iVar = 1
-	word * posCof = functionPool.getMemory();
-	cofactor1( posCof, function, nWords, iVar );
-	computeAllCubeCofactorsWithSupportRec( functionPool, cubeCofactorData, posCof, nVars, nWords, iVar - 1 );
+  for (int i = 0; i < nWords; i++) {
+    result[i] = ~(original[i]);
+  }
 }
 
-void registerFunction( FunctionDataMap & cubeCofactorData, word * function, int nVars, unsigned int occurencesInc ) {
+void AND(word* result, word* lhs, word* rhs, int nWords) {
 
-	auto it = cubeCofactorData.find( function );
-	if ( it == cubeCofactorData.end() ) {
-		FunctionData functionData;
-		//functionData.support = getSupport( function, nVars );
-		functionData.support = getPolarizedSupport( function, nVars );
-		functionData.occurrences = occurencesInc;
-		cubeCofactorData.insert( std::make_pair( function, functionData ) );
-	}
-	else {
-		it->second.occurrences = it->second.occurrences + occurencesInc;
-	}
+  for (int i = 0; i < nWords; i++) {
+    result[i] = lhs[i] & rhs[i];
+  }
 }
 
-bool hasVar( word * function, int nVars, int iVar ) {
+void OR(word* result, word* lhs, word* rhs, int nWords) {
 
-	word * t = function;
-	int nWords = wordNum( nVars );
+  for (int i = 0; i < nWords; i++) {
+    result[i] = lhs[i] | rhs[i];
+  }
+}
 
-	if ( nWords == 1 ) {
-        return hasVarTruth6( function, iVar );
-	}
-    if ( iVar < 6 ) {
-        int i, Shift = (1 << iVar);
-        for ( i = 0; i < nWords; i++ ) {
-            if ( ((t[i] >> Shift) & truths6Neg[iVar]) != (t[i] & truths6Neg[iVar]) ) {
-                return true;
-        	}
+void XOR(word* result, word* lhs, word* rhs, int nWords) {
+
+  for (int i = 0; i < nWords; i++) {
+    result[i] = lhs[i] ^ rhs[i];
+  }
+}
+
+void MUX(word* result, word* zero, word* one, word* sel, int nWords) {
+
+  for (int i = 0; i < nWords; i++) {
+    result[i] = (zero[i] & ~sel[i]) | (one[i] & sel[i]);
+  }
+}
+
+void cofactor0(word* result, word* original, int nWords, int iVar) {
+
+  if (nWords == 1) {
+    result[0] = ((original[0] & truths6Neg[iVar]) << (1 << iVar)) |
+                (original[0] & truths6Neg[iVar]);
+  } else {
+    if (iVar <= 5) {
+      int w, shift = (1 << iVar);
+      for (w = 0; w < nWords; w++) {
+        result[w] = ((original[w] & truths6Neg[iVar]) << shift) |
+                    (original[w] & truths6Neg[iVar]);
+      }
+    } else { // if ( iVar > 5 )
+      word* pOriginal = original;
+      word* pResult   = result;
+
+      word* pLimit = pOriginal + nWords;
+      int i, iStep = wordNum(iVar);
+      for (; pOriginal < pLimit; pOriginal += 2 * iStep, pResult += 2 * iStep) {
+        for (i = 0; i < iStep; i++) {
+          pResult[i]         = pOriginal[i];
+          pResult[i + iStep] = pOriginal[i];
         }
+      }
+    }
+  }
+}
+
+void cofactor1(word* result, word* original, int nWords, int iVar) {
+
+  if (nWords == 1) {
+    result[0] = (original[0] & truths6[iVar]) |
+                ((original[0] & truths6[iVar]) >> (1 << iVar));
+  } else {
+    if (iVar <= 5) {
+      int w, shift = (1 << iVar);
+      for (w = 0; w < nWords; w++) {
+        result[w] = (original[w] & truths6[iVar]) |
+                    ((original[w] & truths6[iVar]) >> shift);
+      }
+    } else { // if ( iVar > 5 )
+      word* pOriginal = original;
+      word* pResult   = result;
+
+      word* pLimit = pOriginal + nWords;
+      int i, iStep = wordNum(iVar);
+      for (; pOriginal < pLimit; pOriginal += 2 * iStep, pResult += 2 * iStep) {
+        for (i = 0; i < iStep; i++) {
+          pResult[i]         = pOriginal[i + iStep];
+          pResult[i + iStep] = pOriginal[i + iStep];
+        }
+      }
+    }
+  }
+}
+
+void computeAllCubeCofactors(BitVectorPool& functionPool,
+                             FunctionSet& cubeCofactors, word* function,
+                             int nVars) {
+  bool isPrevVarCofactored = true;
+  int nWords               = wordNum(nVars);
+  int iVar                 = nVars - 1;
+  computeAllCubeCofactorsRec(functionPool, cubeCofactors, function, nVars,
+                             nWords, iVar, isPrevVarCofactored);
+}
+
+void computeAllCubeCofactorsRec(BitVectorPool& functionPool,
+                                FunctionSet& cubeCofactors, word* function,
+                                int nVars, int nWords, int iVar,
+                                bool isPrevVarCofactored) {
+
+  // ignoring constants
+  if (isConstZero(function, nVars) || isConstOne(function, nVars)) {
+    return;
+  }
+
+  if (isPrevVarCofactored) {
+    // inserting the current function to the unique set
+    auto status = cubeCofactors.insert(function);
+    // When the function was already visited
+    if (status.second == false) {
+      functionPool.giveBackMemory();
+      return;
+    }
+  }
+
+  // When the terminal case is found
+  if (iVar < 0) {
+    return;
+  }
+
+  // Calling recursing with iVar as dont care
+  computeAllCubeCofactorsRec(functionPool, cubeCofactors, function, nVars,
+                             nWords, iVar - 1, false);
+
+  // When iVar is dont care
+  if (hasVar(function, nVars, iVar) == false) {
+    return;
+  }
+
+  // Calling recursing with iVar = 0
+  word* negCof = functionPool.getMemory();
+  cofactor0(negCof, function, nWords, iVar);
+  computeAllCubeCofactorsRec(functionPool, cubeCofactors, negCof, nVars, nWords,
+                             iVar - 1, true);
+
+  // Calling recursing with iVar = 1
+  word* posCof = functionPool.getMemory();
+  cofactor1(posCof, function, nWords, iVar);
+  computeAllCubeCofactorsRec(functionPool, cubeCofactors, posCof, nVars, nWords,
+                             iVar - 1, true);
+}
+
+void computeAllCubeCofactorsWithSupport(BitVectorPool& functionPool,
+                                        FunctionDataMap& cubeCofactorData,
+                                        word* function, int nVars) {
+  int nWords = wordNum(nVars);
+  int iVar   = nVars - 1;
+  computeAllCubeCofactorsWithSupportRec(functionPool, cubeCofactorData,
+                                        function, nVars, nWords, iVar);
+}
+
+void computeAllCubeCofactorsWithSupportRec(BitVectorPool& functionPool,
+                                           FunctionDataMap& cubeCofactorData,
+                                           word* function, int nVars,
+                                           int nWords, int iVar) {
+
+  // When the constants are found
+  if (isConstZero(function, nVars) || isConstOne(function, nVars)) {
+    unsigned int occurrencesInc = (unsigned int)pow(3, iVar + 1);
+    registerFunction(cubeCofactorData, function, nVars, occurrencesInc);
+    return;
+  }
+
+  // When the terminal case is found
+  if (iVar < 0) {
+    unsigned int occurrencesInc = 1;
+    registerFunction(cubeCofactorData, function, nVars, occurrencesInc);
+    return;
+  }
+
+  // Calling recursing with iVar as dont care
+  computeAllCubeCofactorsWithSupportRec(functionPool, cubeCofactorData,
+                                        function, nVars, nWords, iVar - 1);
+
+  // Calling recursing with iVar = 0
+  word* negCof = functionPool.getMemory();
+  cofactor0(negCof, function, nWords, iVar);
+  computeAllCubeCofactorsWithSupportRec(functionPool, cubeCofactorData, negCof,
+                                        nVars, nWords, iVar - 1);
+
+  // Calling recursing with iVar = 1
+  word* posCof = functionPool.getMemory();
+  cofactor1(posCof, function, nWords, iVar);
+  computeAllCubeCofactorsWithSupportRec(functionPool, cubeCofactorData, posCof,
+                                        nVars, nWords, iVar - 1);
+}
+
+void registerFunction(FunctionDataMap& cubeCofactorData, word* function,
+                      int nVars, unsigned int occurencesInc) {
+
+  auto it = cubeCofactorData.find(function);
+  if (it == cubeCofactorData.end()) {
+    FunctionData functionData;
+    // functionData.support = getSupport( function, nVars );
+    functionData.support     = getPolarizedSupport(function, nVars);
+    functionData.occurrences = occurencesInc;
+    cubeCofactorData.insert(std::make_pair(function, functionData));
+  } else {
+    it->second.occurrences = it->second.occurrences + occurencesInc;
+  }
+}
+
+bool hasVar(word* function, int nVars, int iVar) {
+
+  word* t    = function;
+  int nWords = wordNum(nVars);
+
+  if (nWords == 1) {
+    return hasVarTruth6(function, iVar);
+  }
+  if (iVar < 6) {
+    int i, Shift = (1 << iVar);
+    for (i = 0; i < nWords; i++) {
+      if (((t[i] >> Shift) & truths6Neg[iVar]) != (t[i] & truths6Neg[iVar])) {
+        return true;
+      }
+    }
+    return false;
+  } else {
+    int i, Step = (1 << (iVar - 6));
+    word* tLimit = t + nWords;
+    for (; t < tLimit; t += 2 * Step) {
+      for (i = 0; i < Step; i++) {
+        if (t[i] != t[Step + i]) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+}
+
+bool hasVarTruth6(word* function, int iVar) {
+  word t = function[0];
+  return ((t >> (1 << iVar)) & truths6Neg[iVar]) != (t & truths6Neg[iVar]);
+}
+
+bool posVar6(word t, int iVar) {
+  return ((t >> (1 << iVar)) & t & truths6Neg[iVar]) == (t & truths6Neg[iVar]);
+}
+
+bool negVar6(word t, int iVar) {
+  return ((t << (1 << iVar)) & t & truths6[iVar]) == (t & truths6[iVar]);
+}
+
+bool posVar(word* function, int nVars, int iVar) {
+
+  assert(iVar < nVars);
+
+  word* t = function;
+
+  if (nVars <= 6) {
+    return posVar6(t[0], iVar);
+  }
+  if (iVar < 6) {
+    int i, shift = (1 << iVar);
+    int nWords = wordNum(nVars);
+    for (i = 0; i < nWords; i++) {
+      if (((t[i] >> shift) & t[i] & truths6Neg[iVar]) !=
+          (t[i] & truths6Neg[iVar])) {
         return false;
-    }
-    else {
-        int i, Step = (1 << (iVar - 6));
-        word * tLimit = t + nWords;
-        for ( ; t < tLimit; t += 2*Step ) {
-            for ( i = 0; i < Step; i++ ) {
-                if ( t[i] != t[Step+i] ) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-}
-
-bool hasVarTruth6( word * function, int iVar ) {
-	word t = function[0];
-	return ((t >> (1 << iVar)) & truths6Neg[iVar]) != (t & truths6Neg[iVar]);
-}
-
-bool posVar6( word t, int iVar ) {
-    return ((t >> (1<<iVar)) & t & truths6Neg[iVar]) == (t & truths6Neg[iVar]);
-}
-
-bool negVar6( word t, int iVar ) {
-    return ((t << (1<<iVar)) & t & truths6[iVar]) == (t & truths6[iVar]);
-}
-
-bool posVar( word * function, int nVars, int iVar) {
-
-    assert( iVar < nVars );
-
-    word * t = function;
-
-    if ( nVars <= 6 ) {
-        return posVar6(t[0], iVar);
-    }
-    if ( iVar < 6 ) {
-        int i, shift = (1 << iVar);
-        int nWords = wordNum( nVars );
-        for ( i = 0; i < nWords; i++ ) {
-            if ( ((t[i] >> shift) & t[i] & truths6Neg[iVar]) != (t[i] & truths6Neg[iVar]) ) {
-                return false;
-            }
-        }
-        return true;
-    }
-    else {
-        int i, step = (1 << (iVar - 6));
-        word * tLimit = t + wordNum( nVars );
-        for ( ; t < tLimit; t += 2*step ) {
-            for ( i = 0; i < step; i++ ) {
-                if ( t[i] != (t[i] & t[step+i]) ) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-}
-
-bool negVar( word * function, int nVars, int iVar) {
-
-    assert( iVar < nVars );
-
-    word * t = function;
-
-    if ( nVars <= 6 ) {
-        return negVar6( t[0], iVar );
-    }
-    if ( iVar < 6 ) {
-        int i, shift = (1 << iVar);
-        int nWords = wordNum( nVars );
-        for ( i = 0; i < nWords; i++ ) {
-            if ( ((t[i] << shift) & t[i] & truths6[iVar]) != (t[i] & truths6[iVar]) ) {
-                return false;
-            }
-        }
-        return true;
-    }
-    else {
-        int i, step = (1 << (iVar - 6));
-        word * tLimit = t + wordNum( nVars );
-        for ( ; t < tLimit; t += 2*step ) {
-            for ( i = 0; i < step; i++ ) {
-                if ( (t[i] & t[step+i]) != t[step+i] ) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-}
-
-bool isUnate( word * function, int nVars ) {
-
-    for ( int i = 0; i < nVars; i++ ) {
-        if ( !negVar( function, nVars, i ) && !posVar( function, nVars, i ) ) {
-            return false;
-        }
+      }
     }
     return true;
-}
-
-bool isPosUnate( word * function, int nVars ) {
-
-    for ( int i = 0; i < nVars; i++ ) {
-        if ( !posVar( function, nVars, i ) ) {
-            return false;
+  } else {
+    int i, step = (1 << (iVar - 6));
+    word* tLimit = t + wordNum(nVars);
+    for (; t < tLimit; t += 2 * step) {
+      for (i = 0; i < step; i++) {
+        if (t[i] != (t[i] & t[step + i])) {
+          return false;
         }
+      }
     }
     return true;
+  }
 }
 
+bool negVar(word* function, int nVars, int iVar) {
 
-int getSupport( word * function, int nVars ) {
+  assert(iVar < nVars);
 
-	int v, Supp = 0;
-    for ( v = 0; v < nVars; v++ ) {
-        if ( hasVar( function, nVars, v ) ) {
-            Supp |= ( 1 << v );
-        }
+  word* t = function;
+
+  if (nVars <= 6) {
+    return negVar6(t[0], iVar);
+  }
+  if (iVar < 6) {
+    int i, shift = (1 << iVar);
+    int nWords = wordNum(nVars);
+    for (i = 0; i < nWords; i++) {
+      if (((t[i] << shift) & t[i] & truths6[iVar]) != (t[i] & truths6[iVar])) {
+        return false;
+      }
     }
-    return Supp;
-}
-
-int getPolarizedSupport( word * function, int nVars ) {
-
-	int v, Supp = 0;
-    for ( v = 0; v < nVars; v++ ) {
-        if ( !posVar( function, nVars, v ) ) {
-            Supp |= ( 1 << (v*2) );
+    return true;
+  } else {
+    int i, step = (1 << (iVar - 6));
+    word* tLimit = t + wordNum(nVars);
+    for (; t < tLimit; t += 2 * step) {
+      for (i = 0; i < step; i++) {
+        if ((t[i] & t[step + i]) != t[step + i]) {
+          return false;
         }
-        if ( !negVar( function, nVars, v ) ) {
-			Supp |= ( 1 << ((v*2)+1) );
-		}
+      }
     }
-    return Supp;
+    return true;
+  }
 }
 
-bool isConstZero( word * function, int nVars ) {
+bool isUnate(word* function, int nVars) {
 
-	word * pFunction = function;
-	word * pLimit = pFunction + wordNum( nVars );
-
-	while ( pFunction != pLimit ) {
-		if ( *pFunction++ != 0ULL ) {
-			return false;
-		}
-	}
-
-	return true;
+  for (int i = 0; i < nVars; i++) {
+    if (!negVar(function, nVars, i) && !posVar(function, nVars, i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
-bool isConstOne( word * function, int nVars ) {
+bool isPosUnate(word* function, int nVars) {
 
-	word * pFunction = function;
-	word * pLimit = pFunction + wordNum( nVars );
-	const word ONE = ~ 0ULL;
-
-	while ( pFunction != pLimit ) {
-		if ( *pFunction++ != ONE ) {
-			return false;
-		}
-	}
-
-	return true;
+  for (int i = 0; i < nVars; i++) {
+    if (!posVar(function, nVars, i)) {
+      return false;
+    }
+  }
+  return true;
 }
 
-Order order( word * sub, word * target, int nWords ) {
+int getSupport(word* function, int nVars) {
 
-	if ( equals( sub, target, nWords ) ) {
-		return Order::EQUAL;
-	}
-
-	bool smaller = true;
-	bool larger = true;
-	unsigned long int partialResult;
-
-	for ( int i = 0; i < nWords; i++ ) {
-
-		partialResult = sub[i] & target[i];
-
-		if ( partialResult != sub[i] ) {
-			smaller = false;
-		}
-		if ( partialResult != target[i] ) {
-			larger = false;
-		}
-
-		if ( !smaller && !larger ) {
-			return Order::NOTCOMPARABLE;
-		}
-	}
-
-	if ( smaller ) return Order::SMALLER;
-
-	if ( larger ) return Order::LARGER;
+  int v, Supp = 0;
+  for (v = 0; v < nVars; v++) {
+    if (hasVar(function, nVars, v)) {
+      Supp |= (1 << v);
+    }
+  }
+  return Supp;
 }
 
-int getHammingDist( word * f1, word * f2, int nWords ) {
+int getPolarizedSupport(word* function, int nVars) {
 
-	unsigned long int currentWord;
-	int count = 0;
-
-	for ( int i = 0; i < nWords; i++ ) {
-		currentWord = f1[i] ^ f2[i];
-		count += oneCounter( currentWord );
-	}
-
-	return count;
+  int v, Supp = 0;
+  for (v = 0; v < nVars; v++) {
+    if (!posVar(function, nVars, v)) {
+      Supp |= (1 << (v * 2));
+    }
+    if (!negVar(function, nVars, v)) {
+      Supp |= (1 << ((v * 2) + 1));
+    }
+  }
+  return Supp;
 }
 
-//This is better when most bits in word are 0. It uses 3 arithmetic operations and one comparison/branch per "1" bit in word.
-int oneCounter( unsigned long int word ) {
+bool isConstZero(word* function, int nVars) {
 
-	int count;
-	for ( count = 0; word; count++ ) {
-		word &= word-1;
-	}
-	return count;
+  word* pFunction = function;
+  word* pLimit    = pFunction + wordNum(nVars);
+
+  while (pFunction != pLimit) {
+    if (*pFunction++ != 0ULL) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-int wordNum( int nVars ) {
-	return nVars <= 6 ? 1 : 1 << (nVars-6);
+bool isConstOne(word* function, int nVars) {
+
+  word* pFunction = function;
+  word* pLimit    = pFunction + wordNum(nVars);
+  const word ONE  = ~0ULL;
+
+  while (pFunction != pLimit) {
+    if (*pFunction++ != ONE) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
-bool isOdd( word * function ) {
-	return (function[0] & 1) != 0;
+Order order(word* sub, word* target, int nWords) {
+
+  if (equals(sub, target, nWords)) {
+    return Order::EQUAL;
+  }
+
+  bool smaller = true;
+  bool larger  = true;
+  unsigned long int partialResult;
+
+  for (int i = 0; i < nWords; i++) {
+
+    partialResult = sub[i] & target[i];
+
+    if (partialResult != sub[i]) {
+      smaller = false;
+    }
+    if (partialResult != target[i]) {
+      larger = false;
+    }
+
+    if (!smaller && !larger) {
+      return Order::NOTCOMPARABLE;
+    }
+  }
+
+  if (smaller)
+    return Order::SMALLER;
+
+  if (larger)
+    return Order::LARGER;
 }
 
-std::string toBin( word * function, int nWords ) {
+int getHammingDist(word* f1, word* f2, int nWords) {
 
-	if ( function != nullptr ) {
+  unsigned long int currentWord;
+  int count = 0;
 
-		std::stringstream result;
+  for (int i = 0; i < nWords; i++) {
+    currentWord = f1[i] ^ f2[i];
+    count += oneCounter(currentWord);
+  }
 
-		result << "";
-
-		for ( int i = nWords-1; i >= 0; i-- ) {
-			for ( int j = 63; j >= 0; j-- ) {
-				if ( (function[i] >> j) & 1 ) {
-					result << ("1");
-				}
-				else {
-					result << ("0");
-				}
-			}
-		}
-
-		return result.str();
-	}
-	else {
-		return "nullptr";
-	}
+  return count;
 }
 
-std::string toHex( word * function, int nWords ) {
+// This is better when most bits in word are 0. It uses 3 arithmetic operations
+// and one comparison/branch per "1" bit in word.
+int oneCounter(unsigned long int word) {
 
-	std::stringstream result;
-
-	result << "0x";
-
-	for (int i = nWords-1; i >= 0; i--) {
-		result << std::setw(16) << std::setfill('0') << std::hex << function[i];
-	}
-
-	return result.str();
+  int count;
+  for (count = 0; word; count++) {
+    word &= word - 1;
+  }
+  return count;
 }
 
+int wordNum(int nVars) { return nVars <= 6 ? 1 : 1 << (nVars - 6); }
 
-std::string supportToBin( unsigned int support ) {
-	word ptr[1];
-	ptr[0] = support;
-	return Functional::toBin( ptr , 1 );
+bool isOdd(word* function) { return (function[0] & 1) != 0; }
+
+std::string toBin(word* function, int nWords) {
+
+  if (function != nullptr) {
+
+    std::stringstream result;
+
+    result << "";
+
+    for (int i = nWords - 1; i >= 0; i--) {
+      for (int j = 63; j >= 0; j--) {
+        if ((function[i] >> j) & 1) {
+          result << ("1");
+        } else {
+          result << ("0");
+        }
+      }
+    }
+
+    return result.str();
+  } else {
+    return "nullptr";
+  }
+}
+
+std::string toHex(word* function, int nWords) {
+
+  std::stringstream result;
+
+  result << "0x";
+
+  for (int i = nWords - 1; i >= 0; i--) {
+    result << std::setw(16) << std::setfill('0') << std::hex << function[i];
+  }
+
+  return result.str();
+}
+
+std::string supportToBin(unsigned int support) {
+  word ptr[1];
+  ptr[0] = support;
+  return Functional::toBin(ptr, 1);
 }
 
 } /* namespace Functional */

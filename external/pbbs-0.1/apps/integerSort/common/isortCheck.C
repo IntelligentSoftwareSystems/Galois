@@ -30,14 +30,14 @@
 using namespace std;
 using namespace benchIO;
 
-typedef pair<uint,int> uintPair;
+typedef pair<uint, int> uintPair;
 
 template <class T>
 void checkIntegerSort(void* In, void* Out, int n) {
-  T* A = (T*) In;
-  T* B = (T*) Out;
+  T* A = (T*)In;
+  T* B = (T*)Out;
   integerSort(A, n);
-  for(int i=0; i < n; i++) {
+  for (int i = 0; i < n; i++) {
     if (A[i] != B[i]) {
       cout << "integerSortCheck: check failed at i=" << i << endl;
       abort();
@@ -47,26 +47,30 @@ void checkIntegerSort(void* In, void* Out, int n) {
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<inFile> <outFile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  seqData In = readSequenceFromFile(fnames.first);
-  seqData Out = readSequenceFromFile(fnames.second);
-  int n = In.n;
-  elementType dt = In.dt;
+  commandLine P(argc, argv, "<inFile> <outFile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  seqData In                = readSequenceFromFile(fnames.first);
+  seqData Out               = readSequenceFromFile(fnames.second);
+  int n                     = In.n;
+  elementType dt            = In.dt;
   if (dt != Out.dt) {
     cout << "compSortCheck: types don't match" << endl;
-    return(1);
+    return (1);
   }
   if (n != Out.n) {
     cout << "compSortCheck: lengths dont' match" << endl;
-    return(1);
+    return (1);
   }
 
   switch (dt) {
-  case intT: checkIntegerSort<uint>(In.A, Out.A, n); break;
-  case intPairT: checkIntegerSort<uintPair>(In.A, Out.A, n); break;
+  case intT:
+    checkIntegerSort<uint>(In.A, Out.A, n);
+    break;
+  case intPairT:
+    checkIntegerSort<uintPair>(In.A, Out.A, n);
+    break;
   default:
     cout << "integerSortCheck: input files not of right type" << endl;
-    return(1);
+    return (1);
   }
 }

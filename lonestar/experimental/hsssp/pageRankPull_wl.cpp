@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,16 +30,23 @@
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
-static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
+static const char* const name =
+    "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
-static const char* const url = 0;
+static const char* const url  = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file transpose graph>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
-
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file transpose graph>"),
+              cll::Required);
+static cll::opt<unsigned int> maxIterations("maxIterations",
+                                            cll::desc("Maximum iterations"),
+                                            cll::init(4));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
+                                 cll::init(0.01));
+static cll::opt<bool>
+    verify("verify", cll::desc("Verify ranks by printing to the output stream"),
+           cll::init(false));
 
 static const float alpha = 0.85; //(1.0 - 0.85);
 struct PR_NodeData {
@@ -51,30 +58,44 @@ typedef DistGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  const float &local_alpha;
+  const float& local_alpha;
   Graph* graph;
 
-  InitializeGraph(const float &_alpha, Graph* _graph):local_alpha(_alpha), graph(_graph){}
+  InitializeGraph(const float& _alpha, Graph* _graph)
+      : local_alpha(_alpha), graph(_graph) {}
   void static go(Graph& _graph) {
     struct Syncer_0 {
-    	static int extract(GNode src, const struct PR_NodeData & node){ return node.nout; }
-    	static void reduce (GNode src, struct PR_NodeData & node, int y) { galois::atomicAdd(node.nout, y);}
-    	static void reset (GNode src, struct PR_NodeData & node ) { node.nout = 0; }
-    	typedef int ValTy;
+      static int extract(GNode src, const struct PR_NodeData& node) {
+        return node.nout;
+      }
+      static void reduce(GNode src, struct PR_NodeData& node, int y) {
+        galois::atomicAdd(node.nout, y);
+      }
+      static void reset(GNode src, struct PR_NodeData& node) { node.nout = 0; }
+      typedef int ValTy;
     };
-     struct SyncerPull_0 {
-    	static int extract(GNode src,  const struct PR_NodeData & node){ return node.nout; }
-    	static void setVal (GNode src, struct PR_NodeData & node, int y) {node.nout = y; }
-    	typedef int ValTy;
+    struct SyncerPull_0 {
+      static int extract(GNode src, const struct PR_NodeData& node) {
+        return node.nout;
+      }
+      static void setVal(GNode src, struct PR_NodeData& node, int y) {
+        node.nout = y;
+      }
+      typedef int ValTy;
     };
 
-     struct SyncerPull_1 {
-    	static float extract(GNode src,  const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (GNode src, struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
+    struct SyncerPull_1 {
+      static float extract(GNode src, const struct PR_NodeData& node) {
+        return node.value;
+      }
+      static void setVal(GNode src, struct PR_NodeData& node, float y) {
+        node.value = y;
+      }
+      typedef float ValTy;
     };
- 
-    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, galois::loopname("Init"));
+
+    galois::do_all(_graph.begin(), _graph.end(),
+                   InitializeGraph{alpha, &_graph}, galois::loopname("Init"));
 
     _graph.sync_push<Syncer_0>();
     _graph.sync_pull<SyncerPull_0>();
@@ -84,81 +105,79 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - local_alpha;
+    sdata.value        = 1.0 - local_alpha;
     galois::atomicAdd(sdata.nout, 0);
-    for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
-      GNode dst = graph->getEdgeDst(nbr);
+    for (auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src);
+         ++nbr) {
+      GNode dst          = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       galois::atomicAdd(ddata.nout, 1);
     }
   }
 };
 
-
 struct PageRank_pull {
-  const float &local_alpha;
-  const float &local_tolerance;
+  const float& local_alpha;
+  const float& local_tolerance;
   Graph* graph;
 
+  template <typename GraphTy>
+  struct Get_info_functor : public galois::op_tag {
+    GraphTy& graph;
 
- template <typename GraphTy>
-    struct Get_info_functor : public galois::op_tag {
-      GraphTy &graph;
-
-      struct SyncerPull_0 {
-        static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
-        static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
-        typedef float ValTy;
-      };
-
-      Get_info_functor(GraphTy& _g): graph(_g){}
-      unsigned operator()(GNode n){
-        return graph.getHostID(n);
+    struct SyncerPull_0 {
+      static float extract(GNode src, const struct PR_NodeData& node) {
+        return node.value;
       }
-
-      uint32_t getLocalID(GNode n){
-        return graph.getLID(n);
+      static void setVal(GNode src, struct PR_NodeData& node, float y) {
+        node.value = y;
       }
-
-      void sync_graph(){
-        sync_graph_static(graph);
-        //XXX: Why this is not working?
-        //graph.sync_push<Syncer_0>();
-      }
-      void static sync_graph_static(Graph& _g){
-        _g.sync_pull<SyncerPull_0>();
-      }
+      typedef float ValTy;
     };
 
+    Get_info_functor(GraphTy& _g) : graph(_g) {}
+    unsigned operator()(GNode n) { return graph.getHostID(n); }
 
- PageRank_pull(const float &_tolerance, const float &_alpha, Graph* _graph):local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
+    uint32_t getLocalID(GNode n) { return graph.getLID(n); }
 
+    void sync_graph() {
+      sync_graph_static(graph);
+      // XXX: Why this is not working?
+      // graph.sync_push<Syncer_0>();
+    }
+    void static sync_graph_static(Graph& _g) { _g.sync_pull<SyncerPull_0>(); }
+  };
 
- void static go(Graph& _graph) {
+  PageRank_pull(const float& _tolerance, const float& _alpha, Graph* _graph)
+      : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph) {}
 
-   using namespace galois::worklists;
-   typedef PerSocketChunkFIFO<64> PSchunk;
+  void static go(Graph& _graph) {
 
-   galois::for_each(_graph.begin(), _graph.end(), PageRank_pull(tolerance, alpha, &_graph), Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
+    using namespace galois::worklists;
+    typedef PerSocketChunkFIFO<64> PSchunk;
 
- }
+    galois::for_each(_graph.begin(), _graph.end(),
+                     PageRank_pull(tolerance, alpha, &_graph),
+                     Get_info_functor<Graph>(_graph), galois::wl<PSchunk>());
+  }
 
- void operator()(GNode src, galois::UserContext<GNode>& ctx)const {
-   PR_NodeData& sdata = graph->getData(src);
-   float sum = 0;
-   for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
-     GNode dst = graph->getEdgeDst(nbr);
-     PR_NodeData& ddata = graph->getData(dst);
-      unsigned dnout = ddata.nout;
-      if(ddata.nout > 0){
-        sum += ddata.value/dnout;
+  void operator()(GNode src, galois::UserContext<GNode>& ctx) const {
+    PR_NodeData& sdata = graph->getData(src);
+    float sum          = 0;
+    for (auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src);
+         ++nbr) {
+      GNode dst          = graph->getEdgeDst(nbr);
+      PR_NodeData& ddata = graph->getData(dst);
+      unsigned dnout     = ddata.nout;
+      if (ddata.nout > 0) {
+        sum += ddata.value / dnout;
       }
     }
 
-    float pr_value = sum*(1.0 - local_alpha) + local_alpha;
-    float diff = std::fabs(pr_value - sdata.value);
+    float pr_value = sum * (1.0 - local_alpha) + local_alpha;
+    float diff     = std::fabs(pr_value - sdata.value);
 
-    if(diff > local_tolerance){
+    if (diff > local_tolerance) {
       sdata.value = pr_value;
       ctx.push(graph->getGID(src));
     }
@@ -170,7 +189,8 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init,
+        T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
 
@@ -203,52 +223,67 @@ int main(int argc, char** argv) {
 
     std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
     T_pageRank1.start();
-      PageRank_pull::go(hg);
+    PageRank_pull::go(hg);
     T_pageRank1.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get()
+              << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
     T_pageRank2.start();
-      PageRank_pull::go(hg);
+    PageRank_pull::go(hg);
     T_pageRank2.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get()
+              << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
     T_pageRank3.start();
-      PageRank_pull::go(hg);
+    PageRank_pull::go(hg);
     T_pageRank3.stop();
 
-
-
-
-
-
     // Verify
-    if(verify){
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
-          //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        }
+    if (verify) {
+      for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii),
+                                     hg.getData(*ii).value);
+        // std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
+      }
     }
 
     T_total.stop();
 
+    auto mean_time =
+        (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get()) / 3;
 
-    auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get()
+              << " PageRank1 : " << T_pageRank1.get()
+              << " PageRank2 : " << T_pageRank2.get()
+              << " PageRank3 : " << T_pageRank3.get()
+              << " PageRank mean time (3 runs ) (" << maxIterations
+              << ") : " << mean_time << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {
-      std::cerr << "Error: " << c << "\n";
-      return 1;
+    std::cerr << "Error: " << c << "\n";
+    return 1;
   }
 }

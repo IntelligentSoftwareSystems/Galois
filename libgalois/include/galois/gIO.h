@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,7 +25,7 @@
 #include <cstdlib>
 #include <string.h>
 
-//FIXME: move to Runtime
+// FIXME: move to Runtime
 
 namespace galois {
 
@@ -41,7 +41,7 @@ void gDebugStr(const std::string&);
 void gErrorStr(const std::string&);
 
 //! Prints a sequence of things
-template<typename... Args>
+template <typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
@@ -49,7 +49,7 @@ void gPrint(Args... args) {
 }
 
 //! Prints an info string from a sequence of things
-template<typename... Args>
+template <typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
@@ -57,7 +57,7 @@ void gInfo(Args... args) {
 }
 
 //! Prints a warning string from a sequence of things
-template<typename... Args>
+template <typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
@@ -66,7 +66,7 @@ void gWarn(Args... args) {
 
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
 //! is defined.
-template<typename... Args>
+template <typename... Args>
 void gDebug(const Args&... args) {
 #ifndef NDEBUG
   std::ostringstream os;
@@ -76,7 +76,7 @@ void gDebug(const Args&... args) {
 }
 
 //! Prints error message
-template<typename... Args>
+template <typename... Args>
 void gError(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
@@ -85,26 +85,41 @@ void gError(Args... args) {
 
 void gFlush();
 
-#define GALOIS_SYS_DIE(...)   do { galois::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
-#define GALOIS_DIE(...)       do { galois::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_SYS_DIE(...)                                                    \
+  do {                                                                         \
+    galois::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",       \
+                   ##__VA_ARGS__);                                             \
+    abort();                                                                   \
+  } while (0)
+#define GALOIS_DIE(...)                                                        \
+  do {                                                                         \
+    galois::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__);              \
+    abort();                                                                   \
+  } while (0)
 //! Like assert but unconditionally executed
-#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0)
-
+#define GALOIS_ASSERT(cond, ...)                                               \
+  do {                                                                         \
+    bool b = (cond);                                                           \
+    if (!b) {                                                                  \
+      galois::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond,   \
+                     " ", ##__VA_ARGS__);                                      \
+      abort();                                                                 \
+    }                                                                          \
+  } while (0)
 
 template <unsigned ENABLE>
 struct debug {
   template <typename... Args>
-  static void print (const Args&... args) {
-    gDebug (args...);
+  static void print(const Args&... args) {
+    gDebug(args...);
   }
 };
 
 template <>
 struct debug<0> {
   template <typename... Args>
-  inline static void print (const Args&... args) {}
+  inline static void print(const Args&... args) {}
 };
-
 
 } // end namespace galois
 

@@ -16,8 +16,8 @@ int main(int argc, char** argv) {
     trials = atoi(argv[1]);
 
   int provided;
-  MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
-    
+  MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, &provided);
+
   int numTasks, taskRank;
   MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
   MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 
   //  while (!cont) {}
 
-  for (int s = 10 ; s < trials; s*=1.1) {
+  for (int s = 10; s < trials; s *= 1.1) {
     std::vector<char> vec(s);
     galois::Timer T1, T2, T3;
     MPI_Barrier(MPI_COMM_WORLD);
@@ -53,19 +53,16 @@ int main(int argc, char** argv) {
         MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
       } while (!flag);
       MPI_Get_count(&status, MPI_CHAR, &nbytes);
-      MPI_Recv(vec.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &status);
+      MPI_Recv(vec.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG,
+               MPI_COMM_WORLD, &status);
     }
     T2.stop();
     MPI_Barrier(MPI_COMM_WORLD);
     T3.stop();
     MPI_Barrier(MPI_COMM_WORLD);
-    std::cerr << "H" << taskRank 
-              << " size " << s 
-              << " T1 " << T1.get()
-              << " T2 " << T2.get()
-              << " T3 " << T3.get()
-              << " B " << (T3.get() ? (s / (T3.get() - T1.get())) : 0.0)
-              << "\n";
+    std::cerr << "H" << taskRank << " size " << s << " T1 " << T1.get()
+              << " T2 " << T2.get() << " T3 " << T3.get() << " B "
+              << (T3.get() ? (s / (T3.get() - T1.get())) : 0.0) << "\n";
     MPI_Barrier(MPI_COMM_WORLD);
   }
   return 0;

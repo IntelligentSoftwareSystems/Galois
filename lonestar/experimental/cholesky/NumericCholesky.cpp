@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,33 +39,40 @@
 namespace cll = llvm::cl;
 
 const char* name = "Numeric Cholesky Factorization";
-const char* desc = "Compute the numeric cholesky factorization of a filled graph";
+const char* desc =
+    "Compute the numeric cholesky factorization of a filled graph";
 const char* url = NULL;
 
 enum Algo {
-  demo//,
-  //asynchronous
+  demo //,
+  // asynchronous
 };
 
-static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<filled graph file>"), cll::Required);
-static cll::opt<std::string> depFilename(cll::Positional, cll::desc("<dependency graph file>"), cll::Required);
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
-    cll::values(
-      clEnumVal(demo, "Demonstration algorithm"),
-      //clEnumVal(asynchronous, "Asynchronous"),
-      clEnumValEnd), cll::init(demo));
+static cll::opt<std::string> inputFilename(cll::Positional,
+                                           cll::desc("<filled graph file>"),
+                                           cll::Required);
+static cll::opt<std::string> depFilename(cll::Positional,
+                                         cll::desc("<dependency graph file>"),
+                                         cll::Required);
+static cll::opt<Algo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(clEnumVal(demo, "Demonstration algorithm"),
+                     // clEnumVal(asynchronous, "Asynchronous"),
+                     clEnumValEnd),
+         cll::init(demo));
 
 struct Node {
   unsigned id;
   int seen;
-  Node(): seen(0) { };
+  Node() : seen(0){};
 };
 
 // WARNING: Will silently behave oddly when given wrong data type
 typedef double edgedata;
-//typedef float edgedata;
+// typedef float edgedata;
 
-typedef galois::graphs::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
+typedef galois::graphs::LC_Linear_Graph<Node, edgedata>::with_numa_alloc<
+    true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -73,8 +80,7 @@ Graph graph;
 
 // The dependency list is stored as a total ordering
 typedef unsigned int DepItem;
-DepItem *depgraph;
-
+DepItem* depgraph;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
   os << "[id: " << &n << "]";
@@ -82,10 +88,10 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 }
 
 // Adapted from preflowpush/Preflowpush.cpp
-Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
+Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool* hasEdge) {
   Graph::edge_iterator ii = g.edge_begin(src, galois::MethodFlag::UNPROTECTED),
                        ei = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
-  *hasEdge = false;
+  *hasEdge                = false;
   for (; ii != ei; ++ii) {
     if (g.getEdgeDst(ii) == dst) {
       *hasEdge = true;
@@ -98,12 +104,11 @@ Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
 // include/galois/graphs/Serialize.h
 bool outputTextEdgeData(const char* ofile, Graph& G) {
   std::ofstream file(ofile);
-  for (Graph::iterator ii = G.begin(),
-         ee = G.end(); ii != ee; ++ii) {
+  for (Graph::iterator ii = G.begin(), ee = G.end(); ii != ee; ++ii) {
     unsigned src = G.getData(*ii).id;
     // FIXME: Version in include/galois/graphs/Serialize.h is wrong.
-    for (Graph::edge_iterator jj = G.edge_begin(*ii),
-           ej = G.edge_end(*ii); jj != ej; ++jj) {
+    for (Graph::edge_iterator jj = G.edge_begin(*ii), ej = G.edge_end(*ii);
+         jj != ej; ++jj) {
       unsigned dst = G.getData(G.getEdgeDst(jj)).id;
       file << src << ' ' << dst << ' ' << G.getEdgeData(jj) << '\n';
     }
@@ -118,15 +123,18 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
  */
 struct Cmp {
   bool operator()(const GNode& node1, const GNode& node2) const {
-    Node &node1d = graph.getData(node1, galois::MethodFlag::UNPROTECTED);
-    Node &node2d = graph.getData(node2, galois::MethodFlag::UNPROTECTED);
+    Node& node1d = graph.getData(node1, galois::MethodFlag::UNPROTECTED);
+    Node& node2d = graph.getData(node2, galois::MethodFlag::UNPROTECTED);
     int pos1 = -1, pos2 = -1;
 
     // Check the total ordering to determine if item1 <= item2
-    for ( int n = graph.size(), i = 0; i < n; i++ ) {
-      if ( depgraph[i] == node1d.id ) pos1 = i;
-      if ( depgraph[i] == node2d.id ) pos2 = i; // FIXME: make else if
-      if ( pos1 >= 0 && pos2 >= 0 ) break;      // FIXME: eliminate
+    for (int n = graph.size(), i = 0; i < n; i++) {
+      if (depgraph[i] == node1d.id)
+        pos1 = i;
+      if (depgraph[i] == node2d.id)
+        pos2 = i; // FIXME: make else if
+      if (pos1 >= 0 && pos2 >= 0)
+        break; // FIXME: eliminate
     }
     assert(pos1 >= 0 && pos2 >= 0);
     bool result = pos1 <= pos2;
@@ -148,7 +156,7 @@ struct NhFunc {
   static_assert(galois::has_fixed_neighborhood<NhFunc>::value, "Oops!");
   */
 
-  template<typename C>
+  template <typename C>
   void operator()(GNode& node, C& ctx) {
     (*this)(node);
   }
@@ -163,12 +171,12 @@ struct NhFunc {
  * graph produced by symbolic factorization.
  */
 struct DemoAlgo {
-  //typedef int tt_does_not_need_push;
-  //static_assert(galois::does_not_need_push<DemoAlgo>::value, "Oops!");
+  // typedef int tt_does_not_need_push;
+  // static_assert(galois::does_not_need_push<DemoAlgo>::value, "Oops!");
 
   void operator()(GNode node, galois::UserContext<GNode>& ctx) {
     // Find self-edge for this node, update it
-    bool hasEdge = false;
+    bool hasEdge     = false;
     edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
                                          galois::MethodFlag::UNPROTECTED);
     assert(hasEdge);
@@ -176,76 +184,81 @@ struct DemoAlgo {
     factor = sqrt(factor);
     assert(factor != 0 && !isnan(factor));
 
-    //std::cout << "STARTING " << node << "\n";
+    // std::cout << "STARTING " << node << "\n";
 
     // Check seen flag on node
-    Node &noded = graph.getData(node);
+    Node& noded = graph.getData(node);
     assert(noded.seen == 0);
     // DO NOT UPDATE THE SEEN FLAG YET, it may cause problems.
 
-    //std::cout << "STARTING " << noded.id << " " << factor << "\n";
-    //printf("STARTING %4d %10.5f\n", noded.id, factor);
+    // std::cout << "STARTING " << noded.id << " " << factor << "\n";
+    // printf("STARTING %4d %10.5f\n", noded.id, factor);
 
     // Update all edges (except self-edge)
     for (Graph::edge_iterator ii = graph.edge_begin(node),
-           ei = graph.edge_end(node); ii != ei; ++ii) {
-      GNode dst = graph.getEdgeDst(ii);
-      Node &dstd = graph.getData(dst);
-      if ( !dstd.seen && dst != node ) {
-        edgedata &ed = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
+                              ei = graph.edge_end(node);
+         ii != ei; ++ii) {
+      GNode dst  = graph.getEdgeDst(ii);
+      Node& dstd = graph.getData(dst);
+      if (!dstd.seen && dst != node) {
+        edgedata& ed = graph.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
         ed /= factor;
-        //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
-        //std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
+        // printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id,
+        // ed); std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
       }
     }
 
     // Update all edges between neighbors (we're operating on the filled graph,
     // so we they form a (directed) clique)
     for (Graph::edge_iterator iis = graph.edge_begin(node),
-         eis = graph.edge_end(node);
+                              eis = graph.edge_end(node);
          iis != eis; ++iis) {
-      GNode src = graph.getEdgeDst(iis);
-      Node &srcd = graph.getData(src);
-      if ( srcd.seen || src == node ) continue;
+      GNode src  = graph.getEdgeDst(iis);
+      Node& srcd = graph.getData(src);
+      if (srcd.seen || src == node)
+        continue;
       edgedata& eds = graph.getEdgeData(iis, galois::MethodFlag::UNPROTECTED);
 
       // Enumerate all other neighbors
       for (Graph::edge_iterator iid = graph.edge_begin(node),
-           eid = graph.edge_end(node);
+                                eid = graph.edge_end(node);
            iid != eid; ++iid) {
-        GNode dst = graph.getEdgeDst(iid);
-        Node &dstd = graph.getData(dst);
-        if ( dstd.seen || dst == node ) continue;
+        GNode dst  = graph.getEdgeDst(iid);
+        Node& dstd = graph.getData(dst);
+        if (dstd.seen || dst == node)
+          continue;
 
         // Find the edge that bridges these two neighbors
         hasEdge = false; // FIXME: There must be a better way
         Graph::edge_iterator bridge = findEdge(graph, src, dst, &hasEdge);
-        if ( !hasEdge ) continue;
+        if (!hasEdge)
+          continue;
 
         // Update the weight of the bridge edge
         edgedata &edd = graph.getEdgeData(iid, galois::MethodFlag::UNPROTECTED),
-          &edb = graph.getEdgeData(bridge, galois::MethodFlag::UNPROTECTED);
-        edb -= eds*edd;
+                 &edb =
+                     graph.getEdgeData(bridge, galois::MethodFlag::UNPROTECTED);
+        edb -= eds * edd;
 
-        //printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);
-        //std::cout << srcd.id << " " << dstd.id << " " << edb << "\n";
+        // printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);
+        // std::cout << srcd.id << " " << dstd.id << " " << edb << "\n";
       }
     }
-    //std::cout << "OPERATED ON " << noded.id << "\n";
-    //sleep(1); // Use this to help debug parallelism
+    // std::cout << "OPERATED ON " << noded.id << "\n";
+    // sleep(1); // Use this to help debug parallelism
 
     // Now update the seen flag.
     assert(noded.seen == 0);
     noded.seen = 1;
     assert(noded.seen == 1);
-    //printf("FINISHED %4d %d\n", noded.id, noded.seen);
+    // printf("FINISHED %4d %d\n", noded.id, noded.seen);
   }
 
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
     if (ii != ei) { // Ensure there is at least one node in the graph.
       galois::for_each_ordered(ii, ei, Cmp(), NhFunc(), *this);
-      //galois::for_each(ii, ei, *this);
+      // galois::for_each(ii, ei, *this);
     }
   }
 };
@@ -254,20 +267,20 @@ struct DemoAlgo {
 
 bool verify() {
   outputTextEdgeData("choleskyedges.txt", graph);
-  std::cout << "\n\n\nPlease verify by comparing choleskyedges.txt against expected contents.\n\n\n\n"; 
+  std::cout << "\n\n\nPlease verify by comparing choleskyedges.txt against "
+               "expected contents.\n\n\n\n";
   return true;
   /*
-  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
-    if (galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      CheckAcyclic c;
-      return c();
+  if (galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph())
+  == graph.end()) { if (galois::ParallelSTL::find_if(mst.begin(), mst.end(),
+  is_bad_mst()) == mst.end()) { CheckAcyclic c; return c();
     }
   }
   return false;
   */
 }
 
-template<typename Algo>
+template <typename Algo>
 void run() {
   Algo algo;
 
@@ -293,7 +306,7 @@ int main(int argc, char** argv) {
     unsigned int n = graph.size(), i = 0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       Node& data = graph.getData(*ii);
-      data.id = i++;
+      data.id    = i++;
       assert(!data.seen);
     }
     assert(i == n);
@@ -306,9 +319,10 @@ int main(int argc, char** argv) {
     while (depfile) {
       unsigned int node;
       depfile >> node;
-      if ( !depfile ) break;
+      if (!depfile)
+        break;
       assert(node < n);
-      if ( /* i < 0  || */ i >= n ) {
+      if (/* i < 0  || */ i >= n) {
         std::cout << "Error loading dependencies.\n";
         abort();
       }
@@ -321,13 +335,16 @@ int main(int argc, char** argv) {
 
   Tinitial.stop();
 
-  //galois::preAlloc(numThreads);
+  // galois::preAlloc(numThreads);
   galois::reportPageAlloc("MeminfoPre");
 
   switch (algo) {
-    case demo: run<DemoAlgo>(); break;
-    //case asynchronous: run<AsynchronousAlgo>(); break;
-    default: std::cerr << "Unknown algo: " << algo << "\n";
+  case demo:
+    run<DemoAlgo>();
+    break;
+  // case asynchronous: run<AsynchronousAlgo>(); break;
+  default:
+    std::cerr << "Unknown algo: " << algo << "\n";
   }
   galois::reportPageAlloc("MeminfoPost");
 

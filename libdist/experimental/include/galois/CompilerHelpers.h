@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,16 +23,16 @@
 #include <algorithm>
 #include <vector>
 namespace galois {
-  template<typename... Args>
-  int read_set(Args... args) {
-    // Nothing for now.
-    return 0;
-  }
+template <typename... Args>
+int read_set(Args... args) {
+  // Nothing for now.
+  return 0;
+}
 
-  template<typename... Args>
-  int write_set(Args... args) {
-    // Nothing for now.
-    return 0;
-  }
+template <typename... Args>
+int write_set(Args... args) {
+  // Nothing for now.
+  return 0;
+}
 } // end namespace galois
 #endif

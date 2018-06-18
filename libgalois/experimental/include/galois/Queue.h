@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,11 +34,14 @@
 
 namespace galois {
 
-template<typename T, typename K>
+template <typename T, typename K>
 int JComp(T& c, const K& k1, const K& k2) {
-  if (c(k1, k2)) return -1;
-  if (c(k2, k1)) return 1;
-  else return 0;
+  if (c(k1, k2))
+    return -1;
+  if (c(k2, k1))
+    return 1;
+  else
+    return 0;
 }
 
 struct ConcurrentSkipListMapHelper {
@@ -116,7 +119,7 @@ struct ConcurrentSkipListMapHelper {
  * @param <V>
  *          the type of mapped values
  */
-template<typename K, typename V, typename Compare = std::less<K> >
+template <typename K, typename V, typename Compare = std::less<K>>
 class ConcurrentSkipListMap : private boost::noncopyable {
   /*
    * This class implements a tree-like two-dimensionally linked skip list in
@@ -332,20 +335,22 @@ class ConcurrentSkipListMap : private boost::noncopyable {
       c = 0; // suppress warning
       // Add slight jitter so threads will get different seeds
       // and ensure non-zero
-      *randomSeed.getRemote(i) = ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
+      *randomSeed.getRemote(i) =
+          ((1000000 + i) * time.tv_sec + time.tv_usec) | 0x0100;
     }
 
-    Node *node = new (node_heap.allocate(sizeof(Node)))
-      Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL);
+    Node* node = new (node_heap.allocate(sizeof(Node)))
+        Node(K(), &ConcurrentSkipListMapHelper::BASE_HEADER, NULL);
     head = new (head_index_heap.allocate(sizeof(HeadIndex)))
-      HeadIndex(node, NULL, NULL, 1);
+        HeadIndex(node, NULL, NULL, 1);
   }
 
   /**
    * compareAndSet head node
    */
   bool casHead(HeadIndex* cmp, HeadIndex* val) {
-    //return __sync_bool_compare_and_swap((uintptr_t*)&head, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+    // return __sync_bool_compare_and_swap((uintptr_t*)&head,
+    // reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
     return head.compare_exchange_strong(cmp, val);
   }
 
@@ -368,14 +373,16 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      */
     bool casValue(void* cmp, void* val) {
       return value.compare_exchange_strong(cmp, val);
-      //return __sync_bool_compare_and_swap((uintptr_t*)&value, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      // return __sync_bool_compare_and_swap((uintptr_t*)&value,
+      // reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
     }
 
     /**
      * compareAndSet next field
      */
     bool casNext(Node* cmp, Node* val) {
-      //return __sync_bool_compare_and_swap((uintptr_t*)&next, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      // return __sync_bool_compare_and_swap((uintptr_t*)&next,
+      // reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
       return next.compare_exchange_strong(cmp, val);
     }
 
@@ -395,7 +402,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * @return true if successful
      */
     bool appendMarker(Node* f) {
-      // TODO(ddn): Cannot easily switch this allocate to FixedSizeAllocator (yet)
+      // TODO(ddn): Cannot easily switch this allocate to FixedSizeAllocator
+      // (yet)
       return casNext(f, new Node(f));
     }
 
@@ -446,11 +454,13 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         return SnapshotEntry();
       return SnapshotEntry(*key, v);
     }
+
   public:
     /**
      * Creates a new regular node.
      */
-    Node(const K& k, void* v, Node* n): key(k), voidKey(false), value(v), next(n)  { }
+    Node(const K& k, void* v, Node* n)
+        : key(k), voidKey(false), value(v), next(n) {}
 
     /**
      * Creates a new marker node. A marker is distinguished by having its value
@@ -458,7 +468,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * exploited in a few places, but this doesn't distinguish markers from the
      * base-level header node (head.node), which also has a null key.
      */
-    Node(Node* n): voidKey(true), value(this), next(n) { }
+    Node(Node* n) : voidKey(true), value(this), next(n) {}
   };
 
   /* ---------------- Indexing -------------- */
@@ -472,20 +482,22 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   struct Index {
     const galois::optional<K> key;
-    /*final*/Node* node;
+    /*final*/ Node* node;
     /*final*/ Index* down;
     std::atomic<Index*> right;
 
     /**
      * Creates index node with given values
      */
-    Index(Node* n, Index* d, Index* r): key(n->key), node(n), down(d), right(r) { }
+    Index(Node* n, Index* d, Index* r)
+        : key(n->key), node(n), down(d), right(r) {}
 
     /**
      * compareAndSet right field
      */
     bool casRight(Index* cmp, Index* val) {
-      //return __sync_bool_compare_and_swap((uintptr_t*)&right, reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
+      // return __sync_bool_compare_and_swap((uintptr_t*)&right,
+      // reinterpret_cast<uintptr_t>(cmp), reinterpret_cast<uintptr_t>(val));
       return right.compare_exchange_strong(cmp, val);
     }
 
@@ -494,9 +506,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      *
      * @return true if indexed node is known to be deleted
      */
-    bool indexesDeletedNode() {
-      return node->value == NULL;
-    }
+    bool indexesDeletedNode() { return node->value == NULL; }
 
     /**
      * Tries to CAS newSucc as successor. To minimize races with unlink that may
@@ -510,7 +520,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * @return true if successful
      */
     bool link(Index* succ, Index* newSucc) {
-      Node* n = node;
+      Node* n        = node;
       newSucc->right = succ;
       return n->value != NULL && casRight(succ, newSucc);
     }
@@ -536,7 +546,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   struct HeadIndex : public Index {
     const int level;
 
-    HeadIndex(Node* n, Index* d, Index* r, int l): Index(n, d, r), level(l) { }
+    HeadIndex(Node* n, Index* d, Index* r, int l) : Index(n, d, r), level(l) {}
   };
 
   /* ---------------- Map.Entry support -------------- */
@@ -559,8 +569,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
      * @param value
      *          the value
      */
-    SnapshotEntry(const K& k, V* v): key(k), value(v), valid(true) { }
-    SnapshotEntry(): valid(false) { }
+    SnapshotEntry(const K& k, V* v) : key(k), value(v), valid(true) {}
+    SnapshotEntry() : valid(false) {}
   };
 
   /* ---------------- Traversal -------------- */
@@ -655,8 +665,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
         }
         if (v == n || b->value == NULL) // b is deleted
           break;
-	int c = JComp(comp, key, *n->key);
-	if (c == 0)
+        int c = JComp(comp, key, *n->key);
+        if (c == 0)
           return n;
         else if (c < 0)
           return NULL;
@@ -748,7 +758,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     }
   }
 #endif
-    /**
+  /**
    * Specialized variant of findNode to perform Map.get. Does a weak traversal,
    * not bothering to fix any deleted index nodes, returning early if it happens
    * to see key in index, and passing over any deleted base nodes, falling back
@@ -762,9 +772,9 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * @return the value, or null if absent
    */
   V* doGet(const K& key) {
-    //return getUsingFindNode(key);
+    // return getUsingFindNode(key);
     Node* bound = NULL;
-    Index* q = head;
+    Index* q    = head;
     for (;;) {
       K rk;
       Index *d, *r;
@@ -855,17 +865,17 @@ class ConcurrentSkipListMap : private boost::noncopyable {
           if (v == n || b->value == NULL) // b is deleted
             break;
           int c = JComp(comp, kkey, *n->key);
-	  if (c > 0) {
-	    b = n;
-	    n = f;
-	    continue;
-	  }
-	  if (c == 0) {
-	    if (onlyIfAbsent || n->casValue(v, value))
-	      return static_cast<V*>(v);
-	    else
-	      break; // restart if lost race to replace value
-	  }
+          if (c > 0) {
+            b = n;
+            n = f;
+            continue;
+          }
+          if (c == 0) {
+            if (onlyIfAbsent || n->casValue(v, value))
+              return static_cast<V*>(v);
+            else
+              break; // restart if lost race to replace value
+          }
           // else c < 0; fall through
         }
 
@@ -893,8 +903,8 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   int randomLevel() {
     int level = 0;
     int& seed = *randomSeed.getLocal();
-    int r = seed;
-    seed = r * 134775813 + 1;
+    int r     = seed;
+    seed      = r * 134775813 + 1;
     if (r < 0) {
       while ((r <<= 1) > 0)
         ++level;
@@ -912,7 +922,7 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    */
   void insertIndex(Node* z, int level) {
     HeadIndex* h = head;
-    int max = h->level;
+    int max      = h->level;
 
     if (level <= max) {
       Index* idx = NULL;
@@ -928,27 +938,28 @@ class ConcurrentSkipListMap : private boost::noncopyable {
        * creating new head index nodes from the opposite direction.
        */
       level = max + 1;
-      //Index** idxs = new Index*[level+1];
+      // Index** idxs = new Index*[level+1];
       std::vector<Index*> idxs;
-      idxs.resize(level+1);
+      idxs.resize(level + 1);
       Index* idx = NULL;
       for (int i = 1; i <= level; ++i)
-        idxs[i] = idx = new (index_heap.allocate(sizeof(Index))) Index(z, idx, NULL);
+        idxs[i] = idx =
+            new (index_heap.allocate(sizeof(Index))) Index(z, idx, NULL);
 
       HeadIndex* oldh;
       int k;
       for (;;) {
-        oldh = head;
+        oldh         = head;
         int oldLevel = oldh->level;
         if (level <= oldLevel) { // lost race to add level
           k = level;
           break;
         }
         HeadIndex* newh = oldh;
-        Node* oldbase = oldh->node;
+        Node* oldbase   = oldh->node;
         for (int j = oldLevel + 1; j <= level; ++j)
           newh = new (head_index_heap.allocate(sizeof(HeadIndex)))
-            HeadIndex(oldbase, newh, idxs[j], j);
+              HeadIndex(oldbase, newh, idxs[j], j);
         if (casHead(oldh, newh)) {
           k = oldLevel;
           break;
@@ -978,12 +989,12 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     for (;;) {
       Index* q = h;
       Index* t = idx;
-      int j = h->level;
+      int j    = h->level;
       for (;;) {
         Index* r = q->right;
         if (r != NULL) {
           // compare before deletion check avoids needing recheck
-	  int c = JComp(comp, *idx->key, *r->key);
+          int c = JComp(comp, *idx->key, *r->key);
           if (r->indexesDeletedNode()) {
             if (q->unlink(r))
               continue;
@@ -1043,12 +1054,12 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     HeadIndex* h = head;
     HeadIndex* d;
     HeadIndex* e;
-    if (h->level > 3 && (d = static_cast<HeadIndex*>(h->down)) != NULL
-        && (e = static_cast<HeadIndex*>(d->down)) != NULL
-        && e->right.load() == NULL && d->right.load() == NULL
-        && h->right.load() == NULL && casHead(h, d) && // try to set
-        h->right.load() != NULL) // recheck
-      casHead(d, h); // try to backout
+    if (h->level > 3 && (d = static_cast<HeadIndex*>(h->down)) != NULL &&
+        (e = static_cast<HeadIndex*>(d->down)) != NULL &&
+        e->right.load() == NULL && d->right.load() == NULL &&
+        h->right.load() == NULL && casHead(h, d) && // try to set
+        h->right.load() != NULL)                    // recheck
+      casHead(d, h);                                // try to backout
   }
 
   /* ---------------- Finding and removing first element -------------- */
@@ -1121,16 +1132,14 @@ class ConcurrentSkipListMap : private boost::noncopyable {
     }
   }
 
-
   /* ---------------- Constructors -------------- */
 public:
   /**
    * Constructs a new empty map, sorted according to the keys' natural order.
    */
-  ConcurrentSkipListMap():
-    node_heap(sizeof(Node)),
-    index_heap(sizeof(Index)),
-    head_index_heap(sizeof(HeadIndex)) {
+  ConcurrentSkipListMap()
+      : node_heap(sizeof(Node)), index_heap(sizeof(Index)),
+        head_index_heap(sizeof(HeadIndex)) {
     initialize();
   }
 
@@ -1222,9 +1231,8 @@ public:
    */
   V* get(const K& key) {
     return doGet(key);
-    //return getUsingFindNode(key);
+    // return getUsingFindNode(key);
   }
-
 
   /**
    * Associates the specified value with the specified key in this map. If the
@@ -1269,7 +1277,9 @@ public:
       if (n->getValidValue() != NULL)
         ++count;
     }
-    return (count >= std::numeric_limits<int>::max()) ? std::numeric_limits<int>::max() : (int) count;
+    return (count >= std::numeric_limits<int>::max())
+               ? std::numeric_limits<int>::max()
+               : (int)count;
   }
 
   /**
@@ -1277,9 +1287,7 @@ public:
    *
    * @return <tt>true</tt> if this map contains no key-value mappings.
    */
-  bool isEmpty() const {
-    return findFirst() == NULL;
-  }
+  bool isEmpty() const { return findFirst() == NULL; }
 
   /* ------ ConcurrentMap API methods ------ */
 
@@ -1344,10 +1352,10 @@ public:
     for (;;) {
       Node* n = findLast();
       if (n == 0)
-	return std::make_pair((K)0,(V*)NULL);
+        return std::make_pair((K)0, (V*)NULL);
       SnapshotEntry e = n->createSnapshot();
       if (e.valid)
-	return std::make_pair((K)e.key, (V*)e.value);
+        return std::make_pair((K)e.key, (V*)e.value);
     }
   }
 
@@ -1395,42 +1403,41 @@ public:
       Index* d;
       Index* r;
       if ((r = q->right) != 0) {
-	if (r->indexesDeletedNode()) {
-	  q->unlink(r);
-	  q = head; // restart
-	}
-	else
-	  q = r;
+        if (r->indexesDeletedNode()) {
+          q->unlink(r);
+          q = head; // restart
+        } else
+          q = r;
       } else if ((d = q->down) != 0) {
-	q = d;
+        q = d;
       } else {
-	Node* b = q->node;
-	Node* n = b->next;
-	for (;;) {
-	  if (n == 0)
-	    return b->isBaseHeader() ? 0 : b;
-	  Node* f = n->next;            // inconsistent read
-	  if (n != b->next)
-	    break;
-	  void* v = n->value;
-	  if (v == 0) {                 // n is deleted
-	    n->helpDelete(b, f);
-	    break;
-	  }
-	  if (v == n || b->value == 0)   // b is deleted
-	    break;
-	  b = n;
-	  n = f;
-	}
-	q = head; // restart
+        Node* b = q->node;
+        Node* n = b->next;
+        for (;;) {
+          if (n == 0)
+            return b->isBaseHeader() ? 0 : b;
+          Node* f = n->next; // inconsistent read
+          if (n != b->next)
+            break;
+          void* v = n->value;
+          if (v == 0) { // n is deleted
+            n->helpDelete(b, f);
+            break;
+          }
+          if (v == n || b->value == 0) // b is deleted
+            break;
+          b = n;
+          n = f;
+        }
+        q = head; // restart
       }
     }
   }
-
 };
 
-template<class T, class Compare=std::less<T>, class Alloc=std::allocator<T> >
-class PairingHeap: private boost::noncopyable {
+template <class T, class Compare = std::less<T>,
+          class Alloc = std::allocator<T>>
+class PairingHeap : private boost::noncopyable {
   /*
    * Conceptually a pairing heap is an n-ary tree. We represent this using
    * a fixed number of fields:
@@ -1443,7 +1450,7 @@ class PairingHeap: private boost::noncopyable {
     Node* left;
     Node* next;
     Node* prev;
-    Node(T v) : value(v), left(NULL), next(NULL), prev(NULL) { }
+    Node(T v) : value(v), left(NULL), next(NULL), prev(NULL) {}
   };
 
 public:
@@ -1452,13 +1459,12 @@ public:
 private:
   Compare comp;
   const allocator_type& alloc;
-  std::vector<Node*, typename allocator_type::template rebind<Node*>::other> m_tree;
+  std::vector<Node*, typename allocator_type::template rebind<Node*>::other>
+      m_tree;
   Node* m_root;
   int m_capacity;
 
-  allocator_type get_alloc() {
-    return allocator_type(alloc);
-  }
+  allocator_type get_alloc() { return allocator_type(alloc); }
 
   /**
    * Merge two trees together, preserving heap property. Make the least tree the
@@ -1472,7 +1478,7 @@ private:
 
     Node *first = a, *second = b;
     if (comp(b->value, a->value)) {
-      first = b;
+      first  = b;
       second = a;
     }
 
@@ -1498,7 +1504,7 @@ private:
     for (Node* kid = root->left; kid; kid = kid->next) {
       m_tree.push_back(kid);
       kid->prev->next = NULL;
-      kid->prev = NULL;
+      kid->prev       = NULL;
     }
 
     Node* retval;
@@ -1508,16 +1514,16 @@ private:
       // Merge in pairs
       unsigned i = 0;
       for (; i + 1 < m_tree.size(); i += 2) {
-        m_tree[i] = merge(m_tree[i], m_tree[i+1]);
+        m_tree[i] = merge(m_tree[i], m_tree[i + 1]);
       }
 
       // Merge pairs together
       if (i != m_tree.size()) {
         // odd number of siblings and m_tree[i] is the last
-        m_tree[i-2] = merge(m_tree[i-2], m_tree[i]);
+        m_tree[i - 2] = merge(m_tree[i - 2], m_tree[i]);
       }
       for (unsigned j = (m_tree.size() >> 1) - 1; j > 0; --j) {
-        m_tree[2*(j-1)] = merge(m_tree[2*(j-1)], m_tree[2*j]);
+        m_tree[2 * (j - 1)] = merge(m_tree[2 * (j - 1)], m_tree[2 * j]);
       }
 
       retval = m_tree[0];
@@ -1558,8 +1564,8 @@ private:
 public:
   typedef Node* Handle;
 
-  PairingHeap(const allocator_type& a = allocator_type()):
-    alloc(a), m_tree(a), m_root(NULL) { }
+  PairingHeap(const allocator_type& a = allocator_type())
+      : alloc(a), m_tree(a), m_root(NULL) {}
 
   ~PairingHeap() {
     while (!empty()) {
@@ -1567,9 +1573,7 @@ public:
     }
   }
 
-  bool empty() const {
-    return m_root == NULL;
-  }
+  bool empty() const { return m_root == NULL; }
 
   Handle add(const T& x) {
     typename allocator_type::pointer node = get_alloc().allocate(1);
@@ -1583,9 +1587,7 @@ public:
     return node;
   }
 
-  T value(Handle node) {
-    return node->value;
-  }
+  T value(Handle node) { return node->value; }
 
   void decreaseKey(Handle node, const T& val) {
     assert(comp(val, node->value));
@@ -1612,14 +1614,14 @@ public:
     if (empty())
       return galois::optional<T>();
     T retval = m_root->value;
-    m_root = deleteMin(m_root);
+    m_root   = deleteMin(m_root);
 
     return galois::optional<T>(retval);
   }
 };
 
-template<class T,class Compare=std::less<T>,bool Concurrent=true>
-class FCPairingHeap: private boost::noncopyable {
+template <class T, class Compare = std::less<T>, bool Concurrent = true>
+class FCPairingHeap : private boost::noncopyable {
   struct Op {
     T item;
     galois::optional<T> retval;
@@ -1631,13 +1633,13 @@ class FCPairingHeap: private boost::noncopyable {
     std::atomic<Op*> req __attribute__((aligned(64)));
     std::atomic<Slot*> next;
     std::atomic<Slot*> prev;
-    Slot(): req(NULL), next(NULL), prev(NULL) { }
+    Slot() : req(NULL), next(NULL), prev(NULL) {}
   };
 
   galois::substrate::PerThreadStorage<Slot*> localSlots;
-  galois::substrate::PerThreadStorage<std::vector<Op*> > ops;
+  galois::substrate::PerThreadStorage<std::vector<Op*>> ops;
   galois::substrate::PaddedLock<Concurrent> lock;
-  PairingHeap<T,Compare> heap;
+  PairingHeap<T, Compare> heap;
   std::atomic<Slot*> slots;
   const int maxTries;
 
@@ -1645,7 +1647,7 @@ class FCPairingHeap: private boost::noncopyable {
     for (int tries = 0; tries < maxTries; ++tries) {
       //_GLIBCXX_READ_MEM_BARRIER;
       int changes = 0;
-      Slot* cur = slots.load(std::memory_order_acquire);
+      Slot* cur   = slots.load(std::memory_order_acquire);
       while (cur->next) {
         Op* op = cur->req;
         if (op && op->req) {
@@ -1672,7 +1674,8 @@ class FCPairingHeap: private boost::noncopyable {
     do {
       cur = slots;
       slot->next.store(cur, std::memory_order_relaxed);
-    //} while (!__sync_bool_compare_and_swap((uintptr_t*)&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
+      //} while (!__sync_bool_compare_and_swap((uintptr_t*)&slots,
+      //reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
     } while (!slots.compare_exchange_strong(cur, slot));
     cur->prev.store(slot, std::memory_order_release);
   }
@@ -1697,34 +1700,30 @@ class FCPairingHeap: private boost::noncopyable {
     return retval;
   }
 
-  void recycleOp(Op* op) {
-    ops.getLocal()->push_back(op);
-  }
+  void recycleOp(Op* op) { ops.getLocal()->push_back(op); }
 
   Op* makeAddReq(const T& value) {
-    Op* req = getOp();
-    req->item = value;
+    Op* req       = getOp();
+    req->item     = value;
     req->response = NULL;
-    req->req = true;
+    req->req      = true;
     return req;
   }
 
   Op* makePollReq() {
-    Op* response = getOp();
-    response->req = false;
+    Op* response       = getOp();
+    response->req      = false;
     response->response = NULL;
 
-    Op* req = getOp();
-    req->req = true;
+    Op* req       = getOp();
+    req->req      = true;
     req->response = response;
 
     return req;
   }
 
 public:
-  FCPairingHeap(): maxTries(1) {
-    slots = new Slot();
-  }
+  FCPairingHeap() : maxTries(1) { slots = new Slot(); }
 
   ~FCPairingHeap() {
     Slot* cur = slots;
@@ -1736,7 +1735,8 @@ public:
 
     for (unsigned int i = 0; i < ops.size(); ++i) {
       std::vector<Op*>& v = *ops.getRemote(i);
-      for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end(); ii != ee ; ++ii) {
+      for (typename std::vector<Op*>::iterator ii = v.begin(), ee = v.end();
+           ii != ee; ++ii) {
         delete *ii;
       }
     }
@@ -1744,13 +1744,13 @@ public:
 
   void add(T value) {
     Slot* mySlot = getMySlot();
-    //Slot* volatile& myNext = mySlot->next;
+    // Slot* volatile& myNext = mySlot->next;
     std::atomic<Op*>& myReq = mySlot->req;
-    Op* req = makeAddReq(value);
+    Op* req                 = makeAddReq(value);
     myReq.store(req, std::memory_order_release);
 
     do {
-      //if (!myNext) {
+      // if (!myNext) {
       //  addSlot(mySlot);
       //  assert(0 && "should never happen");
       //  abort();
@@ -1764,24 +1764,24 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  galois::substrate::asmPause();
+          galois::substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
         return;
       }
-    } while(1);
+    } while (1);
   }
 
   galois::optional<T> pollMin() {
     Slot* mySlot = getMySlot();
-    //Slot* volatile& myNext = mySlot->next;
+    // Slot* volatile& myNext = mySlot->next;
     std::atomic<Op*>& myReq = mySlot->req;
-    Op* req = makePollReq();
+    Op* req                 = makePollReq();
     myReq.store(req, std::memory_order_release);
 
     do {
-      //if (!myNext) {
+      // if (!myNext) {
       //  addSlot(mySlot);
       //  assert(0 && "should never happen");
       //  abort();
@@ -1791,22 +1791,24 @@ public:
         flatCombine();
         lock.unlock();
 
-	galois::optional<T> retval = myReq.load(std::memory_order_relaxed)->retval;
+        galois::optional<T> retval =
+            myReq.load(std::memory_order_relaxed)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  galois::substrate::asmPause();
+          galois::substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
-	galois::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;
+        galois::optional<T> retval =
+            myReq.load(std::memory_order_acquire)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
       }
-    } while(1);
+    } while (1);
   }
 
   bool empty() const {
@@ -1815,8 +1817,7 @@ public:
     lock.unlock();
     return retval;
   }
-
 };
 
-}
+} // namespace galois
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,13 +25,14 @@ galois::substrate::TerminationDetection::~TerminationDetection(void) {}
 
 static galois::substrate::TerminationDetection* TERM = nullptr;
 
-void galois::substrate::internal::setTermDetect(galois::substrate::TerminationDetection* t) {
+void galois::substrate::internal::setTermDetect(
+    galois::substrate::TerminationDetection* t) {
   GALOIS_ASSERT(!(TERM && t), "Double initialization of TerminationDetection");
   TERM = t;
 }
 
-
-galois::substrate::TerminationDetection& galois::substrate::getSystemTermination(unsigned activeThreads) {
+galois::substrate::TerminationDetection&
+galois::substrate::getSystemTermination(unsigned activeThreads) {
   TERM->init(activeThreads);
   return *TERM;
 }

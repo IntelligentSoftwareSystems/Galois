@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,25 +24,22 @@
 
 using namespace galois::runtime;
 
-//Anchor the class
-SystemHeap::SystemHeap() {
-  assert(AllocSize == runtime::pagePoolSize());
-}
+// Anchor the class
+SystemHeap::SystemHeap() { assert(AllocSize == runtime::pagePoolSize()); }
 
 SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE
 __thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 
-SizedHeapFactory::SizedHeap* 
+SizedHeapFactory::SizedHeap*
 SizedHeapFactory::getHeapForSize(const size_t size) {
   if (size == 0)
     return 0;
   return Base::getInstance()->getHeap(size);
 }
 
-SizedHeapFactory::SizedHeap* 
-SizedHeapFactory::getHeap(const size_t size) {
+SizedHeapFactory::SizedHeap* SizedHeapFactory::getHeap(const size_t size) {
   typedef SizedHeapFactory::HeapMap HeapMap;
 
   if (!localHeaps) {
@@ -65,13 +62,11 @@ SizedHeapFactory::getHeap(const size_t size) {
   }
 }
 
-
-Pow_2_BlockHeap::Pow_2_BlockHeap (void) throw (): heapTable () {
-  populateTable ();
+Pow_2_BlockHeap::Pow_2_BlockHeap(void) throw() : heapTable() {
+  populateTable();
 }
 
-
-SizedHeapFactory::SizedHeapFactory() :lock() {}
+SizedHeapFactory::SizedHeapFactory() : lock() {}
 
 SizedHeapFactory::~SizedHeapFactory() {
   // TODO destructor ordering problem: there may be pointers to deleted

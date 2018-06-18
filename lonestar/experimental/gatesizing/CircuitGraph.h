@@ -15,7 +15,7 @@ struct TimingPowerInfo {
 };
 
 struct Node {
-  VerilogPin *pin;
+  VerilogPin* pin;
   size_t precondition;
   bool isDummy, isPrimary, isOutput;
   float totalNetC, totalPinC;
@@ -23,7 +23,7 @@ struct Node {
 };
 
 struct Edge {
-  VerilogWire *wire;
+  VerilogWire* wire;
   float riseDelay, fallDelay;
 };
 
@@ -32,7 +32,7 @@ typedef Graph::GraphNode GNode;
 
 struct CircuitGraph {
   Graph g;
-  std::unordered_map<VerilogPin *, GNode> nodeMap;
+  std::unordered_map<VerilogPin*, GNode> nodeMap;
   GNode dummySrc, dummySink;
 
 public:

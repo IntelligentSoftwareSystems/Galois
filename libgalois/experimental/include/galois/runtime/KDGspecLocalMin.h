@@ -8,20 +8,24 @@
 namespace galois {
 namespace runtime {
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
-class KDGspecLocalMinExecutor: public IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> >{
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc,
+          typename ArgsTuple>
+class KDGspecLocalMinExecutor
+    : public IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc,
+                      ArgsTuple, TwoPhaseContext<T, Cmp>> {
 
 protected:
-
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using Base = IKDGbase <T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Base = IKDGbase<T, Cmp, NhFunc, internal::DummyExecFunc, OpFunc,
+                        ArgsTuple, Ctxt>;
 
-  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+  using WindowWL =
+      typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>,
+                                SortedRangeWindowWL<T, Cmp>>::type;
   using CtxtWL = typename Base::CtxtWL;
 
-  static const bool ENABLE_PROF = false;
+  static const bool ENABLE_PROF            = false;
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
-
 
   WindowWL winWL;
   PerThreadBag<T> pending;
@@ -31,116 +35,114 @@ protected:
   PerThreadBag<Ctxt*> retireList;
 
 public:
+  KDGspecLocalMinExecutor(const Cmp& cmp, const NhFunc& nhFunc,
+                          const OpFunc& opFunc, const ArgsTuple& argsTuple)
+      : Base(cmp, nhFunc, internal::DummyExecFunc(), opFunc, argsTuple),
+        winWL(cmp) {}
 
-  KDGspecLocalMinExecutor (
-      const Cmp& cmp, 
-      const NhFunc& nhFunc,
-      const OpFunc& opFunc,
-      const ArgsTuple& argsTuple)
-    :
-      Base (cmp, nhFunc, internal::DummyExecFunc (), opFunc, argsTuple),
-      winWL (cmp)
-  {}
+  ~KDGspecLocalMinExecutor() {
 
-  ~KDGspecLocalMinExecutor () {
-
-    dumpStats ();
+    dumpStats();
 
     if (Base::ENABLE_PARAMETER) {
-      ParaMeter::closeStatsFile ();
+      ParaMeter::closeStatsFile();
     }
   }
 
-
 protected:
-  void dumpStats (void) {
-    reportStat_Single (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks);
-    reportStat_Single (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds);
+  void dumpStats(void) {
+    reportStat_Single(Base::loopname, "efficiency %",
+                      double(100.0 * Base::totalCommits) / Base::totalTasks);
+    reportStat_Single(Base::loopname, "avg. parallelism",
+                      double(Base::totalCommits) / Base::rounds);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void abortCtxt (Ctxt* c) {
-    assert (c);
-    c->cancelIteration ();
-    c->reset ();
-    c->~Ctxt ();
-    Base::ctxtAlloc.deallocate (c, 1);
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void abortCtxt(Ctxt* c) {
+    assert(c);
+    c->cancelIteration();
+    c->reset();
+    c->~Ctxt();
+    Base::ctxtAlloc.deallocate(c, 1);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void retireCtxt (Ctxt* c) {
-    assert (c);
-    c->commitIteration ();
-    c->~Ctxt ();
-    Base::ctxtAlloc.deallocate (c, 1);
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void retireCtxt(Ctxt* c) {
+    assert(c);
+    c->commitIteration();
+    c->~Ctxt();
+    Base::ctxtAlloc.deallocate(c, 1);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood(void) {
 
-    galois::runtime::do_all_gen (makeLocalRange (pending),
-        [this] (const T& x) {
+    galois::runtime::do_all_gen(
+        makeLocalRange(pending),
+        [this](const T& x) {
+          Ctxt* c = Base::ctxtAlloc.allocate(1);
+          assert(c);
+          Base::ctxtAlloc.construct(c, x, Base::cmp);
 
-          Ctxt* c = Base::ctxtAlloc.allocate (1);
-          assert (c);
-          Base::ctxtAlloc.construct (c, x, Base::cmp);
+          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal();
+          uhand.reset();
+          runCatching(Base::nhFunc, c, uhand);
 
-          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
-          uhand.reset ();
-          runCatching (Base::nhFunc, c, uhand);
-
-          if (c->isSrc ()) {
-            scheduled.push (c);
+          if (c->isSrc()) {
+            scheduled.push(c);
           } else {
 
             if (ENABLE_PROF) {
               abortList.push(c);
             } else {
-              abortCtxt (c);
+              abortCtxt(c);
             }
           }
 
           Base::roundTasks += 1;
         },
-        std::make_tuple (
-          galois::loopname ("expandNhood"),
-          chunk_size<NhFunc::CHUNK_SIZE> ()));
+        std::make_tuple(galois::loopname("expandNhood"),
+                        chunk_size<NhFunc::CHUNK_SIZE>()));
 
-    pending.clear_all_parallel ();
+    pending.clear_all_parallel();
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator(void) {
 
     galois::optional<T> minElem;
 
     if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
+      if (Base::targetCommitRatio != 0.0 && !winWL.empty()) {
         minElem = *winWL.getMin();
       }
     }
 
+    galois::runtime::do_all_gen(
+        makeLocalRange(scheduled),
+        [this, &minElem](Ctxt* c) {
+          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal();
+          uhand.reset();
 
-    galois::runtime::do_all_gen (makeLocalRange (scheduled),
-        [this, &minElem] (Ctxt* c) {
-
-          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
-          uhand.reset ();
-
-          if (c->isSrc ()) {
-            static_assert (!Base::NEEDS_CUSTOM_LOCKING, "operator not allowed to abort");
-            Base::opFunc (c->getActive (), uhand);
+          if (c->isSrc()) {
+            static_assert(!Base::NEEDS_CUSTOM_LOCKING,
+                          "operator not allowed to abort");
+            Base::opFunc(c->getActive(), uhand);
             Base::roundCommits += 1;
 
-            if (Base::NEEDS_PUSH) { 
-              for (auto i = uhand.getPushBuffer ().begin ()
-                  , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
+            if (Base::NEEDS_PUSH) {
+              for (auto i    = uhand.getPushBuffer().begin(),
+                        endi = uhand.getPushBuffer().end();
+                   i != endi; ++i) {
 
-                if ((Base::targetCommitRatio == 0.0) || !minElem || !Base::cmp (*minElem, *i)) {
+                if ((Base::targetCommitRatio == 0.0) || !minElem ||
+                    !Base::cmp(*minElem, *i)) {
                   // if *i >= *minElem
-                  pending.push (*i);;
+                  pending.push(*i);
+                  ;
                 } else {
-                  winWL.push (*i);
-                } 
+                  winWL.push(*i);
+                }
               }
             } else {
-              assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
+              assert(uhand.getPushBuffer().begin() ==
+                     uhand.getPushBuffer().end());
             }
 
             if (ENABLE_PROF) {
@@ -154,26 +156,22 @@ protected:
             if (ENABLE_PROF) {
               abortList.push(c);
             } else {
-              abortCtxt (c);
+              abortCtxt(c);
             }
           }
         },
-        std::make_tuple (
-          galois::loopname("applyOperator"),
-          chunk_size<OpFunc::CHUNK_SIZE>()));
+        std::make_tuple(galois::loopname("applyOperator"),
+                        chunk_size<OpFunc::CHUNK_SIZE>()));
 
     scheduled.clear_all_parallel();
   }
 
   void serviceAborts(void) {
     if (ENABLE_PROF) {
-      galois::runtime::do_all_gen (makeLocalRange(abortList),
-          [this] (Ctxt* c) {
-            abortCtxt(c);
-          }, 
-          std::make_tuple (
-            galois::loopname ("serviceAborts"),
-            chunk_size<DEFAULT_CHUNK_SIZE> ()));
+      galois::runtime::do_all_gen(
+          makeLocalRange(abortList), [this](Ctxt* c) { abortCtxt(c); },
+          std::make_tuple(galois::loopname("serviceAborts"),
+                          chunk_size<DEFAULT_CHUNK_SIZE>()));
 
       abortList.clear_all_parallel();
     }
@@ -181,55 +179,48 @@ protected:
 
   void performCommits(void) {
     if (ENABLE_PROF) {
-      galois::runtime::do_all_gen (makeLocalRange(retireList),
-          [this] (Ctxt* c) {
-            retireCtxt(c);
-          }, 
-          std::make_tuple (
-            galois::loopname ("performCommits"),
-            chunk_size<DEFAULT_CHUNK_SIZE> ()));
+      galois::runtime::do_all_gen(
+          makeLocalRange(retireList), [this](Ctxt* c) { retireCtxt(c); },
+          std::make_tuple(galois::loopname("performCommits"),
+                          chunk_size<DEFAULT_CHUNK_SIZE>()));
 
       retireList.clear_all_parallel();
     }
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound() {
 
     if (Base::ENABLE_PARAMETER) {
-      ParaMeter::StepStats s (Base::rounds, Base::roundCommits.reduceRO (), Base::roundTasks.reduceRO ());
-      s.dump (ParaMeter::getStatsFile (), Base::loopname);
+      ParaMeter::StepStats s(Base::rounds, Base::roundCommits.reduceRO(),
+                             Base::roundTasks.reduceRO());
+      s.dump(ParaMeter::getStatsFile(), Base::loopname);
     }
 
-    Base::endRound ();
+    Base::endRound();
   }
 
 public:
-
   template <typename R>
-  void push_initial (const R& range) {
+  void push_initial(const R& range) {
 
     if (Base::targetCommitRatio == 0.0) {
 
-      galois::runtime::do_all_gen (range,
-          [this] (const T& x) {
-            pending.push (x);
-          }, 
-          std::make_tuple (
-            galois::loopname ("init-fill"),
-            chunk_size<DEFAULT_CHUNK_SIZE> ()));
-
+      galois::runtime::do_all_gen(
+          range, [this](const T& x) { pending.push(x); },
+          std::make_tuple(galois::loopname("init-fill"),
+                          chunk_size<DEFAULT_CHUNK_SIZE>()));
 
     } else {
-      winWL.initfill (range);
+      winWL.initfill(range);
     }
   }
 
-  void execute () {
+  void execute() {
 
     while (true) {
 
       Base::t_beginRound.start();
-      Base::refillRound (winWL, pending);
+      Base::refillRound(winWL, pending);
       Base::t_beginRound.stop();
 
       if (pending.empty_all()) {
@@ -237,11 +228,11 @@ public:
       }
 
       Base::t_expandNhood.start();
-      expandNhood ();
+      expandNhood();
       Base::t_expandNhood.stop();
 
       Base::t_applyOperator.start();
-      applyOperator ();
+      applyOperator();
       Base::t_applyOperator.stop();
 
       Base::t_serviceAborts.start();
@@ -252,62 +243,67 @@ public:
       performCommits();
       Base::t_performCommits.stop();
 
-      endRound ();
-
+      endRound();
     }
-
   }
 };
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_kdg_spec_local_min_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
-    const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc,
+          typename _ArgsTuple>
+void for_each_ordered_kdg_spec_local_min_impl(const R& range, const Cmp& cmp,
+                                              const NhFunc& nhFunc,
+                                              const OpFunc& opFunc,
+                                              const _ArgsTuple& argsTuple) {
 
-  auto argsT = std::tuple_cat (argsTuple, 
-      get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
-        std::make_tuple (default_loopname {}, enable_parameter<false> {})));
-  using ArgsT = decltype (argsT);
+  auto argsT = std::tuple_cat(
+      argsTuple,
+      get_default_trait_values(
+          argsTuple, std::make_tuple(loopname_tag{}, enable_parameter_tag{}),
+          std::make_tuple(default_loopname{}, enable_parameter<false>{})));
+  using ArgsT = decltype(argsT);
 
   using T = typename R::value_type;
-  
 
   using Exec = KDGspecLocalMinExecutor<T, Cmp, NhFunc, OpFunc, ArgsT>;
-  
-  Exec e (cmp, nhFunc, opFunc, argsT);
+
+  Exec e(cmp, nhFunc, opFunc, argsT);
 
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    substrate::getThreadPool().burnPower(galois::getActiveThreads ());
+    substrate::getThreadPool().burnPower(galois::getActiveThreads());
   }
 
-  e.push_initial (range);
-  e.execute ();
+  e.push_initial(range);
+  e.execute();
 
   if (wakeupThreadPool) {
-    substrate::getThreadPool().beKind ();
+    substrate::getThreadPool().beKind();
   }
-
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_kdg_spec_local_min (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
-    const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc,
+          typename _ArgsTuple>
+void for_each_ordered_kdg_spec_local_min(const R& range, const Cmp& cmp,
+                                         const NhFunc& nhFunc,
+                                         const OpFunc& opFunc,
+                                         const _ArgsTuple& argsTuple) {
 
-  auto tplParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<true> ()));
-  auto tplNoParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<false> ()));
+  auto tplParam =
+      std::tuple_cat(argsTuple, std::make_tuple(enable_parameter<true>()));
+  auto tplNoParam =
+      std::tuple_cat(argsTuple, std::make_tuple(enable_parameter<false>()));
 
   if (useParaMeterOpt) {
-    for_each_ordered_kdg_spec_local_min_impl (range, cmp, nhFunc, opFunc, tplParam);
+    for_each_ordered_kdg_spec_local_min_impl(range, cmp, nhFunc, opFunc,
+                                             tplParam);
   } else {
-    for_each_ordered_kdg_spec_local_min_impl (range, cmp, nhFunc, opFunc, tplNoParam);
+    for_each_ordered_kdg_spec_local_min_impl(range, cmp, nhFunc, opFunc,
+                                             tplNoParam);
   }
 }
 
-} // close Runtime
-} // close Galois
-
-
+} // namespace runtime
+} // namespace galois
 
 #endif // GALOIS_RUNTIME_KDG_SPEC_LOCAL_MIN_H

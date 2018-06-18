@@ -33,40 +33,40 @@ using namespace std;
 using namespace benchIO;
 
 // The serial spanning tree used for checking against
-pair<int*,int> st(edgeArray EA);
+pair<int*, int> st(edgeArray EA);
 
 // This needs to be augmented with a proper check
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
 
-  commandLine P(argc,argv,"<inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* iFile = fnames.first;
-  char* oFile = fnames.second;
+  commandLine P(argc, argv, "<inFile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* iFile               = fnames.first;
+  char* oFile               = fnames.second;
 
-  edgeArray In = readEdgeArrayFromFile(iFile);
+  edgeArray In  = readEdgeArrayFromFile(iFile);
   _seq<int> Out = readIntArrayFromFile(oFile);
 
-  //run serial ST
-  pair<int*,int> serialST = st(In);
-  if (Out.n != serialST.second){
-    cout << "Wrong edge count: ST has " << serialST.second << " edges but algorithm returned " << Out.n << " edges\n";
+  // run serial ST
+  pair<int*, int> serialST = st(In);
+  if (Out.n != serialST.second) {
+    cout << "Wrong edge count: ST has " << serialST.second
+         << " edges but algorithm returned " << Out.n << " edges\n";
     return (1);
   }
 
-  //check if ST has cycles by running serial ST on it
-  //and seeing if result changes
-  bool* flags = newA(bool,In.nonZeros);
-  cilk_for(int i=0;i<In.nonZeros;i++) flags[i] = 0;
-  cilk_for(int i=0;i<Out.n;i++)
-    flags[Out.A[i]] = 1;
-  edge* E = newA(edge,In.nonZeros);
-  int m = sequence::pack(In.E,E,flags,In.nonZeros);
-  edgeArray EA(E,In.numRows,In.numCols,m); 
+  // check if ST has cycles by running serial ST on it
+  // and seeing if result changes
+  bool* flags                                         = newA(bool, In.nonZeros);
+  cilk_for(int i = 0; i < In.nonZeros; i++) flags[i]  = 0;
+  cilk_for(int i = 0; i < Out.n; i++) flags[Out.A[i]] = 1;
+  edge* E                                             = newA(edge, In.nonZeros);
+  int m = sequence::pack(In.E, E, flags, In.nonZeros);
+  edgeArray EA(E, In.numRows, In.numCols, m);
 
-  pair<int*,int> check = st(EA);
-  if (m != check.second){
+  pair<int*, int> check = st(EA);
+  if (m != check.second) {
     cout << "Result is not a spanning tree " << endl;
     return (1);
   }

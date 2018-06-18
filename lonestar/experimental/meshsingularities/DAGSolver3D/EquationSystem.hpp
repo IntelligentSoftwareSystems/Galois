@@ -7,45 +7,41 @@
  *      Author: kj
  */
 
-
 #ifndef EQUATIONSYSTEM_H_
 #define EQUATIONSYSTEM_H_
 
 #include <cstdio>
 #include <cstdlib>
 
-enum SolverMode {
-    OLD,
-    LU,
-    CHOLESKY
-};
+enum SolverMode { OLD, LU, CHOLESKY };
 
 class EquationSystem {
-  private:
-        // needed because of implementation of swapRows
-        double *origPtr;
-  public:
-	// this variables _should_ be public
-	// Productions will use them directly
-        SolverMode mode = OLD;
+private:
+  // needed because of implementation of swapRows
+  double* origPtr;
 
-        unsigned long n;
-        double ** matrix;
-        double *rhs;
+public:
+  // this variables _should_ be public
+  // Productions will use them directly
+  SolverMode mode = OLD;
 
-        EquationSystem() {} ;
-        EquationSystem(unsigned long n, SolverMode mode=OLD);
-        virtual ~EquationSystem();
-        void allocate();
+  unsigned long n;
+  double** matrix;
+  double* rhs;
 
-        void swapRows(const int i, const int j);
-        void swapCols(const int i, const int j);
+  EquationSystem(){};
+  EquationSystem(unsigned long n, SolverMode mode = OLD);
+  virtual ~EquationSystem();
+  void allocate();
 
-        int eliminate(const int rows);
-        void backwardSubstitute(const int startingRow);
+  void swapRows(const int i, const int j);
+  void swapCols(const int i, const int j);
 
-        void checkRow(int row_nr, int* values, int values_cnt);
-        void print() const;
+  int eliminate(const int rows);
+  void backwardSubstitute(const int startingRow);
+
+  void checkRow(int row_nr, int* values, int values_cnt);
+  void print() const;
 };
 
 #endif /* EQUATIONSYSTEM_H_ */

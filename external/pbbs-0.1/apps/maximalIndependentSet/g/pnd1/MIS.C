@@ -30,90 +30,95 @@
 struct TLD {
   std::deque<int> abortedQ;
   int aborted;
-  TLD(): aborted(0) { }
+  TLD() : aborted(0) {}
 };
 
-template<class S>
+template <class S>
 struct GFn1 {
   S step;
   TLD* tld;
-  GFn1(S _step, TLD* _tld): step(_step), tld(_tld) { }
+  GFn1(S _step, TLD* _tld) : step(_step), tld(_tld) {}
   void operator()(int i) {
-        unsigned tid = Exp::getTID();
-        TLD& t = tld[tid];
-        int cur = i;
-        while (true) {
+    unsigned tid = Exp::getTID();
+    TLD& t       = tld[tid];
+    int cur      = i;
+    while (true) {
 #ifdef DUMB
-          if (cur >= numberKeep) I[cur] = numberDone + cur;
+      if (cur >= numberKeep)
+        I[cur] = numberDone + cur;
 #endif
-          bool success = step.commit(cur);
-          //bool success = state[i].commit(I[i]);
-          if (!success) {
-            t.abortedQ.push_back(cur);
-            t.aborted++;
-          }
+      bool success = step.commit(cur);
+      // bool success = state[i].commit(I[i]);
+      if (!success) {
+        t.abortedQ.push_back(cur);
+        t.aborted++;
+      }
 #ifdef DUMB
-          keep[cur] = !success;
+      keep[cur] = !success;
 #endif
-          if (!success)
-            break;
-          if (!t.abortedQ.empty()) {
-            cur = t.abortedQ.front();
-            t.abortedQ.pop_front();
-          } else {
-            break;
-          }
-        }
+      if (!success)
+        break;
+      if (!t.abortedQ.empty()) {
+        cur = t.abortedQ.front();
+        t.abortedQ.pop_front();
+      } else {
+        break;
+      }
+    }
   }
 };
 
 //#define DUMB
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, bool hasState=0, int maxTries=-1) {
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 0,
+                     int maxTries = -1) {
   unsigned numThreads = Exp::getNumThreads();
-  
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (int) numThreads;
+
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (int)numThreads;
 #ifdef DUMB
-  maxRoundSize = (e-s)/granularity+1;
-  vindex *I = newA(vindex,maxRoundSize);
-  vindex *Ihold = newA(vindex,maxRoundSize);
-  bool *keep = newA(bool,maxRoundSize);
-  S *state;
+  maxRoundSize  = (e - s) / granularity + 1;
+  vindex* I     = newA(vindex, maxRoundSize);
+  vindex* Ihold = newA(vindex, maxRoundSize);
+  bool* keep    = newA(bool, maxRoundSize);
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 #endif
-  TLD *tld = new TLD[maxRoundSize];
+  TLD* tld = new TLD[maxRoundSize];
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
-  int failed = 0;
+  int failed     = 0;
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-//      abort();
+      //      cerr << "speculativeLoop: too many iterations, increase maxTries
+      //      parameter\n"; abort();
     }
-    //int size = min(maxRoundSize, e - numberDone);
+    // int size = min(maxRoundSize, e - numberDone);
     int size = e - numberDone;
 
     if (!hasState) {
-//      parallel_for (int i =0; i < size; i++) {
+      //      parallel_for (int i =0; i < size; i++) {
       GFn1<S> gfn1(step, tld);
-      parallel_doall_obj(int, i, 0, size, gfn1)  {
+      parallel_doall_obj(int, i, 0, size, gfn1) {
         unsigned tid = Exp::getTID();
-        TLD& t = tld[tid];
-        int cur = i;
+        TLD& t       = tld[tid];
+        int cur      = i;
         while (true) {
 #ifdef DUMB
-          if (cur >= numberKeep) I[cur] = numberDone + cur;
+          if (cur >= numberKeep)
+            I[cur] = numberDone + cur;
 #endif
           bool success = step.commit(cur);
-          //bool success = state[i].commit(I[i]);
+          // bool success = state[i].commit(I[i]);
           if (!success) {
             t.abortedQ.push_back(cur);
             t.aborted++;
@@ -130,12 +135,13 @@ void speculative_for(S step, int s, int e, int granularity, bool hasState=0, int
             break;
           }
         }
-      } parallel_doall_end
+      }
+      parallel_doall_end
 
-      for (int i = 0; i < numThreads; ++i) {
+          for (int i = 0; i < numThreads; ++i) {
         TLD& t = tld[i];
         for (int j = 0; j < t.abortedQ.size(); ++j) {
-          int cur = t.abortedQ[j];
+          int cur      = t.abortedQ[j];
           bool success = step.commit(cur);
           if (!success)
             abort();
@@ -159,9 +165,12 @@ void speculative_for(S step, int s, int e, int granularity, bool hasState=0, int
     numberDone += size - numberKeep;
   }
 #ifdef DUMB
-  free(I); free(Ihold); free(keep); free(state);
+  free(I);
+  free(Ihold);
+  free(keep);
+  free(state);
 #endif
-  delete [] tld;
+  delete[] tld;
   cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
@@ -176,9 +185,12 @@ using namespace std;
 //   Flags = 1 indicates chosen
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
-  char *Flags;  vertex*G; int *Marks;
+  char* Flags;
+  vertex* G;
+  int* Marks;
   pthread_mutex_t* locks;
-  MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l) : Flags(_F), G(_G), Marks(_M), locks(_l) {}
+  MISstep(char* _F, vertex* _G, int* _M, pthread_mutex_t* _l)
+      : Flags(_F), G(_G), Marks(_M), locks(_l) {}
 
   bool acquire(int id, int i) {
     if (Marks[i] == id)
@@ -189,7 +201,7 @@ struct MISstep {
     int v = Marks[i];
     if (v == -1) {
       Marks[i] = id;
-      retval = true;
+      retval   = true;
     } else {
       retval = false;
     }
@@ -238,7 +250,7 @@ struct MISstep {
     return;
   }
 
-  bool commit(int i) { 
+  bool commit(int i) {
     bool retval = doit(i);
     resetState(i);
     return retval;
@@ -246,20 +258,20 @@ struct MISstep {
 };
 
 char* maximalIndependentSet(graph GS) {
-  int n = GS.n;
-  vertex* G = GS.V;
-  int* Marks = newArray(n, -1);
-  char* Flags = newArray(n,  (char) 0);
+  int n                  = GS.n;
+  vertex* G              = GS.V;
+  int* Marks             = newArray(n, -1);
+  char* Flags            = newArray(n, (char)0);
   pthread_mutex_t* locks = new pthread_mutex_t[n];
   for (int i = 0; i < n; ++i)
     pthread_mutex_init(&locks[i], NULL);
   MISstep mis(Flags, G, Marks, locks);
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds <= 0 ? 25 : numRounds;
+  numRounds     = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds);
   for (int i = 0; i < n; ++i)
     pthread_mutex_destroy(&locks[i]);
-  delete [] locks;
+  delete[] locks;
   free(Marks);
   return Flags;
 }

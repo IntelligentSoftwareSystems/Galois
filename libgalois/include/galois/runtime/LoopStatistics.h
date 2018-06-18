@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -22,8 +22,8 @@
 namespace galois {
 namespace runtime {
 
-// Usually instantiated per thread 
-template<bool Enabled>
+// Usually instantiated per thread
+template <bool Enabled>
 class LoopStatistics {
 
 protected:
@@ -33,11 +33,8 @@ protected:
   const char* loopname;
 
 public:
-  explicit LoopStatistics(const char* ln) :
-    m_iterations(0), 
-    m_pushes(0),
-    m_conflicts(0), 
-    loopname(ln) { }
+  explicit LoopStatistics(const char* ln)
+      : m_iterations(0), m_pushes(0), m_conflicts(0), loopname(ln) {}
 
   ~LoopStatistics() {
     reportStat_Tsum(loopname, "Iterations", m_iterations);
@@ -46,22 +43,15 @@ public:
     reportStat_Tsum(loopname, "Conflicts", m_conflicts);
   }
 
-
   size_t iterations(void) const { return m_iterations; }
   size_t pushes(void) const { return m_pushes; }
   size_t conflicts(void) const { return m_conflicts; }
 
-  inline void inc_pushes(size_t v=1) {
-    m_pushes += v;
-  }
+  inline void inc_pushes(size_t v = 1) { m_pushes += v; }
 
-  inline void inc_iterations() {
-    ++m_iterations;
-  }
+  inline void inc_iterations() { ++m_iterations; }
 
-  inline void inc_conflicts() {
-    ++m_conflicts;
-  }
+  inline void inc_conflicts() { ++m_conflicts; }
 };
 
 template <>
@@ -73,11 +63,11 @@ public:
   size_t pushes(void) const { return 0; }
   size_t conflicts(void) const { return 0; }
 
-  inline void inc_iterations() const { }
-  inline void inc_pushes(size_t v=0) const { }
-  inline void inc_conflicts() const { }
+  inline void inc_iterations() const {}
+  inline void inc_pushes(size_t v = 0) const {}
+  inline void inc_conflicts() const {}
 };
 
-}
-}
+} // namespace runtime
+} // namespace galois
 #endif

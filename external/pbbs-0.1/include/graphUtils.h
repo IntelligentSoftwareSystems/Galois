@@ -38,7 +38,7 @@ edgeArray edgesFromGraph(graph G);
 edgeArray remDuplicates(edgeArray A);
 
 // adds edges so all edges appear in both directions
-edgeArray makeSymmetric(edgeArray A); 
+edgeArray makeSymmetric(edgeArray A);
 
 graph graphFromEdges(edgeArray EA, bool makeSym);
 

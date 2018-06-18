@@ -21,18 +21,16 @@
 namespace llvm {
 
 BumpPtrAllocator::BumpPtrAllocator(size_t size, size_t threshold,
-                                   SlabAllocator &allocator)
+                                   SlabAllocator& allocator)
     : SlabSize(size), SizeThreshold(threshold), Allocator(allocator),
-      CurSlab(0), BytesAllocated(0) { }
+      CurSlab(0), BytesAllocated(0) {}
 
-BumpPtrAllocator::~BumpPtrAllocator() {
-  DeallocateSlabs(CurSlab);
-}
+BumpPtrAllocator::~BumpPtrAllocator() { DeallocateSlabs(CurSlab); }
 
 /// AlignPtr - Align Ptr to Alignment bytes, rounding up.  Alignment should
 /// be a power of two.  This method rounds up, so AlignPtr(7, 4) == 8 and
 /// AlignPtr(8, 4) == 8.
-char *BumpPtrAllocator::AlignPtr(char *Ptr, size_t Alignment) {
+char* BumpPtrAllocator::AlignPtr(char* Ptr, size_t Alignment) {
   assert(Alignment && (Alignment & (Alignment - 1)) == 0 &&
          "Alignment is not a power of two!");
 
@@ -50,23 +48,23 @@ void BumpPtrAllocator::StartNewSlab() {
   if (BytesAllocated >= SlabSize * 128)
     SlabSize *= 2;
 
-  MemSlab *NewSlab = Allocator.Allocate(SlabSize);
+  MemSlab* NewSlab = Allocator.Allocate(SlabSize);
   NewSlab->NextPtr = CurSlab;
-  CurSlab = NewSlab;
-  CurPtr = (char*)(CurSlab + 1);
-  End = ((char*)CurSlab) + CurSlab->Size;
+  CurSlab          = NewSlab;
+  CurPtr           = (char*)(CurSlab + 1);
+  End              = ((char*)CurSlab) + CurSlab->Size;
 }
 
 /// DeallocateSlabs - Deallocate all memory slabs after and including this
 /// one.
-void BumpPtrAllocator::DeallocateSlabs(MemSlab *Slab) {
+void BumpPtrAllocator::DeallocateSlabs(MemSlab* Slab) {
   while (Slab) {
-    MemSlab *NextSlab = Slab->NextPtr;
+    MemSlab* NextSlab = Slab->NextPtr;
 #ifndef NDEBUG
     // Poison the memory so stale pointers crash sooner.  Note we must
     // preserve the Size and NextPtr fields at the beginning.
-    //sys::Memory::setRangeWritable(Slab + 1, Slab->Size - sizeof(MemSlab));
-    //memset(Slab + 1, 0xCD, Slab->Size - sizeof(MemSlab));
+    // sys::Memory::setRangeWritable(Slab + 1, Slab->Size - sizeof(MemSlab));
+    // memset(Slab + 1, 0xCD, Slab->Size - sizeof(MemSlab));
 #endif
     Allocator.Deallocate(Slab);
     Slab = NextSlab;
@@ -80,13 +78,13 @@ void BumpPtrAllocator::Reset() {
     return;
   DeallocateSlabs(CurSlab->NextPtr);
   CurSlab->NextPtr = 0;
-  CurPtr = (char*)(CurSlab + 1);
-  End = ((char*)CurSlab) + CurSlab->Size;
+  CurPtr           = (char*)(CurSlab + 1);
+  End              = ((char*)CurSlab) + CurSlab->Size;
 }
 
 /// Allocate - Allocate space at the specified alignment.
 ///
-void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
+void* BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
   if (!CurSlab) // Start a new slab if we haven't allocated one already.
     StartNewSlab();
 
@@ -94,10 +92,11 @@ void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
   BytesAllocated += Size;
 
   // 0-byte alignment means 1-byte alignment.
-  if (Alignment == 0) Alignment = 1;
+  if (Alignment == 0)
+    Alignment = 1;
 
   // Allocate the aligned space, going forwards from CurPtr.
-  char *Ptr = AlignPtr(CurPtr, Alignment);
+  char* Ptr = AlignPtr(CurPtr, Alignment);
 
   // Check if we can hold it.
   if (Ptr + Size <= End) {
@@ -108,7 +107,7 @@ void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
   // If Size is really big, allocate a separate slab for it.
   size_t PaddedSize = Size + sizeof(MemSlab) + Alignment - 1;
   if (PaddedSize > SizeThreshold) {
-    MemSlab *NewSlab = Allocator.Allocate(PaddedSize);
+    MemSlab* NewSlab = Allocator.Allocate(PaddedSize);
 
     // Put the new slab after the current slab, since we are not allocating
     // into it.
@@ -122,7 +121,7 @@ void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
 
   // Otherwise, start a new slab and try again.
   StartNewSlab();
-  Ptr = AlignPtr(CurPtr, Alignment);
+  Ptr    = AlignPtr(CurPtr, Alignment);
   CurPtr = Ptr + Size;
   assert(CurPtr <= End && "Unable to allocate memory!");
   return Ptr;
@@ -130,7 +129,7 @@ void *BumpPtrAllocator::Allocate(size_t Size, size_t Alignment) {
 
 unsigned BumpPtrAllocator::GetNumSlabs() const {
   unsigned NumSlabs = 0;
-  for (MemSlab *Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
+  for (MemSlab* Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
     ++NumSlabs;
   }
   return NumSlabs;
@@ -138,51 +137,50 @@ unsigned BumpPtrAllocator::GetNumSlabs() const {
 
 size_t BumpPtrAllocator::getTotalMemory() const {
   size_t TotalMemory = 0;
-  for (MemSlab *Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
+  for (MemSlab* Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
     TotalMemory += Slab->Size;
   }
   return TotalMemory;
 }
-  
+
 void BumpPtrAllocator::PrintStats() const {
-  unsigned NumSlabs = 0;
+  unsigned NumSlabs  = 0;
   size_t TotalMemory = 0;
-  for (MemSlab *Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
+  for (MemSlab* Slab = CurSlab; Slab != 0; Slab = Slab->NextPtr) {
     TotalMemory += Slab->Size;
     ++NumSlabs;
   }
 
   std::cerr << "\nNumber of memory regions: " << NumSlabs << '\n'
-         << "Bytes used: " << BytesAllocated << '\n'
-         << "Bytes allocated: " << TotalMemory << '\n'
-         << "Bytes wasted: " << (TotalMemory - BytesAllocated)
-         << " (includes alignment, etc)\n";
+            << "Bytes used: " << BytesAllocated << '\n'
+            << "Bytes allocated: " << TotalMemory << '\n'
+            << "Bytes wasted: " << (TotalMemory - BytesAllocated)
+            << " (includes alignment, etc)\n";
 }
 
 MallocSlabAllocator BumpPtrAllocator::DefaultSlabAllocator =
-  MallocSlabAllocator();
+    MallocSlabAllocator();
 
-SlabAllocator::~SlabAllocator() { }
+SlabAllocator::~SlabAllocator() {}
 
-MallocSlabAllocator::~MallocSlabAllocator() { }
+MallocSlabAllocator::~MallocSlabAllocator() {}
 
-MemSlab *MallocSlabAllocator::Allocate(size_t Size) {
-  MemSlab *Slab = (MemSlab*)Allocator.Allocate(Size, 0);
-  Slab->Size = Size;
+MemSlab* MallocSlabAllocator::Allocate(size_t Size) {
+  MemSlab* Slab = (MemSlab*)Allocator.Allocate(Size, 0);
+  Slab->Size    = Size;
   Slab->NextPtr = 0;
   return Slab;
 }
 
-void MallocSlabAllocator::Deallocate(MemSlab *Slab) {
+void MallocSlabAllocator::Deallocate(MemSlab* Slab) {
   Allocator.Deallocate(Slab);
 }
 
-void PrintRecyclerStats(size_t Size,
-                        size_t Align,
-                        size_t FreeListSize) {
+void PrintRecyclerStats(size_t Size, size_t Align, size_t FreeListSize) {
   std::cerr << "Recycler element size: " << Size << '\n'
-         << "Recycler element alignment: " << Align << '\n'
-         << "Number of elements free for recycling: " << FreeListSize << '\n';
+            << "Recycler element alignment: " << Align << '\n'
+            << "Number of elements free for recycling: " << FreeListSize
+            << '\n';
 }
 
-}
+} // namespace llvm

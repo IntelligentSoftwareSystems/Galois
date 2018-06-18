@@ -8,7 +8,7 @@
 #ifndef GDIST_EXP_APPS_HPR_CL_CLWRAPPER_H_
 #define GDIST_EXP_APPS_HPR_CL_CLWRAPPER_H_
 
-extern "C"{
+extern "C" {
 #include <CL/cl.h>
 }
 #include "CLEnv.h"

@@ -12,14 +12,13 @@
 // define fixed size integer types
 #ifdef _MSC_VER
 // Windows
-typedef unsigned __int8  uint8_t;
+typedef unsigned __int8 uint8_t;
 typedef unsigned __int32 uint32_t;
 typedef unsigned __int64 uint64_t;
 #else
 // GCC
 #include <stdint.h>
 #endif
-
 
 /// compute SHA256 hash
 /** Usage:
@@ -54,7 +53,7 @@ public:
   /// return latest hash as 64 hex characters
   std::string getHash();
   /// return latest hash as bytes
-  void        getHash(unsigned char buffer[HashBytes]);
+  void getHash(unsigned char buffer[HashBytes]);
 
   /// restart
   void reset();
@@ -68,9 +67,9 @@ private:
   /// size of processed data in bytes
   uint64_t m_numBytes;
   /// valid bytes in m_buffer
-  size_t   m_bufferSize;
+  size_t m_bufferSize;
   /// bytes not processed yet
-  uint8_t  m_buffer[BlockSize];
+  uint8_t m_buffer[BlockSize];
 
   enum { HashValues = HashBytes / 4 };
   /// hash, stored as integers

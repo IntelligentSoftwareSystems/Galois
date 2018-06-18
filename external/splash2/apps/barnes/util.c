@@ -24,10 +24,10 @@
 #define MASK (0x7FFFFFFF)
 #define TWOTO31 2147483648.0
 
-local int A = 1;
-local int B = 0;
+local int A     = 1;
+local int B     = 0;
 local int randx = 1;
-local int lastrand;   /* the last random number */
+local int lastrand; /* the last random number */
 
 /*
  * XRAND: generate floating-point random number.
@@ -35,35 +35,32 @@ local int lastrand;   /* the last random number */
 
 double prand();
 
-double xrand(xl, xh)
-  double xl, xh;		/* lower, upper bounds on number */
+double xrand(xl, xh) double xl, xh; /* lower, upper bounds on number */
 {
-   long random ();
-   double x;
+  long random();
+  double x;
 
-   return (xl + (xh - xl) * prand());
+  return (xl + (xh - xl) * prand());
 }
 
-void pranset(int seed)
-{
-   int proc;
-  
-   A = 1;
-   B = 0;
-   randx = (A*seed+B) & MASK;
-   A = (MULT * A) & MASK;
-   B = (MULT*B + ADD) & MASK;
+void pranset(int seed) {
+  int proc;
+
+  A     = 1;
+  B     = 0;
+  randx = (A * seed + B) & MASK;
+  A     = (MULT * A) & MASK;
+  B     = (MULT * B + ADD) & MASK;
 }
 
-double 
-prand()
+double prand()
 /*
-	Return a random double in [0, 1.0)
+    Return a random double in [0, 1.0)
 */
 {
-   lastrand = randx;
-   randx = (A*randx+B) & MASK;
-   return((double)lastrand/TWOTO31);
+  lastrand = randx;
+  randx    = (A * randx + B) & MASK;
+  return ((double)lastrand / TWOTO31);
 }
 
 /*
@@ -73,28 +70,24 @@ prand()
 #include <sys/types.h>
 #include <sys/times.h>
 
+double cputime() {
+  struct tms buffer;
 
-double cputime()
-{
-   struct tms buffer;
-
-   if (times(&buffer) == -1)
-      error("times() call failed\n");
-   return (buffer.tms_utime / (60.0 * HZ));
+  if (times(&buffer) == -1)
+    error("times() call failed\n");
+  return (buffer.tms_utime / (60.0 * HZ));
 }
 
 /*
  * ERROR: scream and die quickly.
  */
 
-error(msg, a1, a2, a3, a4)
-  char *msg, *a1, *a2, *a3, *a4;
+error(msg, a1, a2, a3, a4) char* msg, *a1, *a2, *a3, *a4;
 {
-   extern int errno;
+  extern int errno;
 
-   fprintf(stderr, msg, a1, a2, a3, a4);
-   if (errno != 0)
-      perror("Error");
-   exit(0);
+  fprintf(stderr, msg, a1, a2, a3, a4);
+  if (errno != 0)
+    perror("Error");
+  exit(0);
 }
-

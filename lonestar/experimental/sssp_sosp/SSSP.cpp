@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -102,9 +102,9 @@ struct not_consistent {
 };
 
 template <typename Graph>
-struct not_consistent<
-    Graph,
-    typename std::enable_if<!galois::graphs::is_segmented<Graph>::value>::type> {
+struct not_consistent<Graph,
+                      typename std::enable_if<
+                          !galois::graphs::is_segmented<Graph>::value>::type> {
   Graph& g;
   not_consistent(Graph& g) : g(g) {}
 
@@ -115,7 +115,7 @@ struct not_consistent<
 
     for (auto ii : g.edges(n)) {
       Dist ddist = g.getData(g.getEdgeDst(ii)).dist;
-      Dist w = g.getEdgeData(ii);
+      Dist w     = g.getEdgeData(ii);
       if (ddist > dist + w) {
         // std::cout << ddist << " " << dist + w << " " << n << " " <<
         // g.getEdgeDst(ii) << "\n"; // XXX
@@ -161,8 +161,9 @@ bool verify(Graph& graph, typename Graph::GraphNode source) {
   size_t notVisited =
       pstl::count_if(graph.begin(), graph.end(), not_visited<Graph>(graph));
   if (notVisited) {
-    std::cerr << notVisited << " unvisited nodes; this is an error if the "
-                               "graph is strongly connected\n";
+    std::cerr << notVisited
+              << " unvisited nodes; this is an error if the "
+                 "graph is strongly connected\n";
   }
 
   bool consistent = pstl::find_if(graph.begin(), graph.end(),
@@ -197,7 +198,7 @@ void initialize(Algo& algo, typename Algo::Graph& graph,
   typename Algo::Graph::iterator it = graph.begin();
   std::advance(it, startNode);
   source = *it;
-  it = graph.begin();
+  it     = graph.begin();
   std::advance(it, reportNode);
   report = *it;
 }
@@ -308,7 +309,8 @@ struct AsyncAlgo {
       pusher.push(UpdateRequest(dst, newDist));
     } else {
       while (newDist < oldDist) {
-        if (ddata.dist.compare_exchange_weak(oldDist, newDist, std::memory_order_acq_rel)) {
+        if (ddata.dist.compare_exchange_weak(oldDist, newDist,
+                                             std::memory_order_acq_rel)) {
           if (trackWork && oldDist != DIST_INFINITY)
             *BadWork += 1;
           pusher.push(UpdateRequest(dst, newDist));
@@ -321,7 +323,7 @@ struct AsyncAlgo {
   void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
     const galois::MethodFlag flag =
         UseCas ? galois::MethodFlag::UNPROTECTED : galois::MethodFlag::WRITE;
-    Dist sdist          = graph.getData(req.n, flag).dist;
+    Dist sdist = graph.getData(req.n, flag).dist;
 
     if (req.w != sdist) {
       if (trackWork)
@@ -362,7 +364,8 @@ struct AsyncAlgo {
     using namespace galois::worklists;
     typedef PerSocketChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk,
-                                   10, false> OBIM;
+                                   10, false>
+        OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout
@@ -472,7 +475,8 @@ struct AsyncAlgoPP {
     using namespace galois::worklists;
     typedef ChunkFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk,
-                                   10, false> OBIM;
+                                   10, false>
+        OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout
@@ -494,8 +498,8 @@ namespace DEPRECATED {
 template <>
 struct does_not_need_aborts<AsyncAlgo<true>::Process>
     : public boost::true_type {};
-}
-}
+} // namespace DEPRECATED
+} // namespace galois
 
 static_assert(
     galois::DEPRECATED::does_not_need_aborts<AsyncAlgo<true>::Process>::value,
@@ -566,7 +570,7 @@ int main(int argc, char** argv) {
   case Algo::asyncPP:
     run<AsyncAlgoPP>();
     break;
-    //Fixme: ligra still asumes gcc sync builtins
+    // Fixme: ligra still asumes gcc sync builtins
     //  case Algo::ligra:
     //    run<LigraAlgo<false>>();
     //    break;

@@ -18,11 +18,12 @@ struct Updater {
 struct Reducer {
   void operator()(EdgeMap& lhs, EdgeMap& rhs) {
     // merge rhs to lhs elementwise
-    for (auto& rn: rhs) {
-      std::copy(rn.second.begin(), rn.second.end(), std::back_inserter(lhs[rn.first]));
+    for (auto& rn : rhs) {
+      std::copy(rn.second.begin(), rn.second.end(),
+                std::back_inserter(lhs[rn.first]));
     }
     // remove duplicates
-    for (auto& ln: lhs) {
+    for (auto& ln : lhs) {
       ln.second.sort();
       ln.second.unique();
     }
@@ -34,7 +35,7 @@ struct LocateCoarsenEdges {
   Graph& fg;
   KeyAltTy key;
 
-  LocateCoarsenEdges(Graph& g, KeyAltTy k): fg(g), key(k) {}
+  LocateCoarsenEdges(Graph& g, KeyAltTy k) : fg(g), key(k) {}
 
   void operator()(GNode n) {
     auto& attr = fg.getData(n).attr;
@@ -46,8 +47,8 @@ struct LocateCoarsenEdges {
     }
 
     auto& v = it->second;
-    for (auto e: fg.edges(n)) {
-      auto dst = fg.getEdgeDst(e);
+    for (auto e : fg.edges(n)) {
+      auto dst      = fg.getEdgeDst(e);
       auto& dstAttr = fg.getData(dst).attr;
 
       // no such key for dst
@@ -75,7 +76,7 @@ struct LocateCoarsenEdges {
  * Coarsen fg to cg by key
  * Nodes with no such key will have no representative in the coarsened graph
  */
-void coarsen(Graph *fg, Graph *cg, const KeyAltTy key) {
+void coarsen(Graph* fg, Graph* cg, const KeyAltTy key) {
   // collect nodes and edges in the coarsened graph
   LocateCoarsenEdges lce{*fg, key};
   EdgeMap edges = lce.collect();
@@ -84,7 +85,7 @@ void coarsen(Graph *fg, Graph *cg, const KeyAltTy key) {
 
   // create coarsened nodes
   NodeMap nodes;
-  for (auto& n: edges) {
+  for (auto& n : edges) {
     GNode cn = createNode(cg);
     addNode(cg, cn);
     setNodeAttr(cg, cn, key, const_cast<ValAltTy>(n.first.c_str()));
@@ -92,10 +93,9 @@ void coarsen(Graph *fg, Graph *cg, const KeyAltTy key) {
   }
 
   // create coarsened edges
-  for (auto& n: edges) {
-    for (auto& e: n.second) {
+  for (auto& n : edges) {
+    for (auto& e : n.second) {
       addEdge(cg, nodes[n.first], nodes[e]);
     }
   }
 }
-

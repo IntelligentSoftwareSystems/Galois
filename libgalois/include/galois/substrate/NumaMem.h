@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,11 +32,11 @@ struct largeFreer {
   size_t bytes;
   void operator()(void* ptr) const;
 };
-}//namespace internal
+} // namespace internal
 
 typedef std::unique_ptr<void, internal::largeFreer> LAptr;
 
-LAptr largeMallocLocal(size_t bytes); // fault in locally
+LAptr largeMallocLocal(size_t bytes);    // fault in locally
 LAptr largeMallocFloating(size_t bytes); // leave numa mapping undefined
 // fault in interleaved mapping
 LAptr largeMallocInterleaved(size_t bytes, unsigned numThreads);
@@ -44,12 +44,11 @@ LAptr largeMallocInterleaved(size_t bytes, unsigned numThreads);
 LAptr largeMallocBlocked(size_t bytes, unsigned numThreads);
 
 // fault in specified regions for each thread (threadRanges)
-template<typename RangeArrayTy>
+template <typename RangeArrayTy>
 LAptr largeMallocSpecified(size_t bytes, uint32_t numThreads,
                            RangeArrayTy& threadRanges, size_t elementSize);
-
 
 } // namespace substrate
 } // namespace galois
 
-#endif //GALOIS_SUBSTRATE_NUMAMEM
+#endif // GALOIS_SUBSTRATE_NUMAMEM

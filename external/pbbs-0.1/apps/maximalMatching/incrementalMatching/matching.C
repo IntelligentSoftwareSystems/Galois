@@ -30,15 +30,16 @@
 using namespace std;
 
 struct matchStep {
-  edge *E;  
-  int *R;  
-  bool *matched;
+  edge* E;
+  int* R;
+  bool* matched;
   matchStep(edge* _E, int* _R, bool* m) : E(_E), R(_R), matched(m) {}
 
   bool reserve(int i) {
     int u = E[i].u;
     int v = E[i].v;
-    if (matched[u] || matched[v] || (u == v)) return 0;
+    if (matched[u] || matched[v] || (u == v))
+      return 0;
     reserveLoc(R[u], i);
     reserveLoc(R[v], i);
     return 1;
@@ -50,25 +51,29 @@ struct matchStep {
     if (R[v] == i) {
       R[v] = INT_MAX;
       if (R[u] == i) {
-	matched[u] = matched[v] = 1;
-	return 1;
-      } 
-    } else if (R[u] == i) R[u] = INT_MAX;
+        matched[u] = matched[v] = 1;
+        return 1;
+      }
+    } else if (R[u] == i)
+      R[u] = INT_MAX;
     return 0;
   }
 };
 
-struct notMax { bool operator() (int i) {return i < INT_MAX;}};
+struct notMax {
+  bool operator()(int i) { return i < INT_MAX; }
+};
 
-pair<int*,int> maximalMatching(edgeArray G) {
-  int n = G.numRows;
-  int m = G.nonZeros;
-  int *R = newArray(n, INT_MAX);
-  bool *matched = newArray(n, (bool) 0);
+pair<int*, int> maximalMatching(edgeArray G) {
+  int n         = G.numRows;
+  int m         = G.nonZeros;
+  int* R        = newArray(n, INT_MAX);
+  bool* matched = newArray(n, (bool)0);
   matchStep mStep(G.E, R, matched);
   speculative_for(mStep, 0, m, 50, 0);
   _seq<int> matchingIdx = sequence::filter(R, n, notMax());
-  free(R); free(matched);
+  free(R);
+  free(matched);
   cout << "number of matches = " << matchingIdx.n << endl;
-  return pair<int*,int>(matchingIdx.A, matchingIdx.n);
-}  
+  return pair<int*, int>(matchingIdx.A, matchingIdx.n);
+}

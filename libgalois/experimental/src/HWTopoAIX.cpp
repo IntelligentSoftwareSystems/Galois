@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,7 +39,8 @@ namespace {
 static bool bindToProcessor(int proc) {
   tid_t tid = thread_self();
   if (bindprocessor(BINDTHREAD, tid, proc)) {
-    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
+    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno),
+          ")");
     return false;
   }
   return true;
@@ -71,14 +72,15 @@ struct Policy {
    * levels[3] = [ 0, 1, 2, 0, 1, 2, 3 ]  "Socket siblings"
    * </pre>
    *
-   * The sibling levels are just an alternate indexing to simplify mapping operations.
+   * The sibling levels are just an alternate indexing to simplify mapping
+   * operations.
    */
   typedef std::vector<std::vector<int>> Levels;
   Levels levels;
 
   struct SortedByThread {
     Levels& l;
-    SortedByThread(Levels& l): l(l) { }
+    SortedByThread(Levels& l) : l(l) {}
 
     bool operator()(int a, int b) {
       // Only use SMT threads after all the cores have been used
@@ -93,7 +95,7 @@ struct Policy {
   void parse() {
     int maxProcs = rs_getinfo(NULL, R_MAXPROCS, 0);
     for (int i = 0; i < 5; ++i)
-      levels.emplace_back(maxProcs, -1);   
+      levels.emplace_back(maxProcs, -1);
 
     // SMP level
     int sdl;
@@ -129,26 +131,26 @@ struct Policy {
     }
   }
 
-  //! Fill in level vector, returns the number of entries set 
+  //! Fill in level vector, returns the number of entries set
   int populate(int sdl, std::vector<int>& l, bool siblingsHaveDifferentNames) {
     // Get resources for current logical partition
     rsethandle_t rset = rs_alloc(RS_PARTITION);
-    rsethandle_t rad = rs_alloc(RS_EMPTY);
+    rsethandle_t rad  = rs_alloc(RS_EMPTY);
 
     int sumNumProcs = 0;
-    int numRads = rs_numrads(rset, sdl, 0);
+    int numRads     = rs_numrads(rset, sdl, 0);
     for (int rindex = 0; rindex < numRads; ++rindex) {
       if (rs_getrad(rset, rad, sdl, rindex, 0))
         GALOIS_SYS_DIE("rs_getrad() failed");
       sumNumProcs += rs_getinfo(rad, R_NUMPROCS, 0);
       int maxCpus = rs_getinfo(rad, R_MAXPROCS, 0);
-      int id = 0;
+      int id      = 0;
       for (int i = 0; i < maxCpus; ++i) {
         if (rs_op(RS_TESTRESOURCE, rad, NULL, R_PROCS, i)) {
           if (siblingsHaveDifferentNames)
             l[i] = id++;
           else
-	    l[i] = rindex;
+            l[i] = rindex;
         }
       }
     }
@@ -162,12 +164,12 @@ struct Policy {
     int id = 0;
     for (unsigned i = 0; i < levels[0].size(); ++i) {
       if (levels[0][i] >= 0) {
-        levels[l][i] = id++;
-        levels[l+1][i] = 0;
+        levels[l][i]     = id++;
+        levels[l + 1][i] = 0;
       }
     }
   }
- 
+
   void generate() {
     if (numCores == -1) {
       // Assume each thread is a core
@@ -183,30 +185,33 @@ struct Policy {
     // Remove unmapped processors
     for (unsigned i = 0; i < levels.size(); ++i) {
       auto isMapped = [](int x) { return x >= 0; };
-      auto it = std::stable_partition(levels[i].begin(), levels[i].end(), isMapped);
+      auto it =
+          std::stable_partition(levels[i].begin(), levels[i].end(), isMapped);
       levels[i].resize(std::distance(levels[i].begin(), it));
     }
-    
+
     // Generate mappings
     std::vector<int> lthreads(numThreads);
-    std::copy(boost::counting_iterator<int>(0), boost::counting_iterator<int>(numThreads), lthreads.begin());
+    std::copy(boost::counting_iterator<int>(0),
+              boost::counting_iterator<int>(numThreads), lthreads.begin());
     std::sort(lthreads.begin(), lthreads.end(), SortedByThread(levels));
 
     virtmap.resize(numThreads);
     leaders.resize(numSockets);
     sockets.resize(numThreads);
     for (int gid = 0; gid < numThreads; ++gid) {
-      int lid = lthreads[gid];
+      int lid      = lthreads[gid];
       virtmap[gid] = levels[0][lid];
       sockets[gid] = levels[4][lid];
-      if (levels[3][lid] == 0) 
+      if (levels[3][lid] == 0)
         leaders[sockets[gid]] = gid;
     }
     maxSocket.resize(numThreads);
-    std::partial_sum(sockets.begin(), sockets.end(), maxSocket.begin(), [](int a, int b) { return std::max(a, b); });
+    std::partial_sum(sockets.begin(), sockets.end(), maxSocket.begin(),
+                     [](int a, int b) { return std::max(a, b); });
   }
 
-  Policy(): numThreads(-1), numCores(-1), numSockets(-1) {
+  Policy() : numThreads(-1), numCores(-1), numSockets(-1) {
     parse();
     generate();
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
@@ -227,12 +232,9 @@ struct Policy {
     gPrint("Cores: ", numCores, "\n");
     gPrint("Sockets: ", numSockets, "\n");
 
-    for (int i = 0; i < (int) virtmap.size(); ++i) {
-      gPrint(
-          "T ", i, 
-          " P ", sockets[i],
-          " Tr ", virtmap[i], 
-          " L? ", (i == leaders[sockets[i]] ? 1 : 0));
+    for (int i = 0; i < (int)virtmap.size(); ++i) {
+      gPrint("T ", i, " P ", sockets[i], " Tr ", virtmap[i], " L? ",
+             (i == leaders[sockets[i]] ? 1 : 0));
       if (i >= numCores)
         gPrint(" HT");
       gPrint("\n");
@@ -245,7 +247,7 @@ static Policy& getPolicy() {
   return A;
 }
 
-} //namespace
+} // namespace
 
 bool galois::runtime::LL::bindThreadToProcessor(int id) {
   assert(size_t(id) < getPolicy().virtmap.size());
@@ -257,17 +259,11 @@ unsigned galois::runtime::LL::getProcessorForThread(int id) {
   return getPolicy().virtmap[id];
 }
 
-unsigned galois::runtime::LL::getMaxThreads() {
-  return getPolicy().numThreads;
-}
+unsigned galois::runtime::LL::getMaxThreads() { return getPolicy().numThreads; }
 
-unsigned galois::runtime::LL::getMaxCores() {
-  return getPolicy().numCores;
-}
+unsigned galois::runtime::LL::getMaxCores() { return getPolicy().numCores; }
 
-unsigned galois::runtime::LL::getMaxSockets() {
-  return getPolicy().numSockets;
-}
+unsigned galois::runtime::LL::getMaxSockets() { return getPolicy().numSockets; }
 
 unsigned galois::runtime::LL::getSocketForThread(int id) {
   assert(size_t(id) < getPolicy().sockets.size());

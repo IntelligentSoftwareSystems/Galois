@@ -24,7 +24,7 @@
 #include <sys/time.h>
 
 #ifdef __linux__
-typedef uint32_t u32;  // needed on RedHat for some reason
+typedef uint32_t u32; // needed on RedHat for some reason
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -34,42 +34,46 @@ static inline int futex(volatile int* uaddr, int op, int val,
 }
 #endif
 
-#define ROUNDUP_MOD_N(x,n) \
-    (((x) % (n) != 0) ? ((x) / (n)) * (n) + (n) : (x))
+#define ROUNDUP_MOD_N(x, n) (((x) % (n) != 0) ? ((x) / (n)) * (n) + (n) : (x))
 
-#define ARRAY_SIZE(a) \
-    (sizeof(a) / sizeof((a)[0]))
+#define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
 
 // Generate a compile-time error if 'e' is false.
 #define dmp_static_assert(e) ((void)sizeof(char[1 - 2 * !(e)]))
 
 // Verbose DMP asserts
 #ifndef NDEBUG
-#define DMP_ASSERT(e) \
-  do { \
-    if (!(e)) DMPprintScheduler(); \
-    assert(e); \
-  } while(0)
+#define DMP_ASSERT(e)                                                          \
+  do {                                                                         \
+    if (!(e))                                                                  \
+      DMPprintScheduler();                                                     \
+    assert(e);                                                                 \
+  } while (0)
 #else
 #define DMP_ASSERT(e)
 #endif
 
 // Cacheline size in bytes.
-// This is a #define since LLVM doesn't consider 'const' variables 'const' exprs.
-#define CACHELINE_SIZE      64
+// This is a #define since LLVM doesn't consider 'const' variables 'const'
+// exprs.
+#define CACHELINE_SIZE 64
 
 // Alignment
-#define CACHELINE_ALIGNED           __attribute__((aligned(CACHELINE_SIZE)))
-#define CACHELINE_PADDED(type,var)  union CACHELINE_ALIGNED { type var; char __pad_##var[CACHELINE_SIZE]; }
+#define CACHELINE_ALIGNED __attribute__((aligned(CACHELINE_SIZE)))
+#define CACHELINE_PADDED(type, var)                                            \
+  union CACHELINE_ALIGNED {                                                    \
+    type var;                                                                  \
+    char __pad_##var[CACHELINE_SIZE];                                          \
+  }
 
 // Branch prediction!
-#define likely(x)   __builtin_expect(!!(x), 1)
+#define likely(x) __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 // Inlining notes:
 // -- Fast-path checks are done in DMPcommit/load/store
 // -- Slow-path checks are done in a second non-inlined function
-#define FORCE_INLINE  __attribute__((always_inline))
+#define FORCE_INLINE __attribute__((always_inline))
 
 //--------------------------------------------------------------
 // C API
@@ -79,13 +83,12 @@ extern "C" {
 
 #include "debug.h"
 #include "dmp-common.h"
-
 }
 
-extern int   (*real_posix_memalign)(void**, size_t, size_t);
+extern int (*real_posix_memalign)(void**, size_t, size_t);
 extern void* (*real_malloc)(size_t);
 extern void* (*real_realloc)(void*, size_t);
-extern void  (*real_free)(void*);
+extern void (*real_free)(void*);
 void* alloc_cache_aligned(size_t size);
 
 //--------------------------------------------------------------
@@ -95,14 +98,14 @@ void* alloc_cache_aligned(size_t size);
 // Volatile here prevents register allocation of variables of this type.
 // Appropriate memory barriers and atomic ops (of the "__sync" variety)
 // are required for true atomic access, of course.
-typedef volatile bool     atomic_bool_t;
-typedef volatile int32_t  atomic_int_t;
+typedef volatile bool atomic_bool_t;
+typedef volatile int32_t atomic_int_t;
 typedef volatile uint32_t atomic_uint_t;
 typedef volatile uint64_t atomic_uint64_t;
 
 // Volatile ops
-#define VOLATILE_LOAD(x)      (*(volatile __typeof__(x)*)&(x))
-#define VOLATILE_STORE(x, y)  ((*(volatile __typeof__(x)*)&(x)) = (y))
+#define VOLATILE_LOAD(x) (*(volatile __typeof__(x)*)&(x))
+#define VOLATILE_STORE(x, y) ((*(volatile __typeof__(x)*)&(x)) = (y))
 
 // Spinlocks
 // Any integer location can be treaded as a spinlock.
@@ -118,14 +121,13 @@ typedef volatile uint64_t atomic_uint64_t;
 //   * Previous loads will be visible before this operation
 //   * Loads may be reordered to before this operation
 
-#define DMP_SPINLOCK_TRYLOCK(l) \
-    (__sync_lock_test_and_set((l), 1) == 0)
+#define DMP_SPINLOCK_TRYLOCK(l) (__sync_lock_test_and_set((l), 1) == 0)
 
-#define DMP_SPINLOCK_LOCK(l) \
-    do {} while (!DMP_SPINLOCK_TRYLOCK(l))
+#define DMP_SPINLOCK_LOCK(l)                                                   \
+  do {                                                                         \
+  } while (!DMP_SPINLOCK_TRYLOCK(l))
 
-#define DMP_SPINLOCK_UNLOCK(l) \
-    (__sync_lock_release(l))
+#define DMP_SPINLOCK_UNLOCK(l) (__sync_lock_release(l))
 
 //--------------------------------------------------------------
 // OS-specific
@@ -144,14 +146,19 @@ typedef volatile uint64_t atomic_uint64_t;
 #endif
 
 // busy-wait
-#define YIELD() \
-    { if (DMPnumRunnableThreads > DMP_NUM_PHYSICAL_PROCESSORS) { YIELD_CPU(); } }
+#define YIELD()                                                                \
+  {                                                                            \
+    if (DMPnumRunnableThreads > DMP_NUM_PHYSICAL_PROCESSORS) {                 \
+      YIELD_CPU();                                                             \
+    }                                                                          \
+  }
 
 // futex-wait
 // The futex syscall can return EINTR when interrupted by a signal.
 #ifdef __linux__
-#define WAIT_ON_FUTEX(f,v) \
-    do {} while (futex((f), FUTEX_WAIT, (v), NULL, NULL, 0) == EINTR)
+#define WAIT_ON_FUTEX(f, v)                                                    \
+  do {                                                                         \
+  } while (futex((f), FUTEX_WAIT, (v), NULL, NULL, 0) == EINTR)
 #endif
 
 //--------------------------------------------------------------
@@ -170,20 +177,21 @@ typedef volatile uint64_t atomic_uint64_t;
 //             -> WaitForSerial -> RunSerial -> WaitForOwnership
 
 enum DmpThreadState {
-  Sleeping = 0,       // thread is not running
-  JustWokeUp,         // thread just woke up
+  Sleeping = 0, // thread is not running
+  JustWokeUp,   // thread just woke up
 #ifdef DMP_ENABLE_OWNERSHIP_MODE
-  WaitForOwnership,   // waiting for O-mode
-  RunOwnership,       // running in O-mode
+  WaitForOwnership, // waiting for O-mode
+  RunOwnership,     // running in O-mode
 #endif
 #ifdef DMP_ENABLE_BUFFERED_MODE
-  WaitForBuffered,    // waiting for B-mode
-  RunBuffered,        // running in B-mode
-  WaitForCommit,      // waiting for commit of B-mode
-  RunCommit,          // executing commit of B-mode
+  WaitForBuffered, // waiting for B-mode
+  RunBuffered,     // running in B-mode
+  WaitForCommit,   // waiting for commit of B-mode
+  RunCommit,       // executing commit of B-mode
 #endif
   WaitForSerial,      // waiting for S-mode (possibly with fast-handoff)
-  WaitForSerialToken, // waiting for S-mode token (always just after WaitForSerial)
+  WaitForSerialToken, // waiting for S-mode token (always just after
+                      // WaitForSerial)
   RunSerial,          // running in S-mode
 };
 
@@ -201,13 +209,13 @@ struct DmpThreadInfo {
   // Current "frequently accessed" size: 64 bytes
   // (Update this comment when adding a "frequently accessed" field.)
   //
-  int threadID;          // index into DMPthreadInfos[]
-  DmpThreadState state;  // current run state
-  int schedulingChunk;   // remaining instructions in the current quantum
+  int threadID;         // index into DMPthreadInfos[]
+  DmpThreadState state; // current run state
+  int schedulingChunk;  // remaining instructions in the current quantum
 
   // A circular queue of runnable threads.
   // This queue can only be modified when no other threads are running.
-  int nextRunnableID;    // copied from "nextRunnable->threadID"
+  int nextRunnableID; // copied from "nextRunnable->threadID"
   DmpThreadInfo* nextRunnable;
   DmpThreadInfo* prevRunnable;
 
@@ -231,7 +239,7 @@ struct DmpThreadInfo {
 
 #ifdef DMP_ENABLE_EMPTY_SERIAL_MODE
   atomic_bool_t otherThreadWaitingForSerial;
-  DmpThreadInfo *notifyWhenWaitingForSerial;
+  DmpThreadInfo* notifyWhenWaitingForSerial;
 #endif
 
 #ifdef DMP_ENABLE_FAST_HANDOFF
@@ -244,12 +252,13 @@ struct DmpThreadInfo {
 
 #ifdef DMP_ENABLE_DATA_GROUPING
   // A stack of resources we hold.
-  DMPresource* innerResource;  // the innermost resource we hold, if any
-  DMPresource* nextResource;   // copied from "innerResource->outer" for fast MOT checks
+  DMPresource* innerResource; // the innermost resource we hold, if any
+  DMPresource*
+      nextResource; // copied from "innerResource->outer" for fast MOT checks
 #endif
 
 #ifdef DMP_ENABLE_TINY_SERIAL_MODE
-  int resourceNesting;         // depth of resource nesting
+  int resourceNesting; // depth of resource nesting
 #endif
 
   // ABOVE HERE ARE FREQUENTLY ACCESSED FIELDS.
@@ -281,23 +290,23 @@ struct DmpThreadInfo {
   // At the end of each round, these are collated to produce the per-round
   // work imbalance numbers.
   struct Timing {
-    uint64_t inround;    // net TSC gain in this round
-    double max, min;     // max/min %-of-round spent in this state
-    double mean;         // mean %-of-round spent in this state
+    uint64_t inround; // net TSC gain in this round
+    double max, min;  // max/min %-of-round spent in this state
+    double mean;      // mean %-of-round spent in this state
     double m2;
     // Only used on thread 0
-    double spread_mean;  // mean spread in units of avg-time-in-round
+    double spread_mean; // mean spread in units of avg-time-in-round
     double spread_m2;
   };
 
-  Timing timing[RunSerial+1];
+  Timing timing[RunSerial + 1];
   uint64_t timing_last_tsc;
   uint64_t timing_total_quanta;
 #endif
 
 #ifdef DMP_ENABLE_INSTRUMENT_WORK
   // Maintain total work for this thread, per 'DmpThreadState'.
-  uint64_t work[RunSerial+1];
+  uint64_t work[RunSerial + 1];
   uint64_t work_this_quantum;
   uint64_t toserial_total;
   uint64_t toserial_excall;
@@ -314,9 +323,9 @@ struct DmpThreadInfo {
   uint64_t wb_totalhashchains;
   uint64_t wb_totalhashbuckets;
   uint64_t wb_totalcommitslocked;
-  uint64_t wb_synctotal;         // HB_SYNC only
-  uint64_t wb_syncwithoutwait;   // HB_SYNC only
-#endif  // buffered
+  uint64_t wb_synctotal;       // HB_SYNC only
+  uint64_t wb_syncwithoutwait; // HB_SYNC only
+#endif                         // buffered
 #endif
 };
 
@@ -333,15 +342,15 @@ extern int DMP_NUM_PHYSICAL_PROCESSORS;
 //       16-bit, but all other code works fine with 32-bit IDs.
 #define MaxThreads 1024
 extern DmpThreadInfo* DMPthreadInfos[MaxThreads];
-extern atomic_int_t   DMPthreadInfosSize;
+extern atomic_int_t DMPthreadInfosSize;
 
 // The current number of live threads (always <= DMPthreadInfosSize).
 extern atomic_int_t DMPnumLiveThreads;
 
 // The runnable queue.
-extern DmpThreadInfo* DMPfirstRunnable;       // head
-extern atomic_int_t   DMPfirstRunnableID;
-extern atomic_int_t   DMPnumRunnableThreads;  // size
+extern DmpThreadInfo* DMPfirstRunnable; // head
+extern atomic_int_t DMPfirstRunnableID;
+extern atomic_int_t DMPnumRunnableThreads; // size
 
 // Current quantum round number
 extern atomic_uint64_t DMProundNumber;
@@ -358,15 +367,12 @@ typedef CACHELINE_PADDED(int32_t, val) cacheline_padded_int32_t;
 extern cacheline_padded_int32_t DMPglobalSchedulingChunks[MaxThreads];
 #endif
 
-
 //--------------------------------------------------------------
 // Internal API
 //--------------------------------------------------------------
 
 void DMP_setState(DmpThreadInfo* dmp, const DmpThreadState s);
-inline void DMPMAP_setState(const DmpThreadState s) {
-  DMP_setState(DMPMAP, s);
-}
+inline void DMPMAP_setState(const DmpThreadState s) { DMP_setState(DMPMAP, s); }
 
 // library-thread.cpp
 DmpThreadInfo* DMPthread_find(pthread_t thread);
@@ -423,17 +429,16 @@ extern void DMPinstrument_resource_acquire(DMPresource* r, int oldowner);
 #endif
 
 // Temporarily rename these so we can wrap them with instrumentation.
-#if defined(DMP_ENABLE_INSTRUMENT_ACQUIRES) ||\
-    defined(DMP_ENABLE_INSTRUMENT_WORK) ||\
-    defined(DMP_ENABLE_QUANTUM_TIMING)
-#define DMP_resetRound  __DMP_resetRound__
-#define DMP_setState    __DMP_setState__
+#if defined(DMP_ENABLE_INSTRUMENT_ACQUIRES) ||                                 \
+    defined(DMP_ENABLE_INSTRUMENT_WORK) || defined(DMP_ENABLE_QUANTUM_TIMING)
+#define DMP_resetRound __DMP_resetRound__
+#define DMP_setState __DMP_setState__
 #endif
 
 static FORCE_INLINE uint64_t rdtsc() {
   uint32_t hi, lo;
-  __asm__ __volatile__ ("rdtsc" : "=a"(lo), "=d"(hi));
-  return ((uint64_t)lo) | (((uint64_t)hi)<<32);
+  __asm__ __volatile__("rdtsc" : "=a"(lo), "=d"(hi));
+  return ((uint64_t)lo) | (((uint64_t)hi) << 32);
 }
 
 //--------------------------------------------------------------
@@ -451,7 +456,7 @@ inline void DMP_setState(DmpThreadInfo* dmp, const DmpThreadState s) {
 //--------------------------------------------------------------
 
 #if 0 //|| defined(DMP_ENABLE_DEBUGGING)
-#undef  FORCE_INLINE
+#undef FORCE_INLINE
 #define FORCE_INLINE __attribute__((noinline))
 #define inline __attribute__((noinline))
 #endif

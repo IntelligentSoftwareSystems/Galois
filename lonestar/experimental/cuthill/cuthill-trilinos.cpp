@@ -13,8 +13,11 @@
 #include <iostream>
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> startNode("startnode", cll::desc("Node to start reordering from."), cll::init(0));
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<int> startNode("startnode",
+                               cll::desc("Node to start reordering from."),
+                               cll::init(0));
 
 int main(int argc, char** argv) {
   galois::StatManager statManager;
@@ -33,13 +36,17 @@ int main(int argc, char** argv) {
   rowMap.MyGlobalElements(&globalElements[0]);
   std::vector<int> nonzeros(rowMap.NumMyElements());
   for (size_t i = 0; i < nonzeros.size(); ++i) {
-    nonzeros[i] = std::distance(fileGraph.edge_begin(globalElements[i]), fileGraph.edge_end(globalElements[i]));
+    nonzeros[i] = std::distance(fileGraph.edge_begin(globalElements[i]),
+                                fileGraph.edge_end(globalElements[i]));
   }
   Epetra_CrsMatrix A(Epetra_DataAccess::Copy, rowMap, &nonzeros[0]);
   for (size_t i = 0; i < nonzeros.size(); ++i) {
     double value = 1.0;
-    int src = globalElements[i];
-    for (galois::graphs::FileGraph::edge_iterator ii = fileGraph.edge_begin(src), ei = fileGraph.edge_end(src); ii != ei; ++ii) {
+    int src      = globalElements[i];
+    for (galois::graphs::FileGraph::edge_iterator
+             ii = fileGraph.edge_begin(src),
+             ei = fileGraph.edge_end(src);
+         ii != ei; ++ii) {
       int dst = fileGraph.getEdgeDst(ii);
       A.InsertGlobalValues(globalElements[i], 1, &value, &dst);
     }
@@ -59,7 +66,7 @@ int main(int argc, char** argv) {
 
   Ttotal.stop();
 
-  //std::cout << reordering;
+  // std::cout << reordering;
 
   return 0;
 }

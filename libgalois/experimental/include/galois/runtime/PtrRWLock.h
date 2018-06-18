@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,7 +31,7 @@ namespace galois {
 namespace runtime {
 namespace LL {
 
-/// PtrLock is a spinlock and a pointer. 
+/// PtrLock is a spinlock and a pointer.
 /// This wraps a pointer and
 /// uses the low order bit for the lock flag
 /// Copying a lock is unsynchronized (relaxed ordering)
@@ -46,29 +46,32 @@ class PtrRWLockBase {
 
 protected:
   constexpr PtrRWLockBase() : _lock(0) {}
-  //relaxed order for copy
-  PtrRWLockBase(const PtrRWLockBase& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
+  // relaxed order for copy
+  PtrRWLockBase(const PtrRWLockBase& p)
+      : _lock(p._lock.load(std::memory_order_relaxed)) {}
 
-  uintptr_t _getValue() const {
-    return _lock;
-  }
+  uintptr_t _getValue() const { return _lock; }
 
   void _setValue(uintptr_t val) {
     val |= 1;
     uintptr_t t;
     do {
       t = _lock;
-      if (t & 2) return;
-      if (!(t & 1)) return;
-    } while (!_lock.compare_exchange_weak(t, val, std::memory_order_acq_rel, std::memory_order_relaxed));
+      if (t & 2)
+        return;
+      if (!(t & 1))
+        return;
+    } while (!_lock.compare_exchange_weak(t, val, std::memory_order_acq_rel,
+                                          std::memory_order_relaxed));
   }
 
 public:
-
   PtrRWLockBase& operator=(const PtrRWLockBase& p) {
-    if (&p == this) return *this;
-    //relaxed order for initialization
-    _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    if (&p == this)
+      return *this;
+    // relaxed order for initialization
+    _lock.store(p._lock.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
     return *this;
   }
 
@@ -77,7 +80,9 @@ public:
     if (oldval & 3)
       goto slow_path;
     oldval &= ~(uintptr_t)3;
-    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+    if (!_lock.compare_exchange_weak(oldval, oldval | 1,
+                                     std::memory_order_acq_rel,
+                                     std::memory_order_relaxed))
       goto slow_path;
     assert(is_locked());
     return;
@@ -88,7 +93,8 @@ public:
 
   inline void unlock() {
     assert(is_locked());
-    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1, std::memory_order_release);
+    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1,
+                std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
@@ -101,7 +107,8 @@ public:
     if ((oldval & 3) != 0)
       return false;
     oldval = 0;
-    return _lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed);
+    return _lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel,
+                                       std::memory_order_relaxed);
   }
 
   inline bool is_locked() const {
@@ -111,7 +118,6 @@ public:
   inline bool is_locked_shared() const {
     return _lock.load(std::memory_order_acquire) & 2;
   }
-    
 
   inline void lock_shared() {
     uintptr_t oldval = _lock.load(std::memory_order_relaxed);
@@ -122,7 +128,8 @@ public:
     newval &= ~(uintptr_t)1;
     newval |= 2;
     newval += 4;
-    if (!_lock.compare_exchange_weak(oldval, newval, std::memory_order_acq_rel, std::memory_order_relaxed))
+    if (!_lock.compare_exchange_weak(oldval, newval, std::memory_order_acq_rel,
+                                     std::memory_order_relaxed))
       goto slow_path;
     assert(is_locked_shared());
     return;
@@ -141,10 +148,11 @@ public:
       newval &= ~(uintptr_t)1;
       newval |= 2;
       newval += 4;
-    } while (!_lock.compare_exchange_weak(oldval, newval, std::memory_order_acq_rel, std::memory_order_relaxed));
+    } while (!_lock.compare_exchange_weak(
+        oldval, newval, std::memory_order_acq_rel, std::memory_order_relaxed));
     assert(is_locked_shared());
     return true;
-  }   
+  }
 
   inline void unlock_shared() {
     uintptr_t oldval, newval;
@@ -153,18 +161,19 @@ public:
       newval = oldval - 4;
       if (newval >> 2 == 0)
         newval &= ~(uintptr_t)2;
-    } while (!_lock.compare_exchange_weak(oldval, newval, std::memory_order_acq_rel, std::memory_order_relaxed));
+    } while (!_lock.compare_exchange_weak(
+        oldval, newval, std::memory_order_acq_rel, std::memory_order_relaxed));
   }
 };
 
 } // namespace internal
 
-template<typename T>
+template <typename T>
 class PtrRWLock : public internal::PtrRWLockBase {
   //  static_assert(alignof(T) > 2, "Insufficient spare bits");
 public:
   constexpr PtrRWLock() : PtrRWLockBase() {}
-  //relaxed order for copy
+  // relaxed order for copy
   PtrRWLock(const PtrRWLock& p) : PtrRWLockBase(p) {}
 
   T* getValue() const {
@@ -174,15 +183,15 @@ public:
     return (T*)(val & ~(uintptr_t)1);
   }
 
-  //only works for locked values
+  // only works for locked values
   void setValue(T* ptr) {
     uintptr_t val = (uintptr_t)ptr;
     _setValue(val | 1);
   }
 };
 
-}
-}
+} // namespace LL
+} // namespace runtime
 } // end namespace galois
 
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,7 +23,7 @@
 
 int run = 1;
 
-template<typename T2>
+template <typename T2>
 struct checker {
   typedef typename T2::template retype<int> T;
   T wl;
@@ -31,7 +31,7 @@ struct checker {
   typename T::template rethread<false> wl3;
 
   checker() {
-    int a[4] = {1,2,3,0};
+    int a[4] = {1, 2, 3, 0};
 
     // Don't actually run this code as some worklists don't support
     // the full worklist API
@@ -55,7 +55,7 @@ struct checker {
   }
 };
 
-#define GALOIS_WLCOMPILECHECK(name) checker<name<> > ck_##name;
+#define GALOIS_WLCOMPILECHECK(name) checker<name<>> ck_##name;
 #include "galois/worklists/WorkList.h"
 
 int main(int argc, char** argv) {

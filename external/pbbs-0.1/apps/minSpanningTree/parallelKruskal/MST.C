@@ -45,16 +45,19 @@ using namespace std;
 
 // Assumes root is negative
 inline vindex find(vindex i, vindex* parent) {
-  if ((parent[i]) < 0) return i;
-  vindex j = parent[i];     
-  if (parent[j] < 0) return j;
-  do j = parent[j]; 
+  if ((parent[i]) < 0)
+    return i;
+  vindex j = parent[i];
+  if (parent[j] < 0)
+    return j;
+  do
+    j = parent[j];
   while (parent[j] >= 0);
   vindex tmp;
   // shortcut all links on path
-  while ((tmp = parent[i]) != j) { 
+  while ((tmp = parent[i]) != j) {
     parent[i] = j;
-    i = tmp;
+    i         = tmp;
   }
   return j;
 }
@@ -71,10 +74,14 @@ struct indexedEdge {
 };
 
 struct UnionFindStep {
-  int u;  int v;  
-  indexedEdge *E;  reservation *R;  unionFind UF;  bool *inST;
-  UnionFindStep(indexedEdge* _E, unionFind _UF, reservation* _R, bool* ist) 
-    : E(_E), R(_R), UF(_UF), inST(ist) {}
+  int u;
+  int v;
+  indexedEdge* E;
+  reservation* R;
+  unionFind UF;
+  bool* inST;
+  UnionFindStep(indexedEdge* _E, unionFind _UF, reservation* _R, bool* ist)
+      : E(_E), R(_R), UF(_UF), inST(ist) {}
 
   bool reserve(int i) {
     u = UF.find(E[i].u);
@@ -83,127 +90,140 @@ struct UnionFindStep {
       R[v].reserve(i);
       R[u].reserve(i);
       return 1;
-    } else return 0;
+    } else
+      return 0;
   }
 
   bool commit(int i) {
     if (R[v].check(i)) {
-      R[u].checkReset(i); 
-      UF.link(v, u); 
+      R[u].checkReset(i);
+      UF.link(v, u);
       inST[E[i].id] = 1;
-      return 1;}
-    else if (R[u].check(i)) {
-      UF.link(u, v); 
+      return 1;
+    } else if (R[u].check(i)) {
+      UF.link(u, v);
       inST[E[i].id] = 1;
-      return 1; }
-    else return 0;
+      return 1;
+    } else
+      return 0;
   }
 };
 
 template <class E, class F>
 int almostKth(E* A, E* B, int k, int n, F f) {
-  int ssize = min(1000,n);
-  int stride = n/ssize;
-  int km = (int) (k * ((double) ssize) / n);
+  int ssize  = min(1000, n);
+  int stride = n / ssize;
+  int km     = (int)(k * ((double)ssize) / n);
   E T[ssize];
-  for (int i = 0; i < ssize; i++) T[i] = A[i*stride];
-  sort(T,T+ssize,f);
+  for (int i = 0; i < ssize; i++)
+    T[i] = A[i * stride];
+  sort(T, T + ssize, f);
   E p = T[km];
 
-  bool *flags = newA(bool,n);
-//  {parallel_for (int i=0; i < n; i++) flags[i] = f(A[i],p);}
-  {parallel_doall(int, i, 0, n) { flags[i] = f(A[i],p);} parallel_doall_end }
-  int l = sequence::pack(A,B,flags,n);
-//  {parallel_for (int i=0; i < n; i++) flags[i] = !flags[i];}
-  {parallel_doall(int, i, 0, n) { flags[i] = !flags[i];} parallel_doall_end }
-  sequence::pack(A,B+l,flags,n);
-  free(flags);
-  return l;
+  bool* flags = newA(bool, n);
+  //  {parallel_for (int i=0; i < n; i++) flags[i] = f(A[i],p);}
+  {
+    parallel_doall(int, i, 0, n) { flags[i] = f(A[i], p); }
+    parallel_doall_end
+  }
+  int l = sequence::pack(A, B, flags, n);
+  //  {parallel_for (int i=0; i < n; i++) flags[i] = !flags[i];}
+  {parallel_doall(int, i, 0, n){flags[i] = !flags[i];
+}
+parallel_doall_end
+}
+sequence::pack(A, B + l, flags, n);
+free(flags);
+return l;
 }
 
-typedef std::pair<double,int> ei;
+typedef std::pair<double, int> ei;
 
 struct edgeLess {
-  bool operator() (ei a, ei b) { 
-    return (a.first == b.first) ? (a.second < b.second) 
-      : (a.first < b.first);}};
+  bool operator()(ei a, ei b) {
+    return (a.first == b.first) ? (a.second < b.second) : (a.first < b.first);
+  }
+};
 
-pair<int*,int> mst(wghEdgeArray G) { 
-  //startTime();
-  wghEdge *E = G.E;
-  ei* x = newA(ei,G.m);
-//  parallel_for (int i=0; i < G.m; i++) 
-  parallel_doall(int, i, 0, G.m) {
-    x[i] = ei(E[i].weight,i);
-  } parallel_doall_end
-  //nextTime("copy with id");
+pair<int*, int> mst(wghEdgeArray G) {
+  // startTime();
+  wghEdge* E = G.E;
+  ei* x      = newA(ei, G.m);
+  //  parallel_for (int i=0; i < G.m; i++)
+  parallel_doall(int, i, 0, G.m) { x[i] = ei(E[i].weight, i); }
+  parallel_doall_end
+      // nextTime("copy with id");
 
-  int l = min(4*G.n/3,G.m);
-  ei* y = newA(ei,G.m);
-  l = almostKth(x, y, l, G.m, edgeLess());
-  //nextTime("kth smallest");
+      int l = min(4 * G.n / 3, G.m);
+  ei* y     = newA(ei, G.m);
+  l         = almostKth(x, y, l, G.m, edgeLess());
+  // nextTime("kth smallest");
 
   compSort(y, l, edgeLess());
-  //nextTime("first sort");
+  // nextTime("first sort");
 
   unionFind UF(G.n);
-  reservation *R = new reservation[G.n];
-  //nextTime("initialize nodes");
+  reservation* R = new reservation[G.n];
+  // nextTime("initialize nodes");
 
-  indexedEdge* z = newA(indexedEdge,G.m);
-//  parallel_for (int i=0; i < l; i++) {
-  parallel_doall(int, i, 0, l)  {
+  indexedEdge* z = newA(indexedEdge, G.m);
+  //  parallel_for (int i=0; i < l; i++) {
+  parallel_doall(int, i, 0, l) {
     int j = y[i].second;
-    z[i] = indexedEdge(E[j].u,E[j].v,j);
-  } parallel_doall_end
-  //nextTime("copy to edges");
+    z[i]  = indexedEdge(E[j].u, E[j].v, j);
+  }
+  parallel_doall_end
+      // nextTime("copy to edges");
 
-  bool *mstFlags = newA(bool, G.m);
-//  parallel_for (int i=0; i < G.m; i++) mstFlags[i] = 0;
-  parallel_doall(int, i, 0, G.m) { mstFlags[i] = 0; } parallel_doall_end
-  UnionFindStep UFStep(z, UF, R,  mstFlags);
+      bool* mstFlags = newA(bool, G.m);
+  //  parallel_for (int i=0; i < G.m; i++) mstFlags[i] = 0;
+  parallel_doall(int, i, 0, G.m) { mstFlags[i] = 0; }
+  parallel_doall_end UnionFindStep UFStep(z, UF, R, mstFlags);
   speculative_for(UFStep, 0, l, 50);
   free(z);
-  //nextTime("first union find loop");
+  // nextTime("first union find loop");
 
-  bool *flags = newA(bool,G.m-l);
-//  parallel_for (int i = 0; i < G.m-l; i++) {
-  parallel_doall(int, i, 0, G.m-l)  {
-    int j = y[i+l].second;
+  bool* flags = newA(bool, G.m - l);
+  //  parallel_for (int i = 0; i < G.m-l; i++) {
+  parallel_doall(int, i, 0, G.m - l) {
+    int j    = y[i + l].second;
     vindex u = UF.find(E[j].u);
     vindex v = UF.find(E[j].v);
-    if (u != v) flags[i] = 1;
-    else flags[i] = 0;
-  } parallel_doall_end
-  int k = sequence::pack(y+l, x, flags, G.m-l);
+    if (u != v)
+      flags[i] = 1;
+    else
+      flags[i] = 0;
+  }
+  parallel_doall_end int k = sequence::pack(y + l, x, flags, G.m - l);
   free(flags);
   free(y);
-  //nextTime("filter out self edges");
+  // nextTime("filter out self edges");
 
   compSort(x, k, edgeLess());
-  //nextTime("second sort");
+  // nextTime("second sort");
 
   z = newA(indexedEdge, k);
-//  parallel_for (int i=0; i < k; i++) {
-  parallel_doall(int, i, 0, k)  {
+  //  parallel_for (int i=0; i < k; i++) {
+  parallel_doall(int, i, 0, k) {
     int j = x[i].second;
-    z[i] = indexedEdge(E[j].u,E[j].v,j);
-  } parallel_doall_end
-  free(x);
-  //nextTime("copy to edges");
+    z[i]  = indexedEdge(E[j].u, E[j].v, j);
+  }
+  parallel_doall_end free(x);
+  // nextTime("copy to edges");
 
   UFStep = UnionFindStep(z, UF, R, mstFlags);
   speculative_for(UFStep, 0, k, 10);
 
-  free(z); 
-  //nextTime("second union find loop");
+  free(z);
+  // nextTime("second union find loop");
 
-  int* mst = newA(int, G.m);
+  int* mst   = newA(int, G.m);
   int nInMst = sequence::packIndex(mst, mstFlags, G.m);
   free(mstFlags);
-  //nextTime("pack results");
+  // nextTime("pack results");
 
-  //cout << "n=" << G.n << " m=" << G.m << " nInMst=" << nInMst << endl;
-  UF.del(); delete R;
-  return pair<int*,int>(mst, nInMst);
+  // cout << "n=" << G.n << " m=" << G.m << " nInMst=" << nInMst << endl;
+  UF.del();
+  delete R;
+  return pair<int*, int>(mst, nInMst);
 }

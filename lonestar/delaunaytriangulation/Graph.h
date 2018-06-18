@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,23 +28,21 @@
 #include <vector>
 #include <deque>
 
-typedef galois::graphs::MorphGraph<Element,char,true> Graph;
+typedef galois::graphs::MorphGraph<Element, char, true> Graph;
 typedef Graph::GraphNode GNode;
 
 //! Factor out common graph traversals
-template<typename Alloc=std::allocator<char> >
-struct Searcher: private boost::noncopyable {
+template <typename Alloc = std::allocator<char>>
+struct Searcher : private boost::noncopyable {
   typedef Alloc allocator_type;
   typedef typename Alloc::template rebind<GNode>::other GNodeVectorAlloc;
   typedef std::vector<GNode, GNodeVectorAlloc> GNodeVector;
 
   struct Marker {
     GNodeVector seen;
-    Marker(Graph&, const Alloc& a): seen(a) { }
-    void mark(GNode n) { 
-      seen.push_back(n);
-    }
-    bool hasMark(GNode n) { 
+    Marker(Graph&, const Alloc& a) : seen(a) {}
+    void mark(GNode n) { seen.push_back(n); }
+    bool hasMark(GNode n) {
       return std::find(seen.begin(), seen.end(), n) != seen.end();
     }
   };
@@ -53,19 +51,23 @@ struct Searcher: private boost::noncopyable {
   GNodeVector matches, inside;
   const allocator_type& alloc;
 
-  Searcher(Graph& g, const Alloc& a = allocator_type()): 
-    graph(g), matches(a), inside(a), alloc(a) { }
+  Searcher(Graph& g, const Alloc& a = allocator_type())
+      : graph(g), matches(a), inside(a), alloc(a) {}
 
-  struct DetLess: public std::binary_function<GNode,GNode,bool> {
+  struct DetLess : public std::binary_function<GNode, GNode, bool> {
     Graph& g;
-    DetLess(Graph& x): g(x) { }
+    DetLess(Graph& x) : g(x) {}
     bool operator()(GNode a, GNode b) const {
       Element& e1 = g.getData(a, galois::MethodFlag::UNPROTECTED);
       Element& e2 = g.getData(b, galois::MethodFlag::UNPROTECTED);
-      
+
       for (int i = 0; i < 3; ++i) {
-        uintptr_t v1 = (i < 2 || !e1.boundary()) ? reinterpret_cast<uintptr_t>(e1.getPoint(i)) : 0;
-        uintptr_t v2 = (i < 2 || !e2.boundary()) ? reinterpret_cast<uintptr_t>(e2.getPoint(i)) : 0;
+        uintptr_t v1 = (i < 2 || !e1.boundary())
+                           ? reinterpret_cast<uintptr_t>(e1.getPoint(i))
+                           : 0;
+        uintptr_t v2 = (i < 2 || !e2.boundary())
+                           ? reinterpret_cast<uintptr_t>(e2.getPoint(i))
+                           : 0;
         if (v1 < v2)
           return true;
         else if (v1 > v2)
@@ -74,25 +76,26 @@ struct Searcher: private boost::noncopyable {
       return false;
     }
   };
-  
+
   void removeDupes(GNodeVector& v) {
     std::sort(v.begin(), v.end(), DetLess(graph));
     typename GNodeVector::iterator end = std::unique(v.begin(), v.end());
     v.resize(end - v.begin());
   }
 
-  template<typename Pred>
+  template <typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
     typedef galois::optional<GNode> SomeGNode;
-    typedef typename Alloc::template rebind<std::pair<GNode,SomeGNode>>::other WorklistAlloc;
-    typedef std::deque<std::pair<GNode,SomeGNode>, WorklistAlloc> Worklist;
+    typedef typename Alloc::template rebind<std::pair<GNode, SomeGNode>>::other
+        WorklistAlloc;
+    typedef std::deque<std::pair<GNode, SomeGNode>, WorklistAlloc> Worklist;
 
     Worklist wl(alloc);
     wl.push_back(std::make_pair(start, SomeGNode()));
 
     Marker marker(graph, alloc);
     while (!wl.empty()) {
-      GNode cur = wl.front().first;
+      GNode cur      = wl.front().first;
       SomeGNode prev = wl.front().second;
 
       wl.pop_front();
@@ -103,7 +106,8 @@ struct Searcher: private boost::noncopyable {
       if (marker.hasMark(cur))
         continue;
 
-      // NB(ddn): Technically this makes DelaunayTriangulation.cpp::Process not cautious
+      // NB(ddn): Technically this makes DelaunayTriangulation.cpp::Process not
+      // cautious
       if (!all)
         marker.mark(cur);
 
@@ -113,18 +117,17 @@ struct Searcher: private boost::noncopyable {
         matches.push_back(cur);
         if (all) {
           marker.mark(cur);
-        }
-        else
+        } else
           break; // Found it
       } else {
         if (all && prev)
           inside.push_back(*prev);
       }
 
-      // Search neighbors (a) when matched and looking for all or (b) when no match and looking
-      // for first
+      // Search neighbors (a) when matched and looking for all or (b) when no
+      // match and looking for first
       if (matched == all) {
-        for (auto ii: graph.edges(cur)) {
+        for (auto ii : graph.edges(cur)) {
           GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, SomeGNode(cur)));
         }
@@ -138,13 +141,13 @@ struct Searcher: private boost::noncopyable {
   }
 
   //! Find the first occurance of element matching pred
-  template<typename Pred>
+  template <typename Pred>
   void findFirst(const GNode& start, const Pred& p) {
     find_(start, p, false);
   }
-  
+
   //! Find all the elements matching pred (assuming monotonic predicate)
-  template<typename Pred>
+  template <typename Pred>
   void findAll(const GNode& start, const Pred& p) {
     find_(start, p, true);
     return;

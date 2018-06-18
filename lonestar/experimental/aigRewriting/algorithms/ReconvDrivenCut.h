@@ -1,6 +1,6 @@
 /*
- 
- @Vinicius Possani 
+
+ @Vinicius Possani
  Parallel Rewriting January 5, 2018.
  ABC-based implementation on Galois.
 
@@ -17,27 +17,25 @@ namespace algorithm {
 
 typedef struct RDCutData_ {
 
-	std::unordered_set< aig::GNode > visited;
-	std::unordered_set< aig::GNode > leaves;
+  std::unordered_set<aig::GNode> visited;
+  std::unordered_set<aig::GNode> leaves;
 
 } RDCutData;
 
-typedef galois::substrate::PerThreadStorage< RDCutData > PerThreadRDCutData;
+typedef galois::substrate::PerThreadStorage<RDCutData> PerThreadRDCutData;
 
 class ReconvDrivenCut {
 
 private:
-
-	aig::Aig & aig;
-	PerThreadRDCutData perThreadRDCutData;
+  aig::Aig& aig;
+  PerThreadRDCutData perThreadRDCutData;
 
 public:
+  ReconvDrivenCut(aig::Aig& aig);
 
-	ReconvDrivenCut( aig::Aig & aig );
+  virtual ~ReconvDrivenCut();
 
-	virtual ~ReconvDrivenCut();
-
-	void run( int cutSizeLimit );
+  void run(int cutSizeLimit);
 };
 
 } /* namespace algorithm */

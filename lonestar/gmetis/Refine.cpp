@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,50 +34,50 @@ bool isBoundary(GGraph& g, GNode n) {
   return false;
 }
 
-//This is only used on the terminal graph (find graph)
+// This is only used on the terminal graph (find graph)
 void findBoundary(GNodeBag& bag, GGraph& cg) {
 
-  galois::do_all(galois::iterate(cg), 
-      [&] (GNode n) {
-        auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
-        if (cn.getmaybeBoundary())
-          cn.setmaybeBoundary(isBoundary(cg,n));
-        if (cn.getmaybeBoundary())
-          bag.push(n);
-
-      },
-      galois::loopname("findBoundary"));
+  galois::do_all(galois::iterate(cg),
+                 [&](GNode n) {
+                   auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
+                   if (cn.getmaybeBoundary())
+                     cn.setmaybeBoundary(isBoundary(cg, n));
+                   if (cn.getmaybeBoundary())
+                     bag.push(n);
+                 },
+                 galois::loopname("findBoundary"));
 }
 
-//this is used on the coarse graph to project to the fine graph
+// this is used on the coarse graph to project to the fine graph
 void findBoundaryAndProject(GNodeBag& bag, GGraph& cg, GGraph& fg) {
   galois::do_all(galois::iterate(cg),
-      [&] (GNode n) {
-        auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
-        if (cn.getmaybeBoundary())
-          cn.setmaybeBoundary(isBoundary(cg,n));
+                 [&](GNode n) {
+                   auto& cn = cg.getData(n, galois::MethodFlag::UNPROTECTED);
+                   if (cn.getmaybeBoundary())
+                     cn.setmaybeBoundary(isBoundary(cg, n));
 
-        //project part and maybe boundary
-        //unsigned part = cn.getPart();
-        for (unsigned x = 0; x < cn.numChildren(); ++x) {
-          fg.getData(cn.getChild(x), galois::MethodFlag::UNPROTECTED).initRefine(cn.getPart(), cn.getmaybeBoundary());
-        }
-        if (cn.getmaybeBoundary())
-          bag.push(n);
-
-      },
-      galois::loopname("findBoundaryAndProject"));
+                   // project part and maybe boundary
+                   // unsigned part = cn.getPart();
+                   for (unsigned x = 0; x < cn.numChildren(); ++x) {
+                     fg.getData(cn.getChild(x), galois::MethodFlag::UNPROTECTED)
+                         .initRefine(cn.getPart(), cn.getmaybeBoundary());
+                   }
+                   if (cn.getmaybeBoundary())
+                     bag.push(n);
+                 },
+                 galois::loopname("findBoundaryAndProject"));
 }
 
-template<bool balance>
-void refine_BKL2(unsigned minSize, unsigned maxSize,
-    GGraph& cg, GGraph* fg, std::vector<partInfo>& parts) {
+template <bool balance>
+void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
+                 std::vector<partInfo>& parts) {
 
-  auto gainIndexer = [&cg] (GNode n) -> int {
-    int retval = 0;
+  auto gainIndexer = [&cg](GNode n) -> int {
+    int retval              = 0;
     galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-    unsigned int nPart = cg.getData(n, flag).getPart();
-    for (auto ii = cg.edge_begin(n, flag), ee = cg.edge_end(n); ii != ee; ++ii) {
+    unsigned int nPart      = cg.getData(n, flag).getPart();
+    for (auto ii = cg.edge_begin(n, flag), ee = cg.edge_end(n); ii != ee;
+         ++ii) {
       GNode neigh = cg.getEdgeDst(ii);
       if (cg.getData(neigh, flag).getPart() == nPart)
         retval -= cg.getEdgeData(ii, flag);
@@ -88,7 +88,9 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
   };
 
   typedef galois::worklists::PerSocketChunkFIFO<8> Chunk;
-  typedef galois::worklists::OrderedByIntegerMetric<decltype(gainIndexer), Chunk, 10> pG;
+  typedef galois::worklists::OrderedByIntegerMetric<decltype(gainIndexer),
+                                                    Chunk, 10>
+      pG;
 
   GNodeBag boundary;
 
@@ -101,88 +103,93 @@ void refine_BKL2(unsigned minSize, unsigned maxSize,
   typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
 
-  //Find the partition n is most connected to
-  auto pickPartitionEC = [&] (GNode n, auto& cnx) -> unsigned {
+  // Find the partition n is most connected to
+  auto pickPartitionEC = [&](GNode n, auto& cnx) -> unsigned {
     auto& edges = *edgesThreadLocal.getLocal();
     edges.clear();
     edges.resize(parts.size(), 0);
     unsigned P = cg.getData(n).getPart();
     for (auto ii : cg.edges(n)) {
       GNode neigh = cg.getEdgeDst(ii);
-      auto& nd = cg.getData(neigh);
-      if (parts[nd.getPart()].partWeight < maxSize
-          || nd.getPart() == P)
+      auto& nd    = cg.getData(neigh);
+      if (parts[nd.getPart()].partWeight < maxSize || nd.getPart() == P)
         edges[nd.getPart()] += cg.getEdgeData(ii);
     }
-    return std::distance(edges.begin(), std::max_element(edges.begin(), edges.end()));
+    return std::distance(edges.begin(),
+                         std::max_element(edges.begin(), edges.end()));
   };
 
-  //Find the smallest partition n is connected to
-  auto pickPartitionMP = [&] (GNode n, auto& cnx) -> unsigned {
-    unsigned P = cg.getData(n).getPart();
-    unsigned W = parts[P].partWeight;
+  // Find the smallest partition n is connected to
+  auto pickPartitionMP = [&](GNode n, auto& cnx) -> unsigned {
+    unsigned P  = cg.getData(n).getPart();
+    unsigned W  = parts[P].partWeight;
     auto& edges = *edgesThreadLocal.getLocal();
     edges.clear();
     edges.resize(parts.size(), ~0);
     edges[P] = W;
-    W = (double)W * 0.9;
+    W        = (double)W * 0.9;
     for (auto ii : cg.edges(n)) {
       GNode neigh = cg.getEdgeDst(ii);
-      auto& nd = cg.getData(neigh);
+      auto& nd    = cg.getData(neigh);
       if (parts[nd.getPart()].partWeight < W)
         edges[nd.getPart()] = parts[nd.getPart()].partWeight;
     }
-    return std::distance(edges.begin(), std::min_element(edges.begin(), edges.end()));
+    return std::distance(edges.begin(),
+                         std::min_element(edges.begin(), edges.end()));
   };
 
-  galois::for_each(galois::iterate(boundary),
-      [&] (GNode n, auto& cnx) {
-        auto& nd = cg.getData(n);
+  galois::for_each(
+      galois::iterate(boundary),
+      [&](GNode n, auto& cnx) {
+        auto& nd         = cg.getData(n);
         unsigned curpart = nd.getPart();
-        unsigned newpart = balance ? pickPartitionMP(n, cnx) : pickPartitionEC(n, cnx);
-        if(parts[curpart].partWeight < minSize) return;
+        unsigned newpart =
+            balance ? pickPartitionMP(n, cnx) : pickPartitionEC(n, cnx);
+        if (parts[curpart].partWeight < minSize)
+          return;
         if (curpart != newpart) {
           nd.setPart(newpart);
           __sync_fetch_and_sub(&parts[curpart].partWeight, nd.getWeight());
           __sync_fetch_and_add(&parts[newpart].partWeight, nd.getWeight());
           for (auto ii : cg.edges(n)) {
             GNode neigh = cg.getEdgeDst(ii);
-            auto& ned = cg.getData(neigh);
+            auto& ned   = cg.getData(neigh);
             if (ned.getPart() != newpart && !ned.getmaybeBoundary()) {
               ned.setmaybeBoundary(true);
               if (fg)
                 for (unsigned x = 0; x < ned.numChildren(); ++x)
-                  fg->getData(ned.getChild(x), galois::MethodFlag::UNPROTECTED).setmaybeBoundary(true);
+                  fg->getData(ned.getChild(x), galois::MethodFlag::UNPROTECTED)
+                      .setmaybeBoundary(true);
             }
-            //if (ned.getPart() != newpart)
-            //cnx.push(neigh);
+            // if (ned.getPart() != newpart)
+            // cnx.push(neigh);
           }
           if (fg)
             for (unsigned x = 0; x < nd.numChildren(); ++x)
-              fg->getData(nd.getChild(x), galois::MethodFlag::UNPROTECTED).setPart(newpart);
+              fg->getData(nd.getChild(x), galois::MethodFlag::UNPROTECTED)
+                  .setPart(newpart);
         }
       },
-      galois::loopname("refine"),
-      galois::wl<pG>(gainIndexer));
+      galois::loopname("refine"), galois::wl<pG>(gainIndexer));
 }
 
-void projectPart (MetisGraph* Graph, std::vector<partInfo>& parts) {
-  GGraph* fineGraph = Graph->getFinerGraph()->getGraph();
+void projectPart(MetisGraph* Graph, std::vector<partInfo>& parts) {
+  GGraph* fineGraph   = Graph->getFinerGraph()->getGraph();
   GGraph* coarseGraph = Graph->getGraph();
 
-  galois::do_all(galois::iterate(*coarseGraph), 
-      [&] (GNode n) {
-        auto& cn = coarseGraph->getData(n);
-        unsigned part = cn.getPart();
-        for (unsigned x = 0; x < cn.numChildren(); ++x) {
-          fineGraph->getData(cn.getChild(x)).setPart(part);
-        }  
-      },
-      galois::loopname("project"));
+  galois::do_all(galois::iterate(*coarseGraph),
+                 [&](GNode n) {
+                   auto& cn      = coarseGraph->getData(n);
+                   unsigned part = cn.getPart();
+                   for (unsigned x = 0; x < cn.numChildren(); ++x) {
+                     fineGraph->getData(cn.getChild(x)).setPart(part);
+                   }
+                 },
+                 galois::loopname("project"));
 }
 
 int gain(GGraph& g, GNode n) {
-  int retval = 0;
+  int retval         = 0;
   unsigned int nPart = g.getData(n).getPart();
   for (auto ii : g.edges(n)) {
     GNode neigh = g.getEdgeDst(ii);
@@ -196,40 +203,43 @@ int gain(GGraph& g, GNode n) {
 
 void parallelBoundary(GNodeBag& bag, GGraph& graph) {
   galois::do_all(galois::iterate(graph),
-      [&] (GNode n) {
-        if (gain(graph, n) > 0)
-          bag.push(n);
-      },
-      galois::loopname("Get-Boundary"));
+                 [&](GNode n) {
+                   if (gain(graph, n) > 0)
+                     bag.push(n);
+                 },
+                 galois::loopname("Get-Boundary"));
 }
 
 void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
-  std::vector<GNode>  boundary;
-  unsigned int meanWeight =0;
-  for (unsigned int i =0; i<parts.size(); i++)
+  std::vector<GNode> boundary;
+  unsigned int meanWeight = 0;
+  for (unsigned int i = 0; i < parts.size(); i++)
     meanWeight += parts[i].partWeight;
   meanWeight /= parts.size();
 
   GNodeBag boundaryBag;
-  parallelBoundary (boundaryBag, g);
+  parallelBoundary(boundaryBag, g);
 
-  for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++){
-      GNode n = (*ii) ;
-      unsigned nPart = g.getData(n).getPart();
-      int part[parts.size()];
-      for (unsigned int i =0; i<parts.size(); i++)part[i]=0;
-      for (auto ii : g.edges(n)) {
-        GNode neigh = g.getEdgeDst(ii);
-        part[g.getData(neigh).getPart()]+=g.getEdgeData(ii);
+  for (auto ii = boundaryBag.begin(), ie = boundaryBag.end(); ii != ie; ii++) {
+    GNode n        = (*ii);
+    unsigned nPart = g.getData(n).getPart();
+    int part[parts.size()];
+    for (unsigned int i = 0; i < parts.size(); i++)
+      part[i] = 0;
+    for (auto ii : g.edges(n)) {
+      GNode neigh = g.getEdgeDst(ii);
+      part[g.getData(neigh).getPart()] += g.getEdgeData(ii);
+    }
+    int t          = part[nPart];
+    unsigned int p = nPart;
+    for (unsigned int i = 0; i < parts.size(); i++)
+      if (i != nPart && part[i] > t &&
+          parts[nPart].partWeight > parts[i].partWeight * (98) / (100) &&
+          parts[nPart].partWeight > meanWeight * 98 / 100) {
+        t = part[i];
+        p = i;
       }
-      int t = part[nPart];
-      unsigned int p = nPart;
-      for (unsigned int i =0; i<parts.size(); i++)
-        if (i!=nPart && part[i] > t && parts[nPart].partWeight>  parts[i].partWeight*(98)/(100) && parts[nPart].partWeight > meanWeight*98/100){
-          t = part[i];
-          p = i;
-        }
-    if(p != nPart){
+    if (p != nPart) {
       g.getData(n).setPart(p);
       parts[p].partWeight += g.getData(n).getWeight();
       parts[nPart].partWeight -= g.getData(n).getWeight();
@@ -240,34 +250,35 @@ void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
 void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   std::set<GNode> boundary;
 
-  //find boundary nodes with positive gain
+  // find boundary nodes with positive gain
   GNodeBag boundaryBag;
-  parallelBoundary (boundaryBag, g);
+  parallelBoundary(boundaryBag, g);
 
-  for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++ ){
-    boundary.insert(*ii);}
+  for (auto ii = boundaryBag.begin(), ie = boundaryBag.end(); ii != ie; ii++) {
+    boundary.insert(*ii);
+  }
 
-  //refine by swapping with a neighbor high-gain node
+  // refine by swapping with a neighbor high-gain node
   while (!boundary.empty()) {
     GNode n = *boundary.begin();
     boundary.erase(boundary.begin());
     unsigned nPart = g.getData(n).getPart();
     for (auto ii : g.edges(n)) {
-      GNode neigh = g.getEdgeDst(ii);
+      GNode neigh        = g.getEdgeDst(ii);
       unsigned neighPart = g.getData(neigh).getPart();
-      if (neighPart != nPart && boundary.count(neigh) &&
-          gain(g, n) > 0 && gain(g, neigh) > 0 ) {
-        unsigned nWeight = g.getData(n).getWeight();
+      if (neighPart != nPart && boundary.count(neigh) && gain(g, n) > 0 &&
+          gain(g, neigh) > 0) {
+        unsigned nWeight     = g.getData(n).getWeight();
         unsigned neighWeight = g.getData(neigh).getWeight();
-        //swap
+        // swap
         g.getData(n).setPart(neighPart);
         g.getData(neigh).setPart(nPart);
-        //update partinfo
+        // update partinfo
         parts[neighPart].partWeight += nWeight;
         parts[neighPart].partWeight -= neighWeight;
         parts[nPart].partWeight += neighWeight;
         parts[nPart].partWeight -= nWeight;
-        //remove nodes
+        // remove nodes
         boundary.erase(neigh);
         break;
       }
@@ -284,8 +295,7 @@ void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   return res;
 }*/
 
-void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
-{
+void GraclusRefining(GGraph* graph, int nbParti, int nbIter) {
   nbIter = std::min(15, nbIter);
   std::vector<double> Dist(nbParti);
   std::vector<int> card(nbParti);
@@ -295,62 +305,69 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
   std::vector<Accum> cardAccum(nbParti);
   std::vector<Accum> degreeInAccum(nbParti);
 
-  for(int j=0;j<nbIter;j++)
-  {
+  for (int j = 0; j < nbIter; j++) {
 
     GGraph& g = *graph;
-    galois::do_all(galois::iterate(g), 
-        [&] (GNode n) {
-          unsigned int clust = g.getData(n, galois::MethodFlag::UNPROTECTED).getPart();
-          int degreet =0;
+    galois::do_all(
+        galois::iterate(g),
+        [&](GNode n) {
+          unsigned int clust =
+              g.getData(n, galois::MethodFlag::UNPROTECTED).getPart();
+          int degreet = 0;
 
           g.getData(n, galois::MethodFlag::UNPROTECTED).OldPartCpyNew();
 
-          for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) 
-            if (g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED).getPart() == clust)
-              degreet+=(int) g.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
+          for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED))
+            if (g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED)
+                    .getPart() == clust)
+              degreet +=
+                  (int)g.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
 
-          cardAccum[clust]+=g.getData(n, galois::MethodFlag::UNPROTECTED).getWeight();
+          cardAccum[clust] +=
+              g.getData(n, galois::MethodFlag::UNPROTECTED).getWeight();
           degreeInAccum[clust] += degreet;
-
         },
         galois::loopname("compute dists"));
 
-
-    for (int i=0; i<nbParti; i++)
-    {
+    for (int i = 0; i < nbParti; i++) {
       card[i] = cardAccum[i].reduce();
       cardAccum[i].reset();
 
       degreeIn[i] = degreeInAccum[i].reduce();
       degreeInAccum[i].reset();
 
-      Dist[i] = (card[i] != 0) ? (double)(degreeIn[i] + card[i] )/((double) card[i] * card[i]) : 0;
-
+      Dist[i] = (card[i] != 0) ? (double)(degreeIn[i] + card[i]) /
+                                     ((double)card[i] * card[i])
+                               : 0;
     }
 
-    galois::do_all(galois::iterate(g),
-        [&] (GNode n) {
-          double dmin = std::numeric_limits<double>::min();
-          int partition =-1;
+    galois::do_all(
+        galois::iterate(g),
+        [&](GNode n) {
+          double dmin   = std::numeric_limits<double>::min();
+          int partition = -1;
           galois::gstl::Map<int, int> degreein;
-          degreein[g.getData(n, galois::MethodFlag::UNPROTECTED).getOldPart()] +=1;
+          degreein[g.getData(n, galois::MethodFlag::UNPROTECTED)
+                       .getOldPart()] += 1;
           for (auto ii : g.edges(n, galois::MethodFlag::UNPROTECTED)) {
-            int nclust = g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED).getOldPart();
-            degreein[nclust] += (int) g.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
+            int nclust =
+                g.getData(g.getEdgeDst(ii), galois::MethodFlag::UNPROTECTED)
+                    .getOldPart();
+            degreein[nclust] +=
+                (int)g.getEdgeData(ii, galois::MethodFlag::UNPROTECTED);
           }
 
-          for(auto clust = degreein.begin(), ee = degreein.end(); clust != ee; ++clust) {
-            //the distance between the cluster clust and the noden is :
-            double d = Dist[clust->first]-(2.0*(double)clust->second/(double)card[clust->first]);
-            if(d < dmin || partition ==-1)
-            {
-              dmin = d;
+          for (auto clust = degreein.begin(), ee = degreein.end(); clust != ee;
+               ++clust) {
+            // the distance between the cluster clust and the noden is :
+            double d = Dist[clust->first] - (2.0 * (double)clust->second /
+                                             (double)card[clust->first]);
+            if (d < dmin || partition == -1) {
+              dmin      = d;
               partition = clust->first;
             }
           }
           g.getData(n, galois::MethodFlag::UNPROTECTED).setPart(partition);
-
         },
         galois::loopname("make moves"));
   }
@@ -360,44 +377,48 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
   std::cout<<std::endl;*/
 }
 
-} //anon namespace
+} // namespace
 
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minSize, unsigned maxSize,
-            refinementMode refM, bool verbose) {
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts,
+            unsigned minSize, unsigned maxSize, refinementMode refM,
+            bool verbose) {
   MetisGraph* tGraph = coarseGraph;
-  int nbIter=1;
+  int nbIter         = 1;
   if (refM == GRACLUS) {
-    while ((tGraph = tGraph->getFinerGraph())) nbIter*=2;
-    nbIter /=4;
+    while ((tGraph = tGraph->getFinerGraph()))
+      nbIter *= 2;
+    nbIter /= 4;
   }
   do {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    bool doProject = true;
-    if (verbose) { 
-      std::cout << "Cut " << computeCut(*coarseGraph->getGraph()) << " Weights ";
+    bool doProject        = true;
+    if (verbose) {
+      std::cout << "Cut " << computeCut(*coarseGraph->getGraph())
+                << " Weights ";
       printPartStats(parts);
       std::cout << "\n";
     }
-    //refine nparts times
+    // refine nparts times
     switch (refM) {
-      case BKL2:
-        refine_BKL2<false>(minSize, maxSize, *coarseGraph->getGraph(),
-            fineGraph ? fineGraph->getGraph() : nullptr, parts);
-        doProject = false;
-        break;
-      case BKL:
-        refine_BKL(*coarseGraph->getGraph(), parts);
-        break;
-      case ROBO:
-        refineOneByOne(*coarseGraph->getGraph(), parts);
-        break;
-      case GRACLUS:
-        GraclusRefining(coarseGraph->getGraph(), parts.size(), nbIter);nbIter =(nbIter+1)/2;
-        break;
-      default:
-        abort();
+    case BKL2:
+      refine_BKL2<false>(minSize, maxSize, *coarseGraph->getGraph(),
+                         fineGraph ? fineGraph->getGraph() : nullptr, parts);
+      doProject = false;
+      break;
+    case BKL:
+      refine_BKL(*coarseGraph->getGraph(), parts);
+      break;
+    case ROBO:
+      refineOneByOne(*coarseGraph->getGraph(), parts);
+      break;
+    case GRACLUS:
+      GraclusRefining(coarseGraph->getGraph(), parts.size(), nbIter);
+      nbIter = (nbIter + 1) / 2;
+      break;
+    default:
+      abort();
     }
-    //project up
+    // project up
     if (fineGraph && doProject) {
       projectPart(coarseGraph, parts);
     }
@@ -405,9 +426,9 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minS
 }
 
 /*
-void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize) {
-    MetisGraph* fineGraph = coarseGraph->getFinerGraph();
-    refine_BKL2<true>(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts);
+void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned
+meanSize) { MetisGraph* fineGraph = coarseGraph->getFinerGraph();
+    refine_BKL2<true>(meanSize, *coarseGraph->getGraph(), fineGraph ?
+fineGraph->getGraph() : nullptr, parts);
 }
 */
-

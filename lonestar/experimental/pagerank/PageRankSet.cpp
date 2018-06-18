@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,7 +25,6 @@
 #include "galois/graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
-
 #include <atomic>
 #include <string>
 #include <sstream>
@@ -43,7 +42,7 @@ namespace cll = llvm::cl;
 
 static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin";
-static const char* url = 0;
+static const char* url  = 0;
 
 enum Algo {
   asyncB,
@@ -56,37 +55,57 @@ enum Algo {
   asyncB_prt_oset
 };
 
-cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
-cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(10000000));
-cll::opt<unsigned int> memoryLimit("memoryLimit",
-    cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<float> amp("amp", cll::desc("amp for priority"), cll::init(100));
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"),
+                               cll::Required);
+static cll::opt<std::string>
+    transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
+cll::opt<unsigned int> maxIterations("maxIterations",
+                                     cll::desc("Maximum iterations"),
+                                     cll::init(10000000));
+cll::opt<unsigned int>
+    memoryLimit("memoryLimit",
+                cll::desc("Memory limit for out-of-core algorithms (in MB)"),
+                cll::init(~0U));
+static cll::opt<float> amp("amp", cll::desc("amp for priority"),
+                           cll::init(100));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"),
+                                 cll::init(0.01));
 static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
-static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
-static cll::opt<bool> outOnlyP("outdeg", cll::desc("Out degree only for priority"), cll::init(false));
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
-    cll::values(
-      clEnumValN(Algo::asyncB, "asyncB", "Asynchronous versoin..."),
-      clEnumValN(Algo::asyncB_hset, "asyncB_hset", "asyncB with a two-level hash uni-set scheduler"),
-      clEnumValN(Algo::asyncB_mset, "asyncB_mset", "asyncB with an item-marking uni-set scheduler"),
-      clEnumValN(Algo::asyncB_oset, "asyncB_oset", "asyncB with a two-level set uni-set scheduler"),
-      clEnumValN(Algo::asyncB_prt, "asyncB_prt", "Prioritized (degree biased residual) version..."),
-      clEnumValN(Algo::asyncB_prt_hset, "asyncB_prt_hset", "asyncB_prt with a two-level hash uni-set scheduler"),
-      clEnumValN(Algo::asyncB_prt_mset, "asyncB_prt_mset", "asyncB_prt with an item-marking uni-set scheduler"),
-      clEnumValN(Algo::asyncB_prt_oset, "asyncB_prt_oset", "asyncB_prt with a two-level set uni-set scheduler"),
-      clEnumValEnd), cll::init(Algo::asyncB));
+static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"),
+                                      cll::init("NA"));
+static cll::opt<bool> outOnlyP("outdeg",
+                               cll::desc("Out degree only for priority"),
+                               cll::init(false));
+static cll::opt<Algo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(
+             clEnumValN(Algo::asyncB, "asyncB", "Asynchronous versoin..."),
+             clEnumValN(Algo::asyncB_hset, "asyncB_hset",
+                        "asyncB with a two-level hash uni-set scheduler"),
+             clEnumValN(Algo::asyncB_mset, "asyncB_mset",
+                        "asyncB with an item-marking uni-set scheduler"),
+             clEnumValN(Algo::asyncB_oset, "asyncB_oset",
+                        "asyncB with a two-level set uni-set scheduler"),
+             clEnumValN(Algo::asyncB_prt, "asyncB_prt",
+                        "Prioritized (degree biased residual) version..."),
+             clEnumValN(Algo::asyncB_prt_hset, "asyncB_prt_hset",
+                        "asyncB_prt with a two-level hash uni-set scheduler"),
+             clEnumValN(Algo::asyncB_prt_mset, "asyncB_prt_mset",
+                        "asyncB_prt with an item-marking uni-set scheduler"),
+             clEnumValN(Algo::asyncB_prt_oset, "asyncB_prt_oset",
+                        "asyncB_prt with a two-level set uni-set scheduler"),
+             clEnumValEnd),
+         cll::init(Algo::asyncB));
 
 bool outOnly;
 
 //! Make values unique
-template<typename GNode>
+template <typename GNode>
 struct TopPair {
   float value;
   GNode id;
 
-  TopPair(float v, GNode i): value(v), id(i) { }
+  TopPair(float v, GNode i) : value(v), id(i) {}
 
   bool operator<(const TopPair& b) const {
     if (value == b.value)
@@ -95,46 +114,48 @@ struct TopPair {
   }
 };
 
-template<typename Graph>
-static void printTop(Graph& graph, int topn, const char *algo_name, int numThreads) {
+template <typename Graph>
+static void printTop(Graph& graph, int topn, const char* algo_name,
+                     int numThreads) {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
   typedef TopPair<GNode> Pair;
-  typedef std::map<Pair,GNode> Top;
+  typedef std::map<Pair, GNode> Top;
 
   // normalize the PageRank value so that the sum is equal to one
-  float sum=0;
+  float sum = 0;
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src = *ii;
+    GNode src             = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank(0);
+    float value           = n.getPageRank(0);
     sum += value;
   }
 
   Top top;
-  
+
   std::ofstream myfile;
-  if(dbg){
+  if (dbg) {
     char filename[256];
-    int tamp = amp;
+    int tamp   = amp;
     float ttol = tolerance;
-    sprintf(filename,"/scratch/01982/joyce/tmp/%s_t_%d_tol_%f_amp_%d", algo_name,numThreads,ttol,tamp);
-    myfile.open (filename);
+    sprintf(filename, "/scratch/01982/joyce/tmp/%s_t_%d_tol_%f_amp_%d",
+            algo_name, numThreads, ttol, tamp);
+    myfile.open(filename);
   }
 
-  //std::cout<<"print PageRank\n";
+  // std::cout<<"print PageRank\n";
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src = *ii;
+    GNode src             = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank(0)/sum; // normalized PR (divide PR by sum)
-    //float value = n.getPageRank(); // raw PR 
-    //std::cout<<value<<" "; 
-    if(dbg){
-      myfile << value <<" ";
+    float value = n.getPageRank(0) / sum; // normalized PR (divide PR by sum)
+    // float value = n.getPageRank(); // raw PR
+    // std::cout<<value<<" ";
+    if (dbg) {
+      myfile << value << " ";
     }
     Pair key(value, src);
 
-    if ((int) top.size() < topn) {
+    if ((int)top.size() < topn) {
       top.insert(std::make_pair(key, src));
       continue;
     }
@@ -144,22 +165,24 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
       top.insert(std::make_pair(key, src));
     }
   }
-  if(dbg){
+  if (dbg) {
     myfile.close();
   }
-  //std::cout<<"\nend of print\n";
+  // std::cout<<"\nend of print\n";
 
   int rank = 1;
   std::cout << "Rank PageRank Id\n";
-  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
+  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend();
+       ii != ei; ++ii, ++rank) {
     std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
   }
 }
 
-template<typename Graph>
-struct LNodeSetMarker: public std::unary_function<typename Graph::GraphNode, bool*> {
+template <typename Graph>
+struct LNodeSetMarker
+    : public std::unary_function<typename Graph::GraphNode, bool*> {
   Graph& graph;
-  LNodeSetMarker(Graph& g): graph(g) {}
+  LNodeSetMarker(Graph& g) : graph(g) {}
 
   bool* operator()(const typename Graph::GraphNode n) const {
     return &(graph.getData(n, galois::MethodFlag::UNPROTECTED).inSet);
@@ -170,7 +193,10 @@ struct Async {
   struct LNode {
     PRTy value;
     bool inSet;
-    void init() { value = 1.0 - alpha; inSet = false; }
+    void init() {
+      value = 1.0 - alpha;
+      inSet = false;
+    }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
       os << "{PR " << n.value << ", inSet " << n.inSet << "}";
@@ -178,18 +204,21 @@ struct Async {
     }
   };
 
-  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
+      InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Async"; }
-  
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
+
+  void readGraph(Graph& graph, std::string filename,
+                 std::string transposeGraphName) {
     check_types<Graph, InnerGraph>();
     if (transposeGraphName.size()) {
-      galois::graphs::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName);
     } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
+      std::cerr
+          << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
     }
   }
@@ -197,21 +226,23 @@ struct Async {
   struct Process {
     Graph& graph;
     PRTy tolerance;
-     
-    Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
+
+    Process(Graph& g, PRTy t) : graph(g), tolerance(t) {}
 
     void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
-      LNode& sdata = graph.getData(src);
+      LNode& sdata                = graph.getData(src);
       galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
-      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy pr   = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       if (diff >= tolerance) {
         sdata.value = pr;
-	// for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
-          GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, lockflag);
+        // for each out-going neighbors
+        for (auto jj = graph.edge_begin(src, lockflag),
+                  ej = graph.edge_end(src, lockflag);
+             jj != ej; ++jj) {
+          GNode dst    = graph.getEdgeDst(jj);
+          LNode& ddata = graph.getData(dst, lockflag);
           ctx.push(dst);
         }
       }
@@ -222,49 +253,58 @@ struct Async {
     typedef galois::worklists::PerSocketChunkFIFO<16> WL;
     typedef galois::worklists::PerSocketChunkTwoLevelHashFIFO<16> HSet;
     typedef galois::worklists::PerSocketChunkTwoLevelSetFIFO<16> OSet;
-    typedef galois::worklists::PerSocketChunkMarkingSetFIFO<LNodeSetMarker<Graph>,16> MSet;
+    typedef galois::worklists::PerSocketChunkMarkingSetFIFO<
+        LNodeSetMarker<Graph>, 16>
+        MSet;
 
     auto marker = LNodeSetMarker<Graph>(graph);
 
-    if(algo == Algo::asyncB_hset)
+    if (algo == Algo::asyncB_hset)
       galois::for_each(graph, Process(graph, tolerance), galois::wl<HSet>());
-    else if(algo == Algo::asyncB_mset)
-      galois::for_each(graph, Process(graph, tolerance), galois::wl<MSet>(marker));
-    else if(algo == Algo::asyncB_oset)
+    else if (algo == Algo::asyncB_mset)
+      galois::for_each(graph, Process(graph, tolerance),
+                       galois::wl<MSet>(marker));
+    else if (algo == Algo::asyncB_oset)
       galois::for_each(graph, Process(graph, tolerance), galois::wl<OSet>());
     else
       galois::for_each(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
-  void verify(Graph& graph, PRTy tolerance) {
-    verifyInOut(graph, tolerance);
-  }
+  void verify(Graph& graph, PRTy tolerance) { verifyInOut(graph, tolerance); }
 };
 
-struct AsyncNodePri{
+struct AsyncNodePri {
   struct LNode {
     PRTy value;
-    std::atomic<PRTy> residual; 
+    std::atomic<PRTy> residual;
     bool inSet;
-    void init() { value = 1.0 - alpha; residual = 0.0; inSet = false; }
+    void init() {
+      value    = 1.0 - alpha;
+      residual = 0.0;
+      inSet    = false;
+    }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
-      os << "{PR " << n.value << ", residual " << n.residual << ", inSet " << n.inSet << "}";
+      os << "{PR " << n.value << ", residual " << n.residual << ", inSet "
+         << n.inSet << "}";
       return os;
     }
   };
 
-  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
+      InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncNodePri"; }
 
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
+  void readGraph(Graph& graph, std::string filename,
+                 std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      galois::graphs::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName);
     } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
+      std::cerr
+          << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
     }
   }
@@ -281,8 +321,8 @@ struct AsyncNodePri{
       d /= tolerance;
       if (d > 50)
         return -50;
-      return -d; //d*amp; //std::max((int)floor(d*amp), 0);
-    }      
+      return -d; // d*amp; //std::max((int)floor(d*amp), 0);
+    }
     int operator()(const GNode src) const {
       PRTy d = graph.getData(src, galois::MethodFlag::UNPROTECTED).residual;
       return operator()(src, d);
@@ -294,30 +334,32 @@ struct AsyncNodePri{
     PRTy tolerance;
     PRPri pri;
 
-    Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,t) { }
+    Process(Graph& g, PRTy t, PRTy a) : graph(g), tolerance(t), pri(g, t) {}
 
     void operator()(const GNode src, galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
-      
-      if(sdata.residual < tolerance)
+
+      if (sdata.residual < tolerance)
         return;
 
       galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
-      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy diff = std::fabs(pr - sdata.value);
-      sdata.value = pr;
-      int src_nout = nout(graph,src, lockflag);
-      PRTy delta = diff*alpha/src_nout;
+      PRTy pr          = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff        = std::fabs(pr - sdata.value);
+      sdata.value      = pr;
+      int src_nout     = nout(graph, src, lockflag);
+      PRTy delta       = diff * alpha / src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getEdgeDst(jj);
+      for (auto jj = graph.edge_begin(src, lockflag),
+                ej = graph.edge_end(src, lockflag);
+           jj != ej; ++jj) {
+        GNode dst    = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
-        PRTy old = atomicAdd(ddata.residual, delta);
+        PRTy old     = atomicAdd(ddata.residual, delta);
         // if the residual is greater than tolerance
-        if(old + delta >= tolerance) {
-          //std::cerr << pri(dst, old+delta) << " ";
+        if (old + delta >= tolerance) {
+          // std::cerr << pri(dst, old+delta) << " ";
           ctx.push(dst);
         }
       }
@@ -328,10 +370,15 @@ struct AsyncNodePri{
     initResidual(graph);
     using namespace galois::worklists;
     typedef PerSocketChunkFIFO<32> WL;
-    typedef OrderedByIntegerMetric<PRPri,WL>::with_block_period<8>::type OBIM;
-    typedef detail::MarkingWorkSetMaster<GNode,LNodeSetMarker<Graph>,OBIM> ObimMSet;
-    typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;
-    typedef detail::WorkSetMaster<GNode,OBIM,galois::ThreadSafeTwoLevelHash<GNode> > ObimHSet;
+    typedef OrderedByIntegerMetric<PRPri, WL>::with_block_period<8>::type OBIM;
+    typedef detail::MarkingWorkSetMaster<GNode, LNodeSetMarker<Graph>, OBIM>
+        ObimMSet;
+    typedef detail::WorkSetMaster<GNode, OBIM,
+                                  galois::ThreadSafeTwoLevelSet<GNode>>
+        ObimOSet;
+    typedef detail::WorkSetMaster<GNode, OBIM,
+                                  galois::ThreadSafeTwoLevelHash<GNode>>
+        ObimHSet;
 
     galois::InsertBag<GNode> bag;
     PRPri pri(graph, tolerance);
@@ -339,28 +386,30 @@ struct AsyncNodePri{
     // galois::do_all(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });
-    // galois::for_each(bag, Process(graph, tolerance, amp), galois::wl<OBIM>());
+    // galois::for_each(bag, Process(graph, tolerance, amp),
+    // galois::wl<OBIM>());
 
-    if(algo == Algo::asyncB_prt_mset)
+    if (algo == Algo::asyncB_prt_mset)
       galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), galois::wl<ObimMSet>(marker,dummy,pri));
-    else if(algo == Algo::asyncB_prt_oset)
+                       Process(graph, tolerance, amp),
+                       galois::wl<ObimMSet>(marker, dummy, pri));
+    else if (algo == Algo::asyncB_prt_oset)
       galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), galois::wl<ObimOSet>(dummy,pri));
-    else if(algo == Algo::asyncB_prt_hset)
+                       Process(graph, tolerance, amp),
+                       galois::wl<ObimOSet>(dummy, pri));
+    else if (algo == Algo::asyncB_prt_hset)
       galois::for_each(graph.begin(), graph.end(),
-                       Process(graph, tolerance, amp), galois::wl<ObimHSet>(dummy,pri));
+                       Process(graph, tolerance, amp),
+                       galois::wl<ObimHSet>(dummy, pri));
     else
-      galois::for_each(graph.begin(), graph.end(), 
+      galois::for_each(graph.begin(), graph.end(),
                        Process(graph, tolerance, amp), galois::wl<OBIM>(pri));
   }
 
-  void verify(Graph& graph, PRTy tolerance) {    
-    verifyInOut(graph, tolerance);
-  }
+  void verify(Graph& graph, PRTy tolerance) { verifyInOut(graph, tolerance); }
 };
 
-template<typename Algo>
+template <typename Algo>
 void run() {
   typedef typename Algo::Graph Graph;
 
@@ -369,19 +418,23 @@ void run() {
 
   algo.readGraph(graph, filename, transposeGraphName);
 
-  galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / galois::runtime::pagePoolSize());
+  galois::preAlloc(numThreads +
+                   (2 * graph.size() * sizeof(typename Graph::node_data_type)) /
+                       galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
 
   galois::StatTimer T;
-  auto eamp = -amp;///tolerance;
+  auto eamp = -amp; /// tolerance;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "tolerance: " << tolerance << "\n";
   std::cout << "effective amp: " << eamp << "\n";
   T.start();
-  galois::do_all(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+  galois::do_all(graph, [&graph](typename Graph::GraphNode n) {
+    graph.getData(n).init();
+  });
   algo(graph, tolerance, eamp);
   T.stop();
-  
+
   galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
@@ -390,7 +443,7 @@ void run() {
   }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
   galois::StatManager statManager;
 
@@ -399,18 +452,35 @@ int main(int argc, char **argv) {
   galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-  case Algo::asyncB: run<Async>(); break;
-  case Algo::asyncB_hset: run<Async>(); break;
-  case Algo::asyncB_mset: run<Async>(); break;
-  case Algo::asyncB_oset: run<Async>(); break;
-  case Algo::asyncB_prt: run<AsyncNodePri>(); break;
-  case Algo::asyncB_prt_hset: run<AsyncNodePri>(); break;
-  case Algo::asyncB_prt_mset: run<AsyncNodePri>(); break;
-  case Algo::asyncB_prt_oset: run<AsyncNodePri>(); break;
-  default: std::cerr << "Unknown algorithm\n"; abort();
+  case Algo::asyncB:
+    run<Async>();
+    break;
+  case Algo::asyncB_hset:
+    run<Async>();
+    break;
+  case Algo::asyncB_mset:
+    run<Async>();
+    break;
+  case Algo::asyncB_oset:
+    run<Async>();
+    break;
+  case Algo::asyncB_prt:
+    run<AsyncNodePri>();
+    break;
+  case Algo::asyncB_prt_hset:
+    run<AsyncNodePri>();
+    break;
+  case Algo::asyncB_prt_mset:
+    run<AsyncNodePri>();
+    break;
+  case Algo::asyncB_prt_oset:
+    run<AsyncNodePri>();
+    break;
+  default:
+    std::cerr << "Unknown algorithm\n";
+    abort();
   }
   T.stop();
 
   return 0;
 }
-

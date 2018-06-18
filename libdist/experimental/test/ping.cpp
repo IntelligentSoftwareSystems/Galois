@@ -8,10 +8,8 @@ using namespace galois::runtime;
 
 std::atomic<int> count;
 
-int diff_micro(timeval t1, timeval t2)
-{
-  return (((t1.tv_sec - t2.tv_sec) * 1000000) + 
-          (t1.tv_usec - t2.tv_usec));
+int diff_micro(timeval t1, timeval t2) {
+  return (((t1.tv_sec - t2.tv_sec) * 1000000) + (t1.tv_usec - t2.tv_usec));
 }
 
 void func2(timeval v) {
@@ -28,7 +26,7 @@ void func(timeval v) {
 
 int main(int argc, char** argv) {
   NetworkInterface& net = getSystemNetworkInterface();
-  
+
   if (net.ID == 0) {
     for (int i = 0; i < 100; ++i) {
       ++count;

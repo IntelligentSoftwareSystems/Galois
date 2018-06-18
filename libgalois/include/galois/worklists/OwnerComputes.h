@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,19 +25,26 @@
 namespace galois {
 namespace worklists {
 
-template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkLIFO<>, typename T = int>
+template <typename OwnerFn   = DummyIndexer<int>,
+          typename Container = ChunkLIFO<>, typename T = int>
 struct OwnerComputes : private boost::noncopyable {
-  template<typename _T>
-  using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;
+  template <typename _T>
+  using retype =
+      OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;
 
-  template<bool b>
-  using rethread = OwnerComputes<OwnerFn, typename Container::template rethread<b>, T>;
+  template <bool b>
+  using rethread =
+      OwnerComputes<OwnerFn, typename Container::template rethread<b>, T>;
 
-  template<typename _container>
-  struct with_container { typedef OwnerComputes<OwnerFn, _container, T> type; };
+  template <typename _container>
+  struct with_container {
+    typedef OwnerComputes<OwnerFn, _container, T> type;
+  };
 
-  template<typename _indexer>
-  struct with_indexer { typedef OwnerComputes<_indexer, Container, T> type; };
+  template <typename _indexer>
+  struct with_indexer {
+    typedef OwnerComputes<_indexer, Container, T> type;
+  };
 
 private:
   typedef typename Container::template retype<T> lWLTy;
@@ -52,24 +59,24 @@ private:
 public:
   typedef T value_type;
 
-  void push(const value_type& val)  {
-    unsigned int index = Fn(val);
-    auto& tp = substrate::getThreadPool();
+  void push(const value_type& val) {
+    unsigned int index  = Fn(val);
+    auto& tp            = substrate::getThreadPool();
     unsigned int mindex = tp.getSocket(index);
-    //std::cerr << "[" << index << "," << index % active << "]\n";
+    // std::cerr << "[" << index << "," << index % active << "]\n";
     if (mindex == substrate::ThreadPool::getSocket())
       items.getLocal()->push(val);
     else
       pushBuffer.getRemote(mindex)->push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
@@ -78,7 +85,7 @@ public:
   }
 
   galois::optional<value_type> pop() {
-    cWL& wl = *items.getLocal();
+    cWL& wl                             = *items.getLocal();
     galois::optional<value_type> retval = wl.pop();
     if (retval)
       return retval;
@@ -89,7 +96,6 @@ public:
   }
 };
 GALOIS_WLCOMPILECHECK(OwnerComputes)
-
 
 } // end namespace worklists
 } // end namespace galois

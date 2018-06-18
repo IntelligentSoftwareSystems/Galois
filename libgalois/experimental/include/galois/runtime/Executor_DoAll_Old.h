@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,7 +38,7 @@ namespace runtime {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
-template<typename FunctionTy, typename RangeTy, typename ArgsTy>
+template <typename FunctionTy, typename RangeTy, typename ArgsTy>
 class DoAllExecutor {
 
   static const bool STEAL = exists_by_supertype<steal_tag, ArgsTy>::value;
@@ -54,12 +54,12 @@ class DoAllExecutor {
     substrate::SimpleLock stealLock;
     std::atomic<bool> avail;
 
-    state(): avail(false) { stealLock.lock(); }
+    state() : avail(false) { stealLock.lock(); }
 
     void populateSteal(iterator& begin, iterator& end) {
       if (std::distance(begin, end) > 1) {
-        avail = true;
-        stealEnd = end;
+        avail      = true;
+        stealEnd   = end;
         stealBegin = end = galois::split_range(begin, end);
       }
       stealLock.unlock();
@@ -73,7 +73,7 @@ class DoAllExecutor {
 
         if (stealBegin != stealEnd) {
           begin = stealBegin;
-          if (std::distance(stealBegin, stealEnd) < 2*minSteal)
+          if (std::distance(stealBegin, stealEnd) < 2 * minSteal)
             end = stealBegin = stealEnd;
           else
             end = stealBegin = galois::split_range(stealBegin, stealEnd);
@@ -90,14 +90,14 @@ class DoAllExecutor {
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool trySteal(state& local, iterator& begin, iterator& end, int minSteal) {
-    //First try stealing from self
+    // First try stealing from self
     if (local.doSteal(begin, end, minSteal))
       return true;
-    //Then try stealing from neighbors
-    unsigned myID = substrate::ThreadPool::getTID();
+    // Then try stealing from neighbors
+    unsigned myID  = substrate::ThreadPool::getTID();
     unsigned myPkg = substrate::ThreadPool::getSocket();
-    auto& tp = substrate::getThreadPool();
-    //try socket neighbors
+    auto& tp       = substrate::getThreadPool();
+    // try socket neighbors
     for (unsigned x = 0; x < activeThreads; ++x) {
       if (x != myID && tp.getSocket(x) == myPkg) {
         if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
@@ -109,7 +109,7 @@ class DoAllExecutor {
         }
       }
     }
-    //try some random
+    // try some random
     // auto num = (activeThreads + 7) / 8;
     // for (unsigned x = 0; x < num; ++x)
     //   if (TLDS.getRemote()->doSteal(begin, end))
@@ -119,26 +119,22 @@ class DoAllExecutor {
 
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const ArgsTy& args)
-    :
-      F(_F),
-      range(r),
-      loopname(get_by_supertype<loopname_tag>(args).getValue())
-  {
-  }
+      : F(_F), range(r),
+        loopname(get_by_supertype<loopname_tag>(args).getValue()) {}
 
   void operator()() {
-    //Assume the copy constructor on the functor is readonly
+    // Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
-    iterator end = range.local_end();
+    iterator end   = range.local_end();
 
     if (!STEAL) {
       while (begin != end) {
         F(*begin++);
       }
     } else {
-      int minSteal = std::distance(begin,end) / 8;
-      state& tld = *TLDS.getLocal();
-      tld.populateSteal(begin,end);
+      int minSteal = std::distance(begin, end) / 8;
+      state& tld   = *TLDS.getLocal();
+      tld.populateSteal(begin, end);
 
       do {
         while (begin != end) {
@@ -147,53 +143,54 @@ public:
       } while (trySteal(tld, begin, end, minSteal));
     }
   }
-
 };
 
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+template <typename RangeTy, typename FunctionTy, typename ArgsTy>
+void do_all_old_impl(const RangeTy& range, const FunctionTy& f,
+                     const ArgsTy& args) {
   DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
   substrate::getThreadPool().run(activeThreads, std::ref(W));
 };
 
 // template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-// void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy& args) {
+// void do_all_old_impl(const RangeTy& range, const FunctionTy& f, const ArgsTy&
+// args) {
 //
-  // DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
-  // substrate::getThreadPool().run(activeThreads, std::ref(W));
+// DoAllExecutor<FunctionTy, RangeTy, ArgsTy> W(f, range, args);
+// substrate::getThreadPool().run(activeThreads, std::ref(W));
 
-  // if (steal) {
-    // DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    // substrate::getThreadPool().run(activeThreads, std::ref(W));
-  // } else {
-    // FunctionTy f_cpy (f);
-    // substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
-        // auto begin = range.local_begin();
-        // auto end = range.local_end();
-        // while (begin != end)
-          // f_cpy(*begin++);
-      // });
-  // }
+// if (steal) {
+// DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
+// substrate::getThreadPool().run(activeThreads, std::ref(W));
+// } else {
+// FunctionTy f_cpy (f);
+// substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+// auto begin = range.local_begin();
+// auto end = range.local_end();
+// while (begin != end)
+// f_cpy(*begin++);
+// });
+// }
 // }
 
 // TODO: Need to decide whether user should provide num_run tag or
 // num_run can be provided by loop instance which is guaranteed to be unique
-template<typename RangeTy, typename FunctionTy, typename TupleTy>
-void do_all_gen_old(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+template <typename RangeTy, typename FunctionTy, typename TupleTy>
+void do_all_gen_old(const RangeTy& r, const FunctionTy& fn,
+                    const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const*, TupleTy>::value,
+                "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
 
-  auto dtpl = std::tuple_cat(tpl,
-      get_default_trait_values(tpl,
-        std::make_tuple(loopname_tag{}),
-        std::make_tuple(loopname{})));
+  auto dtpl = std::tuple_cat(
+      tpl, get_default_trait_values(tpl, std::make_tuple(loopname_tag{}),
+                                    std::make_tuple(loopname{})));
 
-  do_all_old_impl( r, fn, dtpl);
+  do_all_old_impl(r, fn, dtpl);
 }
-
 
 } // end namespace runtime
 } // end namespace galois
 
-#endif// GALOIS_RUNTIME_EXECUTOR_DOALL_OLD_H
+#endif // GALOIS_RUNTIME_EXECUTOR_DOALL_OLD_H

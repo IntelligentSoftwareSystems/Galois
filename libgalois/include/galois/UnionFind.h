@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,15 +27,16 @@ namespace galois {
  * Intrusive union-find implementation. Users subclass this to get disjoint
  * functionality for the subclass object.
  */
-template<typename T>
+template <typename T>
 class UnionFindNode {
   T* findImpl() const {
-    if (isRep()) return m_component.load(std::memory_order_relaxed);
+    if (isRep())
+      return m_component.load(std::memory_order_relaxed);
 
     T* rep = m_component;
     while (rep->m_component != rep) {
       T* next = rep->m_component.load(std::memory_order_relaxed);
-      rep = next;
+      rep     = next;
     }
     return rep;
   }
@@ -43,7 +44,7 @@ class UnionFindNode {
 protected:
   std::atomic<T*> m_component;
 
-  UnionFindNode(T* s): m_component(s) { }
+  UnionFindNode(T* s) : m_component(s) {}
 
 public:
   typedef UnionFindNode<T> SuperTy;
@@ -61,18 +62,19 @@ public:
     // compressions along two different paths to the root can create a cycle
     // in the union-find tree. Prevent that from happening by compressing
     // incrementally.
-    if (isRep()) return m_component.load(std::memory_order_relaxed);
+    if (isRep())
+      return m_component.load(std::memory_order_relaxed);
 
-    T* rep = m_component;
+    T* rep  = m_component;
     T* prev = 0;
     while (rep->m_component.load(std::memory_order_relaxed) != rep) {
       T* next = rep->m_component.load(std::memory_order_relaxed);
-    
+
       if (prev && prev->m_component.load(std::memory_order_relaxed) == rep) {
         prev->m_component.store(next, std::memory_order_relaxed);
       }
       prev = rep;
-      rep = next;
+      rep  = next;
     }
 
     return rep;
@@ -95,5 +97,5 @@ public:
     }
   }
 };
-}
+} // namespace galois
 #endif

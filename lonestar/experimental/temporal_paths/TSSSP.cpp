@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,20 +31,19 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Temporal Paths";
-static const char* desc =
-  "Computes the Earliest arrival time from a source node to all other nodes in a directed multi-graph";
+static const char* desc = "Computes the Earliest arrival time from a source "
+                          "node to all other nodes in a directed multi-graph";
 static const char* url = "temporal_path";
 
-static cll::opt<std::string> filename(cll::Positional, 
-                                      cll::desc("<input graph>"), 
-                                      cll::Required);
+static cll::opt<std::string>
+    filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 
 static cll::opt<unsigned int> startNode("startNode",
                                         cll::desc("Node to start search from"),
                                         cll::init(0));
-static cll::opt<unsigned int> reportNode("reportNode", 
-                                         cll::desc("Node to report distance to"),
-                                         cll::init(1));
+static cll::opt<unsigned int>
+    reportNode("reportNode", cll::desc("Node to report distance to"),
+               cll::init(1));
 static cll::opt<int> stepShift("delta",
                                cll::desc("Shift value for the deltastep"),
                                cll::init(10));
@@ -55,7 +54,8 @@ struct time_dir {
   timeTy d;
 };
 
-typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir> Graph;
+typedef galois::graphs::LC_InlineEdge_Graph<std::atomic<timeTy>, time_dir>
+    Graph;
 typedef Graph::GraphNode GNode;
 
 struct EarlyArivalTime {
@@ -63,8 +63,8 @@ struct EarlyArivalTime {
   EarlyArivalTime(Graph& g) : graph(g) {}
   void operator()(GNode src, galois::UserContext<GNode>& ctx) {
     const galois::MethodFlag flag = galois::MethodFlag::UNPROTECTED;
-    auto& srcV = graph.getData(src, flag);
-    
+    auto& srcV                    = graph.getData(src, flag);
+
     for (auto ii : graph.edges(src, flag)) {
       GNode dst   = graph.getEdgeDst(ii);
       auto& dstV  = graph.getData(dst, flag);
@@ -73,7 +73,8 @@ struct EarlyArivalTime {
         auto newDist = edgeV.t + edgeV.d;
         auto oldDist = dstV.load(std::memory_order_relaxed);
         while (oldDist > newDist) {
-          if (dstV.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
+          if (dstV.compare_exchange_weak(oldDist, newDist,
+                                         std::memory_order_relaxed)) {
             ctx.push(dst);
           }
         }
@@ -86,7 +87,9 @@ struct GNIndexer {
   Graph& g;
   GNIndexer(Graph& g) : g(g) {}
   unsigned long operator()(const GNode& val) const {
-    return g.getData(val, galois::MethodFlag::UNPROTECTED).load(std::memory_order_relaxed) >> stepShift;
+    return g.getData(val, galois::MethodFlag::UNPROTECTED)
+               .load(std::memory_order_relaxed) >>
+           stepShift;
   }
 };
 
@@ -96,11 +99,11 @@ int main(int argc, char** argv) {
 
   galois::StatTimer T("OverheadTime");
   T.start();
-  
+
   Graph graph;
   GNode source, report;
 
-  galois::graphs::readGraph(graph, filename); 
+  galois::graphs::readGraph(graph, filename);
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
@@ -113,7 +116,7 @@ int main(int argc, char** argv) {
   auto it = graph.begin();
   std::advance(it, startNode);
   source = *it;
-  it = graph.begin();
+  it     = graph.begin();
   std::advance(it, reportNode);
   report = *it;
 
@@ -128,30 +131,35 @@ int main(int argc, char** argv) {
   for (auto n : graph) {
     for (auto e : graph.edges(n)) {
       graph.getEdgeData(e).t = ++t;
-      graph.getEdgeData(e).d = 0; t % 3;
+      graph.getEdgeData(e).d = 0;
+      t % 3;
     }
   }
 
   std::cout << "Running Asynch with CAS version\n";
   std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
-  std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
-  std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
-  galois::do_all(graph, 
-                       [&graph] (GNode n) { graph.getData(n) = std::numeric_limits<timeTy>::max(); } );
+  std::cout
+      << "WARNING: Performance varies considerably due to delta parameter.\n";
+  std::cout
+      << "WARNING: Do not expect the default to be good for your graph.\n";
+  galois::do_all(graph, [&graph](GNode n) {
+    graph.getData(n) = std::numeric_limits<timeTy>::max();
+  });
   graph.getData(source) = 0;
   galois::StatTimer Tmain;
   Tmain.start();
 
   using namespace galois::worklists;
   typedef PerSocketChunkFIFO<64> PSchunk;
-  typedef OrderedByIntegerMetric<GNIndexer,PSchunk> OBIM;
-  galois::for_each(source, EarlyArivalTime{graph}, galois::wl<OBIM>(GNIndexer{graph}), galois::no_conflicts());
+  typedef OrderedByIntegerMetric<GNIndexer, PSchunk> OBIM;
+  galois::for_each(source, EarlyArivalTime{graph},
+                   galois::wl<OBIM>(GNIndexer{graph}), galois::no_conflicts());
   Tmain.stop();
   T.stop();
 
   galois::reportPageAlloc("MeminfoPost");
   galois::runtime::reportNumaAlloc("NumaPost");
-  
+
   std::cout << "Node " << reportNode << " has earliest time "
             << graph.getData(report) << "\n";
 

@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -52,21 +52,21 @@ struct mpiMessage {
   uint32_t tag;
   std::vector<uint8_t> buf;
 
-  mpiMessage() { }
+  mpiMessage() {}
 
-  mpiMessage(uint32_t r, uint32_t t, std::vector<uint8_t> &b) :
-    rank(r), tag(t), buf(std::move(b))  {};
+  mpiMessage(uint32_t r, uint32_t t, std::vector<uint8_t>& b)
+      : rank(r), tag(t), buf(std::move(b)){};
 };
 
 void* alloc_cb(void* ctx, size_t size) {
   lc_mem_fence();
-  mpiMessage* msg = (mpiMessage*) ctx;
+  mpiMessage* msg = (mpiMessage*)ctx;
   msg->buf.resize(size);
   return msg->buf.data();
 }
 
 void thread_signal(void* signal) {
-  mpiMessage* msg = (mpiMessage*) signal;
+  mpiMessage* msg = (mpiMessage*)signal;
   delete msg;
 }
 
@@ -74,13 +74,9 @@ void thread_signal(void* signal) {
  * LWCI implementation of network IO.
  */
 class NetworkIOLWCI : public galois::runtime::NetworkIO {
-  static int getID() {
-    return lc_id(mv);
-  }
+  static int getID() { return lc_id(mv); }
 
-  static int getNum() {
-    return lc_size(mv);
-  }
+  static int getNum() { return lc_size(mv); }
 
   /**
    * Initializes LWCI's communication layer. (even though it says initMPI...)
@@ -102,29 +98,29 @@ public:
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */
-  NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM) 
+  NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID,
+                uint32_t& NUM)
       : NetworkIO(tracker) {
     auto p = initMPI();
-    ID = p.first;
-    NUM = p.second;
-    save = ID;
+    ID     = p.first;
+    NUM    = p.second;
+    save   = ID;
   }
 
   /**
    * Closes the LCI channel
    */
-  ~NetworkIOLWCI() {
-    lc_close(mv);
-  }
+  ~NetworkIOLWCI() { lc_close(mv); }
 
   virtual void enqueue(message m) {
     memUsageTracker.incrementMemUsage(m.data.size());
     mpiMessage* f = new mpiMessage(m.host, m.tag, m.data);
-    lc_info info = {LC_SYNC_WAKE, LC_SYNC_NULL, {0, (int16_t) m.tag}};
-    while (!lc_send_queue(mv, f->buf.data(), f->buf.size(), m.host, &info, &f->ctx)) {
+    lc_info info  = {LC_SYNC_WAKE, LC_SYNC_NULL, {0, (int16_t)m.tag}};
+    while (!lc_send_queue(mv, f->buf.data(), f->buf.size(), m.host, &info,
+                          &f->ctx)) {
       progress();
     }
-    if (lc_post(&f->ctx, (void*) f)) {
+    if (lc_post(&f->ctx, (void*)f)) {
       delete f;
     }
   }
@@ -132,8 +128,10 @@ public:
   void probe() {
     recv.emplace_back();
     auto& m = recv.back();
-    size_t size; lc_qtag tag;
-    if (lc_recv_queue(mv, &size, (int*) &m.rank, (lc_qtag*) &tag, 0, alloc_cb, &m, LC_SYNC_NULL, &m.ctx)) {
+    size_t size;
+    lc_qtag tag;
+    if (lc_recv_queue(mv, &size, (int*)&m.rank, (lc_qtag*)&tag, 0, alloc_cb, &m,
+                      LC_SYNC_NULL, &m.ctx)) {
       m.tag = tag;
       memUsageTracker.incrementMemUsage(size);
     } else {
@@ -144,8 +142,8 @@ public:
   virtual message dequeue() {
     if (!recv.empty()) {
       uint32_t min_tag = std::numeric_limits<uint32_t>::max();
-      for (auto it = recv.begin(); it != recv.end(); it ++) {
-        auto &m = *it;
+      for (auto it = recv.begin(); it != recv.end(); it++) {
+        auto& m = *it;
         if ((m.tag < min_tag) && (m.tag > 0)) {
           min_tag = m.tag;
         }
@@ -175,10 +173,11 @@ public:
  * @returns Tuple with a pointer to the LWCI network IO as well as the id of
  * the caller in the network layer + total number of hosts in the system.
  */
-std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t> 
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>
 galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker) {
   uint32_t ID, NUM;
-  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOLWCI(tracker, ID, NUM)};
+  std::unique_ptr<galois::runtime::NetworkIO> n{
+      new NetworkIOLWCI(tracker, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 

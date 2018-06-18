@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,7 +25,7 @@ static thread_local ResolveCache* thread_resolve = nullptr;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-//ancor vtable
+// ancor vtable
 internal::remoteObj::~remoteObj() {}
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,11 +66,8 @@ bool CacheManager::isCurrent(fatPointer ptr, void* obj) {
   return obj == resolve(ptr);
 }
 
-size_t CacheManager::CM_size(){
-  return remoteObjects.size();
-}
+size_t CacheManager::CM_size() { return remoteObjects.size(); }
 ////////////////////////////////////////////////////////////////////////////////
-
 
 void* ResolveCache::resolve(fatPointer ptr) {
   void* a = addrs[ptr];
@@ -93,10 +90,7 @@ void ResolveCache::reset() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-
-ResolveCache* galois::runtime::getThreadResolve() {
-  return thread_resolve;
-}
+ResolveCache* galois::runtime::getThreadResolve() { return thread_resolve; }
 
 void galois::runtime::setThreadResolve(ResolveCache* rc) {
   thread_resolve = rc;

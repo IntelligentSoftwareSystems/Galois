@@ -38,7 +38,7 @@ static void LibHoard_ThreadExit() {}
 //-----------------------------------------------------------------------
 
 #if defined(DMP_ENABLE_MODEL_STM)
-#define DMPthread_addToRunnableQueue      __DMPthread_addToRunnableQueue__
+#define DMPthread_addToRunnableQueue __DMPthread_addToRunnableQueue__
 #define DMPthread_removeFromRunnableQueue __DMPthread_removeFromRunnableQueue__
 #endif
 
@@ -49,28 +49,28 @@ void DMPthread_addToRunnableQueue(DmpThreadInfo* dmp) {
   assert(dmp->nextRunnable == NULL);
 
   DmpThreadInfo* before = DMPfirstRunnable;
-  DMPfirstRunnable   = dmp;
-  DMPfirstRunnableID = dmp->threadID;
+  DMPfirstRunnable      = dmp;
+  DMPfirstRunnableID    = dmp->threadID;
   ++DMPnumRunnableThreads;
 
   // Special case for an empty queue.
   if (before == NULL) {
-    dmp->prevRunnable = dmp;
-    dmp->nextRunnable = dmp;
+    dmp->prevRunnable   = dmp;
+    dmp->nextRunnable   = dmp;
     dmp->nextRunnableID = dmp->threadID;
     dmp->isLastRunnable = true;
     return;
   }
 
   // Insert 'dmp' before 'before'.
-  DmpThreadInfo* prev = before->prevRunnable;
-  DmpThreadInfo* next = before;
+  DmpThreadInfo* prev  = before->prevRunnable;
+  DmpThreadInfo* next  = before;
   prev->nextRunnableID = dmp->threadID;
-  prev->nextRunnable = dmp;
-  next->prevRunnable = dmp;
-  dmp->prevRunnable = prev;
-  dmp->nextRunnable = next;
-  dmp->nextRunnableID = next->threadID;
+  prev->nextRunnable   = dmp;
+  next->prevRunnable   = dmp;
+  dmp->prevRunnable    = prev;
+  dmp->nextRunnable    = next;
+  dmp->nextRunnableID  = next->threadID;
 }
 
 void DMPthread_removeFromRunnableQueue(DmpThreadInfo* dmp) {
@@ -81,14 +81,14 @@ void DMPthread_removeFromRunnableQueue(DmpThreadInfo* dmp) {
   assert(DMPnumRunnableThreads != 1);
   --DMPnumRunnableThreads;
 
-  DmpThreadInfo* prev = dmp->prevRunnable;
-  DmpThreadInfo* next = dmp->nextRunnable;
+  DmpThreadInfo* prev  = dmp->prevRunnable;
+  DmpThreadInfo* next  = dmp->nextRunnable;
   prev->nextRunnableID = next->threadID;
-  prev->nextRunnable = next;
-  next->prevRunnable = prev;
-  dmp->prevRunnable = NULL;
-  dmp->nextRunnable = NULL;
-  dmp->nextRunnableID = -1;
+  prev->nextRunnable   = next;
+  next->prevRunnable   = prev;
+  dmp->prevRunnable    = NULL;
+  dmp->nextRunnable    = NULL;
+  dmp->nextRunnableID  = -1;
 
   if (DMPfirstRunnable == dmp) {
     DMPfirstRunnable   = next;
@@ -96,7 +96,7 @@ void DMPthread_removeFromRunnableQueue(DmpThreadInfo* dmp) {
   }
 
   if (dmp->isLastRunnable) {
-    dmp->isLastRunnable = false;
+    dmp->isLastRunnable  = false;
     prev->isLastRunnable = true;
   }
 }
@@ -121,13 +121,14 @@ void DMPthread_finalize(void* raw) {
   // Finished: run DMP cleanup code.
   DMP_sleepAndTerminate();
   --DMPnumLiveThreads;
-  DEBUG_MSG(DEBUG_LIFEDEATH, "Terminated thread %d, %p", DMPMAP->threadID, DMPMAP);
+  DEBUG_MSG(DEBUG_LIFEDEATH, "Terminated thread %d, %p", DMPMAP->threadID,
+            DMPMAP);
 
   // Record the completion time.
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  DMP_printf("DMP Thread: %p: %d: End: %ld s + %ld ms\n",
-             DMPMAP, DMPMAP->threadID, tv.tv_sec, tv.tv_usec);
+  DMP_printf("DMP Thread: %p: %d: End: %ld s + %ld ms\n", DMPMAP,
+             DMPMAP->threadID, tv.tv_sec, tv.tv_usec);
 }
 
 //-----------------------------------------------------------------------
@@ -174,7 +175,7 @@ static DmpThreadInfo* DMPthread_alloc() {
 
   // Do basic initialization on 'dmp': we finish in DMPthread_init().
   dmp->threadID = id;
-  dmp->exited = 0;
+  dmp->exited   = 0;
 
   return dmp;
 }
@@ -184,10 +185,10 @@ static void DMPthread_init(DmpThreadInfo* dmp) {
 
   // Finish initializing the DmpThreadInfo.
   // NOTE: we are running in serial mode on behalf of 'creator'.
-  DMPMAP = dmp;
-  DMPMAP->self = pthread_self();
-  DMPMAP->state = JustWokeUp;
-  DMPMAP->schedulingChunk = DMP_SCHEDULING_CHUNK_SIZE;
+  DMPMAP                      = dmp;
+  DMPMAP->self                = pthread_self();
+  DMPMAP->state               = JustWokeUp;
+  DMPMAP->schedulingChunk     = DMP_SCHEDULING_CHUNK_SIZE;
   DMPMAP->roundBarrierAtStart = DMProundBarrier;
 
   DMPthread_addToRunnableQueue(DMPMAP);
@@ -198,7 +199,7 @@ static void DMPthread_init(DmpThreadInfo* dmp) {
   DEBUG_MSG(DEBUG_LIFEDEATH, "Live threads: %d", DMPnumLiveThreads);
 }
 
-static void* DMPthread_run(void *raw) {
+static void* DMPthread_run(void* raw) {
   // This new thread starts running on behalf of 'creator', who is
   // blocked waiting for us to finish initialization, so finish and
   // then notify our creator that we're ready to run.
@@ -213,8 +214,8 @@ static void* DMPthread_run(void *raw) {
 
   struct timeval tv;
   gettimeofday(&tv, NULL);
-  DMP_printf("DMP Thread: %d: Start: %ld s + %ld ms\n",
-             DMPMAP->threadID, tv.tv_sec, tv.tv_usec);
+  DMP_printf("DMP Thread: %d: Start: %ld s + %ld ms\n", DMPMAP->threadID,
+             tv.tv_sec, tv.tv_usec);
 
   // Go! Setup cleanup a handler in case someone calls pthread_exit().
   void* r;
@@ -225,8 +226,8 @@ static void* DMPthread_run(void *raw) {
   return r;
 }
 
-int DMPthread_create(pthread_t *thread, pthread_attr_t *attr,
-                     void *(*start_routine)(void*), void *start_arg) {
+int DMPthread_create(pthread_t* thread, pthread_attr_t* attr,
+                     void* (*start_routine)(void*), void* start_arg) {
   pthread_attr_t the_attr;
   pthread_t the_thread;
 
@@ -249,11 +250,11 @@ int DMPthread_create(pthread_t *thread, pthread_attr_t *attr,
 
   // Now create the thread and block until it is ready to run.
   DmpThreadRunArg* run = (DmpThreadRunArg*)alloc_cache_aligned(sizeof *run);
-  run->start_routine = start_routine;
-  run->start_arg = start_arg;
-  run->dmp = dmp;
-  run->creator = DMPMAP;
-  run->ready = 0;
+  run->start_routine   = start_routine;
+  run->start_arg       = start_arg;
+  run->dmp             = dmp;
+  run->creator         = DMPMAP;
+  run->ready           = 0;
   const int r = pthread_create(thread, attr, DMPthread_run, (void*)run);
 
   if (r == 0) {
@@ -288,16 +289,19 @@ void DMPthread_initMainThread() {
 // Thread join and cancelation
 //-----------------------------------------------------------------------
 
-int DMPthread_join(pthread_t thread, void **value_ptr) {
+int DMPthread_join(pthread_t thread, void** value_ptr) {
   // This doesn't need to wait until serial mode. Consider this
   // analogy: 'exited' is a shared variable which written by the
   // exiting thread and read by the joiner thread.  Obviously,
   // the exiting thread must write to 'exited' in serial mode.
 
   DmpThreadInfo* dmp = find_thread(thread);
-  if (dmp == NULL) return ESRCH;
-  if (dmp == DMPMAP) return EDEADLK;
-  if (dmp->joiner != NULL) return EINVAL;
+  if (dmp == NULL)
+    return ESRCH;
+  if (dmp == DMPMAP)
+    return EDEADLK;
+  if (dmp->joiner != NULL)
+    return EINVAL;
 
   // Wait for the thread to die.
   if (!dmp->exited) {
@@ -311,7 +315,7 @@ int DMPthread_join(pthread_t thread, void **value_ptr) {
   }
 
   // Now join on the thread.
-  int ret = pthread_join(thread, value_ptr);
+  int ret   = pthread_join(thread, value_ptr);
   dmp->self = 0x0;
   return ret;
 }
@@ -320,7 +324,8 @@ int DMPthread_cancel(pthread_t thread) {
   DMP_waitForSerialMode();
 
   DmpThreadInfo* dmp = find_thread(thread);
-  if (dmp == NULL) return ESRCH;
+  if (dmp == NULL)
+    return ESRCH;
 
   // Mark the thread canceled.
   dmp->canceled = true;

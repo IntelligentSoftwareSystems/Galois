@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,24 +28,27 @@ namespace galois {
 namespace substrate {
 
 // Store an item with padding
-template<typename T>
+template <typename T>
 struct CacheLineStorage {
   alignas(GALOIS_CACHE_LINE_SIZE) T data;
 
   char buffer[GALOIS_CACHE_LINE_SIZE - (sizeof(T) % GALOIS_CACHE_LINE_SIZE)];
-  //static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
+  // static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
 
-  CacheLineStorage() :data() {}
-  CacheLineStorage(const T& v) :data(v) {}
+  CacheLineStorage() : data() {}
+  CacheLineStorage(const T& v) : data(v) {}
 
-  template<typename A>
-  explicit CacheLineStorage(A&& v) :data(std::forward<A>(v)) {}
+  template <typename A>
+  explicit CacheLineStorage(A&& v) : data(std::forward<A>(v)) {}
 
   explicit operator T() { return data; }
 
   T& get() { return data; }
-  template<typename V>
-  CacheLineStorage& operator=(const V& v) { data = v; return *this; }
+  template <typename V>
+  CacheLineStorage& operator=(const V& v) {
+    data = v;
+    return *this;
+  }
 };
 
 } // end namespace substrate

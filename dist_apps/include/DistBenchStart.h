@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -46,9 +46,7 @@ extern cll::opt<std::string> statFile;
 extern cll::opt<bool> verify;
 
 #ifdef __GALOIS_HET_CUDA__
-enum Personality {
-   CPU, GPU_CUDA, GPU_OPENCL
-};
+enum Personality { CPU, GPU_CUDA, GPU_OPENCL };
 
 std::string personality_str(Personality p);
 
@@ -70,14 +68,14 @@ extern cll::opt<std::string> personality_set;
  * @param desc Description of the application
  * @param url URL to the application
  */
-void DistBenchStart(int argc, char** argv, const char* app, 
+void DistBenchStart(int argc, char** argv, const char* app,
                     const char* desc = nullptr, const char* url = nullptr);
 
 #ifdef __GALOIS_HET_CUDA__
 // in internal namespace because this function shouldn't be called elsewhere
 namespace internal {
 void heteroSetup(std::vector<unsigned>& scaleFactor);
-}; // end internal namespace
+}; // namespace internal
 
 /**
  * Given a loaded graph, marshal it over to the GPU device for use
@@ -87,13 +85,13 @@ void heteroSetup(std::vector<unsigned>& scaleFactor);
  * @param cuda_ctx the CUDA context of the currently running program
  */
 template <typename NodeData, typename EdgeData>
-static void marshalGPUGraph(galois::graphs::DistGraph<NodeData, 
-                                                      EdgeData>* loadedGraph,
-                            struct CUDA_Context** cuda_ctx) {
-  auto& net = galois::runtime::getSystemNetworkInterface();
+static void
+marshalGPUGraph(galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph,
+                struct CUDA_Context** cuda_ctx) {
+  auto& net                 = galois::runtime::getSystemNetworkInterface();
   const unsigned my_host_id = galois::runtime::getHostID();
 
-  galois::StatTimer marshalTimer("TIMER_GRAPH_MARSHAL", "DistBench"); 
+  galois::StatTimer marshalTimer("TIMER_GRAPH_MARSHAL", "DistBench");
 
   marshalTimer.start();
 
@@ -108,16 +106,15 @@ static void marshalGPUGraph(galois::graphs::DistGraph<NodeData,
     (*loadedGraph).getMarshalGraph(m);
     load_graph_CUDA(*cuda_ctx, m, net.Num);
   } else if (personality == GPU_OPENCL) {
-    //galois::opencl::cl_env.init(cldevice.Value);
+    // galois::opencl::cl_env.init(cldevice.Value);
   }
 
   marshalTimer.stop();
 }
 #endif
 
-
 /**
- * Loads a graph into memory. Details/partitioning will be handled in the 
+ * Loads a graph into memory. Details/partitioning will be handled in the
  * construct graph call.
  *
  * The user should NOT call this function.
@@ -135,25 +132,27 @@ static void marshalGPUGraph(galois::graphs::DistGraph<NodeData,
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-static galois::graphs::DistGraph<NodeData, EdgeData>* loadDGraph(
-    std::vector<unsigned>& scaleFactor,
-    struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
+static galois::graphs::DistGraph<NodeData, EdgeData>*
+loadDGraph(std::vector<unsigned>& scaleFactor,
+           struct CUDA_Context** cuda_ctx = nullptr) {
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
   galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
-  loadedGraph = galois::graphs::constructGraph<NodeData, EdgeData, 
-                                               iterateOutEdges>(scaleFactor);
+  loadedGraph =
+      galois::graphs::constructGraph<NodeData, EdgeData, iterateOutEdges>(
+          scaleFactor);
   assert(loadedGraph != nullptr);
 
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   marshalGPUGraph(loadedGraph, cuda_ctx);
-  #endif
+#endif
 
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file(localGraphFileName);
+  if (saveLocalGraph)
+    (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
@@ -175,18 +174,18 @@ static galois::graphs::DistGraph<NodeData, EdgeData>* loadDGraph(
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-static galois::graphs::DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
-    std::vector<unsigned>& scaleFactor,
-    struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
+static galois::graphs::DistGraph<NodeData, EdgeData>*
+loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
+                    struct CUDA_Context** cuda_ctx = nullptr) {
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
   galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
   if (inputFileSymmetric) {
-    loadedGraph = galois::graphs::constructSymmetricGraph<NodeData, 
-                                                          EdgeData>(scaleFactor);
+    loadedGraph = galois::graphs::constructSymmetricGraph<NodeData, EdgeData>(
+        scaleFactor);
   } else {
     GALOIS_DIE("must use -symmetricGraph flag with a symmetric graph for "
                "this benchmark");
@@ -194,14 +193,15 @@ static galois::graphs::DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
 
   assert(loadedGraph != nullptr);
 
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   marshalGPUGraph(loadedGraph, cuda_ctx);
-  #endif
+#endif
 
   dGraphTimer.stop();
 
   // Save local graph structure
-  if (saveLocalGraph) (*loadedGraph).save_local_graph_to_file(localGraphFileName);
+  if (saveLocalGraph)
+    (*loadedGraph).save_local_graph_to_file(localGraphFileName);
 
   return loadedGraph;
 }
@@ -223,25 +223,24 @@ static galois::graphs::DistGraph<NodeData, EdgeData>* loadSymmetricDGraph(
  * @returns Pointer to the loaded 2-way graph
  */
 template <typename NodeData, typename EdgeData>
-static galois::graphs::DistGraph<NodeData, EdgeData, true>* 
+static galois::graphs::DistGraph<NodeData, EdgeData, true>*
 loadBDGraph(std::vector<unsigned>& scaleFactor,
             struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench"); 
+  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
   dGraphTimer.start();
 
-  galois::graphs::DistGraph<NodeData, EdgeData, true>* 
-      loadedGraph = nullptr;
+  galois::graphs::DistGraph<NodeData, EdgeData, true>* loadedGraph = nullptr;
 
   // make sure that the symmetric graph flag was passed in
-  loadedGraph = 
-    galois::graphs::constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
+  loadedGraph =
+      galois::graphs::constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
   assert(loadedGraph != nullptr);
 
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   // TODO marshal the incoming edges as well....... (for now we don't have
   // support for it)
   marshalGPUGraph(loadedGraph, cuda_ctx);
-  #endif
+#endif
 
   dGraphTimer.stop();
 
@@ -264,15 +263,15 @@ loadBDGraph(std::vector<unsigned>& scaleFactor,
  * @returns Pointer to the loaded graph
  */
 template <typename NodeData, typename EdgeData, bool iterateOutEdges = true>
-galois::graphs::DistGraph<NodeData, EdgeData>* 
+galois::graphs::DistGraph<NodeData, EdgeData>*
 distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
   return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor, cuda_ctx);
-  #else
+#else
   return loadDGraph<NodeData, EdgeData, iterateOutEdges>(scaleFactor);
-  #endif
+#endif
 }
 
 /**
@@ -289,31 +288,31 @@ distGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
  * @returns Pointer to the loaded symmetric graph
  */
 template <typename NodeData, typename EdgeData>
-galois::graphs::DistGraph<NodeData, EdgeData>* 
+galois::graphs::DistGraph<NodeData, EdgeData>*
 symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
 
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
-  #else
+#else
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
-  #endif
+#endif
 }
 
 /**
  * TODO
  */
 template <typename NodeData, typename EdgeData>
-galois::graphs::DistGraph<NodeData, EdgeData, true>* 
+galois::graphs::DistGraph<NodeData, EdgeData, true>*
 twoWayDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   std::vector<unsigned> scaleFactor;
-  #ifdef __GALOIS_HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   internal::heteroSetup(scaleFactor);
   return loadBDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
-  #else
+#else
   return loadBDGraph<NodeData, EdgeData>(scaleFactor);
-  #endif
+#endif
 }
 
 #endif

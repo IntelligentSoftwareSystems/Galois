@@ -1,13 +1,13 @@
 /*
    gg.h
 
-   Implements the main GG header file. Part of the GGC source code. 
+   Implements the main GG header file. Part of the GGC source code.
 
    Copyright (C) 2014--2016, The University of Texas at Austin
 
    See LICENSE.TXT for copyright license.
 
-   Author: Sreepathi Pai <sreepai@ices.utexas.edu> 
+   Author: Sreepathi Pai <sreepai@ices.utexas.edu>
 
    TODO: RTLICENSE
 */
@@ -26,15 +26,17 @@
 
 #ifndef GGDEBUG
 #define GGDEBUG 0
-#endif 
+#endif
 
-#define dprintf	if (debug) printf
+#define dprintf                                                                \
+  if (debug)                                                                   \
+  printf
 unsigned const debug = GGDEBUG;
 
 #include "Timer.h"
 
-static void check_cuda_error(const cudaError_t e, const char *file, const int line)
-{
+static void check_cuda_error(const cudaError_t e, const char* file,
+                             const int line) {
   if (e != cudaSuccess) {
     fprintf(stderr, "%s:%d: %s (%d)\n", file, line, cudaGetErrorString(e), e);
     exit(1);
@@ -42,9 +44,11 @@ static void check_cuda_error(const cudaError_t e, const char *file, const int li
 }
 
 template <typename T>
-static void check_retval(const T retval, const T expected, const char *file, const int line) {
-  if(retval != expected) {
-    fprintf(stderr, "%s:%d: Got %d, expected %d\n", file, line, retval, expected);
+static void check_retval(const T retval, const T expected, const char* file,
+                         const int line) {
+  if (retval != expected) {
+    fprintf(stderr, "%s:%d: Got %d, expected %d\n", file, line, retval,
+            expected);
     exit(1);
   }
 }
@@ -54,7 +58,10 @@ inline static __device__ __host__ int roundup(int a, int r) {
 }
 
 inline static __device__ __host__ int GG_MIN(int x, int y) {
-  if(x > y) return y; else return x;
+  if (x > y)
+    return y;
+  else
+    return x;
 }
 
 #define check_cuda(x) check_cuda_error(x, __FILE__, __LINE__)
@@ -80,4 +87,4 @@ inline static __device__ __host__ int GG_MIN(int x, int y) {
 #include <util/mgpucontext.h>
 
 extern mgpu::ContextPtr mgc;
-#endif 
+#endif

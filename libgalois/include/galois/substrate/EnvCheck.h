@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,21 +32,24 @@ namespace impl {
 template <typename T>
 struct ConvByType {};
 
-template <> struct ConvByType<int> {
+template <>
+struct ConvByType<int> {
   static void go(const char* varVal, int& ret) {
     assert(varVal);
     ret = std::atoi(varVal);
   }
 };
 
-template <> struct ConvByType<double> {
+template <>
+struct ConvByType<double> {
   static void go(const char* varVal, double& ret) {
     assert(varVal);
     ret = std::atof(varVal);
   }
 };
 
-template <> struct ConvByType<std::string> {
+template <>
+struct ConvByType<std::string> {
   static void go(const char* varVal, std::string& ret) {
     assert(varVal);
     ret = varVal;
@@ -72,7 +75,8 @@ bool EnvCheck(const char* varName);
 bool EnvCheck(const std::string& varName);
 
 /**
- * Return true if Enviroment variable is set, and extract its value into 'retVal' parameter
+ * Return true if Enviroment variable is set, and extract its value into
+ * 'retVal' parameter
  * @param varName: name of the variable
  * @param retVal: lvalue to store the value of environment variable
  * @return true if environment variable set, false otherwise

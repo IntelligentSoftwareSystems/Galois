@@ -32,15 +32,15 @@ using namespace benchIO;
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<triangleFile> <rayFile> <intersectFile>");
-  char* triFile = P.getArgument(2);
-  char* rayFile = P.getArgument(1);
+  commandLine P(argc, argv, "<triangleFile> <rayFile> <intersectFile>");
+  char* triFile       = P.getArgument(2);
+  char* rayFile       = P.getArgument(1);
   char* intersectFile = P.getArgument(0);
 
   // the 1 argument means that the vertices are labeled starting at 1
-  triangles<point3d> T = readTrianglesFromFile<point3d>(triFile,1);
-  _seq<point3d> Pts = readPointsFromFile<point3d>(rayFile);
-  _seq<int> Is = readIntArrayFromFile(intersectFile);
+  triangles<point3d> T = readTrianglesFromFile<point3d>(triFile, 1);
+  _seq<point3d> Pts    = readPointsFromFile<point3d>(rayFile);
+  _seq<int> Is         = readIntArrayFromFile(intersectFile);
 
   return 0;
 }

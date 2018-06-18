@@ -7,9 +7,8 @@
 
 #include "AVIodgExplicit.h"
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   AVIodgExplicit um;
-  um.run (argc, argv);
+  um.run(argc, argv);
   return 0;
 }
-

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,52 +26,44 @@
 #include "bfs.h"
 #include "bfsParallel.h"
 
-class LevelExecBFS: public BFS {
+class LevelExecBFS : public BFS {
 
 public:
+  virtual const std::string getVersion() const {
+    return "using Level-by-Level executor";
+  }
 
-  virtual const std::string getVersion () const { return "using Level-by-Level executor"; }
-
-  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+  virtual size_t runBFS(Graph& graph, GNode& startNode) {
 
     ParCounter numIter;
 
-
     // update request for root
-    Update first (startNode, 0);
+    Update first(startNode, 0);
 
     std::vector<Update> wl;
-    wl.push_back (first);
+    wl.push_back(first);
 
     typedef galois::worklists::PerSocketChunkFIFO<OpFunc::CHUNK_SIZE, Update> C;
-    typedef galois::worklists::OrderedByIntegerMetric<GetLevel, C>::with_barrier<true>::type WL_ty;
+    typedef galois::worklists::OrderedByIntegerMetric<
+        GetLevel, C>::with_barrier<true>::type WL_ty;
 
-    galois::runtime::for_each_ordered_level (
-        galois::runtime::makeStandardRange (wl.begin (), wl.end ()), 
-        GetLevel (), 
-        std::less<unsigned> (),
-        VisitNhood (graph),
-        OpFunc (graph, numIter));
+    galois::runtime::for_each_ordered_level(
+        galois::runtime::makeStandardRange(wl.begin(), wl.end()), GetLevel(),
+        std::less<unsigned>(), VisitNhood(graph), OpFunc(graph, numIter));
 
     // galois::for_each (first,
-        // OpFunc (graph, numIter),
-        // galois::loopname ("bfs-level-exec"),
-        // galois::wl<WL_ty> ());
+    // OpFunc (graph, numIter),
+    // galois::loopname ("bfs-level-exec"),
+    // galois::wl<WL_ty> ());
 
+    std::cout << "number of iterations: " << numIter.reduce() << std::endl;
 
-    std::cout << "number of iterations: " << numIter.reduce () << std::endl;
-
-
-    return numIter.reduce ();
+    return numIter.reduce();
   }
-
-
 };
 
-
-
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   LevelExecBFS b;
-  b.run (argc, argv);
+  b.run(argc, argv);
   return 0;
 }

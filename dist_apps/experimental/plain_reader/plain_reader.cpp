@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,7 +28,7 @@ constexpr static const char* const regionname = "PlainReader";
 /* Declaration of command line arguments */
 /******************************************************************************/
 
-static cll::opt<bool> sameFile("sameFile", 
+static cll::opt<bool> sameFile("sameFile",
                                cll::desc("All processes read same file"),
                                cll::init(false));
 
@@ -38,24 +38,24 @@ static cll::opt<bool> sameFile("sameFile",
 
 constexpr static const char* const name = "Plain Reader";
 constexpr static const char* const desc = "Reads files depending on host ID.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  galois::StatTimer readTimer("TIMER_READ", regionname); 
+  galois::StatTimer readTimer("TIMER_READ", regionname);
 
-  std::string netNum = 
+  std::string netNum =
       std::to_string(galois::runtime::getSystemNetworkInterface().ID);
-  
+
   // if same file is set make all processes read _0
   if (sameFile) {
     netNum = "0";
   }
 
   std::string newName = inputFile + "_" + netNum + ".gr";
-  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID, 
+  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID,
                 "] Reading ", newName);
 
   std::ifstream fileToRead(newName.c_str());
@@ -67,9 +67,9 @@ int main(int argc, char** argv) {
 
   char* dummyBuffer = (char*)malloc(fileSize);
 
-  size_t bytesRead = 0;
+  size_t bytesRead      = 0;
   size_t numBytesToLoad = fileSize;
-  uint64_t numLoops = 0;
+  uint64_t numLoops     = 0;
 
   // begin read
   readTimer.start();
@@ -85,10 +85,14 @@ int main(int argc, char** argv) {
 
   fileToRead.close();
   free(dummyBuffer);
-  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID, "] Num "
-                "read ops called is ", numLoops);
-  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID, "] Time "
-                "in seconds is ", readTimer.get() / 1000.0, " (", 
+  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID,
+                "] Num "
+                "read ops called is ",
+                numLoops);
+  galois::gInfo("[", galois::runtime::getSystemNetworkInterface().ID,
+                "] Time "
+                "in seconds is ",
+                readTimer.get() / 1000.0, " (",
                 (float)bytesRead / readTimer.get() / 1000.0, " MBPS)");
   return 0;
 }

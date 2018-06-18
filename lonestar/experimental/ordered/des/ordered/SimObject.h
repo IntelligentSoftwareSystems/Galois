@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,50 +31,46 @@
 namespace des_ord {
 
 template <typename Event_tp>
-class SimObject: public des::BaseSimObject<Event_tp> {
+class SimObject : public des::BaseSimObject<Event_tp> {
 
   typedef des::BaseSimObject<Event_tp> Base;
   typedef Event_tp Event_ty;
 
-  template <typename AddNewFunc> 
-  struct SendAddList: public Base::SendWrapper {
+  template <typename AddNewFunc>
+  struct SendAddList : public Base::SendWrapper {
     AddNewFunc& addNewFunc;
 
-    SendAddList (AddNewFunc& _container): Base::SendWrapper (), addNewFunc (_container) {}
+    SendAddList(AddNewFunc& _container)
+        : Base::SendWrapper(), addNewFunc(_container) {}
 
-    virtual void send (Base* dstObj, const Event_ty& event) {
-      addNewFunc (event);
+    virtual void send(Base* dstObj, const Event_ty& event) {
+      addNewFunc(event);
     }
   };
 
-
 public:
-
-  SimObject (size_t id, unsigned numOutputs, unsigned numInputs)
-    : Base (id) 
-  {}
+  SimObject(size_t id, unsigned numOutputs, unsigned numInputs) : Base(id) {}
 
   template <typename G, typename AddNewFunc>
-  void execEvent (
-      const Event_ty& event, 
-      G& graph, 
-      typename G::GraphNode& mynode, 
-      AddNewFunc& newEvents) {
+  void execEvent(const Event_ty& event, G& graph, typename G::GraphNode& mynode,
+                 AddNewFunc& newEvents) {
 
-    assert (event.getRecvObj () == this);
+    assert(event.getRecvObj() == this);
 
-    typename Base::template OutDegIterator<G> beg = this->make_begin (graph, mynode);
-    typename Base::template OutDegIterator<G> end = this->make_end (graph, mynode);
+    typename Base::template OutDegIterator<G> beg =
+        this->make_begin(graph, mynode);
+    typename Base::template OutDegIterator<G> end =
+        this->make_end(graph, mynode);
 
-    SendAddList<AddNewFunc> addListWrap (newEvents);
-    this->execEventIntern (event, addListWrap, beg, end);
+    SendAddList<AddNewFunc> addListWrap(newEvents);
+    this->execEventIntern(event, addListWrap, beg, end);
   }
 
-  virtual size_t getStateSize () const = 0;
-  
-  virtual void copyState (void* const buf, const size_t bufSize) const = 0; 
+  virtual size_t getStateSize() const = 0;
 
-  virtual void restoreState (void* const buf, const size_t bufSize) = 0;
+  virtual void copyState(void* const buf, const size_t bufSize) const = 0;
+
+  virtual void restoreState(void* const buf, const size_t bufSize) = 0;
 };
 
 } // end namespace des_ord

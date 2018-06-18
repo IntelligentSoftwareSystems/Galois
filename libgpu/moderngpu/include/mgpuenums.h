@@ -1,6 +1,6 @@
 /******************************************************************************
  * Copyright (c) 2013, NVIDIA CORPORATION.  All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *     * Redistributions of source code must retain the above copyright
@@ -11,10 +11,10 @@
  *     * Neither the name of the NVIDIA CORPORATION nor the
  *       names of its contributors may be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED. IN NO EVENT SHALL NVIDIA CORPORATION BE LIABLE FOR ANY
  * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
@@ -32,39 +32,33 @@
  *
  ******************************************************************************/
 
-#pragma once 
+#pragma once
 
 namespace mgpu {
 
-enum MgpuBounds {
-	MgpuBoundsLower,
-	MgpuBoundsUpper
-};
+enum MgpuBounds { MgpuBoundsLower, MgpuBoundsUpper };
 
-enum MgpuScanType {
-	MgpuScanTypeExc,
-	MgpuScanTypeInc
-};
+enum MgpuScanType { MgpuScanTypeExc, MgpuScanTypeInc };
 
 enum MgpuSearchType {
-	MgpuSearchTypeNone,
-	MgpuSearchTypeIndex,
-	MgpuSearchTypeMatch,
-	MgpuSearchTypeIndexMatch
+  MgpuSearchTypeNone,
+  MgpuSearchTypeIndex,
+  MgpuSearchTypeMatch,
+  MgpuSearchTypeIndexMatch
 };
 
 enum MgpuJoinKind {
-	MgpuJoinKindInner,
-	MgpuJoinKindLeft,
-	MgpuJoinKindRight,
-	MgpuJoinKindOuter
+  MgpuJoinKindInner,
+  MgpuJoinKindLeft,
+  MgpuJoinKindRight,
+  MgpuJoinKindOuter
 };
 
 enum MgpuSetOp {
-	MgpuSetOpIntersection,
-	MgpuSetOpUnion,
-	MgpuSetOpDiff,
-	MgpuSetOpSymDiff
+  MgpuSetOpIntersection,
+  MgpuSetOpUnion,
+  MgpuSetOpDiff,
+  MgpuSetOpSymDiff
 };
 
 } // namespace mgpu

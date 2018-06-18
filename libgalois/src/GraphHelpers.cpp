@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,8 +39,8 @@ uint32_t determine_block_division(uint32_t numDivisions,
     assert(scaleFactor.size() == numDivisions);
     assert(numDivisions >= 1);
 
-    // get numDivisions number of blocks we need + save a prefix sum of the scale
-    // factor vector to scaleFactor
+    // get numDivisions number of blocks we need + save a prefix sum of the
+    // scale factor vector to scaleFactor
     for (uint32_t i = 0; i < numDivisions; i++) {
       numBlocks += scaleFactor[i];
       scaleFactor[i] = numBlocks;
@@ -51,9 +51,9 @@ uint32_t determine_block_division(uint32_t numDivisions,
 }
 
 bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
-                               uint32_t endNode, 
+                               uint32_t endNode,
                                std::vector<uint32_t>& returnRanges) {
-  uint32_t totalNodes = endNode - beginNode;                                
+  uint32_t totalNodes = endNode - beginNode;
 
   // check corner cases
   // no nodes = assign nothing to all units
@@ -72,10 +72,10 @@ bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
     returnRanges[0] = beginNode;
     returnRanges[1] = endNode;
     return true;
-  // more units than nodes
+    // more units than nodes
   } else if (unitsToSplit > totalNodes) {
     uint32_t current_node = beginNode;
-    returnRanges[0] = current_node;
+    returnRanges[0]       = current_node;
     // 1 node for units until out of units
     for (uint32_t i = 0; i < totalNodes; i++) {
       returnRanges[i + 1] = ++current_node;
@@ -91,9 +91,9 @@ bool unitRangeCornerCaseHandle(uint32_t unitsToSplit, uint32_t beginNode,
   return false;
 }
 
-void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode, 
+void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode,
                      uint32_t endNode, std::vector<uint32_t>& returnRanges) {
-  #ifndef NDEBUG
+#ifndef NDEBUG
   // sanity checks
   assert(returnRanges[0] == beginNode &&
          "return ranges begin not the begin node");
@@ -104,9 +104,9 @@ void unitRangeSanity(uint32_t unitsToSplit, uint32_t beginNode,
     assert(returnRanges[i] >= beginNode && returnRanges[i] <= endNode);
     assert(returnRanges[i] >= returnRanges[i - 1]);
   }
-  #endif
+#endif
 }
 
-} // end internal namespace
-} // end graphs namespace
-} // end galois namespace
+} // namespace internal
+} // namespace graphs
+} // namespace galois

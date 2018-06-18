@@ -41,32 +41,38 @@ using namespace std;
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-s] [-S] [-d {2,3}] n <outFile>");
-  pair<int,char*> in = P.sizeAndFileName();
-  int n = in.first;
-  char* fname = in.second;
-  int dims = P.getOptionIntValue("-d", 2);
-  bool inSphere = P.getOption("-s");
-  bool onSphere = P.getOption("-S");
+  commandLine P(argc, argv, "[-s] [-S] [-d {2,3}] n <outFile>");
+  pair<int, char*> in = P.sizeAndFileName();
+  int n               = in.first;
+  char* fname         = in.second;
+  int dims            = P.getOptionIntValue("-d", 2);
+  bool inSphere       = P.getOption("-s");
+  bool onSphere       = P.getOption("-S");
   if (dims == 2) {
-    point2d* Points = newA(point2d,n);
-//    parallel_for (int i=0; i < n; i++) 
+    point2d* Points = newA(point2d, n);
+    //    parallel_for (int i=0; i < n; i++)
     parallel_doall(int, i, 0, n) {
-      if (inSphere) Points[i] = randInUnitSphere2d(i);
-      else if (onSphere) Points[i] = randOnUnitSphere2d(i);
-      else Points[i] = rand2d(i);
-    } parallel_doall_end
-    return writePointsToFile(Points,n,fname);
+      if (inSphere)
+        Points[i] = randInUnitSphere2d(i);
+      else if (onSphere)
+        Points[i] = randOnUnitSphere2d(i);
+      else
+        Points[i] = rand2d(i);
+    }
+    parallel_doall_end return writePointsToFile(Points, n, fname);
   } else if (dims == 3) {
-    point3d* Points = newA(point3d,n);
-//    parallel_for (int i=0; i < n; i++) 
+    point3d* Points = newA(point3d, n);
+    //    parallel_for (int i=0; i < n; i++)
     parallel_doall(int, i, 0, n) {
-      if (inSphere) Points[i] = randInUnitSphere3d(i);
-      else if (onSphere) Points[i] = randOnUnitSphere3d(i);
-      else Points[i] = rand3d(i);
-    } parallel_doall_end
-    return writePointsToFile(Points,n,fname);
-  } 
+      if (inSphere)
+        Points[i] = randInUnitSphere3d(i);
+      else if (onSphere)
+        Points[i] = randOnUnitSphere3d(i);
+      else
+        Points[i] = rand3d(i);
+    }
+    parallel_doall_end return writePointsToFile(Points, n, fname);
+  }
   P.badArgument();
   return 1;
 }

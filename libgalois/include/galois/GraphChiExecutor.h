@@ -13,40 +13,38 @@ namespace graphChi {
 
 namespace internal {
 
-template<bool PassWrappedGraph>
+template <bool PassWrappedGraph>
 struct DispatchOperator {
-  template<typename O,typename G,typename N>
+  template <typename O, typename G, typename N>
   static void run(O&& o, G&& g, N&& n) {
     std::forward<O>(o)(std::forward<G>(g), std::forward<N>(n));
   }
 };
 
-template<>
+template <>
 struct DispatchOperator<false> {
-  template<typename O,typename G,typename N>
+  template <typename O, typename G, typename N>
   static void run(O&& o, G&& g, N&& n) {
     std::forward<O>(o)(std::forward<N>(n));
   }
 };
 
-
-
-template<typename Graph,typename Bag>
+template <typename Graph, typename Bag>
 struct contains_node {
   Graph* graph;
   Bag* bag;
-  contains_node(Graph* g, Bag* b): graph(g), bag(b) { }
+  contains_node(Graph* g, Bag* b) : graph(g), bag(b) {}
   bool operator()(typename Graph::GraphNode n) {
     return bag->contains(graph->idFromNode(n));
   }
 };
 
-template<typename EdgeTy>
+template <typename EdgeTy>
 struct sizeof_edge {
   static const unsigned int value = sizeof(EdgeTy);
 };
 
-template<>
+template <>
 struct sizeof_edge<void> {
   static const unsigned int value = 0;
 };
@@ -55,15 +53,19 @@ struct logical_or {
   bool operator()(bool a, bool b) const { return a || b; }
 };
 
-template<typename Graph,typename Seg,typename Bag>
+template <typename Graph, typename Seg, typename Bag>
 bool any_in_range(Graph& graph, const Seg& cur, Bag* input) {
-  return std::find_if(graph.begin(cur), graph.end(cur), contains_node<Graph,Bag>(&graph, input)) != graph.end(cur);
+  return std::find_if(graph.begin(cur), graph.end(cur),
+                      contains_node<Graph, Bag>(&graph, input)) !=
+         graph.end(cur);
   // TODO(ddn): Figure out the memory leak in ParallelSTL::find_if
-  //return galois::ParallelSTL::find_if(graph.begin(cur), graph.end(cur), contains_node<Graph>(&graph, input)) != graph.end(cur);
-  //return galois::ParallelSTL::map_reduce(graph.begin(cur), graph.end(cur), contains_node<Graph,Bag>(&graph, input), false, logical_or());
+  // return galois::ParallelSTL::find_if(graph.begin(cur), graph.end(cur),
+  // contains_node<Graph>(&graph, input)) != graph.end(cur); return
+  // galois::ParallelSTL::map_reduce(graph.begin(cur), graph.end(cur),
+  // contains_node<Graph,Bag>(&graph, input), false, logical_or());
 }
 
-template<typename Graph>
+template <typename Graph>
 size_t computeEdgeLimit(Graph& graph, size_t memoryLimit) {
   // Convert memoryLimit which is in MB into edges
   size_t bytes = memoryLimit;
@@ -74,27 +76,33 @@ size_t computeEdgeLimit(Graph& graph, size_t memoryLimit) {
   }
   bytes -= sizeNodes;
   // double-buffering (2), in and out edges (2)
-  size_t edgeBytes = 2 * 2 * (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
+  size_t edgeBytes =
+      2 * 2 *
+      (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
   size_t edges = bytes / edgeBytes;
 
   return edges;
 }
 
-template<typename Graph>
+template <typename Graph>
 bool fitsInMemory(Graph& graph, size_t memoryLimit) {
   size_t bytes = memoryLimit;
   bytes *= 1024 * 1024;
   size_t nodeBytes = graph.size() * sizeof(uint64_t);
-  size_t edgeBytes = graph.sizeEdges() * 2 * (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
+  size_t edgeBytes =
+      graph.sizeEdges() * 2 *
+      (sizeof(uint64_t) + sizeof_edge<typename Graph::edge_data_type>::value);
 
   return nodeBytes + edgeBytes < bytes;
 }
 
-template<bool CheckInput, bool PassWrappedGraph, typename Graph, typename WrappedGraph, typename VertexOperator, typename Bag>
-void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input, size_t memoryLimit) {
+template <bool CheckInput, bool PassWrappedGraph, typename Graph,
+          typename WrappedGraph, typename VertexOperator, typename Bag>
+void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op,
+               Bag* input, size_t memoryLimit) {
   typedef typename Graph::segment_type segment_type;
   galois::GAccumulator<size_t> rounds;
-  
+
   size_t edges = computeEdgeLimit(graph, memoryLimit);
   segment_type prev;
   segment_type cur = graph.nextSegment(edges);
@@ -104,7 +112,8 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
     useDense = true;
   } else {
     // TODO improve this heuristic
-    bool useSparse = (cur.size() > graph.size() / 2) && (input->getSize() < graph.size() / 4);
+    bool useSparse = (cur.size() > graph.size() / 2) &&
+                     (input->getSize() < graph.size() / 4);
     useDense = !useSparse;
   }
 
@@ -120,14 +129,15 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
 
       segment_type next = graph.nextSegment(cur, edges);
 
-      int first = 0;
+      int first    = 0;
       bool updated = false;
       wgraph.setSegment(cur);
 
       if (useDense) {
 
-        galois::do_all(galois::iterate(graph.begin(cur), graph.end(cur)), 
-            [&] (typename Graph::GraphNode n) {
+        galois::do_all(
+            galois::iterate(graph.begin(cur), graph.end(cur)),
+            [&](typename Graph::GraphNode n) {
               if (!updated) {
                 if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
                   if (prev.loaded()) {
@@ -146,10 +156,10 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
             },
             galois::loopname("DenseVertexMap"));
 
-
       } else {
-        galois::do_all(galois::iterate(*input), 
-            [&] (size_t n) {
+        galois::do_all(
+            galois::iterate(*input),
+            [&](size_t n) {
               if (!updated) {
                 if (first == 0 && __sync_bool_compare_and_swap(&first, 0, 1)) {
                   if (prev.loaded()) {
@@ -166,9 +176,8 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
                 return;
               }
 
-              DispatchOperator<PassWrappedGraph>::run(op, wgraph, graph.nodeFromId(n));
-
-
+              DispatchOperator<PassWrappedGraph>::run(op, wgraph,
+                                                      graph.nodeFromId(n));
             },
             galois::loopname("SparseVertexMap"));
       }
@@ -178,11 +187,11 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
         abort();
         graph.unload(prev);
       }
-      
+
       rounds += 1;
 
       prev = cur;
-      cur = next;
+      cur  = next;
     } else {
       segment_type next = graph.nextSegment(cur, edges);
       if (prev.loaded())
@@ -196,27 +205,26 @@ void vertexMap(Graph& graph, WrappedGraph& wgraph, VertexOperator op, Bag* input
   if (prev.loaded())
     graph.unload(prev);
 
-
   galois::runtime::reportStat_Single("GraphChiExec", "Rounds", rounds.reduce());
 }
-} // end namespace
+} // namespace internal
 
-
-template<typename Graph, typename VertexOperator>
+template <typename Graph, typename VertexOperator>
 void vertexMap(Graph& graph, VertexOperator op, size_t size) {
   galois::graphs::BindSegmentGraph<Graph> wgraph(graph);
-  
-  internal::vertexMap<false,true>(graph, wgraph, op, static_cast<GraphNodeBag<>*>(0), size);
+
+  internal::vertexMap<false, true>(graph, wgraph, op,
+                                   static_cast<GraphNodeBag<>*>(0), size);
 }
 
-template<typename Graph, typename VertexOperator, typename Bag>
+template <typename Graph, typename VertexOperator, typename Bag>
 void vertexMap(Graph& graph, VertexOperator op, Bag& input, size_t size) {
   galois::graphs::BindSegmentGraph<Graph> wgraph(graph);
-  
-  internal::vertexMap<true,true>(graph, wgraph, op, &input, size);
+
+  internal::vertexMap<true, true>(graph, wgraph, op, &input, size);
 }
 
-} // end namespace
-} // end namespace
+} // namespace graphChi
+} // namespace galois
 
 #endif

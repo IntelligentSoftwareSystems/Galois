@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 11/19/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -30,13 +30,13 @@
 #include <cmath>
 #include <iostream>
 
-
 // XXX: (amber) replaced 3,9. 27, 81 with NDM, MAT_SIZE
-bool LinearElasticBase::getConstitutiveResponse(const VecDouble&  strain, VecDouble& stress, VecDouble& tangents, const ConstRespMode& mode) const {
-
+bool LinearElasticBase::getConstitutiveResponse(
+    const VecDouble& strain, VecDouble& stress, VecDouble& tangents,
+    const ConstRespMode& mode) const {
 
   // Compute stress
-  if (stress.size () != MAT_SIZE) {
+  if (stress.size() != MAT_SIZE) {
     stress.resize(MAT_SIZE);
   }
 
@@ -46,7 +46,8 @@ bool LinearElasticBase::getConstitutiveResponse(const VecDouble&  strain, VecDou
 
       for (size_t k = 0; k < NDM; k++) {
         for (size_t L = 0; L < NDM; L++) {
-          stress[i * NDM + J] += getModuli(i, J, k, L) * (strain[k * NDM + L] - I_MAT[k * NDM + L]);
+          stress[i * NDM + J] += getModuli(i, J, k, L) *
+                                 (strain[k * NDM + L] - I_MAT[k * NDM + L]);
         }
       }
     }
@@ -55,7 +56,7 @@ bool LinearElasticBase::getConstitutiveResponse(const VecDouble&  strain, VecDou
   // Compute tangents, if needed
   if (mode == COMPUTE_TANGENTS) {
 
-    if (tangents.size () != MAT_SIZE * MAT_SIZE) {
+    if (tangents.size() != MAT_SIZE * MAT_SIZE) {
       tangents.resize(MAT_SIZE * MAT_SIZE);
     }
 
@@ -63,7 +64,8 @@ bool LinearElasticBase::getConstitutiveResponse(const VecDouble&  strain, VecDou
       for (size_t J = 0; J < NDM; J++)
         for (size_t k = 0; k < NDM; k++)
           for (size_t L = 0; L < NDM; L++)
-            tangents[i * MAT_SIZE * NDM  + J * MAT_SIZE + k * NDM + L] = getModuli(i, J, k, L);
+            tangents[i * MAT_SIZE * NDM + J * MAT_SIZE + k * NDM + L] =
+                getModuli(i, J, k, L);
   }
 
   return true;

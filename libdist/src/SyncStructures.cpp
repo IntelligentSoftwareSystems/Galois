@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,39 +28,39 @@
 using namespace galois::runtime; // for easy access to BITVECTOR_STATUS
 
 bool galois::runtime::src_invalid(BITVECTOR_STATUS bv_flag) {
-  return (bv_flag == BITVECTOR_STATUS::SRC_INVALID || 
+  return (bv_flag == BITVECTOR_STATUS::SRC_INVALID ||
           bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
 bool galois::runtime::dst_invalid(BITVECTOR_STATUS bv_flag) {
-  return (bv_flag == BITVECTOR_STATUS::DST_INVALID || 
+  return (bv_flag == BITVECTOR_STATUS::DST_INVALID ||
           bv_flag == BITVECTOR_STATUS::BOTH_INVALID);
 }
 
 void galois::runtime::make_src_invalid(BITVECTOR_STATUS* bv_flag) {
-  switch(*bv_flag) {
-    case NONE_INVALID:
-      *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
-      break;
-    case DST_INVALID:
-      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
-      break;
-    case SRC_INVALID:
-    case BOTH_INVALID:
-      break;
+  switch (*bv_flag) {
+  case NONE_INVALID:
+    *bv_flag = BITVECTOR_STATUS::SRC_INVALID;
+    break;
+  case DST_INVALID:
+    *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+    break;
+  case SRC_INVALID:
+  case BOTH_INVALID:
+    break;
   }
 }
 
 void galois::runtime::make_dst_invalid(BITVECTOR_STATUS* bv_flag) {
-  switch(*bv_flag) {
-    case NONE_INVALID:
-      *bv_flag = BITVECTOR_STATUS::DST_INVALID;
-      break;
-    case SRC_INVALID:
-      *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
-      break;
-    case DST_INVALID:
-    case BOTH_INVALID:
-      break;
+  switch (*bv_flag) {
+  case NONE_INVALID:
+    *bv_flag = BITVECTOR_STATUS::DST_INVALID;
+    break;
+  case SRC_INVALID:
+    *bv_flag = BITVECTOR_STATUS::BOTH_INVALID;
+    break;
+  case DST_INVALID:
+  case BOTH_INVALID:
+    break;
   }
 }

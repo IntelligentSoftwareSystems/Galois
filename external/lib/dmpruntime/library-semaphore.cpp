@@ -7,9 +7,9 @@
 
 #include "dmp-internal.h"
 
-#define SEM_DEBUG_MSG(S,msg) DEBUG_MSG( DEBUG_MUTEX, \
-                                        msg "(%p) @%llu T:%d", \
-                                        (S), DMProundNumber, DMPMAP->threadID )
+#define SEM_DEBUG_MSG(S, msg)                                                  \
+  DEBUG_MSG(DEBUG_MUTEX, msg "(%p) @%llu T:%d", (S), DMProundNumber,           \
+            DMPMAP->threadID)
 
 inline bool sem_tryacquire(DMPsemaphore* sem, DMPwaiter* w) {
   if (sem->count) {
@@ -38,9 +38,7 @@ struct DmpSemaphoreTraits {
     return Wrapper::tryacquire_serial(sem, w);
   }
 
-  static void release(DMPsemaphore* sem) {
-    sem_release(sem);
-  }
+  static void release(DMPsemaphore* sem) { sem_release(sem); }
 
   static void update_predictor(DMPresource* r, int oldowner) {
     DmpDefaultPredictor::update(r, oldowner);
@@ -50,7 +48,7 @@ struct DmpSemaphoreTraits {
     return DmpDefaultPredictor::predict(r);
   }
 
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
   static const bool acquire_ends_quantum = false;
   static const bool release_ends_quantum = false;
 };

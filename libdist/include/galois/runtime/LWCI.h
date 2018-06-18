@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,11 +42,11 @@ namespace internal {
  * @param src source array to read from
  * @param count Size of array in bytes
  */
-template<typename Ty>
+template <typename Ty>
 void ompi_op_sum(void* dst, void* src, size_t count) {
-  Ty* dst_ty = (Ty*) dst;
-  Ty* src_ty = (Ty*) src;
-  for (size_t i = 0; i < (count/sizeof(Ty)); ++i) {
+  Ty* dst_ty = (Ty*)dst;
+  Ty* src_ty = (Ty*)src;
+  for (size_t i = 0; i < (count / sizeof(Ty)); ++i) {
     dst_ty[i] += src_ty[i];
   }
 }
@@ -60,10 +60,10 @@ void ompi_op_sum(void* dst, void* src, size_t count) {
  * @param src source array to read from
  * @param count Size of array in bytes
  */
-template<typename Ty>
+template <typename Ty>
 void ompi_op_max(void* dst, void* src, size_t count) {
-  Ty* dst_ty = (Ty*) dst;
-  Ty* src_ty = (Ty*) src;
+  Ty* dst_ty = (Ty*)dst;
+  Ty* src_ty = (Ty*)src;
   for (size_t i = 0; i < (count / sizeof(Ty)); ++i) {
     if (dst_ty[i] < src_ty[i]) {
       dst_ty[i] = src_ty[i];
@@ -80,10 +80,10 @@ void ompi_op_max(void* dst, void* src, size_t count) {
  * @param src source array to read from
  * @param count Size of array in bytes
  */
-template<typename Ty>
+template <typename Ty>
 void ompi_op_min(void* dst, void* src, size_t count) {
-  Ty* dst_ty = (Ty*) dst;
-  Ty* src_ty = (Ty*) src;
+  Ty* dst_ty = (Ty*)dst;
+  Ty* src_ty = (Ty*)src;
   for (size_t i = 0; i < (count / sizeof(Ty)); ++i) {
     if (dst_ty[i] > src_ty[i]) {
       dst_ty[i] = src_ty[i];
@@ -91,7 +91,7 @@ void ompi_op_min(void* dst, void* src, size_t count) {
   }
 }
 
-} // end internal namespace
-} // end runtime namespace
-} // end galois namespace
+} // namespace internal
+} // namespace runtime
+} // namespace galois
 #endif

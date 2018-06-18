@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,15 +34,16 @@
 #include <iostream>
 
 namespace cll = llvm::cl;
- 
+
 static const char* name = "Parallel MST";
-static const char* desc = "Computes the Minimal Spanning Tree using combination of "
-  "Boruvka's and Prim's algorithm";
+static const char* desc =
+    "Computes the Minimal Spanning Tree using combination of "
+    "Boruvka's and Prim's algorithm";
 static const char* url = 0;
 
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
 static cll::opt<int> algo("algo", cll::desc("Algorithm to use"), cll::init(0));
-
 
 typedef int Weight;
 typedef galois::GAccumulator<size_t> MstWeight;
@@ -56,36 +57,35 @@ struct Prim {
   struct HeapItem {
     GraphNode node;
     Weight weight;
-    HeapItem() { }
-    HeapItem(GraphNode n): node(n), weight(std::numeric_limits<int>::max()) { }
-    HeapItem(GraphNode n, Weight w): node(n), weight(w) { }
+    HeapItem() {}
+    HeapItem(GraphNode n) : node(n), weight(std::numeric_limits<int>::max()) {}
+    HeapItem(GraphNode n, Weight w) : node(n), weight(w) {}
     bool operator<(const HeapItem& other) const {
       return weight < other.weight;
     }
   };
 
   typedef galois::PairingHeap<HeapItem, std::less<HeapItem>,
-          galois::PerIterAllocTy::rebind<HeapItem>::other> Heap;
+                              galois::PerIterAllocTy::rebind<HeapItem>::other>
+      Heap;
 
   struct Node {
     GraphNode parent;
     Heap::Handle handle;
     int id;
     bool present;
-    Node(Heap::Handle h): handle(h), present(true) { }
+    Node(Heap::Handle h) : handle(h), present(true) {}
   };
 
   typedef galois::PerIterAllocTy::rebind<Node>::other NodeAlloc;
 
   std::string name() { return std::string("Serial Prim"); }
 
-  void expandNeighborhood(Graph& g, const GraphNode& src) {
-    
-  }
+  void expandNeighborhood(Graph& g, const GraphNode& src) {}
 
-  void doIt(Graph& g, const GraphNode& root, galois::UserContext<GraphNode>& ctx, 
-      MstWeight& mstWeight) {
-    //Heap heap(5, ctx.getPerIterAlloc());
+  void doIt(Graph& g, const GraphNode& root,
+            galois::UserContext<GraphNode>& ctx, MstWeight& mstWeight) {
+    // Heap heap(5, ctx.getPerIterAlloc());
     Heap heap(ctx.getPerIterAlloc());
     NodeAlloc nodeAlloc(ctx.getPerIterAlloc());
 
@@ -99,32 +99,34 @@ struct Prim {
       NodeAlloc::pointer node = nodeAlloc.allocate(1);
       nodeAlloc.construct(node, Node(h));
       g.getData(*ii) = node;
-      node->id = i++;
+      node->id       = i++;
     }
 
     galois::optional<HeapItem> retval = heap.pollMin();
     while (retval) {
       GraphNode src = retval->node;
-      //std::cout << " Got (" << retval.second.weight << "," << src.getData()->id << ")\n";
-      for (Graph::edge_iterator jj = g.edge_begin(src),
-          ej = g.edge_end(src); jj != ej; ++jj) {
+      // std::cout << " Got (" << retval.second.weight << "," <<
+      // src.getData()->id << ")\n";
+      for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src);
+           jj != ej; ++jj) {
         GraphNode dst = g.getEdgeDst(jj);
-        Node* node = g.getData(dst);
-        //std::cout << " Seeing " << node->id << " " 
-        //  << heap.value(node->handle).node.getData()->id << " " 
+        Node* node    = g.getData(dst);
+        // std::cout << " Seeing " << node->id << " "
+        //  << heap.value(node->handle).node.getData()->id << " "
         //  << heap.value(node->handle).weight << " " << "\n";
         if (node->present) {
           const Weight& w = g.getEdgeData(jj);
-          HeapItem item = heap.value(node->handle);
+          HeapItem item   = heap.value(node->handle);
           if (w < item.weight) {
             node->parent = src;
-            //std::cout << " Decrease (" << item.weight << "," << item.node.getData()->id << ") to " 
+            // std::cout << " Decrease (" << item.weight << "," <<
+            // item.node.getData()->id << ") to "
             //  << w << "\n";
             heap.decreaseKey(node->handle, HeapItem(item.node, w));
           }
         }
       }
-      
+
       g.getData(src)->present = false;
 
       retval = heap.pollMin();
@@ -142,54 +144,61 @@ struct Prim {
     Prim& parent;
     Graph& g;
     MstWeight& mstWeight;
-    Process(Prim& p, Graph& _g, MstWeight& m): parent(p), g(_g), mstWeight(m) { }
-    void operator()(const GraphNode& root, galois::UserContext<GraphNode>& ctx) {
+    Process(Prim& p, Graph& _g, MstWeight& m)
+        : parent(p), g(_g), mstWeight(m) {}
+    void operator()(const GraphNode& root,
+                    galois::UserContext<GraphNode>& ctx) {
       parent.doIt(g, root, ctx, mstWeight);
     }
   };
 
   void operator()(Graph& g, MstWeight& w) {
-    GraphNode one[] = { *g.begin() };
+    GraphNode one[] = {*g.begin()};
 
     galois::setActiveThreads(1);
     galois::for_each(&one[0], &one[1], Process(*this, g, w));
   }
 };
 
-
 struct Boruvka {
   typedef galois::graphs::MorphGraph<unsigned, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::pair<GraphNode, Weight> Edge;
-  typedef std::vector<Edge, galois::PerIterAllocTy::rebind<Edge>::other> EdgeList;
+  typedef std::vector<Edge, galois::PerIterAllocTy::rebind<Edge>::other>
+      EdgeList;
 
-  struct EdgeLess : public std::binary_function<const Edge&, const Edge&, bool> {
+  struct EdgeLess
+      : public std::binary_function<const Edge&, const Edge&, bool> {
     bool operator()(const Edge& a, const Edge& b) {
       return a.first != b.first ? a.first < b.first : a.second < b.second;
     }
   };
 
-  struct Indexer: public std::unary_function<const GraphNode&,unsigned> {
+  struct Indexer : public std::unary_function<const GraphNode&, unsigned> {
     const Graph& g;
-    Indexer(const Graph& a): g(a) { }
+    Indexer(const Graph& a) : g(a) {}
     unsigned operator()(const GraphNode& n) const {
       return g.getData(n, galois::MethodFlag::UNPROTECTED);
     }
   };
 
-  struct Less: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
+  struct Less
+      : public std::binary_function<const GraphNode&, const GraphNode&, bool> {
     const Graph& g;
-    Less(const Graph& a): g(a) { }
+    Less(const Graph& a) : g(a) {}
     bool operator()(const GraphNode& lhs, const GraphNode& rhs) const {
-      return g.getData(lhs, galois::MethodFlag::UNPROTECTED) < g.getData(rhs, galois::MethodFlag::UNPROTECTED);
+      return g.getData(lhs, galois::MethodFlag::UNPROTECTED) <
+             g.getData(rhs, galois::MethodFlag::UNPROTECTED);
     }
   };
 
-  struct Greater: public std::binary_function<const GraphNode&,const GraphNode&,bool> {
+  struct Greater
+      : public std::binary_function<const GraphNode&, const GraphNode&, bool> {
     const Graph& g;
-    Greater(const Graph& a): g(a) { }
+    Greater(const Graph& a) : g(a) {}
     bool operator()(const GraphNode& lhs, const GraphNode& rhs) const {
-      return g.getData(lhs, galois::MethodFlag::UNPROTECTED) > g.getData(rhs, galois::MethodFlag::UNPROTECTED);
+      return g.getData(lhs, galois::MethodFlag::UNPROTECTED) >
+             g.getData(rhs, galois::MethodFlag::UNPROTECTED);
     }
   };
 
@@ -199,17 +208,19 @@ struct Boruvka {
     g.edge_begin(src, galois::MethodFlag::WRITE);
   }
 
-  std::pair<GraphNode, Weight> findMin(Graph& g, const GraphNode& src, galois::MethodFlag flag) {
+  std::pair<GraphNode, Weight> findMin(Graph& g, const GraphNode& src,
+                                       galois::MethodFlag flag) {
     Weight minWeight = std::numeric_limits<Weight>::max();
     GraphNode minNode;
 
-    for (Graph::edge_iterator ii = g.edge_begin(src, flag), 
-        ei = g.edge_end(src, flag); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = g.edge_begin(src, flag),
+                              ei = g.edge_end(src, flag);
+         ii != ei; ++ii) {
       GraphNode dst = g.getEdgeDst(ii);
-      
+
       const Weight& w = g.getEdgeData(ii);
-      if (w < minWeight){
-        minNode = dst;
+      if (w < minWeight) {
+        minNode   = dst;
         minWeight = w;
       }
     }
@@ -218,11 +229,13 @@ struct Boruvka {
   }
 
   GraphNode collapseEdge(Graph& g, GraphNode& a, GraphNode& b,
-      galois::UserContext<GraphNode>& ctx, galois::MethodFlag flag) {
+                         galois::UserContext<GraphNode>& ctx,
+                         galois::MethodFlag flag) {
     EdgeList edges(ctx.getPerIterAlloc());
 
     for (Graph::edge_iterator ii = g.edge_begin(a, flag),
-        ei = g.edge_end(a, flag); ii != ei; ++ii) {
+                              ei = g.edge_end(a, flag);
+         ii != ei; ++ii) {
       GraphNode dst = g.getEdgeDst(ii);
       if (dst != b) {
         edges.push_back(std::make_pair(dst, g.getEdgeData(ii)));
@@ -231,7 +244,8 @@ struct Boruvka {
     }
 
     for (Graph::edge_iterator ii = g.edge_begin(b, flag),
-        ei = g.edge_end(b, flag); ii != ei; ++ii) {
+                              ei = g.edge_end(b, flag);
+         ii != ei; ++ii) {
       GraphNode dst = g.getEdgeDst(ii);
       if (dst != a) {
         edges.push_back(std::make_pair(dst, g.getEdgeData(ii)));
@@ -248,7 +262,8 @@ struct Boruvka {
     g.addNode(n);
     GraphNode last;
     unsigned numNeighbors = 0;
-    for (EdgeList::iterator ii = edges.begin(), ei = edges.end(); ii != ei; ++ii) {
+    for (EdgeList::iterator ii = edges.begin(), ei = edges.end(); ii != ei;
+         ++ii) {
       if (ii->first == last)
         continue;
 
@@ -270,7 +285,8 @@ struct Boruvka {
     Graph& g;
     MstWeight& mstWeight;
 
-    Process(Boruvka& p, Graph& _g, MstWeight& m): parent(p), g(_g), mstWeight(m) { }
+    Process(Boruvka& p, Graph& _g, MstWeight& m)
+        : parent(p), g(_g), mstWeight(m) {}
 
     void operator()(GraphNode& src, galois::UserContext<GraphNode>& ctx) {
       parent.expandNeighborhood(g, src);
@@ -278,7 +294,8 @@ struct Boruvka {
       if (!g.containsNode(src))
         return;
 
-      std::pair<GraphNode,Weight> minp = parent.findMin(g, src, galois::MethodFlag::UNPROTECTED);
+      std::pair<GraphNode, Weight> minp =
+          parent.findMin(g, src, galois::MethodFlag::UNPROTECTED);
 
       if (minp.second == std::numeric_limits<Weight>::max()) {
         g.removeNode(src, galois::MethodFlag::UNPROTECTED);
@@ -286,8 +303,9 @@ struct Boruvka {
       }
 
       parent.expandNeighborhood(g, minp.first);
-      
-      GraphNode rep = parent.collapseEdge(g, src, minp.first, ctx, galois::MethodFlag::UNPROTECTED);
+
+      GraphNode rep = parent.collapseEdge(g, src, minp.first, ctx,
+                                          galois::MethodFlag::UNPROTECTED);
       mstWeight += minp.second;
       ctx.push(rep);
     }
@@ -304,24 +322,24 @@ struct Boruvka {
   }
 };
 
-
 struct BoruvkaUnionFind {
   struct Data {
     int parent; // union-find parent
     int rank;   // union-find rank
     int next;   // linked list of nodes on perimeter
-    Weight minWeight; 
-    Data(): rank(0), next(-1), minWeight(std::numeric_limits<Weight>::max()) { }
+    Weight minWeight;
+    Data() : rank(0), next(-1), minWeight(std::numeric_limits<Weight>::max()) {}
   };
 
   typedef galois::graphs::MorphGraph<Data, Weight, true> Graph;
   typedef Graph::GraphNode GraphNode;
   typedef std::vector<GraphNode> NodesTy;
-  typedef std::pair<GraphNode,Weight> MinPairTy;
+  typedef std::pair<GraphNode, Weight> MinPairTy;
 
   std::string name() { return std::string("Boruvka Union Find"); }
 
-  GraphNode find(const Graph& g, GraphNode n, const NodesTy& nodes, galois::MethodFlag flag) const {
+  GraphNode find(const Graph& g, GraphNode n, const NodesTy& nodes,
+                 galois::MethodFlag flag) const {
     GraphNode parent = nodes[g.getData(n, flag).parent];
     if (parent == n)
       return n;
@@ -331,24 +349,28 @@ struct BoruvkaUnionFind {
 
   //! Separate path compression from find so that we can defer writes after the
   //! fail-safe point
-  GraphNode compressPath(const Graph& g, GraphNode n, const NodesTy& nodes) const {
-    GraphNode parent = nodes[g.getData(n, galois::MethodFlag::UNPROTECTED).parent];
+  GraphNode compressPath(const Graph& g, GraphNode n,
+                         const NodesTy& nodes) const {
+    GraphNode parent =
+        nodes[g.getData(n, galois::MethodFlag::UNPROTECTED).parent];
     if (parent == n)
       return n;
     else {
       GraphNode ret = compressPath(g, parent, nodes);
-      g.getData(n, galois::MethodFlag::UNPROTECTED).parent = g.getData(ret, galois::MethodFlag::UNPROTECTED).parent;
+      g.getData(n, galois::MethodFlag::UNPROTECTED).parent =
+          g.getData(ret, galois::MethodFlag::UNPROTECTED).parent;
       return ret;
     }
   }
 
-  void mergeLists(const Graph& g, const GraphNode& a, const GraphNode& b, const NodesTy& nodes) const {
+  void mergeLists(const Graph& g, const GraphNode& a, const GraphNode& b,
+                  const NodesTy& nodes) const {
     GraphNode last = a;
-    int aId = g.getData(a, galois::MethodFlag::UNPROTECTED).next;
-    int bId = g.getData(b, galois::MethodFlag::UNPROTECTED).next;
+    int aId        = g.getData(a, galois::MethodFlag::UNPROTECTED).next;
+    int bId        = g.getData(b, galois::MethodFlag::UNPROTECTED).next;
 
     int bHeadId = g.getData(b, galois::MethodFlag::UNPROTECTED).parent;
-    Weight wbh = g.getData(b, galois::MethodFlag::UNPROTECTED).minWeight;
+    Weight wbh  = g.getData(b, galois::MethodFlag::UNPROTECTED).minWeight;
     assert(wbh != std::numeric_limits<Weight>::max());
 
     bool found = false;
@@ -356,8 +378,10 @@ struct BoruvkaUnionFind {
       if (aId == -1 || bId == -1)
         break;
 
-      Weight wa = g.getData(nodes[aId], galois::MethodFlag::UNPROTECTED).minWeight;
-      Weight wb = g.getData(nodes[bId], galois::MethodFlag::UNPROTECTED).minWeight;
+      Weight wa =
+          g.getData(nodes[aId], galois::MethodFlag::UNPROTECTED).minWeight;
+      Weight wb =
+          g.getData(nodes[bId], galois::MethodFlag::UNPROTECTED).minWeight;
 
       assert(wa != std::numeric_limits<Weight>::max());
       assert(wb != std::numeric_limits<Weight>::max());
@@ -367,26 +391,26 @@ struct BoruvkaUnionFind {
       if (wa > wb) {
         less = wb;
         next = bId;
-        bId = g.getData(nodes[bId], galois::MethodFlag::UNPROTECTED).next;
+        bId  = g.getData(nodes[bId], galois::MethodFlag::UNPROTECTED).next;
       } else {
         less = wa;
         next = aId;
-        aId = g.getData(nodes[aId], galois::MethodFlag::UNPROTECTED).next;
+        aId  = g.getData(nodes[aId], galois::MethodFlag::UNPROTECTED).next;
       }
-      
+
       if (!found && wbh <= less) {
         g.getData(last, galois::MethodFlag::UNPROTECTED).next = bHeadId;
-        last = nodes[bHeadId];
-        found = true;
+        last                                                  = nodes[bHeadId];
+        found                                                 = true;
       }
 
       g.getData(last, galois::MethodFlag::UNPROTECTED).next = next;
-      last = nodes[next];
+      last                                                  = nodes[next];
     }
 
     if (aId == -1)
       g.getData(last, galois::MethodFlag::UNPROTECTED).next = bId;
-    else 
+    else
       g.getData(last, galois::MethodFlag::UNPROTECTED).next = aId;
 
     // Check if we still need to find a place for bHead
@@ -394,18 +418,22 @@ struct BoruvkaUnionFind {
       return;
 
     int rid = g.getData(last, galois::MethodFlag::UNPROTECTED).next;
-    while (rid != -1 && wbh > g.getData(nodes[rid], galois::MethodFlag::UNPROTECTED).minWeight) {
+    while (
+        rid != -1 &&
+        wbh >
+            g.getData(nodes[rid], galois::MethodFlag::UNPROTECTED).minWeight) {
       rid = g.getData(nodes[rid], galois::MethodFlag::UNPROTECTED).next;
       if (rid == -1)
         break;
       last = nodes[rid];
     }
 
-    g.getData(last, galois::MethodFlag::UNPROTECTED).next = bHeadId;
+    g.getData(last, galois::MethodFlag::UNPROTECTED).next           = bHeadId;
     g.getData(nodes[bHeadId], galois::MethodFlag::UNPROTECTED).next = rid;
   }
 
-  GraphNode merge(const Graph& g, GraphNode a, GraphNode b, const NodesTy& nodes) const {
+  GraphNode merge(const Graph& g, GraphNode a, GraphNode b,
+                  const NodesTy& nodes) const {
     GraphNode repA = compressPath(g, a, nodes);
     GraphNode repB = compressPath(g, b, nodes);
 
@@ -430,26 +458,28 @@ struct BoruvkaUnionFind {
     }
   }
 
-
-  bool findMin(Graph& g, GraphNode node, const NodesTy& nodes, MinPairTy& minp) const {
+  bool findMin(Graph& g, GraphNode node, const NodesTy& nodes,
+               MinPairTy& minp) const {
     minp.second = std::numeric_limits<Weight>::max();
-    
+
     GraphNode rep = find(g, node, nodes, galois::MethodFlag::WRITE);
-    //GraphNode rep = compressPath(node, nodes);
-    GraphNode cur = rep;
+    // GraphNode rep = compressPath(node, nodes);
+    GraphNode cur  = rep;
     GraphNode last = cur;
-    bool first = true;
-    int next = g.getData(cur, galois::MethodFlag::UNPROTECTED).parent;
+    bool first     = true;
+    int next       = g.getData(cur, galois::MethodFlag::UNPROTECTED).parent;
 
     while (true) {
-      bool seen = false;
+      bool seen     = false;
       Data& curData = g.getData(cur, galois::MethodFlag::UNPROTECTED);
 
-      for (Graph::edge_iterator ii = g.edge_begin(cur, galois::MethodFlag::WRITE), 
-	     ei = g.edge_end(cur, galois::MethodFlag::WRITE); ii != ei; ++ii) {
+      for (Graph::edge_iterator
+               ii = g.edge_begin(cur, galois::MethodFlag::WRITE),
+               ei = g.edge_end(cur, galois::MethodFlag::WRITE);
+           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
         if (rep == find(g, dst, nodes, galois::MethodFlag::WRITE))
-        //if (rep == compressPath(*dst, nodes))
+          // if (rep == compressPath(*dst, nodes))
           continue;
 
         seen = true;
@@ -461,7 +491,7 @@ struct BoruvkaUnionFind {
           curData.minWeight = w;
 
         if (w < minp.second) {
-          minp.first = dst;
+          minp.first  = dst;
           minp.second = w;
         }
       }
@@ -482,21 +512,25 @@ struct BoruvkaUnionFind {
       cur = nodes[next];
 
       // Check 2nd element in list as well
-      if (!first && minp.second < g.getData(cur, galois::MethodFlag::WRITE).minWeight) {
-        assert(g.getData(cur, galois::MethodFlag::UNPROTECTED).minWeight != std::numeric_limits<Weight>::max());
+      if (!first &&
+          minp.second < g.getData(cur, galois::MethodFlag::WRITE).minWeight) {
+        assert(g.getData(cur, galois::MethodFlag::UNPROTECTED).minWeight !=
+               std::numeric_limits<Weight>::max());
         return true;
       }
 
       first = false;
-    } 
-    
+    }
+
     return minp.second != std::numeric_limits<Weight>::max();
   }
 
   void updateMinWeight(Graph& g, GraphNode cur) const {
     Data& curData = g.getData(cur, galois::MethodFlag::UNPROTECTED);
-    for (Graph::edge_iterator ii = g.edge_begin(cur, galois::MethodFlag::UNPROTECTED), 
-        ei = g.edge_end(cur, galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (Graph::edge_iterator
+             ii = g.edge_begin(cur, galois::MethodFlag::UNPROTECTED),
+             ei = g.edge_end(cur, galois::MethodFlag::UNPROTECTED);
+         ii != ei; ++ii) {
       const Weight& w = g.getEdgeData(ii);
       // Should only happen first time someone sees this node
       if (w < curData.minWeight)
@@ -510,19 +544,17 @@ struct BoruvkaUnionFind {
     MstWeight& mstWeight;
     const NodesTy& nodes;
 
-    Process(BoruvkaUnionFind& s, Graph& _g, MstWeight& m, const NodesTy& n):
-      self(s), g(_g), mstWeight(m), nodes(n)
-    { 
-    
-    }
+    Process(BoruvkaUnionFind& s, Graph& _g, MstWeight& m, const NodesTy& n)
+        : self(s), g(_g), mstWeight(m), nodes(n) {}
 
     void operator()(GraphNode& src, galois::UserContext<GraphNode>& ctx) {
       MinPairTy minp;
-      
+
       if (!self.findMin(g, src, nodes, minp))
         return;
 
-      if (g.getData(minp.first, galois::MethodFlag::UNPROTECTED).minWeight == std::numeric_limits<Weight>::max())
+      if (g.getData(minp.first, galois::MethodFlag::UNPROTECTED).minWeight ==
+          std::numeric_limits<Weight>::max())
         self.updateMinWeight(g, minp.first);
 
       GraphNode rep = self.merge(g, src, minp.first, nodes);
@@ -545,13 +577,12 @@ struct BoruvkaUnionFind {
 
     typedef galois::worklists::PerSocketChunkFIFO<16> IChunk;
 
-    galois::for_each<IChunk>(nodes.begin(), nodes.end(), Process(*this, g, w, nodes));
+    galois::for_each<IChunk>(nodes.begin(), nodes.end(),
+                             Process(*this, g, w, nodes));
   }
 };
 
-
-
-template<typename Graph>
+template <typename Graph>
 void makeGraph(const std::string& in, Graph& g) {
   typedef typename Graph::GraphNode GraphNode;
   typedef galois::graphs::LC_CSR_Graph<size_t, Weight> ReaderGraph;
@@ -562,9 +593,9 @@ void makeGraph(const std::string& in, Graph& g) {
 
   // Assign ids to ReaderGNodes
   size_t numNodes = 0;
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ee = reader.end(); ii != ee; ++ii, ++numNodes) {
-    ReaderGNode src = *ii;
+  for (ReaderGraph::iterator ii = reader.begin(), ee = reader.end(); ii != ee;
+       ++ii, ++numNodes) {
+    ReaderGNode src     = *ii;
     reader.getData(src) = numNodes;
   }
 
@@ -579,22 +610,23 @@ void makeGraph(const std::string& in, Graph& g) {
 
   // Create edges
   size_t numEdges = 0;
-  for (ReaderGraph::iterator ii = reader.begin(),
-      ei = reader.end(); ii != ei; ++ii) {
+  for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei;
+       ++ii) {
     ReaderGNode rsrc = *ii;
-    int rsrcId = reader.getData(rsrc);
+    int rsrcId       = reader.getData(rsrc);
     for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
-        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+                                    ej = reader.edge_end(rsrc);
+         jj != ej; ++jj) {
       ReaderGNode rdst = reader.getEdgeDst(jj);
-      int rdstId = reader.getData(rdst);
-      const Weight& w = reader.getEdgeData(jj);
-      GraphNode gsrc = nodes[rsrcId];
-      GraphNode gdst = nodes[rdstId];
+      int rdstId       = reader.getData(rdst);
+      const Weight& w  = reader.getEdgeData(jj);
+      GraphNode gsrc   = nodes[rsrcId];
+      GraphNode gdst   = nodes[rdstId];
 
       if (g.findEdge(gsrc, gdst) != g.edge_end(gsrc)) {
         Weight& ww = g.getEdgeData(g.findEdge(gsrc, gdst));
         if (ww > w) {
-          ww = w;
+          ww                                    = w;
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
@@ -608,7 +640,7 @@ void makeGraph(const std::string& in, Graph& g) {
   std::cout << "Read " << numNodes << " nodes and " << numEdges << " edges\n";
 }
 
-template<typename Algo>
+template <typename Algo>
 void run(const std::string& in) {
   typedef typename Algo::Graph Graph;
   MstWeight w;
@@ -624,14 +656,20 @@ void run(const std::string& in) {
   std::cout << "MST Weight is " << w.reduce() << "\n";
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
-  case 2: run<BoruvkaUnionFind>(filename); break;
-  case 1: run<Prim>(filename); break;
+  case 2:
+    run<BoruvkaUnionFind>(filename);
+    break;
+  case 1:
+    run<Prim>(filename);
+    break;
   default:
-  case 0: run<Boruvka>(filename); break;
+  case 0:
+    run<Boruvka>(filename);
+    break;
   }
 
   return 0;

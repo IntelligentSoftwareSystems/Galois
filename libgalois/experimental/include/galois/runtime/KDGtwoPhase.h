@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -52,222 +52,213 @@
 #include <iostream>
 #include <memory>
 
-
 namespace galois {
 namespace runtime {
 
-
 namespace {
 
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple>
-class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> > {
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc,
+          typename OpFunc, typename ArgsTuple>
+class IKDGtwoPhaseExecutor
+    : public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple,
+                      TwoPhaseContext<T, Cmp>> {
 
   using ThisClass = IKDGtwoPhaseExecutor;
 
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Base = IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
   using CtxtWL = typename ThisClass::CtxtWL;
 
-
-
 protected:
-
   static const bool DETAILED_STATS = false;
 
   struct CtxtMaker {
     IKDGtwoPhaseExecutor& outer;
 
-    Ctxt* operator () (const T& x) {
+    Ctxt* operator()(const T& x) {
 
-      Ctxt* ctxt = outer.ctxtAlloc.allocate (1);
-      assert (ctxt);
-      outer.ctxtAlloc.construct (ctxt, x, outer.cmp);
+      Ctxt* ctxt = outer.ctxtAlloc.allocate(1);
+      assert(ctxt);
+      outer.ctxtAlloc.construct(ctxt, x, outer.cmp);
 
       return ctxt;
     }
   };
 
-
   typename ThisClass::template WindowWLwrapper<IKDGtwoPhaseExecutor> winWL;
   CtxtMaker ctxtMaker;
 
-
 public:
-  IKDGtwoPhaseExecutor (
-      const Cmp& cmp,
-      const NhFunc& nhFunc,
-      const ExFunc& exFunc,
-      const OpFunc& opFunc,
-      const ArgsTuple& argsTuple)
-    :
-      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
-      winWL (*this, cmp),
-      ctxtMaker {*this}
-  {
-  }
+  IKDGtwoPhaseExecutor(const Cmp& cmp, const NhFunc& nhFunc,
+                       const ExFunc& exFunc, const OpFunc& opFunc,
+                       const ArgsTuple& argsTuple)
+      : Base(cmp, nhFunc, exFunc, opFunc, argsTuple),
+        winWL(*this, cmp), ctxtMaker{*this} {}
 
-  ~IKDGtwoPhaseExecutor () {
+  ~IKDGtwoPhaseExecutor() {
 
-    dumpStats ();
+    dumpStats();
 
     if (ThisClass::ENABLE_PARAMETER) {
-      ParaMeter::closeStatsFile ();
+      ParaMeter::closeStatsFile();
     }
   }
 
-  void dumpStats (void) {
-    reportStat_Single (Base::loopname, "efficiency %", double (100.0 * ThisClass::totalCommits) / ThisClass::totalTasks);
-    reportStat_Single (Base::loopname, "avg. parallelism", double (ThisClass::totalCommits) / ThisClass::rounds);
+  void dumpStats(void) {
+    reportStat_Single(Base::loopname, "efficiency %",
+                      double(100.0 * ThisClass::totalCommits) /
+                          ThisClass::totalTasks);
+    reportStat_Single(Base::loopname, "avg. parallelism",
+                      double(ThisClass::totalCommits) / ThisClass::rounds);
   }
 
-  CtxtMaker& getCtxtMaker(void) {
-    return ctxtMaker;
-  }
+  CtxtMaker& getCtxtMaker(void) { return ctxtMaker; }
 
   template <typename R>
-  void push_initial (const R& range) {
+  void push_initial(const R& range) {
     if (ThisClass::targetCommitRatio == 0.0) {
 
-      galois::runtime::do_all_gen (range,
-          [this] (const T& x) {
-            ThisClass::getNextWL ().push_back (ctxtMaker (x));
+      galois::runtime::do_all_gen(
+          range,
+          [this](const T& x) {
+            ThisClass::getNextWL().push_back(ctxtMaker(x));
           },
-          std::make_tuple (
-            galois::loopname ("init-fill"),
-            chunk_size<NhFunc::CHUNK_SIZE> ()));
-
+          std::make_tuple(galois::loopname("init-fill"),
+                          chunk_size<NhFunc::CHUNK_SIZE>()));
 
     } else {
-      winWL.initfill (range);
-
+      winWL.initfill(range);
     }
   }
 
-  void execute () {
-    execute_impl ();
-  }
+  void execute() { execute_impl(); }
 
 protected:
-
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound() {
 
     if (ThisClass::ENABLE_PARAMETER) {
-      ParaMeter::StepStats s (ThisClass::rounds, ThisClass::roundCommits.reduceRO (), ThisClass::roundTasks.reduceRO ());
-      s.dump (ParaMeter::getStatsFile (), ThisClass::loopname);
+      ParaMeter::StepStats s(ThisClass::rounds,
+                             ThisClass::roundCommits.reduceRO(),
+                             ThisClass::roundTasks.reduceRO());
+      s.dump(ParaMeter::getStatsFile(), ThisClass::loopname);
     }
 
-    ThisClass::endRound ();
+    ThisClass::endRound();
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (internal::DummyExecFunc*) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void
+  expandNhoodImpl(internal::DummyExecFunc*) {
     // for stable case
 
-    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
-        [this] (Ctxt* c) {
-          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
-          uhand.reset ();
+    galois::runtime::do_all_gen(
+        makeLocalRange(ThisClass::getCurrWL()),
+        [this](Ctxt* c) {
+          typename ThisClass::UserCtxt& uhand =
+              *ThisClass::userHandles.getLocal();
+          uhand.reset();
 
           // nhFunc (c, uhand);
-          runCatching (ThisClass::nhFunc, c, uhand);
+          runCatching(ThisClass::nhFunc, c, uhand);
 
           ThisClass::roundTasks += 1;
         },
-        std::make_tuple (
-          galois::loopname ("expandNhood"),
-          chunk_size<NhFunc::CHUNK_SIZE> ()));
+        std::make_tuple(galois::loopname("expandNhood"),
+                        chunk_size<NhFunc::CHUNK_SIZE>()));
   }
 
-  struct GetActive: public std::unary_function<Ctxt*, const T&> {
-    const T& operator () (const Ctxt* c) const {
-      assert (c != nullptr);
-      return c->getActive ();
+  struct GetActive : public std::unary_function<Ctxt*, const T&> {
+    const T& operator()(const Ctxt* c) const {
+      assert(c != nullptr);
+      return c->getActive();
     }
   };
 
   template <typename F>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (F*) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl(F*) {
     // for unstable case
-    auto m_beg = boost::make_transform_iterator (ThisClass::getCurrWL ().begin_all (), GetActive ());
-    auto m_end = boost::make_transform_iterator (ThisClass::getCurrWL ().end_all (), GetActive ());
+    auto m_beg = boost::make_transform_iterator(
+        ThisClass::getCurrWL().begin_all(), GetActive());
+    auto m_end = boost::make_transform_iterator(
+        ThisClass::getCurrWL().end_all(), GetActive());
 
-    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
-        [m_beg, m_end, this] (Ctxt* c) {
-          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
-          uhand.reset ();
+    galois::runtime::do_all_gen(
+        makeLocalRange(ThisClass::getCurrWL()),
+        [m_beg, m_end, this](Ctxt* c) {
+          typename ThisClass::UserCtxt& uhand =
+              *ThisClass::userHandles.getLocal();
+          uhand.reset();
 
-          runCatching (ThisClass::nhFunc, c, uhand, m_beg, m_end);
+          runCatching(ThisClass::nhFunc, c, uhand, m_beg, m_end);
 
           ThisClass::roundTasks += 1;
         },
-        std::make_tuple (
-          galois::loopname ("expandNhoodUnstable"),
-          chunk_size<NhFunc::CHUNK_SIZE> ()));
+        std::make_tuple(galois::loopname("expandNhoodUnstable"),
+                        chunk_size<NhFunc::CHUNK_SIZE>()));
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood() {
     // using ptr to exFunc to choose the right impl.
     // relying on the fact that for stable case, the exFunc is DummyExecFunc.
-    expandNhoodImpl (&this->exFunc);
+    expandNhoodImpl(&this->exFunc);
   }
 
-  inline void executeSourcesImpl (internal::DummyExecFunc*) {
-  }
+  inline void executeSourcesImpl(internal::DummyExecFunc*) {}
 
   template <typename F>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
-    assert (ThisClass::HAS_EXEC_FUNC);
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl(F*) {
+    assert(ThisClass::HAS_EXEC_FUNC);
 
-    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
-      [this] (Ctxt* ctxt) {
+    galois::runtime::do_all_gen(
+        makeLocalRange(ThisClass::getCurrWL()),
+        [this](Ctxt* ctxt) {
+          typename ThisClass::UserCtxt& uhand =
+              *ThisClass::userHandles.getLocal();
+          uhand.reset();
 
-        typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
-        uhand.reset ();
-
-        if (ctxt->isSrc ()) {
-          this->exFunc (ctxt->getActive (), uhand);
-        }
-      },
-      std::make_tuple (
-        galois::loopname ("exec-sources"),
-        galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
-
+          if (ctxt->isSrc()) {
+            this->exFunc(ctxt->getActive(), uhand);
+          }
+        },
+        std::make_tuple(galois::loopname("exec-sources"),
+                        galois::chunk_size<ExFunc::CHUNK_SIZE>()));
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources(void) {
     // using ptr to exFunc to choose the right impl.
     // relying on the fact that for stable case, the exFunc is DummyExecFunc.
-    executeSourcesImpl (&this->exFunc);
+    executeSourcesImpl(&this->exFunc);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator() {
     galois::optional<T> minElem;
 
     if (ThisClass::NEEDS_PUSH) {
-      if (ThisClass::targetCommitRatio != 0.0 && !winWL.empty ()) {
+      if (ThisClass::targetCommitRatio != 0.0 && !winWL.empty()) {
         minElem = *winWL.getMin();
       }
     }
 
-
-    galois::runtime::do_all_gen (makeLocalRange (ThisClass::getCurrWL ()),
-        [this, &minElem] (Ctxt* c) {
+    galois::runtime::do_all_gen(
+        makeLocalRange(ThisClass::getCurrWL()),
+        [this, &minElem](Ctxt* c) {
           bool commit = false;
 
-          typename ThisClass::UserCtxt& uhand = *ThisClass::userHandles.getLocal ();
-          uhand.reset ();
+          typename ThisClass::UserCtxt& uhand =
+              *ThisClass::userHandles.getLocal();
+          uhand.reset();
 
-          if (ThisClass::NEEDS_CUSTOM_LOCKING || c->isSrc ()) {
+          if (ThisClass::NEEDS_CUSTOM_LOCKING || c->isSrc()) {
             // opFunc (c->active, uhand);
             if (ThisClass::NEEDS_CUSTOM_LOCKING) {
               c->enableSrc();
-              runCatching (ThisClass::opFunc, c, uhand);
-              commit = c->isSrc (); // in case opFunc signalled abort
+              runCatching(ThisClass::opFunc, c, uhand);
+              commit = c->isSrc(); // in case opFunc signalled abort
 
             } else {
-              ThisClass::opFunc (c->getActive (), uhand);
-              assert (c->isSrc ());
+              ThisClass::opFunc(c->getActive(), uhand);
+              assert(c->isSrc());
               commit = true;
             }
           } else {
@@ -277,45 +268,46 @@ protected:
           if (commit) {
             ThisClass::roundCommits += 1;
             if (ThisClass::NEEDS_PUSH) {
-              for (auto i = uhand.getPushBuffer ().begin ()
-                  , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
+              for (auto i    = uhand.getPushBuffer().begin(),
+                        endi = uhand.getPushBuffer().end();
+                   i != endi; ++i) {
 
-                if ((ThisClass::targetCommitRatio == 0.0) || !minElem || !ThisClass::cmp (*minElem, *i)) {
+                if ((ThisClass::targetCommitRatio == 0.0) || !minElem ||
+                    !ThisClass::cmp(*minElem, *i)) {
                   // if *i >= *minElem
-                  ThisClass::getNextWL ().push_back (ctxtMaker (*i));
+                  ThisClass::getNextWL().push_back(ctxtMaker(*i));
                 } else {
-                  winWL.push (*i);
+                  winWL.push(*i);
                 }
               }
             } else {
-              assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
+              assert(uhand.getPushBuffer().begin() ==
+                     uhand.getPushBuffer().end());
             }
 
-            c->commitIteration ();
-            c->~Ctxt ();
-            ThisClass::ctxtAlloc.deallocate (c, 1);
+            c->commitIteration();
+            c->~Ctxt();
+            ThisClass::ctxtAlloc.deallocate(c, 1);
           } else {
-            c->cancelIteration ();
-            c->reset ();
-            ThisClass::getNextWL ().push_back (c);
+            c->cancelIteration();
+            c->reset();
+            ThisClass::getNextWL().push_back(c);
           }
         },
-        std::make_tuple (
-          galois::loopname ("applyOperator"),
-          chunk_size<OpFunc::CHUNK_SIZE> ()));
+        std::make_tuple(galois::loopname("applyOperator"),
+                        chunk_size<OpFunc::CHUNK_SIZE>()));
   }
 
+  void execute_impl() {
 
-  void execute_impl () {
-
-    StatTimer t ("executorLoop");
+    StatTimer t("executorLoop");
     t.start();
 
     while (true) {
       ThisClass::t_beginRound.start();
-      ThisClass::beginRound (winWL);
+      ThisClass::beginRound(winWL);
 
-      if (ThisClass::getCurrWL ().empty_all ()) {
+      if (ThisClass::getCurrWL().empty_all()) {
         break;
       }
       ThisClass::t_beginRound.stop();
@@ -323,79 +315,85 @@ protected:
       Timer t;
 
       ThisClass::t_expandNhood.start();
-      expandNhood ();
+      expandNhood();
       ThisClass::t_expandNhood.stop();
 
       ThisClass::t_executeSources.start();
-      executeSources ();
+      executeSources();
       ThisClass::t_executeSources.stop();
 
       ThisClass::t_applyOperator.start();
-      applyOperator ();
+      applyOperator();
       ThisClass::t_applyOperator.stop();
 
-      endRound ();
-
+      endRound();
     }
 
     t.stop();
   }
-
 };
-
 
 } // end anonymous namespace
 
-template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc,
-    const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc,
+          typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_ikdg_impl(const R& range, const Cmp& cmp,
+                                const NhFunc& nhFunc, const ExFunc& exFunc,
+                                const OpFunc& opFunc,
+                                const _ArgsTuple& argsTuple) {
 
-  auto argsT = std::tuple_cat (argsTuple,
-      get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
-        std::make_tuple (default_loopname {}, enable_parameter<false> {})));
-  using ArgsT = decltype (argsT);
+  auto argsT = std::tuple_cat(
+      argsTuple,
+      get_default_trait_values(
+          argsTuple, std::make_tuple(loopname_tag{}, enable_parameter_tag{}),
+          std::make_tuple(default_loopname{}, enable_parameter<false>{})));
+  using ArgsT = decltype(argsT);
 
   using T = typename R::value_type;
 
-
   using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
 
-  Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
+  Exec e(cmp, nhFunc, exFunc, opFunc, argsT);
 
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    substrate::getThreadPool().burnPower(galois::getActiveThreads ());
+    substrate::getThreadPool().burnPower(galois::getActiveThreads());
   }
 
-  e.push_initial (range);
-  e.execute ();
+  e.push_initial(range);
+  e.execute();
 
   if (wakeupThreadPool) {
-    substrate::getThreadPool().beKind ();
+    substrate::getThreadPool().beKind();
   }
-
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc,
-    const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc,
+          typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_ikdg(const R& range, const Cmp& cmp, const NhFunc& nhFunc,
+                           const ExFunc& exFunc, const OpFunc& opFunc,
+                           const _ArgsTuple& argsTuple) {
 
-  auto tplParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<true> ()));
-  auto tplNoParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<false> ()));
+  auto tplParam =
+      std::tuple_cat(argsTuple, std::make_tuple(enable_parameter<true>()));
+  auto tplNoParam =
+      std::tuple_cat(argsTuple, std::make_tuple(enable_parameter<false>()));
 
   if (useParaMeterOpt) {
-    for_each_ordered_ikdg_impl (range, cmp, nhFunc, exFunc, opFunc, tplParam);
+    for_each_ordered_ikdg_impl(range, cmp, nhFunc, exFunc, opFunc, tplParam);
   } else {
-    for_each_ordered_ikdg_impl (range, cmp, nhFunc, exFunc, opFunc, tplNoParam);
+    for_each_ordered_ikdg_impl(range, cmp, nhFunc, exFunc, opFunc, tplNoParam);
   }
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
-void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc,
+          typename ArgsTuple>
+void for_each_ordered_ikdg(const R& range, const Cmp& cmp, const NhFunc& nhFunc,
+                           const OpFunc& opFunc, const ArgsTuple& argsTuple) {
 
-  for_each_ordered_ikdg (range, cmp, nhFunc, internal::DummyExecFunc (), opFunc, argsTuple);
+  for_each_ordered_ikdg(range, cmp, nhFunc, internal::DummyExecFunc(), opFunc,
+                        argsTuple);
 }
 
 } // end namespace runtime

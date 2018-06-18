@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -46,13 +46,16 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Delaunay Triangulation";
-static const char* desc = "Produces a Delaunay triangulation for a set of points";
+static const char* desc =
+    "Produces a Delaunay triangulation for a set of points";
 static const char* url = "delaunay_triangulation";
 
-static cll::opt<std::string> inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> doWriteMesh("writemesh", 
-    cll::desc("Write the mesh out to files with basename"),
-    cll::value_desc("basename"));
+static cll::opt<std::string>
+    inputname(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    doWriteMesh("writemesh",
+                cll::desc("Write the mesh out to files with basename"),
+                cll::value_desc("basename"));
 
 using Tree = typename galois::graphs::SpatialTree2d<Point*>;
 
@@ -69,17 +72,18 @@ struct Process {
   ptrPointBag& ptrPoints;
 
   Process(Graph& g, Tree& t, ptrPointBag& p)
-      : graph(g), tree(t), ptrPoints(p) { }
+      : graph(g), tree(t), ptrPoints(p) {}
 
   typedef galois::PerIterAllocTy Alloc;
 
   struct ContainsTuple {
     const Graph& graph;
     Tuple tuple;
-    ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
+    ContainsTuple(const Graph& g, const Tuple& t) : graph(g), tuple(t) {}
     bool operator()(const GNode& n) const {
       assert(!graph.getData(n, galois::MethodFlag::UNPROTECTED).boundary());
-      return graph.getData(n, galois::MethodFlag::UNPROTECTED).inTriangle(tuple);
+      return graph.getData(n, galois::MethodFlag::UNPROTECTED)
+          .inTriangle(tuple);
     }
   };
 
@@ -91,43 +95,46 @@ struct Process {
       }
     }
     for (int j = 0; j < 2; ++j) {
-      t[j] *= 1/3.0;
+      t[j] *= 1 / 3.0;
     }
   }
 
-  void findBestNormal(const Element& element, const Point* p, const Point*& bestP1, const Point*& bestP2) {
+  void findBestNormal(const Element& element, const Point* p,
+                      const Point*& bestP1, const Point*& bestP2) {
     Tuple center(0);
     computeCenter(element, center);
     int scale = element.clockwise() ? 1 : -1;
 
     Tuple origin = p->t() - center;
-//        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
+    //        double length2 = origin.x() * origin.x() + origin.y() *
+    //        origin.y();
     bestP1 = bestP2 = NULL;
-    double bestVal = 0.0;
+    double bestVal  = 0.0;
     for (int i = 0; i < 3; ++i) {
       int next = i + 1;
-      if (next > 2) next -= 3;
+      if (next > 2)
+        next -= 3;
 
       const Point* p1 = element.getPoint(i);
       const Point* p2 = element.getPoint(next);
-      double dx = p2->t().x() - p1->t().x();
-      double dy = p2->t().y() - p1->t().y();
+      double dx       = p2->t().x() - p1->t().x();
+      double dy       = p2->t().y() - p1->t().y();
       Tuple normal(scale * -dy, scale * dx);
       double val = normal.dot(origin); // / length2;
       if (bestP1 == NULL || val > bestVal) {
         bestVal = val;
-        bestP1 = p1;
-        bestP2 = p2;
+        bestP1  = p1;
+        bestP2  = p2;
       }
     }
     assert(bestP1 != NULL && bestP2 != NULL && bestVal > 0);
   }
 
   GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (auto ii: graph.edges(start)) {
-      GNode dst = graph.getEdgeDst(ii);
+    for (auto ii : graph.edges(start)) {
+      GNode dst  = graph.getEdgeDst(ii);
       Element& e = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-      int count = 0;
+      int count  = 0;
       for (int i = 0; i < e.dim(); ++i) {
         if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
           if (++count == 2)
@@ -145,10 +152,12 @@ struct Process {
     while (!contains(start)) {
       Element& element = graph.getData(start, galois::MethodFlag::WRITE);
       if (element.boundary()) {
-        // Should only happen when quad tree returns a boundary point which is rare
-        // There's only one way to go from here
-        assert(std::distance(graph.edge_begin(start), graph.edge_end(start)) == 1);
-        start = graph.getEdgeDst(graph.edge_begin(start, galois::MethodFlag::WRITE));
+        // Should only happen when quad tree returns a boundary point which is
+        // rare There's only one way to go from here
+        assert(std::distance(graph.edge_begin(start), graph.edge_end(start)) ==
+               1);
+        start = graph.getEdgeDst(
+            graph.edge_begin(start, galois::MethodFlag::WRITE));
       } else {
         // Find which neighbor will get us to point fastest by computing normal
         // vectors
@@ -166,7 +175,7 @@ struct Process {
     Point** rp = tree.find(p->t().x(), p->t().y());
     if (!rp)
       return false;
-    
+
     (*rp)->get(galois::MethodFlag::WRITE);
 
     GNode someNode = (*rp)->someElement();
@@ -183,33 +192,31 @@ struct Process {
   void generateMesh() {
     typedef galois::worklists::PerThreadChunkLIFO<32> CA;
     galois::for_each(galois::iterate(ptrPoints),
-        [&, self=this] (Point* p, auto& ctx) {
-          p->get(galois::MethodFlag::WRITE);
-          assert(!p->inMesh());
+                     [&, self = this](Point* p, auto& ctx) {
+                       p->get(galois::MethodFlag::WRITE);
+                       assert(!p->inMesh());
 
-          GNode node;
-          if (!self->findContainingElement(p, node)) {
-            // Someone updated an element while we were searching, producing
-            // a semi-consistent state
-            // ctx.push(p);
-            // Current version is safe with locking so this shouldn't happen
-            GALOIS_DIE("unreachable");
-            return;
-          }
-  
-          assert(self->graph.getData(node).inTriangle(p->t()));
-          assert(self->graph.containsNode(node));
+                       GNode node;
+                       if (!self->findContainingElement(p, node)) {
+                         // Someone updated an element while we were searching,
+                         // producing a semi-consistent state ctx.push(p);
+                         // Current version is safe with locking so this
+                         // shouldn't happen
+                         GALOIS_DIE("unreachable");
+                         return;
+                       }
 
-          Cavity<Alloc> cav(self->graph, ctx.getPerIterAlloc());
-          cav.init(node, p);
-          cav.build();
-          cav.update();
-          self->tree.insert(p->t().x(), p->t().y(), p);
-        },
-        galois::no_pushes(),
-        galois::per_iter_alloc(),
-        galois::loopname("Main"),
-        galois::wl<CA>());
+                       assert(self->graph.getData(node).inTriangle(p->t()));
+                       assert(self->graph.containsNode(node));
+
+                       Cavity<Alloc> cav(self->graph, ctx.getPerIterAlloc());
+                       cav.init(node, p);
+                       cav.build();
+                       cav.update();
+                       self->tree.insert(p->t().x(), p->t().y(), p);
+                     },
+                     galois::no_pushes(), galois::per_iter_alloc(),
+                     galois::loopname("Main"), galois::wl<CA>());
   }
 };
 
@@ -222,7 +229,7 @@ class ReadPoints {
     minX = minY = std::numeric_limits<double>::max();
     maxX = maxY = std::numeric_limits<double>::min();
 
-    for (const auto& p: points) {
+    for (const auto& p : points) {
       double x = p.t().x();
       double y = p.t().y();
       if (x < minX)
@@ -237,17 +244,18 @@ class ReadPoints {
 
     tree.init(minX, minY, maxX, maxY);
 
-    size_t size = points.size();
-    double width = maxX - minX;
-    double height = maxY - minY;
+    size_t size      = points.size();
+    double width     = maxX - minX;
+    double height    = maxY - minY;
     double maxLength = std::max(width, height);
-    double centerX = minX + width / 2.0;
-    double centerY = minY + height / 2.0;
-    double radius = maxLength * 3.0; // radius of circle that should cover all points
+    double centerX   = minX + width / 2.0;
+    double centerY   = minY + height / 2.0;
+    double radius =
+        maxLength * 3.0; // radius of circle that should cover all points
 
     for (int i = 0; i < 3; ++i) {
-      double dX = radius * cos(2*M_PI*(i/3.0));
-      double dY = radius * sin(2*M_PI*(i/3.0));
+      double dX = radius * cos(2 * M_PI * (i / 3.0));
+      double dY = radius * sin(2 * M_PI * (i / 3.0));
       points.push_back(Point(centerX + dX, centerY + dY, size + i));
     }
   }
@@ -298,7 +306,7 @@ class ReadPoints {
   Tree& tree;
 
 public:
-  ReadPoints(PointList& p, Tree& t): points(p), tree(t) { }
+  ReadPoints(PointList& p, Tree& t) : points(p), tree(t) {}
 
   void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
@@ -311,7 +319,7 @@ public:
       fromPointList(scanner);
     }
     scanner.close();
-    
+
     if (points.size())
       addBoundaryPoints();
     else {
@@ -327,13 +335,13 @@ struct ReadInput {
   ptrPointBag& ptrPoints;
 
   ReadInput(Graph& g, Tree& t, basePointBag& b, ptrPointBag& p)
-      : graph(g), tree(t), basePoints(b), ptrPoints(p) { }
+      : graph(g), tree(t), basePoints(b), ptrPoints(p) {}
 
   void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
     Element large_triangle(p1, p2, p3);
     GNode large_node = graph.createNode(large_triangle);
     graph.addNode(large_node);
-  
+
     p1->addElement(large_node);
     p2->addElement(large_node);
     p3->addElement(large_node);
@@ -343,7 +351,7 @@ struct ReadInput {
     Element border_ele1(p1, p2);
     Element border_ele2(p2, p3);
     Element border_ele3(p3, p1);
-    
+
     GNode border_node1 = graph.createNode(border_ele1);
     GNode border_node2 = graph.createNode(border_ele2);
     GNode border_node3 = graph.createNode(border_ele3);
@@ -362,36 +370,36 @@ struct ReadInput {
   }
 
   struct centerXCmp {
-    template<typename T>
+    template <typename T>
     bool operator()(const T& lhs, const T& rhs) const {
       return lhs.t().x() < rhs.t().x();
     }
   };
 
   struct centerYCmp {
-    template<typename T>
+    template <typename T>
     bool operator()(const T& lhs, const T& rhs) const {
       return lhs.t().y() < rhs.t().y();
     }
   };
 
   struct centerYCmpInv {
-    template<typename T>
+    template <typename T>
     bool operator()(const T& lhs, const T& rhs) const {
       return rhs.t().y() < lhs.t().y();
     }
   };
 
-  template<typename Iter>
+  template <typename Iter>
   void divide(const Iter& b, const Iter& e) {
-    if (std::distance(b,e) > 64) {
+    if (std::distance(b, e) > 64) {
       std::sort(b, e, centerXCmp());
       Iter m = galois::split_range(b, e);
       std::sort(b, m, centerYCmpInv());
       std::sort(m, e, centerYCmp());
       divide(b, galois::split_range(b, m));
       divide(galois::split_range(b, m), m);
-      divide(m,galois::split_range(m, e));
+      divide(m, galois::split_range(m, e));
       divide(galois::split_range(m, e), e);
     } else {
       std::random_shuffle(b, e);
@@ -401,16 +409,16 @@ struct ReadInput {
   void layoutPoints(PointList& points) {
     divide(points.begin(), points.end() - 3);
     galois::do_all(galois::iterate(points.begin(), points.end() - 3),
-        [&] (Point& p) {
-          Point* pr = &basePoints.push(p);
-          ptrPoints.push(pr);
-        });
+                   [&](Point& p) {
+                     Point* pr = &basePoints.push(p);
+                     ptrPoints.push(pr);
+                   });
     //! [Insert elements into InsertBag]
     Point* p1 = &basePoints.push(*(points.end() - 1));
     Point* p2 = &basePoints.push(*(points.end() - 2));
     Point* p3 = &basePoints.push(*(points.end() - 3));
     //! [Insert elements into InsertBag]
-    addBoundaryNodes(p1,p2,p3);
+    addBoundaryNodes(p1, p2, p3);
   }
 
   void operator()(const std::string& filename) {
@@ -420,10 +428,12 @@ struct ReadInput {
     std::cout << "configuration: " << points.size() << " points\n";
 
     galois::preAlloc(2 * numThreads // some per-thread state
-        + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
-        * 32 // include graph node size
-                     / (galois::runtime::pagePoolSize()) // in pages
-        );
+                     + 2 * points.size() *
+                           sizeof(Element) // mesh is about 2x number of points
+                                           // (for random points)
+                           * 32            // include graph node size
+                           / (galois::runtime::pagePoolSize()) // in pages
+    );
     galois::reportPageAlloc("MeminfoPre");
 
     layoutPoints(points);
@@ -434,11 +444,11 @@ static void writePoints(const std::string& filename, const PointList& points) {
   std::ofstream out(filename.c_str());
   // <num vertices> <dimension> <num attributes> <has boundary markers>
   out << points.size() << " 2 0 0\n";
-  //out.setf(std::ios::fixed, std::ios::floatfield);
+  // out.setf(std::ios::fixed, std::ios::floatfield);
   out.setf(std::ios::scientific, std::ios::floatfield);
   out.precision(10);
   long id = 0;
-  for (const auto& p: points) {
+  for (const auto& p : points) {
     const Tuple& t = p.t();
     out << id++ << " " << t.x() << " " << t.y() << " 0\n";
   }
@@ -448,8 +458,8 @@ static void writePoints(const std::string& filename, const PointList& points) {
 
 static void writeMesh(const std::string& filename, Graph& graph) {
   long numTriangles = 0;
-  long numSegments = 0;
-  for (auto n: graph) {
+  long numSegments  = 0;
+  for (auto n : graph) {
     Element& e = graph.getData(n);
     if (e.boundary()) {
       numSegments++;
@@ -462,7 +472,7 @@ static void writeMesh(const std::string& filename, Graph& graph) {
   long sid = 0;
   std::string elementName(filename);
   std::string polyName(filename);
-  
+
   elementName.append(".ele");
   polyName.append(".poly");
 
@@ -475,11 +485,12 @@ static void writeMesh(const std::string& filename, Graph& graph) {
   // <num segments> <has boundary markers>
   pout << "0 2 0 0\n";
   pout << numSegments << " 1\n";
-  for (auto n: graph) {
+  for (auto n : graph) {
     const Element& e = graph.getData(n);
     if (e.boundary()) {
       // <segment id> <vertex> <vertex> <is boundary>
-      pout << sid++ << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id() << " 1\n";
+      pout << sid++ << " " << e.getPoint(0)->id() << " " << e.getPoint(1)->id()
+           << " 1\n";
     } else {
       // <triangle id> <vertex> <vertex> <vertex> [in ccw order]
       eout << tid++ << " " << e.getPoint(0)->id() << " ";
@@ -511,7 +522,7 @@ int main(int argc, char** argv) {
   galois::StatTimer T;
   T.start();
   galois::runtime::profileVtune(
-      [&] () { Process(graph, tree, ptrPoints).generateMesh(); },
+      [&]() { Process(graph, tree, ptrPoints).generateMesh(); },
       "MeshGeneration");
   T.stop();
   std::cout << "mesh size: " << graph.size() << "\n";

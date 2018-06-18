@@ -33,23 +33,24 @@ using namespace benchIO;
 
 void timeSuffixArray(unsigned char* s, int n, int rounds, char* outFile) {
   int* R;
-  for (int i=0; i < rounds; i++) {
+  for (int i = 0; i < rounds; i++) {
     startTime();
     R = suffixArray(s, n);
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) writeIntArrayToFile(R, n, outFile);
+  if (outFile != NULL)
+    writeIntArrayToFile(R, n, outFile);
   delete R;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-p] [-o <outFile>] [-r <rounds>] <inFile>");
-  char* iFile = P.getArgument(0);
-  char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  commandLine P(argc, argv, "[-p] [-o <outFile>] [-r <rounds>] <inFile>");
+  char* iFile  = P.getArgument(0);
+  char* oFile  = P.getOptionValue("-o");
+  int rounds   = P.getOptionIntValue("-r", 1);
   _seq<char> S = readStringFromFile(iFile);
-  
-  timeSuffixArray((unsigned char*) S.A, S.n, rounds, oFile);
+
+  timeSuffixArray((unsigned char*)S.A, S.n, rounds, oFile);
 }

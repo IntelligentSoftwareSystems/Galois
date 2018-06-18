@@ -32,64 +32,67 @@ using namespace benchIO;
 template <class T>
 _seq<T> timeRemDups(T* A, int n, int rounds) {
   T* B = new T[n];
-//  parallel_for (int i=0; i < n; i++) B[i] = A[i];
-  parallel_doall(int, i, 0, n) { B[i] = A[i]; } parallel_doall_end
-  _seq<T> R = removeDuplicates(_seq<T>(B, n)); //run one to "warm things up"
-  for (int j=0; j < rounds; j++) {
+  //  parallel_for (int i=0; i < n; i++) B[i] = A[i];
+  parallel_doall(int, i, 0, n) { B[i] = A[i]; }
+  parallel_doall_end _seq<T> R =
+      removeDuplicates(_seq<T>(B, n)); // run one to "warm things up"
+  for (int j = 0; j < rounds; j++) {
     R.del();
-//    parallel_for (int i=0; i < n; i++) B[i] = A[i];
-    parallel_doall(int, i, 0, n) { B[i] = A[i]; } parallel_doall_end
-    startTime();
+    //    parallel_for (int i=0; i < n; i++) B[i] = A[i];
+    parallel_doall(int, i, 0, n) { B[i] = A[i]; }
+    parallel_doall_end startTime();
     R = removeDuplicates(_seq<T>(A, n));
     nextTimeN();
   }
   cout << endl;
-  delete B; 
+  delete B;
   return R;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
-  seqData D = readSequenceFromFile(iFile);
-  int dt = D.dt;
+  int rounds  = P.getOptionIntValue("-r", 1);
+  seqData D   = readSequenceFromFile(iFile);
+  int dt      = D.dt;
 
   switch (dt) {
   case intT: {
-    int* A = (int*) D.A;
+    int* A      = (int*)D.A;
     _seq<int> R = timeRemDups(A, D.n, rounds);
-    if (oFile != NULL) writeSequenceToFile(R.A, R.n, oFile);
-    delete A;}
-    break;
+    if (oFile != NULL)
+      writeSequenceToFile(R.A, R.n, oFile);
+    delete A;
+  } break;
 
   case stringT: {
-    char** A = (char**) D.A;
+    char** A      = (char**)D.A;
     _seq<char*> R = timeRemDups(A, D.n, rounds);
-    if (oFile != NULL) writeSequenceToFile(R.A, R.n, oFile);}
-    break;
+    if (oFile != NULL)
+      writeSequenceToFile(R.A, R.n, oFile);
+  } break;
 
   case stringIntPairT: {
-    stringIntPair* AA = (stringIntPair*) D.A;
+    stringIntPair* AA = (stringIntPair*)D.A;
     stringIntPair** A = new stringIntPair*[D.n];
-//    parallel_for (int i=0; i < D.n; i++) A[i] = AA+i;
-    parallel_doall(int, i, 0, D.n) { A[i] = AA+i; } parallel_doall_end
-    _seq<stringIntPair*> R = timeRemDups(A, D.n, rounds);
+    //    parallel_for (int i=0; i < D.n; i++) A[i] = AA+i;
+    parallel_doall(int, i, 0, D.n) { A[i] = AA + i; }
+    parallel_doall_end _seq<stringIntPair*> R = timeRemDups(A, D.n, rounds);
     delete A;
     // need to fix delete on AA
     if (oFile != NULL) {
       stringIntPair* B = new stringIntPair[R.n];
-//      parallel_for (int i=0; i < R.n; i++) B[i] = *R.A[i];
-      parallel_doall(int, i, 0, R.n) { B[i] = *R.A[i]; } parallel_doall_end
-      writeSequenceToFile(B, R.n, oFile);
+      //      parallel_for (int i=0; i < R.n; i++) B[i] = *R.A[i];
+      parallel_doall(int, i, 0, R.n) { B[i] = *R.A[i]; }
+      parallel_doall_end writeSequenceToFile(B, R.n, oFile);
       delete B;
-    }}
-    break;
+    }
+  } break;
 
   default:
     cout << "removeDuplicates: input file not of right type" << endl;
-    return(1);
+    return (1);
   }
 }

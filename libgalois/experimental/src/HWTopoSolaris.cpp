@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,16 +33,17 @@ using namespace galois::runtime::LL;
 namespace {
 
 static bool sunBindToProcessor(int proc) {
-  if (processor_bind(P_LWPID,  thr_self(), proc, 0) == -1) {
-    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
+  if (processor_bind(P_LWPID, thr_self(), proc, 0) == -1) {
+    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno),
+          ")");
     return false;
   }
   return true;
 }
 
-//Flat machine with the correct number of threads and binding
+// Flat machine with the correct number of threads and binding
 struct Policy {
-  std::vector<int> procmap; //Galois id -> solaris id
+  std::vector<int> procmap; // Galois id -> solaris id
 
   unsigned numThreads, numCores, numSockets;
 
@@ -51,13 +52,13 @@ struct Policy {
     cpuid_max = sysconf(_SC_CPUID_MAX);
     for (i = 0; i <= cpuid_max; i++) {
       if (p_online(i, P_STATUS) != -1) {
-	procmap.push_back(i);
-	//printf("processor %d present\n", i);
+        procmap.push_back(i);
+        // printf("processor %d present\n", i);
       }
     }
 
     numThreads = procmap.size();
-    numCores = procmap.size();
+    numCores   = procmap.size();
     numSockets = 1;
   }
 };
@@ -67,38 +68,28 @@ static Policy& getPolicy() {
   return A;
 }
 
-} //namespace
+} // namespace
 
 bool galois::runtime::LL::bindThreadToProcessor(int id) {
-  assert(size_t(id) < procmap.size ());
+  assert(size_t(id) < procmap.size());
   return sunBindToProcessor(getPolicy().procmap[id]);
 }
 
 unsigned galois::runtime::LL::getProcessorForThread(int id) {
-  assert(size_t(id) < procmap.size ());
+  assert(size_t(id) < procmap.size());
   return getPolicy().procmap[id];
 }
 
-unsigned galois::runtime::LL::getMaxThreads() {
-  return getPolicy().numThreads;
-}
+unsigned galois::runtime::LL::getMaxThreads() { return getPolicy().numThreads; }
 
-unsigned galois::runtime::LL::getMaxCores() {
-  return getPolicy().numCores;
-}
+unsigned galois::runtime::LL::getMaxCores() { return getPolicy().numCores; }
 
-unsigned galois::runtime::LL::getMaxSockets() {
-  return getPolicy().numSockets;
-}
+unsigned galois::runtime::LL::getMaxSockets() { return getPolicy().numSockets; }
 
 unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
   return getPolicy().numSockets - 1;
 }
 
-unsigned galois::runtime::LL::getSocketForThread(int id) {
-  return 0;
-}
+unsigned galois::runtime::LL::getSocketForThread(int id) { return 0; }
 
-bool galois::runtime::LL::isSocketLeader(int id) {
-  return id == 0;
-}
+bool galois::runtime::LL::isSocketLeader(int id) { return id == 0; }

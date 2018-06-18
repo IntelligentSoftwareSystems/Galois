@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,7 +28,7 @@ namespace galois {
 /**
  * Galois version of <code>boost::optional</code>.
  */
-template<typename T>
+template <typename T>
 class optional {
   LazyObject<T> data_;
   bool initialized_;
@@ -40,7 +40,7 @@ class optional {
 
   void assign_impl(const T& val) { get_impl() = val; }
 
-  void destroy() { 
+  void destroy() {
     if (initialized_) {
       data_.destroy();
       initialized_ = false;
@@ -53,19 +53,17 @@ class optional {
 public:
   typedef bool (optional::*unspecified_bool_type)() const;
 
-  optional(): initialized_(false) { }
+  optional() : initialized_(false) {}
 
-  optional(const T& val): initialized_(false) {
-    construct(val);
-  }
+  optional(const T& val) : initialized_(false) { construct(val); }
 
-  optional(const optional& rhs): initialized_(false) {
+  optional(const optional& rhs) : initialized_(false) {
     if (rhs.is_initialized())
       construct(rhs.get_impl());
   }
 
-  template<typename U>
-  explicit optional(const optional<U>& rhs): initialized_(false) {
+  template <typename U>
+  explicit optional(const optional<U>& rhs) : initialized_(false) {
     assign(rhs);
   }
 
@@ -83,7 +81,7 @@ public:
     }
   }
 
-  template<typename U>
+  template <typename U>
   void assign(const optional<U>& rhs) {
     if (is_initialized()) {
       if (rhs.is_initialized())
@@ -110,7 +108,7 @@ public:
     return *this;
   }
 
-  template<typename U>
+  template <typename U>
   optional& operator=(const optional<U>& rhs) {
     assign(rhs);
     return *this;
@@ -121,16 +119,30 @@ public:
     return *this;
   }
 
-  T& get() { assert(initialized_); return get_impl(); }
-  const T& get() const { assert(initialized_); return get_impl(); }
+  T& get() {
+    assert(initialized_);
+    return get_impl();
+  }
+  const T& get() const {
+    assert(initialized_);
+    return get_impl();
+  }
   T& operator*() { return get(); }
   const T& operator*() const { return get(); }
-  T* operator->() { assert(initialized_); return &get_impl(); }
-  const T* operator->() const { assert(initialized_); return &get_impl(); }
+  T* operator->() {
+    assert(initialized_);
+    return &get_impl();
+  }
+  const T* operator->() const {
+    assert(initialized_);
+    return &get_impl();
+  }
 
-  operator unspecified_bool_type() const { return initialized_ ? &optional::is_initialized : 0; }
+  operator unspecified_bool_type() const {
+    return initialized_ ? &optional::is_initialized : 0;
+  }
 };
 
-}
+} // namespace galois
 
 #endif

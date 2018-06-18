@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,20 +26,16 @@
 
 #include <iostream>
 
-
 class LeafLight : public AbstractLight {
 protected:
-
-
   // direction of maximum emission
   Point3 direction;
 
 public:
-
   LeafLight(double x, double y, double z, double dirX, double dirY, double dirZ)
       : AbstractLight(x, y, z), direction(dirX, dirY, dirZ) {
 
-        AbstractLight::setIntensity(1.0 / MATH_PI, 0);
+    AbstractLight::setIntensity(1.0 / MATH_PI, 0);
   }
 
   Point3& getDirection() { return direction; }

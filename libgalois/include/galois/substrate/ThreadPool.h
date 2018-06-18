@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,29 +36,32 @@ namespace substrate {
 
 namespace internal {
 
-template<typename tpl, int s, int r>
+template <typename tpl, int s, int r>
 struct ExecuteTupleImpl {
   static inline void execute(tpl& cmds) {
     std::get<s>(cmds)();
-    ExecuteTupleImpl<tpl,s+1,r-1>::execute(cmds);
+    ExecuteTupleImpl<tpl, s + 1, r - 1>::execute(cmds);
   }
 };
 
-template<typename tpl, int s>
+template <typename tpl, int s>
 struct ExecuteTupleImpl<tpl, s, 0> {
-  static inline void execute(tpl& f) { }
+  static inline void execute(tpl& f) {}
 };
 
-}
-
+} // namespace internal
 
 class ThreadPool {
   friend class SharedMemSubstrate;
+
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
-  struct fastmode_ty {bool mode;}; //! type for setting fastmode
-  struct dedicated_ty {std::function<void(void)> fn;}; //! type to switch to dedicated mode
-
+  struct fastmode_ty {
+    bool mode;
+  }; //! type for setting fastmode
+  struct dedicated_ty {
+    std::function<void(void)> fn;
+  }; //! type to switch to dedicated mode
 
   //! Per-thread mailboxes for notification
   struct per_signal {
@@ -71,24 +74,26 @@ protected:
 
     void wakeup(bool fastmode) {
       if (fastmode) {
-        done = 0;
+        done        = 0;
         fastRelease = 1;
       } else {
         std::lock_guard<std::mutex> lg(m);
         done = 0;
         cv.notify_one();
-      //start.release();
+        // start.release();
       }
     }
 
     void wait(bool fastmode) {
       if (fastmode) {
-        while(!fastRelease.load(std::memory_order_relaxed)) { asmPause(); }
+        while (!fastRelease.load(std::memory_order_relaxed)) {
+          asmPause();
+        }
         fastRelease = 0;
       } else {
         std::unique_lock<std::mutex> lg(m);
         cv.wait(lg, [=] { return !done; });
-        //start.acquire();
+        // start.acquire();
       }
     }
   };
@@ -97,21 +102,19 @@ protected:
 
   machineTopoInfo mi;
   std::vector<per_signal*> signals;
-  std::vector<std::thread>  threads;
+  std::vector<std::thread> threads;
   unsigned reserved;
   unsigned masterFastmode;
   bool running;
   std::function<void(void)> work;
 
-
-
-  //!destroy all threads
+  //! destroy all threads
   void destroyCommon();
 
   //! Initialize a thread
   void initThread(unsigned tid);
 
-  //!main thread loop
+  //! main thread loop
   void threadLoop(unsigned tid);
 
   //! spin up for run
@@ -130,22 +133,25 @@ public:
 
   //! execute work on all threads
   //! a simple wrapper for run
-  template<typename... Args>
+  template <typename... Args>
   void run(unsigned num, Args&&... args) {
     struct ExecuteTuple {
       //      using Ty = std::tuple<Args...>;
       std::tuple<Args...> cmds;
 
-      void operator()(){
-        internal::ExecuteTupleImpl<std::tuple<Args...>, 0, std::tuple_size<std::tuple<Args...>>::value>::execute(this->cmds);
+      void operator()() {
+        internal::ExecuteTupleImpl<
+            std::tuple<Args...>, 0,
+            std::tuple_size<std::tuple<Args...>>::value>::execute(this->cmds);
       }
-      ExecuteTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
+      ExecuteTuple(Args&&... args) : cmds(std::forward<Args>(args)...) {}
     };
-    //paying for an indirection in work allows small-object optimization in std::function
-    //to kick in and avoid a heap allocation
+    // paying for an indirection in work allows small-object optimization in
+    // std::function to kick in and avoid a heap allocation
     ExecuteTuple lwork(std::forward<Args>(args)...);
     work = std::ref(lwork);
-    //work = std::function<void(void)>(ExecuteTuple(std::forward<Args>(args)...));
+    // work =
+    // std::function<void(void)>(ExecuteTuple(std::forward<Args>(args)...));
     assert(num <= getMaxThreads());
     runInternal(num);
   }
@@ -153,17 +159,17 @@ public:
   //! run function in a dedicated thread until the threadpool exits
   void runDedicated(std::function<void(void)>& f);
 
-  //experimental: busy wait for work
+  // experimental: busy wait for work
   void burnPower(unsigned num);
-  //experimental: leave busy wait
+  // experimental: leave busy wait
   void beKind();
 
   bool isRunning() const { return running; }
 
-
-  //!return the number of non-reserved threads in the pool
+  //! return the number of non-reserved threads in the pool
   unsigned getMaxUsableThreads() const { return mi.maxThreads - reserved; }
-  //!return the number of threads supported by the thread pool on the current machine
+  //! return the number of threads supported by the thread pool on the current
+  //! machine
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
   unsigned getMaxSockets() const { return mi.maxSockets; }
@@ -176,23 +182,32 @@ public:
     abort();
   }
 
-  bool isLeader(unsigned tid) const { return signals[tid]->topo.socketLeader == tid; }
+  bool isLeader(unsigned tid) const {
+    return signals[tid]->topo.socketLeader == tid;
+  }
   unsigned getSocket(unsigned tid) const { return signals[tid]->topo.socket; }
-  unsigned getLeader(unsigned tid) const { return signals[tid]->topo.socketLeader; }
-  unsigned getCumulativeMaxSocket(unsigned tid) const { return signals[tid]->topo.cumulativeMaxSocket; }
-  unsigned getNumaNode(unsigned tid) const { return signals[tid]->topo.numaNode; }
+  unsigned getLeader(unsigned tid) const {
+    return signals[tid]->topo.socketLeader;
+  }
+  unsigned getCumulativeMaxSocket(unsigned tid) const {
+    return signals[tid]->topo.cumulativeMaxSocket;
+  }
+  unsigned getNumaNode(unsigned tid) const {
+    return signals[tid]->topo.numaNode;
+  }
 
   static unsigned getTID() { return my_box.topo.tid; }
   static bool isLeader() { return my_box.topo.tid == my_box.topo.socketLeader; }
   static unsigned getLeader() { return my_box.topo.socketLeader; }
   static unsigned getSocket() { return my_box.topo.socket; }
-  static unsigned getCumulativeMaxSocket() { return my_box.topo.cumulativeMaxSocket; }
+  static unsigned getCumulativeMaxSocket() {
+    return my_box.topo.cumulativeMaxSocket;
+  }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
-
 };
 
 namespace internal {
-  void setThreadPool(ThreadPool* tp);
+void setThreadPool(ThreadPool* tp);
 }
 
 /**
@@ -200,7 +215,7 @@ namespace internal {
  */
 ThreadPool& getThreadPool(void);
 
-} //Substrate
-} //Galois
+} // namespace substrate
+} // namespace galois
 
 #endif

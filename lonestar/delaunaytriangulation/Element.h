@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,7 +29,7 @@ class Point;
 
 class Element {
   Point* points[3];
-  
+
 public:
   Element(const Element& e) {
     points[0] = e.points[0];
@@ -48,7 +48,7 @@ public:
     points[1] = b;
     points[2] = NULL;
   }
-  
+
   Point* getPoint(int i) { return points[i]; }
   const Point* getPoint(int i) const { return points[i]; }
 
@@ -56,7 +56,7 @@ public:
   int dim() const { return boundary() ? 2 : 3; }
 
   bool clockwise() const;
-  
+
   //! determine if a tuple is inside the triangle
   bool inTriangle(const Tuple& p) const;
 

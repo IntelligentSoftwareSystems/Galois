@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,16 +34,18 @@ namespace worklists {
  * created work is processed after all the current work in a round is
  * completed.
  */
-template<class Container=PerSocketChunkFIFO<>, class T=int, bool Concurrent = true>
+template <class Container = PerSocketChunkFIFO<>, class T = int,
+          bool Concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 public:
-  template<bool _concurrent>
+  template <bool _concurrent>
   using rethread = BulkSynchronous<Container, T, _concurrent>;
 
-  template<typename _T>
-  using retype = BulkSynchronous<typename Container::template retype<_T>, _T, Concurrent>;
+  template <typename _T>
+  using retype =
+      BulkSynchronous<typename Container::template retype<_T>, _T, Concurrent>;
 
-  template<typename _container>
+  template <typename _container>
   using with_container = BulkSynchronous<_container, T, Concurrent>;
 
 private:
@@ -51,7 +53,7 @@ private:
 
   struct TLD {
     unsigned round;
-    TLD(): round(0) { }
+    TLD() : round(0) {}
   };
 
   CTy wls[2];
@@ -60,33 +62,35 @@ private:
   substrate::CacheLineStorage<std::atomic<bool>> some;
   std::atomic<bool> isEmpty;
 
- public:
+public:
   typedef T value_type;
 
-  BulkSynchronous(): barrier(runtime::getBarrier(runtime::activeThreads)), some(false), isEmpty(false) { }
+  BulkSynchronous()
+      : barrier(runtime::getBarrier(runtime::activeThreads)), some(false),
+        isEmpty(false) {}
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);
   }
 
-  template<typename ItTy>
+  template <typename ItTy>
   void push(ItTy b, ItTy e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
     tlds.getLocal()->round = 1;
-    some.get() = true;
+    some.get()             = true;
   }
 
   galois::optional<value_type> pop() {
     TLD& tld = *tlds.getLocal();
     galois::optional<value_type> r;
-    
+
     while (true) {
       if (isEmpty)
         return r; // empty
@@ -99,7 +103,7 @@ private:
       if (substrate::ThreadPool::getTID() == 0) {
         if (!some.get())
           isEmpty = true;
-        some.get() = false; 
+        some.get() = false;
       }
       tld.round = (tld.round + 1) & 1;
       barrier.wait();

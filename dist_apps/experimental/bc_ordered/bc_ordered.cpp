@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,29 +38,32 @@ static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                                     "of sources in a file to "
                                                     "use in BC"),
                                           cll::init(""));
-static cll::opt<unsigned int> maxIterations("maxIterations", 
-                               cll::desc("Maximum iterations: Default 10000"), 
-                               cll::init(10000));
-static cll::opt<bool> singleSourceBC("singleSource", 
-                                cll::desc("Use for single source BC"),
-                                cll::init(false));
-static cll::opt<unsigned long long> startSource("startNode",// not uint64_t due to a bug in llvm cl 
-                                cll::desc("Starting source node used for "
-                                          "betweeness-centrality"),
-                                cll::init(0));
-static cll::opt<unsigned int> numberOfSources("numOfSources", 
-                                cll::desc("Number of sources to use for "
-                                          "betweeness-centraility"),
-                                cll::init(0));
-static cll::opt<bool> randomSources("randomSources", 
-                                cll::desc("Use random sources."),
-                                cll::init(false));
+static cll::opt<unsigned int>
+    maxIterations("maxIterations",
+                  cll::desc("Maximum iterations: Default 10000"),
+                  cll::init(10000));
+static cll::opt<bool> singleSourceBC("singleSource",
+                                     cll::desc("Use for single source BC"),
+                                     cll::init(false));
+static cll::opt<unsigned long long>
+    startSource("startNode", // not uint64_t due to a bug in llvm cl
+                cll::desc("Starting source node used for "
+                          "betweeness-centrality"),
+                cll::init(0));
+static cll::opt<unsigned int>
+    numberOfSources("numOfSources",
+                    cll::desc("Number of sources to use for "
+                              "betweeness-centraility"),
+                    cll::init(0));
+static cll::opt<bool> randomSources("randomSources",
+                                    cll::desc("Use random sources."),
+                                    cll::init(false));
 
 /******************************************************************************/
 /* Graph structure declarations */
 /******************************************************************************/
 static uint64_t current_src_node = 0;
-const uint32_t infinity = std::numeric_limits<uint32_t>::max();
+const uint32_t infinity          = std::numeric_limits<uint32_t>::max();
 
 // NOTE: types assume that fields will not reach uint64_t: it may
 // need to be changed for very large graphs
@@ -85,20 +88,15 @@ struct NodeData {
   // used to determine if data has been propagated yet
   uint8_t propagation_flag;
 
-  #ifdef BCDEBUG
+#ifdef BCDEBUG
   void dump() {
-    galois::gPrint("DUMP: ", current_length.load(), " ",
-                   old_length, " ",
-                   num_shortest_paths, " ",
-                   num_successors, " ",
-                   num_predecessors.load(), " ",
-                   trim.load(), " ",
-                   to_add.load(), " ",
-                   to_add_float, " ",
-                   dependency, " ",
+    galois::gPrint("DUMP: ", current_length.load(), " ", old_length, " ",
+                   num_shortest_paths, " ", num_successors, " ",
+                   num_predecessors.load(), " ", trim.load(), " ",
+                   to_add.load(), " ", to_add_float, " ", dependency, " ",
                    (bool)propagation_flag, "\n");
   }
-  #endif
+#endif
 };
 
 static std::set<uint64_t> random_sources = std::set<uint64_t>();
@@ -141,12 +139,9 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph) {}
 
   void static go(Graph& _graph) {
-    galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()), 
-      InitializeGraph{&_graph}, 
-      galois::no_stats(),
-      galois::loopname("InitializeGraph")
-    );
+    galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()),
+                   InitializeGraph{&_graph}, galois::no_stats(),
+                   galois::loopname("InitializeGraph"));
   }
 
   void operator()(GNode node) const {
@@ -175,11 +170,10 @@ struct Sanity {
 
   Sanity(Graph* _graph, galois::DGReduceMax<float>& _DGAccumulator_max,
          galois::DGReduceMin<float>& _DGAccumulator_min,
-         galois::DGAccumulator<float>& _DGAccumulator_sum) 
-    : graph(_graph),
-      DGAccumulator_max(_DGAccumulator_max),
-      DGAccumulator_min(_DGAccumulator_min),
-      DGAccumulator_sum(_DGAccumulator_sum) {}
+         galois::DGAccumulator<float>& _DGAccumulator_sum)
+      : graph(_graph), DGAccumulator_max(_DGAccumulator_max),
+        DGAccumulator_min(_DGAccumulator_min),
+        DGAccumulator_sum(_DGAccumulator_sum) {}
 
   void static go(Graph& _graph, galois::DGReduceMax<float>& DGA_max,
                  galois::DGReduceMin<float>& DGA_min,
@@ -188,13 +182,10 @@ struct Sanity {
     DGA_min.reset();
     DGA_sum.reset();
 
-    galois::do_all(
-      galois::iterate(_graph.masterNodesRange().begin(), 
-                      _graph.masterNodesRange().end()),
-      Sanity( &_graph, DGA_max, DGA_min, DGA_sum),
-      galois::no_stats(),
-      galois::loopname("Sanity")
-    );
+    galois::do_all(galois::iterate(_graph.masterNodesRange().begin(),
+                                   _graph.masterNodesRange().end()),
+                   Sanity(&_graph, DGA_max, DGA_min, DGA_sum),
+                   galois::no_stats(), galois::loopname("Sanity"));
 
     float max_bc = DGA_max.reduce();
     float min_bc = DGA_min.reduce();
@@ -207,7 +198,7 @@ struct Sanity {
       galois::gPrint("BC sum is ", bc_sum, "\n");
     }
   }
-  
+
   /* Gets the max, min rank from all owned nodes and
    * also the sum of ranks */
   void operator()(GNode src) const {
@@ -223,8 +214,9 @@ struct Sanity {
 /* Main method for running */
 /******************************************************************************/
 
-constexpr static const char* const name = "Level by Level Betweeness Centrality - "
-                                          "Distributed Heterogeneous.";
+constexpr static const char* const name =
+    "Level by Level Betweeness Centrality - "
+    "Distributed Heterogeneous.";
 constexpr static const char* const desc = "Level by Level Betweeness Centrality"
                                           " on Distributed Galois.";
 constexpr static const char* const url = 0;
@@ -235,7 +227,7 @@ int main(int argc, char** argv) {
 
   auto& net = galois::runtime::getSystemNetworkInterface();
   if (net.ID == 0) {
-    galois::runtime::reportParam(REGION_NAME, "Max Iterations", 
+    galois::runtime::reportParam(REGION_NAME, "Max Iterations",
                                  (unsigned long)maxIterations);
   }
 
@@ -253,11 +245,12 @@ int main(int argc, char** argv) {
     // random num generate for sources
     std::minstd_rand0 r_generator;
     r_generator.seed(100);
-    std::uniform_int_distribution<uint64_t> r_dist(0, h_graph->globalSize() - 1);
-  
+    std::uniform_int_distribution<uint64_t> r_dist(0,
+                                                   h_graph->globalSize() - 1);
+
     if (numberOfSources != 0) {
       // uncomment this to have srcnodeid included as well
-      //random_sources.insert(startSource);
+      // random_sources.insert(startSource);
 
       while (random_sources.size() < numberOfSources) {
         random_sources.insert(r_dist(r_generator));
@@ -273,13 +266,13 @@ int main(int argc, char** argv) {
     sourceFile.close();
   }
 
-  #ifndef NDEBUG
+#ifndef NDEBUG
   int counter = 0;
   for (auto i = random_sources.begin(); i != random_sources.end(); i++) {
     printf("Source #%d: %lu\n", counter, *i);
     counter++;
   }
-  #endif
+#endif
 
   bitset_to_add.resize(h_graph->size());
   bitset_to_add_float.resize(h_graph->size());
@@ -344,9 +337,8 @@ int main(int argc, char** argv) {
   if (verify) {
     char* v_out = (char*)malloc(40);
 
-    for (auto ii = (*h_graph).masterNodesRange().begin(); 
-              ii != (*h_graph).masterNodesRange().end(); 
-              ++ii) {
+    for (auto ii = (*h_graph).masterNodesRange().begin();
+         ii != (*h_graph).masterNodesRange().end(); ++ii) {
       // outputs betweenness centrality
       sprintf(v_out, "%lu %.9f\n", (*h_graph).getGID(*ii),
               (*h_graph).getData(*ii).betweeness_centrality);

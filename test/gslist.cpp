@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
   typedef galois::substrate::PerThreadStorage<HeapPtr> Heaps;
   typedef galois::concurrent_gslist<int> Collection;
   int numThreads = 2;
-  unsigned size = 100;
+  unsigned size  = 100;
   if (argc > 1)
     numThreads = atoi(argv[1]);
   if (size <= 0)
@@ -27,7 +27,7 @@ int main(int argc, char** argv) {
 
   galois::on_each([&](unsigned id, unsigned total) {
     HeapPtr& hp = *heaps.getLocal();
-    hp = HeapPtr(new Heap(sizeof(Collection::block_type)));
+    hp          = HeapPtr(new Heap(sizeof(Collection::block_type)));
     for (unsigned i = 0; i < size; ++i)
       c.push_front(*hp, i);
   });

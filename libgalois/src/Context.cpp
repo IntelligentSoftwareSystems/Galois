@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -50,7 +50,8 @@ void galois::runtime::signalConflict(Lockable* lockable) {
 }
 #endif
 
-void galois::runtime::setThreadContext(galois::runtime::SimpleRuntimeContext* ctx) {
+void galois::runtime::setThreadContext(
+    galois::runtime::SimpleRuntimeContext* ctx) {
   thread_ctx = ctx;
 }
 
@@ -63,21 +64,20 @@ bool galois::runtime::owns(Lockable* lockable, MethodFlag m) {
   SimpleRuntimeContext* ctx = getThreadContext();
   if (ctx) {
     return ctx->owns(lockable, m);
-  } 
+  }
   return false;
 }
 #endif
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // LockManagerBase & SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
 
 galois::runtime::LockManagerBase::AcquireStatus
-galois::runtime::LockManagerBase::tryAcquire(galois::runtime::Lockable* lockable) 
-{
+galois::runtime::LockManagerBase::tryAcquire(
+    galois::runtime::Lockable* lockable) {
   assert(lockable);
-  // XXX(ddn): Hand inlining this code makes a difference on 
+  // XXX(ddn): Hand inlining this code makes a difference on
   // delaunaytriangulation (GCC 4.7.2)
 #if 0
   if (tryLock(lockable)) {
@@ -89,13 +89,15 @@ galois::runtime::LockManagerBase::tryAcquire(galois::runtime::Lockable* lockable
     lockable->owner.setValue(this);
     return NEW_OWNER;
 #endif
-  } else if (getOwner(lockable) == this) {
-    return ALREADY_OWNER;
-  }
-  return FAIL;
+}
+else if (getOwner(lockable) == this) {
+  return ALREADY_OWNER;
+}
+return FAIL;
 }
 
-void galois::runtime::SimpleRuntimeContext::acquire(galois::runtime::Lockable* lockable, galois::MethodFlag m) {
+void galois::runtime::SimpleRuntimeContext::acquire(
+    galois::runtime::Lockable* lockable, galois::MethodFlag m) {
   AcquireStatus i;
   if (customAcquire) {
     subAcquire(lockable, m);
@@ -108,7 +110,8 @@ void galois::runtime::SimpleRuntimeContext::acquire(galois::runtime::Lockable* l
   }
 }
 
-void galois::runtime::SimpleRuntimeContext::release(galois::runtime::Lockable* lockable) {
+void galois::runtime::SimpleRuntimeContext::release(
+    galois::runtime::Lockable* lockable) {
   assert(lockable);
   // The deterministic executor, for instance, steals locks from other
   // iterations
@@ -120,10 +123,10 @@ void galois::runtime::SimpleRuntimeContext::release(galois::runtime::Lockable* l
 unsigned galois::runtime::SimpleRuntimeContext::commitIteration() {
   unsigned numLocks = 0;
   while (locks) {
-    //ORDER MATTERS!
+    // ORDER MATTERS!
     Lockable* lockable = locks;
-    locks = lockable->next;
-    lockable->next = 0;
+    locks              = lockable->next;
+    lockable->next     = 0;
     substrate::compilerBarrier();
     release(lockable);
     ++numLocks;
@@ -136,12 +139,14 @@ unsigned galois::runtime::SimpleRuntimeContext::cancelIteration() {
   return commitIteration();
 }
 
-void galois::runtime::SimpleRuntimeContext::subAcquire(galois::runtime::Lockable* lockable, galois::MethodFlag) {
+void galois::runtime::SimpleRuntimeContext::subAcquire(
+    galois::runtime::Lockable* lockable, galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }
 
 #ifdef GALOIS_USE_EXP
-bool galois::runtime::SimpleRuntimeContext::owns(galois::runtime::Lockable* lockable, galois::MethodFlag) const {
+bool galois::runtime::SimpleRuntimeContext::owns(
+    galois::runtime::Lockable* lockable, galois::MethodFlag) const {
   GALOIS_DIE("SimpleRuntimeContext::owns Not Implemented");
 }
 #endif

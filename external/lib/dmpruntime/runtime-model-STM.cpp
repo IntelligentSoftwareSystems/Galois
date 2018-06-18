@@ -37,9 +37,9 @@ static void DMPupdateStmThreadIds() {
   DmpThreadInfo* dmp = DMPfirstRunnable;
   if (dmp == NULL)
     return;
-  for (int id = 0; ; ++id) {
+  for (int id = 0;; ++id) {
     dmp->stmThreadId = id;
-    dmp = dmp->nextRunnable;
+    dmp              = dmp->nextRunnable;
     if (dmp == DMPfirstRunnable)
       break;
   }
@@ -57,13 +57,11 @@ static HashSet ToClear;
 __thread HashSet* DMPreadLog;
 __thread HashSet* DMPwriteLog;
 
-void DMP_initRuntime() {
-  memset(DMPmot, 0, sizeof DMPmot);
-}
+void DMP_initRuntime() { memset(DMPmot, 0, sizeof DMPmot); }
 
 void DMP_initRuntimeThread() {
-  DMPreadLog  = new HashSet;
-  DMPwriteLog = new HashSet;
+  DMPreadLog          = new HashSet;
+  DMPwriteLog         = new HashSet;
   DMPMAP->stmReadLog  = (void*)DMPreadLog;
   DMPMAP->stmWriteLog = (void*)DMPwriteLog;
 }
@@ -91,10 +89,11 @@ void DMPstmCheckConflictsForThread(DmpThreadInfo* dmp) {
 
   const uint32_t readconflict  = 0xffff & ~DMPthreadToReader(dmp);
   const uint32_t writeconflict = (0xffff << 16) & ~DMPthreadToWriter(dmp);
-  bool conflict = false;
+  bool conflict                = false;
 
   // Check for R/W conflicts with other threads.
-  for (HashSet::iterator hash = readLog->begin(); hash != readLog->end(); ++hash) {
+  for (HashSet::iterator hash = readLog->begin(); hash != readLog->end();
+       ++hash) {
     const uint32_t rc = (DMPmot[*hash] & readconflict);
     const uint32_t wc = (DMPmot[*hash] & writeconflict);
     if (wc != 0) {
@@ -105,7 +104,8 @@ void DMPstmCheckConflictsForThread(DmpThreadInfo* dmp) {
   }
 
   // Check for R/W and W/W conflicts with other threads.
-  for (HashSet::iterator hash = writeLog->begin(); hash != writeLog->end(); ++hash) {
+  for (HashSet::iterator hash = writeLog->begin(); hash != writeLog->end();
+       ++hash) {
     const uint32_t rc = (DMPmot[*hash] & readconflict);
     const uint32_t wc = (DMPmot[*hash] & writeconflict);
     if (rc != 0) {
@@ -139,9 +139,9 @@ void DMPstmCheckConflicts() {
   }
   // Now schedule the threads.
   if (DMPnumRunnableThreads >= 2) {
-    bool didall = false;
+    bool didall   = false;
     int scheduled = 0;
-    int running = 0;
+    int running   = 0;
     for (int n = 0; !didall; ++n) {
       // Another scheduling iteration.
       if (n > 1) {
@@ -149,9 +149,9 @@ void DMPstmCheckConflicts() {
       } else if (n == 1) {
         DMPstmParallelQuanta++;
       }
-      didall = true;
+      didall  = true;
       running = 0;
-      for (dmp = DMPfirstRunnable; dmp != NULL; ) {
+      for (dmp = DMPfirstRunnable; dmp != NULL;) {
         const int me = 1 << dmp->stmThreadId;
         // Scheduled yet?
         if ((me & scheduled) == 0) {
@@ -202,11 +202,11 @@ void DMPstoreContained(void* addr) {
 //
 
 void DMPloadRange(void* addr, size_t size) {
-  MotIterator<LoadStoreTraits::doLoad>::foreach(addr, size);
+  MotIterator<LoadStoreTraits::doLoad>::foreach (addr, size);
 }
 
 void DMPstoreRange(void* addr, size_t size) {
-  MotIterator<LoadStoreTraits::doStore>::foreach(addr, size);
+  MotIterator<LoadStoreTraits::doStore>::foreach (addr, size);
 }
 
 //--------------------------------------------------------------
@@ -224,4 +224,4 @@ void DMPmemcpy(void* dst, const void* src, size_t size) {
   memcpy(dst, src, size);
 }
 
-#endif  // DMP_ENABLE_MODEL_STM
+#endif // DMP_ENABLE_MODEL_STM

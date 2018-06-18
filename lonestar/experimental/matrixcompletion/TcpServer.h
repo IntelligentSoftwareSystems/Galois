@@ -13,38 +13,38 @@
 #include <string>
 #include <vector>
 
-template<typename Graph>
+template <typename Graph>
 struct AuxData {
   typedef typename Graph::GraphNode GNode;
 
   Graph& graph;
   size_t numItems;
-  std::vector<std::pair<double, size_t> > margins;
+  std::vector<std::pair<double, size_t>> margins;
   std::ostream& out;
   std::map<int, size_t> itemCount;
   std::map<int, size_t> userCount;
   size_t numDeletedItems;
   size_t numDeletedUsers;
-  
-  AuxData(Graph& g, size_t numItems, std::ostream& out):
-    graph(g), numItems(numItems), out(out), numDeletedItems(0), numDeletedUsers(0) { }
+
+  AuxData(Graph& g, size_t numItems, std::ostream& out)
+      : graph(g), numItems(numItems), out(out), numDeletedItems(0),
+        numDeletedUsers(0) {}
 
   void initialize() {
     updateMargins();
     galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
-    executor.execute(
-        graph.begin(), graph.begin() + numItems,
-        graph.begin() + numItems, graph.end(),
-        1000, 1000,
-        [&](GNode src, GNode dst, typename Graph::edge_iterator) {
-          graph.getData(src).count += 1;
-          graph.getData(dst).count += 1;
-        }, true);
+    executor.execute(graph.begin(), graph.begin() + numItems,
+                     graph.begin() + numItems, graph.end(), 1000, 1000,
+                     [&](GNode src, GNode dst, typename Graph::edge_iterator) {
+                       graph.getData(src).count += 1;
+                       graph.getData(dst).count += 1;
+                     },
+                     true);
   }
 
   void update() {
     updateMargins();
-    //TODO updateDeleted();
+    // TODO updateDeleted();
   }
 
   void updateMargins() {
@@ -55,18 +55,16 @@ struct AuxData {
     galois::runtime::Fixed2DGraphTiledExecutor<Graph> executor(graph);
     double norm1 = 1.0 / (graph.size() - numItems);
     double norm2 = 1.0 / (numItems);
-    executor.executeDense(
-        graph.begin(), graph.begin() + numItems,
-        graph.begin() + numItems, graph.end(),
-        100, 100,
-        [&](GNode src, GNode dst) {
-          auto e = predictionError(
-              graph.getData(src).latentVector,
-              graph.getData(dst).latentVector,
-              0);
-          graph.getData(src).sum += e;
-          graph.getData(dst).sum += e;
-        }, true);
+    executor.executeDense(graph.begin(), graph.begin() + numItems,
+                          graph.begin() + numItems, graph.end(), 100, 100,
+                          [&](GNode src, GNode dst) {
+                            auto e = predictionError(
+                                graph.getData(src).latentVector,
+                                graph.getData(dst).latentVector, 0);
+                            graph.getData(src).sum += e;
+                            graph.getData(dst).sum += e;
+                          },
+                          true);
     galois::do_all(graph, [&](GNode n) {
       if (n < numItems)
         graph.getData(n).sum *= norm1;
@@ -74,14 +72,17 @@ struct AuxData {
         graph.getData(n).sum *= norm2;
     });
     elapsed.stop();
-    double flop = (double) (graph.size() - numItems) * numItems * (2.0 * 100 + 2);
+    double flop =
+        (double)(graph.size() - numItems) * numItems * (2.0 * 100 + 2);
     flop += graph.size();
 
-    //std::cout << "Margin GFLOP/S: " << flop / elapsed.get() / 1e6 << "\n"; // XXX
+    // std::cout << "Margin GFLOP/S: " << flop / elapsed.get() / 1e6 << "\n"; //
+    // XXX
     margins.resize(graph.size());
-    auto mm = margins.begin();
+    auto mm   = margins.begin();
     size_t id = 0;
-    for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++mm, ++id) {
+    for (auto ii = graph.begin(), ei = graph.end(); ii != ei;
+         ++ii, ++mm, ++id) {
       *mm = std::make_pair(graph.getData(*ii).sum, id);
     }
     galois::ParallelSTL::sort(margins.begin(), margins.begin() + numItems);
@@ -89,8 +90,9 @@ struct AuxData {
   }
 };
 
-template<typename Algo, typename Graph>
-class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Graph> > {
+template <typename Algo, typename Graph>
+class TcpConnection
+    : public std::enable_shared_from_this<TcpConnection<Algo, Graph>> {
   typedef typename Graph::GraphNode GNode;
 
   boost::asio::ip::tcp::socket socket_;
@@ -103,7 +105,7 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   boost::asio::streambuf request;
   galois::runtime::PerThreadStorage<std::stringstream> response;
   std::stringstream sumResponse;
-    
+
   std::string kind;
   size_t uidBegin;
   size_t uidEnd;
@@ -119,7 +121,8 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
     }
 
     std::istream in(&request);
-    in >> kind >> uidBegin >> uidEnd >> iidBegin >> iidEnd >> minValue >> maxValue;
+    in >> kind >> uidBegin >> uidEnd >> iidBegin >> iidEnd >> minValue >>
+        maxValue;
     if (!in) {
       out << "Error parsing request\n";
     } else if (kind == "GET") {
@@ -141,18 +144,14 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
     }
 
     boost::asio::async_write(
-        socket_,
-        boost::asio::buffer(sumResponse.str()),
-        std::bind(
-          &TcpConnection::handleWrite,
-          this->shared_from_this(),
-          std::placeholders::_1,
-          std::placeholders::_2));
+        socket_, boost::asio::buffer(sumResponse.str()),
+        std::bind(&TcpConnection::handleWrite, this->shared_from_this(),
+                  std::placeholders::_1, std::placeholders::_2));
   }
 
   bool validRange() {
     size_t numItems = algo.numItems();
-    size_t r = std::distance(graph.begin(), graph.end());
+    size_t r        = std::distance(graph.begin(), graph.end());
     if (uidBegin >= r || uidEnd > r || iidBegin >= r || iidEnd > r)
       return false;
     if (uidBegin < numItems || uidEnd < numItems)
@@ -164,7 +163,7 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
 
   void recompute() {
     initializeGraphData(graph); // TODO reinitialize only part of latent space
-    std::unique_ptr<StepFunction> sf { newStepFunction() };
+    std::unique_ptr<StepFunction> sf{newStepFunction()};
     algo(graph, *sf);
     auxData.update();
   }
@@ -175,7 +174,10 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   }
 
   void writeNetworkFloat(std::ostream& o, float v) {
-    union { float as_float; uint32_t as_uint; } c = { v };
+    union {
+      float as_float;
+      uint32_t as_uint;
+    } c            = {v};
     uint32_t value = galois::convert_htobe32(c.as_uint);
     o.write(reinterpret_cast<char*>(&value), sizeof(value));
   }
@@ -192,15 +194,15 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
       return;
     executor.execute(
         graph.begin() + iidBegin, graph.begin() + iidEnd,
-        graph.begin() + uidBegin, graph.begin() + uidEnd,
-        1000, 1000,
+        graph.begin() + uidBegin, graph.begin() + uidEnd, 1000, 1000,
         [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
           writeNetworkInt(*response.getLocal(), src);
           writeNetworkInt(*response.getLocal(), graph.getData(src).count);
           writeNetworkInt(*response.getLocal(), dst);
           writeNetworkInt(*response.getLocal(), graph.getData(dst).count);
           writeNetworkFloat(*response.getLocal(), graph.getEdgeData(edge));
-        }, false);
+        },
+        false);
   }
 
   void handleModifyRequest() {
@@ -211,20 +213,22 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
 
     executor.execute(
         graph.begin() + iidBegin, graph.begin() + iidEnd,
-        graph.begin() + uidBegin, graph.begin() + uidEnd,
-        1000, 1000,
+        graph.begin() + uidBegin, graph.begin() + uidEnd, 1000, 1000,
         [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
           graph.getEdgeData(edge) = minValue;
-        }, false);
+        },
+        false);
     recompute(); // XXX
   }
 
   void handleDeleteRequest() {
     if (!validRange())
       return;
-    for (auto ii = graph.begin() + iidBegin, ei = graph.begin() + iidEnd; ii != ei; ++ii)
+    for (auto ii = graph.begin() + iidBegin, ei = graph.begin() + iidEnd;
+         ii != ei; ++ii)
       graph.getData(*ii).deleted = true;
-    for (auto ii = graph.begin() + uidBegin, ei = graph.begin() + uidEnd; ii != ei; ++ii)
+    for (auto ii = graph.begin() + uidBegin, ei = graph.begin() + uidEnd;
+         ii != ei; ++ii)
       graph.getData(*ii).deleted = true;
     recompute(); // XXX
   }
@@ -238,23 +242,30 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
       return;
     int count = 0;
     if (minValue > 0) {
-      size_t first = (uidBegin != uidEnd) ? numItems : 0; 
-      size_t last = (uidBegin != uidEnd) ? auxData.margins.size() : numItems;
-      for (auto ii = auxData.margins.begin() + first, ei = auxData.margins.begin() + last; ii != ei && count < minValue; ++ii) {
+      size_t first = (uidBegin != uidEnd) ? numItems : 0;
+      size_t last  = (uidBegin != uidEnd) ? auxData.margins.size() : numItems;
+      for (auto ii = auxData.margins.begin() + first,
+                ei = auxData.margins.begin() + last;
+           ii != ei && count < minValue; ++ii) {
         if (!graph.getData(graph.begin()[ii->second]).deleted) {
           writeNetworkInt(*response.getLocal(), ii->second);
-          writeNetworkInt(*response.getLocal(), graph.getData(ii->second).count);
+          writeNetworkInt(*response.getLocal(),
+                          graph.getData(ii->second).count);
           writeNetworkFloat(*response.getLocal(), ii->first);
           count += 1;
         }
       }
     } else {
-      size_t first = (uidBegin != uidEnd) ? 0 : auxData.margins.size() - numItems; 
+      size_t first =
+          (uidBegin != uidEnd) ? 0 : auxData.margins.size() - numItems;
       size_t last = (uidBegin != uidEnd) ? numItems : auxData.margins.size();
-      for (auto ii = auxData.margins.rbegin() + first, ei = auxData.margins.rbegin() + last; ii != ei && count < maxValue; ++ii) {
+      for (auto ii = auxData.margins.rbegin() + first,
+                ei = auxData.margins.rbegin() + last;
+           ii != ei && count < maxValue; ++ii) {
         if (!graph.getData(graph.begin()[ii->second]).deleted) {
           writeNetworkInt(*response.getLocal(), ii->second);
-          writeNetworkInt(*response.getLocal(), graph.getData(ii->second).count);
+          writeNetworkInt(*response.getLocal(),
+                          graph.getData(ii->second).count);
           writeNetworkFloat(*response.getLocal(), ii->first);
           count += 1;
         }
@@ -267,13 +278,10 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
       return;
     executor.executeDense(
         graph.begin() + iidBegin, graph.begin() + iidEnd,
-        graph.begin() + uidBegin, graph.begin() + uidEnd,
-        100, 100,
+        graph.begin() + uidBegin, graph.begin() + uidEnd, 100, 100,
         [&](GNode src, GNode dst) {
-          auto e = predictionError(
-              graph.getData(src).latentVector,
-              graph.getData(dst).latentVector,
-              0);
+          auto e = predictionError(graph.getData(src).latentVector,
+                                   graph.getData(dst).latentVector, 0);
           if (minValue && e < minValue)
             return;
           if (maxValue && e >= maxValue)
@@ -282,8 +290,9 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
           writeNetworkInt(*response.getLocal(), graph.getData(src).count);
           writeNetworkInt(*response.getLocal(), dst);
           writeNetworkInt(*response.getLocal(), graph.getData(dst).count);
-          writeNetworkFloat(*response.getLocal(), (float) e);
-        }, false);
+          writeNetworkFloat(*response.getLocal(), (float)e);
+        },
+        false);
   }
 
   void handleWrite(const boost::system::error_code& error, size_t) {
@@ -293,32 +302,22 @@ class TcpConnection: public std::enable_shared_from_this<TcpConnection<Algo, Gra
   }
 
 public:
-  TcpConnection(
-      boost::asio::io_service& io_service, 
-      Algo& a,
-      Graph& g,
-      AuxData<Graph>& auxData,
-      std::ostream& o):
-    socket_(io_service), algo(a), graph(g), auxData(auxData), out(o), executor(g) { }
+  TcpConnection(boost::asio::io_service& io_service, Algo& a, Graph& g,
+                AuxData<Graph>& auxData, std::ostream& o)
+      : socket_(io_service), algo(a), graph(g), auxData(auxData), out(o),
+        executor(g) {}
 
-  boost::asio::ip::tcp::socket& socket() {
-    return socket_;
-  }
+  boost::asio::ip::tcp::socket& socket() { return socket_; }
 
   void start() {
     boost::asio::async_read_until(
-        socket_,
-        request,
-        "\r\n",
-        std::bind(
-          &TcpConnection::handleRequest,
-          this->shared_from_this(),
-          std::placeholders::_1,
-          std::placeholders::_2));
+        socket_, request, "\r\n",
+        std::bind(&TcpConnection::handleRequest, this->shared_from_this(),
+                  std::placeholders::_1, std::placeholders::_2));
   }
 };
 
-template<typename Algo, typename Graph>
+template <typename Algo, typename Graph>
 class TcpServer {
   typedef TcpConnection<Algo, Graph> Connection;
   typedef std::shared_ptr<Connection> tpointer;
@@ -329,7 +328,8 @@ class TcpServer {
   std::ostream& out;
 
   void startAccept() {
-    tpointer con = tpointer(new Connection(acceptor.get_io_service(), algo, graph, auxData, out));
+    tpointer con = tpointer(
+        new Connection(acceptor.get_io_service(), algo, graph, auxData, out));
     acceptor.async_accept(
         con->socket(),
         std::bind(&TcpServer::handleAccept, this, con, std::placeholders::_1));
@@ -343,24 +343,19 @@ class TcpServer {
   }
 
 public:
-  TcpServer(
-      boost::asio::io_service& io_service, 
-      int port,
-      Algo& a,
-      Graph& g,
-      AuxData<Graph>& auxData,
-      std::ostream& o):
-    acceptor(io_service, boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), port)),
-    graph(g), algo(a), auxData(auxData), out(o)
-  {
+  TcpServer(boost::asio::io_service& io_service, int port, Algo& a, Graph& g,
+            AuxData<Graph>& auxData, std::ostream& o)
+      : acceptor(io_service, boost::asio::ip::tcp::endpoint(
+                                 boost::asio::ip::tcp::v4(), port)),
+        graph(g), algo(a), auxData(auxData), out(o) {
     startAccept();
   }
 };
 
-template<typename Algo, typename Graph>
-auto startServerHelper(Algo& algo, Graph& graph, int port, std::ostream& out, int) 
-  -> decltype(typename Graph::node_data_type().sum, bool()) 
-{
+template <typename Algo, typename Graph>
+auto startServerHelper(Algo& algo, Graph& graph, int port, std::ostream& out,
+                       int)
+    -> decltype(typename Graph::node_data_type().sum, bool()) {
   AuxData<Graph> auxData(graph, algo.numItems(), out);
   auxData.initialize();
 
@@ -375,12 +370,13 @@ auto startServerHelper(Algo& algo, Graph& graph, int port, std::ostream& out, in
   return false;
 }
 
-template<typename Algo, typename Graph>
-void startServerHelper(Algo& algo, Graph& graph, int port, std::ostream& out, ...) {
+template <typename Algo, typename Graph>
+void startServerHelper(Algo& algo, Graph& graph, int port, std::ostream& out,
+                       ...) {
   GALOIS_DIE("server mode not supported for this graph type");
 }
 
-template<typename Algo, typename Graph>
+template <typename Algo, typename Graph>
 void startServer(Algo& algo, Graph& graph, int port, std::ostream& out) {
   startServerHelper(algo, graph, port, out, 0);
 }

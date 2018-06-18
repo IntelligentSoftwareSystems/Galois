@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -47,20 +47,20 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Buchberger Algorithm";
-static const char* desc = "Generates Groebner basis for polynomial ideal using Buchberger Algorithm";
+static const char* desc =
+    "Generates Groebner basis for polynomial ideal using Buchberger Algorithm";
 static const char* url = 0;
 
-enum MonomialOrder {
-  lex,
-  grevlex
-};
+enum MonomialOrder { lex, grevlex };
 
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<MonomialOrder> monomialOrder(cll::desc("Monomial order:"),
-    cll::values(
-      clEnumVal(lex, "lexicographic"),
-      clEnumVal(grevlex, "graded reverse lexicographic"),
-      clEnumValEnd), cll::init(grevlex));
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<MonomialOrder> monomialOrder(
+    cll::desc("Monomial order:"),
+    cll::values(clEnumVal(lex, "lexicographic"),
+                clEnumVal(grevlex, "graded reverse lexicographic"),
+                clEnumValEnd),
+    cll::init(grevlex));
 
 #if 0
 //! Unfortunate pun
@@ -122,43 +122,25 @@ struct GaloisField {
 struct RationalField {
   typedef mpq_class element_type;
 
-  void init() { }
+  void init() {}
 
-  void inverse(element_type& a) const {
-    a = 1 / a;
-  }
-  
-  void add(element_type& a, const element_type& b) const {
-    a += b;
-  }
+  void inverse(element_type& a) const { a = 1 / a; }
 
-  void subtract(element_type& a, const element_type& b) const {
-    a -= b;
-  }
+  void add(element_type& a, const element_type& b) const { a += b; }
 
-  void negate(element_type& a) const {
-    a = -a;
-  }
+  void subtract(element_type& a, const element_type& b) const { a -= b; }
 
-  void divide(element_type& a, const element_type& b) const {
-    a /= b;
-  }
+  void negate(element_type& a) const { a = -a; }
 
-  void multiply(element_type& a, const element_type& b) const {
-    a *= b;
-  }
+  void divide(element_type& a, const element_type& b) const { a /= b; }
 
-  void assign(element_type& a, const element_type& b) const {
-    a = b;
-  }
+  void multiply(element_type& a, const element_type& b) const { a *= b; }
 
-  void assignOne(element_type& a) const {
-    a = 1;
-  }
+  void assign(element_type& a, const element_type& b) const { a = b; }
 
-  int sign(const element_type& a) const {
-    return sgn(a);
-  }
+  void assignOne(element_type& a) const { a = 1; }
+
+  int sign(const element_type& a) const { return sgn(a); }
 
   bool neq(const element_type& a, const element_type& b) const {
     return a != b;
@@ -170,54 +152,56 @@ struct RationalField {
 };
 
 typedef RationalField Field;
-//typedef GaloisField Field;
+// typedef GaloisField Field;
 typedef Field::element_type number;
 
 Field TheField;
 
-template<class Order,class Alloc> class Ring;
+template <class Order, class Alloc>
+class Ring;
 
 //! Weights to ease vectorization of lexicographic sorting
 static int powersOfTwo[16] __attribute__((__aligned__(16)));
 
 struct Term {
-  typedef char exp_type; 
+  typedef char exp_type;
   typedef char __attribute__((__aligned__(16))) * __restrict__ exp_ptr_type;
 
 private:
-  template<class Order,class Alloc> friend class Ring;
+  template <class Order, class Alloc>
+  friend class Ring;
 
   Field::element_type m_coef;
   exp_ptr_type m_exps;
   int m_totalDegree;
 
 public:
-  Term(): m_coef(1), m_exps(NULL), m_totalDegree(0) { }
+  Term() : m_coef(1), m_exps(NULL), m_totalDegree(0) {}
 
   Field::element_type& coef() { return m_coef; }
   const Field::element_type& coef() const { return m_coef; }
 
   exp_type& exp(int i) { return m_exps[i]; }
   const exp_type& exp(int i) const { return m_exps[i]; }
-  
+
   int totalDegree() const { return m_totalDegree; }
-  
-  exp_ptr_type const & exps() const { return m_exps; }
+
+  exp_ptr_type const& exps() const { return m_exps; }
   exp_ptr_type& exps() { return m_exps; }
 
   //! Compute LCM
-  template<class R>
+  template <class R>
   void makeLcm(const Term& a, const Term& b, R& ring) {
     // Vectorized.
     // GCC 4.7 vectorizer prefers (1) over (2)
     int N = ring.numVars();
     for (int i = 0; i < N; ++i) { // (1)
-    //for (int i = 0; i < ring.numVars(); ++i) { // (2)
+      // for (int i = 0; i < ring.numVars(); ++i) { // (2)
       m_exps[i] = std::max(a.m_exps[i], b.m_exps[i]);
     }
   }
 
-  template<class R>
+  template <class R>
   bool equals(const Term& b, R& ring) {
     // TODO vectorize
     int N = ring.numVars();
@@ -229,7 +213,7 @@ public:
   }
 
   //! a | b ?
-  template<class R>
+  template <class R>
   bool divides(const Term& b, const R& ring) const {
     // TODO vectorize
     for (int i = 0; i < ring.numVars(); ++i) {
@@ -240,7 +224,7 @@ public:
   }
 
   //! Relatively prime?
-  template<class R>
+  template <class R>
   bool relPrime(const Term& b, const R& ring) const {
     // TODO vectorize
     for (int i = 0; i < ring.numVars(); ++i) {
@@ -262,33 +246,21 @@ public:
   typedef Terms::iterator iterator;
   typedef Terms::const_iterator const_iterator;
 
-  Poly(): m_totalDegree(0) { }
+  Poly() : m_totalDegree(0) {}
 
   int totalDegree() const { return m_totalDegree; }
 
-  const Term* head() const {
-    return terms.front();
-  }
-  
-  Term* head() {
-    return terms.front();
-  }
-  
-  const_iterator begin() const {
-    return terms.begin();
-  }
-  
-  const_iterator end() const {
-    return terms.end();
-  }
-  
-  iterator begin() {
-    return terms.begin();
-  }
-  
-  iterator end() {
-    return terms.end();
-  }
+  const Term* head() const { return terms.front(); }
+
+  Term* head() { return terms.front(); }
+
+  const_iterator begin() const { return terms.begin(); }
+
+  const_iterator end() const { return terms.end(); }
+
+  iterator begin() { return terms.begin(); }
+
+  iterator end() { return terms.end(); }
 
   void push(Term* t) {
     terms.push_back(t);
@@ -298,21 +270,21 @@ public:
   bool empty() const { return terms.empty(); }
 
   //! f = f * s
-  template<class R>
+  template <class R>
   void scaleBy(const Field::element_type& s, R& ring) {
     for (iterator ii = begin(), ei = end(); ii != ei; ++ii) {
       Term* t = *ii;
-      TheField.multiply(t->coef(),  s);
+      TheField.multiply(t->coef(), s);
     }
   }
 
   //! f = f * a/b
-  template<class R>
+  template <class R>
   void scaleBy(const Term& a, const Term& b, R& ring) {
     Field::element_type s;
     TheField.assign(s, a.coef());
     TheField.divide(s, b.coef());
-   
+
     m_totalDegree = 0;
 
     for (iterator ii = begin(), ei = end(); ii != ei; ++ii) {
@@ -322,7 +294,7 @@ public:
         assert(a.exp(i) >= b.exp(i));
         t->exp(i) += a.exp(i) - b.exp(i);
       }
-      TheField.multiply(t->coef(),  s);
+      TheField.multiply(t->coef(), s);
       ring.generateTotalDegree(*t);
       m_totalDegree += t->totalDegree();
     }
@@ -332,35 +304,26 @@ public:
 class PolySet {
   // TODO: better allocator
   typedef std::vector<Poly*> Polys;
-  
+
   Polys polys;
+
 public:
   typedef Polys::iterator iterator;
   typedef Polys::const_iterator const_iterator;
 
-  void push(Poly* p) {
-    polys.push_back(p);
-  }
+  void push(Poly* p) { polys.push_back(p); }
 
-  iterator begin() {
-    return polys.begin();
-  }
+  iterator begin() { return polys.begin(); }
 
-  iterator end() {
-    return polys.end();
-  }
+  iterator end() { return polys.end(); }
 
-  const_iterator begin() const {
-    return polys.begin();
-  }
+  const_iterator begin() const { return polys.begin(); }
 
-  const_iterator end() const {
-    return polys.end();
-  }
+  const_iterator end() const { return polys.end(); }
 };
 
-template<class Order, class Alloc=std::allocator<char> >
-class Ring: private boost::noncopyable {
+template <class Order, class Alloc = std::allocator<char>>
+class Ring : private boost::noncopyable {
 private:
   Order order;
   Alloc m_alloc;
@@ -383,35 +346,35 @@ private:
 public:
   const static int kBlockSize = 16 / sizeof(Term::exp_type);
 
-  template<class AllocNew>
-  struct realloc { typedef Ring<Order,AllocNew> other; };
+  template <class AllocNew>
+  struct realloc {
+    typedef Ring<Order, AllocNew> other;
+  };
 
-  Ring(int numVars, const Alloc& alloc=Alloc()): m_alloc(alloc) { 
+  Ring(int numVars, const Alloc& alloc = Alloc()) : m_alloc(alloc) {
     m_numVars = ((numVars + kBlockSize - 1) / kBlockSize) * kBlockSize;
   }
 
   ~Ring() {
-    for (std::list<Poly*>::iterator ii = polys.begin(), ei = polys.end(); ii != ei; ++ii) {
+    for (std::list<Poly*>::iterator ii = polys.begin(), ei = polys.end();
+         ii != ei; ++ii) {
       (*ii)->~Poly();
       m_alloc.deallocate(reinterpret_cast<char*>(*ii), sizeof(Poly));
     }
-    for (std::list<Term*>::iterator ii = terms.begin(), ei = terms.end(); ii != ei; ++ii) {
+    for (std::list<Term*>::iterator ii = terms.begin(), ei = terms.end();
+         ii != ei; ++ii) {
       (*ii)->~Term();
       m_alloc.deallocate(reinterpret_cast<char*>(*ii), sizeofTerm());
     }
   }
 
   // TODO
-  Ring tempRing() const {
-    return *this;
-  }
+  Ring tempRing() const { return *this; }
 
   //! For ease of vectorization, this will always be a multiple of blockSize
   int numVars() const { return m_numVars; }
 
-  bool gt(const Term& a, const Term& b) const {
-    return order.gt(a, b, *this);
-  }
+  bool gt(const Term& a, const Term& b) const { return order.gt(a, b, *this); }
 
   Poly& makePoly(const Poly& p = Poly()) {
     Poly* ptr = reinterpret_cast<Poly*>(m_alloc.allocate(sizeof(Poly)));
@@ -439,17 +402,19 @@ public:
   }
 
   void generateTotalDegree(Term& t) {
-    // Vectorized. 
+    // Vectorized.
     // GCC 4.7 vectorizer prefers (1) over (2)
-    int sum = 0;
+    int sum               = 0;
     Term::exp_ptr_type ii = t.exps();
     for (int i = 0; i < numVars(); ++i) // (1)
       sum += ii[i];
     t.m_totalDegree = sum;
-    //std::accumulate(t.exps(), t.exps() + numVars(), 0, std::plus<int>()); // (2)
+    // std::accumulate(t.exps(), t.exps() + numVars(), 0, std::plus<int>()); //
+    // (2)
   }
 
-  void write(std::ostream& out, const Term& t, const std::vector<std::string>* idMap = NULL) const {
+  void write(std::ostream& out, const Term& t,
+             const std::vector<std::string>* idMap = NULL) const {
     if (TheField.sign(t.coef()) >= 0)
       out << "+";
     TheField.write(out, t.coef());
@@ -468,18 +433,22 @@ public:
     }
   }
 
-  void write(std::ostream& out, const Term* t, const std::vector<std::string>* idMap = NULL) const {
+  void write(std::ostream& out, const Term* t,
+             const std::vector<std::string>* idMap = NULL) const {
     write(out, *t, idMap);
   }
 
-  void write(std::ostream& out, const Poly& p, const std::vector<std::string>* idMap = NULL) const {
+  void write(std::ostream& out, const Poly& p,
+             const std::vector<std::string>* idMap = NULL) const {
     for (Poly::const_iterator ii = p.begin(), ei = p.end(); ii != ei; ++ii) {
       write(out, *ii, idMap);
     }
   }
 
-  void write(std::ostream& out, const PolySet& polys, const std::vector<std::string>* idMap = NULL) const {
-    for (PolySet::const_iterator ii = polys.begin(), ei = polys.end(); ii != ei; ++ii) {
+  void write(std::ostream& out, const PolySet& polys,
+             const std::vector<std::string>* idMap = NULL) const {
+    for (PolySet::const_iterator ii = polys.begin(), ei = polys.end(); ii != ei;
+         ++ii) {
       write(out, **ii, idMap);
       if (ii + 1 != ei)
         out << ", ";
@@ -490,7 +459,7 @@ public:
   int normalRank(const Poly& f, const Poly& g) const {
     const Term* fh = f.head();
     const Term* gh = g.head();
-    int retval = 0;
+    int retval     = 0;
 
     // Vectorized.
     for (int i = 0; i < numVars(); ++i) {
@@ -504,8 +473,9 @@ public:
   int rankPair(const Poly& f, const Poly& g) const {
     const Term* fh = f.head();
     const Term* gh = g.head();
-    int retval = std::max(f.totalDegree() - fh->totalDegree(), g.totalDegree() - gh->totalDegree());
-    int n = normalRank(f, g);
+    int retval     = std::max(f.totalDegree() - fh->totalDegree(),
+                          g.totalDegree() - gh->totalDegree());
+    int n          = normalRank(f, g);
     // prefer pairs with least sugar component, breaking ties with normalRank
     int sugar = retval + n;
     return (sugar << 8) | (n & 0xFF);
@@ -513,7 +483,7 @@ public:
 };
 
 class LexOrder {
-  template<class R>
+  template <class R>
   bool gtSimple(const Term& a, const Term& b, const R& ring) const {
     for (int i = 0; i < ring.numVars(); ++i) {
       if (a.exp(i) < b.exp(i))
@@ -524,17 +494,17 @@ class LexOrder {
     return false;
   }
 
-  template<class R>
+  template <class R>
   bool gtVectorized(const Term& a, const Term& b, const R& ring) const {
     Term::exp_ptr_type aa = a.exps();
     Term::exp_ptr_type bb = b.exps();
-    int* pp = powersOfTwo;
+    int* pp               = powersOfTwo;
 
-    for (int block = 0; block < ring.numVars(); block += R::kBlockSize) { 
+    for (int block = 0; block < ring.numVars(); block += R::kBlockSize) {
       // Sigh. In GCC 4.7 this inner loop (1) is not vectorized because of
       // the condition (2)
       int smaller = 0;
-      int larger = 0;
+      int larger  = 0;
       for (int i = 0; i < R::kBlockSize; ++i) { // (1)
         int idx = block + i;
         smaller += aa[idx] < bb[idx] ? pp[R::kBlockSize - i] : 0;
@@ -549,14 +519,14 @@ class LexOrder {
   }
 
 public:
-  template<class R>
+  template <class R>
   bool gt(const Term& a, const Term& b, const R& ring) const {
     return gtVectorized(a, b, ring);
   }
 };
 
 class GrevlexOrder {
-  template<class R>
+  template <class R>
   bool gtSimple(const Term& a, const Term& b, const R& ring) const {
     if (a.totalDegree() != b.totalDegree())
       return a.totalDegree() > b.totalDegree();
@@ -570,20 +540,20 @@ class GrevlexOrder {
     return false;
   }
 
-  template<class R>
+  template <class R>
   bool gtVectorized(const Term& a, const Term& b, const R& ring) const {
     if (a.totalDegree() != b.totalDegree())
       return a.totalDegree() > b.totalDegree();
 
     Term::exp_ptr_type aa = a.exps();
     Term::exp_ptr_type bb = b.exps();
-    int* pp = powersOfTwo;
+    int* pp               = powersOfTwo;
 
-    for (int block = ring.numVars() - 1; block >= 0; block -= R::kBlockSize) { 
+    for (int block = ring.numVars() - 1; block >= 0; block -= R::kBlockSize) {
       // Sigh. In GCC 4.7 this inner loop (1) is not vectorized because of
       // the condition (2)
       int smaller = 0;
-      int larger = 0;
+      int larger  = 0;
       for (int i = 0; i < R::kBlockSize; ++i) { // (1)
         int idx = block - i;
         smaller += aa[idx] < bb[idx] ? pp[R::kBlockSize - i] : 0;
@@ -598,7 +568,7 @@ class GrevlexOrder {
   }
 
 public:
-  template<class R>
+  template <class R>
   bool gt(const Term& a, const Term& b, const R& ring) const {
     return gtVectorized(a, b, ring);
   }
@@ -610,15 +580,16 @@ struct PolyPair {
   Term* lcm;
   int index;
   bool m_useless;
-  PolyPair(Poly* _a, Poly* _b, Term* _lcm, int _index = 0): a(_a), b(_b), lcm(_lcm), index(_index), m_useless(false) { }
+  PolyPair(Poly* _a, Poly* _b, Term* _lcm, int _index = 0)
+      : a(_a), b(_b), lcm(_lcm), index(_index), m_useless(false) {}
   bool useless() const { return m_useless; }
   void makeUseless() { m_useless = true; }
 };
 
 //! r = a - b
-template<class R>
+template <class R>
 Poly* subtract(const Poly& a, const Poly& b, R& ring) {
-  Poly* result = &ring.makePoly();
+  Poly* result            = &ring.makePoly();
   Poly::const_iterator aa = a.begin(), ea = a.end();
   Poly::const_iterator bb = b.begin(), eb = b.end();
 
@@ -629,7 +600,7 @@ Poly* subtract(const Poly& a, const Poly& b, R& ring) {
     if (ring.gt(*a, *b)) {
       t = Term(*a);
       ++aa;
-    } else if (ring.gt(*b, *a)) { 
+    } else if (ring.gt(*b, *a)) {
       t = Term(*b);
       TheField.negate(t.coef());
       ++bb;
@@ -658,7 +629,7 @@ Poly* subtract(const Poly& a, const Poly& b, R& ring) {
 
 //! Compute s-polynomial.
 //! spoly(f,g) = f * lcm/LT(f) - g * lcm/LT(g) where lcm = LCM(LM(f), LM(g))
-template<class R>
+template <class R>
 Poly* spoly(const Term& lcm, const Poly& f, const Poly& g, R& ring) {
   // ff = f * lcm/LT(f)
   Poly& ff = ring.makePoly(f);
@@ -672,24 +643,27 @@ Poly* spoly(const Term& lcm, const Poly& f, const Poly& g, R& ring) {
 
 //! Reduce f with respect to polys.
 //! Not canonical unless polys is groebner basis (obvs)
-template<class R>
+template <class R>
 Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
-//  std::cerr << "    "; ring.write(std::cerr, f);
+  //  std::cerr << "    "; ring.write(std::cerr, f);
 
-  const Poly* cur = &f;
+  const Poly* cur         = &f;
   Poly::const_iterator ff = cur->begin(), ef = cur->end();
 
   while (ff != ef) {
     bool reduced = false;
 
-    for (PolySet::const_iterator pp = polys.begin(), ep = polys.end(); pp != ep; ++pp) {
+    for (PolySet::const_iterator pp = polys.begin(), ep = polys.end(); pp != ep;
+         ++pp) {
       const Poly* p = *pp;
 
-      // when we are doing inter reduction, i.e., f reduce G when f \in G, skip ourselves
+      // when we are doing inter reduction, i.e., f reduce G when f \in G, skip
+      // ourselves
       if (&f == p)
         continue;
 
-      // Right now we never delete terms reduced to zero by interReduce() so ignore them here
+      // Right now we never delete terms reduced to zero by interReduce() so
+      // ignore them here
       if (p->empty())
         continue;
 
@@ -698,7 +672,8 @@ Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
       if (!ph->divides(**ff, ring))
         continue;
 
-//      std::cerr << " ("; ring.write(std::cerr, *ph); std::cerr << "|"; ring.write(std::cerr, **ff); std::cerr << ")";
+      //      std::cerr << " ("; ring.write(std::cerr, *ph); std::cerr << "|";
+      //      ring.write(std::cerr, **ff); std::cerr << ")";
       // cur = cur - p * ff/ph
       Poly& g = ring.makePoly(*p);
       g.scaleBy(**ff, *ph, ring);
@@ -706,7 +681,7 @@ Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
 
       ff = cur->begin();
       ef = cur->end();
-//      std::cerr << " => "; ring.write(std::cerr, *cur);
+      //      std::cerr << " => "; ring.write(std::cerr, *cur);
       reduced = true;
       break;
     }
@@ -714,7 +689,7 @@ Poly* reduce(const Poly& f, const PolySet& polys, R& ring) {
       ++ff;
   }
 
-//  std::cerr << "\n";
+  //  std::cerr << "\n";
 
   return const_cast<Poly*>(cur);
 }
@@ -723,12 +698,16 @@ galois::Statistic bkUpdate("BKUpdate");
 galois::Statistic mfUpdate("MFUpdate");
 galois::Statistic bpUpdate("BPUpdate");
 
-//! Updates basis with h, adds new pairs and marks some previous pairs as useless.
-template<class R1,class R2,class Pushable>
-void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs, R1& localRing, R2& ring, Pushable& out) {
+//! Updates basis with h, adds new pairs and marks some previous pairs as
+//! useless.
+template <class R1, class R2, class Pushable>
+void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs,
+            R1& localRing, R2& ring, Pushable& out) {
   // Gebauer-Moeller criterion B_k
   Term& lcm_t = localRing.makeTerm();
-  for (galois::InsertBag<PolyPair>::iterator ii = pairs.begin(), ei = pairs.end(); ii != ei; ++ii) {
+  for (galois::InsertBag<PolyPair>::iterator ii = pairs.begin(),
+                                             ei = pairs.end();
+       ii != ei; ++ii) {
     PolyPair& p = *ii;
     if (p.useless())
       continue;
@@ -743,13 +722,14 @@ void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs, R1& loc
     p.makeUseless();
     bkUpdate += 1;
   }
-  
+
   // Successive application of various deletion criteria
   Term& lcm_hi = localRing.makeTerm();
   Term& lcm_hj = localRing.makeTerm();
-  for (PolySet::const_iterator ii = basis.begin(), ei = basis.end(); ii != ei; ++ii) {
+  for (PolySet::const_iterator ii = basis.begin(), ei = basis.end(); ii != ei;
+       ++ii) {
 
-    // Buchberger's Product criterion 
+    // Buchberger's Product criterion
     if (h->head()->relPrime(*(*ii)->head(), localRing)) {
       bpUpdate += 1;
       continue;
@@ -758,7 +738,8 @@ void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs, R1& loc
     // Gebauer-Moeller criteria M and F
     lcm_hi.makeLcm(*h->head(), *(*ii)->head(), localRing);
     bool condM = false;
-    for (PolySet::const_iterator jj = ii + 1, ej = basis.end(); jj != ej; ++jj) {
+    for (PolySet::const_iterator jj = ii + 1, ej = basis.end(); jj != ej;
+         ++jj) {
       lcm_hj.makeLcm(*h->head(), *(*jj)->head(), localRing);
       if (lcm_hj.divides(lcm_hi, localRing)) {
         condM = true;
@@ -779,15 +760,17 @@ void update(Poly* h, PolySet& basis, galois::InsertBag<PolyPair>& pairs, R1& loc
 
 galois::Statistic zeroUpdate("ZeroUpdate");
 
-template<class R>
+template <class R>
 struct Process {
-  typedef typename R::template realloc<galois::PerIterAllocTy::rebind<char>::other>::other LocalRing;
+  typedef typename R::template realloc<
+      galois::PerIterAllocTy::rebind<char>::other>::other LocalRing;
 
   PolySet& basis;
   galois::InsertBag<PolyPair>& pairs;
   R& ring;
 
-  Process(PolySet& _basis, galois::InsertBag<PolyPair>& _pairs, R& r): basis(_basis), pairs(_pairs), ring(r) { }
+  Process(PolySet& _basis, galois::InsertBag<PolyPair>& _pairs, R& r)
+      : basis(_basis), pairs(_pairs), ring(r) {}
 
   void operator()(const PolyPair* p, galois::UserContext<PolyPair*>& ctx) {
     if (p->useless()) {
@@ -808,12 +791,12 @@ struct Process {
   }
 };
 
-template<class R>
+template <class R>
 struct Verifier {
   PolySet& g;
   R& ring;
 
-  Verifier(PolySet& _g, R& r): g(_g), ring(r) { }
+  Verifier(PolySet& _g, R& r) : g(_g), ring(r) {}
 
   bool operator()(const PolyPair& p) {
     // TODO opportunity for temporary
@@ -823,10 +806,12 @@ struct Verifier {
   }
 };
 
-template<class C,class R>
+template <class C, class R>
 void allPairs(const PolySet& ideal, C& c, R& ring) {
-  for (PolySet::const_iterator ii = ideal.begin(), ei = ideal.end(); ii != ei; ++ii) {
-    for (PolySet::const_iterator jj = ideal.begin(), ej = ideal.end(); jj != ej; ++jj) {
+  for (PolySet::const_iterator ii = ideal.begin(), ei = ideal.end(); ii != ei;
+       ++ii) {
+    for (PolySet::const_iterator jj = ideal.begin(), ej = ideal.end(); jj != ej;
+         ++jj) {
       if (*ii == *jj)
         continue;
       if ((*ii)->empty() || (*jj)->empty())
@@ -839,18 +824,14 @@ void allPairs(const PolySet& ideal, C& c, R& ring) {
 }
 
 struct Indexer {
-  int operator()(const PolyPair& p) const {
-    return p.index;
-  }
-  int operator()(const PolyPair* p) const {
-    return p->index;
-  }
+  int operator()(const PolyPair& p) const { return p.index; }
+  int operator()(const PolyPair* p) const { return p->index; }
 };
 
-template<class R>
+template <class R>
 void interReduce(PolySet& polys, R& ring) {
   for (PolySet::iterator ii = polys.begin(), ei = polys.end(); ii != ei; ++ii) {
-    Poly*& p = *ii;
+    Poly*& p      = *ii;
     Poly* reduced = reduce(*p, polys, ring);
     // TODO opportunity for temporary
     boost::swap(p, reduced);
@@ -862,7 +843,7 @@ void interReduce(PolySet& polys, R& ring) {
   }
 }
 
-template<class R>
+template <class R>
 void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
   galois::InsertBag<PolyPair> pairs;
   galois::InsertBag<PolyPair*> initial;
@@ -873,21 +854,22 @@ void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
     update(*ii, basis, pairs, ring, ring, initial);
   }
   using namespace galois::worklists;
-  typedef OrderedByIntegerMetric<Indexer,PerSocketChunkLIFO<8> > OBIM;
-  galois::for_each(initial.begin(), initial.end(), Process<R>(basis, pairs, ring), galois::wl<OBIM>());
+  typedef OrderedByIntegerMetric<Indexer, PerSocketChunkLIFO<8>> OBIM;
+  galois::for_each(initial.begin(), initial.end(),
+                   Process<R>(basis, pairs, ring), galois::wl<OBIM>());
 
   interReduce(basis, ring);
 }
 
 namespace parser {
-namespace qi = boost::spirit::qi;
-namespace ascii = boost::spirit::ascii;
+namespace qi     = boost::spirit::qi;
+namespace ascii  = boost::spirit::ascii;
 namespace fusion = boost::fusion;
 
 struct Coef {
-  typedef boost::variant<char,char> Sign;
+  typedef boost::variant<char, char> Sign;
   Sign sign;
-  typedef boost::variant<fusion::vector<int,int>, int> Rational;
+  typedef boost::variant<fusion::vector<int, int>, int> Rational;
   galois::optional<Rational> rational;
 };
 
@@ -904,41 +886,33 @@ struct Term {
 struct Poly {
   std::vector<Term> terms;
 };
-}
+} // namespace parser
 
 // Macros need to be used outside of namespace scope
 
-BOOST_FUSION_ADAPT_STRUCT(
-    parser::Coef,
-    (parser::Coef::Sign, sign)
-    (galois::optional<parser::Coef::Rational>, rational)
-)
+BOOST_FUSION_ADAPT_STRUCT(parser::Coef,
+                          (parser::Coef::Sign,
+                           sign)(galois::optional<parser::Coef::Rational>,
+                                 rational))
 
-BOOST_FUSION_ADAPT_STRUCT(
-    parser::Mono,
-    (std::string, id)
-    (galois::optional<int>, expo)
-)
+BOOST_FUSION_ADAPT_STRUCT(parser::Mono,
+                          (std::string, id)(galois::optional<int>, expo))
 
-BOOST_FUSION_ADAPT_STRUCT(
-    parser::Term,
-    (parser::Coef, coef)
-    (std::vector<parser::Mono>, monos)
-)
+BOOST_FUSION_ADAPT_STRUCT(parser::Term,
+                          (parser::Coef, coef)(std::vector<parser::Mono>,
+                                               monos))
 
-BOOST_FUSION_ADAPT_STRUCT(
-    parser::Poly,
-    (std::vector<parser::Term>, terms)
-)
+BOOST_FUSION_ADAPT_STRUCT(parser::Poly, (std::vector<parser::Term>, terms))
 
 namespace parser {
-namespace qi = boost::spirit::qi;
-namespace ascii = boost::spirit::ascii;
+namespace qi     = boost::spirit::qi;
+namespace ascii  = boost::spirit::ascii;
 namespace fusion = boost::fusion;
 
 // +2xy^3 - z^3, ...
-template<typename It>
-struct PolySetGrammar: qi::grammar<It, std::vector<parser::Poly>(), ascii::space_type> {
+template <typename It>
+struct PolySetGrammar
+    : qi::grammar<It, std::vector<parser::Poly>(), ascii::space_type> {
   qi::rule<It, std::string(), ascii::space_type> id;
   qi::rule<It, parser::Coef::Sign(), ascii::space_type> sign;
   qi::rule<It, parser::Coef::Rational(), ascii::space_type> rational;
@@ -949,7 +923,7 @@ struct PolySetGrammar: qi::grammar<It, std::vector<parser::Poly>(), ascii::space
   qi::rule<It, std::vector<parser::Term>(), ascii::space_type> poly;
   qi::rule<It, std::vector<parser::Poly>(), ascii::space_type> start;
 
-  PolySetGrammar(): PolySetGrammar::base_type(start, "polynomial list") {
+  PolySetGrammar() : PolySetGrammar::base_type(start, "polynomial list") {
     // sign := + | -
     sign %= qi::char_("+") | qi::char_("-");
     sign.name("sign");
@@ -976,51 +950,48 @@ struct PolySetGrammar: qi::grammar<It, std::vector<parser::Poly>(), ascii::space
     // start := poly (, poly)*
     start %= poly % ',';
 
-    using boost::phoenix::val;
     using boost::phoenix::construct;
-    qi::on_error<qi::fail>(start,
-        std::cerr 
-        << val("Error! Expecting ")
-        << qi::labels::_4
-        << val(" here: \"")
-        << construct<std::string>(qi::labels::_3, qi::labels::_2)
-        << val("\"\n")
-    );
+    using boost::phoenix::val;
+    qi::on_error<qi::fail>(start, std::cerr
+                                      << val("Error! Expecting ")
+                                      << qi::labels::_4 << val(" here: \"")
+                                      << construct<std::string>(qi::labels::_3,
+                                                                qi::labels::_2)
+                                      << val("\"\n"));
   }
 };
 
 // Q[x y z w ...]
-template<class It>
-struct HeaderGrammar: qi::grammar<It, std::vector<std::string>(), ascii::space_type> {
+template <class It>
+struct HeaderGrammar
+    : qi::grammar<It, std::vector<std::string>(), ascii::space_type> {
   qi::rule<It, std::string(), ascii::space_type> id;
   qi::rule<It, std::vector<std::string>(), ascii::space_type> start;
 
-  HeaderGrammar(): HeaderGrammar::base_type(start, "Ring Definition") { 
+  HeaderGrammar() : HeaderGrammar::base_type(start, "Ring Definition") {
     id %= qi::lexeme[+ascii::alnum];
     id.name("id");
     // Q[ <id> (, <id>)* ]
-    start %=  qi::lit("Q[") >> id % ',' >> qi::lit("]");
+    start %= qi::lit("Q[") >> id % ',' >> qi::lit("]");
 
-    using boost::phoenix::val;
     using boost::phoenix::construct;
-    qi::on_error<qi::fail>(start,
-        std::cerr 
-        << val("Error! Expecting ")
-        << qi::labels::_4
-        << val(" here: \"")
-        << construct<std::string>(qi::labels::_3, qi::labels::_2)
-        << val("\"\n")
-    );
+    using boost::phoenix::val;
+    qi::on_error<qi::fail>(start, std::cerr
+                                      << val("Error! Expecting ")
+                                      << qi::labels::_4 << val(" here: \"")
+                                      << construct<std::string>(qi::labels::_3,
+                                                                qi::labels::_2)
+                                      << val("\"\n"));
   }
 };
 
 //! A simple parser.
-template<class Order>
-class Parser: private boost::noncopyable {
+template <class Order>
+class Parser : private boost::noncopyable {
   typedef ::Term TheTerm;
   typedef ::Poly ThePoly;
   typedef Ring<Order> TheRing;
-  typedef std::map<std::string,int> NameMap;
+  typedef std::map<std::string, int> NameMap;
   typedef std::vector<std::string> IdMap;
   NameMap nameMap;
   IdMap idMap;
@@ -1028,7 +999,7 @@ class Parser: private boost::noncopyable {
   Order order;
   TheRing* m_ring;
 
-  template<class It>
+  template <class It>
   void readHeader(It begin, It end) {
     HeaderGrammar<It> grammar;
     bool r = qi::phrase_parse(begin, end, grammar, ascii::space, idMap);
@@ -1044,12 +1015,12 @@ class Parser: private boost::noncopyable {
         std::cerr << "Duplicate variable name: " << *ii << "\n";
         abort();
       }
-      int index = nameMap.size();
+      int index    = nameMap.size();
       nameMap[*ii] = index;
     }
   }
 
-  template<class It>
+  template <class It>
   void readPolys(It begin, It end, std::vector<parser::Poly>& polys) {
     PolySetGrammar<It> grammar;
     bool r = qi::phrase_parse(begin, end, grammar, ascii::space, polys);
@@ -1059,8 +1030,8 @@ class Parser: private boost::noncopyable {
     }
   }
 
-  struct RationalVisitor: public boost::static_visitor<Field::element_type> {
-    Field::element_type operator()(const fusion::vector<int,int>& x) const {
+  struct RationalVisitor : public boost::static_visitor<Field::element_type> {
+    Field::element_type operator()(const fusion::vector<int, int>& x) const {
       Field::element_type a(fusion::at_c<0>(x));
       Field::element_type b(fusion::at_c<1>(x));
       TheField.divide(a, b);
@@ -1073,13 +1044,13 @@ class Parser: private boost::noncopyable {
 
   void parseCoef(const Coef& coef, Field::element_type& c) {
     const char* sign = boost::get<char>(&coef.sign);
-    bool neg = *sign == '-';
+    bool neg         = *sign == '-';
 
     TheField.assign(c, 1);
     if (coef.rational) {
       c = boost::apply_visitor(RationalVisitor(), *coef.rational);
     }
-    //c.canonicalize();
+    // c.canonicalize();
     if (neg)
       TheField.negate(c);
   }
@@ -1091,13 +1062,14 @@ class Parser: private boost::noncopyable {
       abort();
     }
     int index = ii->second;
-    int expo = mono.expo ? *mono.expo : 1;
+    int expo  = mono.expo ? *mono.expo : 1;
     t.exp(index) += expo;
   }
 
   void parseTerm(const Term& term, std::vector<TheTerm*>& terms) {
     TheTerm& t = m_ring->makeTerm();
-    std::for_each(term.monos.begin(), term.monos.end(), boost::bind(&Parser::parseMono, this, _1, boost::ref(t)));
+    std::for_each(term.monos.begin(), term.monos.end(),
+                  boost::bind(&Parser::parseMono, this, _1, boost::ref(t)));
     parseCoef(term.coef, t.coef());
     m_ring->generateTotalDegree(t);
     terms.push_back(&t);
@@ -1105,7 +1077,7 @@ class Parser: private boost::noncopyable {
 
   struct GreaterThan {
     Ring<Order>& ring;
-    GreaterThan(Ring<Order>& r): ring(r) { }
+    GreaterThan(Ring<Order>& r) : ring(r) {}
     bool operator()(const TheTerm* a, const TheTerm* b) const {
       return ring.gt(*a, *b);
     }
@@ -1113,11 +1085,13 @@ class Parser: private boost::noncopyable {
 
   void parsePoly(const Poly& poly) {
     std::vector<TheTerm*> terms;
-    std::for_each(poly.terms.begin(), poly.terms.end(), boost::bind(&Parser::parseTerm, this, _1, boost::ref(terms)));
+    std::for_each(poly.terms.begin(), poly.terms.end(),
+                  boost::bind(&Parser::parseTerm, this, _1, boost::ref(terms)));
 
     std::sort(terms.begin(), terms.end(), GreaterThan(*m_ring));
     ThePoly& p = m_ring->makePoly();
-    for (std::vector<TheTerm*>::iterator ii = terms.begin(), ei = terms.end(); ii != ei; ++ii) {
+    for (std::vector<TheTerm*>::iterator ii = terms.begin(), ei = terms.end();
+         ii != ei; ++ii) {
       p.push(*ii);
     }
     m_polys.push(&p);
@@ -1125,7 +1099,8 @@ class Parser: private boost::noncopyable {
 
   void writeHeader(std::ostream& out) const {
     out << "Q[";
-    for (IdMap::const_iterator ii = idMap.begin(), ei = idMap.end(); ii != ei; ++ii) {
+    for (IdMap::const_iterator ii = idMap.begin(), ei = idMap.end(); ii != ei;
+         ++ii) {
       out << *ii;
       if (ii + 1 != ei)
         out << ", ";
@@ -1141,10 +1116,11 @@ class Parser: private boost::noncopyable {
 public:
   typedef TheRing RingTy;
 
-  Parser(): m_ring(0) { }
+  Parser() : m_ring(0) {}
 
   ~Parser() {
-    if (m_ring) delete m_ring;
+    if (m_ring)
+      delete m_ring;
   }
 
   void read(std::istream& in) {
@@ -1159,9 +1135,11 @@ public:
 
     std::vector<Poly> polys;
     readPolys(begin, end, polys);
-    std::for_each(polys.begin(), polys.end(), boost::bind(&Parser::parsePoly, this, _1));
+    std::for_each(polys.begin(), polys.end(),
+                  boost::bind(&Parser::parsePoly, this, _1));
 
-    std::cout << "Rational ring of " << nameMap.size() << " (" << m_ring->numVars() << ") variables\n";
+    std::cout << "Rational ring of " << nameMap.size() << " ("
+              << m_ring->numVars() << ") variables\n";
     std::cout << "Ideal of " << polys.size() << " polynomials\n";
   }
 
@@ -1170,18 +1148,14 @@ public:
     writePolys(out, polys);
   }
 
-  RingTy& ring() {
-    return *m_ring;
-  }
+  RingTy& ring() { return *m_ring; }
 
-  PolySet& polys() {
-    return m_polys;
-  }
+  PolySet& polys() { return m_polys; }
 };
 
-}
+} // namespace parser
 
-template<class Order>
+template <class Order>
 void run() {
   std::ifstream scanner(filename.c_str());
   if (!scanner.good()) {
@@ -1195,7 +1169,7 @@ void run() {
   scanner.close();
 
   P.write(std::cout, P.polys()); // REMOVe
-  
+
   TheField.init();
 
   galois::StatTimer T;
@@ -1204,21 +1178,22 @@ void run() {
   PolySet basis;
   buchberger(P.polys(), basis, P.ring());
   T.stop();
-  
+
   if (!skipVerify) {
     galois::InsertBag<PolyPair> pairs;
     allPairs(basis, pairs, P.ring());
     Verifier<typename ParserTy::RingTy> v(basis, P.ring());
-    if (galois::ParallelSTL::find_if(pairs.begin(), pairs.end(), v) != pairs.end()) {
+    if (galois::ParallelSTL::find_if(pairs.begin(), pairs.end(), v) !=
+        pairs.end()) {
       std::cerr << "Basis is not Groebner.\n";
       assert(0 && "Triangulation failed");
       abort();
     }
   }
   P.write(std::cout, basis);
-  std::cout << "Groebner basis with " << std::distance(basis.begin(), basis.end()) << " polynomials\n";
+  std::cout << "Groebner basis with "
+            << std::distance(basis.begin(), basis.end()) << " polynomials\n";
 }
-
 
 int main(int argc, char** argv) {
   galois::StatManager statManager;
@@ -1229,13 +1204,18 @@ int main(int argc, char** argv) {
 
   LonestarStart(argc, argv, name, desc, url);
 
-  for (unsigned i = 0; i < sizeof(powersOfTwo)/sizeof(*powersOfTwo); ++i)
+  for (unsigned i = 0; i < sizeof(powersOfTwo) / sizeof(*powersOfTwo); ++i)
     powersOfTwo[i] = 2 << (i - 1);
 
   switch (monomialOrder) {
-    case lex: run<LexOrder>(); break;
-    case grevlex: run<GrevlexOrder>(); break;
-    default: abort();
+  case lex:
+    run<LexOrder>();
+    break;
+  case grevlex:
+    run<GrevlexOrder>();
+    break;
+  default:
+    abort();
   }
 
   return 0;

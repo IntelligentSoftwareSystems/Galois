@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,24 +36,25 @@ namespace galois {
  * Unordered collection of elements. This data structure supports scalable
  * concurrent pushes but reading the bag can only be done serially.
  */
-template<typename T, unsigned int BlockSize = 0>
+template <typename T, unsigned int BlockSize = 0>
 class InsertBag {
 
   struct header {
     header* next;
-    T* dbegin; //start of interesting data
-    T* dend; //end of valid data
-    T* dlast; //end of storage
+    T* dbegin; // start of interesting data
+    T* dend;   // end of valid data
+    T* dlast;  // end of storage
   };
 
   typedef std::pair<header*, header*> PerThread;
 
 public:
-  template<typename U>
-  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
+  template <typename U>
+  class Iterator : public boost::iterator_facade<Iterator<U>, U,
+                                                 boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    galois::substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
+    galois::substrate::PerThreadStorage<std::pair<header*, header*>>* hd;
     unsigned int thr;
     header* p;
     U* v;
@@ -89,12 +90,14 @@ public:
     }
 
     void increment() {
-      if (advance_local()) return;
-      if (advance_chunk()) return;
+      if (advance_local())
+        return;
+      if (advance_chunk())
+        return;
       advance_thread();
     }
 
-    template<typename OtherTy>
+    template <typename OtherTy>
     bool equal(const Iterator<OtherTy>& o) const {
       return hd == o.hd && thr == o.thr && p == o.p && v == o.v;
     }
@@ -102,14 +105,16 @@ public:
     U& dereference() const { return *v; }
 
   public:
-    Iterator(): hd(0), thr(0), p(0), v(0) { }
+    Iterator() : hd(0), thr(0), p(0), v(0) {}
 
-    template<typename OtherTy>
-    Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
+    template <typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o)
+        : hd(o.hd), thr(o.thr), p(o.p), v(o.v) {}
 
-    Iterator(galois::substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
-      hd(h), thr(t), p(0), v(0)
-    {
+    Iterator(
+        galois::substrate::PerThreadStorage<std::pair<header*, header*>>* h,
+        unsigned t)
+        : hd(h), thr(t), p(0), v(0) {
       // find first valid item
       if (!init_thread())
         advance_thread();
@@ -124,22 +129,22 @@ private:
     PerThread& hpair = *heads.getLocal();
     if (hpair.second) {
       hpair.second->next = h;
-      hpair.second = h;
+      hpair.second       = h;
     } else {
       hpair.first = hpair.second = h;
     }
   }
 
-  header* newHeaderFromHeap(void *m, unsigned size) {
-    header* H = new (m) header();
+  header* newHeaderFromHeap(void* m, unsigned size) {
+    header* H  = new (m) header();
     int offset = 1;
     if (sizeof(T) < sizeof(header))
-      offset += sizeof(header)/sizeof(T);
-    T* a = reinterpret_cast<T*>(m);
+      offset += sizeof(header) / sizeof(T);
+    T* a      = reinterpret_cast<T*>(m);
     H->dbegin = &a[offset];
-    H->dend = H->dbegin;
-    H->dlast = &a[(size / sizeof(T))];
-    H->next = 0;
+    H->dend   = H->dbegin;
+    H->dlast  = &a[(size / sizeof(T))];
+    H->next   = 0;
     return H;
   }
 
@@ -147,18 +152,19 @@ private:
     if (BlockSize) {
       return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromHeap(galois::runtime::pagePoolAlloc(), galois::runtime::pagePoolSize());
+      return newHeaderFromHeap(galois::runtime::pagePoolAlloc(),
+                               galois::runtime::pagePoolSize());
     }
   }
 
   void destruct_serial() {
     for (unsigned x = 0; x < heads.size(); ++x) {
       PerThread& hpair = *heads.getRemote(x);
-      header*& h = hpair.first;
+      header*& h       = hpair.first;
       while (h) {
         uninitialized_destroy(h->dbegin, h->dend);
         header* h2 = h;
-        h = h->next;
+        h          = h->next;
         if (BlockSize)
           heap.deallocate(h2);
         else
@@ -170,28 +176,30 @@ private:
 
   void destruct_parallel(void) {
     galois::runtime::on_each_gen(
-        [this] (const unsigned tid, const unsigned numT) {
+        [this](const unsigned tid, const unsigned numT) {
           PerThread& hpair = *heads.getLocal(tid);
-          header*& h = hpair.first;
+          header*& h       = hpair.first;
           while (h) {
             uninitialized_destroy(h->dbegin, h->dend);
             header* h2 = h;
-            h = h->next;
+            h          = h->next;
             if (BlockSize)
               heap.deallocate(h2);
             else
               galois::runtime::pagePoolFree(h2);
           }
           hpair.second = 0;
-        }, std::make_tuple(galois::no_stats()));
+        },
+        std::make_tuple(galois::no_stats()));
   }
 
 public:
-  // static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) + sizeof(header)),
+  // static_assert(BlockSize == 0 || BlockSize >= (2 * sizeof(T) +
+  // sizeof(header)),
   //     "BlockSize should larger than sizeof(T) + O(1)");
 
-  InsertBag(): heap(BlockSize) { }
-  InsertBag(InsertBag&& o): heap(BlockSize) {
+  InsertBag() : heap(BlockSize) {}
+  InsertBag(InsertBag&& o) : heap(BlockSize) {
     std::swap(heap, o.heap);
     std::swap(heads, o.heads);
   }
@@ -205,17 +213,11 @@ public:
   InsertBag(const InsertBag&) = delete;
   InsertBag& operator=(const InsertBag&) = delete;
 
-  ~InsertBag() {
-    destruct_parallel();
-  }
+  ~InsertBag() { destruct_parallel(); }
 
-  void clear() {
-    destruct_parallel();
-  }
+  void clear() { destruct_parallel(); }
 
-  void clear_serial() {
-    destruct_serial();
-  }
+  void clear_serial() { destruct_serial(); }
 
   void swap(InsertBag& o) {
     std::swap(heap, o.heap);
@@ -236,8 +238,12 @@ public:
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
 
-  local_iterator local_begin() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID()); }
-  local_iterator local_end() { return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1); }
+  local_iterator local_begin() {
+    return local_iterator(&heads, galois::substrate::ThreadPool::getTID());
+  }
+  local_iterator local_end() {
+    return local_iterator(&heads, galois::substrate::ThreadPool::getTID() + 1);
+  }
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {
@@ -248,7 +254,7 @@ public:
     return true;
   }
   //! Thread safe bag insertion
-  template<typename... Args>
+  template <typename... Args>
   reference emplace(Args&&... args) {
     header* H = heads.getLocal()->second;
     T* rv;
@@ -261,7 +267,7 @@ public:
     return *rv;
   }
 
-  template<typename... Args>
+  template <typename... Args>
   reference emplace_back(Args&&... args) {
     return emplace(std::forward<Args>(args)...);
   }
@@ -280,14 +286,18 @@ public:
   }
 
   //! Thread safe bag insertion
-  template<typename ItemTy>
-  reference push(ItemTy&& val) { return emplace(std::forward<ItemTy>(val)); }
+  template <typename ItemTy>
+  reference push(ItemTy&& val) {
+    return emplace(std::forward<ItemTy>(val));
+  }
 
   //! Thread safe bag insertion
-  template<typename ItemTy>
-  reference push_back(ItemTy&& val) { return emplace(std::forward<ItemTy>(val)); }
+  template <typename ItemTy>
+  reference push_back(ItemTy&& val) {
+    return emplace(std::forward<ItemTy>(val));
+  }
 };
 
-}
+} // namespace galois
 
 #endif

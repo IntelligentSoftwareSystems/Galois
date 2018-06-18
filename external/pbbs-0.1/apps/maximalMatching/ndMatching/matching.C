@@ -28,53 +28,59 @@
 using namespace std;
 
 void maxMatchNonDeterministic(edge* E, bool* matched, vindex* vertices, int m) {
-//  parallel_for (int i = 0; i < m; i++) {
-  parallel_doall(int, i, 0, m)  {
+  //  parallel_for (int i = 0; i < m; i++) {
+  parallel_doall(int, i, 0, m) {
     vindex v = E[i].v;
     vindex u = E[i].u;
-    int j =0;
+    int j    = 0;
     if (u != v) {
       while (1) {
-	if (matched[v] || matched[u]) break;
-	if (utils::CAS(&vertices[v], -1, -2)) {
-	  if (utils::CAS(&vertices[u], -1, -2)) {
-	    matched[v] = matched[u] = 1;
-	    vertices[u] = i;
-	    break;
-	  } else vertices[v] = -1;
-	}
+        if (matched[v] || matched[u])
+          break;
+        if (utils::CAS(&vertices[v], -1, -2)) {
+          if (utils::CAS(&vertices[u], -1, -2)) {
+            matched[v] = matched[u] = 1;
+            vertices[u]             = i;
+            break;
+          } else
+            vertices[v] = -1;
+        }
       }
     }
-  } parallel_doall_end
+  }
+  parallel_doall_end
 }
 
-void initVertices(bool* matched, vindex* vertices, int n){
-//  parallel_for(int i=0;i<n;i++) {
-  parallel_doall(int, i, 0, n)  {
+void initVertices(bool* matched, vindex* vertices, int n) {
+  //  parallel_for(int i=0;i<n;i++) {
+  parallel_doall(int, i, 0, n) {
     vertices[i] = -1;
-    matched[i] = 0;
-  } parallel_doall_end
+    matched[i]  = 0;
+  }
+  parallel_doall_end
 }
 
-struct nonNegative { bool operator() (int i) {return i >= 0;}};
+struct nonNegative {
+  bool operator()(int i) { return i >= 0; }
+};
 
 // Finds a maximal matching of the graph
 // Returns cross pointers between vertices, or -1 if unmatched
-pair<int*,int> maximalMatching(edgeArray EA) {
+pair<int*, int> maximalMatching(edgeArray EA) {
   int m = EA.nonZeros;
   int n = EA.numRows;
 
-  vindex* R = newA(vindex,n);
-  bool* matched = newA(bool,n);
+  vindex* R     = newA(vindex, n);
+  bool* matched = newA(bool, n);
   initVertices(matched, R, n);
 
   maxMatchNonDeterministic(EA.E, matched, R, m);
 
-  int* Out = newA(int,n);
+  int* Out     = newA(int, n);
   int nMatches = sequence::filter(R, Out, n, nonNegative());
-  free(matched); free(R);
+  free(matched);
+  free(R);
 
   cout << "number of matches = " << nMatches << endl;
-  return pair<int*,int>(Out,nMatches);
-}  
-
+  return pair<int*, int>(Out, nMatches);
+}

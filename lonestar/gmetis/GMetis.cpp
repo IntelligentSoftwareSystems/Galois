@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,35 +39,49 @@
 namespace cll = llvm::cl;
 
 static const char* name = "GMetis";
-static const char* desc = "Partitions a graph into K parts and minimizing the graph cut";
+static const char* desc =
+    "Partitions a graph into K parts and minimizing the graph cut";
 static const char* url = "gMetis";
 
+static cll::opt<InitialPartMode> partMode(
+    cll::desc("Choose a inital part mode:"),
+    cll::values(clEnumVal(GGP, "GGP"), clEnumVal(GGGP, "GGGP (default)"),
+                clEnumVal(MGGGP, "MGGGP"), clEnumValEnd),
+    cll::init(GGGP));
+static cll::opt<refinementMode> refineMode(
+    cll::desc("Choose a refinement mode:"),
+    cll::values(clEnumVal(BKL, "BKL"), clEnumVal(BKL2, "BKL2 (default)"),
+                clEnumVal(ROBO, "ROBO"), clEnumVal(GRACLUS, "GRACLUS"),
+                clEnumValEnd),
+    cll::init(BKL2));
 
-static cll::opt<InitialPartMode> partMode(cll::desc("Choose a inital part mode:"),
-    cll::values(
-      clEnumVal(GGP, "GGP"),
-      clEnumVal(GGGP, "GGGP (default)"),
-      clEnumVal(MGGGP, "MGGGP"),
-      clEnumValEnd), cll::init(GGGP));
-static cll::opt<refinementMode> refineMode(cll::desc("Choose a refinement mode:"),
-    cll::values(
-      clEnumVal(BKL, "BKL"),
-      clEnumVal(BKL2, "BKL2 (default)"),
-      clEnumVal(ROBO, "ROBO"),
-      clEnumVal(GRACLUS, "GRACLUS"),
-      clEnumValEnd), cll::init(BKL2));
+static cll::opt<bool>
+    mtxInput("mtxinput",
+             cll::desc("Use text mtx files instead of binary galois gr files"),
+             cll::init(false));
+static cll::opt<bool> weighted("weighted", cll::desc("weighted"),
+                               cll::init(false));
+static cll::opt<bool>
+    verbose("verbose",
+            cll::desc("verbose output (debugging mode, takes extra time)"),
+            cll::init(false));
+static cll::opt<std::string> outfile("output",
+                                     cll::desc("output partition file name"));
+static cll::opt<std::string>
+    orderedfile("ordered", cll::desc("output ordered graph file name"));
+static cll::opt<std::string>
+    permutationfile("permutation", cll::desc("output permutation file name"));
+static cll::opt<std::string> filename(cll::Positional,
+                                      cll::desc("<input file>"), cll::Required);
+static cll::opt<int> numPartitions(cll::Positional,
+                                   cll::desc("<Number of partitions>"),
+                                   cll::Required);
+static cll::opt<double> imbalance(
+    "balance",
+    cll::desc("Fraction deviated from mean partition size (default 0.01)"),
+    cll::init(0.01));
 
-static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead of binary galois gr files"), cll::init(false));
-static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
-static cll::opt<bool> verbose("verbose", cll::desc("verbose output (debugging mode, takes extra time)"), cll::init(false));
-static cll::opt<std::string> outfile("output", cll::desc("output partition file name"));
-static cll::opt<std::string> orderedfile("ordered", cll::desc("output ordered graph file name"));
-static cll::opt<std::string> permutationfile("permutation", cll::desc("output permutation file name"));
-static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
-static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size (default 0.01)"), cll::init(0.01));
-
-//const double COARSEN_FRACTION = 0.9;
+// const double COARSEN_FRACTION = 0.9;
 
 /**
  * KMetis Algorithm
@@ -76,16 +90,19 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   galois::StatTimer TM;
   TM.start();
   unsigned fineMetisGraphWeight = metisGraph->getTotalWeight();
-  unsigned meanWeight = ( (double)fineMetisGraphWeight) / (double)nparts;
-  //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
+  unsigned meanWeight = ((double)fineMetisGraphWeight) / (double)nparts;
+  // unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 *
+  // intlog2(nparts)), 20 * (nparts));
   unsigned coarsenTo = 20 * nparts;
 
-  if (verbose) std::cout << "Starting coarsening: \n";
+  if (verbose)
+    std::cout << "Starting coarsening: \n";
   galois::StatTimer T("Coarsen");
   T.start();
   MetisGraph* mcg = coarsen(metisGraph, coarsenTo, verbose);
   T.stop();
-  if (verbose) std::cout << "Time coarsen: " << T.get() << "\n";
+  if (verbose)
+    std::cout << "Time coarsen: " << T.get() << "\n";
 
   galois::StatTimer T2("Partition");
   T2.start();
@@ -93,29 +110,39 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   parts = partition(mcg, fineMetisGraphWeight, nparts, partMode);
   T2.stop();
 
-  if (verbose) std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
+  if (verbose)
+    std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
 
   std::vector<partInfo> initParts = parts;
-  if (verbose) std::cout << "Time clustering:  "<<T2.get()<<'\n';
+  if (verbose)
+    std::cout << "Time clustering:  " << T2.get() << '\n';
 
   if (verbose) {
     switch (refineMode) {
-      case BKL2:    std::cout<< "Sorting refinnement with BKL2\n";    break;
-      case BKL:     std::cout<< "Sorting refinnement with BKL\n";     break;
-      case ROBO:    std::cout<< "Sorting refinnement with ROBO\n";    break;
-      case GRACLUS: std::cout<< "Sorting refinnement with GRACLUS\n"; break;
-      default: abort();
+    case BKL2:
+      std::cout << "Sorting refinnement with BKL2\n";
+      break;
+    case BKL:
+      std::cout << "Sorting refinnement with BKL\n";
+      break;
+    case ROBO:
+      std::cout << "Sorting refinnement with ROBO\n";
+      break;
+    case GRACLUS:
+      std::cout << "Sorting refinnement with GRACLUS\n";
+      break;
+    default:
+      abort();
     }
   }
 
   galois::StatTimer T3("Refine");
   T3.start();
-  refine(mcg, parts, 
-      meanWeight - (unsigned)(meanWeight * imbalance), 
-      meanWeight + (unsigned)(meanWeight * imbalance), 
-      refineMode, verbose);
+  refine(mcg, parts, meanWeight - (unsigned)(meanWeight * imbalance),
+         meanWeight + (unsigned)(meanWeight * imbalance), refineMode, verbose);
   T3.stop();
-  if (verbose) std::cout << "Time refinement: " << T3.get() << "\n";
+  if (verbose)
+    std::cout << "Time refinement: " << T3.get() << "\n";
 
   TM.stop();
 
@@ -131,31 +158,29 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   return;
 }
 
-
-//printGraphBeg(*graph)
+// printGraphBeg(*graph)
 
 typedef galois::graphs::FileGraph FG;
 typedef FG::GraphNode FN;
-template<typename GNode, typename Weights>
+template <typename GNode, typename Weights>
 struct order_by_degree {
-  GGraph &graph;
+  GGraph& graph;
   Weights& weights;
-  order_by_degree(GGraph &g, Weights &w):graph(g),weights(w) {
-
-  }
+  order_by_degree(GGraph& g, Weights& w) : graph(g), weights(w) {}
   bool operator()(const GNode& a, const GNode& b) {
     uint64_t wa = weights[a];
     uint64_t wb = weights[b];
-    int pa = graph.getData(a,galois::MethodFlag::UNPROTECTED).getPart();
-    int pb = graph.getData(b,galois::MethodFlag::UNPROTECTED).getPart();
-    if (pa != pb) { 
+    int pa      = graph.getData(a, galois::MethodFlag::UNPROTECTED).getPart();
+    int pb      = graph.getData(b, galois::MethodFlag::UNPROTECTED).getPart();
+    if (pa != pb) {
       return pa < pb;
     }
     return wa < wb;
   }
 };
 
-typedef galois::substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
+typedef galois::substrate::PerThreadStorage<std::map<GNode, uint64_t>>
+    PerThreadDegInfo;
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -167,14 +192,14 @@ int main(int argc, char** argv) {
 
   galois::graphs::readGraph(graph, filename);
 
-  galois::do_all(galois::iterate(graph), 
-      [&] (GNode node) {
-        for (auto jj : graph.edges(node)) {
-          graph.getEdgeData(jj)=1;
-          // weight+=1;
-        }
-      },
-      galois::loopname("initMorphGraph"));
+  galois::do_all(galois::iterate(graph),
+                 [&](GNode node) {
+                   for (auto jj : graph.edges(node)) {
+                     graph.getEdgeData(jj) = 1;
+                     // weight+=1;
+                   }
+                 },
+                 galois::loopname("initMorphGraph"));
 
   graphStat(graph);
   std::cout << "\n";
@@ -186,90 +211,93 @@ int main(int argc, char** argv) {
 
   std::cout << "Total edge cut: " << computeCut(graph) << "\n";
 
-  if (outfile != "") {   
+  if (outfile != "") {
     MetisGraph* coarseGraph = &metisGraph;
     while (coarseGraph->getCoarserGraph())
       coarseGraph = coarseGraph->getCoarserGraph();
     std::ofstream outFile(outfile.c_str());
-    for (auto it = graph.begin(), ie = graph.end(); it!=ie; it++)
-    {
+    for (auto it = graph.begin(), ie = graph.end(); it != ie; it++) {
       unsigned gPart = graph.getData(*it).getPart();
-      outFile<< gPart<< '\n';
+      outFile << gPart << '\n';
     }
   }
-  
-  if (orderedfile != "" || permutationfile != "") { 
+
+  if (orderedfile != "" || permutationfile != "") {
     galois::graphs::FileGraph g;
     g.fromFile(filename);
     typedef galois::LargeArray<GNode> Permutation;
-    Permutation perm; 
+    Permutation perm;
     perm.create(g.size());
-    std::copy(graph.begin(),graph.end(), perm.begin());
-    PerThreadDegInfo threadDegInfo; 
+    std::copy(graph.begin(), graph.end(), perm.begin());
+    PerThreadDegInfo threadDegInfo;
     std::vector<int> parts(numPartitions);
-    for (unsigned int i=0;i<parts.size();i++){ 
+    for (unsigned int i = 0; i < parts.size(); i++) {
       parts[i] = i;
-    } 
+    }
 
     using WL = galois::worklists::PerSocketChunkFIFO<16>;
 
-    galois::for_each(galois::iterate(parts), 
-        [&] (int part, auto& lwl) {
+    galois::for_each(
+        galois::iterate(parts),
+        [&](int part, auto& lwl) {
           constexpr auto flag = galois::MethodFlag::UNPROTECTED;
-          typedef std::vector<std::pair<unsigned,GNode>, galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
-          //copy and translate all edges
+          typedef std::vector<
+              std::pair<unsigned, GNode>,
+              galois::PerIterAllocTy::rebind<std::pair<unsigned, GNode>>::other>
+              GD;
+          // copy and translate all edges
           GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
           for (auto n : graph) {
-            auto &nd = graph.getData(n,flag); 
+            auto& nd = graph.getData(n, flag);
             if (static_cast<int>(nd.getPart()) == part) {
-              int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
-              orderedNodes.push_back(std::make_pair(edges,n));
+              int edges = std::distance(graph.edge_begin(n, flag),
+                                        graph.edge_end(n, flag));
+              orderedNodes.push_back(std::make_pair(edges, n));
             }
-          } 
-          std::sort(orderedNodes.begin(),orderedNodes.end());
+          }
+          std::sort(orderedNodes.begin(), orderedNodes.end());
           int index = 0;
-          std::map<GNode, uint64_t> &threadMap(*threadDegInfo.getLocal());
+          std::map<GNode, uint64_t>& threadMap(*threadDegInfo.getLocal());
           for (auto p : orderedNodes) {
             GNode n = p.second;
             threadMap[n] += index;
             for (auto eb : graph.edges(n, flag)) {
               GNode neigh = graph.getEdgeDst(eb);
-              auto &nd = graph.getData(neigh,flag);
-              if (static_cast<int>(nd.getPart()) == part) { 
+              auto& nd    = graph.getData(neigh, flag);
+              if (static_cast<int>(nd.getPart()) == part) {
                 threadMap[neigh] += index;
               }
             }
             index++;
           }
         },
-        galois::wl<WL>(),
-        galois::per_iter_alloc(),
+        galois::wl<WL>(), galois::per_iter_alloc(),
         galois::loopname("Order Graph"));
 
-    std::map<GNode,uint64_t> globalMap;
-    for (unsigned int i = 0; i < threadDegInfo.size(); i++) { 
-      std::map<GNode,uint64_t> &localMap(*threadDegInfo.getRemote(i));
-      for (auto mb = localMap.begin(), me = localMap.end(); mb != me; mb++) { 
+    std::map<GNode, uint64_t> globalMap;
+    for (unsigned int i = 0; i < threadDegInfo.size(); i++) {
+      std::map<GNode, uint64_t>& localMap(*threadDegInfo.getRemote(i));
+      for (auto mb = localMap.begin(), me = localMap.end(); mb != me; mb++) {
         globalMap[mb->first] = mb->second;
       }
     }
-    order_by_degree<GNode,std::map<GNode,uint64_t> > fn(graph,globalMap);
-    std::map<GNode,int> nodeIdMap; 
+    order_by_degree<GNode, std::map<GNode, uint64_t>> fn(graph, globalMap);
+    std::map<GNode, int> nodeIdMap;
     int id = 0;
-    for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) { 
-      nodeIdMap[*nb] = id; 
+    for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) {
+      nodeIdMap[*nb] = id;
       id++;
     }
-    //compute inverse
+    // compute inverse
     std::stable_sort(perm.begin(), perm.end(), fn);
     galois::LargeArray<uint64_t> perm2;
     perm2.create(g.size());
-    //compute permutation
-    id = 0; 
-    for (auto pb = perm.begin(), pe = perm.end(); pb != pe; pb++) { 
-      int prevId = nodeIdMap[*pb];
-      perm2[prevId] = id; 
-      //std::cout<<prevId <<" "<<id<<std::endl;
+    // compute permutation
+    id = 0;
+    for (auto pb = perm.begin(), pe = perm.end(); pb != pe; pb++) {
+      int prevId    = nodeIdMap[*pb];
+      perm2[prevId] = id;
+      // std::cout<<prevId <<" "<<id<<std::endl;
       id++;
     }
     galois::graphs::FileGraph out;

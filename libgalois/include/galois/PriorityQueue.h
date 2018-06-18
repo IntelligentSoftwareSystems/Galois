@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,10 +32,12 @@
 namespace galois {
 
 /**
- * Thread-safe ordered set. Faster than STL heap operations (about 10%-15% faster on serially) and
- * can use scalable allocation, e.g., {@link FixedSizeAllocator}.
+ * Thread-safe ordered set. Faster than STL heap operations (about 10%-15%
+ * faster on serially) and can use scalable allocation, e.g., {@link
+ * FixedSizeAllocator}.
  */
-template <typename T, typename Cmp=std::less<T>, typename Alloc=galois::FixedSizeAllocator<T> >
+template <typename T, typename Cmp = std::less<T>,
+          typename Alloc = galois::FixedSizeAllocator<T>>
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
 
@@ -49,7 +51,8 @@ public:
   typedef typename container_type::const_iterator iterator;
   typedef typename container_type::const_iterator const_iterator;
   typedef typename container_type::const_reverse_iterator reverse_iterator;
-  typedef typename container_type::const_reverse_iterator const_reverse_iterator;
+  typedef
+      typename container_type::const_reverse_iterator const_reverse_iterator;
   typedef galois::substrate::SimpleLock Lock_ty;
 
 private:
@@ -57,17 +60,20 @@ private:
   Set orderedSet;
 
 public:
-  template<typename _T, typename _Cmp=std::less<_T>, typename _Alloc=galois::FixedSizeAllocator<_T> >
-  using retype = ThreadSafeOrderedSet<_T, _Cmp, _Alloc>; // FIXME: loses Alloc and Cmp types
+  template <typename _T, typename _Cmp = std::less<_T>,
+            typename _Alloc = galois::FixedSizeAllocator<_T>>
+  using retype =
+      ThreadSafeOrderedSet<_T, _Cmp,
+                           _Alloc>; // FIXME: loses Alloc and Cmp types
 
-  explicit ThreadSafeOrderedSet(const Cmp& cmp=Cmp(), const Alloc& alloc=Alloc()):
-      orderedSet(cmp, alloc)
-  {}
+  explicit ThreadSafeOrderedSet(const Cmp& cmp     = Cmp(),
+                                const Alloc& alloc = Alloc())
+      : orderedSet(cmp, alloc) {}
 
   template <typename Iter>
-  ThreadSafeOrderedSet(Iter b, Iter e, const Cmp& cmp=Cmp(), const Alloc& alloc=Alloc())
-    : orderedSet(cmp, alloc)
-  {
+  ThreadSafeOrderedSet(Iter b, Iter e, const Cmp& cmp = Cmp(),
+                       const Alloc& alloc = Alloc())
+      : orderedSet(cmp, alloc) {
     for (; b != e; ++b) {
       orderedSet.insert(*b);
     }
@@ -83,7 +89,7 @@ public:
 
   size_type size() const {
     mutex.lock();
-    size_type sz =  orderedSet.size();
+    size_type sz = orderedSet.size();
     mutex.unlock();
 
     return sz;
@@ -131,24 +137,25 @@ public:
       ret = true;
     } else {
       size_type s = orderedSet.erase(x);
-      ret = (s > 0);
+      ret         = (s > 0);
     }
     mutex.unlock();
 
     return ret;
   }
 
-  void clear () {
-    mutex.lock ();
-    orderedSet.clear ();
-    mutex.unlock ();
+  void clear() {
+    mutex.lock();
+    orderedSet.clear();
+    mutex.unlock();
   }
 
   const_iterator begin() const { return orderedSet.begin(); }
   const_iterator end() const { return orderedSet.end(); }
 };
 
-template <typename T, typename Cmp=std::less<T>, typename Cont=std::vector<T, runtime::Pow_2_BlockAllocator<T> > >
+template <typename T, typename Cmp = std::less<T>,
+          typename Cont = std::vector<T, runtime::Pow_2_BlockAllocator<T>>>
 class MinHeap {
 public:
   typedef runtime::Pow_2_BlockAllocator<T> alloc_type;
@@ -162,14 +169,15 @@ public:
   typedef typename container_type::const_iterator iterator;
   typedef typename container_type::const_iterator const_iterator;
   typedef typename container_type::const_reverse_iterator reverse_iterator;
-  typedef typename container_type::const_reverse_iterator const_reverse_iterator;
+  typedef
+      typename container_type::const_reverse_iterator const_reverse_iterator;
   // typedef typename container_type::const_iterator iterator;
 
 protected:
   struct RevCmp {
     Cmp cmp;
 
-    explicit RevCmp(const Cmp& cmp): cmp(cmp) {}
+    explicit RevCmp(const Cmp& cmp) : cmp(cmp) {}
 
     bool operator()(const T& left, const T& right) const {
       return cmp(right, left);
@@ -195,28 +203,20 @@ protected:
   }
 
 public:
-  explicit MinHeap(const Cmp& cmp=Cmp(), const Cont& container=Cont())
-    : container(container), revCmp(cmp)
-  {}
+  explicit MinHeap(const Cmp& cmp = Cmp(), const Cont& container = Cont())
+      : container(container), revCmp(cmp) {}
 
   template <typename Iter>
-  MinHeap(Iter b, Iter e, const Cmp& cmp=Cmp())
-    : container(b, e), revCmp(cmp)
-  {
+  MinHeap(Iter b, Iter e, const Cmp& cmp = Cmp())
+      : container(b, e), revCmp(cmp) {
     std::make_heap(container.begin(), container.end());
   }
 
-  bool empty() const {
-    return container.empty();
-  }
+  bool empty() const { return container.empty(); }
 
-  size_type size() const {
-   return container.size();
-  }
+  size_type size() const { return container.size(); }
 
-  const_reference top() const {
-    return container.front();
-  }
+  const_reference top() const { return container.front(); }
 
   // for compatibility with various stl types
   inline void push_back(const value_type& x) { this->push(x); }
@@ -245,7 +245,7 @@ public:
       ret = true;
     } else {
       typename container_type::iterator nend =
-        std::remove(container.begin(), container.end(), x);
+          std::remove(container.begin(), container.end(), x);
 
       ret = (nend != container.end());
       container.erase(nend, container.end());
@@ -260,22 +260,18 @@ public:
     return (std::find(begin(), end(), x) != end());
   }
 
-  void clear () {
-    container.clear ();
-  }
+  void clear() { container.clear(); }
 
   const_iterator begin() const { return container.begin(); }
   const_iterator end() const { return container.end(); }
 
-  void reserve(size_type s) {
-    container.reserve(s);
-  }
+  void reserve(size_type s) { container.reserve(s); }
 };
 
 /**
  * Thread-safe min heap.
  */
-template <typename T, typename Cmp=std::less<T> >
+template <typename T, typename Cmp = std::less<T>>
 class ThreadSafeMinHeap {
 public:
   typedef MinHeap<T, Cmp> container_type;
@@ -288,7 +284,8 @@ public:
   typedef typename container_type::const_iterator iterator;
   typedef typename container_type::const_iterator const_iterator;
   typedef typename container_type::const_reverse_iterator reverse_iterator;
-  typedef typename container_type::const_reverse_iterator const_reverse_iterator;
+  typedef
+      typename container_type::const_reverse_iterator const_reverse_iterator;
 
 protected:
   typedef galois::substrate::SimpleLock Lock_ty;
@@ -297,15 +294,10 @@ protected:
   container_type heap;
 
 public:
-  explicit ThreadSafeMinHeap(const Cmp& cmp=Cmp())
-    : heap(cmp)
-  {}
+  explicit ThreadSafeMinHeap(const Cmp& cmp = Cmp()) : heap(cmp) {}
 
   template <typename Iter>
-  ThreadSafeMinHeap(Iter b, Iter e, const Cmp& cmp=Cmp())
-    : heap(b, e, cmp)
-  {}
-
+  ThreadSafeMinHeap(Iter b, Iter e, const Cmp& cmp = Cmp()) : heap(b, e, cmp) {}
 
   bool empty() const {
     mutex.lock();
@@ -317,7 +309,7 @@ public:
 
   size_type size() const {
     mutex.lock();
-    size_type sz =  heap.size();
+    size_type sz = heap.size();
     mutex.unlock();
 
     return sz;
@@ -368,21 +360,19 @@ public:
     return ret;
   }
 
-  void clear () {
-    mutex.lock ();
-    heap.clear ();
-    mutex.unlock ();
+  void clear() {
+    mutex.lock();
+    heap.clear();
+    mutex.unlock();
   }
 
   // TODO: can't use in parallel context
   const_iterator begin() const { return heap.begin(); }
   const_iterator end() const { return heap.end(); }
 
-  void reserve(size_type s) {
-    heap.reserve(s);
-  }
+  void reserve(size_type s) { heap.reserve(s); }
 };
 
-}
+} // namespace galois
 
 #endif

@@ -7,22 +7,19 @@ using namespace galois::runtime;
 
 struct DistObj : public Lockable {
   int i;
-  DistObj(): i(0) { }
+  DistObj() : i(0) {}
   DistObj(RecvBuffer& buf) { deserialize(buf); }
-  
+
   typedef int tt_has_serialize;
-  void deserialize(RecvBuffer& buf) {
-    gDeserialize(buf, i);
-  }
-  void serialize(SendBuffer& buf) const {
-    gSerialize(buf, i);
-  }
+  void deserialize(RecvBuffer& buf) { gDeserialize(buf, i); }
+  void serialize(SendBuffer& buf) const { gSerialize(buf, i); }
 };
 
 int main() {
-  static_assert(galois::runtime::is_serializable<DistObj>::value, "DistObj not serializable");
+  static_assert(galois::runtime::is_serializable<DistObj>::value,
+                "DistObj not serializable");
 
-  unsigned i1 {0XDEADBEEF}, i2;
+  unsigned i1{0XDEADBEEF}, i2;
   gptr<DistObj> ptr1, ptr2;
   SendBuffer sbuf;
   galois::runtime::gSerialize(sbuf, ptr1, i1);
@@ -33,7 +30,7 @@ int main() {
   GALOIS_ASSERT(i1 == i2);
 
   {
-    std::vector<double> input(1024*1024, 1.0);
+    std::vector<double> input(1024 * 1024, 1.0);
     std::vector<double> output;
     galois::Timer T;
     T.start();

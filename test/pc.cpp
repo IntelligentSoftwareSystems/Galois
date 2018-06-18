@@ -9,11 +9,11 @@ using namespace galois::substrate;
 
 int num = 1;
 
-template<typename T>
+template <typename T>
 struct testL {
   PerThreadStorage<T>& b;
 
-  testL(PerThreadStorage<T>& B) :b(B) {}
+  testL(PerThreadStorage<T>& B) : b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
       *b.getLocal() += x;
@@ -21,11 +21,11 @@ struct testL {
   }
 };
 
-template<typename T>
+template <typename T>
 struct testR {
   PerThreadStorage<T>& b;
 
-  testR(PerThreadStorage<T>& B) :b(B) {}
+  testR(PerThreadStorage<T>& B) : b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
       *b.getRemote((t + 1) % n) += x;
@@ -33,10 +33,11 @@ struct testR {
   }
 };
 
-template<typename T>
+template <typename T>
 void testf(const char* str) {
   PerThreadStorage<T> b;
-  std::cout << "\nRunning: " << str << " sizeof " << sizeof(PerThreadStorage<T>) << "\n";
+  std::cout << "\nRunning: " << str << " sizeof " << sizeof(PerThreadStorage<T>)
+            << "\n";
   galois::Timer tL;
   tL.start();
   testL<T> L(b);
@@ -59,7 +60,7 @@ int main(int argc, char** argv) {
   unsigned M = galois::substrate::getThreadPool().getMaxThreads();
 
   while (M) {
-    galois::setActiveThreads(M); //galois::runtime::LL::getMaxThreads());
+    galois::setActiveThreads(M); // galois::runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
 
     testf<int>("int");

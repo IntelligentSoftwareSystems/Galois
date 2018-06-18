@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -51,23 +51,26 @@ namespace des {
 namespace cll = llvm::cl;
 
 static const char* name = "Discrete Event Simulation";
-static const char* desc = "Perform logic circuit simulation using Discrete Event Simulation";
+static const char* desc =
+    "Perform logic circuit simulation using Discrete Event Simulation";
 static const char* url = "discrete_event_simulation";
 
-static cll::opt<std::string> netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string>
+    netlistFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 
 /**
- * The Class AbstractMain holds common functionality for {@link des_unord::DESunorderedSerial} and {@link des_unord::DESunordered}.
+ * The Class AbstractMain holds common functionality for {@link
+ * des_unord::DESunorderedSerial} and {@link des_unord::DESunordered}.
  */
 // TODO: graph type can also be exposed to sub-classes as a template parameter
 template <typename SimInit_tp>
 class AbstractMain {
 
 public:
-
-  typedef galois::graphs::MorphGraph<typename SimInit_tp::BaseSimObj_ty*, void, true> Graph;
+  typedef galois::graphs::MorphGraph<typename SimInit_tp::BaseSimObj_ty*, void,
+                                     true>
+      Graph;
   typedef typename Graph::GraphNode GNode;
-
 
 protected:
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
@@ -88,8 +91,7 @@ protected:
    */
   virtual void runLoop(const SimInit_tp& simInit, Graph& graph) = 0;
 
-
-  virtual void initRemaining (const SimInit_tp& simInit, Graph& graph) = 0;
+  virtual void initRemaining(const SimInit_tp& simInit, Graph& graph) = 0;
 
 public:
   /**
@@ -104,38 +106,37 @@ public:
 
     SimInit_tp simInit(netlistFile);
     Graph graph;
-    simInit.initialize (graph);
+    simInit.initialize(graph);
 
     // Graph graph;
     // graph.copyFromGraph (in_graph);
 
-    printf("circuit graph: %d nodes, %zd edges\n", graph.size(), simInit.getNumEdges());
+    printf("circuit graph: %d nodes, %zd edges\n", graph.size(),
+           simInit.getNumEdges());
     printf("Number of initial events = %zd\n", simInit.getInitEvents().size());
 
-    initRemaining (simInit, graph);
+    initRemaining(simInit, graph);
 
-    galois::preAlloc (256 * galois::getActiveThreads ());
-        // + (simInit.getInitEvents().size() * graph.size()));
+    galois::preAlloc(256 * galois::getActiveThreads());
+    // + (simInit.getInitEvents().size() * graph.size()));
 
     galois::reportPageAlloc("MeminfoPre");
 
     galois::StatTimer t;
 
-    t.start ();
+    t.start();
 
     runLoop(simInit, graph);
 
-    t.stop ();
+    t.stop();
 
     galois::reportPageAlloc("MeminfoPost");
 
     if (!skipVerify) {
-      simInit.verify ();
+      simInit.verify();
     }
-
   }
-
 };
 
 } // namespace des
-#endif // DES_ABSTRACT_MAIN_H_ 
+#endif // DES_ABSTRACT_MAIN_H_

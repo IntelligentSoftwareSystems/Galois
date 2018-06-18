@@ -7,9 +7,9 @@
 
 #include "dmp-internal.h"
 
-#define CONDVAR_DEBUG_MSG(C,M,msg) DEBUG_MSG( DEBUG_CONDVAR, \
-                                              msg "(%p) @%llu T:%d", \
-                                              (C), DMProundNumber, DMPMAP->threadID )
+#define CONDVAR_DEBUG_MSG(C, M, msg)                                           \
+  DEBUG_MSG(DEBUG_CONDVAR, msg "(%p) @%llu T:%d", (C), DMProundNumber,         \
+            DMPMAP->threadID)
 
 struct DmpCondvarTraits {
   typedef DMPcondvar T;
@@ -27,7 +27,7 @@ struct DmpCondvarTraits {
     return DmpDefaultPredictor::predict(r);
   }
 
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
   static const bool acquire_ends_quantum = false;
   static const bool release_ends_quantum = false;
 };
@@ -48,7 +48,7 @@ struct DmpCondvarTraitsForWait {
     return DmpDefaultPredictor::predict_ignoring(r, DMPMAP);
   }
 
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
   static const bool acquire_ends_quantum = false;
   static const bool release_ends_quantum = false;
 };
@@ -79,12 +79,10 @@ int DMPcondvar_init(DMPcondvar* C, void* attr) {
   return 0;
 }
 
-int DMPcondvar_destroy(DMPcondvar* C) {
-  return 0;
-}
+int DMPcondvar_destroy(DMPcondvar* C) { return 0; }
 
 int DMPcondvar_wait(DMPcondvar* C, DMPmutex* M) {
-  CONDVAR_DEBUG_MSG(C,M,"CondvarWait-Top");
+  CONDVAR_DEBUG_MSG(C, M, "CondvarWait-Top");
   DMPresource_take_ownership<DmpCondvarTraits>(&C->resource);
 
   // Add to the condvar's wait queue.
@@ -94,7 +92,7 @@ int DMPcondvar_wait(DMPcondvar* C, DMPmutex* M) {
   // PThread spec says if we are canceled while waiting, then:
   // (1) We should lock 'M' before running cleanup handlers, and
   // (2) We should remove ourself from the wait queue.
-  struct CleanupData d = { C, M, &waiter };
+  struct CleanupData d = {C, M, &waiter};
   pthread_cleanup_push(cleanup, &d);
 
   // Handoff ownership of the resource:
@@ -108,12 +106,12 @@ int DMPcondvar_wait(DMPcondvar* C, DMPmutex* M) {
   // Done.
   pthread_cleanup_pop(0);
   DMPmutex_lock(M);
-  CONDVAR_DEBUG_MSG(C,M,"CondvarWait-Leaving");
+  CONDVAR_DEBUG_MSG(C, M, "CondvarWait-Leaving");
   return 0;
 }
 
 int DMPcondvar_signal(DMPcondvar* C) {
-  CONDVAR_DEBUG_MSG(C,NULL,"CondvarSignal");
+  CONDVAR_DEBUG_MSG(C, NULL, "CondvarSignal");
   DMPresource_take_ownership<DmpCondvarTraits>(&C->resource);
 
   // Wake the first waiter.
@@ -126,7 +124,7 @@ int DMPcondvar_signal(DMPcondvar* C) {
 }
 
 int DMPcondvar_broadcast(DMPcondvar* C) {
-  CONDVAR_DEBUG_MSG(C,NULL,"CondvarBroadcast");
+  CONDVAR_DEBUG_MSG(C, NULL, "CondvarBroadcast");
   DMPresource_take_ownership<DmpCondvarTraits>(&C->resource);
 
   // Wake all waiters.

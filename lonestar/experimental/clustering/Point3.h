@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,9 +39,7 @@ public:
 
   double getLen() const { return x * x + y * y + z * z; }
 
-  double getVol(void) const {
-    return x * y * z;
-  }
+  double getVol(void) const { return x * y * z; }
 
   void scale(double factor) {
     x *= factor;
@@ -131,10 +129,10 @@ public:
   double getX() const { return x; }
 
   double getY() const { return y; }
-  
+
   double getZ() const { return z; }
 
-  bool operator == (const Point3& other) const {
+  bool operator==(const Point3& other) const {
     return (x == other.x) && (y == other.y) && (z == other.z);
   }
 

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,7 +20,6 @@
 #ifndef DES_LOGIC_DEFS_H_
 #define DES_LOGIC_DEFS_H_
 
-
 namespace des {
 
 /** type used for value of a signal e.g. 0, 1, X , Z */
@@ -28,9 +27,8 @@ typedef char LogicVal;
 
 /** the unknown logic value */
 const char LOGIC_UNKNOWN = 'X';
-const char LOGIC_ZERO = '0';
-const char LOGIC_ONE = '1';
-
+const char LOGIC_ZERO    = '0';
+const char LOGIC_ONE     = '1';
 
 } // namespace des
 

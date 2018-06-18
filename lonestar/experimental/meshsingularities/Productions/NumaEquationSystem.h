@@ -8,23 +8,19 @@
 #ifndef NUMAEQUATIONSYSTEM_H_
 #define NUMAEQUATIONSYSTEM_H_
 
-
 #include <cstdio>
 #include <cstdlib>
 
 #include "EquationSystem.h"
 
-class NumaEquationSystem : public EquationSystem{
-  public:
-	// this variables _should_ be public
-	// Productions will use them directly
+class NumaEquationSystem : public EquationSystem {
+public:
+  // this variables _should_ be public
+  // Productions will use them directly
 
-
-	NumaEquationSystem(int n, int node);
-	NumaEquationSystem(double ** matrix, double *rhs, int size, int node);
-	virtual ~NumaEquationSystem();
-
+  NumaEquationSystem(int n, int node);
+  NumaEquationSystem(double** matrix, double* rhs, int size, int node);
+  virtual ~NumaEquationSystem();
 };
-
 
 #endif /* NUMAEQUATIONSYSTEM_H_ */

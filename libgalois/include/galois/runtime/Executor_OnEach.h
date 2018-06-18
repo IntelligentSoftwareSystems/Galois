@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,10 +39,13 @@ template <typename FunctionTy, typename ArgsTy>
 inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
 
   static_assert(!exists_by_supertype<char*, ArgsTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, ArgsTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const*, ArgsTy>::value,
+                "old loopname");
 
-  static constexpr bool NEEDS_STATS = exists_by_supertype<loopname_tag, ArgsTy>::value;
-  static constexpr bool MORE_STATS = NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsTy>::value;
+  static constexpr bool NEEDS_STATS =
+      exists_by_supertype<loopname_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS =
+      NEEDS_STATS && exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
   const char* const loopname = galois::internal::getLoopName(argsTuple);
 
@@ -53,13 +56,11 @@ inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
   const auto numT = getActiveThreads();
 
   auto runFun = [&] {
-
     execTime.start();
 
     fn(substrate::ThreadPool::getTID(), numT);
 
     execTime.stop();
-
   };
 
   timer.start();
@@ -67,18 +68,17 @@ inline void on_each_impl(FunctionTy& fn, const ArgsTy& argsTuple) {
   timer.stop();
 }
 
-}
+} // namespace internal
 
-template<typename FunctionTy, typename TupleTy>
+template <typename FunctionTy, typename TupleTy>
 inline void on_each_gen(FunctionTy& fn, const TupleTy& tpl) {
   internal::on_each_impl<FunctionTy, TupleTy>(fn, tpl);
 }
 
-template<typename FunctionTy, typename TupleTy>
+template <typename FunctionTy, typename TupleTy>
 inline void on_each_gen(const FunctionTy& fn, const TupleTy& tpl) {
   internal::on_each_impl<const FunctionTy, TupleTy>(fn, tpl);
 }
-
 
 } // end namespace runtime
 } // end namespace galois

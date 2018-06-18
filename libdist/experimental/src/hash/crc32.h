@@ -12,13 +12,12 @@
 // define fixed size integer types
 #ifdef _MSC_VER
 // Windows
-typedef unsigned __int8  uint8_t;
+typedef unsigned __int8 uint8_t;
 typedef unsigned __int32 uint32_t;
 #else
 // GCC
 #include <stdint.h>
 #endif
-
 
 /// compute CRC32 hash, based on Intel's Slicing-by-8 algorithm
 /** Usage:
@@ -36,7 +35,8 @@ typedef unsigned __int32 uint32_t;
     Note:
     You can find code for the faster Slicing-by-16 algorithm on my website, too:
     http://create.stephan-brumme.com/crc32/
-    Its unrolled version is about twice as fast but its look-up table doubled in size as well.
+    Its unrolled version is about twice as fast but its look-up table doubled in
+   size as well.
   */
 class CRC32 //: public Hash
 {
@@ -60,7 +60,7 @@ public:
   /// return latest hash as 8 hex characters
   std::string getHash();
   /// return latest hash as bytes
-  void        getHash(unsigned char buffer[HashBytes]);
+  void getHash(unsigned char buffer[HashBytes]);
 
   /// restart
   void reset();

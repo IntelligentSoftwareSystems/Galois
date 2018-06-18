@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,8 +20,11 @@
 struct AsyncRsd {
   struct LNode {
     std::atomic<PRTy> value;
-    std::atomic<PRTy> residual; 
-    void init() { value = 1.0 - alpha; residual = 0.0; }
+    std::atomic<PRTy> residual;
+    void init() {
+      value    = 1.0 - alpha;
+      residual = 0.0;
+    }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
       os << "{PR " << n.value << ", residual " << n.residual << "}";
@@ -29,17 +32,20 @@ struct AsyncRsd {
     }
   };
 
-  typedef galois::graphs::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_numa_alloc<true>::type
+      InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "AsyncRsd"; }
 
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
+  void readGraph(Graph& graph, std::string filename,
+                 std::string transposeGraphName) {
     if (transposeGraphName.size()) {
-      galois::graphs::readGraph(graph, filename, transposeGraphName); 
+      galois::graphs::readGraph(graph, filename, transposeGraphName);
     } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
+      std::cerr
+          << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
     }
   }
@@ -48,27 +54,30 @@ struct AsyncRsd {
     Graph& graph;
     PRTy tolerance;
 
-    Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
+    Process(Graph& g, PRTy t) : graph(g), tolerance(t) {}
 
     void operator()(const GNode& src, galois::UserContext<GNode>& ctx) const {
-      LNode& sdata = graph.getData(src);      
+      LNode& sdata                = graph.getData(src);
       galois::MethodFlag lockflag = galois::MethodFlag::UNPROTECTED;
 
-      //PRTy oldResidual = sdata.residual.exchange(0.0);
+      // PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.residual = 0;
-      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy diff = std::fabs(pr - sdata.value);
-      sdata.value = pr;
-      int src_nout = nout(graph,src, lockflag);
-      PRTy delta = diff*alpha/src_nout;
+      PRTy pr        = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff      = std::fabs(pr - sdata.value);
+      sdata.value    = pr;
+      int src_nout   = nout(graph, src, lockflag);
+      PRTy delta     = diff * alpha / src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getEdgeDst(jj);
+      for (auto jj = graph.edge_begin(src, lockflag),
+                ej = graph.edge_end(src, lockflag);
+           jj != ej; ++jj) {
+        GNode dst    = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
         if (ddata.residual <= tolerance) {
           PRTy old = atomicAdd(ddata.residual, delta);
-          // if the node is not in the worklist and the residual is greater than tolerance
-          if(old <= tolerance && old + delta >= tolerance)
+          // if the node is not in the worklist and the residual is greater than
+          // tolerance
+          if (old <= tolerance && old + delta >= tolerance)
             ctx.push(dst);
         }
       }
@@ -81,8 +90,5 @@ struct AsyncRsd {
     galois::for_each(graph, Process(graph, tolerance), galois::wl<WL>());
   }
 
-  void verify(Graph& graph, PRTy tolerance) {
-    verifyInOut(graph, tolerance);
-  }
+  void verify(Graph& graph, PRTy tolerance) { verifyInOut(graph, tolerance); }
 };
-

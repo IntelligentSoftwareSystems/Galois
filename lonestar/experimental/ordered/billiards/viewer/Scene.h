@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,10 +33,11 @@ public:
   qglviewer::Vec vel;
   float time;
 
-  Ball(): time(0.0) { }
+  Ball() : time(0.0) {}
 
-  template<typename T1, typename T2>
-  Ball(T1&& p, T2&& v, float t = 0.0): pos(std::forward<T1>(p)), vel(std::forward<T2>(v)), time(t) { }
+  template <typename T1, typename T2>
+  Ball(T1&& p, T2&& v, float t = 0.0)
+      : pos(std::forward<T1>(p)), vel(std::forward<T2>(v)), time(t) {}
 };
 
 //! Drawing a sphere
@@ -60,6 +61,7 @@ class Balls {
   class Lines {
     std::vector<GLfloat> vertices;
     std::vector<GLushort> indices;
+
   public:
     void update(std::vector<Ball> balls);
     void draw();
@@ -69,8 +71,8 @@ class Balls {
     Ball ball;
     int index;
 
-    template<typename T>
-    Event(int i, T&& b): ball(std::forward<T>(b)), index(i) { }
+    template <typename T>
+    Event(int i, T&& b) : ball(std::forward<T>(b)), index(i) {}
   };
 
   struct EventLess {
@@ -91,7 +93,6 @@ public:
   void draw(Viewer* v);
 };
 
-
 //! Drawing a scene
 class Scene {
   Balls balls;
@@ -103,13 +104,14 @@ class Scene {
   float deltaTime;
 
   void initCushions(double length, double width);
-  void drawCushions (void);
+  void drawCushions(void);
 
   void readConfig();
   void readLog();
-  
+
 public:
-  Scene(const std::string& c, const std::string& e): configFilename(c), eventLogFilename(e), currentTime(0.0) { }
+  Scene(const std::string& c, const std::string& e)
+      : configFilename(c), eventLogFilename(e), currentTime(0.0) {}
 
   //! Initializes scene; returns dimensions of scene
   qglviewer::Vec init(float dt = 0.1);

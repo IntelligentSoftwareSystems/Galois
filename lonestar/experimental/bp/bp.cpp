@@ -13,25 +13,30 @@ namespace cll = llvm::cl;
 
 static const char* name = "Belief propagation";
 static const char* desc = "Performs belief propagation on Ising Grids";
-static const char* url = 0;
+static const char* url  = 0;
 
 static cll::opt<int> algo("algo", cll::desc("Algorithm"), cll::init(1));
 static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
-static cll::opt<int> hardness(cll::Positional, cll::desc("<hardness>"), cll::Required);
+static cll::opt<int> hardness(cll::Positional, cll::desc("<hardness>"),
+                              cll::Required);
 static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
-static cll::opt<int> MaxIterations(cll::Positional, cll::desc("<max iterations>"), cll::Required);
+static cll::opt<int> MaxIterations(cll::Positional,
+                                   cll::desc("<max iterations>"),
+                                   cll::Required);
 
 static const double DAMPING = 0.2;
-//static const double TOL = 1e-10;
+// static const double TOL = 1e-10;
 
-template<typename NodeTy,typename EdgeTy>
-struct BipartiteGraph: public galois::graphs::MorphGraph<NodeTy,EdgeTy,true> {
-  typedef galois::graphs::MorphGraph<NodeTy,EdgeTy,true> Super;
+template <typename NodeTy, typename EdgeTy>
+struct BipartiteGraph
+    : public galois::graphs::MorphGraph<NodeTy, EdgeTy, true> {
+  typedef galois::graphs::MorphGraph<NodeTy, EdgeTy, true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
   NodeList factors;
   NodeList variables;
 
-  void addNode(const typename Super::GraphNode& n, bool isFactor, galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+  void addNode(const typename Super::GraphNode& n, bool isFactor,
+               galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
     if (isFactor) {
       factors.push_back(n);
     } else {
@@ -40,26 +45,23 @@ struct BipartiteGraph: public galois::graphs::MorphGraph<NodeTy,EdgeTy,true> {
     Super::addNode(n, mflag);
   }
 
-  void addNode(const typename Super::GraphNode& n, galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+  void addNode(const typename Super::GraphNode& n,
+               galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
 
-  void removeNode(typename Super::GraphNode n, galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
+  void removeNode(typename Super::GraphNode n,
+                  galois::MethodFlag mflag = galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
 };
 
-enum {
-  BP_SEQ = 0,
-  BP_SEQ_RAND,
-  BP_PAR,
-  BP_MAX_RES
-};
+enum { BP_SEQ = 0, BP_SEQ_RAND, BP_PAR, BP_MAX_RES };
 
-//! Probabilities specialized for pairwise binary case and consider unary case as
-//! another special case
+//! Probabilities specialized for pairwise binary case and consider unary case
+//! as another special case
 struct Prob {
   double v[4];
 
@@ -93,47 +95,51 @@ struct Prob {
   }
 };
 
-template<int Type>
+template <int Type>
 struct BP {
   struct Node {
     //! Pairwise potentials
     Prob prob;
-    Node() { }
-    Node(double p00, double p01, double p10, double p11): prob(p00,p01,p10,p11) { }
-    Node(double p0, double p1): prob(p0,p1) { }
+    Node() {}
+    Node(double p00, double p01, double p10, double p11)
+        : prob(p00, p01, p10, p11) {}
+    Node(double p0, double p1) : prob(p0, p1) {}
   };
-  
+
   struct Edge {
     Prob message;
     Prob message_new;
-    Edge() { } // For Graph
+    Edge() {} // For Graph
   };
 
-  typedef BipartiteGraph<Node,Edge> Graph;
+  typedef BipartiteGraph<Node, Edge> Graph;
   typedef typename Graph::GraphNode GraphNode;
-  typedef std::vector<std::pair<GraphNode,GraphNode> > SequentialSchedule;
+  typedef std::vector<std::pair<GraphNode, GraphNode>> SequentialSchedule;
 
   Graph& graph;
   SequentialSchedule m_sequential_schedule;
 
-  BP(Graph& g): graph(g) { }
+  BP(Graph& g) : graph(g) {}
 
   // initialize messages to 1
   // initialize residual to 0
-  
-  Prob calculateIncomingMessageProduct(const GraphNode& factor, const GraphNode& var_i) {
+
+  Prob calculateIncomingMessageProduct(const GraphNode& factor,
+                                       const GraphNode& var_i) {
     Prob prod(graph.getData(factor).prob);
 
     for (typename Graph::edge_iterator ii = graph.edge_begin(factor),
-        ei = graph.edge_end(factor); ii != ei; ++ii) {
+                                       ei = graph.edge_end(factor);
+         ii != ei; ++ii) {
       GraphNode var = graph.getEdgeDst(ii);
 
       if (var == var_i)
         continue;
-      
+
       Prob prod_j;
       for (typename Graph::edge_iterator jj = graph.edge_begin(var),
-          ej = graph.edge_end(var); jj != ej; ++jj) {
+                                         ej = graph.edge_end(var);
+           jj != ej; ++jj) {
         GraphNode factor_j = graph.getEdgeDst(jj);
         if (factor_j == factor)
           continue;
@@ -154,7 +160,7 @@ struct BP {
       marg = graph.getData(factor).prob;
     } else {
       Prob& prob = graph.getData(factor).prob;
-      prob = calculateIncomingMessageProduct(factor, var);
+      prob       = calculateIncomingMessageProduct(factor, var);
 
       // XXX compute marginal and normalize
     }
@@ -174,23 +180,25 @@ struct BP {
     }
   }
 
-  void maxResidualScheduling() {
-
-  }
+  void maxResidualScheduling() {}
 
   void parallelScheduling() {
     for (typename Graph::NodeList::iterator ii = graph.variables.begin(),
-        ei = graph.variables.end(); ii != ei; ++ii) {
-      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii), 
-          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+                                            ei = graph.variables.end();
+         ii != ei; ++ii) {
+      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
+                                         ej = graph.edge_end(*ii);
+           jj != ej; ++jj) {
         calculateMessage(*ii, graph.getEdgeDst(jj));
       }
     }
 
-    for (typename Graph::NodeList::iterator ii = graph.variables.begin(), 
-        ei = graph.variables.end(); ii != ei; ++ii) {
+    for (typename Graph::NodeList::iterator ii = graph.variables.begin(),
+                                            ei = graph.variables.end();
+         ii != ei; ++ii) {
       for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
-          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+                                         ej = graph.edge_end(*ii);
+           jj != ej; ++jj) {
         updateMessage(*ii, graph.getEdgeDst(jj));
       }
     }
@@ -199,29 +207,33 @@ struct BP {
   void generateSequentialSchedule() {
     m_sequential_schedule.clear();
 
-    for (typename Graph::NodeList::iterator ii = graph.factors.begin(), 
-        ei = graph.factors.end(); ii != ei; ++ii) {
+    for (typename Graph::NodeList::iterator ii = graph.factors.begin(),
+                                            ei = graph.factors.end();
+         ii != ei; ++ii) {
       for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
-          ej = graph.edge_end(*ii); jj != ej; ++jj) {
-        m_sequential_schedule.push_back(std::make_pair(graph.getEdgeDst(jj), *ii));
+                                         ej = graph.edge_end(*ii);
+           jj != ej; ++jj) {
+        m_sequential_schedule.push_back(
+            std::make_pair(graph.getEdgeDst(jj), *ii));
       }
     }
   }
-  
+
   void sequentialScheduling(bool randomize) {
     if (randomize)
-      std::random_shuffle(m_sequential_schedule.begin(), m_sequential_schedule.end());
+      std::random_shuffle(m_sequential_schedule.begin(),
+                          m_sequential_schedule.end());
 
-    for (typename SequentialSchedule::iterator ii = m_sequential_schedule.begin(), 
-        ei = m_sequential_schedule.end(); ii != ei; ++ii) {
+    for (typename SequentialSchedule::iterator
+             ii = m_sequential_schedule.begin(),
+             ei = m_sequential_schedule.end();
+         ii != ei; ++ii) {
       calculateMessage(ii->first, ii->second);
       updateMessage(ii->first, ii->second);
     }
   }
 
-  bool isConverged() {
-    return false;
-  }
+  bool isConverged() { return false; }
 
   void operator()() {
     if (Type == BP_SEQ || Type == BP_SEQ_RAND) {
@@ -230,11 +242,20 @@ struct BP {
 
     for (int iteration = 0; iteration < MaxIterations; ++iteration) {
       switch (Type) {
-        case BP_MAX_RES: maxResidualScheduling(); break;
-        case BP_PAR: parallelScheduling(); break;
-        case BP_SEQ_RAND: sequentialScheduling(true); break;
-        case BP_SEQ: sequentialScheduling(false); break;
-        default: abort();
+      case BP_MAX_RES:
+        maxResidualScheduling();
+        break;
+      case BP_PAR:
+        parallelScheduling();
+        break;
+      case BP_SEQ_RAND:
+        sequentialScheduling(true);
+        break;
+      case BP_SEQ:
+        sequentialScheduling(false);
+        break;
+      default:
+        abort();
       }
 
       if (isConverged()) {
@@ -246,12 +267,7 @@ struct BP {
   }
 };
 
-
-struct Exact {
-
-
-};
-
+struct Exact {};
 
 #if 0
 /**
@@ -438,12 +454,11 @@ struct GBP {
 };
 #endif
 
-
 //! Generate random Ising grid
 //!  N*N discrete variables, X_i, \phi(X_i) in {0, 1} (spin)
 //!  \phi_ij(X_i, X_j) = e^{\lambda*C} if x_i = x_j or e^{-\lambda*C} otherwise
 //!  \lambda in [-0.5, 0.5]
-template<typename Graph>
+template <typename Graph>
 struct GenerateInput {
   typedef typename Graph::GraphNode GraphNode;
   typedef typename Graph::node_data_type node_data_type;
@@ -452,19 +467,17 @@ struct GenerateInput {
   Graph& graph;
   int hardness;
 
-  double nextRand() {
-    return rand() / (double) RAND_MAX;
-  }
+  double nextRand() { return rand() / (double)RAND_MAX; }
 
   //! Create a pairwise factor
   void addFactor(int var1, int var2) {
     GraphNode& n1 = graph.variables[var1];
     GraphNode& n2 = graph.variables[var2];
-    
+
     double lambda = nextRand() - 0.5;
     edge_data_type edge;
-    double p00 = exp(lambda*hardness);
-    double p01 = exp(-lambda*hardness);
+    double p00      = exp(lambda * hardness);
+    double p01      = exp(-lambda * hardness);
     GraphNode new_n = graph.createNode(node_data_type(p00, p01, p01, p00));
     graph.addNode(new_n, true);
     graph.getEdgeData(graph.addEdge(new_n, n1)) = edge;
@@ -476,7 +489,7 @@ struct GenerateInput {
   //! Create a unary factor
   void addFactor(int var) {
     GraphNode& n = graph.variables[var];
-    double h = nextRand();
+    double h     = nextRand();
     edge_data_type edge;
     GraphNode new_n = graph.createNode(node_data_type(exp(-h), exp(h)));
     graph.addNode(new_n, true);
@@ -484,11 +497,11 @@ struct GenerateInput {
     graph.getEdgeData(graph.addEdge(n, new_n)) = edge;
   }
 
-  GenerateInput(Graph& g, int N, int h, int seed): graph(g), hardness(h) {
+  GenerateInput(Graph& g, int N, int h, int seed) : graph(g), hardness(h) {
     srand(seed);
 
     // Create variables
-    for (int i = 0; i < N*N; ++i) {
+    for (int i = 0; i < N * N; ++i) {
       GraphNode n = graph.createNode(node_data_type());
       graph.addNode(n, false);
     }
@@ -496,20 +509,20 @@ struct GenerateInput {
     for (int i = 0; i < N; ++i) {
       for (int j = 0; j < N; ++j) {
         if (i >= 1)
-          addFactor(i*N+j, (i-1)*N+j);
+          addFactor(i * N + j, (i - 1) * N + j);
         if (j >= 1)
-          addFactor(i*N+j, i*N+(j-1));
-        addFactor(i*N+j);
+          addFactor(i * N + j, i * N + (j - 1));
+        addFactor(i * N + j);
       }
     }
   }
 };
 
-template<typename Algo>
+template <typename Algo>
 static void start(int N, int hardness, int seed) {
   typename Algo::Graph g;
   GenerateInput<typename Algo::Graph>(g, N, hardness, seed);
-  
+
   galois::StatTimer T;
   T.start();
   Algo algo(g);
@@ -517,16 +530,28 @@ static void start(int N, int hardness, int seed) {
   T.stop();
 }
 
-int main(int argc,  char **argv) {
+int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   switch (algo) {
-    case 3: std::cout << "Using BP-MAX-RES\n"; start<BP<BP_MAX_RES> >(N, hardness, seed); break;
-    case 2: std::cout << "Using BP-PAR\n"; start<BP<BP_PAR> >(N, hardness, seed); break;
-    case 1: std::cout << "Using BP-SEQ-RAND\n"; start<BP<BP_SEQ_RAND> >(N, hardness, seed); break;
-    case 0: 
-    default: std::cout << "Using BP-SEQ\n"; start<BP<BP_SEQ> >(N, hardness, seed); break;
+  case 3:
+    std::cout << "Using BP-MAX-RES\n";
+    start<BP<BP_MAX_RES>>(N, hardness, seed);
+    break;
+  case 2:
+    std::cout << "Using BP-PAR\n";
+    start<BP<BP_PAR>>(N, hardness, seed);
+    break;
+  case 1:
+    std::cout << "Using BP-SEQ-RAND\n";
+    start<BP<BP_SEQ_RAND>>(N, hardness, seed);
+    break;
+  case 0:
+  default:
+    std::cout << "Using BP-SEQ\n";
+    start<BP<BP_SEQ>>(N, hardness, seed);
+    break;
   }
- 
+
   return 0;
 }

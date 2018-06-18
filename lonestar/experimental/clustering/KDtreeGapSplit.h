@@ -4,31 +4,32 @@
 /**
  * KD-Tree construction Ideas
  *
- * -- Median split is cheaper than gap split which uses sorting (NlogN). Median split can
- *  use std::nth_element(O(N)), which requires random access itertors.
- *    >> We can use Large Array as backing structure, while nodes contain iterators
- *    or indices to the Large Array
+ * -- Median split is cheaper than gap split which uses sorting (NlogN). Median
+ * split can use std::nth_element(O(N)), which requires random access itertors.
+ *    >> We can use Large Array as backing structure, while nodes contain
+ * iterators or indices to the Large Array
  *    >> But pushing new items after clustering or unclustered requires a Bag,
- *    which supports forward for bi-directional iterators. Need to copy stuff from
- *    bag to large array
- *    >> Per-THread-Vector may be a compromise for this 
+ *    which supports forward for bi-directional iterators. Need to copy stuff
+ * from bag to large array
+ *    >> Per-THread-Vector may be a compromise for this
  *    >> Using LargeArray as backing store for points makes it easy to provide
  *    iterators to go over all points
  *
- * -- Since query nodes for Nearest Neighbor search are all in the tree, NN search may 
- *  benefit from starting at the node in the tree. Need to investigate it. 
+ * -- Since query nodes for Nearest Neighbor search are all in the tree, NN
+ * search may benefit from starting at the node in the tree. Need to investigate
+ * it.
  *
  * -- Investigate whether storing a data point at the split point improves
  *  performance
  *
  * -- While parallel clustering algorithm rebuilds the tree every round, serial
- *  algorithm doesn't need to do so, therefore, serial KdTree needs to support add and remove operations
+ *  algorithm doesn't need to do so, therefore, serial KdTree needs to support
+ * add and remove operations
  *
  *
  */
 
-
-/* 
+/*
  * Tree building algorithm
  *
  * KdNode<NodeWrapper*> root;
@@ -63,10 +64,9 @@ public:
   static const unsigned MAX_POINTS_IN_CELL = 4;
 
 protected:
-
   using DataList = galois::LargeArray<T*>;
-  using LI = typename DataList::iterator;
- 
+  using LI       = typename DataList::iterator;
+
   struct KDcell {
     Point3 m_min;
     Point3 m_max;
@@ -79,40 +79,38 @@ protected:
     KDtree* m_rightChild;
   };
 
-  using CellAlloc = typename std::conditional<CONCURRENT, 
-        galois::FixedSizeAllocator<KDcell>, std::allocator<KDCell> >::type;
+  using CellAlloc =
+      typename std::conditional<CONCURRENT, galois::FixedSizeAllocator<KDcell>,
+                                std::allocator<KDCell>>::type;
 
-  using LeafBag = typename std::conditional<CONCURRENT, 
-        galois::InsertBag<KDcell*>, std::vector<KDcell*> >::type;
+  using LeafBag =
+      typename std::conditional<CONCURRENT, galois::InsertBag<KDcell*>,
+                                std::vector<KDcell*>>::type;
 
   KDcell* root = nullptr;
   DataList m_dataList;
   LeafBag m_leaves;
 
 public:
-
   template <typename I>
-  typename std::enable_if<CONCURRENT, void>::type build(const I& beg, const I& end) {
+  typename std::enable_if<CONCURRENT, void>::type build(const I& beg,
+                                                        const I& end) {
 
     size_t sz = std::distance(beg, end);
 
     m_dataList.allocateBlocked(sz);
 
-    galois::do_all(galois::iterate(0ul, sz),
-        [&] (size_t i) {
-          m_dataList[i] = *(beg + i); // TODO: implement parallel copy algorithm
-        });
-
+    galois::do_all(galois::iterate(0ul, sz), [&](size_t i) {
+      m_dataList[i] = *(beg + i); // TODO: implement parallel copy algorithm
+    });
 
           auto it = std::advance(beg
-    auto 
-
+    auto
   }
 
   template <typename I>
-  typename std::enable_if<!CONCURRENT, void>::type build(const I& beg, const I& end) {
-  }
-
+  typename std::enable_if<!CONCURRENT, void>::type build(const I& beg,
+                                                         const I& end) {}
 
   template <typename I, typename WL>
   galois::optional<I> buildRecursive(I beg, I end) {
@@ -133,7 +131,6 @@ public:
   }
 
 protected:
-
   template <typename I>
   void computeLimits(const I& beg, const I& end) {
 
@@ -149,84 +146,83 @@ protected:
     m_max = max;
   }
 
-
   template <typename I>
   I splitRange(I beg, I end) {
 
-      Point3 diff(m_max);
-      diff.sub(m_min);
+    Point3 diff(m_max);
+    diff.sub(m_min);
 
-      SplitType splitType0 = SPLIT_X;
-      SplitType splitType1 = SPLIT_X;
-      SplitType splitType2 = SPLIT_X;
+    SplitType splitType0 = SPLIT_X;
+    SplitType splitType1 = SPLIT_X;
+    SplitType splitType2 = SPLIT_X;
 
-      if (diff.getZ() > diff.getX() && diff.getZ() > diff.getY()) {
-        splitType0      = KDtree::SPLIT_Z;
-        bool comparCond = diff.getX() > diff.getY();
-        splitType1      = comparCond ? KDtree::SPLIT_X : KDtree::SPLIT_Y;
-        splitType2      = comparCond ? KDtree::SPLIT_Y : KDtree::SPLIT_X;
-      } else if (diff.getY() > diff.getX()) {
-        splitType0      = KDtree::SPLIT_Y;
-        bool comparCond = diff.getX() > diff.getZ();
-        splitType1      = comparCond ? KDtree::SPLIT_X : KDtree::SPLIT_Z;
-        splitType2      = comparCond ? KDtree::SPLIT_Z : KDtree::SPLIT_X;
-      } else {
-        splitType0      = KDtree::SPLIT_X;
-        bool comparCond = diff.getY() > diff.getZ();
-        splitType1      = comparCond ? KDtree::SPLIT_Y : KDtree::SPLIT_Z;
-        splitType2      = comparCond ? KDtree::SPLIT_Z : KDtree::SPLIT_Y;
-      }
+    if (diff.getZ() > diff.getX() && diff.getZ() > diff.getY()) {
+      splitType0      = KDtree::SPLIT_Z;
+      bool comparCond = diff.getX() > diff.getY();
+      splitType1      = comparCond ? KDtree::SPLIT_X : KDtree::SPLIT_Y;
+      splitType2      = comparCond ? KDtree::SPLIT_Y : KDtree::SPLIT_X;
+    } else if (diff.getY() > diff.getX()) {
+      splitType0      = KDtree::SPLIT_Y;
+      bool comparCond = diff.getX() > diff.getZ();
+      splitType1      = comparCond ? KDtree::SPLIT_X : KDtree::SPLIT_Z;
+      splitType2      = comparCond ? KDtree::SPLIT_Z : KDtree::SPLIT_X;
+    } else {
+      splitType0      = KDtree::SPLIT_X;
+      bool comparCond = diff.getY() > diff.getZ();
+      splitType1      = comparCond ? KDtree::SPLIT_Y : KDtree::SPLIT_Z;
+      splitType2      = comparCond ? KDtree::SPLIT_Z : KDtree::SPLIT_Y;
+    }
 
-      SplitType splitTypeUsed  = splitType0;
-      double splitValueUsed = computeSplitValue(list, offset, size, splitType0, arr);
+    SplitType splitTypeUsed = splitType0;
+    double splitValueUsed =
+        computeSplitValue(list, offset, size, splitType0, arr);
+    if (splitValueUsed == std::numeric_limits<double>::max()) {
+      splitTypeUsed  = splitType1;
+      splitValueUsed = computeSplitValue(list, offset, size, splitType1, arr);
       if (splitValueUsed == std::numeric_limits<double>::max()) {
-        splitTypeUsed  = splitType1;
-        splitValueUsed = computeSplitValue(list, offset, size, splitType1, arr);
-        if (splitValueUsed == std::numeric_limits<double>::max()) {
-          splitTypeUsed = splitType2;
-          splitValueUsed =
-              computeSplitValue(list, offset, size, splitType2, arr);
-        }
+        splitTypeUsed  = splitType2;
+        splitValueUsed = computeSplitValue(list, offset, size, splitType2, arr);
       }
-      // Unable to find a good split along any axis!
-      if (splitValueUsed == std::numeric_limits<double>::max()) {
-        assert(false && "Unable to find a valid split across any dimension!");
-      }
-
+    }
+    // Unable to find a good split along any axis!
+    if (splitValueUsed == std::numeric_limits<double>::max()) {
+      assert(false && "Unable to find a valid split across any dimension!");
+    }
   }
 
-  template <SplitType S, typename T=double>
+  template <SplitType S, typename T = double>
   struct GetSplitComponent {
-     T operator () (const NodeWrapper* n) const { std::abort(); return T(); }
+    T operator()(const NodeWrapper* n) const {
+      std::abort();
+      return T();
+    }
   };
 
-  template <typename T=double>
+  template <typename T = double>
   struct GetSplitComponent<SPLIT_X, T> {
-     T operator () (const NodeWrapper* n) const { return n->getLocationX(); }
+    T operator()(const NodeWrapper* n) const { return n->getLocationX(); }
   };
 
-  template <typename T=double>
+  template <typename T = double>
   struct GetSplitComponent<SPLIT_Y, T> {
-     T operator () (const NodeWrapper* n) const { return n->getLocationY(); }
+    T operator()(const NodeWrapper* n) const { return n->getLocationY(); }
   };
 
-  template <typename T=double>
+  template <typename T = double>
   struct GetSplitComponent<SPLIT_Z, T> {
-     T operator () (const NodeWrapper* n) const { return n->getLocationZ(); }
+    T operator()(const NodeWrapper* n) const { return n->getLocationZ(); }
   };
 
   template <typename I>
-  static double computeSplitValue(const I& beg, const I& end, const SplitType& splitType) {
+  static double computeSplitValue(const I& beg, const I& end,
+                                  const SplitType& splitType) {
 
-    switch(splitType) {
-      case SPLIT_X: 
-        return findMedianGapSplit<SPLIT_X>(beg, end)
-      case SPLIT_Y: 
-        return findMedianGapSplit<SPLIT_Y>(beg, end)
-      case SPLIT_Z: 
-        return findMedianGapSplit<SPLIT_Z>(beg, end)
-      default:
-          std::abort(); return 0.0;
+    switch (splitType) {
+    case SPLIT_X:
+      return findMedianGapSplit<SPLIT_X>(beg, end) case SPLIT_Y
+          : return findMedianGapSplit<SPLIT_Y>(beg, end) case SPLIT_Z
+          : return findMedianGapSplit<SPLIT_Z>(beg, end) default : std::abort();
+      return 0.0;
     }
   }
 
@@ -235,7 +231,7 @@ protected:
 
     GetSplitComponent<S, double> getComp;
 
-    auto cmp = [&getComp] (const NodeWrapper* a, const NodeWrapper* b) {
+    auto cmp = [&getComp](const NodeWrapper* a, const NodeWrapper* b) {
       return getComp(a) < getComp(b);
     };
 
@@ -244,22 +240,21 @@ protected:
     auto size = std::distance(beg, end);
 
     int startOff = ((size - 1) >> 1) - ((size + 7) >> 3);
-    int stopOff   = (size >> 1) + ((size + 7) >> 3);
+    int stopOff  = (size >> 1) + ((size + 7) >> 3);
     if (startOff == stopOff) {
       // should never happen
       assert(false && "Start==End in findMedianSplit, should not happen!");
     }
 
     const auto start = std::advance(beg, startOff);
-    const auto stop = std::advance(beg, stopOff);
+    const auto stop  = std::advance(beg, stopOff);
     assert(start != stop && "start == stop shouldn't happen");
 
-
     double largestGap = 0;
-    double splitVal = 0;
+    double splitVal   = 0;
 
-    auto i = start;
-    double nextValue  = getComp(*i++);
+    auto i           = start;
+    double nextValue = getComp(*i++);
 
     for (i != stop; ++i) {
 
@@ -268,7 +263,7 @@ protected:
 
       if ((nextValue - curValue) > largestGap) {
         largestGap = nextValue - curValue;
-        splitVal = 0.5f * (curValue + nextValue);
+        splitVal   = 0.5f * (curValue + nextValue);
         if (splitVal == nextValue) {
           splitVal = curValue;
         } // if not between then choose smaller value
@@ -282,8 +277,8 @@ protected:
   }
 
   template <typename I>
-  static I splitList(const I& beg, const I& end, const SplitType& splitType, const double splitVal) {
-  }
+  static I splitList(const I& beg, const I& end, const SplitType& splitType,
+                     const double splitVal) {}
 
   static KDtree* subDivide(galois::gstl::Vector<NodeWrapper*>& list, int offset,
                            const int size, galois::gstl::Vector<double>* arr,
@@ -307,11 +302,11 @@ protected:
       }
       cell.computeBoundingBoxFromPoints(list, size);
       cell.notifyContentsRebuilt(true);
-      //TODO: create leaf node
+      // TODO: create leaf node
     } else {
       bool shouldClean = false;
       if (arr == NULL) {
-      //TODO: create leaf node
+        // TODO: create leaf node
         arr         = new galois::gstl::Vector<double>(size);
         shouldClean = true;
       }
@@ -366,17 +361,16 @@ protected:
       KDtree& cell = *toReturn;
       cell.max.set(max);
       cell.min.set(min);
-      cell.m_leftChild = subDivide(list, offset, leftCountForSplit, arr, factory);
+      cell.m_leftChild =
+          subDivide(list, offset, leftCountForSplit, arr, factory);
       cell.m_rightChild = subDivide(list, offset + leftCountForSplit,
-                                  size - leftCountForSplit, arr, factory);
+                                    size - leftCountForSplit, arr, factory);
       // Clean up on exit.
       if (shouldClean == true)
         delete arr;
     }
     return toReturn;
   }
-
 };
 
-
-#endif// KD_TREE_GAP_SPLIT_H
+#endif // KD_TREE_GAP_SPLIT_H

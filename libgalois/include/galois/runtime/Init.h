@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,7 +30,7 @@ namespace galois {
 namespace runtime {
 
 template <typename SM>
-class SharedMemRuntime: public galois::substrate::SharedMemSubstrate {
+class SharedMemRuntime : public galois::substrate::SharedMemSubstrate {
 
   using Base = galois::substrate::SharedMemSubstrate;
 
@@ -38,15 +38,10 @@ class SharedMemRuntime: public galois::substrate::SharedMemSubstrate {
   SM m_sm;
 
 public:
-  explicit SharedMemRuntime(void)
-    :
-      Base(),
-      m_pa(),
-      m_sm()
-    {
-      internal::setPagePoolState(&m_pa);
-      internal::setSysStatManager(&m_sm);
-    }
+  explicit SharedMemRuntime(void) : Base(), m_pa(), m_sm() {
+    internal::setPagePoolState(&m_pa);
+    internal::setSysStatManager(&m_sm);
+  }
 
   ~SharedMemRuntime(void) {
     m_sm.print();
@@ -58,5 +53,4 @@ public:
 } // end namespace runtime
 } // end namespace galois
 
-
-#endif// GALOIS_RUNTIME_INIT_H
+#endif // GALOIS_RUNTIME_INIT_H

@@ -28,67 +28,80 @@ struct reservation {
   int r;
   reservation() : r(INT_MAX) {}
   void reserve(int i) { utils::writeMin(&r, i); }
-  bool reserved() { return (r < INT_MAX);}
-  void reset() {r = INT_MAX;}
-  bool check(int i) { return (r == i);}
+  bool reserved() { return (r < INT_MAX); }
+  void reset() { r = INT_MAX; }
+  bool check(int i) { return (r == i); }
   bool checkReset(int i) {
-    if (r==i) { r = INT_MAX; return 1;}
-    else return 0;
+    if (r == i) {
+      r = INT_MAX;
+      return 1;
+    } else
+      return 0;
   }
 };
 
-inline void reserveLoc(int& x, int i) {utils::writeMin(&x,i);}
+inline void reserveLoc(int& x, int i) { utils::writeMin(&x, i); }
 
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=1, int maxTries=-1) {
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
-  vindex *I = newA(vindex,maxRoundSize);
-  vindex *Ihold = newA(vindex,maxRoundSize);
-  bool *keep = newA(bool,maxRoundSize);
-  S *state;
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 1,
+                     int maxTries = -1) {
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (e - s) / granularity + 1;
+  vindex* I        = newA(vindex, maxRoundSize);
+  vindex* Ihold    = newA(vindex, maxRoundSize);
+  bool* keep       = newA(bool, maxRoundSize);
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      "speculativeLoop: too many iterations, increase maxTries parameter";
-//      abort();
+      //      "speculativeLoop: too many iterations, increase maxTries
+      //      parameter"; abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = state[i].reserve(I[i]);
-      } parallel_doall_end
+      //      parallel_for (int i =0; i < size; i++) {
+      parallel_doall(int, i, 0, size) {
+        if (i >= numberKeep)
+          I[i] = numberDone + i;
+        keep[i] = state[i].reserve(I[i]);
+      }
+      parallel_doall_end
     } else {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = step.reserve(I[i]);
-      } parallel_doall_end
+      //      parallel_for (int i =0; i < size; i++) {
+      parallel_doall(int, i, 0, size) {
+        if (i >= numberKeep)
+          I[i] = numberDone + i;
+        keep[i] = step.reserve(I[i]);
+      }
+      parallel_doall_end
     }
 
     if (hasState) {
-//      parallel_for (int i =0; i < size; i++) 
+      //      parallel_for (int i =0; i < size; i++)
       parallel_doall(int, i, 0, size) {
-	if (keep[i]) keep[i] = !state[i].commit(I[i]);
-      } parallel_doall_end
+        if (keep[i])
+          keep[i] = !state[i].commit(I[i]);
+      }
+      parallel_doall_end
     } else {
-//      parallel_for (int i =0; i < size; i++) 
+      //      parallel_for (int i =0; i < size; i++)
       parallel_doall(int, i, 0, size) {
-	if (keep[i]) keep[i] = !step.commit(I[i]);
-      } parallel_doall_end
+        if (keep[i])
+          keep[i] = !step.commit(I[i]);
+      }
+      parallel_doall_end
     }
 
     // keep edges that failed to hook for next round
@@ -96,5 +109,8 @@ void speculative_for(S step, int s, int e, int granularity,
     swap(I, Ihold);
     numberDone += size - numberKeep;
   }
-  free(I); free(Ihold); free(keep); free(state);
+  free(I);
+  free(Ihold);
+  free(keep);
+  free(state);
 }

@@ -33,47 +33,51 @@ using namespace benchIO;
 struct getX {
   point2d* P;
   getX(point2d* _P) : P(_P) {}
-  double operator() (int i) {return P[i].x;}
+  double operator()(int i) { return P[i].x; }
 };
 
-struct lessX {bool operator() (point2d a, point2d b) {
-  return (a.x < b.x) ? 1 : (a.x > b.x) ? 0 : (a.y < b.y);} };
+struct lessX {
+  bool operator()(point2d a, point2d b) {
+    return (a.x < b.x) ? 1 : (a.x > b.x) ? 0 : (a.y < b.y);
+  }
+};
 
-bool eq(point2d a, point2d b) {
-  return (a.x == b.x) && (a.y == b.y);
-}
+bool eq(point2d a, point2d b) { return (a.x == b.x) && (a.y == b.y); }
 
 bool checkHull(_seq<point2d> PIn, _seq<int> I) {
-  point2d* P = PIn.A;
-  int n = PIn.n;
-  int nOut = I.n;
+  point2d* P  = PIn.A;
+  int n       = PIn.n;
+  int nOut    = I.n;
   point2d* PO = newA(point2d, nOut);
-  for (int i=0; i < nOut; i++) PO[i] = P[I.A[i]];
-  int idx = sequence::maxIndex<double>(0, nOut,  greater<double>(), getX(PO));
+  for (int i = 0; i < nOut; i++)
+    PO[i] = P[I.A[i]];
+  int idx = sequence::maxIndex<double>(0, nOut, greater<double>(), getX(PO));
   sort(P, P + n, lessX());
-  if (!eq(P[0], PO[0])) { 
+  if (!eq(P[0], PO[0])) {
     cout << "checkHull: bad leftmost point" << endl;
-    P[0].print();  PO[0].print(); cout << endl;
+    P[0].print();
+    PO[0].print();
+    cout << endl;
     return 1;
   }
-  if (!eq(P[n-1], PO[idx])) {
+  if (!eq(P[n - 1], PO[idx])) {
     cout << "checkHull: bad rightmost point" << endl;
     return 1;
   }
   int k = 1;
   for (int i = 0; i < idx; i++) {
-    if (i > 0 && counterClockwise(PO[i-1],PO[i],P[i+1])) {
-	cout << "checkHull: not convex" << endl;
-	return 1;
+    if (i > 0 && counterClockwise(PO[i - 1], PO[i], P[i + 1])) {
+      cout << "checkHull: not convex" << endl;
+      return 1;
     }
-    if (PO[i].x > PO[i+1].x) {
+    if (PO[i].x > PO[i + 1].x) {
       cout << "checkHull: not sorted by x" << endl;
       return 1;
     }
-    while (!eq(P[k], PO[i+1]) && k < n)
-      if (counterClockwise(PO[i],PO[i+1],P[k++])) {
-	cout << "checkHull: above hull" << endl;
-	return 1;
+    while (!eq(P[k], PO[i + 1]) && k < n)
+      if (counterClockwise(PO[i], PO[i + 1], P[k++])) {
+        cout << "checkHull: above hull" << endl;
+        return 1;
       }
     if (k == n) {
       cout << "checkHull: unexpected points in hull" << endl;
@@ -87,12 +91,12 @@ bool checkHull(_seq<point2d> PIn, _seq<int> I) {
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* iFile = fnames.first;
-  char* oFile = fnames.second;
+  commandLine P(argc, argv, "<inFile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* iFile               = fnames.first;
+  char* oFile               = fnames.second;
 
   _seq<point2d> PIn = readPointsFromFile<point2d>(iFile);
-  _seq<int> I = readIntArrayFromFile(oFile);
+  _seq<int> I       = readIntArrayFromFile(oFile);
   return checkHull(PIn, I);
 }

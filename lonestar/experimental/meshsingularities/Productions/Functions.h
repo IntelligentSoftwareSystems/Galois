@@ -15,16 +15,11 @@ double f2(int, ...);
 double f3(int, ...);
 double f4(int, ...);
 
-enum Functions {
-	F1,
-	F2,
-	F3,
-	F4
-};
+enum Functions { F1, F2, F3, F4 };
 
 struct Function {
-	const char *name;
-	double (*func)(int, ...);
+  const char* name;
+  double (*func)(int, ...);
 };
 
 extern const Function functionsTable[];

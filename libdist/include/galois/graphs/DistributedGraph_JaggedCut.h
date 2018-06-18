@@ -1,6 +1,6 @@
-/* This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+/* This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -16,10 +16,10 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-/** 
+/**
  * @file DistributedGraph_JaggedCut.h
  *
- * Implements the jagged cut partitioning scheme for DistGraph. 
+ * Implements the jagged cut partitioning scheme for DistGraph.
  */
 
 #ifndef _GALOIS_DIST_HGRAPHJVC_H
@@ -36,15 +36,15 @@ namespace graphs {
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
- * @tparam columnBlocked If true, blocks the blocks (instead of cyclic 
+ * @tparam columnBlocked If true, blocks the blocks (instead of cyclic
  * distribution)
  * @tparam moreColumnHosts If true, swaps the number of rows and columns
  * @tparam columnChunkSize Specifies the size of a column chunk (column chunk
  * used to split blocks evenly; higher size means less precise splitting
  * of blocks)
  */
-template<typename NodeTy, typename EdgeTy, bool columnBlocked = false, 
-         bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
+template <typename NodeTy, typename EdgeTy, bool columnBlocked = false,
+          bool moreColumnHosts = false, uint32_t columnChunkSize = 256>
 class DistGraphJaggedCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_jaggedCut";
 
@@ -55,42 +55,38 @@ private:
   unsigned numRowHosts;
   unsigned numColumnHosts;
 
-  //! nodes without outgoing edges that are stored with nodes having outgoing 
+  //! nodes without outgoing edges that are stored with nodes having outgoing
   //! edges (to preserve original ordering locality)
-  uint32_t dummyOutgoingNodes; 
+  uint32_t dummyOutgoingNodes;
 
   std::vector<std::vector<std::pair<uint64_t, uint64_t>>> jaggedColumnMap;
 
-  //! Factorize numHosts into rows and columns such that difference between 
+  //! Factorize numHosts into rows and columns such that difference between
   //! factors is minimized
   void factorize_hosts() {
     numColumnHosts = sqrt(base_DistGraph::numHosts);
-    while ((base_DistGraph::numHosts % numColumnHosts) != 0) numColumnHosts--;
-    numRowHosts = base_DistGraph::numHosts/numColumnHosts;
-    assert(numRowHosts>=numColumnHosts);
+    while ((base_DistGraph::numHosts % numColumnHosts) != 0)
+      numColumnHosts--;
+    numRowHosts = base_DistGraph::numHosts / numColumnHosts;
+    assert(numRowHosts >= numColumnHosts);
     if (moreColumnHosts) {
       std::swap(numRowHosts, numColumnHosts);
     }
     if (base_DistGraph::id == 0) {
-      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts, "\n");
+      galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts,
+                     "\n");
     }
   }
 
-  unsigned gridRowID() const {
-    return (base_DistGraph::id / numColumnHosts);
-  }
+  unsigned gridRowID() const { return (base_DistGraph::id / numColumnHosts); }
 
-  unsigned gridRowID(unsigned id) const {
-    return (id / numColumnHosts);
-  }
+  unsigned gridRowID(unsigned id) const { return (id / numColumnHosts); }
 
   unsigned gridColumnID() const {
     return (base_DistGraph::id % numColumnHosts);
   }
 
-  unsigned gridColumnID(unsigned id) const {
-    return (id % numColumnHosts);
-  }
+  unsigned gridColumnID(unsigned id) const { return (id % numColumnHosts); }
 
   unsigned getBlockID(unsigned rowID, uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
@@ -121,8 +117,8 @@ private:
 
   uint32_t getColumnIndex(unsigned rowID, uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    auto blockID = getBlockID(rowID, gid);
-    auto h = getColumnHostIDOfBlock(blockID);
+    auto blockID         = getBlockID(rowID, gid);
+    auto h               = getColumnHostIDOfBlock(blockID);
     uint32_t columnIndex = 0;
     for (auto b = 0U; b <= blockID; ++b) {
       if (getColumnHostIDOfBlock(b) == h) {
@@ -141,31 +137,31 @@ private:
 
   //! Returns true if this host has nothing to send to the specified host
   //! given a particular communication pattern
-  bool isNotCommunicationPartner(unsigned host, 
-                                 typename base_DistGraph::SyncType syncType, 
-                                 WriteLocation writeLocation, 
+  bool isNotCommunicationPartner(unsigned host,
+                                 typename base_DistGraph::SyncType syncType,
+                                 WriteLocation writeLocation,
                                  ReadLocation readLocation) {
     if (syncType == base_DistGraph::syncReduce) {
-      switch(writeLocation) {
-        case writeSource:
-          return (gridRowID() != gridRowID(host));
-        case writeDestination:
-        case writeAny:
-          // columns do not match processor grid
-          return false; 
-        default:
-          assert(false);
+      switch (writeLocation) {
+      case writeSource:
+        return (gridRowID() != gridRowID(host));
+      case writeDestination:
+      case writeAny:
+        // columns do not match processor grid
+        return false;
+      default:
+        assert(false);
       }
     } else { // syncBroadcast
-      switch(readLocation) {
-        case readSource:
-          return (gridRowID() != gridRowID(host));
-        case readDestination:
-        case readAny:
-          // columns do not match processor grid
-          return false; 
-        default:
-          assert(false);
+      switch (readLocation) {
+      case readSource:
+        return (gridRowID() != gridRowID(host));
+      case readDestination:
+      case readAny:
+        // columns do not match processor grid
+        return false;
+      default:
+        assert(false);
       }
     }
     return false;
@@ -206,7 +202,8 @@ public:
   //! @copydoc DistGraphEdgeCut::isLocal
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    if (isOwned(gid)) return true;
+    if (isOwned(gid))
+      return true;
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
@@ -217,39 +214,41 @@ public:
   }
 
   //! @copydoc DistGraphEdgeCut::L2G
-  virtual uint64_t L2G(uint32_t lid) const {
-    return localToGlobalVector[lid];
-  }
+  virtual uint64_t L2G(uint32_t lid) const { return localToGlobalVector[lid]; }
 
   // requirement: for all X and Y,
   // On X, nothingToSend(Y) <=> On Y, nothingToRecv(X)
   // Note: templates may not be virtual, so passing types as arguments
-  virtual bool nothingToSend(unsigned host, 
-                             typename base_DistGraph::SyncType syncType, 
-                             WriteLocation writeLocation, 
+  virtual bool nothingToSend(unsigned host,
+                             typename base_DistGraph::SyncType syncType,
+                             WriteLocation writeLocation,
                              ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
-                        base_DistGraph::mirrorNodes : base_DistGraph::masterNodes;
+    auto& sharedNodes = (syncType == base_DistGraph::syncReduce)
+                            ? base_DistGraph::mirrorNodes
+                            : base_DistGraph::masterNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      return isNotCommunicationPartner(host, syncType, writeLocation,
+                                       readLocation);
     }
     return true;
   }
 
-  virtual bool nothingToRecv(unsigned host, 
-                             typename base_DistGraph::SyncType syncType, 
-                             WriteLocation writeLocation, 
+  virtual bool nothingToRecv(unsigned host,
+                             typename base_DistGraph::SyncType syncType,
+                             WriteLocation writeLocation,
                              ReadLocation readLocation) {
-    auto &sharedNodes = (syncType == base_DistGraph::syncReduce) ? 
-                        base_DistGraph::masterNodes : base_DistGraph::mirrorNodes;
+    auto& sharedNodes = (syncType == base_DistGraph::syncReduce)
+                            ? base_DistGraph::masterNodes
+                            : base_DistGraph::mirrorNodes;
     if (sharedNodes[host].size() > 0) {
-      return isNotCommunicationPartner(host, syncType, writeLocation, readLocation);
+      return isNotCommunicationPartner(host, syncType, writeLocation,
+                                       readLocation);
     }
     return true;
   }
 
-  /** 
-   * Constructor for Jagged Cut 
+  /**
+   * Constructor for Jagged Cut
    *
    * @param filename Graph file to read
    * @param host the host id of the caller
@@ -260,17 +259,16 @@ public:
    *
    * @todo get rid of string argument (2nd one)
    */
-  DistGraphJaggedCut(const std::string& filename, const std::string&, 
-                     unsigned host, unsigned _numHosts, 
-                     std::vector<unsigned>& scalefactor, 
-                     bool transpose = false) : base_DistGraph(host, _numHosts) {
+  DistGraphJaggedCut(const std::string& filename, const std::string&,
+                     unsigned host, unsigned _numHosts,
+                     std::vector<unsigned>& scalefactor, bool transpose = false)
+      : base_DistGraph(host, _numHosts) {
     if (transpose) {
       GALOIS_DIE("Transpose not supported for jagged vertex-cuts");
     }
 
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
-      "GraphPartitioningTime", GRNAME
-    );
+        "GraphPartitioningTime", GRNAME);
 
     Tgraph_construct.start();
 
@@ -287,53 +285,51 @@ public:
     // at this point gid2Host has pairs for how to split nodes among
     // hosts; pair has begin and end
     uint64_t nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
-    typename galois::graphs::OfflineGraph::edge_iterator edgeBegin = 
-      g.edge_begin(nodeBegin);
+    typename galois::graphs::OfflineGraph::edge_iterator edgeBegin =
+        g.edge_begin(nodeBegin);
 
     uint64_t nodeEnd = base_DistGraph::gid2host[base_DistGraph::id].second;
-    typename galois::graphs::OfflineGraph::edge_iterator edgeEnd = 
-      g.edge_begin(nodeEnd);
-    
+    typename galois::graphs::OfflineGraph::edge_iterator edgeEnd =
+        g.edge_begin(nodeEnd);
+
     galois::Timer edgeInspectionTimer;
     edgeInspectionTimer.start();
 
     galois::graphs::BufferedGraph<EdgeTy> mpiGraph;
-    mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin, 
+    mpiGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin,
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
 
     determineJaggedColumnMapping(g, mpiGraph); // first pass of the graph file
 
     std::vector<uint64_t> prefixSumOfEdges; // TODO use LargeArray
-    loadStatistics(g, mpiGraph, prefixSumOfEdges); // second pass of the graph file
+    loadStatistics(g, mpiGraph,
+                   prefixSumOfEdges); // second pass of the graph file
 
     assert(prefixSumOfEdges.size() == numNodes);
 
     base_DistGraph::graph.allocateFrom(numNodes, numEdges);
 
     if (numNodes > 0) {
-      //assert(numEdges > 0);
+      // assert(numEdges > 0);
       base_DistGraph::graph.constructNodes();
 
       auto& base_graph = base_DistGraph::graph;
       galois::do_all(
-        galois::iterate((uint32_t)0, numNodes),
-        [&] (auto n) {
-          base_graph.fixEndEdge(n, prefixSumOfEdges[n]);
-        },
-        #if MORE_DIST_STATS
-        galois::loopname("EdgeLoading"),
-        #endif
-        galois::no_stats()
-      );
-
+          galois::iterate((uint32_t)0, numNodes),
+          [&](auto n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
+#if MORE_DIST_STATS
+          galois::loopname("EdgeLoading"),
+#endif
+          galois::no_stats());
     }
 
     if (base_DistGraph::numOwned != 0) {
-      base_DistGraph::beginMaster = G2L(base_DistGraph::gid2host[base_DistGraph::id].first);
+      base_DistGraph::beginMaster =
+          G2L(base_DistGraph::gid2host[base_DistGraph::id].first);
     } else {
       // no owned nodes, therefore empty masters
-      base_DistGraph::beginMaster = 0; 
+      base_DistGraph::beginMaster = 0;
     }
 
     base_DistGraph::printStatistics();
@@ -341,10 +337,11 @@ public:
     if (columnBlocked) {
       // like an unconstrained vertex-cut; all nodes because it is not optimized
       // to know which nodes may have edges
-      base_DistGraph::numNodesWithEdges = numNodes; 
+      base_DistGraph::numNodesWithEdges = numNodes;
     }
 
-    loadEdges(base_DistGraph::graph, g, mpiGraph); // third pass of the graph file
+    loadEdges(base_DistGraph::graph, g,
+              mpiGraph); // third pass of the graph file
 
     fill_mirrorNodes(base_DistGraph::mirrorNodes);
 
@@ -361,80 +358,85 @@ public:
     Tgraph_construct.stop();
 
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
-      "GraphCommSetupTime", GRNAME
-    );
+        "GraphCommSetupTime", GRNAME);
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
   }
 
 private:
-  void determineJaggedColumnMapping(galois::graphs::OfflineGraph& g,
-                                    galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
+  void determineJaggedColumnMapping(
+      galois::graphs::OfflineGraph& g,
+      galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     auto activeThreads = galois::runtime::activeThreads;
-    galois::setActiveThreads(numFileThreads); // only use limited threads for reading file
+    galois::setActiveThreads(
+        numFileThreads); // only use limited threads for reading file
 
     galois::Timer timer;
     timer.start();
     mpiGraph.resetReadCounters();
-    size_t numColumnChunks = (base_DistGraph::numGlobalNodes + columnChunkSize - 1) / 
-                             columnChunkSize;
-    std::vector<uint64_t> prefixSumOfInEdges(numColumnChunks); // TODO use LargeArray
+    size_t numColumnChunks =
+        (base_DistGraph::numGlobalNodes + columnChunkSize - 1) /
+        columnChunkSize;
+    std::vector<uint64_t> prefixSumOfInEdges(
+        numColumnChunks); // TODO use LargeArray
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),
-      [&] (auto src) {
-        auto ii = mpiGraph.edgeBegin(src);
-        auto ee = mpiGraph.edgeEnd(src);
-        for (; ii < ee; ++ii) {
-          auto dst = mpiGraph.edgeDestination(*ii);
-          ++prefixSumOfInEdges[dst/columnChunkSize]; // racy-writes are fine; imprecise
-        }
-      },
-      #if MORE_DIST_STATS
-      galois::loopname("CalculateIndegree"),
-      #endif
-      galois::no_stats()
-    );
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto src) {
+          auto ii = mpiGraph.edgeBegin(src);
+          auto ee = mpiGraph.edgeEnd(src);
+          for (; ii < ee; ++ii) {
+            auto dst = mpiGraph.edgeDestination(*ii);
+            ++prefixSumOfInEdges[dst / columnChunkSize]; // racy-writes are
+                                                         // fine; imprecise
+          }
+        },
+#if MORE_DIST_STATS
+        galois::loopname("CalculateIndegree"),
+#endif
+        galois::no_stats());
 
     timer.stop();
-    galois::gPrint("[", base_DistGraph::id, "] In-degree calculation time: ", timer.get_usec()/1000000.0f,
+    galois::gPrint(
+        "[", base_DistGraph::id,
+        "] In-degree calculation time: ", timer.get_usec() / 1000000.0f,
         " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-        mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+        mpiGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
 
     galois::setActiveThreads(activeThreads); // revert to prior active threads
 
     // TODO move this to a common helper function
     std::vector<uint64_t> prefixSumOfThreadBlocks(activeThreads, 0);
     galois::on_each([&](unsigned tid, unsigned nthreads) {
-        assert(nthreads == activeThreads);
-        auto range = galois::block_range((size_t)0, numColumnChunks,
-          tid, nthreads);
-        auto begin = range.first;
-        auto end = range.second;
-        // find prefix sum of each block
-        for (auto i = begin + 1; i < end; ++i) {
-          prefixSumOfInEdges[i] += prefixSumOfInEdges[i-1];
-        }
-        if (begin < end) {
-          prefixSumOfThreadBlocks[tid] = prefixSumOfInEdges[end - 1];
-        } else {
-          prefixSumOfThreadBlocks[tid] = 0;
-        }
+      assert(nthreads == activeThreads);
+      auto range =
+          galois::block_range((size_t)0, numColumnChunks, tid, nthreads);
+      auto begin = range.first;
+      auto end   = range.second;
+      // find prefix sum of each block
+      for (auto i = begin + 1; i < end; ++i) {
+        prefixSumOfInEdges[i] += prefixSumOfInEdges[i - 1];
+      }
+      if (begin < end) {
+        prefixSumOfThreadBlocks[tid] = prefixSumOfInEdges[end - 1];
+      } else {
+        prefixSumOfThreadBlocks[tid] = 0;
+      }
     });
     for (unsigned int i = 1; i < activeThreads; ++i) {
-      prefixSumOfThreadBlocks[i] += prefixSumOfThreadBlocks[i-1];
+      prefixSumOfThreadBlocks[i] += prefixSumOfThreadBlocks[i - 1];
     }
     galois::on_each([&](unsigned tid, unsigned nthreads) {
-        assert(nthreads == activeThreads);
-        if (tid > 0) {
-          auto range = galois::block_range((size_t)0, numColumnChunks,
-            tid, nthreads);
-          // update prefix sum from previous block
-          for (auto i = range.first; i < range.second; ++i) {
-            prefixSumOfInEdges[i] += prefixSumOfThreadBlocks[tid-1];
-          }
+      assert(nthreads == activeThreads);
+      if (tid > 0) {
+        auto range =
+            galois::block_range((size_t)0, numColumnChunks, tid, nthreads);
+        // update prefix sum from previous block
+        for (auto i = range.first; i < range.second; ++i) {
+          prefixSumOfInEdges[i] += prefixSumOfThreadBlocks[tid - 1];
         }
+      }
     });
 
     jaggedColumnMap.resize(numColumnHosts);
@@ -442,23 +444,27 @@ private:
       // partition based on indegree-count only
 
       auto pair = galois::graphs::divideNodesBinarySearch(
-        prefixSumOfInEdges.size(), prefixSumOfInEdges.back(),
-        0, 1, i, base_DistGraph::numHosts, prefixSumOfInEdges).first;
+                      prefixSumOfInEdges.size(), prefixSumOfInEdges.back(), 0,
+                      1, i, base_DistGraph::numHosts, prefixSumOfInEdges)
+                      .first;
 
       // pair is iterators; i_pair is uints
       auto i_pair = std::make_pair(*(pair.first), *(pair.second));
-      
+
       i_pair.first *= columnChunkSize;
-      i_pair.second *= columnChunkSize; 
-      if (i_pair.first > base_DistGraph::numGlobalNodes) i_pair.first = base_DistGraph::numGlobalNodes;
-      if (i_pair.second > base_DistGraph::numGlobalNodes) i_pair.second = base_DistGraph::numGlobalNodes;
+      i_pair.second *= columnChunkSize;
+      if (i_pair.first > base_DistGraph::numGlobalNodes)
+        i_pair.first = base_DistGraph::numGlobalNodes;
+      if (i_pair.second > base_DistGraph::numGlobalNodes)
+        i_pair.second = base_DistGraph::numGlobalNodes;
       jaggedColumnMap[gridColumnID()].push_back(i_pair);
     }
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       unsigned h = (gridRowID() * numColumnHosts) + i;
-      if (h == base_DistGraph::id) continue;
+      if (h == base_DistGraph::id)
+        continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, jaggedColumnMap[gridColumnID()]);
       net.sendTagged(h, galois::runtime::evilPhase, b);
@@ -471,7 +477,7 @@ private:
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
-      auto& b = p->second;
+      auto& b    = p->second;
       galois::runtime::gDeserialize(b, jaggedColumnMap[h]);
     }
     base_DistGraph::increment_evilPhase();
@@ -481,7 +487,9 @@ private:
   void loadStatistics(galois::graphs::OfflineGraph& g,
                       galois::graphs::BufferedGraph<EdgeTy>& mpiGraph,
                       std::vector<uint64_t>& prefixSumOfEdges) {
-    base_DistGraph::numOwned = base_DistGraph::gid2host[base_DistGraph::id].second - base_DistGraph::gid2host[base_DistGraph::id].first;
+    base_DistGraph::numOwned =
+        base_DistGraph::gid2host[base_DistGraph::id].second -
+        base_DistGraph::gid2host[base_DistGraph::id].first;
 
     std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
@@ -496,7 +504,7 @@ private:
       hasIncomingEdge[i].resize(columnBlockSize);
     }
 
-    std::vector<std::vector<uint64_t> > numOutgoingEdges(numColumnHosts);
+    std::vector<std::vector<uint64_t>> numOutgoingEdges(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       numOutgoingEdges[i].assign(base_DistGraph::numOwned, 0);
     }
@@ -507,33 +515,36 @@ private:
     uint64_t rowOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),
-      [&] (auto src) {
-        auto ii = mpiGraph.edgeBegin(src);
-        auto ee = mpiGraph.edgeEnd(src);
-        for (; ii < ee; ++ii) {
-          auto dst = mpiGraph.edgeDestination(*ii);
-          auto h = this->getColumnHostID(this->gridColumnID(), dst);
-          hasIncomingEdge[h].set(this->getColumnIndex(this->gridColumnID(), dst));
-          numOutgoingEdges[h][src - rowOffset]++;
-        }
-      },
-      #if MORE_DIST_STATS
-      galois::loopname("EdgeInspection"),
-      #endif
-      galois::no_stats()
-    );
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto src) {
+          auto ii = mpiGraph.edgeBegin(src);
+          auto ee = mpiGraph.edgeEnd(src);
+          for (; ii < ee; ++ii) {
+            auto dst = mpiGraph.edgeDestination(*ii);
+            auto h   = this->getColumnHostID(this->gridColumnID(), dst);
+            hasIncomingEdge[h].set(
+                this->getColumnIndex(this->gridColumnID(), dst));
+            numOutgoingEdges[h][src - rowOffset]++;
+          }
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeInspection"),
+#endif
+        galois::no_stats());
 
     timer.stop();
-    galois::gPrint("[", base_DistGraph::id, "] Edge inspection time: ", timer.get_usec()/1000000.0f, 
-        " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-        mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+    galois::gPrint("[", base_DistGraph::id,
+                   "] Edge inspection time: ", timer.get_usec() / 1000000.0f,
+                   " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
+                   mpiGraph.getBytesRead() / (float)timer.get_usec(),
+                   " MBPS)\n");
 
     auto& net = galois::runtime::getSystemNetworkInterface();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       unsigned h = (gridRowID() * numColumnHosts) + i;
-      if (h == base_DistGraph::id) continue;
+      if (h == base_DistGraph::id)
+        continue;
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, numOutgoingEdges[i]);
       galois::runtime::gSerialize(b, hasIncomingEdge[i]);
@@ -547,7 +558,7 @@ private:
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
-      auto& b = p->second;
+      auto& b    = p->second;
       galois::runtime::gDeserialize(b, numOutgoingEdges[h]);
       galois::runtime::gDeserialize(b, hasIncomingEdge[h]);
     }
@@ -561,14 +572,14 @@ private:
     globalToLocalMap.reserve(max_nodes);
     prefixSumOfEdges.reserve(max_nodes);
     unsigned leaderHostID = gridRowID() * numColumnHosts;
-    dummyOutgoingNodes = 0;
-    numNodes = 0;
-    numEdges = 0;
+    dummyOutgoingNodes    = 0;
+    numNodes              = 0;
+    numEdges              = 0;
 
     // go over master nodes first
     {
       uint64_t src = base_DistGraph::gid2host[base_DistGraph::id].first;
-      unsigned i = gridColumnID();
+      unsigned i   = gridColumnID();
       for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
         numEdges += numOutgoingEdges[i][j];
         localToGlobalVector.push_back(src);
@@ -581,11 +592,12 @@ private:
     }
 
     for (unsigned i = 0; i < numColumnHosts; ++i) {
-      if ((leaderHostID + i) == base_DistGraph::id) continue; // skip master nodes
+      if ((leaderHostID + i) == base_DistGraph::id)
+        continue; // skip master nodes
       uint64_t src = base_DistGraph::gid2host[leaderHostID + i].first;
-      #ifndef NDEBUG
+#ifndef NDEBUG
       uint64_t src_end = base_DistGraph::gid2host[leaderHostID + i].second;
-      #endif
+#endif
 
       for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
         bool createNode = false;
@@ -616,32 +628,32 @@ private:
     }
 
     uint64_t src = base_DistGraph::gid2host[leaderHostID].first;
-    uint64_t src_end = base_DistGraph::gid2host[leaderHostID+numColumnHosts-1].second;
+    uint64_t src_end =
+        base_DistGraph::gid2host[leaderHostID + numColumnHosts - 1].second;
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
-      auto range = galois::block_range((uint64_t)0, base_DistGraph::numGlobalNodes,
-        h, base_DistGraph::numHosts);
+      auto range =
+          galois::block_range((uint64_t)0, base_DistGraph::numGlobalNodes, h,
+                              base_DistGraph::numHosts);
       galois::DynamicBitSet createNode;
       createNode.resize(range.second - range.first);
       galois::do_all(
-        galois::iterate(range.first,
-                        range.second),     
-        [&] (auto dst) {
-          if ((dst < src) || (dst >= src_end)) {
-            for (unsigned i = 0; i < numColumnHosts; ++i) {
-              if (this->getColumnHostID(i, dst) == this->gridColumnID()) {
-                if (hasIncomingEdge[i].test(this->getColumnIndex(i, dst))) {
-                  createNode.set(dst - range.first);
-                  break;
+          galois::iterate(range.first, range.second),
+          [&](auto dst) {
+            if ((dst < src) || (dst >= src_end)) {
+              for (unsigned i = 0; i < numColumnHosts; ++i) {
+                if (this->getColumnHostID(i, dst) == this->gridColumnID()) {
+                  if (hasIncomingEdge[i].test(this->getColumnIndex(i, dst))) {
+                    createNode.set(dst - range.first);
+                    break;
+                  }
                 }
               }
             }
-          }
-        },
-        #if MORE_DIST_STATS
-        galois::loopname("CreateDstNode"),
-        #endif
-        galois::no_stats()
-      );
+          },
+#if MORE_DIST_STATS
+          galois::loopname("CreateDstNode"),
+#endif
+          galois::no_stats());
 
       for (uint64_t dst = range.first; dst < range.second; ++dst) {
         if (createNode.test(dst - range.first)) {
@@ -654,9 +666,8 @@ private:
   }
 
   //! @copydoc DistGraphCartesianCut::loadEdges
-  template<typename GraphTy>
-  void loadEdges(GraphTy& graph, 
-                 galois::graphs::OfflineGraph& g,
+  template <typename GraphTy>
+  void loadEdges(GraphTy& graph, galois::graphs::OfflineGraph& g,
                  galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     if (base_DistGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
@@ -676,99 +687,99 @@ private:
     std::atomic<uint32_t> edgesToReceive;
     edgesToReceive.store(numNodesWithEdges);
 
-    galois::on_each(
-      [&](unsigned tid, unsigned nthreads) {
-        receiveEdges(graph, edgesToReceive);
-      });
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      receiveEdges(graph, edgesToReceive);
+    });
 
     base_DistGraph::increment_evilPhase();
 
     timer.stop();
-    galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ", 
-                   timer.get_usec()/1000000.0f, 
+    galois::gPrint("[", base_DistGraph::id,
+                   "] Edge loading time: ", timer.get_usec() / 1000000.0f,
                    " seconds to read ", mpiGraph.getBytesRead(), " bytes (",
-                   mpiGraph.getBytesRead()/(float)timer.get_usec(), " MBPS)\n");
+                   mpiGraph.getBytesRead() / (float)timer.get_usec(),
+                   " MBPS)\n");
   }
 
   //! Read in our assigned edges, constructing them if they belong to this host
   //! and sending them off to the correct host otherwise
   //! Edge data version
-  template<typename GraphTy, 
-           typename std::enable_if<
-             !std::is_void<typename GraphTy::edge_data_type>::value
-           >::type* = nullptr>
-  void loadEdgesFromFile(GraphTy& graph, 
-                         galois::graphs::OfflineGraph& g,
+  template <typename GraphTy,
+            typename std::enable_if<!std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void loadEdgesFromFile(GraphTy& graph, galois::graphs::OfflineGraph& g,
                          galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
-    auto& net = galois::runtime::getSystemNetworkInterface();
+    auto& net         = galois::runtime::getSystemNetworkInterface();
 
     typedef std::vector<std::vector<uint64_t>> DstVecVecTy;
     galois::substrate::PerThreadStorage<DstVecVecTy> gdst_vecs(numColumnHosts);
-    typedef std::vector<std::vector<typename GraphTy::edge_data_type>> DataVecVecTy;
-    galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(numColumnHosts);
+    typedef std::vector<std::vector<typename GraphTy::edge_data_type>>
+        DataVecVecTy;
+    galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(
+        numColumnHosts);
     typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-    const unsigned& id = base_DistGraph::id; // manually copy it because it is protected
+    const unsigned& id =
+        base_DistGraph::id; // manually copy it because it is protected
 
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),     
-      [&] (auto n) {
-        uint32_t lsrc = 0;
-        uint64_t cur = 0;
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          uint32_t lsrc = 0;
+          uint64_t cur  = 0;
 
-        if (this->isLocal(n)) {
-          lsrc = this->G2L(n);
-          cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-        }
-
-        auto ii = mpiGraph.edgeBegin(n);
-        auto ee = mpiGraph.edgeEnd(n);
-        auto& gdst_vec = *gdst_vecs.getLocal();
-        auto& gdata_vec = *gdata_vecs.getLocal();
-
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          gdst_vec[i].clear();
-          gdata_vec[i].clear();
-        }
-
-        for (; ii < ee; ++ii) {
-          uint64_t gdst = mpiGraph.edgeDestination(*ii);
-          auto gdata = mpiGraph.edgeData(*ii);
-          int i = this->getColumnHostID(this->gridColumnID(), gdst);
-          if ((h_offset + i) == id) {
-            assert(this->isLocal(n));
-            uint32_t ldst = this->G2L(gdst);
-            graph.constructEdge(cur++, ldst, gdata);
-          } else {
-            gdst_vec[i].push_back(gdst);
-            gdata_vec[i].push_back(gdata);
+          if (this->isLocal(n)) {
+            lsrc = this->G2L(n);
+            cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
-        }
 
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          if (gdst_vec[i].size() > 0) {
-            auto& b = (*sb.getLocal())[i];
-            galois::runtime::gSerialize(b, n);
-            galois::runtime::gSerialize(b, gdst_vec[i]);
-            galois::runtime::gSerialize(b, gdata_vec[i]);
-            if (b.size() > edgePartitionSendBufSize) {
-              net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-              b.getVec().clear();
+          auto ii         = mpiGraph.edgeBegin(n);
+          auto ee         = mpiGraph.edgeEnd(n);
+          auto& gdst_vec  = *gdst_vecs.getLocal();
+          auto& gdata_vec = *gdata_vecs.getLocal();
+
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            gdst_vec[i].clear();
+            gdata_vec[i].clear();
+          }
+
+          for (; ii < ee; ++ii) {
+            uint64_t gdst = mpiGraph.edgeDestination(*ii);
+            auto gdata    = mpiGraph.edgeData(*ii);
+            int i         = this->getColumnHostID(this->gridColumnID(), gdst);
+            if ((h_offset + i) == id) {
+              assert(this->isLocal(n));
+              uint32_t ldst = this->G2L(gdst);
+              graph.constructEdge(cur++, ldst, gdata);
+            } else {
+              gdst_vec[i].push_back(gdst);
+              gdata_vec[i].push_back(gdata);
             }
           }
-        }
-        if (this->isLocal(n)) {
-          assert(cur == (*graph.edge_end(lsrc)));
-        }
-      },
-      #if MORE_DIST_STATS
-      galois::loopname("EdgeLoading"),
-      #endif
-      galois::no_stats()
-    );
+
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            if (gdst_vec[i].size() > 0) {
+              auto& b = (*sb.getLocal())[i];
+              galois::runtime::gSerialize(b, n);
+              galois::runtime::gSerialize(b, gdst_vec[i]);
+              galois::runtime::gSerialize(b, gdata_vec[i]);
+              if (b.size() > edgePartitionSendBufSize) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
+            }
+          }
+          if (this->isLocal(n)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+#endif
+        galois::no_stats());
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
       auto& sbr = *sb.getRemote(t);
@@ -787,75 +798,73 @@ private:
   //! Read in our assigned edges, constructing them if they belong to this host
   //! and sending them off to the correct host otherwise
   //! No edge data version
-  template<typename GraphTy,
-           typename std::enable_if<
-             std::is_void<typename GraphTy::edge_data_type>::value
-           >::type* = nullptr>
-  void loadEdgesFromFile(GraphTy& graph, 
-                         galois::graphs::OfflineGraph& g,
+  template <typename GraphTy,
+            typename std::enable_if<std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void loadEdgesFromFile(GraphTy& graph, galois::graphs::OfflineGraph& g,
                          galois::graphs::BufferedGraph<EdgeTy>& mpiGraph) {
     unsigned h_offset = gridRowID() * numColumnHosts;
-    auto& net = galois::runtime::getSystemNetworkInterface();
+    auto& net         = galois::runtime::getSystemNetworkInterface();
 
     typedef std::vector<std::vector<uint64_t>> DstVecVecTy;
     galois::substrate::PerThreadStorage<DstVecVecTy> gdst_vecs(numColumnHosts);
     typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-    const unsigned& id = base_DistGraph::id; // manually copy it because it is protected
+    const unsigned& id =
+        base_DistGraph::id; // manually copy it because it is protected
 
     galois::do_all(
-      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-                      base_DistGraph::gid2host[base_DistGraph::id].second),     
-      [&] (auto n) {
-        uint32_t lsrc = 0;
-        uint64_t cur = 0;
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          uint32_t lsrc = 0;
+          uint64_t cur  = 0;
 
-        if (this->isLocal(n)) {
-          lsrc = this->G2L(n);
-          cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-        }
-
-        auto ii = mpiGraph.edgeBegin(n);
-        auto ee = mpiGraph.edgeEnd(n);
-        auto& gdst_vec = *gdst_vecs.getLocal();
-
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          gdst_vec[i].clear();
-        }
-
-        for (; ii < ee; ++ii) {
-          uint64_t gdst = mpiGraph.edgeDestination(*ii);
-          int i = this->getColumnHostID(this->gridColumnID(), gdst);
-          if ((h_offset + i) == id) {
-            assert(this->isLocal(n));
-            uint32_t ldst = this->G2L(gdst);
-            graph.constructEdge(cur++, ldst);
-          } else {
-            gdst_vec[i].push_back(gdst);
+          if (this->isLocal(n)) {
+            lsrc = this->G2L(n);
+            cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
-        }
 
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          if (gdst_vec[i].size() > 0) {
-            auto& b = (*sb.getLocal())[i];
-            galois::runtime::gSerialize(b, n);
-            galois::runtime::gSerialize(b, gdst_vec[i]);
-            if (b.size() > edgePartitionSendBufSize) {
-              net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-              b.getVec().clear();
+          auto ii        = mpiGraph.edgeBegin(n);
+          auto ee        = mpiGraph.edgeEnd(n);
+          auto& gdst_vec = *gdst_vecs.getLocal();
+
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            gdst_vec[i].clear();
+          }
+
+          for (; ii < ee; ++ii) {
+            uint64_t gdst = mpiGraph.edgeDestination(*ii);
+            int i         = this->getColumnHostID(this->gridColumnID(), gdst);
+            if ((h_offset + i) == id) {
+              assert(this->isLocal(n));
+              uint32_t ldst = this->G2L(gdst);
+              graph.constructEdge(cur++, ldst);
+            } else {
+              gdst_vec[i].push_back(gdst);
             }
           }
-        }
-        if (this->isLocal(n)) {
-          assert(cur == (*graph.edge_end(lsrc)));
-        }
-      },
-      #if MORE_DIST_STATS
-      galois::loopname("EdgeLoading"),
-      #endif
-      galois::no_stats()
-    );
+
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            if (gdst_vec[i].size() > 0) {
+              auto& b = (*sb.getLocal())[i];
+              galois::runtime::gSerialize(b, n);
+              galois::runtime::gSerialize(b, gdst_vec[i]);
+              if (b.size() > edgePartitionSendBufSize) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
+            }
+          }
+          if (this->isLocal(n)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+#endif
+        galois::no_stats());
 
     // flush all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
@@ -876,7 +885,7 @@ private:
    * Receive the edge dest/data assigned to this host from other hosts
    * that were responsible for reading them.
    */
-  template<typename GraphTy>
+  template <typename GraphTy>
   void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -893,7 +902,8 @@ private:
           galois::runtime::gDeserialize(rb, gdst_vec);
           assert(isLocal(n));
           uint32_t lsrc = G2L(n);
-          uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          uint64_t cur =
+              *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           uint64_t cur_end = *graph.edge_end(lsrc);
           assert((cur_end - cur) == gdst_vec.size());
           deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
@@ -907,16 +917,17 @@ private:
    * Deserialize received edges and constructs them in our graph. No edge-data
    * variant.
    */
-  template<typename GraphTy, 
-           typename std::enable_if<!std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
-                        std::vector<uint64_t>& gdst_vec, uint64_t& cur, 
+  template <typename GraphTy,
+            typename std::enable_if<!std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
                         uint64_t& cur_end) {
     std::vector<typename GraphTy::edge_data_type> gdata_vec;
     galois::runtime::gDeserialize(b, gdata_vec);
     uint64_t i = 0;
     while (cur < cur_end) {
-      auto gdata = gdata_vec[i];
+      auto gdata    = gdata_vec[i];
       uint64_t gdst = gdst_vec[i++];
       uint32_t ldst = G2L(gdst);
       graph.constructEdge(cur++, ldst, gdata);
@@ -927,10 +938,11 @@ private:
    * Deserialize received edges and constructs them in our graph. No edge-data
    * variant.
    */
-  template<typename GraphTy, 
-           typename std::enable_if<std::is_void<typename GraphTy::edge_data_type>::value>::type* = nullptr>
-  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b, 
-                        std::vector<uint64_t>& gdst_vec, uint64_t& cur, 
+  template <typename GraphTy,
+            typename std::enable_if<std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
                         uint64_t& cur_end) {
     uint64_t i = 0;
     while (cur < cur_end) {
@@ -943,32 +955,35 @@ private:
   /**
    * @copydoc DistGraphEdgeCut::fill_mirrorNodes
    */
-  void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes){
+  void fill_mirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes) {
     for (uint32_t i = 0; i < numNodes; ++i) {
-      uint64_t gid = localToGlobalVector[i];
+      uint64_t gid    = localToGlobalVector[i];
       unsigned hostID = getHostID(gid);
-      if (hostID == base_DistGraph::id) continue;
+      if (hostID == base_DistGraph::id)
+        continue;
       mirrorNodes[hostID].push_back(gid);
     }
   }
 
 public:
-  bool is_vertex_cut() const{
+  bool is_vertex_cut() const {
     if (moreColumnHosts) {
       // IEC and OEC will be reversed, so do not handle it as an edge-cut
-      if ((numRowHosts == 1) && (numColumnHosts == 1)) return false;
+      if ((numRowHosts == 1) && (numColumnHosts == 1))
+        return false;
     } else {
-      if ((numRowHosts == 1) || (numColumnHosts == 1)) return false; // IEC or OEC
+      if ((numRowHosts == 1) || (numColumnHosts == 1))
+        return false; // IEC or OEC
     }
     return true;
   }
 
-  void reset_bitset(typename base_DistGraph::SyncType syncType, 
+  void reset_bitset(typename base_DistGraph::SyncType syncType,
                     void (*bitset_reset_range)(size_t, size_t)) const {
     if (base_DistGraph::numOwned != 0) {
       auto endMaster = base_DistGraph::beginMaster + base_DistGraph::numOwned;
       if (syncType == base_DistGraph::syncBroadcast) { // reset masters
-        bitset_reset_range(base_DistGraph::beginMaster, endMaster-1);
+        bitset_reset_range(base_DistGraph::beginMaster, endMaster - 1);
       } else { // reset mirrors
         assert(syncType == base_DistGraph::syncReduce);
         if (base_DistGraph::beginMaster > 0) {
@@ -981,10 +996,11 @@ public:
     }
   }
 
-  std::vector<std::pair<uint32_t,uint32_t>> getMirrorRanges() const {
+  std::vector<std::pair<uint32_t, uint32_t>> getMirrorRanges() const {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRanges_vec;
     if (base_DistGraph::beginMaster > 0) {
-      mirrorRanges_vec.push_back(std::make_pair(0, base_DistGraph::beginMaster));
+      mirrorRanges_vec.push_back(
+          std::make_pair(0, base_DistGraph::beginMaster));
     }
     auto endMaster = base_DistGraph::beginMaster + base_DistGraph::numOwned;
     if (endMaster < numNodes) {

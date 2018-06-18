@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,10 +28,10 @@ namespace substrate {
 
 /// PaddedLock is a spinlock.  If the second template parameter is
 /// false, the lock is a noop.
-template<bool concurrent>
+template <bool concurrent>
 class PaddedLock;
 
-template<>
+template <>
 class PaddedLock<true> {
   mutable CacheLineStorage<SimpleLock> Lock;
 
@@ -41,7 +41,7 @@ public:
   void unlock() const { Lock.get().unlock(); }
 };
 
-template<>
+template <>
 class PaddedLock<false> {
 public:
   void lock() const {}

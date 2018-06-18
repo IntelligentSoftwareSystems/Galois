@@ -6,9 +6,8 @@
  */
 #include "AVIabstractMain.h"
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   AVIorderedSerial serial;
-  serial.run (argc, argv);
+  serial.run(argc, argv);
   return 0;
 }
-

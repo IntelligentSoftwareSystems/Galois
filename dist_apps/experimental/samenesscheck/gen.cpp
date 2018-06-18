@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -42,7 +42,7 @@ typedef typename Graph::GraphNode GNode;
 
 constexpr static const char* const name = "Check Sameness";
 constexpr static const char* const desc = "Sameness check.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
@@ -56,39 +56,37 @@ int main(int argc, char** argv) {
   Graph* regular = new Graph_edgeCut(inputFile, partFolder, net.ID, net.Num,
                                      dummyScale, false);
   // pass in the second copy as transpose even though it isn't
-  Graph* regular2 = new Graph_edgeCut(inputFileTranspose, partFolder, net.ID, 
+  Graph* regular2 = new Graph_edgeCut(inputFileTranspose, partFolder, net.ID,
                                       net.Num, dummyScale, false);
 
   galois::gPrint("Graphs loaded: beginning checking of all edges.\n");
 
-  galois::do_all(
-    galois::iterate(regular->masterNodesRange()),
-    [&] (auto node) {
-      for (auto edge : regular->edges(node)) {
-        auto edgeDst = regular->getEdgeDst(edge);
-        auto edgeData = regular->getEdgeData(edge);
-        bool found = false;
+  galois::do_all(galois::iterate(regular->masterNodesRange()), [&](auto node) {
+    for (auto edge : regular->edges(node)) {
+      auto edgeDst  = regular->getEdgeDst(edge);
+      auto edgeData = regular->getEdgeData(edge);
+      bool found    = false;
 
-        // check to see if this edge exists in the other graph
-        for (auto edge2 : regular2->edges(node)) {
-          auto edgeDst2 = regular2->getEdgeDst(edge2);
-          auto edgeData2 = regular2->getEdgeData(edge2);
+      // check to see if this edge exists in the other graph
+      for (auto edge2 : regular2->edges(node)) {
+        auto edgeDst2  = regular2->getEdgeDst(edge2);
+        auto edgeData2 = regular2->getEdgeData(edge2);
 
-          if (edgeDst2 == edgeDst) {
-            if (edgeData2 == edgeData) {
-              found = true;
-              break;
-            } 
+        if (edgeDst2 == edgeDst) {
+          if (edgeData2 == edgeData) {
+            found = true;
+            break;
           }
         }
-
-        if (!found) {
-          printf("Edge %lu to %lu with same weight not found\n", 
-                 regular->getGID(node), regular->getGID(edgeDst));
-          GALOIS_DIE("An edge was not found");
-        }
       }
-    });
+
+      if (!found) {
+        printf("Edge %lu to %lu with same weight not found\n",
+               regular->getGID(node), regular->getGID(edgeDst));
+        GALOIS_DIE("An edge was not found");
+      }
+    }
+  });
 
   return 0;
 }

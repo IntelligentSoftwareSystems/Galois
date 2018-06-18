@@ -34,33 +34,35 @@ using namespace std;
 using namespace benchIO;
 
 void timeMST(wghEdgeArray EA, int rounds, char* outFile) {
-  int m = EA.m;
-  int n = EA.n;
-  wghEdge *InE = newA(wghEdge, m);
-//  parallel_for (int i=0; i < m; i++) InE[i] = EA.E[i];
-  parallel_doall(int, i, 0, m) { InE[i] = EA.E[i]; } parallel_doall_end
-  pair<int*,int> Out = mst(wghEdgeArray(InE, n, m));
-  for (int i=0; i < rounds; i++) {
-    if (Out.first != NULL) free(Out.first);
-//    parallel_for (int i=0; i < m; i++) InE[i] = EA.E[i];
-    parallel_doall(int, i, 0, m) { InE[i] = EA.E[i]; } parallel_doall_end
-    startTime();
-    Out = mst(wghEdgeArray(InE,n,m));
+  int m        = EA.m;
+  int n        = EA.n;
+  wghEdge* InE = newA(wghEdge, m);
+  //  parallel_for (int i=0; i < m; i++) InE[i] = EA.E[i];
+  parallel_doall(int, i, 0, m) { InE[i] = EA.E[i]; }
+  parallel_doall_end pair<int*, int> Out = mst(wghEdgeArray(InE, n, m));
+  for (int i = 0; i < rounds; i++) {
+    if (Out.first != NULL)
+      free(Out.first);
+    //    parallel_for (int i=0; i < m; i++) InE[i] = EA.E[i];
+    parallel_doall(int, i, 0, m) { InE[i] = EA.E[i]; }
+    parallel_doall_end startTime();
+    Out = mst(wghEdgeArray(InE, n, m));
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) writeIntArrayToFile(Out.first, Out.second, outFile);
+  if (outFile != NULL)
+    writeIntArrayToFile(Out.first, Out.second, outFile);
   free(InE);
   free(Out.first);
   EA.del();
 }
-    
+
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
-  char* iFile = P.getArgument(0);
-  char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
+  char* iFile     = P.getArgument(0);
+  char* oFile     = P.getOptionValue("-o");
+  int rounds      = P.getOptionIntValue("-r", 1);
   wghEdgeArray EA = readWghEdgeArrayFromFile(iFile);
   timeMST(EA, rounds, oFile);
 }

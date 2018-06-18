@@ -30,10 +30,12 @@
 #include "unionFind.h"
 
 struct unionFindStep {
-  int u;  int v;  
-  edge *E;  int *R;  unionFind UF;
-  unionFindStep(edge* _E, unionFind _UF, int* _R)
-    : E(_E), R(_R), UF(_UF) {} 
+  int u;
+  int v;
+  edge* E;
+  int* R;
+  unionFind UF;
+  unionFindStep(edge* _E, unionFind _UF, int* _R) : E(_E), R(_R), UF(_UF) {}
 
   bool reserve(int i) {
     u = UF.find(E[i].u);
@@ -42,34 +44,40 @@ struct unionFindStep {
       reserveLoc(R[u], i);
       reserveLoc(R[v], i);
       return 1;
-    } else return 0;
+    } else
+      return 0;
   }
 
   bool commit(int i) {
-    if (checkLoc(R[v], i)) { 
-      if (checkLoc(R[u], i)) resetLoc(R[u]);
-      UF.link(v, u); 
-      return 1; }
-    else if (checkLoc(R[u], i)) {
+    if (checkLoc(R[v], i)) {
+      if (checkLoc(R[u], i))
+        resetLoc(R[u]);
+      UF.link(v, u);
+      return 1;
+    } else if (checkLoc(R[u], i)) {
       UF.link(u, v);
-      return 1; }
-    else return 0;
+      return 1;
+    } else
+      return 0;
   }
 };
 
-struct notMax { bool operator() (int i) {return i < INT_MAX;}};
+struct notMax {
+  bool operator()(int i) { return i < INT_MAX; }
+};
 
-pair<int*,int> st(edgeArray G){
+pair<int*, int> st(edgeArray G) {
   int m = G.nonZeros;
   int n = G.numRows;
   unionFind UF(n);
-  int *R = newArray(n, INT_MAX);
-  int l = (4*n)/3;
-  unionFindStep UFStep(G.E, UF, R); 
-  speculative_for(UFStep, 0, l, 80 );
+  int* R = newArray(n, INT_MAX);
+  int l  = (4 * n) / 3;
+  unionFindStep UFStep(G.E, UF, R);
+  speculative_for(UFStep, 0, l, 80);
   speculative_for(UFStep, l, m, 40);
   _seq<int> stIdx = sequence::filter(R, n, notMax());
   cout << "Tree size = " << stIdx.n << endl;
-  UF.del(); delete[] R;
-  return pair<int*,int>(stIdx.A, stIdx.n);
+  UF.del();
+  delete[] R;
+  return pair<int*, int>(stIdx.A, stIdx.n);
 }

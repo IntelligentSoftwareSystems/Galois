@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,19 +27,16 @@
 
 #include "Billiards.h"
 
-class BilliardsLevelExec: public Billiards<BilliardsLevelExec> {
+class BilliardsLevelExec : public Billiards<BilliardsLevelExec> {
 
 public:
-
-  using Graph = galois::graphs::MorphGraph<void*, void, true>;
-  using GNode = Graph::GraphNode;
-  using VecNodes = std::vector<GNode>;
+  using Graph     = galois::graphs::MorphGraph<void*, void, true>;
+  using GNode     = Graph::GraphNode;
+  using VecNodes  = std::vector<GNode>;
   using AddListTy = galois::PerThreadVector<Event>;
 
   struct GetEventTime {
-    const FP& operator () (const Event& e) const { 
-      return e.getTime ();
-    }
+    const FP& operator()(const Event& e) const { return e.getTime(); }
   };
 
   struct OpFunc {
@@ -51,33 +48,24 @@ public:
     AddListTy& addList;
     Accumulator& iter;
 
-    OpFunc (
-        Table& table,
-        const FP& endtime,
-        AddListTy& addList,
-        Accumulator& iter)
-      :
-        table (table),
-        endtime (endtime),
-        addList (addList),
-        iter (iter)
-    {}
-
+    OpFunc(Table& table, const FP& endtime, AddListTy& addList,
+           Accumulator& iter)
+        : table(table), endtime(endtime), addList(addList), iter(iter) {}
 
     template <typename C>
-    void operator () (const Event& e, C& ctx) const {
+    void operator()(const Event& e, C& ctx) const {
 
-      addList.get ().clear ();
+      addList.get().clear();
 
-      // TODO: use locks to update balls' state atomically 
+      // TODO: use locks to update balls' state atomically
       // and read atomically
-      const_cast<Event&>(e).simulate ();
-      table.addNextEvents (e, addList.get (), endtime);
+      const_cast<Event&>(e).simulate();
+      table.addNextEvents(e, addList.get(), endtime);
 
-      for (auto i = addList.get ().begin ()
-          , endi = addList.get ().end (); i != endi; ++i) {
+      for (auto i = addList.get().begin(), endi = addList.get().end();
+           i != endi; ++i) {
 
-        ctx.push (*i);
+        ctx.push(*i);
       }
 
       iter += 1;
@@ -85,10 +73,12 @@ public:
   };
 
 public:
+  virtual const std::string version() const {
+    return "using Level-by-Level Executor";
+  }
 
-  virtual const std::string version () const { return "using Level-by-Level Executor"; }
-
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  virtual size_t runSim(Table& table, std::vector<Event>& initEvents,
+                        const FP& endtime, bool enablePrints = false) {
 
     Graph graph;
     VecNodes nodes;
@@ -96,19 +86,17 @@ public:
     AddListTy addList;
     Accumulator iter;
 
-    createLocks (table, graph, nodes);
+    createLocks(table, graph, nodes);
 
-    galois::runtime::for_each_ordered_level (
-        galois::runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
-        GetEventTime (), std::less<FP> (),
-        VisitNhood<Graph, VecNodes> (graph, nodes),
-        OpFunc (table, endtime, addList, iter));
+    galois::runtime::for_each_ordered_level(
+        galois::runtime::makeStandardRange(initEvents.begin(),
+                                           initEvents.end()),
+        GetEventTime(), std::less<FP>(),
+        VisitNhood<Graph, VecNodes>(graph, nodes),
+        OpFunc(table, endtime, addList, iter));
 
-    return iter.reduce ();
-
+    return iter.reduce();
   }
-
 };
-
 
 #endif // BILLIARDS_LEVEL_EXEC_H

@@ -16,7 +16,7 @@
 #define LLVM_SUPPORT_COMPILER_H
 
 #ifndef __has_feature
-# define __has_feature(x) 0
+#define __has_feature(x) 0
 #endif
 
 /// LLVM_LIBRARY_VISIBILITY - If a class marked with this attribute is linked
@@ -24,7 +24,7 @@
 /// not accessible from outside it.  Can also be used to mark variables and
 /// functions, making them private to any shared library they are linked into.
 #if (__GNUC__ >= 4) && !defined(__MINGW32__) && !defined(__CYGWIN__)
-#define LLVM_LIBRARY_VISIBILITY __attribute__ ((visibility("hidden")))
+#define LLVM_LIBRARY_VISIBILITY __attribute__((visibility("hidden")))
 #else
 #define LLVM_LIBRARY_VISIBILITY
 #endif
@@ -55,7 +55,7 @@
 #define LLVM_ATTRIBUTE_READNONE
 #endif
 
-#ifdef __GNUC__  // aka 'ATTRIBUTE_PURE' but following LLVM Conventions.
+#ifdef __GNUC__ // aka 'ATTRIBUTE_PURE' but following LLVM Conventions.
 #define LLVM_ATTRIBUTE_READONLY __attribute__((__pure__))
 #else
 #define LLVM_ATTRIBUTE_READONLY
@@ -102,7 +102,6 @@
 #define LLVM_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
-
 #ifdef __GNUC__
 #define LLVM_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -113,25 +112,24 @@
 
 // LLVM_ATTRIBUTE_DEPRECATED(decl, "message")
 #if __has_feature(attribute_deprecated_with_message)
-# define LLVM_ATTRIBUTE_DEPRECATED(decl, message) \
+#define LLVM_ATTRIBUTE_DEPRECATED(decl, message)                               \
   decl __attribute__((deprecated(message)))
 #elif defined(__GNUC__)
-# define LLVM_ATTRIBUTE_DEPRECATED(decl, message) \
+#define LLVM_ATTRIBUTE_DEPRECATED(decl, message)                               \
   decl __attribute__((deprecated))
 #elif defined(_MSC_VER)
-# define LLVM_ATTRIBUTE_DEPRECATED(decl, message) \
+#define LLVM_ATTRIBUTE_DEPRECATED(decl, message)                               \
   __declspec(deprecated(message)) decl
 #else
-# define LLVM_ATTRIBUTE_DEPRECATED(decl, message) \
-  decl
+#define LLVM_ATTRIBUTE_DEPRECATED(decl, message) decl
 #endif
 
 // LLVM_BUILTIN_UNREACHABLE - On compilers which support it, expands
 // to an expression which states that it is undefined behavior for the
 // compiler to reach this point.  Otherwise is not defined.
-#if defined(__clang__) || (__GNUC__ > 4) \
- || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
-# define LLVM_BUILTIN_UNREACHABLE __builtin_unreachable()
+#if defined(__clang__) || (__GNUC__ > 4) ||                                    \
+    (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#define LLVM_BUILTIN_UNREACHABLE __builtin_unreachable()
 #endif
 
 #endif

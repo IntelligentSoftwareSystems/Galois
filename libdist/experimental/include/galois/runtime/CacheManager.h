@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,16 +34,17 @@ namespace runtime {
 namespace internal {
 struct dser_t {};
 struct tser_t {};
-}
+} // namespace internal
 
 class DeSerializeBuffer;
-template<typename T>
+template <typename T>
 T gDeserializeObj(DeSerializeBuffer&);
 
 namespace internal {
 
 class remoteObj {
   std::atomic<unsigned> refs;
+
 public:
   void incRef() { ++refs; }
   void decRef() { --refs; }
@@ -51,35 +52,36 @@ public:
   virtual void* getObj() = 0;
 };
 
-template<typename T>
+template <typename T>
 class remoteObjImpl : public remoteObj {
   T obj;
+
 public:
-  //  remoteObjImpl(DeSerializeBuffer& buf) :obj{std::move(gDeserializeObj<T>(buf))} {}
-  template<typename U = void>
-  remoteObjImpl(DeSerializeBuffer& buf, internal::dser_t* p) :obj{buf} {}
-  template<typename U = void>
+  //  remoteObjImpl(DeSerializeBuffer& buf)
+  //  :obj{std::move(gDeserializeObj<T>(buf))} {}
+  template <typename U = void>
+  remoteObjImpl(DeSerializeBuffer& buf, internal::dser_t* p) : obj{buf} {}
+  template <typename U = void>
   remoteObjImpl(DeSerializeBuffer& buf, internal::tser_t* p) {
     gDeserialize(buf, obj);
   }
 
-  remoteObjImpl(T&& buf) :obj(buf) {}
+  remoteObjImpl(T&& buf) : obj(buf) {}
   virtual ~remoteObjImpl() {}
   virtual void* getObj() { return &obj; }
 };
 
-}
+} // namespace internal
 
 class ResolveCache {
   std::unordered_map<fatPointer, void*> addrs;
   std::deque<internal::remoteObj*> objs;
- 
+
 public:
   ~ResolveCache() { reset(); }
   void* resolve(fatPointer);
   void reset();
 };
-
 
 class CacheManager {
   std::unordered_map<fatPointer, internal::remoteObj*> remoteObjects;
@@ -94,8 +96,7 @@ class CacheManager {
   friend class RemoteDirectory;
 
 public:
-
-  template<typename T>
+  template <typename T>
   void create(fatPointer ptr, DeSerializeBuffer& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     std::lock_guard<LL::SimpleLock> lgr(Lock);
@@ -103,12 +104,13 @@ public:
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
-    //FIXME: need to do RO lock
-    typename std::conditional<has_serialize<T>::value, internal::dser_t, internal::tser_t>::type* P = 0;
+    // FIXME: need to do RO lock
+    typename std::conditional<has_serialize<T>::value, internal::dser_t,
+                              internal::tser_t>::type* P = 0;
     obj = new internal::remoteObjImpl<T>(buf, P);
   }
 
-  template<typename T>
+  template <typename T>
   void create(fatPointer ptr, T&& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     std::lock_guard<LL::SimpleLock> lgr(Lock);
@@ -116,7 +118,7 @@ public:
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
-    //FIXME: need to do RO lock
+    // FIXME: need to do RO lock
     obj = new internal::remoteObjImpl<T>(std::forward<T>(buf));
   }
 
@@ -137,7 +139,7 @@ void setThreadResolve(ResolveCache*);
 
 CacheManager& getCacheManager();
 
-}
-}
+} // namespace runtime
+} // namespace galois
 
 #endif

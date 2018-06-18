@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,12 +28,9 @@
 
 #include "galois/gIO.h"
 
-
 #include <boost/iterator/iterator_facade.hpp>
 
 #include <list>
-
-
 
 namespace galois {
 
@@ -41,415 +38,379 @@ namespace galois {
 
 #ifdef NEW_SERIAL_BAG_IMPL
 
-template <typename T, const size_t SZ=0>
+template <typename T, const size_t SZ = 0>
 class SerialBag {
 
   using dbg = galois::debug<0>;
 
   using PageHeap = runtime::PageHeap;
-  using FSheap = runtime::FixedSizeHeap;
+  using FSheap   = runtime::FixedSizeHeap;
 
   struct Block {
     Block* next;
     Block* prev;
     DynamicBoundedVector<T> chunk;
 
-    explicit Block (T* beg=nullptr, T* end=nullptr)
-      :
-        next (nullptr),
-        prev (nullptr),
-        chunk (beg, end)
-    {}
+    explicit Block(T* beg = nullptr, T* end = nullptr)
+        : next(nullptr), prev(nullptr), chunk(beg, end) {}
   };
-
-
 
   PageHeap* pageHeap;
   FSheap fsHeap;
   Block sentinel; // sentinel
   Block* tail;
 
-  void init (void) {
-    tail = &sentinel;
+  void init(void) {
+    tail          = &sentinel;
     sentinel.next = tail;
     sentinel.prev = tail;
   }
 
   //! sentinel is a dummy empty block that must be after tail
-  void checkInvariants (void) const {
-    assert (tail->next == &sentinel);
-    assert (sentinel.prev == tail);
+  void checkInvariants(void) const {
+    assert(tail->next == &sentinel);
+    assert(sentinel.prev == tail);
   }
 
-  Block* getHead (void) const {
-    return sentinel.next;
-  }
+  Block* getHead(void) const { return sentinel.next; }
 
   template <typename U>
-  struct OuterIterImpl: public boost::iterator_facade<OuterIterImpl<U>, U, boost::bidirectional_traversal_tag> {
+  struct OuterIterImpl
+      : public boost::iterator_facade<OuterIterImpl<U>, U,
+                                      boost::bidirectional_traversal_tag> {
 
     friend class boost::iterator_core_access;
 
     Block* curr;
 
-    explicit OuterIterImpl (Block* b=nullptr): curr (b) {}
+    explicit OuterIterImpl(Block* b = nullptr) : curr(b) {}
 
-    U& dereference (void)  const {
-      assert (curr != nullptr);
+    U& dereference(void) const {
+      assert(curr != nullptr);
       return curr->chunk;
     }
 
     // const U& dereference (void) const {
-      // assert (curr != nullptr);
-      // return curr->chunk;
+    // assert (curr != nullptr);
+    // return curr->chunk;
     // }
 
-    void increment (void) {
-      curr = curr->next;
-    }
+    void increment(void) { curr = curr->next; }
 
-    void decrement (void) {
-      curr = curr->prev;
-    }
+    void decrement(void) { curr = curr->prev; }
 
-    bool equal (const OuterIterImpl& that) const {
-      return curr == that.curr;
-    }
-
+    bool equal(const OuterIterImpl& that) const { return curr == that.curr; }
   };
 
-  using OuterIter = OuterIterImpl<DynamicBoundedVector<T> >;
+  using OuterIter = OuterIterImpl<DynamicBoundedVector<T>>;
 
-  OuterIter make_outer_beg (void) {
-    return OuterIter (getHead ());
+  OuterIter make_outer_beg(void) { return OuterIter(getHead()); }
+
+  OuterIter make_outer_end(void) { return OuterIter(&sentinel); }
+
+  using ConstOuterIter = OuterIterImpl<const DynamicBoundedVector<T>>;
+
+  ConstOuterIter make_outer_cbeg(void) const {
+    return ConstOuterIter(getHead());
   }
 
-  OuterIter make_outer_end (void) {
-    return OuterIter (&sentinel);
-  }
-
-  using ConstOuterIter = OuterIterImpl<const DynamicBoundedVector<T> >;
-
-  ConstOuterIter make_outer_cbeg (void) const {
-    return ConstOuterIter (getHead ());
-  }
-
-  ConstOuterIter make_outer_cend (void) const {
-    return ConstOuterIter (&sentinel);
+  ConstOuterIter make_outer_cend(void) const {
+    return ConstOuterIter(&sentinel);
   }
 
   using RevOuterIter = std::reverse_iterator<OuterIter>;
 
-  RevOuterIter make_outer_rbeg (void) {
-    return RevOuterIter (make_outer_end ());
-  }
+  RevOuterIter make_outer_rbeg(void) { return RevOuterIter(make_outer_end()); }
 
-  RevOuterIter make_outer_rend (void) {
-    return RevOuterIter (make_outer_beg ());
-  }
+  RevOuterIter make_outer_rend(void) { return RevOuterIter(make_outer_beg()); }
 
   using ConstRevOuterIter = std::reverse_iterator<ConstOuterIter>;
 
-  ConstRevOuterIter make_outer_crbeg (void) const {
-    return ConstRevOuterIter (make_outer_cend ());
+  ConstRevOuterIter make_outer_crbeg(void) const {
+    return ConstRevOuterIter(make_outer_cend());
   }
 
-  ConstRevOuterIter make_outer_crend (void) const {
-    return ConstRevOuterIter (make_outer_cbeg ());
+  ConstRevOuterIter make_outer_crend(void) const {
+    return ConstRevOuterIter(make_outer_cbeg());
   }
 
-  static const size_t ALLOC_SIZE = (SZ == 0) ? PageHeap::AllocSize : SZ * sizeof (T);
-  static_assert (sizeof(T) < PageHeap::AllocSize, "Serial Bag with template type too large in size");
-  static_assert (ALLOC_SIZE <= PageHeap::AllocSize, "Serial Bag with SZ parameter too large");
-  static_assert (ALLOC_SIZE > (sizeof (T) + sizeof (Block)), "Serial Bag with SZ parameter too small");
+  static const size_t ALLOC_SIZE =
+      (SZ == 0) ? PageHeap::AllocSize : SZ * sizeof(T);
+  static_assert(sizeof(T) < PageHeap::AllocSize,
+                "Serial Bag with template type too large in size");
+  static_assert(ALLOC_SIZE <= PageHeap::AllocSize,
+                "Serial Bag with SZ parameter too large");
+  static_assert(ALLOC_SIZE > (sizeof(T) + sizeof(Block)),
+                "Serial Bag with SZ parameter too small");
 
-
-  Block* newBlock (void) {
+  Block* newBlock(void) {
 
     void* p = nullptr;
 
     if (SZ == 0) {
-      assert (pageHeap);
-      p = pageHeap->allocate (ALLOC_SIZE);
+      assert(pageHeap);
+      p = pageHeap->allocate(ALLOC_SIZE);
 
     } else {
-      p = fsHeap.allocate (ALLOC_SIZE);
+      p = fsHeap.allocate(ALLOC_SIZE);
     }
 
-    assert (p != nullptr);
-    dbg::print (this, " allocating a new block: ", p);
-
+    assert(p != nullptr);
+    dbg::print(this, " allocating a new block: ", p);
 
     size_t offset = 1;
-    if (sizeof (T) < sizeof (Block)) {
-      offset += sizeof (Block) / sizeof (T);
+    if (sizeof(T) < sizeof(Block)) {
+      offset += sizeof(Block) / sizeof(T);
     }
 
-    T* beg = reinterpret_cast<T*> (p) + offset;
-    T* end = reinterpret_cast<T*> (p) + (ALLOC_SIZE / sizeof (T));
+    T* beg = reinterpret_cast<T*>(p) + offset;
+    T* end = reinterpret_cast<T*>(p) + (ALLOC_SIZE / sizeof(T));
 
-    Block* b = reinterpret_cast<Block*> (p);
-    ::new (b) Block (beg, end);
+    Block* b = reinterpret_cast<Block*>(p);
+    ::new (b) Block(beg, end);
 
     return b;
   }
 
-  void deleteBlock (Block* const b) {
-    b->~Block ();
+  void deleteBlock(Block* const b) {
+    b->~Block();
 
     if (SZ == 0) {
-      assert (pageHeap);
-      pageHeap->deallocate (b);
-      dbg::print (this, " deallocating block: ", b);
+      assert(pageHeap);
+      pageHeap->deallocate(b);
+      dbg::print(this, " deallocating block: ", b);
     } else {
-      fsHeap.deallocate (b);
+      fsHeap.deallocate(b);
     }
   };
 
-  void pushBackBlock (void) {
+  void pushBackBlock(void) {
 
-    checkInvariants ();
+    checkInvariants();
 
-    Block* b = newBlock ();
+    Block* b = newBlock();
 
-    b->next = &sentinel;
+    b->next       = &sentinel;
     sentinel.prev = b;
-    b->prev = tail;
-    tail->next = b;
-    tail = b;
+    b->prev       = tail;
+    tail->next    = b;
+    tail          = b;
 
-    checkInvariants ();
+    checkInvariants();
     // b->next = head;
     // head->prev = b;
     // head = b;
   }
 
-  void popBackBlock (void) {
+  void popBackBlock(void) {
 
-    assert (tail != nullptr && tail != &sentinel && !tail->chunk.empty ());
-    checkInvariants ();
+    assert(tail != nullptr && tail != &sentinel && !tail->chunk.empty());
+    checkInvariants();
 
     Block* old_t = tail;
 
-    Block* new_t = tail->prev;
-    new_t->next = &sentinel;
+    Block* new_t  = tail->prev;
+    new_t->next   = &sentinel;
     sentinel.prev = new_t;
 
     tail = new_t;
 
-    deleteBlock (old_t);
-    checkInvariants ();
+    deleteBlock(old_t);
+    checkInvariants();
   }
 
-  void pushFrontBlock (void) {
-    checkInvariants ();
+  void pushFrontBlock(void) {
+    checkInvariants();
 
-    Block* b = newBlock ();
+    Block* b = newBlock();
 
-
-    Block* head = getHead ();
-    b->next = head;
-    head->prev = b;
-    b->prev = &sentinel;
+    Block* head   = getHead();
+    b->next       = head;
+    head->prev    = b;
+    b->prev       = &sentinel;
     sentinel.next = b;
 
     if (tail == &sentinel) {
       tail = b;
     }
 
-    checkInvariants ();
+    checkInvariants();
   }
 
+  void popFrontBlock(void) {
+    checkInvariants();
 
-  void popFrontBlock (void) {
-    checkInvariants ();
+    Block* head = getHead();
 
-    Block* head = getHead ();
+    assert(head != nullptr && head != &sentinel && head->chunk.empty());
+    assert(head->prev == &sentinel);
 
-    assert (head != nullptr && head != &sentinel && head->chunk.empty ());
-    assert (head->prev == &sentinel);
-
-    sentinel.next = head->next;
+    sentinel.next    = head->next;
     head->next->prev = &sentinel;
 
     if (tail == head) {
       tail = &sentinel;
-      init ();
+      init();
     }
 
-    deleteBlock (head);
-    checkInvariants ();
+    deleteBlock(head);
+    checkInvariants();
   }
 
-  void printBlocks (void) {
-    std::printf ("SerialBag blocks are: ");
-    for (Block* i = getHead (); i != &sentinel; i = i->next) {
+  void printBlocks(void) {
+    std::printf("SerialBag blocks are: ");
+    for (Block* i = getHead(); i != &sentinel; i = i->next) {
       auto& c = i->chunk;
-      std::printf ("<curr:%p, next:%p, prev:%p, dbeg:%p, dsize:%p, dend:%p>, ",
-          i, i->next, i->prev, c.begin (), c.begin () + c.size (), c.begin () + c.capacity ());
+      std::printf("<curr:%p, next:%p, prev:%p, dbeg:%p, dsize:%p, dend:%p>, ",
+                  i, i->next, i->prev, c.begin(), c.begin() + c.size(),
+                  c.begin() + c.capacity());
     }
-    std::printf ("\n");
+    std::printf("\n");
   }
 
 public:
-  using value_type = T;
-  using reference = T&;
-  using size_type = size_t;
+  using value_type      = T;
+  using reference       = T&;
+  using size_type       = size_t;
   using difference_type = ptrdiff_t;
-  using const_reference = const  value_type&;
-  using pointer = value_type*;
-  using const_pointer = const  value_type*;
+  using const_reference = const value_type&;
+  using pointer         = value_type*;
+  using const_pointer   = const value_type*;
 
+  using iterator = typename ChooseStlTwoLevelIterator<
+      OuterIter, typename DynamicBoundedVector<T>::iterator>::type;
+  using const_iterator = typename ChooseStlTwoLevelIterator<
+      ConstOuterIter, typename DynamicBoundedVector<T>::const_iterator>::type;
 
-  using iterator =  typename ChooseStlTwoLevelIterator<OuterIter, typename DynamicBoundedVector<T>::iterator>::type;
-  using const_iterator =  typename ChooseStlTwoLevelIterator<ConstOuterIter, typename DynamicBoundedVector<T>::const_iterator>::type;
+  using reverse_iterator = typename ChooseStlTwoLevelIterator<
+      RevOuterIter, typename DynamicBoundedVector<T>::reverse_iterator>::type;
+  using const_reverse_iterator = typename ChooseStlTwoLevelIterator<
+      ConstRevOuterIter,
+      typename DynamicBoundedVector<T>::const_reverse_iterator>::type;
 
-  using reverse_iterator =  typename ChooseStlTwoLevelIterator<RevOuterIter, typename DynamicBoundedVector<T>::reverse_iterator>::type;
-  using const_reverse_iterator =  typename ChooseStlTwoLevelIterator<ConstRevOuterIter, typename DynamicBoundedVector<T>::const_reverse_iterator>::type;
-
-  SerialBag (void)
-    :
-      pageHeap (PageHeap::getInstance ()),
-      fsHeap (ALLOC_SIZE),
-      sentinel (),
-      tail (&sentinel)
-  {
-    init ();
+  SerialBag(void)
+      : pageHeap(PageHeap::getInstance()), fsHeap(ALLOC_SIZE), sentinel(),
+        tail(&sentinel) {
+    init();
   }
 
-  ~SerialBag (void) {
-    clear ();
-  }
+  ~SerialBag(void) { clear(); }
 
-  bool empty (void) const {
-    return tail == &sentinel;
-  }
+  bool empty(void) const { return tail == &sentinel; }
 
-  size_t size (void) const {
+  size_t size(void) const {
 
     size_t s = 0;
-    for (Block* i = getHead (); i != &sentinel; i = i->next) {
-      s += i->chunk.size ();
+    for (Block* i = getHead(); i != &sentinel; i = i->next) {
+      s += i->chunk.size();
     }
 
     return s;
   }
 
-  void clear (void) {
+  void clear(void) {
 
-    for (Block* i = getHead (); i != &sentinel;) {
+    for (Block* i = getHead(); i != &sentinel;) {
       Block* b = i;
-      i = i->next;
-      b->chunk.clear ();
-      popFrontBlock ();
+      i        = i->next;
+      b->chunk.clear();
+      popFrontBlock();
     }
 
-    init ();
+    init();
   }
 
-
   template <typename... Args>
-  void emplace_back (Args&&... args) {
+  void emplace_back(Args&&... args) {
 
-    if (empty () || tail->chunk.full ()) {
-      pushBackBlock ();
+    if (empty() || tail->chunk.full()) {
+      pushBackBlock();
       // printBlocks ();
     }
 
-    tail->chunk.emplace_back (std::forward<Args> (args)...);
+    tail->chunk.emplace_back(std::forward<Args>(args)...);
   }
 
-  void push_back (const T& elem) {
-    this->emplace_back (elem);
+  void push_back(const T& elem) { this->emplace_back(elem); }
+
+  reference back(void) {
+    assert(!empty());
+    return tail->chunk.back();
   }
 
-  reference back (void) {
-    assert (!empty ());
-    return tail->chunk.back ();
+  const_reference back(void) const {
+    return const_cast<SerialBag*>(this)->back();
   }
 
-  const_reference back (void) const {
-    return const_cast<SerialBag*> (this)->back ();
-  }
+  void pop_back(void) {
+    assert(!empty());
 
-  void pop_back (void) {
-    assert (!empty ());
+    tail->chunk.pop_back();
 
-    tail->chunk.pop_back ();
-
-    if (tail->chunk.empty ()) {
-      popBackBlock ();
+    if (tail->chunk.empty()) {
+      popBackBlock();
     }
   }
 
-  void splice (SerialBag& that) {
-    this->checkInvariants ();
-    that.checkInvariants ();
+  void splice(SerialBag& that) {
+    this->checkInvariants();
+    that.checkInvariants();
 
-    if (!that.empty ()) {
-      this->tail->next = that.getHead ();
-      that.getHead ()->prev = this->tail;
+    if (!that.empty()) {
+      this->tail->next     = that.getHead();
+      that.getHead()->prev = this->tail;
 
-      this->tail = that.tail;
-      this->tail->next = &(this->sentinel);
+      this->tail          = that.tail;
+      this->tail->next    = &(this->sentinel);
       this->sentinel.prev = this->tail;
 
-      that.init (); // make that look empty
+      that.init(); // make that look empty
     }
 
-    assert (that.empty ());
-    this->checkInvariants ();
-    that.checkInvariants ();
+    assert(that.empty());
+    this->checkInvariants();
+    that.checkInvariants();
   }
 
-  iterator begin () {
-    return stl_two_level_begin (make_outer_beg (), make_outer_end ());
+  iterator begin() {
+    return stl_two_level_begin(make_outer_beg(), make_outer_end());
   }
 
-  iterator end () {
-    return stl_two_level_end (make_outer_beg (), make_outer_end ());
+  iterator end() {
+    return stl_two_level_end(make_outer_beg(), make_outer_end());
   }
 
-  const_iterator cbegin () const {
-    return stl_two_level_cbegin (make_outer_cbeg (), make_outer_cend ());
+  const_iterator cbegin() const {
+    return stl_two_level_cbegin(make_outer_cbeg(), make_outer_cend());
   }
 
-  const_iterator cend () const {
-    return stl_two_level_cend (make_outer_cbeg (), make_outer_cend ());
+  const_iterator cend() const {
+    return stl_two_level_cend(make_outer_cbeg(), make_outer_cend());
   }
 
-  const_iterator begin () const {
-    return cbegin ();
+  const_iterator begin() const { return cbegin(); }
+
+  const_iterator end() const { return cend(); }
+
+  reverse_iterator rbegin() {
+    return stl_two_level_rbegin(make_outer_rbeg(), make_outer_rend());
   }
 
-  const_iterator end () const {
-    return cend ();
+  reverse_iterator rend() {
+    return stl_two_level_rend(make_outer_rbeg(), make_outer_rend());
   }
 
-  reverse_iterator rbegin () {
-    return stl_two_level_rbegin (make_outer_rbeg (), make_outer_rend ());
+  const_reverse_iterator crbegin() {
+    return stl_two_level_crbegin(make_outer_crbeg(), make_outer_crend());
   }
 
-  reverse_iterator rend () {
-    return stl_two_level_rend (make_outer_rbeg (), make_outer_rend ());
+  const_reverse_iterator crend() {
+    return stl_two_level_crend(make_outer_crbeg(), make_outer_crend());
   }
 
-  const_reverse_iterator crbegin () {
-    return stl_two_level_crbegin (make_outer_crbeg (), make_outer_crend ());
-  }
+  const_reverse_iterator rbegin() const { return crbegin(); }
 
-  const_reverse_iterator crend () {
-    return stl_two_level_crend (make_outer_crbeg (), make_outer_crend ());
-  }
-
-  const_reverse_iterator rbegin () const {
-    return crbegin ();
-  }
-
-  const_reverse_iterator crend () const {
-    return crend ();
-  }
-
+  const_reverse_iterator crend() const { return crend(); }
 };
 
 #else
@@ -482,7 +443,8 @@ public:
 //
 //
 //   template <typename U>
-//   struct OuterIterImpl: public boost::iterator_facade<OuterIterImpl<U>, U, boost::bidirectional_traversal_tag> {
+//   struct OuterIterImpl: public boost::iterator_facade<OuterIterImpl<U>, U,
+//   boost::bidirectional_traversal_tag> {
 //
 //     friend class boost::iterator_core_access;
 //
@@ -554,10 +516,12 @@ public:
 //     return ConstRevOuterIter (make_outer_cbeg ());
 //   }
 //
-//   static const size_t ALLOC_SIZE = (SZ == 0) ? PageHeap::AllocSize : SZ * sizeof (T);
-//   static_assert (sizeof(T) < PageHeap::AllocSize, "Serial Bag with template type too large in size");
-//   static_assert (ALLOC_SIZE <= PageHeap::AllocSize, "Serial Bag with SZ parameter too large");
-//   static_assert (ALLOC_SIZE > sizeof (Block), "Serial Bag with SZ parameter too small");
+//   static const size_t ALLOC_SIZE = (SZ == 0) ? PageHeap::AllocSize : SZ *
+//   sizeof (T); static_assert (sizeof(T) < PageHeap::AllocSize, "Serial Bag
+//   with template type too large in size"); static_assert (ALLOC_SIZE <=
+//   PageHeap::AllocSize, "Serial Bag with SZ parameter too large");
+//   static_assert (ALLOC_SIZE > sizeof (Block), "Serial Bag with SZ parameter
+//   too small");
 //
 //
 //   Block* allocateBlock (void) {
@@ -625,11 +589,16 @@ public:
 //   using const_pointer = const  value_type*;
 //
 //
-//   using iterator =  typename ChooseStlTwoLevelIterator<OuterIter, typename DynamicBoundedVector<T>::iterator>::type;
-//   using const_iterator =  typename ChooseStlTwoLevelIterator<ConstOuterIter, typename DynamicBoundedVector<T>::const_iterator>::type;
+//   using iterator =  typename ChooseStlTwoLevelIterator<OuterIter, typename
+//   DynamicBoundedVector<T>::iterator>::type; using const_iterator =  typename
+//   ChooseStlTwoLevelIterator<ConstOuterIter, typename
+//   DynamicBoundedVector<T>::const_iterator>::type;
 //
-//   using reverse_iterator =  typename ChooseStlTwoLevelIterator<RevOuterIter, typename DynamicBoundedVector<T>::reverse_iterator>::type;
-//   using const_reverse_iterator =  typename ChooseStlTwoLevelIterator<ConstRevOuterIter, typename DynamicBoundedVector<T>::const_reverse_iterator>::type;
+//   using reverse_iterator =  typename ChooseStlTwoLevelIterator<RevOuterIter,
+//   typename DynamicBoundedVector<T>::reverse_iterator>::type; using
+//   const_reverse_iterator =  typename
+//   ChooseStlTwoLevelIterator<ConstRevOuterIter, typename
+//   DynamicBoundedVector<T>::const_reverse_iterator>::type;
 //
 //   SerialBag (void)
 //     :
@@ -673,8 +642,10 @@ public:
 //     std::printf ("SerialBag blocks are: ");
 //     for (Block* i = head; i != &tail; i = i->next) {
 //       auto& c = i->chunk;
-//       std::printf ("<curr:%p, next:%p, prev:%p, dbeg:%p, dsize:%p, dend:%p>, ",
-//           i, i->next, i->prev, c.begin (), c.begin () + c.size (), c.begin () + c.capacity ());
+//       std::printf ("<curr:%p, next:%p, prev:%p, dbeg:%p, dsize:%p, dend:%p>,
+//       ",
+//           i, i->next, i->prev, c.begin (), c.begin () + c.size (), c.begin ()
+//           + c.capacity ());
 //     }
 //     std::printf ("\n");
 //   }
@@ -765,28 +736,21 @@ public:
 //
 #endif
 
-template <typename T, const size_t SZ=0>
-class PerThreadBag: public PerThreadContainer<SerialBag<T, SZ> > {
-  using C = SerialBag<T, SZ>;
+template <typename T, const size_t SZ = 0>
+class PerThreadBag : public PerThreadContainer<SerialBag<T, SZ>> {
+  using C        = SerialBag<T, SZ>;
   using Super_ty = PerThreadContainer<C>;
 
 public:
+  PerThreadBag() : Super_ty() { Super_ty::init(); }
 
-  PerThreadBag (): Super_ty () {
-    Super_ty::init ();
-  }
+  void push_back(const T& x) { Super_ty::get().push_back(x); }
 
-  void push_back (const T& x) {
-    Super_ty::get ().push_back (x);
-  }
+  void push(const T& x) { push_back(x); }
 
-  void push (const T& x) {
-    push_back (x);
-  }
-
-  void splice_all (PerThreadBag& that) {
+  void splice_all(PerThreadBag& that) {
     for (unsigned i = 0; i < Super_ty::numRows(); ++i) {
-      Super_ty::get(i).splice (that.Super_ty::get (i));
+      Super_ty::get(i).splice(that.Super_ty::get(i));
     }
   }
 };

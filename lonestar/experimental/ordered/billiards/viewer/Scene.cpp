@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,7 +31,7 @@
 #include <limits>
 #include <algorithm>
 
-//! Project world coordinates to screen based on current GL 
+//! Project world coordinates to screen based on current GL
 class WorldScreenProjector {
   GLint viewport[4];
   GLdouble mvp[16];
@@ -45,13 +45,16 @@ public:
   qglviewer::Vec project(const qglviewer::Vec& p) {
     GLdouble v[4], vs[4];
     // vs = MVP * V
-    v[0] = p[0]; v[1] = p[1]; v[2] = p[2]; v[3] = 1.0;
-    vs[0] = mvp[0]*v[0] + mvp[4]*v[1] + mvp[ 8]*v[2] + mvp[12]*v[3];
-    vs[1] = mvp[1]*v[0] + mvp[5]*v[1] + mvp[ 9]*v[2] + mvp[13]*v[3];
-    vs[2] = mvp[2]*v[0] + mvp[6]*v[1] + mvp[10]*v[2] + mvp[14]*v[3];
-    vs[3] = mvp[3]*v[0] + mvp[7]*v[1] + mvp[11]*v[2] + mvp[15]*v[3];
+    v[0]  = p[0];
+    v[1]  = p[1];
+    v[2]  = p[2];
+    v[3]  = 1.0;
+    vs[0] = mvp[0] * v[0] + mvp[4] * v[1] + mvp[8] * v[2] + mvp[12] * v[3];
+    vs[1] = mvp[1] * v[0] + mvp[5] * v[1] + mvp[9] * v[2] + mvp[13] * v[3];
+    vs[2] = mvp[2] * v[0] + mvp[6] * v[1] + mvp[10] * v[2] + mvp[14] * v[3];
+    vs[3] = mvp[3] * v[0] + mvp[7] * v[1] + mvp[11] * v[2] + mvp[15] * v[3];
 
-    // Projection to window 
+    // Projection to window
     // see http://www.opengl.org/sdk/docs/man2/xhtml/gluProject.xml
     vs[0] /= vs[3];
     vs[1] /= vs[3];
@@ -71,8 +74,8 @@ public:
 // -----------------------------------------------
 
 void Sphere::init(float radius, float rings, float sectors) {
-  float R = 1.0/(rings-1);
-  float S = 1.0/(sectors-1);
+  float R = 1.0 / (rings - 1);
+  float S = 1.0 / (sectors - 1);
 
   vertices.resize(rings * sectors * 3);
   normals.resize(rings * sectors * 3);
@@ -82,8 +85,8 @@ void Sphere::init(float radius, float rings, float sectors) {
   for (unsigned int r = 0; r < rings; ++r) {
     for (unsigned int s = 0; s < sectors; ++s) {
       float y = sin(-M_PI_2 + M_PI * r * R);
-      float x = cos(2*M_PI* s * S) * sin(M_PI * r * R);
-      float z = sin(2*M_PI* s * S) * sin(M_PI * r * R);
+      float x = cos(2 * M_PI * s * S) * sin(M_PI * r * R);
+      float z = sin(2 * M_PI * s * S) * sin(M_PI * r * R);
 
       *v++ = x * radius;
       *v++ = y * radius;
@@ -99,13 +102,13 @@ void Sphere::init(float radius, float rings, float sectors) {
   for (unsigned int r = 0; r < rings - 1; ++r) {
     for (unsigned int s = 0; s < sectors - 1; ++s) {
       *i++ = r * sectors + s;
-      *i++ = r * sectors + (s+1);
-      *i++ = (r+1) * sectors + (s+1);
-      *i++ = (r+1) * sectors + s;
+      *i++ = r * sectors + (s + 1);
+      *i++ = (r + 1) * sectors + (s + 1);
+      *i++ = (r + 1) * sectors + s;
     }
   }
 }
-  
+
 void Sphere::draw() {
   // TODO: Switch over to using shader programs
   glEnableClientState(GL_VERTEX_ARRAY);
@@ -144,14 +147,14 @@ void Balls::draw(Viewer* v) {
   }
 
   lines.draw();
-  
+
   WorldScreenProjector proj(v->camera());
 
   glDisable(GL_LIGHTING);
   int index = 0;
   for (Ball& b : balls) {
     qglviewer::Vec screen = proj.project(b.pos);
-    //qglviewer::Vec screen = v->camera()->projectedCoordinatesOf(b.pos);
+    // qglviewer::Vec screen = v->camera()->projectedCoordinatesOf(b.pos);
     // v->drawText(screen.x, screen.y, QString::number(index++));
   }
   glEnable(GL_LIGHTING);
@@ -174,14 +177,16 @@ void Balls::animate(float endTime) {
   lines.update(balls);
 }
 
-void Balls::initBall(int index, float time, float px, float py, float vx, float vy) {
+void Balls::initBall(int index, float time, float px, float py, float vx,
+                     float vy) {
   if (time == 0.0) {
     balls[index].pos[0] = px;
     balls[index].pos[1] = py;
     balls[index].vel[0] = vx;
     balls[index].vel[1] = vy;
   } else {
-    events.emplace_back(index, Ball(qglviewer::Vec(px, py, 0.0), qglviewer::Vec(vx, vy, 0.0), time));
+    events.emplace_back(index, Ball(qglviewer::Vec(px, py, 0.0),
+                                    qglviewer::Vec(vx, vy, 0.0), time));
   }
 }
 
@@ -193,11 +198,11 @@ void Balls::update() {
 void Balls::Lines::update(std::vector<Ball> balls) {
   vertices.resize(balls.size() * 3 * 2);
   indices.resize(balls.size() * 2);
-  
-  auto v = vertices.begin();
-  auto i = indices.begin();
+
+  auto v             = vertices.begin();
+  auto i             = indices.begin();
   unsigned int index = 0;
-  
+
   for (const Ball& b : balls) {
     qglviewer::Vec off = b.pos + b.vel;
     for (int k = 0; k < 3; ++k)
@@ -219,27 +224,22 @@ void Balls::Lines::draw() {
   glEnable(GL_LIGHTING);
 }
 
-void Scene::initCushions (double length, double width) {
-  cushions = {
-      0.0, 0.0,
-      0.0, width,
-      length, width,
-      length, 0.0,
-      0.0, 0.0
+void Scene::initCushions(double length, double width) {
+  cushions = {0.0,    0.0, 0.0, width, length, width,
+              length, 0.0, 0.0, 0.0
 
   };
 }
 
 // TODO: anti-aliasing for lines
-void Scene::drawCushions (void) {
+void Scene::drawCushions(void) {
   glDisable(GL_LIGHTING);
   glColor3f(1.0f, 1.0f, 1.0f);
   glEnableClientState(GL_VERTEX_ARRAY);
   glVertexPointer(2, GL_DOUBLE, 0, &cushions[0]);
-  glDrawArrays(GL_LINE_STRIP, 0, cushions.size ()/2);
+  glDrawArrays(GL_LINE_STRIP, 0, cushions.size() / 2);
   glDisableClientState(GL_VERTEX_ARRAY);
   glEnable(GL_LIGHTING);
-
 }
 
 // -----------------------------------------------
@@ -249,7 +249,7 @@ void Scene::drawCushions (void) {
 void Scene::readConfig() {
   std::ifstream infile(configFilename.c_str());
   std::string comma;
-  
+
   float width, length, mass, ballRadius;
   size_t numBalls;
 
@@ -272,7 +272,7 @@ void Scene::readLog() {
 
   int index;
   float time, px, py, vx, vy;
-  
+
   infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
   while (infile) {
     infile >> index >> comma;
@@ -293,12 +293,12 @@ qglviewer::Vec Scene::init(float dt) {
 
   readConfig();
   readLog();
-  
+
   return sceneDim;
 }
 
 void Scene::draw(Viewer* v) {
-  drawCushions ();
+  drawCushions();
   balls.draw(v);
 }
 

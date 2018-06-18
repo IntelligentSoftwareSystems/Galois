@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -16,7 +16,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-
 
 /**
  * @file GlobalObj.h
@@ -48,9 +47,9 @@ class GlobalObject {
   //! ID of a global object
   uint32_t objID;
 
- protected:
+protected:
   GlobalObject(const GlobalObject&) = delete;
-  GlobalObject(GlobalObject&&) = delete;
+  GlobalObject(GlobalObject&&)      = delete;
 
   /**
    * Returns the pointer for a global object
@@ -67,10 +66,10 @@ class GlobalObject {
    * @tparam T type of the object to make a GlobalObject
    * @param ptr pointer to object to make a GlobalObject
    *
-   * @todo lock needed if multiple GlobalObjects are being constructed in 
+   * @todo lock needed if multiple GlobalObjects are being constructed in
    * parallel
    */
-  template<typename T>
+  template <typename T>
   GlobalObject(const T* ptr) {
     objID = allobjs.size();
     allobjs.push_back(reinterpret_cast<uintptr_t>(ptr));
@@ -81,12 +80,10 @@ class GlobalObject {
    *
    * @returns this object's global id
    */
-  uint32_t idForSelf() const {
-    return objID;
-  }
+  uint32_t idForSelf() const { return objID; }
 };
 
 } // end namespace runtime
 } // end namespace galois
 
-#endif//_GALOIS_DIST_GLOBAL_OBJECT_H
+#endif //_GALOIS_DIST_GLOBAL_OBJECT_H

@@ -9,8 +9,8 @@
 #ifndef _DMP_INTERNAL_RESOURCE_H_
 #define _DMP_INTERNAL_RESOURCE_H_
 
-#define RESOURCE_CONTAINER(ptr, type) \
-    ((type *)( (char *)(ptr) - offsetof(type,resource) ))
+#define RESOURCE_CONTAINER(ptr, type)                                          \
+  ((type*)((char*)(ptr)-offsetof(type, resource)))
 
 //--------------------------------------------------------------
 // Resource basic API
@@ -18,7 +18,7 @@
 
 inline void DMPresource_init(DMPresource* r, int state) {
   dmp_static_assert(DMP_RESOURCE_STATE_OWNER_MASK >= MaxThreads);
-  r->state = state;
+  r->state   = state;
   r->waiters = NULL;
 #ifdef DMP_ENABLE_WB_HBSYNC
   r->lastRoundUsed = 0;
@@ -33,7 +33,7 @@ inline void DMPresource_init(DMPresource* r, int state) {
 #endif
 #ifdef DMP_ENABLE_PREDICT_HANDOFF_MARKOV
   for (int i = 0; i < ARRAY_SIZE(r->acquires); ++i) {
-    r->acquires[i].threadID = -1;
+    r->acquires[i].threadID            = -1;
     r->acquires[i].recentFollowersSlot = 0;
     for (int k = 0; k < ARRAY_SIZE(r->acquires[i].recentFollowers); ++k)
       r->acquires[i].recentFollowers[k] = -1;
@@ -55,7 +55,7 @@ inline bool DMPresource_is_owner(DMPresource* r, DmpThreadInfo* dmp) {
 inline void DMPresource_set_owner(DMPresource* r, DmpThreadInfo* dmp) {
   r->state = dmp->threadID | (r->state & ~DMP_RESOURCE_STATE_OWNER_MASK);
 #ifdef DMP_ENABLE_WB_HBSYNC
-  r->lastRoundUsed = DMProundNumber;  // mark this resource used
+  r->lastRoundUsed = DMProundNumber; // mark this resource used
 #endif
 }
 
@@ -71,8 +71,8 @@ static void DMPwaiter_add(DMPwaiter** first, DMPwaiter* w) {
   // REQUIRES: 'w' is not attached to any list
   DMP_ASSERT(w);
   w->waiting = 1;
-  w->dmp = DMPMAP;
-  w->next = NULL;
+  w->dmp     = DMPMAP;
+  w->next    = NULL;
 #ifdef DMP_ENABLE_WB_HBSYNC
   w->roundReleased = (uint64_t)(-1);
 #endif
@@ -94,7 +94,7 @@ static void DMPwaiter_remove(DMPwaiter** first, DMPwaiter* w) {
   w->roundReleased = DMProundNumber;
 #endif
   w->waiting = 0;
-  w->next = NULL;
+  w->next    = NULL;
 }
 
 //--------------------------------------------------------------
@@ -188,11 +188,10 @@ static bool DMPresource_ownership_barrier(DMPresource* const r) {
 //       -- updates resource nesting ('DMPMAP->innerResource')
 //--------------------------------------------------------------
 
-template<typename Traits>
+template <typename Traits>
 bool DMPresource_tryacquire(DMPresource* const r,
                             typename Traits::T* const object,
-                            DMPwaiter* const waiter)
-{
+                            DMPwaiter* const waiter) {
   const bool cancontinue = DMPresource_ownership_barrier(r);
 
 #ifdef DMP_ENABLE_INSTRUMENT_WORK
@@ -233,7 +232,7 @@ bool DMPresource_tryacquire(DMPresource* const r,
     if (Traits::tryacquire_serial(object, waiter))
       goto success;
   }
-#else   // DMP_ENABLE_FAST_HANDOFF
+#else // DMP_ENABLE_FAST_HANDOFF
   {
     // In parallel mode: try to acquire if we own the resource.
     // See DMP_fastHandoff() for the fast-handoff protocol.
@@ -268,9 +267,9 @@ success:
 #ifdef DMP_ENABLE_DATA_GROUPING
   // Add to the held-resource chain.
   if (Traits::nest_globally) {
-    r->outer = DMPMAP->innerResource;
+    r->outer              = DMPMAP->innerResource;
     DMPMAP->innerResource = r;
-    DMPMAP->nextResource = r->outer;
+    DMPMAP->nextResource  = r->outer;
   }
 #endif
 
@@ -302,9 +301,8 @@ success:
   return true;
 }
 
-template<typename Traits>
-void DMPresource_handoff(DMPresource* const r)
-{
+template <typename Traits>
+void DMPresource_handoff(DMPresource* const r) {
 #if defined(DMP_ENABLE_DATA_GROUPING) || defined(DMP_ENABLE_HANDOFF)
   DMP_ASSERT(DMPresource_owner(r) == DMPMAP->threadID);
 #endif
@@ -316,14 +314,16 @@ void DMPresource_handoff(DMPresource* const r)
   if (Traits::nest_globally) {
     if (DMPMAP->innerResource == r) {
       DMPMAP->innerResource = r->outer;
-      DMPMAP->nextResource = (r->outer) ? r->outer->outer : NULL;
-      r->outer = NULL;
+      DMPMAP->nextResource  = (r->outer) ? r->outer->outer : NULL;
+      r->outer              = NULL;
     } else {
       DMPresource *p, *n;
       for (n = DMPMAP->innerResource, n = NULL; n; p = n, n = n->outer) {
         if (n == r) {
-          if (p) p->outer = n->outer;
-          if (DMPMAP->nextResource == n) DMPMAP->nextResource = n->outer;
+          if (p)
+            p->outer = n->outer;
+          if (DMPMAP->nextResource == n)
+            DMPMAP->nextResource = n->outer;
           r->outer = NULL;
           break;
         }
@@ -387,12 +387,11 @@ void DMPresource_handoff(DMPresource* const r)
 //   * This is used to implement DMPbarrier_wait and DMPcondvar_wait.
 //--------------------------------------------------------------
 
-template<typename Traits>
+template <typename Traits>
 void DMPresource_acquire(DMPresource* const r,
-                         typename Traits::T* const object)
-{
+                         typename Traits::T* const object) {
   DMPwaiter waiter = DMP_WAITER_INIT;
-  waiter.dmp = DMPMAP;
+  waiter.dmp       = DMPMAP;
 
   while (true) {
     if (DMPresource_tryacquire<Traits>(r, object, &waiter)) {
@@ -420,7 +419,7 @@ void DMPresource_acquire(DMPresource* const r,
   }
 }
 
-template<typename TraitsBase>
+template <typename TraitsBase>
 struct DmpResourceTakeOwnershipTraits {
   typedef typename TraitsBase::T T;
   static bool tryacquire_parallel(T* object, DMPwaiter*) {
@@ -441,46 +440,46 @@ struct DmpResourceTakeOwnershipTraits {
   static void update_predictor(DMPresource* r, int oldowner) {
     TraitsBase::update_predictor(r, oldowner);
   }
-  static int  predict_next(DMPresource* r) {
+  static int predict_next(DMPresource* r) {
     return TraitsBase::predict_next(r);
   }
 
-  static const bool nest_globally = TraitsBase::nest_globally;
+  static const bool nest_globally        = TraitsBase::nest_globally;
   static const bool acquire_ends_quantum = TraitsBase::acquire_ends_quantum;
   static const bool release_ends_quantum = TraitsBase::release_ends_quantum;
 };
 
-template<typename TraitsBase>
-void DMPresource_take_ownership(DMPresource* const r)
-{
-  typename TraitsBase::T* object = RESOURCE_CONTAINER(r, typename TraitsBase::T);
-  DMPresource_acquire<DmpResourceTakeOwnershipTraits<TraitsBase> >(r, object);
+template <typename TraitsBase>
+void DMPresource_take_ownership(DMPresource* const r) {
+  typename TraitsBase::T* object =
+      RESOURCE_CONTAINER(r, typename TraitsBase::T);
+  DMPresource_acquire<DmpResourceTakeOwnershipTraits<TraitsBase>>(r, object);
 }
 
-template<typename Traits>
-void DMPresource_release(DMPresource* const r,
-                         typename Traits::T* const object,
-                         const bool needs_ownership)
-{
+template <typename Traits>
+void DMPresource_release(DMPresource* const r, typename Traits::T* const object,
+                         const bool needs_ownership) {
 #if defined(DMP_ENABLE_MODE_B_S) || defined(DMP_ENABLE_MODE_OB_S)
   // Don't need to take_ownership when releasing mutex locks.
   // Consider the possible races:
   //   -- release w/ acquire: acquire cannot happen until the next commit anyway
-  //   -- release w/ release: two releases in the same round are harmless (release is idempotent: "just write 0")
+  //   -- release w/ release: two releases in the same round are harmless
+  //   (release is idempotent: "just write 0")
   // HOWEVER,
   //   -- release w/ release: two releases in different rounds are bad, e.g.:
   //        1) T1 calls unlock(L) in round #4
   //        2) T2 calls unlock(L) in round #5
   //        3) T3 calls lock(L)   in round #5
-  //   -- Because of the round #5 race, T2 can nondeterministically deny T3 the mutex in quantum 5.
-  //   -- Thus, we must take_ownership if we're not the current holder of the mutex.
+  //   -- Because of the round #5 race, T2 can nondeterministically deny T3 the
+  //   mutex in quantum 5.
+  //   -- Thus, we must take_ownership if we're not the current holder of the
+  //   mutex.
   if (!needs_ownership) {
 #ifdef DMP_ENABLE_WB_HBSYNC
     r->lastRoundUsed = DMProundNumber;
 #endif
     Traits::release(object);
-  }
-  else
+  } else
 #endif
   {
     // In the common case, we'll already have ownership here.
@@ -509,17 +508,15 @@ struct DmpResourceWaitUntilWokenTraits {
   static void release(T*) {}
 
   static void update_predictor(DMPresource* r, int oldowner) {}
-  static int  predict_next(DMPresource* r) { return -1; }
+  static int predict_next(DMPresource* r) { return -1; }
 
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
   static const bool acquire_ends_quantum = false;
   static const bool release_ends_quantum = false;
 };
 
-inline
-void DMPresource_wait_until_woken(DMPresource* const r,
-                                  DMPwaiter* const waiter)
-{
+inline void DMPresource_wait_until_woken(DMPresource* const r,
+                                         DMPwaiter* const waiter) {
   DMP_ASSERT(waiter);
   // NOTE: waiter->waiting could be false if we've already been signaled
 
@@ -528,7 +525,8 @@ void DMPresource_wait_until_woken(DMPresource* const r,
     if (!waiter->waiting && waiter->roundReleased < DMProundNumber)
       return;
 #else
-    if (DMPresource_tryacquire<DmpResourceWaitUntilWokenTraits>(r, NULL, waiter))
+    if (DMPresource_tryacquire<DmpResourceWaitUntilWokenTraits>(r, NULL,
+                                                                waiter))
       return;
 #endif
 
@@ -543,7 +541,7 @@ void DMPresource_wait_until_woken(DMPresource* const r,
 // Simplify a common traits pattern
 //--------------------------------------------------------------
 
-template<typename T, bool tryacquire(T*,DMPwaiter*)>
+template <typename T, bool tryacquire(T*, DMPwaiter*)>
 struct DmpResourceTryacquireWrapper {
   // Check ownership in parallel mode.
   static bool tryacquire_parallel(T* object, DMPwaiter* w) {
@@ -555,7 +553,8 @@ struct DmpResourceTryacquireWrapper {
     }
 #else
     if (DMPresource_owner(&object->resource) == DMPMAP->threadID) {
-      if (tryacquire(object, w)) return true;
+      if (tryacquire(object, w))
+        return true;
     }
 #endif
     return false;
@@ -591,10 +590,9 @@ struct DmpResourceTryacquireWrapper {
 
 struct DmpEmptyPredictor {
   static void update(DMPresource* r, const int oldowner) {}
-  static DmpThreadInfo* predict(DMPresource* r) {
-    return NULL;
-  }
-  static DmpThreadInfo* predict_ignoring(DMPresource* r, DmpThreadInfo* ignore) {
+  static DmpThreadInfo* predict(DMPresource* r) { return NULL; }
+  static DmpThreadInfo* predict_ignoring(DMPresource* r,
+                                         DmpThreadInfo* ignore) {
     return NULL;
   }
 };
@@ -626,7 +624,7 @@ struct DmpCoutingPredictorBase {
       }
       if (k == unique) {
         counts[unique].threadID = recent[i];
-        counts[unique].count = 0;
+        counts[unique].count    = 0;
         unique++;
       }
     }
@@ -670,9 +668,11 @@ struct DmpWindowedPredictor {
     return predict_ignoring(r, NULL);
   }
 
-  static DmpThreadInfo* predict_ignoring(DMPresource* r, DmpThreadInfo* ignore) {
-    return DmpCoutingPredictorBase<ARRAY_SIZE(r->recentAcquires)>
-            ::predict_ignoring(r->recentAcquires, r->recentAcquiresSlot, ignore);
+  static DmpThreadInfo* predict_ignoring(DMPresource* r,
+                                         DmpThreadInfo* ignore) {
+    return DmpCoutingPredictorBase<ARRAY_SIZE(
+        r->recentAcquires)>::predict_ignoring(r->recentAcquires,
+                                              r->recentAcquiresSlot, ignore);
   }
 };
 
@@ -690,8 +690,8 @@ struct DmpMarkovPredictor {
     for (int i = 0; i < ARRAY_SIZE(r->acquires); ++i) {
       DMPresource::Acquire* a = r->acquires + i;
       if (a->threadID < 0) {
-        a->threadID = oldowner;
-        a->recentFollowers[0] = DMPMAP->threadID;
+        a->threadID            = oldowner;
+        a->recentFollowers[0]  = DMPMAP->threadID;
         a->recentFollowersSlot = 1;
         break;
       }
@@ -708,12 +708,15 @@ struct DmpMarkovPredictor {
     return predict_ignoring(r, NULL);
   }
 
-  static DmpThreadInfo* predict_ignoring(DMPresource* r, DmpThreadInfo* ignore) {
+  static DmpThreadInfo* predict_ignoring(DMPresource* r,
+                                         DmpThreadInfo* ignore) {
     for (int i = 0; i < ARRAY_SIZE(r->acquires); ++i) {
       DMPresource::Acquire* a = r->acquires + i;
       if (a->threadID == DMPMAP->threadID) {
-        return DmpCoutingPredictorBase<ARRAY_SIZE(a->recentFollowers)>
-                ::predict_ignoring(a->recentFollowers, a->recentFollowersSlot, ignore);
+        return DmpCoutingPredictorBase<ARRAY_SIZE(
+            a->recentFollowers)>::predict_ignoring(a->recentFollowers,
+                                                   a->recentFollowersSlot,
+                                                   ignore);
       }
     }
     return NULL;
@@ -722,7 +725,6 @@ struct DmpMarkovPredictor {
 
 #endif // DMP_ENABLE_PREDICT_HANDOFF_MARKOV
 
-
 #if defined(DMP_ENABLE_PREDICT_HANDOFF_WINDOWED)
 typedef DmpWindowedPredictor DmpDefaultPredictor;
 #elif defined(DMP_ENABLE_PREDICT_HANDOFF_MARKOV)
@@ -730,6 +732,5 @@ typedef DmpMarkovPredictor DmpDefaultPredictor;
 #else
 typedef DmpEmptyPredictor DmpDefaultPredictor;
 #endif
-
 
 #endif // _DMP_INTERNAL_RESOURCE_H_

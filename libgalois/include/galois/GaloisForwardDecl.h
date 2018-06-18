@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,16 +20,17 @@
 namespace galois {
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args);
+void for_each(const RangeFunc& rangeMaker, const FunctionTy& fn,
+              const Args&... args);
 
 template <typename RangeFunc, typename FunctionTy, typename... Args>
-void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn, const Args&... args);
+void do_all(const RangeFunc& rangeMaker, const FunctionTy& fn,
+            const Args&... args);
 
-template<typename FunctionTy, typename... Args>
+template <typename FunctionTy, typename... Args>
 void on_each(const FunctionTy& fn, const Args&... args);
 
-template<typename FunctionTy, typename... Args>
+template <typename FunctionTy, typename... Args>
 void on_each(FunctionTy& fn, const Args&... args);
 
 } // end namespace galois
-

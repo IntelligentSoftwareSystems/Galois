@@ -12,15 +12,12 @@
 #include "BFS.h"
 
 struct GraphLabBFS {
-  typedef typename galois::graphs::LC_CSR_Graph<SNode,void>
-    ::with_no_lockable<true>::type
-    ::with_numa_alloc<true>::type InnerGraph;
+  typedef typename galois::graphs::LC_CSR_Graph<SNode, void>::with_no_lockable<
+      true>::type ::with_numa_alloc<true>::type InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
-    readInOutGraph(graph);
-  }
+  void readGraph(Graph& graph) { readInOutGraph(graph); }
 
   std::string name() const { return "GraphLab"; }
 
@@ -29,8 +26,8 @@ struct GraphLabBFS {
 
     struct message_type {
       size_t value;
-      message_type(): value(std::numeric_limits<size_t>::max()) { }
-      explicit message_type(size_t v): value(v) { }
+      message_type() : value(std::numeric_limits<size_t>::max()) {}
+      explicit message_type(size_t v) : value(v) {}
       message_type& operator+=(const message_type& other) {
         value = std::min<size_t>(value, other.value);
         return *this;
@@ -44,29 +41,29 @@ struct GraphLabBFS {
     bool changed;
 
   public:
-    Program(): received_dist(DIST_INFINITY), changed(false) { }
+    Program() : received_dist(DIST_INFINITY), changed(false) {}
 
     void init(Graph& graph, GNode node, const message_type& msg) {
       received_dist = msg.value;
     }
 
     void apply(Graph& graph, GNode node, const gather_type&) {
-      changed = false;
+      changed      = false;
       SNode& sdata = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       if (sdata.dist > received_dist) {
-        changed = true;
+        changed    = true;
         sdata.dist = received_dist;
       }
     }
 
-    bool needsScatter(Graph& graph, GNode node) {
-      return changed;
-    }
+    bool needsScatter(Graph& graph, GNode node) { return changed; }
 
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&,
+                typename Graph::edge_data_reference) {}
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+                 galois::graphsLab::Context<Graph, Program>& ctx,
+                 typename Graph::edge_data_reference) {
       SNode& sdata = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + 1;
 
@@ -77,13 +74,14 @@ struct GraphLabBFS {
   };
 
   void operator()(Graph& graph, const GNode& source) {
-    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph, Program> engine(graph, Program());
     engine.signal(source, Program::message_type(0));
     engine.execute();
   }
 };
 
-static void bitwise_or(std::vector<std::vector<bool> >& v1, const std::vector<std::vector<bool> >& v2) {
+static void bitwise_or(std::vector<std::vector<bool>>& v1,
+                       const std::vector<std::vector<bool>>& v2) {
   while (v1.size() < v2.size())
     v1.emplace_back();
 
@@ -97,19 +95,19 @@ static void bitwise_or(std::vector<std::vector<bool> >& v1, const std::vector<st
   }
 }
 
-template<bool UseHashed>
+template <bool UseHashed>
 struct GraphLabDiameter {
   struct LNode {
-    std::vector<std::vector<bool> > bitmask1;
-    std::vector<std::vector<bool> > bitmask2;
+    std::vector<std::vector<bool>> bitmask1;
+    std::vector<std::vector<bool>> bitmask2;
     bool odd_iteration;
 
-    LNode(): odd_iteration(false) { }
+    LNode() : odd_iteration(false) {}
   };
 
-  typedef typename galois::graphs::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true>::type
-    ::template with_numa_alloc<true>::type InnerGraph;
+  typedef typename galois::graphs::LC_CSR_Graph<LNode, void>::
+      template with_no_lockable<true>::type ::template with_numa_alloc<
+          true>::type InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -117,7 +115,7 @@ struct GraphLabDiameter {
 
   struct Initialize {
     Graph& graph;
-    //FIXME: don't use mutable
+    // FIXME: don't use mutable
     mutable galois::optional<std::mt19937> gen;
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
     mutable std::uniform_real_distribution<float> dist;
@@ -125,7 +123,7 @@ struct GraphLabDiameter {
     mutable std::uniform_real<float> dist;
 #endif
 
-    Initialize(Graph& g): graph(g) { }
+    Initialize(Graph& g) : graph(g) {}
 
     size_t hash_value() const {
       if (!gen) {
@@ -172,10 +170,10 @@ struct GraphLabDiameter {
 
   struct Program {
     struct gather_type {
-      std::vector<std::vector<bool> > bitmask;
-      gather_type() { }
-      explicit gather_type(const std::vector<std::vector<bool> > & in_b) {
-        for(size_t i=0;i<in_b.size();++i){
+      std::vector<std::vector<bool>> bitmask;
+      gather_type() {}
+      explicit gather_type(const std::vector<std::vector<bool>>& in_b) {
+        for (size_t i = 0; i < in_b.size(); ++i) {
           bitmask.push_back(in_b[i]);
         }
       }
@@ -187,18 +185,19 @@ struct GraphLabDiameter {
     };
     typedef galois::graphsLab::EmptyMessage message_type;
 
-    typedef std::pair<GNode,message_type> WorkItem;
+    typedef std::pair<GNode, message_type> WorkItem;
     typedef int tt_needs_gather_out_edges;
-    
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type& gather, typename Graph::edge_data_reference) {
+
+    void gather(Graph& graph, GNode node, GNode src, GNode dst,
+                gather_type& gather, typename Graph::edge_data_reference) {
       LNode& sdata = graph.getData(node, galois::MethodFlag::UNPROTECTED);
       LNode& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
       if (sdata.odd_iteration) {
         bitwise_or(gather.bitmask, ddata.bitmask2);
-        //gather += gather_type(ddata.bitmask2);
+        // gather += gather_type(ddata.bitmask2);
       } else {
         bitwise_or(gather.bitmask, ddata.bitmask1);
-        //gather += gather_type(ddata.bitmask1);
+        // gather += gather_type(ddata.bitmask1);
       }
     }
 
@@ -215,17 +214,18 @@ struct GraphLabDiameter {
       }
     }
 
-    void init(Graph& graph, GNode node, const message_type& msg) { }
+    void init(Graph& graph, GNode node, const message_type& msg) {}
     bool needsScatter(Graph& graph, GNode node) { return false; }
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) { }
+                 galois::graphsLab::Context<Graph, Program>& ctx,
+                 typename Graph::edge_data_reference) {}
   };
 
   struct count_exact_visited {
     Graph& graph;
-    count_exact_visited(Graph& g): graph(g) { }
+    count_exact_visited(Graph& g) : graph(g) {}
     size_t operator()(GNode n) const {
-      LNode& data = graph.getData(n);
+      LNode& data  = graph.getData(n);
       size_t count = 0;
       for (size_t i = 0; i < data.bitmask1[0].size(); ++i)
         if (data.bitmask1[0][i])
@@ -236,19 +236,20 @@ struct GraphLabDiameter {
 
   struct count_hashed_visited {
     Graph& graph;
-    count_hashed_visited(Graph& g): graph(g) { }
+    count_hashed_visited(Graph& g) : graph(g) {}
 
-    size_t approximate_pair_number(const std::vector<std::vector<bool> >& bitmask) const {
+    size_t approximate_pair_number(
+        const std::vector<std::vector<bool>>& bitmask) const {
       float sum = 0.0;
       for (size_t a = 0; a < bitmask.size(); ++a) {
         for (size_t i = 0; i < bitmask[a].size(); ++i) {
           if (bitmask[a][i] == 0) {
-            sum += (float) i;
+            sum += (float)i;
             break;
           }
         }
       }
-      return (size_t) (pow(2.0, sum / (float) (bitmask.size())) / 0.77351);
+      return (size_t)(pow(2.0, sum / (float)(bitmask.size())) / 0.77351);
     }
 
     size_t operator()(GNode n) const {
@@ -259,10 +260,10 @@ struct GraphLabDiameter {
 
   size_t operator()(Graph& graph, const GNode& source) {
     size_t previous_count = 0;
-    size_t diameter = 0;
+    size_t diameter       = 0;
     for (size_t iter = 0; iter < 100; ++iter) {
-      //galois::graphsLab::executeSync(graph, graph, Program());
-      galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
+      // galois::graphsLab::executeSync(graph, graph, Program());
+      galois::graphsLab::SyncEngine<Graph, Program> engine(graph, Program());
       engine.execute();
 
       galois::do_all(graph.begin(), graph.end(), [&](GNode n) {
@@ -276,14 +277,18 @@ struct GraphLabDiameter {
 
       size_t current_count;
       if (UseHashed)
-        current_count = galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-            count_hashed_visited(graph), (size_t) 0, std::plus<size_t>());
+        current_count = galois::ParallelSTL::map_reduce(
+            graph.begin(), graph.end(), count_hashed_visited(graph), (size_t)0,
+            std::plus<size_t>());
       else
-        current_count = galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-            count_exact_visited(graph), (size_t) 0, std::plus<size_t>());
+        current_count = galois::ParallelSTL::map_reduce(
+            graph.begin(), graph.end(), count_exact_visited(graph), (size_t)0,
+            std::plus<size_t>());
 
-      std::cout << iter + 1 << "-th hop: " << current_count << " vertex pairs are reached\n";
-      if (iter > 0 && (float) current_count < (float) previous_count * (1.0 + 0.0001)) {
+      std::cout << iter + 1 << "-th hop: " << current_count
+                << " vertex pairs are reached\n";
+      if (iter > 0 &&
+          (float)current_count < (float)previous_count * (1.0 + 0.0001)) {
         diameter = iter;
         std::cout << "Converged.\n";
         break;

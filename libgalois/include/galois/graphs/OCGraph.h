@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,20 +38,18 @@ namespace graphs {
  * Binds the segment parameter of an out-of-core graph so that it can be used in
  * place of a non out-of-core graph.
  */
-template<typename Graph>
-class BindSegmentGraph: private boost::noncopyable {
+template <typename Graph>
+class BindSegmentGraph : private boost::noncopyable {
   typedef typename Graph::segment_type segment_type;
 
   Graph& graph;
   segment_type segment;
 
 public:
-  explicit BindSegmentGraph(Graph& g): graph(g) { }
-  BindSegmentGraph(Graph& g, segment_type s): graph(g), segment(s) { }
+  explicit BindSegmentGraph(Graph& g) : graph(g) {}
+  BindSegmentGraph(Graph& g, segment_type s) : graph(g), segment(s) {}
 
-  void setSegment(const segment_type& s) {
-    segment = s;
-  }
+  void setSegment(const segment_type& s) { segment = s; }
 
   typedef typename Graph::GraphNode GraphNode;
   typedef typename Graph::edge_data_type edge_data_type;
@@ -65,11 +63,13 @@ public:
   typedef typename Graph::local_iterator local_iterator;
   typedef typename Graph::const_local_iterator const_local_iterator;
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  node_data_reference getData(GraphNode N,
+                              MethodFlag mflag = MethodFlag::WRITE) {
     return graph.getData(N, mflag);
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference getEdgeData(edge_iterator ni,
+                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
     return graph.getEdgeData(segment, ni, mflag);
   }
 
@@ -94,15 +94,19 @@ public:
     return graph.edge_end(segment, N, mflag);
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return internal::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  runtime::iterable<NoDerefIterator<edge_iterator>>
+  edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return internal::make_no_deref_range(edge_begin(N, mflag),
+                                         edge_end(N, mflag));
   }
 
-  runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  runtime::iterable<NoDerefIterator<edge_iterator>>
+  out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return edges(N, mflag);
   }
 
-  edge_data_reference getInEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference
+  getInEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     return graph.getInEdgeData(segment, ni, mflag);
   }
 
@@ -110,36 +114,35 @@ public:
     return graph.getInEdgeDst(segment, ni);
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  in_edge_iterator in_edge_begin(GraphNode N,
+                                 MethodFlag mflag = MethodFlag::WRITE) {
     return graph.in_edge_begin(segment, N, mflag);
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  in_edge_iterator in_edge_end(GraphNode N,
+                               MethodFlag mflag = MethodFlag::WRITE) {
     return graph.in_edge_end(segment, N, mflag);
   }
 
-  internal::InEdgesIterator<BindSegmentGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  internal::InEdgesIterator<BindSegmentGraph>
+  in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return internal::InEdgesIterator<BindSegmentGraph>(*this, N, mflag);
   }
 
-  size_t idFromNode(GraphNode N) {
-    return graph.idFromNode(N);
-  }
+  size_t idFromNode(GraphNode N) { return graph.idFromNode(N); }
 
-  GraphNode nodeFromId(size_t N) {
-    return graph.nodeFromId(N);
-  }
+  GraphNode nodeFromId(size_t N) { return graph.nodeFromId(N); }
 };
 
 //! Like {@link FileGraph} but allows partial loading of the graph.
-class OCFileGraph: private boost::noncopyable {
+class OCFileGraph : private boost::noncopyable {
 public:
   typedef uint32_t GraphNode;
   typedef boost::counting_iterator<uint32_t> iterator;
   typedef boost::counting_iterator<uint64_t> edge_iterator;
   typedef uint64_t* edge_offset_iterator;
 
-  template<typename EdgeTy>
+  template <typename EdgeTy>
   struct EdgeReference {
     typedef typename LazyObject<EdgeTy>::reference type;
   };
@@ -162,10 +165,11 @@ private:
     size_t m_sizeof_data;
 
     void unload();
-    void load(int fd, offset_t offset, size_t begin, size_t len, size_t sizeof_data);
+    void load(int fd, offset_t offset, size_t begin, size_t len,
+              size_t sizeof_data);
 
   public:
-    Block(): m_mapping(0) { }
+    Block() : m_mapping(0) {}
 
     char* get(size_t index) const {
       char* p = m_data + (m_sizeof_data * (index - m_begin));
@@ -180,7 +184,7 @@ private:
     Block edgeData;
     bool loaded;
 
-    Segment(): loaded(false) { }
+    Segment() : loaded(false) {}
 
     void unload() {
       outs.unload();
@@ -199,26 +203,33 @@ private:
 public:
   typedef Segment segment_type;
 
-  OCFileGraph(): masterMapping(0), masterFD(-1), numEdges(0), numNodes(0), outIdx(0) { }
+  OCFileGraph()
+      : masterMapping(0), masterFD(-1), numEdges(0), numNodes(0), outIdx(0) {}
   ~OCFileGraph();
 
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }
   size_t size() const { return numNodes; }
   size_t sizeEdges() const { return numEdges; }
-  edge_iterator edge_begin(GraphNode n) const { return edge_iterator(n == 0 ? 0 : outIdx[n-1]); }
+  edge_iterator edge_begin(GraphNode n) const {
+    return edge_iterator(n == 0 ? 0 : outIdx[n - 1]);
+  }
   edge_iterator edge_end(GraphNode n) const { return edge_iterator(outIdx[n]); }
   edge_offset_iterator edge_offset_begin() const { return outIdx; }
   edge_offset_iterator edge_offset_end() const { return outIdx + numNodes; }
 
-  template<typename EdgeTy>
-  typename EdgeReference<EdgeTy>::type getEdgeData(const segment_type& s, edge_iterator it, typename std::enable_if<!std::is_same<void,EdgeTy>::value>::type* = 0) {
+  template <typename EdgeTy>
+  typename EdgeReference<EdgeTy>::type getEdgeData(
+      const segment_type& s, edge_iterator it,
+      typename std::enable_if<!std::is_same<void, EdgeTy>::value>::type* = 0) {
     EdgeTy* p = reinterpret_cast<EdgeTy*>(s.edgeData.get(*it));
     return *p;
   }
 
-  template<typename EdgeTy>
-  typename EdgeReference<EdgeTy>::type getEdgeData(const segment_type& s, edge_iterator it, typename std::enable_if<std::is_same<void,EdgeTy>::value>::type* = 0) {
+  template <typename EdgeTy>
+  typename EdgeReference<EdgeTy>::type getEdgeData(
+      const segment_type& s, edge_iterator it,
+      typename std::enable_if<std::is_same<void, EdgeTy>::value>::type* = 0) {
     return 0;
   }
 
@@ -236,55 +247,66 @@ public:
     s.loaded = false;
   }
 
-  void load(segment_type& s, edge_iterator begin, edge_iterator end, size_t sizeof_data);
+  void load(segment_type& s, edge_iterator begin, edge_iterator end,
+            size_t sizeof_data);
 
   void fromFile(const std::string& fname);
 };
 
-struct read_oc_immutable_edge_graph_tag { };
+struct read_oc_immutable_edge_graph_tag {};
 
-template<typename NodeTy, typename EdgeTy,
-  bool HasNoLockable=false,
-  //bool UseNumaAlloc=false, // XXX: implement this
-  bool HasOutOfLineLockable=false>
-class OCImmutableEdgeGraph:
-    private internal::LocalIteratorFeature<false>,
-    private internal::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+template <typename NodeTy, typename EdgeTy, bool HasNoLockable = false,
+          // bool UseNumaAlloc=false, // XXX: implement this
+          bool HasOutOfLineLockable = false>
+class OCImmutableEdgeGraph
+    : private internal::LocalIteratorFeature<false>,
+      private internal::OutOfLineLockableFeature<HasOutOfLineLockable &&
+                                                 !HasNoLockable> {
 public:
-  template<bool _has_id>
+  template <bool _has_id>
   struct with_id {
     typedef OCImmutableEdgeGraph type;
   };
 
-  template<typename _node_data>
+  template <typename _node_data>
   struct with_node_data {
-    typedef OCImmutableEdgeGraph<_node_data,EdgeTy,HasNoLockable,HasOutOfLineLockable> type;
+    typedef OCImmutableEdgeGraph<_node_data, EdgeTy, HasNoLockable,
+                                 HasOutOfLineLockable>
+        type;
   };
 
-  template<typename _edge_data>
+  template <typename _edge_data>
   struct with_edge_data {
-    typedef OCImmutableEdgeGraph<NodeTy,_edge_data,HasNoLockable,HasOutOfLineLockable> type;
+    typedef OCImmutableEdgeGraph<NodeTy, _edge_data, HasNoLockable,
+                                 HasOutOfLineLockable>
+        type;
   };
 
-  template<bool _has_no_lockable>
+  template <bool _has_no_lockable>
   struct with_no_lockable {
-    typedef OCImmutableEdgeGraph<NodeTy,EdgeTy,_has_no_lockable,HasOutOfLineLockable> type;
+    typedef OCImmutableEdgeGraph<NodeTy, EdgeTy, _has_no_lockable,
+                                 HasOutOfLineLockable>
+        type;
   };
 
-  template<bool _use_numa_alloc>
+  template <bool _use_numa_alloc>
   struct with_numa_alloc {
     typedef OCImmutableEdgeGraph type;
   };
 
-  template<bool _has_out_of_line_lockable>
+  template <bool _has_out_of_line_lockable>
   struct with_out_of_line_lockable {
-    typedef OCImmutableEdgeGraph<NodeTy,EdgeTy,HasNoLockable,_has_out_of_line_lockable> type;
+    typedef OCImmutableEdgeGraph<NodeTy, EdgeTy, HasNoLockable,
+                                 _has_out_of_line_lockable>
+        type;
   };
 
   typedef read_oc_immutable_edge_graph_tag read_tag;
 
 private:
-  typedef internal::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
+  typedef internal::NodeInfoBase<NodeTy,
+                                 !HasNoLockable && !HasOutOfLineLockable>
+      NodeInfo;
   typedef LargeArray<NodeInfo> NodeData;
 
   NodeData nodeData;
@@ -302,7 +324,8 @@ public:
   typedef EdgeTy edge_data_type;
   typedef edge_data_type file_edge_data_type;
   typedef NodeTy node_data_type;
-  typedef typename OCFileGraph::template EdgeReference<EdgeTy>::type edge_data_reference;
+  typedef typename OCFileGraph::template EdgeReference<EdgeTy>::type
+      edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
   typedef typename OCFileGraph::edge_iterator edge_iterator;
   typedef edge_iterator in_edge_iterator;
@@ -312,11 +335,13 @@ public:
   typedef local_iterator const_local_iterator;
 
   class segment_type {
-    template<typename,typename,bool,bool> friend class OCImmutableEdgeGraph;
+    template <typename, typename, bool, bool>
+    friend class OCImmutableEdgeGraph;
     OCFileGraph::segment_type out;
     OCFileGraph::segment_type in;
     iterator nodeBegin;
     iterator nodeEnd;
+
   public:
     //! Returns true if segment has been loaded into memory
     bool loaded() const { return out.loaded; }
@@ -337,48 +362,55 @@ private:
     segment_type ret;
 
     edge_offset_iterator outStart = outGraph.edge_offset_begin();
-    edge_offset_iterator outEnd = outGraph.edge_offset_end();
+    edge_offset_iterator outEnd   = outGraph.edge_offset_end();
     std::advance(outStart, startNode);
     if (outStart == outEnd) {
       ret.nodeBegin = ret.nodeEnd = iterator(0);
       return ret;
     }
-    edge_offset_iterator outNext = std::lower_bound(outStart + 1, outEnd, *outStart + numEdges);
+    edge_offset_iterator outNext =
+        std::lower_bound(outStart + 1, outEnd, *outStart + numEdges);
     ptrdiff_t outNodes = std::distance(outStart, outNext);
 
     edge_offset_iterator inStart = inGraph->edge_offset_begin();
-    edge_offset_iterator inEnd = inGraph->edge_offset_end();
+    edge_offset_iterator inEnd   = inGraph->edge_offset_end();
     std::advance(inStart, startNode);
-    edge_offset_iterator inNext = std::lower_bound(inStart + 1, inEnd, *inStart + numEdges);
+    edge_offset_iterator inNext =
+        std::lower_bound(inStart + 1, inEnd, *inStart + numEdges);
     ptrdiff_t inNodes = std::distance(inStart, inNext);
 
     ptrdiff_t nodes = std::min(outNodes, inNodes);
 
     ret.nodeBegin = iterator(startNode);
-    ret.nodeEnd = iterator(startNode + nodes);
+    ret.nodeEnd   = iterator(startNode + nodes);
     return ret;
   }
 
   void load(segment_type& seg, size_t sizeof_data) {
-    outGraph.load(seg.out, outGraph.edge_begin(*seg.nodeBegin), outGraph.edge_end(seg.nodeEnd[-1]), sizeof_data);
+    outGraph.load(seg.out, outGraph.edge_begin(*seg.nodeBegin),
+                  outGraph.edge_end(seg.nodeEnd[-1]), sizeof_data);
     if (inGraph != &outGraph)
-      inGraph->load(seg.in, inGraph->edge_begin(*seg.nodeBegin), inGraph->edge_end(seg.nodeEnd[-1]), sizeof_data);
+      inGraph->load(seg.in, inGraph->edge_begin(*seg.nodeBegin),
+                    inGraph->edge_end(seg.nodeEnd[-1]), sizeof_data);
     else
       seg.in = seg.out;
   }
 
-  template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     galois::runtime::acquire(&nodeData[N], mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(idFromNode(N), mflag);
   }
 
-  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
-  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+  template <bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag,
+                   typename std::enable_if<_A2>::type* = 0) {}
 
 public:
   ~OCImmutableEdgeGraph() {
@@ -432,14 +464,16 @@ public:
   iterator begin(const segment_type& cur) { return cur.nodeBegin; }
   iterator end(const segment_type& cur) { return cur.nodeEnd; }
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  node_data_reference getData(GraphNode N,
+                              MethodFlag mflag = MethodFlag::WRITE) {
     // galois::runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni,
+                                  MethodFlag mflag = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return outGraph.getEdgeData<EdgeTy>(segment.out, ni);
   }
@@ -454,27 +488,40 @@ public:
   iterator begin() const { return outGraph.begin(); }
   iterator end() const { return outGraph.end(); }
 
-  const_local_iterator local_begin() const { return const_local_iterator(this->localBegin(numNodes)); }
-  const_local_iterator local_end() const { return const_local_iterator(this->localEnd(numNodes)); }
-  local_iterator local_begin() { return local_iterator(this->localBegin(numNodes)); }
-  local_iterator local_end() { return local_iterator(this->localEnd(numNodes)); }
+  const_local_iterator local_begin() const {
+    return const_local_iterator(this->localBegin(numNodes));
+  }
+  const_local_iterator local_end() const {
+    return const_local_iterator(this->localEnd(numNodes));
+  }
+  local_iterator local_begin() {
+    return local_iterator(this->localBegin(numNodes));
+  }
+  local_iterator local_end() {
+    return local_iterator(this->localEnd(numNodes));
+  }
 
-  edge_iterator edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator edge_begin(const segment_type& segment, GraphNode N,
+                           MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (galois::runtime::shouldLock(mflag)) {
-      for (edge_iterator ii = outGraph.edge_begin(N), ee = outGraph.edge_end(N); ii != ee; ++ii) {
+      for (edge_iterator ii = outGraph.edge_begin(N), ee = outGraph.edge_end(N);
+           ii != ee; ++ii) {
         acquireNode(outGraph.getEdgeDst(segment.out, *ii), mflag);
       }
     }
     return outGraph.edge_begin(N);
   }
 
-  edge_iterator edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  edge_iterator edge_end(const segment_type& segment, GraphNode N,
+                         MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return outGraph.edge_end(N);
   }
 
-  edge_data_reference getInEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+  edge_data_reference
+  getInEdgeData(const segment_type& segment, edge_iterator ni,
+                MethodFlag mflag = MethodFlag::UNPROTECTED) {
     // galois::runtime::checkWrite(mflag, false);
     return inGraph->getEdgeData<EdgeTy>(segment.in, ni);
   }
@@ -483,28 +530,28 @@ public:
     return inGraph->getEdgeDst(segment.in, ni);
   }
 
-  in_edge_iterator in_edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  in_edge_iterator in_edge_begin(const segment_type& segment, GraphNode N,
+                                 MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (galois::runtime::shouldLock(mflag)) {
-      for (in_edge_iterator ii = inGraph->edge_begin(N), ee = inGraph->edge_end(N); ii != ee; ++ii) {
+      for (in_edge_iterator ii = inGraph->edge_begin(N),
+                            ee = inGraph->edge_end(N);
+           ii != ee; ++ii) {
         acquireNode(inGraph->getEdgeDst(segment.in, ii), mflag);
       }
     }
     return inGraph->edge_begin(N);
   }
 
-  in_edge_iterator in_edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+  in_edge_iterator in_edge_end(const segment_type& segment, GraphNode N,
+                               MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return inGraph->edge_end(N);
   }
 
-  size_t idFromNode(GraphNode N) {
-    return N;
-  }
+  size_t idFromNode(GraphNode N) { return N; }
 
-  GraphNode nodeFromId(size_t N) {
-    return N;
-  }
+  GraphNode nodeFromId(size_t N) { return N; }
 
   //! Assumes that the graph is symmetric
   void createFrom(const std::string& fname) {
@@ -523,7 +570,8 @@ public:
     inGraphStorage.fromFile(transpose);
     numNodes = outGraph.size();
     if (numNodes != inGraphStorage.size())
-      GALOIS_DIE("graph does not have the same number of nodes as its transpose");
+      GALOIS_DIE(
+          "graph does not have the same number of nodes as its transpose");
     numEdges = outGraph.sizeEdges();
     nodeData.create(numNodes);
     inGraph = &inGraphStorage;
@@ -533,13 +581,13 @@ public:
   }
 };
 
-template<typename GraphTy,typename... Args>
-void readGraphDispatch(GraphTy& graph, read_oc_immutable_edge_graph_tag, Args&&... args) {
+template <typename GraphTy, typename... Args>
+void readGraphDispatch(GraphTy& graph, read_oc_immutable_edge_graph_tag,
+                       Args&&... args) {
   graph.createFrom(std::forward<Args>(args)...);
 }
 
-
-} // end namespace
-} // end namespace
+} // namespace graphs
+} // namespace galois
 
 #endif

@@ -31,188 +31,203 @@
 #include "parallel.h"
 
 namespace benchIO {
-  using namespace std;
+using namespace std;
 
-  // A structure that keeps a sequence of strings all allocated from
-  // the same block of memory
-  struct words {
-    long n; // total number of characters
-    char* Chars;  // array storing all strings
-    long m; // number of substrings
-    char** Strings; // pointers to strings (all should be null terminated)
-    words() {}
-    words(char* C, long nn, char** S, long mm)
+// A structure that keeps a sequence of strings all allocated from
+// the same block of memory
+struct words {
+  long n;         // total number of characters
+  char* Chars;    // array storing all strings
+  long m;         // number of substrings
+  char** Strings; // pointers to strings (all should be null terminated)
+  words() {}
+  words(char* C, long nn, char** S, long mm)
       : Chars(C), n(nn), Strings(S), m(mm) {}
-    void del() {free(Chars); free(Strings);}
-  };
- 
-  inline bool isSpace(char c) {
-    switch (c)  {
-    case '\r': 
-    case '\t': 
-    case '\n': 
-    case 0:
-    case ' ' : return true;
-    default : return false;
-    }
-  }
-
-  struct toLong { long operator() (bool v) {return (long) v;} };
-
-  // parallel code for converting a string to words
-  words stringToWords(char *Str, long n) {
-//    parallel_for (long i=0; i < n; i++) 
-    parallel_doall(long, i, 0, n) {
-      if (isSpace(Str[i])) Str[i] = 0; 
-    } parallel_doall_end
-
-    // mark start of words
-    bool *FL = newA(bool,n);
-    FL[0] = Str[0];
-//    parallel_for (long i=1; i < n; i++) FL[i] = Str[i] && !Str[i-1];
-    parallel_doall(long, i, 1, n) { FL[i] = Str[i] && !Str[i-1]; } parallel_doall_end
-    
-    // offset for each start of word
-    _seq<long> Off = sequence::packIndex(FL, n);
-    long m = Off.n;
-    long *offsets = Off.A;
-
-    // pointer to each start of word
-    char **SA = newA(char*, m);
-//    parallel_for (long j=0; j < m; j++) SA[j] = Str+offsets[j];
-    parallel_doall(long, j, 0, m) { SA[j] = Str+offsets[j]; } parallel_doall_end
-
-    free(offsets); free(FL);
-    return words(Str,n,SA,m);
-  }
-
-  int writeStringToFile(char* S, long n, char* fileName) {
-    ofstream file (fileName, ios::out | ios::binary);
-    if (!file.is_open()) {
-      std::cout << "Unable to open file: " << fileName << std::endl;
-      return 1;
-    }
-    file.write(S, n);
-    file.close();
-    return 0;
-  }
-
-  inline int xToStringLen(long a) { return 21;}
-  inline void xToString(char* s, long a) { sprintf(s,"%ld",a);}
-
-  inline int xToStringLen(int a) { return 12;}
-  inline void xToString(char* s, int a) { sprintf(s,"%d",a);}
-
-  inline int xToStringLen(double a) { return 18;}
-  inline void xToString(char* s, double a) { sprintf(s,"%.11le", a);}
-
-  inline int xToStringLen(char* a) { return strlen(a)+1;}
-  inline void xToString(char* s, char* a) { sprintf(s,"%s",a);}
-
-  template <class A, class B>
-  inline int xToStringLen(pair<A,B> a) { 
-    return xToStringLen(a.first) + xToStringLen(a.second) + 1;
-  }
-  template <class A, class B>
-  inline void xToString(char* s, pair<A,B> a) { 
-    int l = xToStringLen(a.first);
-    xToString(s,a.first);
-    s[l] = ' ';
-    xToString(s+l+1,a.second);
-  }
-
-  struct notZero { bool operator() (char A) {return A > 0;}};
-
-  template <class T>
-  _seq<char> arrayToString(T* A, long n) {
-    long* L = newA(long,n);
-//    {parallel_for(long i=0; i < n; i++) L[i] = xToStringLen(A[i])+1;}
-    {parallel_doall(long, i, 0, n) { L[i] = xToStringLen(A[i])+1;}  parallel_doall_end }
-    long m = sequence::scan(L,L,n,utils::addF<long>(),(long) 0);
-    char* B = newA(char,m);
-//    parallel_for(long j=0; j < m; j++) 
-    parallel_doall(long, j, 0, m) {
-      B[j] = 0;
-    } parallel_doall_end
-//    parallel_for(long i=0; i < n-1; i++) {
-    parallel_doall(long, i, 0, n-1)  {
-      xToString(B + L[i],A[i]);
-      B[L[i+1] - 1] = '\n';
-    } parallel_doall_end
-    xToString(B + L[n-1],A[n-1]);
-    B[m-1] = '\n';
-    free(L);
-    char* C = newA(char,m+1);
-    long mm = sequence::filter(B,C,m,notZero());
-    C[mm] = 0;
-    free(B);
-    return _seq<char>(C,mm);
-  }
-
-  template <class T>
-  void writeArrayToStream(ofstream& os, T* A, long n) {
-    long BSIZE = 1000000;
-    long offset = 0;
-    while (offset < n) {
-      // Generates a string for a sequence of size at most BSIZE
-      // and then wrties it to the output stream
-      _seq<char> S = arrayToString(A+offset,min(BSIZE,n-offset));
-      os.write(S.A, S.n);
-      S.del();
-      offset += BSIZE;
-    }    
-  }
-
-  template <class T>
-    int writeArrayToFile(string header, T* A, long n, char* fileName) {
-    ofstream file (fileName, ios::out | ios::binary);
-    if (!file.is_open()) {
-      std::cout << "Unable to open file: " << fileName << std::endl;
-      return 1;
-    }
-    file << header << endl;
-    writeArrayToStream(file, A, n);
-    file.close();
-    return 0;
-  }
-
-  _seq<char> readStringFromFile(char *fileName) {
-    ifstream file (fileName, ios::in | ios::binary | ios::ate);
-    if (!file.is_open()) {
-      std::cout << "Unable to open file: " << fileName << std::endl;
-      abort();
-    }
-    long end = file.tellg();
-    file.seekg (0, ios::beg);
-    long n = end - file.tellg();
-    char* bytes = new char[n+1];
-    file.read (bytes,n);
-    file.close();
-    return _seq<char>(bytes,n);
-  }
-
-  string intHeaderIO = "sequenceInt";
-
-  int writeIntArrayToFile(int* A, long n, char* fileName) {
-    return writeArrayToFile(intHeaderIO, A, n, fileName);
-  }
-
-  _seq<int> readIntArrayFromFile(char *fileName) {
-    _seq<char> S = readStringFromFile(fileName);
-    words W = stringToWords(S.A, S.n);
-    string header = (string) W.Strings[0];
-    if (header != intHeaderIO) {
-      cout << "readIntArrayFromFile: bad input" << endl;
-      abort();
-    }
-    long n = W.m-1;
-    int* A = new int[n];
-//    parallel_for(long i=0; i < n; i++)
-    parallel_doall(long, i, 0, n) {
-      A[i] = atoi(W.Strings[i+1]);
-    } parallel_doall_end
-    return _seq<int>(A,n);
+  void del() {
+    free(Chars);
+    free(Strings);
   }
 };
+
+inline bool isSpace(char c) {
+  switch (c) {
+  case '\r':
+  case '\t':
+  case '\n':
+  case 0:
+  case ' ':
+    return true;
+  default:
+    return false;
+  }
+}
+
+struct toLong {
+  long operator()(bool v) { return (long)v; }
+};
+
+// parallel code for converting a string to words
+words stringToWords(char* Str, long n) {
+  //    parallel_for (long i=0; i < n; i++)
+  parallel_doall(long, i, 0, n) {
+    if (isSpace(Str[i]))
+      Str[i] = 0;
+  }
+  parallel_doall_end
+
+      // mark start of words
+      bool* FL = newA(bool, n);
+  FL[0]        = Str[0];
+  //    parallel_for (long i=1; i < n; i++) FL[i] = Str[i] && !Str[i-1];
+  parallel_doall(long, i, 1, n) { FL[i] = Str[i] && !Str[i - 1]; }
+  parallel_doall_end
+
+      // offset for each start of word
+      _seq<long>
+          Off   = sequence::packIndex(FL, n);
+  long m        = Off.n;
+  long* offsets = Off.A;
+
+  // pointer to each start of word
+  char** SA = newA(char*, m);
+  //    parallel_for (long j=0; j < m; j++) SA[j] = Str+offsets[j];
+  parallel_doall(long, j, 0, m) { SA[j] = Str + offsets[j]; }
+  parallel_doall_end
+
+      free(offsets);
+  free(FL);
+  return words(Str, n, SA, m);
+}
+
+int writeStringToFile(char* S, long n, char* fileName) {
+  ofstream file(fileName, ios::out | ios::binary);
+  if (!file.is_open()) {
+    std::cout << "Unable to open file: " << fileName << std::endl;
+    return 1;
+  }
+  file.write(S, n);
+  file.close();
+  return 0;
+}
+
+inline int xToStringLen(long a) { return 21; }
+inline void xToString(char* s, long a) { sprintf(s, "%ld", a); }
+
+inline int xToStringLen(int a) { return 12; }
+inline void xToString(char* s, int a) { sprintf(s, "%d", a); }
+
+inline int xToStringLen(double a) { return 18; }
+inline void xToString(char* s, double a) { sprintf(s, "%.11le", a); }
+
+inline int xToStringLen(char* a) { return strlen(a) + 1; }
+inline void xToString(char* s, char* a) { sprintf(s, "%s", a); }
+
+template <class A, class B>
+inline int xToStringLen(pair<A, B> a) {
+  return xToStringLen(a.first) + xToStringLen(a.second) + 1;
+}
+template <class A, class B>
+inline void xToString(char* s, pair<A, B> a) {
+  int l = xToStringLen(a.first);
+  xToString(s, a.first);
+  s[l] = ' ';
+  xToString(s + l + 1, a.second);
+}
+
+struct notZero {
+  bool operator()(char A) { return A > 0; }
+};
+
+template <class T>
+_seq<char> arrayToString(T* A, long n) {
+  long* L = newA(long, n);
+  //    {parallel_for(long i=0; i < n; i++) L[i] = xToStringLen(A[i])+1;}
+  {
+    parallel_doall(long, i, 0, n) { L[i] = xToStringLen(A[i]) + 1; }
+    parallel_doall_end
+  }
+  long m  = sequence::scan(L, L, n, utils::addF<long>(), (long)0);
+  char* B = newA(char, m);
+  //    parallel_for(long j=0; j < m; j++)
+  parallel_doall(long, j, 0, m) { B[j] = 0; }
+  parallel_doall_end
+  //    parallel_for(long i=0; i < n-1; i++) {
+  parallel_doall(long, i, 0, n - 1) {
+    xToString(B + L[i], A[i]);
+    B[L[i + 1] - 1] = '\n';
+  }
+  parallel_doall_end xToString(B + L[n - 1], A[n - 1]);
+  B[m - 1] = '\n';
+  free(L);
+  char* C = newA(char, m + 1);
+  long mm = sequence::filter(B, C, m, notZero());
+  C[mm]   = 0;
+  free(B);
+  return _seq<char>(C, mm);
+}
+
+template <class T>
+void writeArrayToStream(ofstream& os, T* A, long n) {
+  long BSIZE  = 1000000;
+  long offset = 0;
+  while (offset < n) {
+    // Generates a string for a sequence of size at most BSIZE
+    // and then wrties it to the output stream
+    _seq<char> S = arrayToString(A + offset, min(BSIZE, n - offset));
+    os.write(S.A, S.n);
+    S.del();
+    offset += BSIZE;
+  }
+}
+
+template <class T>
+int writeArrayToFile(string header, T* A, long n, char* fileName) {
+  ofstream file(fileName, ios::out | ios::binary);
+  if (!file.is_open()) {
+    std::cout << "Unable to open file: " << fileName << std::endl;
+    return 1;
+  }
+  file << header << endl;
+  writeArrayToStream(file, A, n);
+  file.close();
+  return 0;
+}
+
+_seq<char> readStringFromFile(char* fileName) {
+  ifstream file(fileName, ios::in | ios::binary | ios::ate);
+  if (!file.is_open()) {
+    std::cout << "Unable to open file: " << fileName << std::endl;
+    abort();
+  }
+  long end = file.tellg();
+  file.seekg(0, ios::beg);
+  long n      = end - file.tellg();
+  char* bytes = new char[n + 1];
+  file.read(bytes, n);
+  file.close();
+  return _seq<char>(bytes, n);
+}
+
+string intHeaderIO = "sequenceInt";
+
+int writeIntArrayToFile(int* A, long n, char* fileName) {
+  return writeArrayToFile(intHeaderIO, A, n, fileName);
+}
+
+_seq<int> readIntArrayFromFile(char* fileName) {
+  _seq<char> S  = readStringFromFile(fileName);
+  words W       = stringToWords(S.A, S.n);
+  string header = (string)W.Strings[0];
+  if (header != intHeaderIO) {
+    cout << "readIntArrayFromFile: bad input" << endl;
+    abort();
+  }
+  long n = W.m - 1;
+  int* A = new int[n];
+  //    parallel_for(long i=0; i < n; i++)
+  parallel_doall(long, i, 0, n) { A[i] = atoi(W.Strings[i + 1]); }
+  parallel_doall_end return _seq<int>(A, n);
+}
+}; // namespace benchIO
 
 #endif // _BENCH_IO

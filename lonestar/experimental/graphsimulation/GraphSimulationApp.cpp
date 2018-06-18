@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,68 +31,66 @@ static const char* desc =
     "Compute graph simulation for a pair of given query and data graphs";
 static const char* url = "graph_simulation";
 
-enum Simulation {
-  graph,
-  dual,
-  strong
-};
+enum Simulation { graph, dual, strong };
 
-static cll::opt<Simulation> simType("simType",
-                                    cll::desc("Type of simulation:"),
-                                    cll::values(clEnumValN(Simulation::graph, "graphSim", "keep node labeling + outgoing transitions (default)"),
-                                                clEnumValN(Simulation::dual, "dualSim", "graphSim + keep incoming transitions"),
-                                                clEnumValN(Simulation::strong, "strongSim", "dualSim + nodes matched within a ball of r = diameter(query graph)"),
-                                                clEnumValEnd),
-                                    cll::init(Simulation::graph));
+static cll::opt<Simulation> simType(
+    "simType", cll::desc("Type of simulation:"),
+    cll::values(
+        clEnumValN(Simulation::graph, "graphSim",
+                   "keep node labeling + outgoing transitions (default)"),
+        clEnumValN(Simulation::dual, "dualSim",
+                   "graphSim + keep incoming transitions"),
+        clEnumValN(Simulation::strong, "strongSim",
+                   "dualSim + nodes matched within a ball of r = "
+                   "diameter(query graph)"),
+        clEnumValEnd),
+    cll::init(Simulation::graph));
 
-static cll::opt<std::string> queryGraph("q",
-                                        cll::desc("<query graph>"), 
+static cll::opt<std::string> queryGraph("q", cll::desc("<query graph>"),
                                         cll::Required);
 
-static cll::opt<std::string> dataGraph("d",
-                                       cll::desc("<data graph>"),
+static cll::opt<std::string> dataGraph("d", cll::desc("<data graph>"),
                                        cll::Required);
 
-static cll::opt<std::string> outputFile("o",
-                                        cll::desc("[match output]"));
+static cll::opt<std::string> outputFile("o", cll::desc("[match output]"));
 
-template<typename G>
+template <typename G>
 void initializeQueryGraph(G& g, uint32_t labelCount) {
   uint32_t i = 0;
-  for (auto n: g) {
+  for (auto n : g) {
     g.getData(n).id = i++;
   }
 
-  galois::do_all(galois::iterate(g),
-      [&g, labelCount] (typename Graph::GraphNode n) {
-        auto& data = g.getData(n);
+  galois::do_all(
+      galois::iterate(g), [&g, labelCount](typename Graph::GraphNode n) {
+        auto& data   = g.getData(n);
         data.matched = 0; // matches to none
-        data.label = data.id % labelCount;
-        auto edgeid = data.id;
-        for (auto e: g.edges(n)) {
-          auto& eData = g.getEdgeData(e);
-          eData.label = edgeid % labelCount; // TODO: change to random
+        data.label   = data.id % labelCount;
+        auto edgeid  = data.id;
+        for (auto e : g.edges(n)) {
+          auto& eData     = g.getEdgeData(e);
+          eData.label     = edgeid % labelCount; // TODO: change to random
           eData.timestamp = edgeid;
           ++edgeid;
         }
       });
 }
 
-template<typename G>
+template <typename G>
 void initializeDataGraph(G& g, uint32_t labelCount) {
   uint32_t i = 0;
-  for (auto n: g) {
+  for (auto n : g) {
     g.getData(n).id = i++;
   }
 
-  galois::do_all(galois::iterate(g),
-      [&g, labelCount] (typename Graph::GraphNode n) {
-        auto& data = g.getData(n);
-        data.label = data.id % labelCount; // TODO: change to random
+  galois::do_all(
+      galois::iterate(g), [&g, labelCount](typename Graph::GraphNode n) {
+        auto& data  = g.getData(n);
+        data.label  = data.id % labelCount; // TODO: change to random
         auto edgeid = data.id;
-        for (auto e: g.edges(n)) {
-          auto& eData = g.getEdgeData(e);
-          eData.label = edgeid % labelCount; // TODO: change to random
+        for (auto e : g.edges(n)) {
+          auto& eData     = g.getEdgeData(e);
+          eData.label     = edgeid % labelCount; // TODO: change to random
           eData.timestamp = edgeid;
           ++edgeid;
         }
@@ -119,15 +117,15 @@ int main(int argc, char** argv) {
   galois::StatTimer SimT("GraphSimulation");
   SimT.start();
 
-  switch(simType) {
+  switch (simType) {
   case Simulation::graph:
     runGraphSimulation(qG, dG);
     break;
   case Simulation::dual:
-//    runDualSimulation();
+    //    runDualSimulation();
     break;
   case Simulation::strong:
-//    runStrongSimulation();
+    //    runStrongSimulation();
     break;
   default:
     std::cerr << "Unknown algorithm!" << std::endl;

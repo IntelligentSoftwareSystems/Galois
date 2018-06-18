@@ -2,41 +2,39 @@
 #include "FileReader.h"
 
 void VerilogModule::clear() {
-  for (auto item: inputs) {
-     delete item.second;
-  }
-
-  for (auto item: outputs) {
+  for (auto item : inputs) {
     delete item.second;
   }
 
-  for (auto item: gates) {
+  for (auto item : outputs) {
     delete item.second;
   }
 
-  for (auto item: wires) {
+  for (auto item : gates) {
+    delete item.second;
+  }
+
+  for (auto item : wires) {
     delete item.second;
   }
 }
 
-VerilogModule::~VerilogModule() {
-  clear();
-}
+VerilogModule::~VerilogModule() { clear(); }
 
-static void allocateConstants(VerilogModule *vModule) {
+static void allocateConstants(VerilogModule* vModule) {
   for (size_t i = 0; i < 2; i++) {
     std::string name = "1'b" + std::to_string(i);
 
-    VerilogWire *wireConst = new VerilogWire;
-    wireConst->name = name;
-    wireConst->root = nullptr;
-    wireConst->wireLoad = vModule->cellLib->defaultWireLoad;
+    VerilogWire* wireConst = new VerilogWire;
+    wireConst->name        = name;
+    wireConst->root        = nullptr;
+    wireConst->wireLoad    = vModule->cellLib->defaultWireLoad;
     vModule->wires.insert({name, wireConst});
 
-    VerilogPin *pinConst = new VerilogPin;
-    pinConst->name = name;
-    pinConst->gate = nullptr;
-    pinConst->wire = nullptr;
+    VerilogPin* pinConst = new VerilogPin;
+    pinConst->name       = name;
+    pinConst->gate       = nullptr;
+    pinConst->wire       = nullptr;
     vModule->inputs.insert({name, pinConst});
   }
 }
@@ -47,44 +45,35 @@ static std::string getWireName(FileReader& fRd) {
   // wire name
   if ("\\" == result) {
     result = token; // get rid of "\\"
-    token = fRd.nextToken();
+    token  = fRd.nextToken();
   }
 
   // wire name is an array element
   if ("[" == token) {
-    result += token; // consume "["
+    result += token;           // consume "["
     result += fRd.nextToken(); // get index
     result += fRd.nextToken(); // consume "]"
-  }
-  else {
+  } else {
     fRd.pushToken(token);
   }
 
   return result;
 }
 
-void VerilogModule::read(std::string inName, CellLib *lib) {
-  char delimiters[] = {
-    '(', ')',
-    ',', ':', ';', 
-    '/',
-    '#',
-    '[', ']', 
-    '{', '}',
-    '*',
-    '\"', '\\'
-  };
+void VerilogModule::read(std::string inName, CellLib* lib) {
+  char delimiters[] = {'(', ')', ',', ':', ';', '/',  '#',
+                       '[', ']', '{', '}', '*', '\"', '\\'};
 
-  char separators[] = {
-    ' ', '\t', '\n', ','
-  };
+  char separators[] = {' ', '\t', '\n', ','};
 
-  FileReader fRd(inName, delimiters, sizeof(delimiters), separators, sizeof(separators));
+  FileReader fRd(inName, delimiters, sizeof(delimiters), separators,
+                 sizeof(separators));
   cellLib = lib;
 
   allocateConstants(this);
 
-  for (std::string token = fRd.nextToken(); token != ""; token = fRd.nextToken()) {
+  for (std::string token = fRd.nextToken(); token != "";
+       token             = fRd.nextToken()) {
     // module moduleName(port1, port2, ...);
     if (token == "module") {
       name = fRd.nextToken();
@@ -101,18 +90,18 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
         std::string name = getWireName(fRd);
         // pin for I/O
         if (!primary.count(name)) {
-          VerilogPin *pin = new VerilogPin;
-          pin->name = name;
-          pin->gate = nullptr;
-          pin->wire = nullptr;
+          VerilogPin* pin = new VerilogPin;
+          pin->name       = name;
+          pin->gate       = nullptr;
+          pin->wire       = nullptr;
           primary.insert({pin->name, pin});
         }
         // wire for I/O
         if (!wires.count(name)) {
-          VerilogWire *wire = new VerilogWire;
-          wire->name = name;
-          wire->root = nullptr;
-          wire->wireLoad = cellLib->defaultWireLoad;
+          VerilogWire* wire = new VerilogWire;
+          wire->name        = name;
+          wire->root        = nullptr;
+          wire->wireLoad    = cellLib->defaultWireLoad;
           wires.insert({wire->name, wire});
         }
       }
@@ -124,10 +113,10 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
         fRd.pushToken(token);
         std::string wireName = getWireName(fRd);
         if (!wires.count(wireName)) {
-          VerilogWire *wire = new VerilogWire;
-          wire->name = wireName;
-          wire->root = nullptr;
-          wire->wireLoad = cellLib->defaultWireLoad;
+          VerilogWire* wire = new VerilogWire;
+          wire->name        = wireName;
+          wire->root        = nullptr;
+          wire->wireLoad    = cellLib->defaultWireLoad;
           wires.insert({wire->name, wire});
         }
       }
@@ -138,20 +127,22 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
     }
 
     // connect lhs wire->root to rhs node
-    else if (token == "assign" ) {
+    else if (token == "assign") {
       auto wire = wires.at(fRd.nextToken());
       fRd.nextToken(); // get "="
       auto pinName = fRd.nextToken();
-      auto pin = (inputs.count(pinName)) ? inputs.at(pinName) : outputs.at(pinName);
+      auto pin =
+          (inputs.count(pinName)) ? inputs.at(pinName) : outputs.at(pinName);
       wire->root = pin;
       fRd.nextToken(); // get ";"
     }
 
-    // logic gates: gateType gateName ( .port1 (wire1), .port2 (wire2), ... .portN (wireN) );
+    // logic gates: gateType gateName ( .port1 (wire1), .port2 (wire2), ...
+    // .portN (wireN) );
     else {
-      VerilogGate *gate = new VerilogGate;
-      gate->cell = cellLib->cells.at(token);
-      gate->name = fRd.nextToken();
+      VerilogGate* gate = new VerilogGate;
+      gate->cell        = cellLib->cells.at(token);
+      gate->name        = fRd.nextToken();
       gates.insert({gate->name, gate});
       fRd.nextToken(); // get "("
 
@@ -162,9 +153,9 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
           std::abort();
         }
         // .pinName (wireName)
-        VerilogPin *pin = new VerilogPin;
-        pin->name = token.substr(1);
-        pin->gate = gate;
+        VerilogPin* pin = new VerilogPin;
+        pin->name       = token.substr(1);
+        pin->gate       = gate;
 
         fRd.nextToken(); // get "("
         pin->wire = wires.at(getWireName(fRd));
@@ -174,8 +165,7 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
         if (cellPin->pinType == PIN_OUTPUT) {
           pin->wire->root = pin;
           gate->outPins.insert(pin);
-        }
-        else if (cellPin->pinType == PIN_INPUT) {
+        } else if (cellPin->pinType == PIN_INPUT) {
           pin->wire->leaves.insert(pin);
           gate->inPins.insert(pin);
         }
@@ -185,37 +175,36 @@ void VerilogModule::read(std::string inName, CellLib *lib) {
   } // end for token
 
   // connect input to input wire
-  for (auto item: inputs) {
-    auto i = item.second;
-    auto wire = wires.at(i->name);
-    i->wire = wire;
+  for (auto item : inputs) {
+    auto i     = item.second;
+    auto wire  = wires.at(i->name);
+    i->wire    = wire;
     wire->root = i;
   }
   // connect output to output wire
-  for (auto item: outputs) {
-    auto i = item.second;
+  for (auto item : outputs) {
+    auto i    = item.second;
     auto wire = wires.at(i->name);
-    i->wire = wire;
+    i->wire   = wire;
     wire->leaves.insert(i);
   }
 }
 
-VerilogModule::VerilogModule() {
-}
+VerilogModule::VerilogModule() {}
 
 void VerilogModule::printDebug() {
   std::cout << "module " << name << std::endl;
-  for (auto item: inputs) {
+  for (auto item : inputs) {
     auto i = item.second;
     std::cout << "input " << i->name << std::endl;
   }
 
-  for (auto item: outputs) {
+  for (auto item : outputs) {
     auto o = item.second;
     std::cout << "output " << o->name << std::endl;
   }
 
-  for (auto item: wires) {
+  for (auto item : wires) {
     auto w = item.second;
     std::cout << "wire " << w->name << ": from ";
     // input/output wires don't have gates
@@ -224,7 +213,7 @@ void VerilogModule::printDebug() {
     }
     std::cout << w->root->name << " to ";
 
-    for (auto p: w->leaves) {
+    for (auto p : w->leaves) {
       // input/output wires don't have gates
       if (p->gate) {
         std::cout << p->gate->name << ".";
@@ -234,28 +223,30 @@ void VerilogModule::printDebug() {
     std::cout << std::endl;
   }
 
-  for (auto item: gates) {
+  for (auto item : gates) {
     auto g = item.second;
     std::cout << "gate: " << g->cell->name << " " << g->name << "(";
-    for (auto p: g->inPins) {
+    for (auto p : g->inPins) {
       std::cout << "." << p->name << " (" << p->wire->name << ") ";
     }
-    for (auto p: g->outPins) {
+    for (auto p : g->outPins) {
       std::cout << "." << p->name << " (" << p->wire->name << ") ";
     }
     std::cout << ");" << std::endl;
   }
 }
 
-static void writeVerilogIOs(std::ofstream& of, std::string portTypeName, std::unordered_map<std::string, VerilogPin *>& ports) {
+static void
+writeVerilogIOs(std::ofstream& of, std::string portTypeName,
+                std::unordered_map<std::string, VerilogPin*>& ports) {
   // input/output port1, port2, ...;
   of << "  " << portTypeName << " ";
   size_t i = 0, num = ports.size();
   if ("input" == portTypeName) {
-     num -= 2;
+    num -= 2;
   }
 
-  for (auto item: ports) {
+  for (auto item : ports) {
     auto& name = item.second->name;
     if ("1'b1" == name || "1'b0" == name) {
       continue;
@@ -269,19 +260,20 @@ static void writeVerilogIOs(std::ofstream& of, std::string portTypeName, std::un
       if (0 == i % 10) {
         of << "\n      ";
       }
-    }
-    else {
+    } else {
       of << ";" << std::endl;
     }
   }
 }
 
-static void writeVerilogWires(std::ofstream& of, std::unordered_map<std::string, VerilogWire *>& wires) {
+static void
+writeVerilogWires(std::ofstream& of,
+                  std::unordered_map<std::string, VerilogWire*>& wires) {
   size_t i = 0, num = wires.size() - 2;
 
   // wire wire1, wire2, ...;
   of << "  wire ";
-  for (auto item: wires) {
+  for (auto item : wires) {
     auto& name = item.second->name;
     if ("1'b1" == name || "1'b0" == name) {
       continue;
@@ -292,8 +284,7 @@ static void writeVerilogWires(std::ofstream& of, std::unordered_map<std::string,
     i++;
     if (num) {
       of << ((0 == i % 10) ? ";\n  wire " : ", ");
-    }
-    else {
+    } else {
       of << ";" << std::endl;
     }
   }
@@ -311,7 +302,7 @@ void VerilogModule::write(std::string outName) {
   // module moduleName (port1, port2, ...);
   of << "module " << name << "(";
   num = inputs.size() + outputs.size() - 2;
-  for (auto item: inputs) {
+  for (auto item : inputs) {
     auto& name = item.second->name;
     if ("1'b1" == name || "1'b0" == name) {
       continue;
@@ -325,12 +316,11 @@ void VerilogModule::write(std::string outName) {
       if (0 == i % 10) {
         of << "\n    ";
       }
-    }
-    else {
+    } else {
       of << ");" << std::endl;
     }
   }
-  for (auto item: outputs) {
+  for (auto item : outputs) {
     of << item.second->name;
     num--;
     i++;
@@ -339,8 +329,7 @@ void VerilogModule::write(std::string outName) {
       if (0 == i % 10) {
         of << "\n    ";
       }
-    }
-    else {
+    } else {
       of << ");" << std::endl;
     }
   }
@@ -350,16 +339,16 @@ void VerilogModule::write(std::string outName) {
 
   writeVerilogWires(of, wires);
 
-  for (auto item: gates) {
+  for (auto item : gates) {
     auto g = item.second;
     of << "  " << g->cell->name << " " << g->name << "(";
     num = g->cell->cellPins.size();
-    for (auto p: g->inPins) {
+    for (auto p : g->inPins) {
       of << "." << p->name << " (" << p->wire->name << ")";
       num--;
       of << ((num) ? ", " : ");");
     }
-    for (auto p: g->outPins) {
+    for (auto p : g->outPins) {
       of << "." << p->name << " (" << p->wire->name << ")";
       num--;
       of << ((num) ? ", " : ");");

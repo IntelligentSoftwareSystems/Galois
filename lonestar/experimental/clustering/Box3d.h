@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,27 +32,16 @@ protected:
 public:
   Box3d()
       : m_min(std::numeric_limits<double>::m_max()),
-        m_max(-1 * std::numeric_limits<double>::m_max()),
-        m_init(false)
-  {}
+        m_max(-1 * std::numeric_limits<double>::m_max()), m_init(false) {}
 
   explicit Box3d(const Point3& pt)
-    :
-      m_min(pt),
-      m_max(pt),
-      m_init(true)
-  
+      : m_min(pt), m_max(pt), m_init(true)
+
   {}
 
-  Box3d(const Point3& a, const Point3& b) 
-    :
-      m_min(a),
-      m_max(a),
-      m_init(true)
-  {
+  Box3d(const Point3& a, const Point3& b) : m_min(a), m_max(a), m_init(true) {
     addPoint(b);
   }
-
 
   void addPoint(const Point3& pt) {
     m_init = true;
@@ -80,7 +69,7 @@ public:
 
   bool isInitialized() const { return m_init; }
 
-  bool operator == (const Box3d& other) const {
+  bool operator==(const Box3d& other) const {
     return m_min == other.m_min && m_max == other.m_max;
   }
 };

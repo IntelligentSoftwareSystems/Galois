@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,7 +26,7 @@ class Element;
 
 class Edge {
   Tuple p[2];
-  
+
 public:
   Edge() {}
   Edge(const Tuple& a, const Tuple& b) {
@@ -38,27 +38,23 @@ public:
       p[1] = a;
     }
   }
-  Edge(const Edge &rhs) {
+  Edge(const Edge& rhs) {
     p[0] = rhs.p[0];
     p[1] = rhs.p[1];
   }
-  
+
   bool operator==(const Edge& rhs) const {
     return p[0] == rhs.p[0] && p[1] == rhs.p[1];
-  }    
-  bool operator!=(const Edge& rhs) const {
-    return !(*this == rhs);
-  }    
+  }
+  bool operator!=(const Edge& rhs) const { return !(*this == rhs); }
   bool operator<(const Edge& rhs) const {
     return (p[0] < rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] < rhs.p[1]));
-  }    
-  
+  }
+
   bool operator>(const Edge& rhs) const {
     return (p[0] > rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] > rhs.p[1]));
-  }    
-
-  Tuple getPoint(int i) const {
-    return p[i];
   }
+
+  Tuple getPoint(int i) const { return p[i]; }
 };
 #endif

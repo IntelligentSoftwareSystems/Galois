@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,108 +27,103 @@
 #include "logicDefs.h"
 #include "LogicUpdate.h"
 
-
 namespace des {
 
 class LogicGate {
 
 public:
+  LogicGate() {}
 
-  LogicGate () {}
+  LogicGate(const LogicGate& that) {}
 
-  LogicGate (const LogicGate& that) {}
+  virtual ~LogicGate() {}
 
-  virtual ~LogicGate () {}
-
-  virtual LogicGate* makeClone () const = 0;
+  virtual LogicGate* makeClone() const = 0;
 
   /**
    * @return number of inputs
    */
-  virtual size_t getNumInputs () const = 0;
+  virtual size_t getNumInputs() const = 0;
 
   /**
    * @return number of outputs
    */
-  virtual size_t getNumOutputs () const = 0;
+  virtual size_t getNumOutputs() const = 0;
 
   /**
    * @return current output value
    */
-  virtual LogicVal getOutputVal () const = 0;
+  virtual LogicVal getOutputVal() const = 0;
 
   /**
    * @return namem of the output
    */
-  virtual const std::string& getOutputName () const = 0;
+  virtual const std::string& getOutputName() const = 0;
 
   /**
    * @param update
    *
-   * applies the update to internal state e.g. change to some input. Must update the output
-   * if the inputs have changed
+   * applies the update to internal state e.g. change to some input. Must update
+   * the output if the inputs have changed
    */
-  virtual void applyUpdate (const LogicUpdate& update) = 0;
+  virtual void applyUpdate(const LogicUpdate& update) = 0;
 
   /**
-    * Evaluate output based on the current state of the input
-    *
-    * @return the
-    */
-   virtual LogicVal evalOutput() const = 0;
+   * Evaluate output based on the current state of the input
+   *
+   * @return the
+   */
+  virtual LogicVal evalOutput() const = 0;
 
-   /**
-    * @param net: name of a wire
-    * @return true if has an input with the name equal to 'net'
-    */
-   virtual bool hasInputName(const std::string& net) const = 0;
+  /**
+   * @param net: name of a wire
+   * @return true if has an input with the name equal to 'net'
+   */
+  virtual bool hasInputName(const std::string& net) const = 0;
 
-   /**
-    * @param inputName net name
-    * @return index of the input matching the net name provided
-    */
-   virtual size_t getInputIndex (const std::string& inputName) const = 0;
+  /**
+   * @param inputName net name
+   * @return index of the input matching the net name provided
+   */
+  virtual size_t getInputIndex(const std::string& inputName) const = 0;
 
-   /**
-    * @param net: name of a wire
-    * @return true if has an output with the name equal to 'net'
-    */
-   virtual bool hasOutputName(const std::string& net) const = 0;
+  /**
+   * @param net: name of a wire
+   * @return true if has an output with the name equal to 'net'
+   */
+  virtual bool hasOutputName(const std::string& net) const = 0;
 
-   /**
-    * @return string representation
-    */
-   virtual std::string str () const = 0;
+  /**
+   * @return string representation
+   */
+  virtual std::string str() const = 0;
 
   /**
    * @return delay of the gate
    */
   virtual const SimTime& getDelay() const = 0;
 
-  
   /**
    * Handles an erroneous situation, where the net name in
    * LogicUpdate provided does not match any of the inputs.
    *
    * @param le
    */
-  virtual void netNameMismatch (const LogicUpdate& le) const = 0;
+  virtual void netNameMismatch(const LogicUpdate& le) const = 0;
 
-  virtual size_t getStateSize () const = 0;
+  virtual size_t getStateSize() const = 0;
 
-  virtual void copyState (void* const buf, const size_t bufSize) const = 0;
+  virtual void copyState(void* const buf, const size_t bufSize) const = 0;
 
-  virtual void restoreState (void* const buf, const size_t bufSize) = 0;
+  virtual void restoreState(void* const buf, const size_t bufSize) = 0;
 };
 
-
-template <size_t Nout, size_t Nin> 
-class BaseLogicGate: public LogicGate {
+template <size_t Nout, size_t Nin>
+class BaseLogicGate : public LogicGate {
 
   friend class NetlistParser;
 
 protected:
-
   /** The output name. */
   std::string outputName;
 
@@ -139,10 +134,10 @@ protected:
   SimTime delay;
 
 public:
-
-  BaseLogicGate (const std::string& outputName, const LogicVal& outVal, const SimTime& delay)
-    : outputName (outputName), outputVal (outVal) {
-    setDelay (delay);
+  BaseLogicGate(const std::string& outputName, const LogicVal& outVal,
+                const SimTime& delay)
+      : outputName(outputName), outputVal(outVal) {
+    setDelay(delay);
   }
 
   /**
@@ -150,51 +145,47 @@ public:
    *
    * @return the delay
    */
-  virtual const SimTime& getDelay() const {
-    return delay;
-  }
-
+  virtual const SimTime& getDelay() const { return delay; }
 
   /**
    * @return number of inputs
    */
-  virtual size_t getNumInputs () const { return Nin; }
+  virtual size_t getNumInputs() const { return Nin; }
 
   /**
    * @return number of outputs
    */
-  virtual size_t getNumOutputs () const { return Nout; }
+  virtual size_t getNumOutputs() const { return Nout; }
 
   /**
    * @return current output value
    */
-  virtual LogicVal getOutputVal () const { return outputVal; }
+  virtual LogicVal getOutputVal() const { return outputVal; }
 
   /**
    * @return namem of the output
    */
-  virtual const std::string& getOutputName () const { return outputName; }
+  virtual const std::string& getOutputName() const { return outputName; }
 
   /**
    * @param net: name of a wire
    * @return true if has an output with the name equal to 'net'
    */
-  virtual bool hasOutputName(const std::string& net) const { return (outputName == net); }
-
+  virtual bool hasOutputName(const std::string& net) const {
+    return (outputName == net);
+  }
 
   /**
    * Sets the output val.
    *
    * @param outputVal the new output val
    */
-  void setOutputVal(const LogicVal& outputVal) {
-    this->outputVal = outputVal;
-  }
+  void setOutputVal(const LogicVal& outputVal) { this->outputVal = outputVal; }
 
-
-  virtual void netNameMismatch (const LogicUpdate& le) const {
-    std::cerr << "Received logic update : " << le.str () << " with mismatching net name, this = " << str () << std::endl;
-    exit (-1);
+  virtual void netNameMismatch(const LogicUpdate& le) const {
+    std::cerr << "Received logic update : " << le.str()
+              << " with mismatching net name, this = " << str() << std::endl;
+    exit(-1);
   }
 
 private:
@@ -209,25 +200,20 @@ private:
       this->delay = MIN_DELAY;
     }
   }
- 
-protected:
 
+protected:
   struct State {
     LogicVal outputVal;
     SimTime delay;
 
-    State (const BaseLogicGate& g)
-      : outputVal (g.outputVal), delay (g.delay) 
-    {}
+    State(const BaseLogicGate& g) : outputVal(g.outputVal), delay(g.delay) {}
 
-    void restore (BaseLogicGate& g) {
+    void restore(BaseLogicGate& g) {
       g.outputVal = outputVal;
-      g.delay = delay;
+      g.delay     = delay;
     }
   };
-
 };
-
 
 } // namespace des
 

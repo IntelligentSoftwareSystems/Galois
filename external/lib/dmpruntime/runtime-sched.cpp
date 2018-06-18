@@ -28,32 +28,32 @@
 atomic_uint_t DMPbufferingBarrier; // inner-round barrier: * -> B
 #endif
 #ifdef DMP_ENABLE_BUFFERED_MODE
-atomic_uint_t DMPcommitBarrier;    // inner-round barrier: B -> Bcommit
+atomic_uint_t DMPcommitBarrier; // inner-round barrier: B -> Bcommit
 #endif
-atomic_uint_t DMPserialBarrier;    // inner-round barrier: * -> S
-atomic_uint_t DMProundBarrier;     // end-of-round barrier: S -> *
-atomic_int_t  DMPscheduledThread;  // token for serial mode
+atomic_uint_t DMPserialBarrier;  // inner-round barrier: * -> S
+atomic_uint_t DMProundBarrier;   // end-of-round barrier: S -> *
+atomic_int_t DMPscheduledThread; // token for serial mode
 
-atomic_uint64_t DMProundNumber;    // round counter
+atomic_uint64_t DMProundNumber; // round counter
 
 //
 // Bookends
 //
 
 static const DmpThreadState FirstStateInRound =
-#if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_O_B_S) ||\
+#if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_O_B_S) ||        \
     defined(DMP_ENABLE_MODEL_STM)
-        RunOwnership;
+    RunOwnership;
 #elif defined(DMP_ENABLE_MODEL_B_S) || defined(DMP_ENABLE_MODEL_OB_S)
-        RunBuffered;
+    RunBuffered;
 #endif
 
 static const DmpThreadState LastStateInRound =
-#if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_O_B_S) ||\
+#if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_O_B_S) ||        \
     defined(DMP_ENABLE_MODEL_STM)
-        WaitForOwnership;
+    WaitForOwnership;
 #elif defined(DMP_ENABLE_MODEL_B_S) || defined(DMP_ENABLE_MODEL_OB_S)
-        WaitForBuffered;
+    WaitForBuffered;
 #endif
 
 //-----------------------------------------------------------------------
@@ -116,11 +116,13 @@ static inline void internal_waitAtBarrier(atomic_uint_t* b) {
 
 static inline void internal_waitForToken() {
 #ifdef DMP_ENABLE_EMPTY_SERIAL_MODE
-  // Optimization: don't wait for the serial token if we don't need to exec serially.
+  // Optimization: don't wait for the serial token if we don't need to exec
+  // serially.
   if (DMPMAP->state == WaitForSerialToken && !DMPMAP->needSerial)
     return;
   if (DMPMAP->state == WaitForSerialToken) {
-    DmpThreadInfo *other = __sync_val_compare_and_swap(&DMPMAP->notifyWhenWaitingForSerial, NULL, DMPMAP);
+    DmpThreadInfo* other = __sync_val_compare_and_swap(
+        &DMPMAP->notifyWhenWaitingForSerial, NULL, DMPMAP);
     if (other != NULL) {
       other->otherThreadWaitingForSerial = true;
     }
@@ -137,7 +139,7 @@ static inline void internal_waitForToken() {
 static inline void internal_updateGlobalSchedulingChunk() {
   // Called at the end of parallel mode.
   DMPglobalSchedulingChunks[DMPMAP->threadID].val = 0;
-  DMPMAP->triggerGlobalSchedulingChunkUpdate = 0;
+  DMPMAP->triggerGlobalSchedulingChunkUpdate      = 0;
 }
 
 static inline void internal_resetGlobalSchedulingChunks() {
@@ -178,7 +180,7 @@ static inline void internal_executeBufferedCommit() {
   DMPMAP_setState(RunCommit);
   DMP_commitBufferedWrites();
 
-#else  // serial commit
+#else // serial commit
   internal_waitForToken();
   __sync_synchronize();
   DMPMAP_setState(RunCommit);
@@ -196,8 +198,8 @@ static inline void internal_executeBufferedCommit() {
 
 #if defined(DMP_ENABLE_MODEL_O_S) || defined(DMP_ENABLE_MODEL_STM)
 
-__attribute__((noinline))
-static void internal_waitForSerialMode(const int islocked) {
+__attribute__((noinline)) static void
+internal_waitForSerialMode(const int islocked) {
   DMP_ASSERT(DMPMAP->state == RunOwnership);
   DMPMAP_setState(WaitForSerial);
   internal_updateGlobalSchedulingChunk();
@@ -246,11 +248,10 @@ static void internal_waitForSerialMode(const int islocked) {
   __sync_synchronize();
 }
 
-#elif defined(DMP_ENABLE_MODEL_B_S) ||\
-      defined(DMP_ENABLE_MODEL_OB_S)
+#elif defined(DMP_ENABLE_MODEL_B_S) || defined(DMP_ENABLE_MODEL_OB_S)
 
-__attribute__((noinline))
-static void internal_waitForSerialMode(const int dummy) {
+__attribute__((noinline)) static void
+internal_waitForSerialMode(const int dummy) {
   DMP_ASSERT(DMPMAP->state == RunBuffered);
 
   // Commit.
@@ -271,8 +272,8 @@ static void internal_waitForSerialMode(const int dummy) {
 
 #elif defined(DMP_ENABLE_MODEL_O_B_S)
 
-__attribute__((noinline))
-static void internal_waitForSerialMode(const int dummy) {
+__attribute__((noinline)) static void
+internal_waitForSerialMode(const int dummy) {
   if (DMPMAP->state == RunOwnership)
     DMP_waitForBufferingMode();
 
@@ -315,12 +316,8 @@ static void do_waitForSerialMode(const bool needSerial) {
   }
 }
 
-void DMP_waitForSerialMode() {
-  do_waitForSerialMode(true);
-}
-void DMP_waitForSerialModeForEndOfQuantum() {
-  do_waitForSerialMode(false);
-}
+void DMP_waitForSerialMode() { do_waitForSerialMode(true); }
+void DMP_waitForSerialModeForEndOfQuantum() { do_waitForSerialMode(false); }
 
 //
 // End-Of-Round
@@ -329,7 +326,7 @@ void DMP_waitForSerialModeForEndOfQuantum() {
 void DMP_resetRound(const int oldRoundBarrier) {
   DMProundNumber++;
   DMPscheduledThread = DMPfirstRunnableID;
-  DMPserialBarrier = DMPnumRunnableThreads;
+  DMPserialBarrier   = DMPnumRunnableThreads;
 #ifdef DMP_ENABLE_BUFFERED_MODE
   DMPcommitBarrier = DMPnumRunnableThreads;
 #endif
@@ -359,7 +356,7 @@ void DMP_resetRound(const int oldRoundBarrier) {
 static inline void DMP_startNextQuantum() {
   DMPMAP->schedulingChunk = DMP_SCHEDULING_CHUNK_SIZE;
 #ifdef DMP_ENABLE_EMPTY_SERIAL_MODE
-  DMPMAP->needSerial = false;
+  DMPMAP->needSerial                 = false;
   DMPMAP->notifyWhenWaitingForSerial = NULL;
 #endif
   DMPMAP_setState(FirstStateInRound);
@@ -370,13 +367,13 @@ static inline void DMP_arriveAtRoundBarrier(const int oldRoundBarrier) {
   // We have just ended our quantum.
   // Now we decide who gets the serial token next.
 #ifndef DMP_ENABLE_EMPTY_SERIAL_MODE
-  const bool haveToken = true;
-  const bool isEndOfRound = DMPMAP->isLastRunnable;
+  const bool haveToken     = true;
+  const bool isEndOfRound  = DMPMAP->isLastRunnable;
   const int nextToGetToken = DMPMAP->nextRunnableID;
 #else
   // "Empty serial mode" optimization.
-  bool haveToken = true;
-  bool isEndOfRound = false;
+  bool haveToken     = true;
+  bool isEndOfRound  = false;
   int nextToGetToken = -1;
 
   if (!DMPMAP->needSerial) {
@@ -386,7 +383,7 @@ static inline void DMP_arriveAtRoundBarrier(const int oldRoundBarrier) {
   }
 
   if (haveToken) {
-    for (DmpThreadInfo *dmp = DMPMAP; ; dmp = dmp->nextRunnable) {
+    for (DmpThreadInfo* dmp = DMPMAP;; dmp = dmp->nextRunnable) {
       if (dmp->isLastRunnable) {
         isEndOfRound = true;
         break;
@@ -401,7 +398,8 @@ static inline void DMP_arriveAtRoundBarrier(const int oldRoundBarrier) {
       // This thread may not yet have finished parallel mode.
       // We need to wait for that to occur before continuing.
       DMPMAP->otherThreadWaitingForSerial = false;
-      if (__sync_bool_compare_and_swap(&dmp->notifyWhenWaitingForSerial, NULL, DMPMAP)) {
+      if (__sync_bool_compare_and_swap(&dmp->notifyWhenWaitingForSerial, NULL,
+                                       DMPMAP)) {
         while (!DMPMAP->otherThreadWaitingForSerial)
           YIELD();
         __sync_synchronize();
@@ -439,8 +437,7 @@ static inline void DMP_arriveAtRoundBarrier(const int oldRoundBarrier) {
   }
 }
 
-__attribute__((noinline))
-void DMP_waitForNextQuantum() {
+__attribute__((noinline)) void DMP_waitForNextQuantum() {
   // Special case to avoid a race: threads must remember the
   // 'roundBarrier' from the time they woke so they don't miss
   // the end-of-round.
@@ -472,10 +469,12 @@ void DMP_waitForNextQuantum() {
 }
 
 void DMP_waitForSignal(volatile int* signal) {
-  if (*signal) return;
+  if (*signal)
+    return;
   // NB: since we update the runnable queue, we must execute in serial mode.
   DMP_waitForSerialMode();
-  if (*signal) return;
+  if (*signal)
+    return;
 
   // Sleep this thread.
   DMPMAP_setState(Sleeping);
@@ -506,7 +505,7 @@ void DMP_sleepAndTerminate() {
   if (DMPMAP->joiner != NULL) {
     // NB: this adds 'joiner' to the *front* of the runnable queue.
     DMPthread_addToRunnableQueue(DMPMAP->joiner);
-    DMPMAP->joiner->state = JustWokeUp;
+    DMPMAP->joiner->state               = JustWokeUp;
     DMPMAP->joiner->roundBarrierAtStart = oldRoundBarrier;
     __sync_synchronize();
   }
@@ -597,7 +596,7 @@ void DMP_fastHandoff(DmpThreadInfo* next, DMPresource* r) {
   DMP_SPINLOCK_UNLOCK(&next->handoffSpinlock);
 }
 
-#endif  // DMP_ENABLE_FAST_HANDOFF
+#endif // DMP_ENABLE_FAST_HANDOFF
 
 //--------------------------------------------------------------
 // Kendo-style wait-for-turn
@@ -612,8 +611,7 @@ void DMP_waitForTurnInRound();
 static __thread int64_t TotalChunkDiff;
 static __thread int64_t TotalDiffs;
 
-__attribute__((noinline))
-void DMP_waitForTurnInRound() {
+__attribute__((noinline)) void DMP_waitForTurnInRound() {
   // Nop if only one thread is running.
   if (DMPMAP->state == RunSerial || DMPnumRunnableThreads == 1)
     return;
@@ -621,15 +619,17 @@ void DMP_waitForTurnInRound() {
   DMP_ASSERT(DMPMAP->state == RunBuffered);
 
   const int myChunk = DMPMAP->schedulingChunk;
-  const int myID = DMPMAP->threadID;
+  const int myID    = DMPMAP->threadID;
 
   // Make sure this is up-to-date to prevent deadlock
   DMPglobalSchedulingChunks[myID].val = myChunk;
 
-//  fprintf(stderr, "CHECK @%llu Me:(%d/%d)\n", DMProundNumber, myID, myChunk);
+  //  fprintf(stderr, "CHECK @%llu Me:(%d/%d)\n", DMProundNumber, myID,
+  //  myChunk);
 
   // Wait until I am the thread with the fewest ticks so far this quantum.
-  for (DmpThreadInfo* dmp = DMPMAP->nextRunnable; dmp != DMPMAP; dmp = dmp->nextRunnable) {
+  for (DmpThreadInfo* dmp = DMPMAP->nextRunnable; dmp != DMPMAP;
+       dmp                = dmp->nextRunnable) {
     const int theirID = dmp->threadID;
 
     // Has the thread passed me?
@@ -647,7 +647,7 @@ void DMP_waitForTurnInRound() {
     if (theirState >= RunBuffered && theirChunk <= targetChunk)
       continue;
 
-    // Stats
+      // Stats
 #if 0
     const int diff = theirChunk - targetChunk;
     if (diff >= 0) {
@@ -666,7 +666,8 @@ void DMP_waitForTurnInRound() {
 
     int lastVal = theirChunk;
 
-    // NB: Wakeup corner case -- if we started the round before the other thread,
+    // NB: Wakeup corner case -- if we started the round before the other
+    // thread,
     //     their current chunk may be for the prior round (e.g. if can be < 0),
     //     so fudge 'lastVal' to avoid deadlocks.
     if (theirState < RunBuffered) {
@@ -675,13 +676,15 @@ void DMP_waitForTurnInRound() {
 
     VOLATILE_STORE(dmp->triggerGlobalSchedulingChunkUpdate, targetChunk);
 
-//    fprintf(stderr, "SPIN! @%llu Me:(%d/%d) Them:(%d/%d)\n", DMProundNumber, myID, myChunk, theirID, theirChunk);
+    //    fprintf(stderr, "SPIN! @%llu Me:(%d/%d) Them:(%d/%d)\n",
+    //    DMProundNumber, myID, myChunk, theirID, theirChunk);
 
     while (true) {
       // Wait for a signal.
       int nspin = 0;
       int newChunk;
-      while ((newChunk = VOLATILE_LOAD(DMPglobalSchedulingChunks[theirID].val)) >= lastVal) {
+      while ((newChunk = VOLATILE_LOAD(
+                  DMPglobalSchedulingChunks[theirID].val)) >= lastVal) {
         if (++nspin = 128) {
           YIELD();
           nspin = 0;
@@ -695,15 +698,17 @@ void DMP_waitForTurnInRound() {
       // Not yet; maybe some other thread asked for an earlier wakeup.
       lastVal = newChunk;
       VOLATILE_STORE(dmp->triggerGlobalSchedulingChunkUpdate, targetChunk);
-//      fprintf(stderr, "SPIN! @%llu Me:(%d/%d) Them:(%d/%d)\n", DMProundNumber, myID, myChunk, theirID, newChunk);
+      //      fprintf(stderr, "SPIN! @%llu Me:(%d/%d) Them:(%d/%d)\n",
+      //      DMProundNumber, myID, myChunk, theirID, newChunk);
     }
 
-//    if (nspin >= 10000)
-//      fprintf(stderr, "OKAY! @%llu Me:(%d/%d)\n", DMProundNumber, myID, myChunk);
+    //    if (nspin >= 10000)
+    //      fprintf(stderr, "OKAY! @%llu Me:(%d/%d)\n", DMProundNumber, myID,
+    //      myChunk);
   }
 
   // NB: another thread could have acquired the mutex we're in line for.
   __sync_synchronize();
 }
 
-#endif  // DMP_ENABLE_WB_HBSYNC
+#endif // DMP_ENABLE_WB_HBSYNC

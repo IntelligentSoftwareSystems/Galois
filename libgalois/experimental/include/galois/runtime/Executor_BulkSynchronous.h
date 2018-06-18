@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,38 +27,40 @@ namespace galois {
 namespace runtime {
 namespace BulkSynchronousImpl {
 
-template<typename T, bool isLIFO, unsigned ChunkSize>
-struct FixedSizeRingAdaptor: public galois::FixedSizeRing<T,ChunkSize> {
+template <typename T, bool isLIFO, unsigned ChunkSize>
+struct FixedSizeRingAdaptor : public galois::FixedSizeRing<T, ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
 
-  reference cur() { return isLIFO ? this->front() : this->back();  }
+  reference cur() { return isLIFO ? this->front() : this->back(); }
 
-  template<typename U>
+  template <typename U>
   void push(U&& val) {
     this->push_front(std::forward<U>(val));
   }
 
-  void pop()  {
-    if (isLIFO) this->pop_front();
-    else this->pop_back();
+  void pop() {
+    if (isLIFO)
+      this->pop_front();
+    else
+      this->pop_back();
   }
 };
 
 struct WID {
   unsigned tid;
   unsigned pid;
-  WID(unsigned t): tid(t) {
-    pid = substrate::getThreadPool().getLeader(tid);
-  }
+  WID(unsigned t) : tid(t) { pid = substrate::getThreadPool().getLeader(tid); }
   WID() {
     tid = substrate::ThreadPool::getTID();
     pid = substrate::ThreadPool::getLeader();
   }
 };
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
 class PerSocketChunkMaster : private boost::noncopyable {
-  class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
+  class Chunk : public FixedSizeRingAdaptor<T, isLIFO, ChunkSize>,
+                public OuterTy<Chunk, true>::ListNode {};
 
   FixedSizeAllocator<Chunk> alloc;
 
@@ -82,19 +84,19 @@ class PerSocketChunkMaster : private boost::noncopyable {
     alloc.deallocate(ptr, 1);
   }
 
-  void pushChunk(const WID& id, Chunk* C)  {
+  void pushChunk(const WID& id, Chunk* C) {
     LevelItem& I = *Q.getLocal(id.pid);
     I.push(C);
   }
 
-  Chunk* popChunkByID(unsigned int i)  {
+  Chunk* popChunkByID(unsigned int i) {
     LevelItem* I = Q.getRemote(i);
     if (I)
       return I->pop();
     return 0;
   }
 
-  Chunk* popChunk(const WID& id)  {
+  Chunk* popChunk(const WID& id) {
     Chunk* r = popChunkByID(id.pid);
     if (r)
       return r;
@@ -102,13 +104,13 @@ class PerSocketChunkMaster : private boost::noncopyable {
     for (unsigned int i = id.pid + 1; i < Q.size(); ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     for (unsigned int i = 0; i < id.pid; ++i) {
       r = popChunkByID(i);
       if (r)
-	return r;
+        return r;
     }
 
     return 0;
@@ -123,12 +125,12 @@ public:
 
   PerSocketChunkMaster() {
     for (unsigned int i = 0; i < data.size(); ++i) {
-      p& r = *data.getRemote(i);
+      p& r   = *data.getRemote(i);
       r.next = 0;
     }
   }
 
-  void push(const WID& id, const value_type& val)  {
+  void push(const WID& id, const value_type& val) {
     p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->full()) {
       n.next->push(val);
@@ -145,13 +147,13 @@ public:
     return 0;
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(const WID& id, Iter b, Iter e) {
     while (b != e)
       push(id, *b++);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push_initial(const WID& id, Iter b, Iter e) {
     push(id, b, e);
   }
@@ -179,7 +181,7 @@ public:
     return true;
   }
 
-  void pop(const WID& id)  {
+  void pop(const WID& id) {
     p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->empty()) {
       n.next->pop();
@@ -189,8 +191,10 @@ public:
   }
 };
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+void PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::popSP(const WID& id,
+                                                                p& n) {
   while (true) {
     if (n.next && !n.next->empty()) {
       n.next->pop();
@@ -204,8 +208,10 @@ void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::popSP(const WID& id, p& n
   }
 }
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-bool PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p& n) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+bool PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::emptySP(const WID& id,
+                                                                  p& n) {
   while (true) {
     if (n.next && !n.next->empty())
       return false;
@@ -217,8 +223,11 @@ bool PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::emptySP(const WID& id, p&
   }
 }
 
-template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int ChunkSize>
-void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, const T& val) {
+template <typename T, template <typename, bool> class OuterTy, bool isLIFO,
+          int ChunkSize>
+void PerSocketChunkMaster<T, OuterTy, isLIFO, ChunkSize>::pushSP(const WID& id,
+                                                                 p& n,
+                                                                 const T& val) {
   if (n.next)
     pushChunk(id, n.next);
   n.next = mkChunk();
@@ -226,25 +235,31 @@ void PerSocketChunkMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& 
 }
 
 // TODO: Switch to thread-local worklists
-template<typename T,int ChunkSize>
-class Worklist: public PerSocketChunkMaster<T, worklists::ConExtLinkedQueue, true, ChunkSize> { };
+template <typename T, int ChunkSize>
+class Worklist : public PerSocketChunkMaster<T, worklists::ConExtLinkedQueue,
+                                             true, ChunkSize> {};
 
-template<class T, class FunctionTy, class ArgsTy>
+template <class T, class FunctionTy, class ArgsTy>
 class Executor {
   typedef T value_type;
-  typedef Worklist<value_type,256> WLTy;
+  typedef Worklist<value_type, 256> WLTy;
 
-  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
-  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
-  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
-  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
-  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+  static const bool needsStats =
+      !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
+  static const bool needsPush =
+      !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static const bool needsAborts =
+      !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static const bool needsPia =
+      exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak =
+      exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct ThreadLocalData {
     galois::runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<needsStats> stat;
-    ThreadLocalData(const char* ln): stat(ln) { }
+    ThreadLocalData(const char* ln) : stat(ln) {}
   };
 
   WLTy wls[2];
@@ -253,12 +268,11 @@ class Executor {
   substrate::Barrier& barrier;
   substrate::CacheLineStorage<volatile long> done;
 
-  bool empty(WLTy* wl) {
-    return wl->sempty();
-  }
+  bool empty(WLTy* wl) { return wl->sempty(); }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+  void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur,
+                      WLTy* next) {
     tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
     if (needsPush) {
@@ -269,7 +283,8 @@ class Executor {
     cur->pop(wid);
   }
 
-  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
+  void processWithAborts(ThreadLocalData& tld, const WID& wid, WLTy* cur,
+                         WLTy* next) {
     int result = 0;
 #ifdef GALOIS_USE_LONGJMP
     if ((result = setjmp(hackjmp)) == 0) {
@@ -278,13 +293,19 @@ class Executor {
 #endif
       process(tld, wid, cur, next);
 #ifdef GALOIS_USE_LONGJMP
-    } else { clearConflictLock(); }
+    } else {
+      clearConflictLock();
+    }
 #else
-    } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
+    } catch (const ConflictFlag& flag) {
+      clearConflictLock();
+      result = flag;
+    }
 #endif
-    //FIXME:    clearReleasable();
+    // FIXME:    clearReleasable();
     switch (result) {
-    case 0: break;
+    case 0:
+      break;
     case galois::runtime::CONFLICT:
       abortIteration(tld, wid, cur, next);
       break;
@@ -301,9 +322,8 @@ class Executor {
       tld.stat.inc_iterations();
       function(val, tld.facing.data());
       if (needsPush) {
-        next->push(wid,
-            tld.facing.getPushBuffer().begin(),
-            tld.facing.getPushBuffer().end());
+        next->push(wid, tld.facing.getPushBuffer().begin(),
+                   tld.facing.getPushBuffer().end());
         tld.facing.resetPushBuffer();
       }
       if (needsAborts)
@@ -318,7 +338,7 @@ class Executor {
     unsigned tid = substrate::ThreadPool::getTID();
     WID wid;
 
-    WLTy* cur = &wls[0];
+    WLTy* cur  = &wls[0];
     WLTy* next = &wls[1];
 
     while (true) {
@@ -353,53 +373,49 @@ class Executor {
 public:
   static_assert(!needsBreak, "not supported by this executor");
 
-  Executor(const FunctionTy& f, const ArgsTy& args):
-    function(f),
-    loopname(get_by_supertype<loopname_tag>(args).value),
-    barrier(getBarrier(activeThreads)) { }
+  Executor(const FunctionTy& f, const ArgsTy& args)
+      : function(f), loopname(get_by_supertype<loopname_tag>(args).value),
+        barrier(getBarrier(activeThreads)) {}
 
-  template<typename RangeTy>
-  void init(const RangeTy& range) { }
+  template <typename RangeTy>
+  void init(const RangeTy& range) {}
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void initThread(const RangeTy& range) {
     wls[0].push_initial(WID(), range.local_begin(), range.local_end());
   }
 
-  void operator()() {
-    go();
-  }
+  void operator()() { go(); }
 };
 
-}
-}
+} // namespace BulkSynchronousImpl
+} // namespace runtime
 
 namespace worklists {
 
-template<typename T=int>
+template <typename T = int>
 struct BulkSynchronousInline {
-  template<bool _concurrent>
+  template <bool _concurrent>
   using rethread = BulkSynchronousInline<T>;
 
-  template<typename _T>
+  template <typename _T>
   using retype = BulkSynchronousInline<_T>;
 
   typedef T value_type;
 };
 
-}
+} // namespace worklists
 
 namespace runtime {
 
-template<class T, class FunctionTy, class ArgsTy>
-struct ForEachExecutor<worklists::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:
-  public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy>
-{
+template <class T, class FunctionTy, class ArgsTy>
+struct ForEachExecutor<worklists::BulkSynchronousInline<T>, FunctionTy, ArgsTy>
+    : public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> {
   typedef BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> SuperTy;
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args) : SuperTy(f, args) {}
 };
 
-}
+} // namespace runtime
 
-}
+} // namespace galois
 #endif

@@ -8,19 +8,19 @@ const size_t DIST_INFINITY = std::numeric_limits<size_t>::max() - 1;
 static AttrList makeAttrCopy(Attr& attr) {
   size_t num = attr.size();
 
-  KeyAltTy *key = nullptr; 
-  ValAltTy *value = nullptr;
+  KeyAltTy* key   = nullptr;
+  ValAltTy* value = nullptr;
 
   if (num) {
-    key = new KeyAltTy [num] ();
-    value = new ValAltTy [num] ();
+    key   = new KeyAltTy[num]();
+    value = new ValAltTy[num]();
 
     size_t i = 0;
-    for (auto k: attr) {
+    for (auto k : attr) {
       // deep copy for strings
-      key[i] = new std::string::value_type [k.first.size()+1] ();
+      key[i] = new std::string::value_type[k.first.size() + 1]();
       std::copy(k.first.begin(), k.first.end(), key[i]);
-      value[i] = new std::string::value_type [k.second.size()+1] ();
+      value[i] = new std::string::value_type[k.second.size() + 1]();
       std::copy(k.second.begin(), k.second.end(), value[i]);
       i++;
     }
@@ -29,42 +29,42 @@ static AttrList makeAttrCopy(Attr& attr) {
   return {num, key, value};
 }
 
-AttrList getNodeAllAttr(Graph *g, GNode n) {
+AttrList getNodeAllAttr(Graph* g, GNode n) {
   return makeAttrCopy(g->getData(n).attr);
 }
 
-AttrList getEdgeAllAttr(Graph *g, Edge e) {
+AttrList getEdgeAllAttr(Graph* g, Edge e) {
   auto ei = g->findEdge(e.src, e.dst);
   assert(ei != g->edge_end(e.src));
   return makeAttrCopy(g->getEdgeData(ei));
 }
 
-NodeList getAllNodes(Graph *g) {
+NodeList getAllNodes(Graph* g) {
   NodeList l = createNodeList(getNumNodes(g));
-  auto i = 0;
-  for (auto n: *g) {
+  auto i     = 0;
+  for (auto n : *g) {
     l.nodes[i++] = n;
   }
   return l;
 }
 
-EdgeList getAllEdges(Graph *g) {
+EdgeList getAllEdges(Graph* g) {
   EdgeList l = createEdgeList(getNumEdges(g));
-  auto i = 0;
-  for (auto n: *g) {
-    for (auto e: g->edges(n)) {
+  auto i     = 0;
+  for (auto n : *g) {
+    for (auto e : g->edges(n)) {
       l.edges[i].src = n;
       l.edges[i].dst = g->getEdgeDst(e);
       i++;
     }
   }
-  return l; 
+  return l;
 }
 
 NodeList createNodeList(int num) {
-  GNode *l = NULL;
+  GNode* l = NULL;
   if (num)
-    l = new GNode [num] ();
+    l = new GNode[num]();
   return {num, l};
 }
 
@@ -75,14 +75,12 @@ void printNodeList(NodeList nl) {
   std::cout << std::endl;
 }
 
-void deleteNodeList(NodeList nl) {
-  delete[] nl.nodes;
-}
+void deleteNodeList(NodeList nl) { delete[] nl.nodes; }
 
 EdgeList createEdgeList(int num) {
-  Edge *l = NULL;
+  Edge* l = NULL;
   if (num)
-    l = new Edge [num] ();
+    l = new Edge[num]();
   return {num, l};
 }
 
@@ -93,17 +91,11 @@ void printEdgeList(EdgeList el) {
   std::cout << std::endl;
 }
 
-void deleteEdgeList(EdgeList el) {
-  delete[] el.edges;
-}
+void deleteEdgeList(EdgeList el) { delete[] el.edges; }
 
-void deleteNodeDoubles(NodeDouble *array) {
-  delete[] array;
-}
+void deleteNodeDoubles(NodeDouble* array) { delete[] array; }
 
-void deleteGraphMatches(NodePair *pairs) {
-  delete[] pairs;
-}
+void deleteGraphMatches(NodePair* pairs) { delete[] pairs; }
 
 void deleteAttrList(AttrList l) {
   if (0 == l.num) {
@@ -118,4 +110,3 @@ void deleteAttrList(AttrList l) {
   delete[] l.key;
   delete[] l.value;
 }
-

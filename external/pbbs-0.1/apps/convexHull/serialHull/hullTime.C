@@ -36,23 +36,24 @@ using namespace benchIO;
 void timeHull(point2d* P, int n, int rounds, char* outFile) {
   int m;
   _seq<int> I;
-  for (int i=0; i < rounds; i++) {
-    if (i != 0) I.del();
+  for (int i = 0; i < rounds; i++) {
+    if (i != 0)
+      I.del();
     startTime();
     I = hull(P, n);
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) writeIntArrayToFile(I.A, I.n, outFile);
+  if (outFile != NULL)
+    writeIntArrayToFile(I.A, I.n, outFile);
 }
-
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  int rounds  = P.getOptionIntValue("-r", 1);
 
   _seq<point2d> PIn = readPointsFromFile<point2d>(iFile);
   timeHull(PIn.A, PIn.n, rounds, oFile);

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,13 +26,13 @@ namespace galois {
 namespace substrate {
 
 struct threadTopoInfo {
-  unsigned tid; // this thread (galois id)
-  unsigned socketLeader; //first thread id in tid's socket
-  unsigned socket; // socket (L3 normally) of thread
-  unsigned numaNode; // memory bank.  may be different than socket.
+  unsigned tid;                 // this thread (galois id)
+  unsigned socketLeader;        // first thread id in tid's socket
+  unsigned socket;              // socket (L3 normally) of thread
+  unsigned numaNode;            // memory bank.  may be different than socket.
   unsigned cumulativeMaxSocket; // max socket id seen from [0, tid]
-  unsigned osContext; // OS ID to use for thread binding
-  unsigned osNumaNode; // OS ID for numa node
+  unsigned osContext;           // OS ID to use for thread binding
+  unsigned osNumaNode;          // OS ID for numa node
 };
 
 struct machineTopoInfo {
@@ -42,11 +42,10 @@ struct machineTopoInfo {
   unsigned maxNumaNodes;
 };
 
-//parse machine topology
-std::pair<machineTopoInfo,std::vector<threadTopoInfo>> getHWTopo();
-//bind a thread to a hwContext (returned by getHWTopo)
+// parse machine topology
+std::pair<machineTopoInfo, std::vector<threadTopoInfo>> getHWTopo();
+// bind a thread to a hwContext (returned by getHWTopo)
 bool bindThreadSelf(unsigned osContext);
-
 
 } // end namespace substrate
 } // end namespace galois

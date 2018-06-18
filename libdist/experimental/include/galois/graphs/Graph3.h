@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -38,18 +38,18 @@
 namespace galois {
 namespace graphs {
 
-enum class EdgeDirection {Un, Out, InOut};
+enum class EdgeDirection { Un, Out, InOut };
 
-template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
+template <typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph;
 
-template<typename NHTy>
+template <typename NHTy>
 class GraphNodeBase {
   NHTy nextNode;
   bool active;
 
 protected:
-  GraphNodeBase() :active(false) {}
+  GraphNodeBase() : active(false) {}
 
   NHTy& getNextNode() { return nextNode; }
 
@@ -61,24 +61,19 @@ protected:
   }
 
   void dump(std::ostream& os) const {
-    os << "next: " << nextNode 
-       << " active: " << active;
+    os << "next: " << nextNode << " active: " << active;
   }
 
 public:
-  bool getActive() const {
-    return active;
-  }
+  bool getActive() const { return active; }
 
-  void setActive(bool b) {
-    active = b;
-  }
+  void setActive(bool b) { active = b; }
 };
 
-template<typename NodeDataTy>
+template <typename NodeDataTy>
 class GraphNodeData {
   NodeDataTy data;
-  
+
 protected:
   void serialize(galois::runtime::SerializeBuffer& s) const {
     gSerialize(s, data);
@@ -87,34 +82,31 @@ protected:
     gDeserialize(s, data);
   }
 
-  void dump(std::ostream& os) const {
-    os << "data: " << data;
-  }
+  void dump(std::ostream& os) const { os << "data: " << data; }
 
 public:
-  template<typename... Args>
-  GraphNodeData(Args&&... args) :data(std::forward<Args...>(args...)) {}
-  GraphNodeData() :data() {}
+  template <typename... Args>
+  GraphNodeData(Args&&... args) : data(std::forward<Args...>(args...)) {}
+  GraphNodeData() : data() {}
 
-  NodeDataTy& getData() {
-    return data;
-  }
+  NodeDataTy& getData() { return data; }
 };
 
-template<>
+template <>
 class GraphNodeData<void> {};
 
-template<typename NHTy, typename EdgeDataTy, EdgeDirection EDir>
+template <typename NHTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNodeEdges;
 
-template<typename NHTy, typename EdgeDataTy>
+template <typename NHTy, typename EdgeDataTy>
 class Edge {
   NHTy dst;
   EdgeDataTy val;
 
 public:
-  template<typename... Args>
-  Edge(const NHTy& d, Args&&... args) :dst(d), val(std::forward<Args...>(args...)) {}
+  template <typename... Args>
+  Edge(const NHTy& d, Args&&... args)
+      : dst(d), val(std::forward<Args...>(args...)) {}
 
   Edge() {}
 
@@ -130,21 +122,20 @@ public:
   }
 
   void dump(std::ostream& os) const {
-    os << "<{Edge: dst: " << dst
-       << " dst active: " << dst->getActive()
-       << " val: " << val
-       << "}>";
+    os << "<{Edge: dst: " << dst << " dst active: " << dst->getActive()
+       << " val: " << val << "}>";
   }
 
-  //Trivially copyable
+  // Trivially copyable
   typedef int tt_is_copyable;
 };
 
-template<typename NHTy>
+template <typename NHTy>
 class Edge<NHTy, void> {
   NHTy dst;
+
 public:
-  Edge(const NHTy& d) :dst(d) {}
+  Edge(const NHTy& d) : dst(d) {}
   Edge() {}
 
   NHTy getDst() const { return dst; }
@@ -157,14 +148,14 @@ public:
     os << "}>";
   }
 
-  //Trivially copyable
+  // Trivially copyable
   typedef int tt_is_copyable;
 };
 
-template<typename NHTy, typename EdgeDataTy>
+template <typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Out> {
   typedef Edge<NHTy, EdgeDataTy> EdgeTy;
-  typedef gdeque<EdgeTy,4> EdgeListTy;
+  typedef gdeque<EdgeTy, 4> EdgeListTy;
 
   EdgeListTy edges;
 
@@ -183,40 +174,32 @@ protected:
     }
   }
 
- public:
+public:
   typedef typename EdgeListTy::iterator iterator;
 
-  template<typename... Args>
+  template <typename... Args>
   void createEdge(const NHTy& src, const NHTy& dst, Args&&... args) {
     edges.emplace_back(dst, std::forward<Args...>(args...));
   }
 
-  void createEdge(const NHTy& src, const NHTy& dst) {
-    edges.emplace_back(dst);
-  }
+  void createEdge(const NHTy& src, const NHTy& dst) { edges.emplace_back(dst); }
 
-  void clearEdges() {
-    edges.clear();
-  }
+  void clearEdges() { edges.clear(); }
 
-  iterator begin() {
-    return edges.begin();
-  }
+  iterator begin() { return edges.begin(); }
 
-  iterator end() {
-    return edges.end();
-  }
+  iterator end() { return edges.end(); }
 };
 
-template<typename NHTy, typename EdgeDataTy>
+template <typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::InOut> {
-  //FIXME
+  // FIXME
 };
 
-template<typename NHTy>
+template <typename NHTy>
 class GraphNodeEdges<NHTy, void, EdgeDirection::Un> {
   typedef Edge<NHTy, void> EdgeTy;
-  typedef gdeque<EdgeTy,4> EdgeListTy;
+  typedef gdeque<EdgeTy, 4> EdgeListTy;
 
   EdgeListTy edges;
 
@@ -235,56 +218,54 @@ protected:
     }
   }
 
- public:
+public:
   typedef typename EdgeListTy::iterator iterator;
 
   void createEdge(NHTy& src, NHTy& dest) {
-    //assert(*src == this);
+    // assert(*src == this);
     dest->edges.emplace_back(src);
     edges.emplace_back(dest);
   }
 
-  void clearEdges() {
-    edges.clear();
-  }
+  void clearEdges() { edges.clear(); }
 
-  iterator begin() {
-    return edges.begin();
-  }
+  iterator begin() { return edges.begin(); }
 
-  iterator end() {
-    return edges.end();
-  }
+  iterator end() { return edges.end(); }
 };
 
-template<typename NHTy, typename EdgeDataTy>
+template <typename NHTy, typename EdgeDataTy>
 class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
-  //FIXME
+  // FIXME
 };
 
-
-template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
+template <typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNode
-  : public galois::runtime::Lockable,
-    public GraphNodeBase<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
-    public GraphNodeData<NodeDataTy>,
-    public GraphNodeEdges<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
-{
+    : public galois::runtime::Lockable,
+      public GraphNodeBase<
+          galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir>>>,
+      public GraphNodeData<NodeDataTy>,
+      public GraphNodeEdges<
+          galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir>>,
+          EdgeDataTy, EDir> {
   friend class ThirdGraph<NodeDataTy, EdgeDataTy, EDir>;
-  using GraphNodeBase<galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
+  using GraphNodeBase<galois::runtime::gptr<
+      GraphNode<NodeDataTy, EdgeDataTy, EDir>>>::getNextNode;
 
 public:
-  typedef galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
-  typedef typename galois::graphs::Edge<Handle,EdgeDataTy> EdgeType;
-  typedef typename GraphNodeEdges<Handle,EdgeDataTy,EDir>::iterator edge_iterator;
+  typedef galois::runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir>> Handle;
+  typedef typename galois::graphs::Edge<Handle, EdgeDataTy> EdgeType;
+  typedef
+      typename GraphNodeEdges<Handle, EdgeDataTy, EDir>::iterator edge_iterator;
 
-  template<typename... Args>
-  GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
+  template <typename... Args>
+  GraphNode(Args&&... args)
+      : GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
 
   GraphNode() = default;
   GraphNode(galois::runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
-  //serialize
+  // serialize
   typedef int tt_has_serialize;
   void serialize(galois::runtime::SerializeBuffer& s) const {
     GraphNodeBase<Handle>::serialize(s);
@@ -320,8 +301,8 @@ public:
  * @param EdgeTy type of edge data (may be void)
  * @param IsDir  bool indicated if graph is directed
  *
-*/
-template<typename NodeTy, typename EdgeTy, EdgeDirection EDir>
+ */
+template <typename NodeTy, typename EdgeTy, EdgeDirection EDir>
 class ThirdGraph {
   typedef GraphNode<NodeTy, EdgeTy, EDir> gNode;
 
@@ -330,26 +311,33 @@ class ThirdGraph {
   runtime::PerThreadDist<ThirdGraph> basePtr;
 
   struct is_edge : public std::unary_function<typename gNode::EdgeType&, bool> {
-    bool operator()(typename gNode::EdgeType& n) const { 
-      return n.getDst()->getActive(); 
+    bool operator()(typename gNode::EdgeType& n) const {
+      return n.getDst()->getActive();
     }
   };
-  struct is_node: public std::unary_function<runtime::gptr<gNode>&, bool>{
-    bool operator() (const runtime::gptr<gNode>& g) const {
+  struct is_node : public std::unary_function<runtime::gptr<gNode>&, bool> {
+    bool operator()(const runtime::gptr<gNode>& g) const {
       acquire(g, MethodFlag::ALL);
       return g->getActive();
     }
   };
-  struct makePtrLocal: public std::unary_function<gNode&, runtime::gptr<gNode>> {
-    runtime::gptr<gNode> operator()(gNode& data) const { return runtime::gptr<gNode>(&data); }
+  struct makePtrLocal
+      : public std::unary_function<gNode&, runtime::gptr<gNode>> {
+    runtime::gptr<gNode> operator()(gNode& data) const {
+      return runtime::gptr<gNode>(&data);
+    }
   };
 
-  static void invalidate(typename Bag<runtime::gptr<gNode>>::pointer localStatePtr) {
-    for (unsigned x = 0; x < runtime::getSystemThreadPool().getMaxThreads(); ++x) {
-      auto lptr = localStatePtr.remote(runtime::NetworkInterface::ID, x).resolve();
-      for (auto ii = lptr->local_begin(),
-                ei = lptr->local_end(); ii != ei; ++ii) {
-        galois::runtime::getLocalDirectory().invalidate(static_cast<runtime::fatPointer>(*ii));
+  static void
+  invalidate(typename Bag<runtime::gptr<gNode>>::pointer localStatePtr) {
+    for (unsigned x = 0; x < runtime::getSystemThreadPool().getMaxThreads();
+         ++x) {
+      auto lptr =
+          localStatePtr.remote(runtime::NetworkInterface::ID, x).resolve();
+      for (auto ii = lptr->local_begin(), ei = lptr->local_end(); ii != ei;
+           ++ii) {
+        galois::runtime::getLocalDirectory().invalidate(
+            static_cast<runtime::fatPointer>(*ii));
       }
     }
   }
@@ -357,9 +345,11 @@ class ThirdGraph {
 public:
   typedef typename gNode::Handle NodeHandle;
   //! Edge iterator
-  typedef typename boost::filter_iterator<is_edge,typename gNode::edge_iterator> edge_iterator;
+  typedef
+      typename boost::filter_iterator<is_edge, typename gNode::edge_iterator>
+          edge_iterator;
 
-  template<typename... Args>
+  template <typename... Args>
   NodeHandle createNode(Args&&... args) {
     NodeHandle N(&*localStateStore->emplace(std::forward<Args...>(args...)));
     localStatePtr->push(N);
@@ -371,11 +361,9 @@ public:
     localStatePtr->push(N);
     return N;
   }
-  
-  void addNode(NodeHandle N) {
-    N->setActive(true);
-  }
-  
+
+  void addNode(NodeHandle N) { N->setActive(true); }
+
   void removeNode(NodeHandle N) {
     if (N->getActive()) {
       N->setActive(false);
@@ -385,34 +373,42 @@ public:
   }
 
   //! Node iterator
-  typedef boost::filter_iterator<is_node, typename Bag<runtime::gptr<gNode>>::local_iterator> local_iterator;
+  typedef boost::filter_iterator<
+      is_node, typename Bag<runtime::gptr<gNode>>::local_iterator>
+      local_iterator;
 
   local_iterator local_begin() {
-    return boost::make_filter_iterator<is_node>(localStatePtr->local_begin(), localStatePtr->local_end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->local_begin(),
+                                                localStatePtr->local_end());
   }
 
   local_iterator local_end() {
     assert(localStatePtr->local_end() == localStatePtr->local_end());
-    return boost::make_filter_iterator<is_node>(localStatePtr->local_end(), localStatePtr->local_end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->local_end(),
+                                                localStatePtr->local_end());
   }
 
-  typedef boost::filter_iterator<is_node, typename Bag<runtime::gptr<gNode>>::iterator> iterator;
-  
+  typedef boost::filter_iterator<is_node,
+                                 typename Bag<runtime::gptr<gNode>>::iterator>
+      iterator;
+
   iterator begin() {
-    return boost::make_filter_iterator<is_node>(localStatePtr->begin(), localStatePtr->end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->begin(),
+                                                localStatePtr->end());
   }
 
   iterator end() {
-    return boost::make_filter_iterator<is_node>(localStatePtr->end(), localStatePtr->end());
+    return boost::make_filter_iterator<is_node>(localStatePtr->end(),
+                                                localStatePtr->end());
   }
 
-  //! Returns an iterator to the neighbors of a node 
+  //! Returns an iterator to the neighbors of a node
   edge_iterator edge_begin(NodeHandle N) {
     assert(N);
     acquire(N, galois::MethodFlag::ALL);
     // prefetch all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
-      //ii->getDst().prefetch();
+      // ii->getDst().prefetch();
     }
     // lock all the nodes
     for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
@@ -421,13 +417,13 @@ public:
       acquire(ii->getDst(), galois::MethodFlag::ALL);
       if (ii->getDst()->getActive()) {
         // modify the call when local nodes aren't looked up in directory
-	//        ii->getDst().acquire();
+        //        ii->getDst().acquire();
       }
     }
     return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
   }
 
-  //! Returns the end of the neighbor iterator 
+  //! Returns the end of the neighbor iterator
   edge_iterator edge_end(NodeHandle N) {
     assert(N);
     acquire(N, galois::MethodFlag::ALL);
@@ -441,7 +437,7 @@ public:
   }
 
   template <typename... Args>
-  void addEdge(NodeHandle src, NodeHandle dst, Args&&...args ) {
+  void addEdge(NodeHandle src, NodeHandle dst, Args&&... args) {
     assert(src);
     assert(dst);
     src->createEdge(src, dst, std::forward<Args...>(args...));
@@ -452,7 +448,7 @@ public:
     return ii->getDst();
   }
 
-  template<typename EI>
+  template <typename EI>
   auto getEdgeData(EI ii) -> decltype(ii->getValue()) {
     return ii->getValue();
   }
@@ -467,39 +463,43 @@ public:
     return N->getActive();
   }
 
-  size_t size() const { GALOIS_DIE("Not implemented"); return 0; }
+  size_t size() const {
+    GALOIS_DIE("Not implemented");
+    return 0;
+  }
 
   typedef runtime::PerThreadDist<ThirdGraph> pointer;
   static pointer allocate() {
     return runtime::PerThreadDist<ThirdGraph>::allocate();
   }
   static void deallocate(pointer p) {
-    runtime::getSystemNetworkInterface().broadcastAlt(&invalidate, p->localStatePtr);
+    runtime::getSystemNetworkInterface().broadcastAlt(&invalidate,
+                                                      p->localStatePtr);
     invalidate(p->localStatePtr);
     Bag<runtime::gptr<gNode>>::deallocate(p->localStatePtr);
     Bag<gNode>::deallocate(p->localStateStore);
     runtime::PerThreadDist<ThirdGraph>::deallocate(p);
   }
 
-  explicit ThirdGraph(pointer p) :basePtr(p) {
+  explicit ThirdGraph(pointer p) : basePtr(p) {
     localStateStore = Bag<gNode>::allocate();
-    localStatePtr = Bag<runtime::gptr<gNode>>::allocate();
+    localStatePtr   = Bag<runtime::gptr<gNode>>::allocate();
   }
 
-  explicit ThirdGraph(pointer p, runtime::DeSerializeBuffer& buf) :basePtr(p) {
+  explicit ThirdGraph(pointer p, runtime::DeSerializeBuffer& buf) : basePtr(p) {
     gDeserialize(buf, localStateStore, localStatePtr);
-    //gDeserialize(buf, localStatePtr);
+    // gDeserialize(buf, localStatePtr);
     assert(localStateStore);
     assert(localStatePtr);
   }
 
   void getInitData(runtime::SerializeBuffer& buf) {
     gSerialize(buf, localStateStore, localStatePtr);
-    //gSerialize(buf, localStatePtr);
+    // gSerialize(buf, localStatePtr);
   }
 };
 
-} //namespace graphs
-} //namespace galois
+} // namespace graphs
+} // namespace galois
 
 #endif

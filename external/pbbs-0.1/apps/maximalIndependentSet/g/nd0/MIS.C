@@ -26,49 +26,55 @@
 #include "parallel.h"
 //#include "speculative_for.h"
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=1, int maxTries=-1) {
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
-  vindex *I = newA(vindex,maxRoundSize);
-  vindex *Ihold = newA(vindex,maxRoundSize);
-  bool *keep = newA(bool,maxRoundSize);
-  S *state;
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 1,
+                     int maxTries = -1) {
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (e - s) / granularity + 1;
+  vindex* I        = newA(vindex, maxRoundSize);
+  vindex* Ihold    = newA(vindex, maxRoundSize);
+  bool* keep       = newA(bool, maxRoundSize);
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
-  int failed = 0;
+  int failed     = 0;
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-//      abort();
+      //      cerr << "speculativeLoop: too many iterations, increase maxTries
+      //      parameter\n"; abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
       abort();
     } else {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = step.reserve(I[i]);
-      } parallel_doall_end
+      //      parallel_for (int i =0; i < size; i++) {
+      parallel_doall(int, i, 0, size) {
+        if (i >= numberKeep)
+          I[i] = numberDone + i;
+        keep[i] = step.reserve(I[i]);
+      }
+      parallel_doall_end
     }
 
     if (hasState) {
       abort();
     } else {
-//      parallel_for (int i =0; i < size; i++) {
-      parallel_doall(int, i, 0, size)  {
-        if (keep[i]) keep[i] = !step.commit(I[i]);
-      } parallel_doall_end
+      //      parallel_for (int i =0; i < size; i++) {
+      parallel_doall(int, i, 0, size) {
+        if (keep[i])
+          keep[i] = !step.commit(I[i]);
+      }
+      parallel_doall_end
     }
 
     // keep edges that failed to hook for next round
@@ -77,7 +83,9 @@ void speculative_for(S step, int s, int e, int granularity,
     swap(I, Ihold);
     numberDone += size - numberKeep;
   }
-  free(I); free(Ihold); free(keep); 
+  free(I);
+  free(Ihold);
+  free(keep);
   if (hasState)
     free(state);
   cout << "rounds = " << round << " failed = " << failed << "\n";
@@ -94,7 +102,9 @@ using namespace std;
 //   Flags = 1 indicates chosen
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
-  char *Flags;  vertex*G; int *Marks;
+  char* Flags;
+  vertex* G;
+  int* Marks;
   MISstep(char* _F, vertex* _G, int* _M) : Flags(_F), G(_G), Marks(_M) {}
 
   bool acquire(int id, int i) {
@@ -161,7 +171,7 @@ struct MISstep {
     return;
   }
 
-  bool commit(int i) { 
+  bool commit(int i) {
     bool retval = doit(i, false);
     resetState(i);
     return retval;
@@ -169,13 +179,13 @@ struct MISstep {
 };
 
 char* maximalIndependentSet(graph GS) {
-  int n = GS.n;
-  vertex* G = GS.V;
-  int* Marks = newArray(n, -1);
-  char* Flags = newArray(n,  (char) 0);
+  int n       = GS.n;
+  vertex* G   = GS.V;
+  int* Marks  = newArray(n, -1);
+  char* Flags = newArray(n, (char)0);
   MISstep mis(Flags, G, Marks);
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds <= 0 ? 25 : numRounds;
+  numRounds     = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds, 0);
   free(Marks);
   return Flags;

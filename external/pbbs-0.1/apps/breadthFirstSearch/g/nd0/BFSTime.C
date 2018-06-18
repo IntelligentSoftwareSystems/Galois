@@ -36,7 +36,7 @@ using namespace benchIO;
 void timeBFS(graph G, int rounds, char* outFile) {
   graph GN = G.copy();
   BFS(0, GN);
-  for (int i=0; i < rounds; i++) {
+  for (int i = 0; i < rounds; i++) {
     GN.del();
     GN = G.copy();
     startTime();
@@ -46,18 +46,20 @@ void timeBFS(graph G, int rounds, char* outFile) {
   cout << endl;
   G.del();
   int m = 0;
-  for (int i=0; i < GN.n; i++) m += GN.V[i].degree;
+  for (int i = 0; i < GN.n; i++)
+    m += GN.V[i].degree;
   GN.m = m;
-  if (outFile != NULL) writeGraphToFile(GN, outFile);
+  if (outFile != NULL)
+    writeGraphToFile(GN, outFile);
   GN.del();
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
-  graph G = readGraphFromFile(iFile);
+  int rounds  = P.getOptionIntValue("-r", 1);
+  graph G     = readGraphFromFile(iFile);
   timeBFS(G, rounds, oFile);
 }

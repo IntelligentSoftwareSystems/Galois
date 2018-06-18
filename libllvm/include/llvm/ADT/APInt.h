@@ -23,21 +23,21 @@
 #include <string>
 
 namespace llvm {
-  class Serializer;
-  class Deserializer;
-  class FoldingSetNodeID;
-  class StringRef;
+class Serializer;
+class Deserializer;
+class FoldingSetNodeID;
+class StringRef;
 
-  template<typename T>
-  class SmallVectorImpl;
+template <typename T>
+class SmallVectorImpl;
 
-  // An unsigned host type used as a single part of a multi-part
-  // bignum.
-  typedef uint64_t integerPart;
+// An unsigned host type used as a single part of a multi-part
+// bignum.
+typedef uint64_t integerPart;
 
-  const unsigned int host_char_bit = 8;
-  const unsigned int integerPartWidth = host_char_bit *
-    static_cast<unsigned int>(sizeof(integerPart));
+const unsigned int host_char_bit = 8;
+const unsigned int integerPartWidth =
+    host_char_bit * static_cast<unsigned int>(sizeof(integerPart));
 
 //===----------------------------------------------------------------------===//
 //                              APInt Class
@@ -70,20 +70,20 @@ namespace llvm {
 ///
 /// @brief Class for arbitrary precision integers.
 class APInt {
-  unsigned BitWidth;      ///< The number of bits in this APInt.
+  unsigned BitWidth; ///< The number of bits in this APInt.
 
   /// This union is used to store the integer value. When the
   /// integer bit-width <= 64, it uses VAL, otherwise it uses pVal.
   union {
-    uint64_t VAL;    ///< Used to store the <= 64 bits integer value.
-    uint64_t *pVal;  ///< Used to store the >64 bits integer value.
+    uint64_t VAL;   ///< Used to store the <= 64 bits integer value.
+    uint64_t* pVal; ///< Used to store the >64 bits integer value.
   };
 
   /// This enum is used to hold the constants we needed for APInt.
   enum {
     /// Bits in a word
-    APINT_BITS_PER_WORD = static_cast<unsigned int>(sizeof(uint64_t)) *
-                          CHAR_BIT,
+    APINT_BITS_PER_WORD =
+        static_cast<unsigned int>(sizeof(uint64_t)) * CHAR_BIT,
     /// Byte size of a word
     APINT_WORD_SIZE = static_cast<unsigned int>(sizeof(uint64_t))
   };
@@ -91,13 +91,11 @@ class APInt {
   /// This constructor is used only internally for speed of construction of
   /// temporaries. It is unsafe for general use so it is not public.
   /// @brief Fast internal constructor
-  APInt(uint64_t* val, unsigned bits) : BitWidth(bits), pVal(val) { }
+  APInt(uint64_t* val, unsigned bits) : BitWidth(bits), pVal(val) {}
 
   /// @returns true if the number of bits <= 64, false otherwise.
   /// @brief Determine if this APInt just has one word to store value.
-  bool isSingleWord() const {
-    return BitWidth <= APINT_BITS_PER_WORD;
-  }
+  bool isSingleWord() const { return BitWidth <= APINT_BITS_PER_WORD; }
 
   /// @returns the word position for the specified bit position.
   /// @brief Determine which word a bit is in.
@@ -171,9 +169,8 @@ class APInt {
   /// has specific constraints on its inputs. If those constraints are not met
   /// then it provides a simpler form of divide.
   /// @brief An internal division function for dividing APInts.
-  static void divide(const APInt LHS, unsigned lhsWords,
-                     const APInt &RHS, unsigned rhsWords,
-                     APInt *Quotient, APInt *Remainder);
+  static void divide(const APInt LHS, unsigned lhsWords, const APInt& RHS,
+                     unsigned rhsWords, APInt* Quotient, APInt* Remainder);
 
   /// out-of-line slow case for inline constructor
   void initSlowCase(unsigned numBits, uint64_t val, bool isSigned);
@@ -226,7 +223,7 @@ public:
   /// @param isSigned how to treat signedness of val
   /// @brief Create a new APInt of numBits width, initialized as val.
   APInt(unsigned numBits, uint64_t val, bool isSigned = false)
-    : BitWidth(numBits), VAL(0) {
+      : BitWidth(numBits), VAL(0) {
     assert(BitWidth && "bitwidth too small");
     if (isSingleWord())
       VAL = val;
@@ -253,19 +250,18 @@ public:
   /// This constructor interprets the string \arg str in the given radix. The
   /// interpretation stops when the first character that is not suitable for the
   /// radix is encountered, or the end of the string. Acceptable radix values
-  /// are 2, 8, 10, 16, and 36. It is an error for the value implied by the 
+  /// are 2, 8, 10, 16, and 36. It is an error for the value implied by the
   /// string to require more bits than numBits.
   ///
   /// @param numBits the bit width of the constructed APInt
   /// @param str the string to be interpreted
-  /// @param radix the radix to use for the conversion 
+  /// @param radix the radix to use for the conversion
   /// @brief Construct an APInt from a string representation.
   APInt(unsigned numBits, StringRef str, uint8_t radix);
 
   /// Simply makes *this a copy of that.
   /// @brief Copy Constructor.
-  APInt(const APInt& that)
-    : BitWidth(that.BitWidth), VAL(0) {
+  APInt(const APInt& that) : BitWidth(that.BitWidth), VAL(0) {
     assert(BitWidth && "bitwidth too small");
     if (isSingleWord())
       VAL = that.VAL;
@@ -276,7 +272,7 @@ public:
   /// @brief Destructor.
   ~APInt() {
     if (!isSingleWord())
-      delete [] pVal;
+      delete[] pVal;
   }
 
   /// Default constructor that creates an uninitialized APInt.  This is useful
@@ -293,51 +289,39 @@ public:
   /// This tests the high bit of this APInt to determine if it is set.
   /// @returns true if this APInt is negative, false otherwise
   /// @brief Determine sign of this APInt.
-  bool isNegative() const {
-    return (*this)[BitWidth - 1];
-  }
+  bool isNegative() const { return (*this)[BitWidth - 1]; }
 
   /// This tests the high bit of the APInt to determine if it is unset.
   /// @brief Determine if this APInt Value is non-negative (>= 0)
-  bool isNonNegative() const {
-    return !isNegative();
-  }
+  bool isNonNegative() const { return !isNegative(); }
 
   /// This tests if the value of this APInt is positive (> 0). Note
   /// that 0 is not a positive value.
   /// @returns true if this APInt is positive.
   /// @brief Determine if this APInt Value is positive.
-  bool isStrictlyPositive() const {
-    return isNonNegative() && !!*this;
-  }
+  bool isStrictlyPositive() const { return isNonNegative() && !!*this; }
 
   /// This checks to see if the value has all bits of the APInt are set or not.
   /// @brief Determine if all bits are set
-  bool isAllOnesValue() const {
-    return countPopulation() == BitWidth;
-  }
+  bool isAllOnesValue() const { return countPopulation() == BitWidth; }
 
   /// This checks to see if the value of this APInt is the maximum unsigned
   /// value for the APInt's bit width.
   /// @brief Determine if this is the largest unsigned value.
-  bool isMaxValue() const {
-    return countPopulation() == BitWidth;
-  }
+  bool isMaxValue() const { return countPopulation() == BitWidth; }
 
   /// This checks to see if the value of this APInt is the maximum signed
   /// value for the APInt's bit width.
   /// @brief Determine if this is the largest signed value.
   bool isMaxSignedValue() const {
-    return BitWidth == 1 ? VAL == 0 :
-                          !isNegative() && countPopulation() == BitWidth - 1;
+    return BitWidth == 1 ? VAL == 0
+                         : !isNegative() && countPopulation() == BitWidth - 1;
   }
 
   /// This checks to see if the value of this APInt is the minimum unsigned
   /// value for the APInt's bit width.
   /// @brief Determine if this is the smallest unsigned value.
-  bool isMinValue() const {
-    return !*this;
-  }
+  bool isMinValue() const { return !*this; }
 
   /// This checks to see if the value of this APInt is the minimum signed
   /// value for the APInt's bit width.
@@ -354,8 +338,8 @@ public:
 
     if (isSingleWord())
       return isUIntN(N, VAL);
-    return APInt(N, makeArrayRef(pVal, getNumWords())).zext(getBitWidth())
-      == (*this);
+    return APInt(N, makeArrayRef(pVal, getNumWords())).zext(getBitWidth()) ==
+           (*this);
   }
 
   /// @brief Check if this APInt has an N-bits signed integer value.
@@ -376,16 +360,14 @@ public:
 
   /// This converts the APInt to a boolean value as a test against zero.
   /// @brief Boolean conversion function.
-  bool getBoolValue() const {
-    return !!*this;
-  }
+  bool getBoolValue() const { return !!*this; }
 
   /// getLimitedValue - If this value is smaller than the specified limit,
   /// return it, otherwise return the limit value.  This causes the value
   /// to saturate to the limit.
   uint64_t getLimitedValue(uint64_t Limit = ~0ULL) const {
-    return (getActiveBits() > 64 || getZExtValue() > Limit) ?
-      Limit :  getZExtValue();
+    return (getActiveBits() > 64 || getZExtValue() > Limit) ? Limit
+                                                            : getZExtValue();
   }
 
   /// @}
@@ -404,9 +386,7 @@ public:
   }
 
   /// @brief Gets minimum unsigned value of APInt for a specific bit width.
-  static APInt getMinValue(unsigned numBits) {
-    return APInt(numBits, 0);
-  }
+  static APInt getMinValue(unsigned numBits) { return APInt(numBits, 0); }
 
   /// @brief Gets minimum signed value of APInt for a specific bit width.
   static APInt getSignedMinValue(unsigned numBits) {
@@ -430,9 +410,7 @@ public:
 
   /// @returns the '0' value for an APInt of the specified bit-width.
   /// @brief Get the '0' value.
-  static APInt getNullValue(unsigned numBits) {
-    return APInt(numBits, 0);
-  }
+  static APInt getNullValue(unsigned numBits) { return APInt(numBits, 0); }
 
   /// Get an APInt with the same BitWidth as this APInt, just zero mask
   /// the low bits and right shift to the least significant bit.
@@ -450,7 +428,7 @@ public:
     Res.setBit(BitNo);
     return Res;
   }
-  
+
   /// Constructs an APInt value that has a contiguous range of bits set. The
   /// bits from loBit (inclusive) to hiBit (exclusive) will be set. All other
   /// bits will be zero. For example, with parameters(32, 0, 16) you would get
@@ -466,8 +444,8 @@ public:
     assert(loBit < numBits && "loBit out of range");
     if (hiBit < loBit)
       return getLowBitsSet(numBits, hiBit) |
-             getHighBitsSet(numBits, numBits-loBit);
-    return getLowBitsSet(numBits, hiBit-loBit).shl(loBit);
+             getHighBitsSet(numBits, numBits - loBit);
+    return getLowBitsSet(numBits, hiBit - loBit).shl(loBit);
   }
 
   /// Constructs an APInt value that has the top hiBitsSet bits set.
@@ -556,9 +534,7 @@ public:
   /// Negates *this using two's complement logic.
   /// @returns An APInt value representing the negation of *this.
   /// @brief Unary negation operator
-  APInt operator-() const {
-    return APInt(BitWidth, 0) - (*this);
-  }
+  APInt operator-() const { return APInt(BitWidth, 0) - (*this); }
 
   /// Performs logical negation operation on this APInt.
   /// @returns true if *this is zero, false otherwise.
@@ -573,7 +549,7 @@ public:
   APInt& operator=(const APInt& RHS) {
     // If the bitwidths are the same, we can avoid mucking with memory
     if (isSingleWord() && RHS.isSingleWord()) {
-      VAL = RHS.VAL;
+      VAL      = RHS.VAL;
       BitWidth = RHS.BitWidth;
       return clearUnusedBits();
     }
@@ -603,7 +579,7 @@ public:
   /// Performs a bitwise OR operation on this APInt and RHS. RHS is
   /// logically zero-extended or truncated to match the bit-width of
   /// the LHS.
-  /// 
+  ///
   /// @brief Bitwise OR assignment operator.
   APInt& operator|=(uint64_t RHS) {
     if (isSingleWord()) {
@@ -656,9 +632,7 @@ public:
       return APInt(getBitWidth(), VAL & RHS.VAL);
     return AndSlowCase(RHS);
   }
-  APInt And(const APInt& RHS) const {
-    return this->operator&(RHS);
-  }
+  APInt And(const APInt& RHS) const { return this->operator&(RHS); }
 
   /// Performs a bitwise OR operation on *this and RHS.
   /// @returns An APInt value representing the bitwise OR of *this and RHS.
@@ -669,9 +643,7 @@ public:
       return APInt(getBitWidth(), VAL | RHS.VAL);
     return OrSlowCase(RHS);
   }
-  APInt Or(const APInt& RHS) const {
-    return this->operator|(RHS);
-  }
+  APInt Or(const APInt& RHS) const { return this->operator|(RHS); }
 
   /// Performs a bitwise XOR operation on *this and RHS.
   /// @returns An APInt value representing the bitwise XOR of *this and RHS.
@@ -682,9 +654,7 @@ public:
       return APInt(BitWidth, VAL ^ RHS.VAL);
     return XorSlowCase(RHS);
   }
-  APInt Xor(const APInt& RHS) const {
-    return this->operator^(RHS);
-  }
+  APInt Xor(const APInt& RHS) const { return this->operator^(RHS); }
 
   /// Multiplies this APInt by RHS and returns the result.
   /// @brief Multiplication operator.
@@ -693,24 +663,16 @@ public:
   /// Adds RHS to this APInt and returns the result.
   /// @brief Addition operator.
   APInt operator+(const APInt& RHS) const;
-  APInt operator+(uint64_t RHS) const {
-    return (*this) + APInt(BitWidth, RHS);
-  }
+  APInt operator+(uint64_t RHS) const { return (*this) + APInt(BitWidth, RHS); }
 
   /// Subtracts RHS from this APInt and returns the result.
   /// @brief Subtraction operator.
   APInt operator-(const APInt& RHS) const;
-  APInt operator-(uint64_t RHS) const {
-    return (*this) - APInt(BitWidth, RHS);
-  }
+  APInt operator-(uint64_t RHS) const { return (*this) - APInt(BitWidth, RHS); }
 
-  APInt operator<<(unsigned Bits) const {
-    return shl(Bits);
-  }
+  APInt operator<<(unsigned Bits) const { return shl(Bits); }
 
-  APInt operator<<(const APInt &Bits) const {
-    return shl(Bits);
-  }
+  APInt operator<<(const APInt& Bits) const { return shl(Bits); }
 
   /// Arithmetic right-shift this APInt by shiftAmt.
   /// @brief Arithmetic right-shift function.
@@ -740,31 +702,31 @@ public:
 
   /// Arithmetic right-shift this APInt by shiftAmt.
   /// @brief Arithmetic right-shift function.
-  APInt ashr(const APInt &shiftAmt) const;
+  APInt ashr(const APInt& shiftAmt) const;
 
   /// Logical right-shift this APInt by shiftAmt.
   /// @brief Logical right-shift function.
-  APInt lshr(const APInt &shiftAmt) const;
+  APInt lshr(const APInt& shiftAmt) const;
 
   /// Left-shift this APInt by shiftAmt.
   /// @brief Left-shift function.
-  APInt shl(const APInt &shiftAmt) const;
+  APInt shl(const APInt& shiftAmt) const;
 
   /// @brief Rotate left by rotateAmt.
-  APInt rotl(const APInt &rotateAmt) const;
+  APInt rotl(const APInt& rotateAmt) const;
 
   /// @brief Rotate right by rotateAmt.
-  APInt rotr(const APInt &rotateAmt) const;
+  APInt rotr(const APInt& rotateAmt) const;
 
   /// Perform an unsigned divide operation on this APInt by RHS. Both this and
   /// RHS are treated as unsigned quantities for purposes of this division.
   /// @returns a new APInt value containing the division result
   /// @brief Unsigned division operation.
-  APInt udiv(const APInt &RHS) const;
+  APInt udiv(const APInt& RHS) const;
 
   /// Signed divide this APInt by APInt RHS.
   /// @brief Signed division function for APInt.
-  APInt sdiv(const APInt &RHS) const {
+  APInt sdiv(const APInt& RHS) const {
     if (isNegative())
       if (RHS.isNegative())
         return (-(*this)).udiv(-RHS);
@@ -782,11 +744,11 @@ public:
   /// which is *this.
   /// @returns a new APInt value containing the remainder result
   /// @brief Unsigned remainder operation.
-  APInt urem(const APInt &RHS) const;
+  APInt urem(const APInt& RHS) const;
 
   /// Signed remainder operation on APInt.
   /// @brief Function for signed remainder operation.
-  APInt srem(const APInt &RHS) const {
+  APInt srem(const APInt& RHS) const {
     if (isNegative())
       if (RHS.isNegative())
         return -((-(*this)).urem(-RHS));
@@ -803,17 +765,17 @@ public:
   /// may overlap with the pair of output arguments. It is safe to call
   /// udivrem(X, Y, X, Y), for example.
   /// @brief Dual division/remainder interface.
-  static void udivrem(const APInt &LHS, const APInt &RHS,
-                      APInt &Quotient, APInt &Remainder);
+  static void udivrem(const APInt& LHS, const APInt& RHS, APInt& Quotient,
+                      APInt& Remainder);
 
-  static void sdivrem(const APInt &LHS, const APInt &RHS,
-                      APInt &Quotient, APInt &Remainder) {
+  static void sdivrem(const APInt& LHS, const APInt& RHS, APInt& Quotient,
+                      APInt& Remainder) {
     if (LHS.isNegative()) {
       if (RHS.isNegative())
         APInt::udivrem(-LHS, -RHS, Quotient, Remainder);
       else
         APInt::udivrem(-LHS, RHS, Quotient, Remainder);
-      Quotient = -Quotient;
+      Quotient  = -Quotient;
       Remainder = -Remainder;
     } else if (RHS.isNegative()) {
       APInt::udivrem(LHS, -RHS, Quotient, Remainder);
@@ -822,17 +784,16 @@ public:
       APInt::udivrem(LHS, RHS, Quotient, Remainder);
     }
   }
-  
-  
+
   // Operations that return overflow indicators.
-  APInt sadd_ov(const APInt &RHS, bool &Overflow) const;
-  APInt uadd_ov(const APInt &RHS, bool &Overflow) const;
-  APInt ssub_ov(const APInt &RHS, bool &Overflow) const;
-  APInt usub_ov(const APInt &RHS, bool &Overflow) const;
-  APInt sdiv_ov(const APInt &RHS, bool &Overflow) const;
-  APInt smul_ov(const APInt &RHS, bool &Overflow) const;
-  APInt umul_ov(const APInt &RHS, bool &Overflow) const;
-  APInt sshl_ov(unsigned Amt, bool &Overflow) const;
+  APInt sadd_ov(const APInt& RHS, bool& Overflow) const;
+  APInt uadd_ov(const APInt& RHS, bool& Overflow) const;
+  APInt ssub_ov(const APInt& RHS, bool& Overflow) const;
+  APInt usub_ov(const APInt& RHS, bool& Overflow) const;
+  APInt sdiv_ov(const APInt& RHS, bool& Overflow) const;
+  APInt smul_ov(const APInt& RHS, bool& Overflow) const;
+  APInt umul_ov(const APInt& RHS, bool& Overflow) const;
+  APInt sshl_ov(unsigned Amt, bool& Overflow) const;
 
   /// @returns the bit value at bitPosition
   /// @brief Array-indexing support.
@@ -865,47 +826,37 @@ public:
   /// relationship.
   /// @returns true if *this == Val
   /// @brief Equality comparison.
-  bool eq(const APInt &RHS) const {
-    return (*this) == RHS;
-  }
+  bool eq(const APInt& RHS) const { return (*this) == RHS; }
 
   /// Compares this APInt with RHS for the validity of the inequality
   /// relationship.
   /// @returns true if *this != Val
   /// @brief Inequality operator.
-  bool operator!=(const APInt& RHS) const {
-    return !((*this) == RHS);
-  }
+  bool operator!=(const APInt& RHS) const { return !((*this) == RHS); }
 
   /// Compares this APInt with a uint64_t for the validity of the inequality
   /// relationship.
   /// @returns true if *this != Val
   /// @brief Inequality operator.
-  bool operator!=(uint64_t Val) const {
-    return !((*this) == Val);
-  }
+  bool operator!=(uint64_t Val) const { return !((*this) == Val); }
 
   /// Compares this APInt with RHS for the validity of the inequality
   /// relationship.
   /// @returns true if *this != Val
   /// @brief Inequality comparison
-  bool ne(const APInt &RHS) const {
-    return !((*this) == RHS);
-  }
+  bool ne(const APInt& RHS) const { return !((*this) == RHS); }
 
   /// Regards both *this and RHS as unsigned quantities and compares them for
   /// the validity of the less-than relationship.
   /// @returns true if *this < RHS when both are considered unsigned.
   /// @brief Unsigned less than comparison
-  bool ult(const APInt &RHS) const;
+  bool ult(const APInt& RHS) const;
 
   /// Regards both *this as an unsigned quantity and compares it with RHS for
   /// the validity of the less-than relationship.
   /// @returns true if *this < RHS when considered unsigned.
   /// @brief Unsigned less than comparison
-  bool ult(uint64_t RHS) const {
-    return ult(APInt(getBitWidth(), RHS));
-  }
+  bool ult(uint64_t RHS) const { return ult(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as signed quantities and compares them for
   /// validity of the less-than relationship.
@@ -917,114 +868,83 @@ public:
   /// the validity of the less-than relationship.
   /// @returns true if *this < RHS when considered signed.
   /// @brief Signed less than comparison
-  bool slt(uint64_t RHS) const {
-    return slt(APInt(getBitWidth(), RHS));
-  }
+  bool slt(uint64_t RHS) const { return slt(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as unsigned quantities and compares them for
   /// validity of the less-or-equal relationship.
   /// @returns true if *this <= RHS when both are considered unsigned.
   /// @brief Unsigned less or equal comparison
-  bool ule(const APInt& RHS) const {
-    return ult(RHS) || eq(RHS);
-  }
+  bool ule(const APInt& RHS) const { return ult(RHS) || eq(RHS); }
 
   /// Regards both *this as an unsigned quantity and compares it with RHS for
   /// the validity of the less-or-equal relationship.
   /// @returns true if *this <= RHS when considered unsigned.
   /// @brief Unsigned less or equal comparison
-  bool ule(uint64_t RHS) const {
-    return ule(APInt(getBitWidth(), RHS));
-  }
+  bool ule(uint64_t RHS) const { return ule(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as signed quantities and compares them for
   /// validity of the less-or-equal relationship.
   /// @returns true if *this <= RHS when both are considered signed.
   /// @brief Signed less or equal comparison
-  bool sle(const APInt& RHS) const {
-    return slt(RHS) || eq(RHS);
-  }
+  bool sle(const APInt& RHS) const { return slt(RHS) || eq(RHS); }
 
   /// Regards both *this as a signed quantity and compares it with RHS for
   /// the validity of the less-or-equal relationship.
   /// @returns true if *this <= RHS when considered signed.
   /// @brief Signed less or equal comparison
-  bool sle(uint64_t RHS) const {
-    return sle(APInt(getBitWidth(), RHS));
-  }
+  bool sle(uint64_t RHS) const { return sle(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as unsigned quantities and compares them for
   /// the validity of the greater-than relationship.
   /// @returns true if *this > RHS when both are considered unsigned.
   /// @brief Unsigned greather than comparison
-  bool ugt(const APInt& RHS) const {
-    return !ult(RHS) && !eq(RHS);
-  }
+  bool ugt(const APInt& RHS) const { return !ult(RHS) && !eq(RHS); }
 
   /// Regards both *this as an unsigned quantity and compares it with RHS for
   /// the validity of the greater-than relationship.
   /// @returns true if *this > RHS when considered unsigned.
   /// @brief Unsigned greater than comparison
-  bool ugt(uint64_t RHS) const {
-    return ugt(APInt(getBitWidth(), RHS));
-  }
+  bool ugt(uint64_t RHS) const { return ugt(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as signed quantities and compares them for
   /// the validity of the greater-than relationship.
   /// @returns true if *this > RHS when both are considered signed.
   /// @brief Signed greather than comparison
-  bool sgt(const APInt& RHS) const {
-    return !slt(RHS) && !eq(RHS);
-  }
+  bool sgt(const APInt& RHS) const { return !slt(RHS) && !eq(RHS); }
 
   /// Regards both *this as a signed quantity and compares it with RHS for
   /// the validity of the greater-than relationship.
   /// @returns true if *this > RHS when considered signed.
   /// @brief Signed greater than comparison
-  bool sgt(uint64_t RHS) const {
-    return sgt(APInt(getBitWidth(), RHS));
-  }
+  bool sgt(uint64_t RHS) const { return sgt(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as unsigned quantities and compares them for
   /// validity of the greater-or-equal relationship.
   /// @returns true if *this >= RHS when both are considered unsigned.
   /// @brief Unsigned greater or equal comparison
-  bool uge(const APInt& RHS) const {
-    return !ult(RHS);
-  }
+  bool uge(const APInt& RHS) const { return !ult(RHS); }
 
   /// Regards both *this as an unsigned quantity and compares it with RHS for
   /// the validity of the greater-or-equal relationship.
   /// @returns true if *this >= RHS when considered unsigned.
   /// @brief Unsigned greater or equal comparison
-  bool uge(uint64_t RHS) const {
-    return uge(APInt(getBitWidth(), RHS));
-  }
+  bool uge(uint64_t RHS) const { return uge(APInt(getBitWidth(), RHS)); }
 
   /// Regards both *this and RHS as signed quantities and compares them for
   /// validity of the greater-or-equal relationship.
   /// @returns true if *this >= RHS when both are considered signed.
   /// @brief Signed greather or equal comparison
-  bool sge(const APInt& RHS) const {
-    return !slt(RHS);
-  }
+  bool sge(const APInt& RHS) const { return !slt(RHS); }
 
   /// Regards both *this as a signed quantity and compares it with RHS for
   /// the validity of the greater-or-equal relationship.
   /// @returns true if *this >= RHS when considered signed.
   /// @brief Signed greater or equal comparison
-  bool sge(uint64_t RHS) const {
-    return sge(APInt(getBitWidth(), RHS));
-  }
+  bool sge(uint64_t RHS) const { return sge(APInt(getBitWidth(), RHS)); }
 
-  
-  
-  
   /// This operation tests if there are any pairs of corresponding bits
   /// between this APInt and RHS that are both set.
-  bool intersects(const APInt &RHS) const {
-    return (*this & RHS) != 0;
-  }
+  bool intersects(const APInt& RHS) const { return (*this & RHS) != 0; }
 
   /// @}
   /// @name Resizing Operators
@@ -1067,7 +987,7 @@ public:
     else {
       // Set all the bits in all the words.
       for (unsigned i = 0; i < getNumWords(); ++i)
-	pVal[i] = -1ULL;
+        pVal[i] = -1ULL;
     }
     // Clear the unused ones
     clearUnusedBits();
@@ -1110,16 +1030,12 @@ public:
   /// @{
 
   /// @returns the total number of bits.
-  unsigned getBitWidth() const {
-    return BitWidth;
-  }
+  unsigned getBitWidth() const { return BitWidth; }
 
   /// Here one word's bitwidth equals to that of uint64_t.
   /// @returns the number of words to hold the integer value of this APInt.
   /// @brief Get the number of words.
-  unsigned getNumWords() const {
-    return getNumWords(BitWidth);
-  }
+  unsigned getNumWords() const { return getNumWords(BitWidth); }
 
   /// Here one word's bitwidth equals to that of uint64_t.
   /// @returns the number of words to hold the integer value with a
@@ -1133,16 +1049,12 @@ public:
   /// bit width minus the number of leading zeros. This is used in several
   /// computations to see how "wide" the value is.
   /// @brief Compute the number of active bits in the value
-  unsigned getActiveBits() const {
-    return BitWidth - countLeadingZeros();
-  }
+  unsigned getActiveBits() const { return BitWidth - countLeadingZeros(); }
 
   /// This function returns the number of active words in the value of this
   /// APInt. This is used in conjunction with getActiveData to extract the raw
   /// value of the APInt.
-  unsigned getActiveWords() const {
-    return whichWord(getActiveBits()-1) + 1;
-  }
+  unsigned getActiveWords() const { return whichWord(getActiveBits() - 1) + 1; }
 
   /// Computes the minimum bit width for this APInt while considering it to be
   /// a signed (and probably negative) value. If the value is not negative,
@@ -1154,7 +1066,7 @@ public:
   unsigned getMinSignedBits() const {
     if (isNegative())
       return BitWidth - countLeadingOnes() + 1;
-    return getActiveBits()+1;
+    return getActiveBits() + 1;
   }
 
   /// This method attempts to return the value of this APInt as a zero extended
@@ -1175,7 +1087,7 @@ public:
   int64_t getSExtValue() const {
     if (isSingleWord())
       return int64_t(VAL << (APINT_BITS_PER_WORD - BitWidth)) >>
-                     (APINT_BITS_PER_WORD - BitWidth);
+             (APINT_BITS_PER_WORD - BitWidth);
     assert(getMinSignedBits() <= 64 && "Too many bits for int64_t");
     return int64_t(pVal[0]);
   }
@@ -1250,22 +1162,22 @@ public:
   /// @}
   /// @name Conversion Functions
   /// @{
-  void print(std::ostream &OS, bool isSigned) const;
+  void print(std::ostream& OS, bool isSigned) const;
 
   /// toString - Converts an APInt to a string and append it to Str.  Str is
   /// commonly a SmallString.
-  void toString(SmallVectorImpl<char> &Str, unsigned Radix, bool Signed,
+  void toString(SmallVectorImpl<char>& Str, unsigned Radix, bool Signed,
                 bool formatAsCLiteral = false) const;
 
   /// Considers the APInt to be unsigned and converts it into a string in the
   /// radix given. The radix can be 2, 8, 10 16, or 36.
-  void toStringUnsigned(SmallVectorImpl<char> &Str, unsigned Radix = 10) const {
+  void toStringUnsigned(SmallVectorImpl<char>& Str, unsigned Radix = 10) const {
     toString(Str, Radix, false, false);
   }
 
   /// Considers the APInt to be signed and converts it into a string in the
   /// radix given. The radix can be 2, 8, 10, 16, or 36.
-  void toStringSigned(SmallVectorImpl<char> &Str, unsigned Radix = 10) const {
+  void toStringSigned(SmallVectorImpl<char>& Str, unsigned Radix = 10) const {
     toString(Str, Radix, true, false);
   }
 
@@ -1274,7 +1186,6 @@ public:
   /// to the methods above to avoid thrashing the heap for the string.
   std::string toString(unsigned Radix, bool Signed) const;
 
-
   /// @returns a byte-swapped representation of this APInt Value.
   APInt byteSwap() const;
 
@@ -1282,14 +1193,10 @@ public:
   double roundToDouble(bool isSigned) const;
 
   /// @brief Converts this unsigned APInt to a double value.
-  double roundToDouble() const {
-    return roundToDouble(false);
-  }
+  double roundToDouble() const { return roundToDouble(false); }
 
   /// @brief Converts this signed APInt to a double value.
-  double signedRoundToDouble() const {
-    return roundToDouble(true);
-  }
+  double signedRoundToDouble() const { return roundToDouble(true); }
 
   /// The conversion does not do a translation from integer to double, it just
   /// re-interprets the bits as a double. Note that it is valid to do this on
@@ -1346,9 +1253,7 @@ public:
   /// @{
 
   /// @returns the floor log base 2 of this APInt.
-  unsigned logBase2() const {
-    return BitWidth - 1 - countLeadingZeros();
-  }
+  unsigned logBase2() const { return BitWidth - 1 - countLeadingZeros(); }
 
   /// @returns the ceil log base 2 of this APInt.
   unsigned ceilLogBase2() const {
@@ -1402,48 +1307,47 @@ public:
 
   /// Sets the least significant part of a bignum to the input value,
   /// and zeroes out higher parts.  */
-  static void tcSet(integerPart *, integerPart, unsigned int);
+  static void tcSet(integerPart*, integerPart, unsigned int);
 
   /// Assign one bignum to another.
-  static void tcAssign(integerPart *, const integerPart *, unsigned int);
+  static void tcAssign(integerPart*, const integerPart*, unsigned int);
 
   /// Returns true if a bignum is zero, false otherwise.
-  static bool tcIsZero(const integerPart *, unsigned int);
+  static bool tcIsZero(const integerPart*, unsigned int);
 
   /// Extract the given bit of a bignum; returns 0 or 1.  Zero-based.
-  static int tcExtractBit(const integerPart *, unsigned int bit);
+  static int tcExtractBit(const integerPart*, unsigned int bit);
 
   /// Copy the bit vector of width srcBITS from SRC, starting at bit
   /// srcLSB, to DST, of dstCOUNT parts, such that the bit srcLSB
   /// becomes the least significant bit of DST.  All high bits above
   /// srcBITS in DST are zero-filled.
-  static void tcExtract(integerPart *, unsigned int dstCount,
-                        const integerPart *,
+  static void tcExtract(integerPart*, unsigned int dstCount, const integerPart*,
                         unsigned int srcBits, unsigned int srcLSB);
 
   /// Set the given bit of a bignum.  Zero-based.
-  static void tcSetBit(integerPart *, unsigned int bit);
+  static void tcSetBit(integerPart*, unsigned int bit);
 
   /// Clear the given bit of a bignum.  Zero-based.
-  static void tcClearBit(integerPart *, unsigned int bit);
+  static void tcClearBit(integerPart*, unsigned int bit);
 
   /// Returns the bit number of the least or most significant set bit
   /// of a number.  If the input number has no bits set -1U is
   /// returned.
-  static unsigned int tcLSB(const integerPart *, unsigned int);
-  static unsigned int tcMSB(const integerPart *parts, unsigned int n);
+  static unsigned int tcLSB(const integerPart*, unsigned int);
+  static unsigned int tcMSB(const integerPart* parts, unsigned int n);
 
   /// Negate a bignum in-place.
-  static void tcNegate(integerPart *, unsigned int);
+  static void tcNegate(integerPart*, unsigned int);
 
   /// DST += RHS + CARRY where CARRY is zero or one.  Returns the
   /// carry flag.
-  static integerPart tcAdd(integerPart *, const integerPart *,
-                           integerPart carry, unsigned);
+  static integerPart tcAdd(integerPart*, const integerPart*, integerPart carry,
+                           unsigned);
 
   /// DST -= RHS + CARRY where CARRY is zero or one.  Returns the
   /// carry flag.
-  static integerPart tcSubtract(integerPart *, const integerPart *,
+  static integerPart tcSubtract(integerPart*, const integerPart*,
                                 integerPart carry, unsigned);
 
   ///  DST += SRC * MULTIPLIER + PART   if add is true
@@ -1457,7 +1361,7 @@ public:
   ///  DSTPARTS parts of the result, and if all of the omitted higher
   ///  parts were zero return zero, otherwise overflow occurred and
   ///  return one.
-  static int tcMultiplyPart(integerPart *dst, const integerPart *src,
+  static int tcMultiplyPart(integerPart* dst, const integerPart* src,
                             integerPart multiplier, integerPart carry,
                             unsigned int srcParts, unsigned int dstParts,
                             bool add);
@@ -1466,15 +1370,15 @@ public:
   /// and is filled with the least significant parts of the result.
   /// Returns one if overflow occurred, otherwise zero.  DST must be
   /// disjoint from both operands.
-  static int tcMultiply(integerPart *, const integerPart *,
-                        const integerPart *, unsigned);
+  static int tcMultiply(integerPart*, const integerPart*, const integerPart*,
+                        unsigned);
 
   /// DST = LHS * RHS, where DST has width the sum of the widths of
   /// the operands.  No overflow occurs.  DST must be disjoint from
   /// both operands. Returns the number of parts required to hold the
   /// result.
-  static unsigned int tcFullMultiply(integerPart *, const integerPart *,
-                                     const integerPart *, unsigned, unsigned);
+  static unsigned int tcFullMultiply(integerPart*, const integerPart*,
+                                     const integerPart*, unsigned, unsigned);
 
   /// If RHS is zero LHS and REMAINDER are left unchanged, return one.
   /// Otherwise set LHS to LHS / RHS with the fractional part
@@ -1486,35 +1390,33 @@ public:
   ///  for use by the routine; its contents need not be initialized
   ///  and are destroyed.  LHS, REMAINDER and SCRATCH must be
   ///  distinct.
-  static int tcDivide(integerPart *lhs, const integerPart *rhs,
-                      integerPart *remainder, integerPart *scratch,
+  static int tcDivide(integerPart* lhs, const integerPart* rhs,
+                      integerPart* remainder, integerPart* scratch,
                       unsigned int parts);
 
   /// Shift a bignum left COUNT bits.  Shifted in bits are zero.
   /// There are no restrictions on COUNT.
-  static void tcShiftLeft(integerPart *, unsigned int parts,
-                          unsigned int count);
+  static void tcShiftLeft(integerPart*, unsigned int parts, unsigned int count);
 
   /// Shift a bignum right COUNT bits.  Shifted in bits are zero.
   /// There are no restrictions on COUNT.
-  static void tcShiftRight(integerPart *, unsigned int parts,
+  static void tcShiftRight(integerPart*, unsigned int parts,
                            unsigned int count);
 
   /// The obvious AND, OR and XOR and complement operations.
-  static void tcAnd(integerPart *, const integerPart *, unsigned int);
-  static void tcOr(integerPart *, const integerPart *, unsigned int);
-  static void tcXor(integerPart *, const integerPart *, unsigned int);
-  static void tcComplement(integerPart *, unsigned int);
+  static void tcAnd(integerPart*, const integerPart*, unsigned int);
+  static void tcOr(integerPart*, const integerPart*, unsigned int);
+  static void tcXor(integerPart*, const integerPart*, unsigned int);
+  static void tcComplement(integerPart*, unsigned int);
 
   /// Comparison (unsigned) of two bignums.
-  static int tcCompare(const integerPart *, const integerPart *,
-                       unsigned int);
+  static int tcCompare(const integerPart*, const integerPart*, unsigned int);
 
   /// Increment a bignum in-place.  Return the carry flag.
-  static integerPart tcIncrement(integerPart *, unsigned int);
+  static integerPart tcIncrement(integerPart*, unsigned int);
 
   /// Set the least significant BITS and clear the rest.
-  static void tcSetLeastSignificantBits(integerPart *, unsigned int,
+  static void tcSetLeastSignificantBits(integerPart*, unsigned int,
                                         unsigned int bits);
 
   /// @brief debug method
@@ -1525,26 +1427,22 @@ public:
 
 /// Magic data for optimising signed division by a constant.
 struct APInt::ms {
-  APInt m;  ///< magic number
-  unsigned s;  ///< shift amount
+  APInt m;    ///< magic number
+  unsigned s; ///< shift amount
 };
 
 /// Magic data for optimising unsigned division by a constant.
 struct APInt::mu {
-  APInt m;     ///< magic number
-  bool a;      ///< add indicator
-  unsigned s;  ///< shift amount
+  APInt m;    ///< magic number
+  bool a;     ///< add indicator
+  unsigned s; ///< shift amount
 };
 
-inline bool operator==(uint64_t V1, const APInt& V2) {
-  return V2 == V1;
-}
+inline bool operator==(uint64_t V1, const APInt& V2) { return V2 == V1; }
 
-inline bool operator!=(uint64_t V1, const APInt& V2) {
-  return V2 != V1;
-}
+inline bool operator!=(uint64_t V1, const APInt& V2) { return V2 != V1; }
 
-inline std::ostream &operator<<(std::ostream &OS, const APInt &I) {
+inline std::ostream& operator<<(std::ostream& OS, const APInt& I) {
   I.print(OS, true);
   return OS;
 }
@@ -1552,29 +1450,19 @@ inline std::ostream &operator<<(std::ostream &OS, const APInt &I) {
 namespace APIntOps {
 
 /// @brief Determine the smaller of two APInts considered to be signed.
-inline APInt smin(const APInt &A, const APInt &B) {
-  return A.slt(B) ? A : B;
-}
+inline APInt smin(const APInt& A, const APInt& B) { return A.slt(B) ? A : B; }
 
 /// @brief Determine the larger of two APInts considered to be signed.
-inline APInt smax(const APInt &A, const APInt &B) {
-  return A.sgt(B) ? A : B;
-}
+inline APInt smax(const APInt& A, const APInt& B) { return A.sgt(B) ? A : B; }
 
 /// @brief Determine the smaller of two APInts considered to be signed.
-inline APInt umin(const APInt &A, const APInt &B) {
-  return A.ult(B) ? A : B;
-}
+inline APInt umin(const APInt& A, const APInt& B) { return A.ult(B) ? A : B; }
 
 /// @brief Determine the larger of two APInts considered to be unsigned.
-inline APInt umax(const APInt &A, const APInt &B) {
-  return A.ugt(B) ? A : B;
-}
+inline APInt umax(const APInt& A, const APInt& B) { return A.ugt(B) ? A : B; }
 
 /// @brief Check if the specified APInt has a N-bits unsigned integer value.
-inline bool isIntN(unsigned N, const APInt& APIVal) {
-  return APIVal.isIntN(N);
-}
+inline bool isIntN(unsigned N, const APInt& APIVal) { return APIVal.isIntN(N); }
 
 /// @brief Check if the specified APInt has a N-bits signed integer value.
 inline bool isSignedIntN(unsigned N, const APInt& APIVal) {
@@ -1585,24 +1473,20 @@ inline bool isSignedIntN(unsigned N, const APInt& APIVal) {
 /// starting at the least significant bit with the remainder zero.
 inline bool isMask(unsigned numBits, const APInt& APIVal) {
   return numBits <= APIVal.getBitWidth() &&
-    APIVal == APInt::getLowBitsSet(APIVal.getBitWidth(), numBits);
+         APIVal == APInt::getLowBitsSet(APIVal.getBitWidth(), numBits);
 }
 
 /// @returns true if the argument APInt value contains a sequence of ones
 /// with the remainder zero.
 inline bool isShiftedMask(unsigned numBits, const APInt& APIVal) {
-  return isMask(numBits, (APIVal - APInt(numBits,1)) | APIVal);
+  return isMask(numBits, (APIVal - APInt(numBits, 1)) | APIVal);
 }
 
 /// @returns a byte-swapped representation of the specified APInt Value.
-inline APInt byteSwap(const APInt& APIVal) {
-  return APIVal.byteSwap();
-}
+inline APInt byteSwap(const APInt& APIVal) { return APIVal.byteSwap(); }
 
 /// @returns the floor log base 2 of the specified APInt value.
-inline unsigned logBase2(const APInt& APIVal) {
-  return APIVal.logBase2();
-}
+inline unsigned logBase2(const APInt& APIVal) { return APIVal.logBase2(); }
 
 /// GreatestCommonDivisor - This function returns the greatest common
 /// divisor of the two APInt values using Euclid's algorithm.
@@ -1663,73 +1547,51 @@ inline APInt shl(const APInt& LHS, unsigned shiftAmt) {
 
 /// Signed divide APInt LHS by APInt RHS.
 /// @brief Signed division function for APInt.
-inline APInt sdiv(const APInt& LHS, const APInt& RHS) {
-  return LHS.sdiv(RHS);
-}
+inline APInt sdiv(const APInt& LHS, const APInt& RHS) { return LHS.sdiv(RHS); }
 
 /// Unsigned divide APInt LHS by APInt RHS.
 /// @brief Unsigned division function for APInt.
-inline APInt udiv(const APInt& LHS, const APInt& RHS) {
-  return LHS.udiv(RHS);
-}
+inline APInt udiv(const APInt& LHS, const APInt& RHS) { return LHS.udiv(RHS); }
 
 /// Signed remainder operation on APInt.
 /// @brief Function for signed remainder operation.
-inline APInt srem(const APInt& LHS, const APInt& RHS) {
-  return LHS.srem(RHS);
-}
+inline APInt srem(const APInt& LHS, const APInt& RHS) { return LHS.srem(RHS); }
 
 /// Unsigned remainder operation on APInt.
 /// @brief Function for unsigned remainder operation.
-inline APInt urem(const APInt& LHS, const APInt& RHS) {
-  return LHS.urem(RHS);
-}
+inline APInt urem(const APInt& LHS, const APInt& RHS) { return LHS.urem(RHS); }
 
 /// Performs multiplication on APInt values.
 /// @brief Function for multiplication operation.
-inline APInt mul(const APInt& LHS, const APInt& RHS) {
-  return LHS * RHS;
-}
+inline APInt mul(const APInt& LHS, const APInt& RHS) { return LHS * RHS; }
 
 /// Performs addition on APInt values.
 /// @brief Function for addition operation.
-inline APInt add(const APInt& LHS, const APInt& RHS) {
-  return LHS + RHS;
-}
+inline APInt add(const APInt& LHS, const APInt& RHS) { return LHS + RHS; }
 
 /// Performs subtraction on APInt values.
 /// @brief Function for subtraction operation.
-inline APInt sub(const APInt& LHS, const APInt& RHS) {
-  return LHS - RHS;
-}
+inline APInt sub(const APInt& LHS, const APInt& RHS) { return LHS - RHS; }
 
 /// Performs bitwise AND operation on APInt LHS and
 /// APInt RHS.
 /// @brief Bitwise AND function for APInt.
-inline APInt And(const APInt& LHS, const APInt& RHS) {
-  return LHS & RHS;
-}
+inline APInt And(const APInt& LHS, const APInt& RHS) { return LHS & RHS; }
 
 /// Performs bitwise OR operation on APInt LHS and APInt RHS.
 /// @brief Bitwise OR function for APInt.
-inline APInt Or(const APInt& LHS, const APInt& RHS) {
-  return LHS | RHS;
-}
+inline APInt Or(const APInt& LHS, const APInt& RHS) { return LHS | RHS; }
 
 /// Performs bitwise XOR operation on APInt.
 /// @brief Bitwise XOR function for APInt.
-inline APInt Xor(const APInt& LHS, const APInt& RHS) {
-  return LHS ^ RHS;
-}
+inline APInt Xor(const APInt& LHS, const APInt& RHS) { return LHS ^ RHS; }
 
 /// Performs a bitwise complement operation on APInt.
 /// @brief Bitwise complement function.
-inline APInt Not(const APInt& APIVal) {
-  return ~APIVal;
-}
+inline APInt Not(const APInt& APIVal) { return ~APIVal; }
 
-} // End of APIntOps namespace
+} // namespace APIntOps
 
-} // End of llvm namespace
+} // namespace llvm
 
 #endif

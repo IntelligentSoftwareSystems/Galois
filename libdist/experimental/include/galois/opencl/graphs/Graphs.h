@@ -14,8 +14,7 @@
 #else
 extern "C" {
 #include "CL/cl.h"
-}
-;
+};
 #endif
 #include "galois/opencl/graphs/GraphUtils.h"
 #include "galois/opencl/graphs/CL_LC_Graph.h"

@@ -23,8 +23,14 @@
 #include <cstddef>
 
 namespace llvm {
-template <typename T> struct ReferenceAdder { typedef T& result; };
-template <typename T> struct ReferenceAdder<T&> { typedef T result; };
+template <typename T>
+struct ReferenceAdder {
+  typedef T& result;
+};
+template <typename T>
+struct ReferenceAdder<T&> {
+  typedef T result;
+};
 
 class MallocAllocator {
 public:
@@ -33,17 +39,19 @@ public:
 
   void Reset() {}
 
-  void *Allocate(size_t Size, size_t /*Alignment*/) { return malloc(Size); }
+  void* Allocate(size_t Size, size_t /*Alignment*/) { return malloc(Size); }
 
   template <typename T>
-  T *Allocate() { return static_cast<T*>(malloc(sizeof(T))); }
-
-  template <typename T>
-  T *Allocate(size_t Num) {
-    return static_cast<T*>(malloc(sizeof(T)*Num));
+  T* Allocate() {
+    return static_cast<T*>(malloc(sizeof(T)));
   }
 
-  void Deallocate(const void *Ptr) { free(const_cast<void*>(Ptr)); }
+  template <typename T>
+  T* Allocate(size_t Num) {
+    return static_cast<T*>(malloc(sizeof(T) * Num));
+  }
+
+  void Deallocate(const void* Ptr) { free(const_cast<void*>(Ptr)); }
 
   void PrintStats() const {}
 };
@@ -53,7 +61,7 @@ public:
 class MemSlab {
 public:
   size_t Size;
-  MemSlab *NextPtr;
+  MemSlab* NextPtr;
 };
 
 /// SlabAllocator - This class can be used to parameterize the underlying
@@ -64,8 +72,8 @@ public:
 class SlabAllocator {
 public:
   virtual ~SlabAllocator();
-  virtual MemSlab *Allocate(size_t Size) = 0;
-  virtual void Deallocate(MemSlab *Slab) = 0;
+  virtual MemSlab* Allocate(size_t Size) = 0;
+  virtual void Deallocate(MemSlab* Slab) = 0;
 };
 
 /// MallocSlabAllocator - The default slab allocator for the bump allocator
@@ -77,10 +85,10 @@ class MallocSlabAllocator : public SlabAllocator {
   MallocAllocator Allocator;
 
 public:
-  MallocSlabAllocator() : Allocator() { }
+  MallocSlabAllocator() : Allocator() {}
   virtual ~MallocSlabAllocator();
-  virtual MemSlab *Allocate(size_t Size);
-  virtual void Deallocate(MemSlab *Slab);
+  virtual MemSlab* Allocate(size_t Size);
+  virtual void Deallocate(MemSlab* Slab);
 };
 
 /// BumpPtrAllocator - This allocator is useful for containers that need
@@ -88,8 +96,8 @@ public:
 /// allocating memory, and never deletes it until the entire block is dead. This
 /// makes allocation speedy, but must only be used when the trade-off is ok.
 class BumpPtrAllocator {
-  BumpPtrAllocator(const BumpPtrAllocator &); // do not implement
-  void operator=(const BumpPtrAllocator &);   // do not implement
+  BumpPtrAllocator(const BumpPtrAllocator&); // do not implement
+  void operator=(const BumpPtrAllocator&);   // do not implement
 
   /// SlabSize - Allocate data into slabs of this size unless we get an
   /// allocation above SizeThreshold.
@@ -102,19 +110,19 @@ class BumpPtrAllocator {
   /// Allocator - The underlying allocator we use to get slabs of memory.  This
   /// defaults to MallocSlabAllocator, which wraps malloc, but it could be
   /// changed to use a custom allocator.
-  SlabAllocator &Allocator;
+  SlabAllocator& Allocator;
 
   /// CurSlab - The slab that we are currently allocating into.
   ///
-  MemSlab *CurSlab;
+  MemSlab* CurSlab;
 
   /// CurPtr - The current pointer into the current slab.  This points to the
   /// next free byte in the slab.
-  char *CurPtr;
+  char* CurPtr;
 
   /// End - The end of the current slab.
   ///
-  char *End;
+  char* End;
 
   /// BytesAllocated - This field tracks how many bytes we've allocated, so
   /// that we can compute how much space was wasted.
@@ -123,7 +131,7 @@ class BumpPtrAllocator {
   /// AlignPtr - Align Ptr to Alignment bytes, rounding up.  Alignment should
   /// be a power of two.  This method rounds up, so AlignPtr(7, 4) == 8 and
   /// AlignPtr(8, 4) == 8.
-  static char *AlignPtr(char *Ptr, size_t Alignment);
+  static char* AlignPtr(char* Ptr, size_t Alignment);
 
   /// StartNewSlab - Allocate a new slab and move the bump pointers over into
   /// the new slab.  Modifies CurPtr and End.
@@ -131,14 +139,16 @@ class BumpPtrAllocator {
 
   /// DeallocateSlabs - Deallocate all memory slabs after and including this
   /// one.
-  void DeallocateSlabs(MemSlab *Slab);
+  void DeallocateSlabs(MemSlab* Slab);
 
   static MallocSlabAllocator DefaultSlabAllocator;
 
-  template<typename T> friend class SpecificBumpPtrAllocator;
+  template <typename T>
+  friend class SpecificBumpPtrAllocator;
+
 public:
   BumpPtrAllocator(size_t size = 4096, size_t threshold = 4096,
-                   SlabAllocator &allocator = DefaultSlabAllocator);
+                   SlabAllocator& allocator = DefaultSlabAllocator);
   ~BumpPtrAllocator();
 
   /// Reset - Deallocate all but the current slab and reset the current pointer
@@ -147,37 +157,37 @@ public:
 
   /// Allocate - Allocate space at the specified alignment.
   ///
-  void *Allocate(size_t Size, size_t Alignment);
+  void* Allocate(size_t Size, size_t Alignment);
 
   /// Allocate space, but do not construct, one object.
   ///
   template <typename T>
-  T *Allocate() {
-    return static_cast<T*>(Allocate(sizeof(T),AlignOf<T>::Alignment));
+  T* Allocate() {
+    return static_cast<T*>(Allocate(sizeof(T), AlignOf<T>::Alignment));
   }
 
   /// Allocate space for an array of objects.  This does not construct the
   /// objects though.
   template <typename T>
-  T *Allocate(size_t Num) {
+  T* Allocate(size_t Num) {
     return static_cast<T*>(Allocate(Num * sizeof(T), AlignOf<T>::Alignment));
   }
 
   /// Allocate space for a specific count of elements and with a specified
   /// alignment.
   template <typename T>
-  T *Allocate(size_t Num, size_t Alignment) {
+  T* Allocate(size_t Num, size_t Alignment) {
     // Round EltSize up to the specified alignment.
-    size_t EltSize = (sizeof(T)+Alignment-1)&(-Alignment);
+    size_t EltSize = (sizeof(T) + Alignment - 1) & (-Alignment);
     return static_cast<T*>(Allocate(Num * EltSize, Alignment));
   }
 
-  void Deallocate(const void * /*Ptr*/) {}
+  void Deallocate(const void* /*Ptr*/) {}
 
   unsigned GetNumSlabs() const;
 
   void PrintStats() const;
-  
+
   /// Compute the total physical memory allocated by this allocator.
   size_t getTotalMemory() const;
 };
@@ -188,24 +198,24 @@ public:
 template <typename T>
 class SpecificBumpPtrAllocator {
   BumpPtrAllocator Allocator;
-public:
-  SpecificBumpPtrAllocator(size_t size = 4096, size_t threshold = 4096,
-              SlabAllocator &allocator = BumpPtrAllocator::DefaultSlabAllocator)
-    : Allocator(size, threshold, allocator) {}
 
-  ~SpecificBumpPtrAllocator() {
-    DestroyAll();
-  }
+public:
+  SpecificBumpPtrAllocator(
+      size_t size = 4096, size_t threshold = 4096,
+      SlabAllocator& allocator = BumpPtrAllocator::DefaultSlabAllocator)
+      : Allocator(size, threshold, allocator) {}
+
+  ~SpecificBumpPtrAllocator() { DestroyAll(); }
 
   /// Call the destructor of each allocated object and deallocate all but the
   /// current slab and reset the current pointer to the beginning of it, freeing
   /// all memory allocated so far.
   void DestroyAll() {
-    MemSlab *Slab = Allocator.CurSlab;
+    MemSlab* Slab = Allocator.CurSlab;
     while (Slab) {
-      char *End = Slab == Allocator.CurSlab ? Allocator.CurPtr :
-                                              (char *)Slab + Slab->Size;
-      for (char *Ptr = (char*)(Slab+1); Ptr < End; Ptr += sizeof(T)) {
+      char* End = Slab == Allocator.CurSlab ? Allocator.CurPtr
+                                            : (char*)Slab + Slab->Size;
+      for (char* Ptr = (char*)(Slab + 1); Ptr < End; Ptr += sizeof(T)) {
         Ptr = Allocator.AlignPtr(Ptr, alignOf<T>());
         if (Ptr + sizeof(T) <= End)
           reinterpret_cast<T*>(Ptr)->~T();
@@ -216,27 +226,25 @@ public:
   }
 
   /// Allocate space for a specific count of elements.
-  T *Allocate(size_t num = 1) {
-    return Allocator.Allocate<T>(num);
-  }
+  T* Allocate(size_t num = 1) { return Allocator.Allocate<T>(num); }
 };
 
-}  // end namespace llvm
+} // end namespace llvm
 
-inline void *operator new(size_t Size, llvm::BumpPtrAllocator &Allocator) {
+inline void* operator new(size_t Size, llvm::BumpPtrAllocator& Allocator) {
   struct S {
     char c;
     union {
       double D;
       long double LD;
       long long L;
-      void *P;
+      void* P;
     } x;
   };
-  return Allocator.Allocate(Size, std::min((size_t)llvm::NextPowerOf2(Size),
-                                           offsetof(S, x)));
+  return Allocator.Allocate(
+      Size, std::min((size_t)llvm::NextPowerOf2(Size), offsetof(S, x)));
 }
 
-inline void operator delete(void *, llvm::BumpPtrAllocator &) {}
+inline void operator delete(void*, llvm::BumpPtrAllocator&) {}
 
 #endif // LLVM_SUPPORT_ALLOCATOR_H

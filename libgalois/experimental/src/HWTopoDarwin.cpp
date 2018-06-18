@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,7 +27,7 @@ using namespace galois::substrate;
 namespace {
 
 struct Policy {
-  //number of "real" processors
+  // number of "real" processors
   uint32_t numCpus;
 
   Policy() {
@@ -45,44 +45,24 @@ static Policy& getPolicy() {
   return A;
 }
 
-} //namespace
+} // namespace
 
-bool galois::runtime::LL::bindThreadToProcessor(int id) {
-  return false;
-}
+bool galois::runtime::LL::bindThreadToProcessor(int id) { return false; }
 
-unsigned galois::runtime::LL::getProcessorForThread(int id) {
-  return id;
-}
+unsigned galois::runtime::LL::getProcessorForThread(int id) { return id; }
 
-unsigned galois::runtime::LL::getMaxThreads() {
-  return getPolicy().numCpus;
-}
+unsigned galois::runtime::LL::getMaxThreads() { return getPolicy().numCpus; }
 
-unsigned galois::runtime::LL::getMaxCores() {
-  return getPolicy().numCpus;
-}
+unsigned galois::runtime::LL::getMaxCores() { return getPolicy().numCpus; }
 
-unsigned galois::runtime::LL::getMaxSockets() {
-  return getPolicy().numCpus;
-}
+unsigned galois::runtime::LL::getMaxSockets() { return getPolicy().numCpus; }
 
-unsigned galois::runtime::LL::getSocketForThread(int id) {
-  return id;
-}
+unsigned galois::runtime::LL::getSocketForThread(int id) { return id; }
 
-unsigned galois::runtime::LL::getMaxSocketForThread(int id) {
-  return id;
-}
+unsigned galois::runtime::LL::getMaxSocketForThread(int id) { return id; }
 
-bool galois::runtime::LL::isSocketLeader(int id) {
-  return true;
-}
+bool galois::runtime::LL::isSocketLeader(int id) { return true; }
 
-unsigned galois::runtime::LL::getLeaderForThread(int id) {
-  return id;
-}
+unsigned galois::runtime::LL::getLeaderForThread(int id) { return id; }
 
-unsigned galois::runtime::LL::getLeaderForSocket(int id) {
-  return id;
-}
+unsigned galois::runtime::LL::getLeaderForSocket(int id) { return id; }

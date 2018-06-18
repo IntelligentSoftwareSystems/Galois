@@ -11,7 +11,7 @@ struct SNode {
   Dist dist;
 };
 
-template<typename Graph>
+template <typename Graph>
 void readInOutGraph(Graph& graph);
 
 extern llvm::cl::opt<unsigned int> memoryLimit;

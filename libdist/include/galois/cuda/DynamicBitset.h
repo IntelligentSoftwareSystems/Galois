@@ -21,21 +21,20 @@
 class DynamicBitset {
   size_t num_bits_capacity;
   size_t num_bits;
-  uint64_t *bit_vector;
+  uint64_t* bit_vector;
 
 public:
   DynamicBitset() {
     num_bits_capacity = 0;
-    num_bits = 0;
-    bit_vector = NULL;
+    num_bits          = 0;
+    bit_vector        = NULL;
   }
 
-  DynamicBitset(size_t nbits) {
-    alloc(nbits);
-  }
+  DynamicBitset(size_t nbits) { alloc(nbits); }
 
   ~DynamicBitset() {
-    if (bit_vector != NULL) cudaFree(bit_vector);
+    if (bit_vector != NULL)
+      cudaFree(bit_vector);
   }
 
   void alloc(size_t nbits) {
@@ -43,7 +42,7 @@ public:
     assert(sizeof(unsigned long long int) * 8 == 64);
     assert(sizeof(uint64_t) * 8 == 64);
     num_bits_capacity = nbits;
-    num_bits = nbits;
+    num_bits          = nbits;
     CUDA_SAFE_CALL(cudaMalloc(&bit_vector, vec_size() * sizeof(uint64_t)));
     reset();
   }
@@ -53,12 +52,10 @@ public:
     num_bits = nbits;
   }
 
-  __device__ __host__ size_t size() const {
-    return num_bits;
-  }
+  __device__ __host__ size_t size() const { return num_bits; }
 
   __device__ __host__ size_t vec_size() const {
-    size_t bit_vector_size = (num_bits + 63)/64;
+    size_t bit_vector_size = (num_bits + 63) / 64;
     return bit_vector_size;
   }
 
@@ -72,18 +69,18 @@ public:
 
   // assumes bit_vector is not updated (set) in parallel
   __device__ bool test(const size_t id) const {
-    size_t bit_index = id/64;
+    size_t bit_index    = id / 64;
     uint64_t bit_offset = 1;
-    bit_offset <<= (id%64);
+    bit_offset <<= (id % 64);
     return ((bit_vector[bit_index] & bit_offset) != 0);
   }
 
   __device__ void set(const size_t id) {
-    size_t bit_index = id/64;
+    size_t bit_index                  = id / 64;
     unsigned long long int bit_offset = 1;
-    bit_offset <<= (id%64);
+    bit_offset <<= (id % 64);
     if ((bit_vector[bit_index] & bit_offset) == 0) { // test and set
-      atomicOr((unsigned long long int *)&bit_vector[bit_index], bit_offset);
+      atomicOr((unsigned long long int*)&bit_vector[bit_index], bit_offset);
     }
   }
 
@@ -94,115 +91,166 @@ public:
 
   // different indices can be updated in parallel
   // but assumes same index is not updated in parallel
-  __device__ void batch_bitwise_and(const size_t bit_index, const uint64_t mask) {
+  __device__ void batch_bitwise_and(const size_t bit_index,
+                                    const uint64_t mask) {
     bit_vector[bit_index] &= mask;
   }
 
-  void copy_to_cpu(uint64_t *bit_vector_cpu_copy) {
+  void copy_to_cpu(uint64_t* bit_vector_cpu_copy) {
     assert(bit_vector_cpu_copy != NULL);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector, vec_size() * sizeof(uint64_t), cudaMemcpyDeviceToHost));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector_cpu_copy, bit_vector,
+                              vec_size() * sizeof(uint64_t),
+                              cudaMemcpyDeviceToHost));
   }
 
-  void copy_to_gpu(uint64_t * cpu_bit_vector) {
+  void copy_to_gpu(uint64_t* cpu_bit_vector) {
     assert(cpu_bit_vector != NULL);
-    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector, vec_size() * sizeof(uint64_t), 
-                   cudaMemcpyHostToDevice));
+    CUDA_SAFE_CALL(cudaMemcpy(bit_vector, cpu_bit_vector,
+                              vec_size() * sizeof(uint64_t),
+                              cudaMemcpyHostToDevice));
   }
 };
 
-class DynamicBitsetIterator 
+class DynamicBitsetIterator
     : public std::iterator<std::random_access_iterator_tag, bool> {
-  DynamicBitset *bitset;
+  DynamicBitset* bitset;
   size_t offset;
 
 public:
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator(DynamicBitset *b, size_t i = 0) : bitset(b), offset(i) {}
+  __device__ __host__ __forceinline__ DynamicBitsetIterator(DynamicBitset* b,
+                                                            size_t i = 0)
+      : bitset(b), offset(i) {}
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator& operator++() { offset++; return *this; }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator& operator++() {
+    offset++;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator& operator--() { offset--; return *this; }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator& operator--() {
+    offset--;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator<(const DynamicBitsetIterator &bi) { return (offset < bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator<(const DynamicBitsetIterator& bi) {
+    return (offset < bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator<=(const DynamicBitsetIterator &bi) { return (offset <= bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator<=(const DynamicBitsetIterator& bi) {
+    return (offset <= bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator>(const DynamicBitsetIterator &bi) { return (offset > bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator>(const DynamicBitsetIterator& bi) {
+    return (offset > bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator>=(const DynamicBitsetIterator &bi) { return (offset >= bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator>=(const DynamicBitsetIterator& bi) {
+    return (offset >= bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator& operator+=(size_t i) { offset += i; return *this; }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator&
+  operator+=(size_t i) {
+    offset += i;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator& operator-=(size_t i) { offset -= i; return *this; }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator&
+  operator-=(size_t i) {
+    offset -= i;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator operator+(size_t i) { return DynamicBitsetIterator(bitset, offset + i); }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator
+  operator+(size_t i) {
+    return DynamicBitsetIterator(bitset, offset + i);
+  }
 
-  __device__ __host__ __forceinline__
-  DynamicBitsetIterator operator-(size_t i) { return DynamicBitsetIterator(bitset, offset - i); }
+  __device__ __host__ __forceinline__ DynamicBitsetIterator
+  operator-(size_t i) {
+    return DynamicBitsetIterator(bitset, offset - i);
+  }
 
-  __device__ __host__ __forceinline__
-  difference_type operator-(const DynamicBitsetIterator &bi) { return (offset - bi.offset); }
+  __device__ __host__ __forceinline__ difference_type
+  operator-(const DynamicBitsetIterator& bi) {
+    return (offset - bi.offset);
+  }
 
-  __device__ __forceinline__
-  bool operator*() const { return bitset->test(offset); }
+  __device__ __forceinline__ bool operator*() const {
+    return bitset->test(offset);
+  }
 
-  __device__ __forceinline__
-  bool operator[](const size_t id) const { return bitset->test(offset+id); }
+  __device__ __forceinline__ bool operator[](const size_t id) const {
+    return bitset->test(offset + id);
+  }
 };
 
-class IdentityIterator 
+class IdentityIterator
     : public std::iterator<std::random_access_iterator_tag, size_t> {
   size_t offset;
 
 public:
-  __device__ __host__ __forceinline__
-  IdentityIterator(size_t i = 0) : offset(i) {}
+  __device__ __host__ __forceinline__ IdentityIterator(size_t i = 0)
+      : offset(i) {}
 
-  __device__ __host__ __forceinline__
-  IdentityIterator& operator++() { offset++; return *this; }
+  __device__ __host__ __forceinline__ IdentityIterator& operator++() {
+    offset++;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  IdentityIterator& operator--() { offset--; return *this; }
+  __device__ __host__ __forceinline__ IdentityIterator& operator--() {
+    offset--;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator<(const IdentityIterator &bi) { return (offset < bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator<(const IdentityIterator& bi) {
+    return (offset < bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator<=(const IdentityIterator &bi) { return (offset <= bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator<=(const IdentityIterator& bi) {
+    return (offset <= bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator>(const IdentityIterator &bi) { return (offset > bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator>(const IdentityIterator& bi) {
+    return (offset > bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  bool operator>=(const IdentityIterator &bi) { return (offset >= bi.offset); }
+  __device__ __host__ __forceinline__ bool
+  operator>=(const IdentityIterator& bi) {
+    return (offset >= bi.offset);
+  }
 
-  __device__ __host__ __forceinline__
-  IdentityIterator& operator+=(size_t i) { offset += i; return *this; }
+  __device__ __host__ __forceinline__ IdentityIterator& operator+=(size_t i) {
+    offset += i;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  IdentityIterator& operator-=(size_t i) { offset -= i; return *this; }
+  __device__ __host__ __forceinline__ IdentityIterator& operator-=(size_t i) {
+    offset -= i;
+    return *this;
+  }
 
-  __device__ __host__ __forceinline__
-  IdentityIterator operator+(size_t i) { return IdentityIterator(offset + i); }
+  __device__ __host__ __forceinline__ IdentityIterator operator+(size_t i) {
+    return IdentityIterator(offset + i);
+  }
 
-  __device__ __host__ __forceinline__
-  IdentityIterator operator-(size_t i) { return IdentityIterator(offset - i); }
+  __device__ __host__ __forceinline__ IdentityIterator operator-(size_t i) {
+    return IdentityIterator(offset - i);
+  }
 
-  __device__ __host__ __forceinline__
-  difference_type operator-(const IdentityIterator &bi) { return (offset - bi.offset); }
+  __device__ __host__ __forceinline__ difference_type
+  operator-(const IdentityIterator& bi) {
+    return (offset - bi.offset);
+  }
 
-  __device__ __forceinline__
-  size_t operator*() const { return offset; }
+  __device__ __forceinline__ size_t operator*() const { return offset; }
 
-  __device__ __forceinline__
-  size_t operator[](const size_t id) const { return offset+id; }
+  __device__ __forceinline__ size_t operator[](const size_t id) const {
+    return offset + id;
+  }
 };

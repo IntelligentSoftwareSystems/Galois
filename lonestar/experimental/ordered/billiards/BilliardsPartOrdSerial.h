@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,14 +30,12 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
-
 #include "galois/Reduction.h"
 #include "galois/Markable.h"
 #include "galois/PerThreadContainer.h"
 
 #include "galois/runtime/Executor_DoAll.h"
 #include "galois/substrate/CompilerSpecific.h"
-
 
 #include "dependTest.h"
 #include "Billiards.h"
@@ -46,7 +44,8 @@
 // METHOD 1
 // =========
 //
-// O (B^2 * number of rounds (or iterations of outermost while loop)) parallel algorithm
+// O (B^2 * number of rounds (or iterations of outermost while loop)) parallel
+// algorithm
 //
 // workList = initial events
 //
@@ -84,88 +83,88 @@
 //
 // Method 1B:
 // Typically, a few elements will make it to the indepList. Therefore,
-// we can keep on removing (and adding) items from workList and get rid of 
+// we can keep on removing (and adding) items from workList and get rid of
 // remainingList. We'll have to check every element against existing items
 // in the indepList
 //
 // Method 1C:
-// Mark independent events in the workList for removal, and 
-// copy independent to indepList. Now workList contains 
+// Mark independent events in the workList for removal, and
+// copy independent to indepList. Now workList contains
 // marked events, which can be removed easily (e.g. by swapping with last
-// element of vector). This gets rid of the remainingList 
+// element of vector). This gets rid of the remainingList
 //
 //
 //
 //
-//    
+//
 //
 
-
-
-
-class BilliardsPOunsortedSerial: public Billiards {
+class BilliardsPOunsortedSerial : public Billiards {
   typedef std::vector<Event> WLTy;
   typedef std::vector<Event> ILTy;
 
 public:
+  virtual const std::string version() const {
+    return "Partially Ordered with Unsorted workList";
+  }
 
-  virtual const std::string version () const { return "Partially Ordered with Unsorted workList"; }
-
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  virtual size_t runSim(Table& table, std::vector<Event>& initEvents,
+                        const FP& endtime, bool enablePrints = false) {
 
     galois::TimeAccumulator findTimer;
     galois::TimeAccumulator simTimer;
-    
-    WLTy* workList = new WLTy (initEvents.begin (), initEvents.end ());
-    WLTy* remainingList = new WLTy ();
+
+    WLTy* workList      = new WLTy(initEvents.begin(), initEvents.end());
+    WLTy* remainingList = new WLTy();
 
     ILTy indepList;
 
     std::vector<Event> addList;
 
-    size_t iter = 0;
-    unsigned step = 0;
+    size_t iter     = 0;
+    unsigned step   = 0;
     size_t findIter = 0;
 
-    while (!workList->empty ()) {
+    while (!workList->empty()) {
 
-      findTimer.start ();
-      findIndepEvents (indepList, *remainingList, *workList, findIter, enablePrints);
-      findTimer.stop ();
+      findTimer.start();
+      findIndepEvents(indepList, *remainingList, *workList, findIter,
+                      enablePrints);
+      findTimer.stop();
 
-      if (indepList.empty ()) {
-        std::cerr <<  "No independent events?? No progress??" << std::endl;
-        std::abort ();
+      if (indepList.empty()) {
+        std::cerr << "No independent events?? No progress??" << std::endl;
+        std::abort();
       }
-      
 
-      simTimer.start ();
-      simulateIndepEvents (indepList, *remainingList, addList,
-          table, endtime, enablePrints);
-      simTimer.stop ();
-
+      simTimer.start();
+      simulateIndepEvents(indepList, *remainingList, addList, table, endtime,
+                          enablePrints);
+      simTimer.stop();
 
       if (enablePrints) {
-        std::cout << "step=" << step << ", indepList.size=" << indepList.size ()  
-          << ", workList.size=" << workList->size () << std::endl;
+        std::cout << "step=" << step << ", indepList.size=" << indepList.size()
+                  << ", workList.size=" << workList->size() << std::endl;
       }
 
-      iter += indepList.size ();
+      iter += indepList.size();
       ++step;
 
-      std::swap (workList, remainingList);
-      remainingList->clear ();
-      indepList.clear ();
-
-
+      std::swap(workList, remainingList);
+      remainingList->clear();
+      indepList.clear();
     }
 
     std::cout << "Total number of step=" << step << std::endl;
     std::cout << "Total number of events=" << iter << std::endl;
-    std::cout << "Average parallelism=" << (double (iter)/double (step)) << std::endl;
-    std::cout << "Total Iterations spent in finding independent evens= " << findIter << std::endl;
-    std::cout << "Time spent in FINDING independent events= " << findTimer.get () << std::endl;
-    std::cout << "Time spent in SIMULATING independent events= " << simTimer.get () << std::endl;
+    std::cout << "Average parallelism=" << (double(iter) / double(step))
+              << std::endl;
+    std::cout << "Total Iterations spent in finding independent evens= "
+              << findIter << std::endl;
+    std::cout << "Time spent in FINDING independent events= " << findTimer.get()
+              << std::endl;
+    std::cout << "Time spent in SIMULATING independent events= "
+              << simTimer.get() << std::endl;
 
     delete workList;
     delete remainingList;
@@ -174,81 +173,74 @@ public:
   }
 
 private:
-
-  void findIndepEvents (ILTy& indepList, WLTy& remainingList, WLTy& workList, 
-      size_t& findIter, bool enablePrints) {
-    for (WLTy::const_iterator i = workList.begin ()
-        , ei = workList.end (); i != ei; ++i) {
-
+  void findIndepEvents(ILTy& indepList, WLTy& remainingList, WLTy& workList,
+                       size_t& findIter, bool enablePrints) {
+    for (WLTy::const_iterator i = workList.begin(), ei = workList.end();
+         i != ei; ++i) {
 
       bool indep = true;
 
-      for (WLTy::const_iterator j = workList.begin ()
-          , ej = workList.end (); j != ej; ++j) {
+      for (WLTy::const_iterator j = workList.begin(), ej = workList.end();
+           j != ej; ++j) {
 
         ++findIter;
 
         // if event i happens after j, then check for order independence
-        if (i != j 
-            && (*i) > (*j)) {
+        if (i != j && (*i) > (*j)) {
 
-          // DEBUG: std::cout << "Testing e1=" << i->str () << ", e2=" << j->str () << std::endl;
-          if (OrderDepTest::dependsOn (*i, *j)) {
-            //DEBUG: std::cout << "Are dependent" << std::endl;
+          // DEBUG: std::cout << "Testing e1=" << i->str () << ", e2=" << j->str
+          // () << std::endl;
+          if (OrderDepTest::dependsOn(*i, *j)) {
+            // DEBUG: std::cout << "Are dependent" << std::endl;
             indep = false;
             break;
 
           } else {
-            //DEBUG: std::cout << "Are independent" << std::endl;
+            // DEBUG: std::cout << "Are independent" << std::endl;
           }
         }
       }
 
       if (indep) {
-        indepList.push_back (*i);
+        indepList.push_back(*i);
 
       } else {
-        remainingList.push_back (*i);
+        remainingList.push_back(*i);
       }
-
 
     } // end for
   }
 
+  void simulateIndepEvents(ILTy& indepList, WLTy& remainingList,
+                           std::vector<Event>& addList, Table& table,
+                           const FP& endtime, bool enablePrints) {
 
-  void simulateIndepEvents (ILTy& indepList, WLTy& remainingList, 
-      std::vector<Event>& addList, Table& table, const FP& endtime, bool enablePrints) {
-
-    for (WLTy::iterator i = indepList.begin (), ei = indepList.end ();
-        i != ei; ++i) {
+    for (WLTy::iterator i = indepList.begin(), ei = indepList.end(); i != ei;
+         ++i) {
 
       if (enablePrints) {
-        std::cout << "Processing event=" << i->str () << std::endl;
+        std::cout << "Processing event=" << i->str() << std::endl;
       }
 
-      addList.clear ();
-      i->simulate ();
-      table.addNextEvents (*i, addList, endtime);
+      addList.clear();
+      i->simulate();
+      table.addNextEvents(*i, addList, endtime);
 
-      for (std::vector<Event>::iterator a = addList.begin (), ea = addList.end ();
-          a != ea; ++a) {
+      for (std::vector<Event>::iterator a = addList.begin(), ea = addList.end();
+           a != ea; ++a) {
 
-        remainingList.push_back (*a);
+        remainingList.push_back(*a);
 
         if (enablePrints) {
-          std::cout << "Adding event=" << a->str () << std::endl;
+          std::cout << "Adding event=" << a->str() << std::endl;
         }
       }
 
       if (enablePrints) {
-        table.printState (std::cout);
+        table.printState(std::cout);
       }
-
     }
   }
-
-
-
 };
 
 // Method 2:
@@ -258,7 +250,7 @@ private:
 // Order workList by priority in an iterable e.g. set or sorted vector
 //
 //
-// workList = initial events 
+// workList = initial events
 //
 //
 // while (!workList.empty ()) {
@@ -279,7 +271,7 @@ private:
 //       }
 //     }
 //
-//     if (!indep) { 
+//     if (!indep) {
 //        continue;
 //     }
 //
@@ -302,15 +294,15 @@ private:
 //    for each newly generated event e {
 //      add e to workList;
 //    }
-//    
+//
 //  }
 //
 //  workList = remainingList;
 //  remainingList = new ...
 // }
-//      
+//
 // Typically, a few elements will make it to the indepList. Therefore,
-// it's more efficient to make the workList an iterable priority queue 
+// it's more efficient to make the workList an iterable priority queue
 // and remove the items from priority queue that make it to the indepList.
 //
 // Possible implementations
@@ -318,12 +310,12 @@ private:
 // skiplist
 //
 //
-//        
+//
 // METHOD 3:
 // =========
 //
 
-class BilliardsPOsortedSerial: public Billiards {
+class BilliardsPOsortedSerial : public Billiards {
 
   typedef std::set<Event, Event::Comparator> WLTy;
   typedef std::vector<Event> ILTy;
@@ -331,76 +323,83 @@ class BilliardsPOsortedSerial: public Billiards {
   static const bool SHOW_PARAMETER = false;
 
   static const bool PRODUCE_LOG = true;
+
 public:
+  virtual const std::string version() const {
+    return "Partially Ordered with Unsorted workList";
+  }
 
-  virtual const std::string version () const { return "Partially Ordered with Unsorted workList"; }
-
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
-
+  virtual size_t runSim(Table& table, std::vector<Event>& initEvents,
+                        const FP& endtime, bool enablePrints = false) {
 
     std::ofstream* statsFile = NULL;
     if (SHOW_PARAMETER) {
-      statsFile = new std::ofstream ("parameter_billiards.csv");
+      statsFile = new std::ofstream("parameter_billiards.csv");
       (*statsFile) << "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE" << std::endl;
     }
 
     SimLogger* logger = nullptr;
 
     if (PRODUCE_LOG) {
-      logger = new SimLogger ();
-      table.writeConfig ();
-      table.ballsToCSV ();
+      logger = new SimLogger();
+      table.writeConfig();
+      table.ballsToCSV();
     }
 
     galois::TimeAccumulator findTimer;
     galois::TimeAccumulator simTimer;
 
-    WLTy workList (initEvents.begin (), initEvents.end ());
+    WLTy workList(initEvents.begin(), initEvents.end());
 
     ILTy indepList;
 
     std::vector<Event> addList;
 
-    size_t iter = 0;
-    unsigned step = 0;
+    size_t iter     = 0;
+    unsigned step   = 0;
     size_t findIter = 0;
 
-    while (!workList.empty ()) {
+    while (!workList.empty()) {
 
-      findTimer.start ();
-      findIndepEvents (indepList, workList, findIter, enablePrints);
-      findTimer.stop ();
-      
-      if (indepList.empty ()) {
-        std::cerr <<  "No independent events?? No progress??" << std::endl;
-        std::abort ();
+      findTimer.start();
+      findIndepEvents(indepList, workList, findIter, enablePrints);
+      findTimer.stop();
+
+      if (indepList.empty()) {
+        std::cerr << "No independent events?? No progress??" << std::endl;
+        std::abort();
       }
 
-      simTimer.start ();
-      simulateIndepEvents (indepList, workList, addList, 
-          table, endtime, logger, enablePrints);
-      simTimer.stop ();
+      simTimer.start();
+      simulateIndepEvents(indepList, workList, addList, table, endtime, logger,
+                          enablePrints);
+      simTimer.stop();
 
       if (SHOW_PARAMETER) {
-        (*statsFile) << "foreach, " << step << ", " << indepList.size ()
-          << ", " << (workList.size () + indepList.size ()) << std::endl;
+        (*statsFile) << "foreach, " << step << ", " << indepList.size() << ", "
+                     << (workList.size() + indepList.size()) << std::endl;
       }
 
-      iter+= indepList.size ();
+      iter += indepList.size();
       ++step;
 
-      if (PRODUCE_LOG) { logger->incStep (); }
+      if (PRODUCE_LOG) {
+        logger->incStep();
+      }
 
-      indepList.clear ();
+      indepList.clear();
     }
 
     std::cout << "Total number of step=" << step << std::endl;
     std::cout << "Total number of events=" << iter << std::endl;
-    std::cout << "Average parallelism=" << (double (iter)/double (step)) << std::endl;
-    std::cout << "Total Iterations spent in finding independent evens= " << findIter << std::endl;
-    std::cout << "Time spent in FINDING independent events= " << findTimer.get () << std::endl;
-    std::cout << "Time spent in SIMULATING independent events= " << simTimer.get () << std::endl;
-
+    std::cout << "Average parallelism=" << (double(iter) / double(step))
+              << std::endl;
+    std::cout << "Total Iterations spent in finding independent evens= "
+              << findIter << std::endl;
+    std::cout << "Time spent in FINDING independent events= " << findTimer.get()
+              << std::endl;
+    std::cout << "Time spent in SIMULATING independent events= "
+              << simTimer.get() << std::endl;
 
     if (SHOW_PARAMETER) {
       delete statsFile;
@@ -413,101 +412,87 @@ public:
     }
 
     return iter;
-
   }
 
 protected:
+  void findIndepEvents(ILTy& indepList, WLTy& workList, size_t& findIter,
+                       bool enablePrints) {
 
-  void findIndepEvents (ILTy& indepList, WLTy& workList, size_t& findIter, bool enablePrints) {
+    indepList.clear();
 
-    indepList.clear ();
-
-    for (WLTy::iterator i = workList.begin (), ei = workList.end ();
-        i != ei;) {
+    for (WLTy::iterator i = workList.begin(), ei = workList.end(); i != ei;) {
 
       bool indep = true;
 
-      for (ILTy::const_iterator j = indepList.begin (), ej = indepList.end ();
-          j != ej; ++j) {
+      for (ILTy::const_iterator j = indepList.begin(), ej = indepList.end();
+           j != ej; ++j) {
 
         ++findIter;
 
-        assert ((*i) > (*j));
+        assert((*i) > (*j));
 
-        if (OrderDepTest::dependsOn (*i, *j)) {
+        if (OrderDepTest::dependsOn(*i, *j)) {
           indep = false;
           break;
         }
       } // end for indepList
 
-
-
       if (indep) {
 
         // from start upto i in priority order
-        for (WLTy::iterator j = workList.begin ()/*, ej = workList.end ()*/; 
-            (j != i) && ((*j) < (*i)); ++j) {
+        for (WLTy::iterator j = workList.begin() /*, ej = workList.end ()*/;
+             (j != i) && ((*j) < (*i)); ++j) {
 
           ++findIter;
 
-          if (OrderDepTest::dependsOn (*i, *j)) {
+          if (OrderDepTest::dependsOn(*i, *j)) {
             indep = false;
             break;
           }
         }
       }
 
-
-
       if (indep) {
         // add to indepList
-        indepList.push_back (*i);
+        indepList.push_back(*i);
 
         // remove from workList
         WLTy::iterator tmp = i;
         ++i;
-        workList.erase (tmp);
+        workList.erase(tmp);
 
       } else {
         ++i;
       }
-
     }
-
   }
 
+  void simulateIndepEvents(ILTy& indepList, WLTy& workList,
+                           std::vector<Event>& addList, Table& table,
+                           const FP& endtime, SimLogger* logger,
+                           bool enablePrints) {
 
-  void simulateIndepEvents (ILTy& indepList, WLTy& workList, 
-      std::vector<Event>& addList, Table& table, const FP& endtime, SimLogger* logger, bool enablePrints) { 
+    for (ILTy::iterator i = indepList.begin(), ei = indepList.end(); i != ei;
+         ++i) {
 
+      addList.clear();
+      const bool notStale = i->notStale();
 
-    for (ILTy::iterator i = indepList.begin (), ei = indepList.end ();
-        i != ei; ++i) {
+      i->simulate();
+      table.addNextEvents(*i, addList, endtime);
 
-      addList.clear ();
-      const bool notStale = i->notStale ();
+      for (std::vector<Event>::const_iterator a  = addList.begin(),
+                                              ea = addList.end();
+           a != ea; ++a) {
 
-
-      i->simulate ();
-      table.addNextEvents (*i, addList, endtime);
-
-      for (std::vector<Event>::const_iterator a = addList.begin (), ea = addList.end ();
-          a != ea; ++a) {
-
-        workList.insert (*a);
+        workList.insert(*a);
       }
 
       if (PRODUCE_LOG && notStale) {
-        logger->log (*i);
+        logger->log(*i);
       }
     }
   }
-
-
-
 };
 
-
-
 #endif //  BILLIARDS_PART_ORD_SERIAL_H
-

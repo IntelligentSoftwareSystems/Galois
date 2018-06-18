@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -53,8 +53,8 @@ public:
         max(-1 * std::numeric_limits<double>::max()), m_splitType(LEAF),
         m_splitValue(std::numeric_limits<double>::max()) {
     m_points.resize(MAX_POINTS_IN_CELL);
-    m_leftChild      = NULL;
-    m_rightChild     = NULL;
+    m_leftChild    = NULL;
+    m_rightChild   = NULL;
     removeFromTree = false;
   }
   KdCell(int inSplitType, double inSplitValue)
@@ -64,7 +64,7 @@ public:
     else
       m_points.resize(0);
     m_leftChild = m_rightChild = NULL;
-    removeFromTree         = false;
+    removeFromTree             = false;
   }
   virtual ~KdCell() {}
 
@@ -78,7 +78,8 @@ public:
     if (max.equals(other.max) == false)
       return false;
     if (m_splitType == KdCell::LEAF)
-      return m_leftChild->equals(*m_leftChild) && m_rightChild->equals(*m_rightChild);
+      return m_leftChild->equals(*m_leftChild) &&
+             m_rightChild->equals(*m_rightChild);
     if (m_points.size() != other.m_points.size())
       return false;
     for (unsigned int i = 0; i < m_points.size(); i++) {
@@ -190,9 +191,10 @@ public:
       KdCell& cell = *toReturn;
       cell.max.set(max);
       cell.min.set(min);
-      cell.m_leftChild = subDivide(list, offset, leftCountForSplit, arr, factory);
+      cell.m_leftChild =
+          subDivide(list, offset, leftCountForSplit, arr, factory);
       cell.m_rightChild = subDivide(list, offset + leftCountForSplit,
-                                  size - leftCountForSplit, arr, factory);
+                                    size - leftCountForSplit, arr, factory);
       // Clean up on exit.
       if (shouldClean == true)
         delete arr;
@@ -203,14 +205,14 @@ public:
   bool notifyContentsRebuilt(bool inChange) { return inChange; }
 
   static double computeSplitValue(galois::gstl::Vector<NodeWrapper*>& list,
-      //TODO: create leaf node
+                                  // TODO: create leaf node
                                   int offset, int size, int pSplitType,
                                   galois::gstl::Vector<double>* arr) {
     for (int i = 0; i < size; i++) {
       (*arr)[i] = findSplitComponent(*(list[offset + i]), pSplitType);
     }
     return findMedianGapSplit(arr, size);
-      //TODO: create leaf node
+    // TODO: create leaf node
   }
 
   static double findSplitComponent(NodeWrapper& n, int pSplitType) {
@@ -234,14 +236,14 @@ public:
       // should never happen
       assert(false && "Start==End in findMedianSplit, should not happen!");
     }
-    double largestGap = 0;
+    double largestGap   = 0;
     double m_splitValue = 0;
-    double nextValue  = (*arr)[start];
+    double nextValue    = (*arr)[start];
     for (int i = start; i < end; i++) {
       double curValue = nextValue; // ie val[i]
       nextValue       = (*arr)[i + 1];
       if ((nextValue - curValue) > largestGap) {
-        largestGap = nextValue - curValue;
+        largestGap   = nextValue - curValue;
         m_splitValue = 0.5f * (curValue + nextValue);
         if (m_splitValue == nextValue) {
           m_splitValue = curValue;
@@ -302,7 +304,7 @@ public:
     } else {
       // otherwise its an interior node, so find which child should contain the
       // point
-      double val     = findSplitComponent(point, m_splitType);
+      double val    = findSplitComponent(point, m_splitType);
       KdCell* child = val <= m_splitValue ? m_leftChild : m_rightChild;
       if (child != NULL)
         return child->contains(point);
@@ -376,8 +378,9 @@ public:
     // Interior node.
     else {
       double nodeSplitAxisValue = findSplitComponent(nw, m_splitType);
-      KdCell* child = nodeSplitAxisValue <= m_splitValue ? m_leftChild : m_rightChild;
-      treeChanged   = child->removeInternal(nw, this, parent);
+      KdCell* child =
+          nodeSplitAxisValue <= m_splitValue ? m_leftChild : m_rightChild;
+      treeChanged = child->removeInternal(nw, this, parent);
       std::cout << "BEFORE EX " << *this << std::endl;
       if (treeChanged == true && removeFromTree == false) {
         treeChanged |= recomputeParentBoundingBoxIfChanges();
@@ -396,7 +399,7 @@ public:
       for (int i = 0; i < KdCell::MAX_POINTS_IN_CELL; i++) {
         if (current->m_points[i] == NULL) {
           current->m_points[i] = &nw;
-          canInsert             = true;
+          canInsert            = true;
           break;
         }
       }

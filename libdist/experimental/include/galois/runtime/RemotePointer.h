@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,7 +29,7 @@
 namespace galois {
 namespace runtime {
 
-template<typename T>
+template <typename T>
 class gptr {
   fatPointer ptr;
 
@@ -39,44 +39,42 @@ class gptr {
 
   T* resolve_safe() const {
     if (inGaloisForEach) {
-      //parallel code ensures acquire happens before use
+      // parallel code ensures acquire happens before use
     } else {
-      //Serial code needs hand holding
+      // Serial code needs hand holding
       serial_acquire(*this);
     }
     return resolve();
   }
 
-  explicit gptr(fatPointer p) :ptr(p) {}
+  explicit gptr(fatPointer p) : ptr(p) {}
 
 public:
   typedef T element_type;
-  
-  constexpr gptr() noexcept :ptr(0, 0) {}
-  explicit constexpr  gptr(T* p) noexcept :gptr(NetworkInterface::ID, p) {}
-  gptr(uint32_t o, T* p) noexcept :ptr(o, reinterpret_cast<uintptr_t>(p)) {}
-  
-  T& operator*()  { return *resolve_safe(); }
-  T* operator->() { return  resolve_safe(); }
-  T& operator*()  const { return *resolve_safe(); }
-  T* operator->() const { return  resolve_safe(); }
 
-  bool operator< (const gptr& rhs) const { return ptr < rhs.ptr;  }
-  bool operator> (const gptr& rhs) const { return ptr > rhs.ptr;  }
+  constexpr gptr() noexcept : ptr(0, 0) {}
+  explicit constexpr gptr(T* p) noexcept : gptr(NetworkInterface::ID, p) {}
+  gptr(uint32_t o, T* p) noexcept : ptr(o, reinterpret_cast<uintptr_t>(p)) {}
+
+  T& operator*() { return *resolve_safe(); }
+  T* operator->() { return resolve_safe(); }
+  T& operator*() const { return *resolve_safe(); }
+  T* operator->() const { return resolve_safe(); }
+
+  bool operator<(const gptr& rhs) const { return ptr < rhs.ptr; }
+  bool operator>(const gptr& rhs) const { return ptr > rhs.ptr; }
   bool operator==(const gptr& rhs) const { return ptr == rhs.ptr; }
   bool operator!=(const gptr& rhs) const { return ptr != rhs.ptr; }
   bool operator<=(const gptr& rhs) const { return ptr <= rhs.ptr; }
   bool operator>=(const gptr& rhs) const { return ptr >= rhs.ptr; }
 
-  explicit operator bool()         const { return bool(ptr); }
-  explicit operator fatPointer()   const { return ptr; }
+  explicit operator bool() const { return bool(ptr); }
+  explicit operator fatPointer() const { return ptr; }
 
   bool isLocal() const { return ptr.isLocal(); }
 
-  //experimental
-  gptr operator+(int n) {
-    return gptr(ptr.arith(n*sizeof(T)));
-  }
+  // experimental
+  gptr operator+(int n) { return gptr(ptr.arith(n * sizeof(T))); }
 
   T* resolve() const {
     void* obj = nullptr;
@@ -92,7 +90,7 @@ public:
     return obj ? static_cast<T*>(obj) : nullptr;
   }
 
-  //Trivially_copyable
+  // Trivially_copyable
   typedef int tt_is_copyable;
 
   // bool sameHost(const gptr& rhs) const {
@@ -103,7 +101,6 @@ public:
   //   ptr.setObj(p);
   //   ptr.setHost(p ? NetworkInterface::ID : 0);
   // }
-
 };
 
 // template<typename T>
@@ -117,19 +114,19 @@ public:
 //     return retval;
 
 //   if (isLocal()) {
-//     while(!getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj()))) {}
-//     return retval;
+//     while(!getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj())))
+//     {} return retval;
 //   }
-  
+
 //   do {
-//     getRemoteDirectory().fetch<T>(ptr, write ? ResolveFlag::RW : ResolveFlag::RO);
-//     retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
+//     getRemoteDirectory().fetch<T>(ptr, write ? ResolveFlag::RW :
+//     ResolveFlag::RO); retval = static_cast<T*>(getCacheManager().resolve(ptr,
+//     write));
 //   } while (!retval);
 //   return retval;
 // }
 
+} // namespace runtime
+} // namespace galois
 
-} //namespace runtime
-} //namespace galois
-
-#endif //DISTSUPPORT
+#endif // DISTSUPPORT

@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 10/7/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -24,7 +24,7 @@
  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */ 
+ */
 
 #ifndef SEGMENT
 #define SEGMENT
@@ -37,17 +37,17 @@
 #include <cassert>
 
 /**
-   \brief Segment: Geometry of straight segments 
-   
+   \brief Segment: Geometry of straight segments
+
    A Segment is:\n
-   1) A set of indices that describe the connectivity of the segment, 
+   1) A set of indices that describe the connectivity of the segment,
    properly oriented. The coordinates
    are not stored in the element but wherever the application decides\n
-   2) An affine map from a one-dimensional segment (parametric configuration) 
-   with length 1 to the convex  
-   hull of the two vertices. Segments embedded in two- and three-dimensional space 
-   are hence easily handled. \n
-   
+   2) An affine map from a one-dimensional segment (parametric configuration)
+   with length 1 to the convex
+   hull of the two vertices. Segments embedded in two- and three-dimensional
+   space are hence easily handled. \n
+
    The parametric configuration is the segment (0,1).\n
    The parametric coordinate used is the distance to 0.
 
@@ -56,25 +56,19 @@
 
 */
 
-
-template<size_t SPD> 
-class Segment:public AbstractGeom<SPD>
-{
- public:
-  Segment (const VecDouble& globalCoordVec, const VecSize_t& connectivity)
-    :AbstractGeom<SPD> (globalCoordVec, connectivity) {
-      assert (connectivity.size () == 2);
+template <size_t SPD>
+class Segment : public AbstractGeom<SPD> {
+public:
+  Segment(const VecDouble& globalCoordVec, const VecSize_t& connectivity)
+      : AbstractGeom<SPD>(globalCoordVec, connectivity) {
+    assert(connectivity.size() == 2);
   }
 
+  inline virtual ~Segment() {}
 
-  inline virtual ~Segment(){}
+  Segment(const Segment<SPD>& that) : AbstractGeom<SPD>(that) {}
 
-  Segment(const Segment<SPD> & that) : AbstractGeom<SPD> (that) {
-  }
-
-  virtual Segment<SPD>* clone() const {
-    return new Segment<SPD>(*this);
-  }
+  virtual Segment<SPD>* clone() const { return new Segment<SPD>(*this); }
 
   inline size_t getNumVertices() const { return 2; }
 
@@ -86,77 +80,66 @@ class Segment:public AbstractGeom<SPD>
 
   //! @param X first parametric coordinate
   //! @param Y Output the result of the map
-  void map(const double * X, double *Y) const; 
+  void map(const double* X, double* Y) const;
   //! @param X first parametric coordinate
   //! @param DY Output the derivative of the map
   //! @param Jac Output the jacobian of the map
-  void dMap(const double * X, double *DY, double &Jac) const; 
+  void dMap(const double* X, double* DY, double& Jac) const;
   inline size_t getNumFaces() const { return 2; }
 
   //! \warning not implemented
-  ElementGeometry * getFaceGeometry(size_t e) const 
-    { std::cerr << "Segment<SPD>::getFaceGeometry. "
-	"Not implemented!\n\n";  return 0; }
+  ElementGeometry* getFaceGeometry(size_t e) const {
+    std::cerr << "Segment<SPD>::getFaceGeometry. "
+                 "Not implemented!\n\n";
+    return 0;
+  }
 
-  double getInRadius(void) const{
+  double getInRadius(void) const {
     double l;
     l = 0.0;
-    for(size_t i=0; i<SPD; i++) {
-      l += (AbstractGeom<SPD>::getCoordinate(1,i) - AbstractGeom<SPD>::getCoordinate(0,i))*
-             (AbstractGeom<SPD>::getCoordinate(1,i) - AbstractGeom<SPD>::getCoordinate(0,i)) ;
+    for (size_t i = 0; i < SPD; i++) {
+      l += (AbstractGeom<SPD>::getCoordinate(1, i) -
+            AbstractGeom<SPD>::getCoordinate(0, i)) *
+           (AbstractGeom<SPD>::getCoordinate(1, i) -
+            AbstractGeom<SPD>::getCoordinate(0, i));
     }
 
-    return(0.5*sqrt(l));
+    return (0.5 * sqrt(l));
   }
 
-  double getOutRadius(void) const{
-    return(getInRadius());
-  }
+  double getOutRadius(void) const { return (getInRadius()); }
 
-  virtual void computeNormal (size_t e, VecDouble& vNormal) const {
+  virtual void computeNormal(size_t e, VecDouble& vNormal) const {
     std::cerr << "Segment::computeNormal not implemented yet" << std::endl;
-    abort ();
+    abort();
   }
-
-
-  
 };
-
-
-
-
-
 
 // Class implementation
 
+template <size_t SPD>
+void Segment<SPD>::map(const double* X, double* Y) const {
+  for (size_t i = 0; i < SPD; i++)
+    Y[i] = X[0] * AbstractGeom<SPD>::getCoordinate(0, i) +
+           (1 - X[0]) * AbstractGeom<SPD>::getCoordinate(1, i);
 
-template<size_t SPD> 
-void Segment<SPD>::map(const double * X, double *Y) const
-{
-  for(size_t i=0; i<SPD; i++)
-    Y[i] = X[0]*AbstractGeom<SPD>::getCoordinate(0,i) + (1-X[0])*AbstractGeom<SPD>::getCoordinate(1,i);
-  
   return;
 }
 
+template <size_t SPD>
+void Segment<SPD>::dMap(const double* X, double* DY, double& Jac) const {
+  for (size_t i = 0; i < SPD; i++)
+    DY[i] = AbstractGeom<SPD>::getCoordinate(0, i) -
+            AbstractGeom<SPD>::getCoordinate(1, i);
 
+  double g11 = 0;
 
+  for (size_t i = 0; i < SPD; i++)
+    g11 += DY[i] * DY[i];
 
-template<size_t SPD> 
-void Segment<SPD>::dMap(const double * X, double *DY, double &Jac) const
-{
-  for(size_t i=0; i<SPD; i++)
-    DY[i] =  AbstractGeom<SPD>::getCoordinate(0,i) - AbstractGeom<SPD>::getCoordinate(1,i);
-  
-  double g11=0;
+  Jac = sqrt(g11);
 
-  for(size_t i=0; i<SPD; i++)
-    g11 += DY[i]*DY[i];
-  
-  Jac=sqrt(g11);
-  
   return;
 }
-
 
 #endif

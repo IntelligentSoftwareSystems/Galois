@@ -25,8 +25,7 @@
 struct event {
   float v;
   int p;
-  event(float value, int index, bool type) 
-    : v(value), p((index << 1) + type) {}
+  event(float value, int index, bool type) : v(value), p((index << 1) + type) {}
   event() {}
 };
 #define START 0
@@ -35,7 +34,9 @@ struct event {
 #define IS_END(_event) ((_event.p & 1))
 #define GET_INDEX(_event) (_event.p >> 1)
 
-struct cmpVal { bool operator() (event a, event b) {return a.v < b.v;}};
+struct cmpVal {
+  bool operator()(event a, event b) { return a.v < b.v; }
+};
 
 struct range {
   float min;
@@ -49,9 +50,8 @@ typedef event* Events[3];
 typedef range BoundingBox[3];
 
 static std::ostream& operator<<(std::ostream& os, const BoundingBox B) {
- return os << B[0].min << ":" << B[0].max << " + " 
-	   << B[1].min << ":" << B[1].max << " + " 
-	   << B[2].min << ":" << B[2].max;
+  return os << B[0].min << ":" << B[0].max << " + " << B[1].min << ":"
+            << B[1].max << " + " << B[2].min << ":" << B[2].max;
 }
 
 struct cutInfo {
@@ -59,54 +59,54 @@ struct cutInfo {
   float cutOff;
   int numLeft;
   int numRight;
-cutInfo(float _cost, float _cutOff, int nl, int nr) 
-: cost(_cost), cutOff(_cutOff), numLeft(nl), numRight(nr) {}
+  cutInfo(float _cost, float _cutOff, int nl, int nr)
+      : cost(_cost), cutOff(_cutOff), numLeft(nl), numRight(nr) {}
   cutInfo() {}
 };
 
 struct treeNode {
-  treeNode *left;
-  treeNode *right;
+  treeNode* left;
+  treeNode* right;
   BoundingBox box;
   int cutDim;
   float cutOff;
   int* triangleIndices;
   int n;
   int leaves;
-  
-  bool isLeaf() {return (triangleIndices != NULL);}
 
-  treeNode(treeNode* L, treeNode* R, 
-	   int _cutDim, float _cutOff, BoundingBox B) 
-    : left(L), right(R), triangleIndices(NULL), cutDim(_cutDim), 
-      cutOff(_cutOff) {
-    for (int i=0; i < 3; i++) box[i] = B[i];
-    n = L->n + R->n;
+  bool isLeaf() { return (triangleIndices != NULL); }
+
+  treeNode(treeNode* L, treeNode* R, int _cutDim, float _cutOff, BoundingBox B)
+      : left(L), right(R), triangleIndices(NULL), cutDim(_cutDim),
+        cutOff(_cutOff) {
+    for (int i = 0; i < 3; i++)
+      box[i] = B[i];
+    n      = L->n + R->n;
     leaves = L->leaves + R->leaves;
   }
 
-  treeNode(Events E, int _n, BoundingBox B)
-    : left(NULL), right(NULL) {
+  treeNode(Events E, int _n, BoundingBox B) : left(NULL), right(NULL) {
 
     event* events = E[0];
 
     // extract indices from events
-    triangleIndices = newA(int, _n/2);
-    int k = 0;
-    for (int i = 0; i < _n; i++) 
+    triangleIndices = newA(int, _n / 2);
+    int k           = 0;
+    for (int i = 0; i < _n; i++)
       if (IS_START(events[i]))
-	triangleIndices[k++] = GET_INDEX(events[i]);
+        triangleIndices[k++] = GET_INDEX(events[i]);
 
-    n = _n/2;
+    n      = _n / 2;
     leaves = 1;
-    for (int i=0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
       box[i] = B[i];
       free(E[i]);
     }
   }
-  
-  static void del(treeNode *T) {
-    if (T->isLeaf())  free(T->triangleIndices); 
+
+  static void del(treeNode* T) {
+    if (T->isLeaf())
+      free(T->triangleIndices);
     else {
       cilk_spawn del(T->left);
       del(T->right);
@@ -115,4 +115,3 @@ struct treeNode {
     free(T);
   }
 };
-

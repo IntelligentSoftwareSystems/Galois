@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,51 +25,62 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-namespace{
+namespace {
 
 class AddNewVariableHandler : public MatchFinder::MatchCallback {
-  private:
-    Rewriter &rewriter;
-    InfoClass* info;
-  public:
-    AddNewVariableHandler(Rewriter &rewriter, InfoClass* _info ) :  rewriter(rewriter), info(_info){}
-    virtual void run(const MatchFinder::MatchResult &Results) {
+private:
+  Rewriter& rewriter;
+  InfoClass* info;
 
-      clang::LangOptions LangOpts;
-      LangOpts.CPlusPlus = true;
-      clang::PrintingPolicy Policy(LangOpts);
+public:
+  AddNewVariableHandler(Rewriter& rewriter, InfoClass* _info)
+      : rewriter(rewriter), info(_info) {}
+  virtual void run(const MatchFinder::MatchResult& Results) {
 
+    clang::LangOptions LangOpts;
+    LangOpts.CPlusPlus = true;
+    clang::PrintingPolicy Policy(LangOpts);
 
-      for(auto i : info->newVariables_map){
-        if(i.second.size()){
-          for(auto j : i.second){
-            std::string str_nodeData_struct = "nodeData_struct_" + j.FIELD_NAME + "_" + i.first;
-            std::string str_varDecl_getData_src = "varDecl_getData_src_" + j.FIELD_NAME + "_" + i.first;
+    for (auto i : info->newVariables_map) {
+      if (i.second.size()) {
+        for (auto j : i.second) {
+          std::string str_nodeData_struct =
+              "nodeData_struct_" + j.FIELD_NAME + "_" + i.first;
+          std::string str_varDecl_getData_src =
+              "varDecl_getData_src_" + j.FIELD_NAME + "_" + i.first;
 
-            auto varDecl_getData_src = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl_getData_src);
-            auto nodeData_struct = Results.Nodes.getNodeAs<clang::RecordDecl>(str_nodeData_struct); 
+          auto varDecl_getData_src =
+              Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl_getData_src);
+          auto nodeData_struct =
+              Results.Nodes.getNodeAs<clang::RecordDecl>(str_nodeData_struct);
 
-            if(varDecl_getData_src){
-              std::string str_varName_getData_src = varDecl_getData_src->getNameAsString();
+          if (varDecl_getData_src) {
+            std::string str_varName_getData_src =
+                varDecl_getData_src->getNameAsString();
 
-              SourceLocation getData_src_end = varDecl_getData_src->getSourceRange().getEnd().getLocWithOffset(2); 
-              std::string newVar_init = "\n" + str_varName_getData_src + "." + j.FIELD_NAME + "=" + j.INIT_VAL + ";\n";
-              rewriter.InsertText(getData_src_end, newVar_init, true, true);
-              //break;
-            }
-            if(nodeData_struct){
-              nodeData_struct->dumpColor();
-              SourceLocation nodeData_loc_end = nodeData_struct->getSourceRange().getEnd().getLocWithOffset(-2);
-              findAndReplace(j.FIELD_TYPE, "&", "");
-              findAndReplace(j.FIELD_TYPE, "*", "");
+            SourceLocation getData_src_end =
+                varDecl_getData_src->getSourceRange().getEnd().getLocWithOffset(
+                    2);
+            std::string newVar_init = "\n" + str_varName_getData_src + "." +
+                                      j.FIELD_NAME + "=" + j.INIT_VAL + ";\n";
+            rewriter.InsertText(getData_src_end, newVar_init, true, true);
+            // break;
+          }
+          if (nodeData_struct) {
+            nodeData_struct->dumpColor();
+            SourceLocation nodeData_loc_end =
+                nodeData_struct->getSourceRange().getEnd().getLocWithOffset(-2);
+            findAndReplace(j.FIELD_TYPE, "&", "");
+            findAndReplace(j.FIELD_TYPE, "*", "");
 
-              std::string  newVar = "\n" + j.FIELD_TYPE + " " + j.FIELD_NAME + " ;\n";
-              rewriter.InsertText(nodeData_loc_end, newVar, true, true);
-            }
+            std::string newVar =
+                "\n" + j.FIELD_TYPE + " " + j.FIELD_NAME + " ;\n";
+            rewriter.InsertText(nodeData_loc_end, newVar, true, true);
           }
         }
       }
     }
+  }
 
 #if 0
       for(auto i : info->syncFlags_map){
@@ -203,5 +214,5 @@ class AddNewVariableHandler : public MatchFinder::MatchCallback {
 #endif
 };
 
-}//namespace
-#endif//_PLUGIN_ANALYSIS_TWO_LOOP_TRANSFORM_H
+} // namespace
+#endif //_PLUGIN_ANALYSIS_TWO_LOOP_TRANSFORM_H

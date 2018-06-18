@@ -54,20 +54,19 @@ static const unsigned int DIST_INFINITY =
 const galois::gstl::Vector<size_t>& countLevels(Graph& graph) {
 
   //! [Define GReducible]
-    galois::GVectorPerItemReduce<size_t, std::plus<size_t>> reducer;
+  galois::GVectorPerItemReduce<size_t, std::plus<size_t>> reducer;
 
-    galois::do_all(galois::iterate(graph), [&](GNode n) {
-      LNode srcdata = graph.getData(n);
-      if (srcdata.dist == DIST_INFINITY) {
-        return;
-      }
-      reducer.update(srcdata.dist, 1);
-    });
+  galois::do_all(galois::iterate(graph), [&](GNode n) {
+    LNode srcdata = graph.getData(n);
+    if (srcdata.dist == DIST_INFINITY) {
+      return;
+    }
+    reducer.update(srcdata.dist, 1);
+  });
 
-    return reducer.reduce();
+  return reducer.reduce();
   //! [Define GReducible]
 }
-
 
 // constexpr static const unsigned CHUNK_SIZE = 16;
 

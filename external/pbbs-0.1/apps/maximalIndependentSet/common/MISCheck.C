@@ -33,18 +33,19 @@ using namespace benchIO;
 
 // Checks if valid maximal independent set
 int checkMaximalIndependentSet(graph G, int* Flags) {
-  int n = G.n;
+  int n     = G.n;
   vertex* V = G.V;
-  for (int i=0; i < n; i++) {
+  for (int i = 0; i < n; i++) {
     int nflag;
-    for (int j=0; j < V[i].degree; j++) {
+    for (int j = 0; j < V[i].degree; j++) {
       vindex ngh = V[i].Neighbors[j];
       if (Flags[ngh] == 1)
-	if (Flags[i] == 1) {
-	  cout << "checkMaximalIndependentSet: bad edge " 
-	       << i << "," << ngh << endl;
-	  return 1;
-	} else nflag = 1;
+        if (Flags[i] == 1) {
+          cout << "checkMaximalIndependentSet: bad edge " << i << "," << ngh
+               << endl;
+          return 1;
+        } else
+          nflag = 1;
     }
     if ((Flags[i] != 1) && (nflag != 1)) {
       cout << "checkMaximalIndependentSet: bad vertex " << i << endl;
@@ -56,16 +57,16 @@ int checkMaximalIndependentSet(graph G, int* Flags) {
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* iFile = fnames.first;
-  char* oFile = fnames.second;
+  commandLine P(argc, argv, "<inFile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* iFile               = fnames.first;
+  char* oFile               = fnames.second;
 
-  graph G = readGraphFromFile(iFile);
+  graph G       = readGraphFromFile(iFile);
   _seq<int> Out = readIntArrayFromFile(oFile);
   if (Out.n != G.n) {
     cout << "maximumMatchingCheck: output file not of right length" << endl;
-    return(1);
+    return (1);
   }
 
   return checkMaximalIndependentSet(G, Out.A);

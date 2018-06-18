@@ -10,22 +10,22 @@
 #include "galois/substrate/PerThreadStorage.h"
 
 struct MoveOnly {
-  MoveOnly() = default;
+  MoveOnly()           = default;
   MoveOnly(MoveOnly&&) = default;
   MoveOnly& operator=(MoveOnly&&) = default;
-  MoveOnly(const MoveOnly&) = delete;
+  MoveOnly(const MoveOnly&)       = delete;
   MoveOnly& operator=(const MoveOnly&) = delete;
 };
 
 struct MoveOnlyA {
-  int *x;
-  MoveOnlyA() { }
+  int* x;
+  MoveOnlyA() {}
   MoveOnlyA(const MoveOnlyA&) = delete;
   MoveOnly& operator=(const MoveOnlyA&) = delete;
-  ~MoveOnlyA() { }
+  ~MoveOnlyA() {}
 };
 
-template<typename T>
+template <typename T>
 void test(T&& x) {
   T a = std::move(x);
   T b;
@@ -33,7 +33,7 @@ void test(T&& x) {
   a = std::move(b);
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 void testContainerA(T&& x, U&& y) {
   T a = std::move(x);
   T b;
@@ -41,7 +41,7 @@ void testContainerA(T&& x, U&& y) {
   b.emplace_back(std::move(y));
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 void testContainerAA(T&& x, U&& y) {
   galois::runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
 
@@ -52,7 +52,7 @@ void testContainerAA(T&& x, U&& y) {
   b.clear(heap);
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 void testContainerB(T&& x, U&& y) {
   T a = std::move(x);
   T b;
@@ -60,7 +60,7 @@ void testContainerB(T&& x, U&& y) {
   b.insert(std::move(y));
 }
 
-template<typename T, typename U>
+template <typename T, typename U>
 void testContainerC(T&& x, U&& y) {
   T a = std::move(x);
   T b;
@@ -69,9 +69,9 @@ void testContainerC(T&& x, U&& y) {
 }
 
 int main() {
-  //test(galois::FixedSizeBag<MoveOnly>());
-  //test(galois::ConcurrentFixedSizeBag<MoveOnly>());
-  //test(galois::FixedSizeRing<MoveOnly>());
+  // test(galois::FixedSizeBag<MoveOnly>());
+  // test(galois::ConcurrentFixedSizeBag<MoveOnly>());
+  // test(galois::FixedSizeRing<MoveOnly>());
   test(galois::gdeque<MoveOnly>());
   test(galois::gslist<MoveOnly>());
   test(galois::concurrent_gslist<MoveOnly>());
@@ -85,10 +85,11 @@ int main() {
 
   testContainerA(galois::gdeque<MoveOnly>(), MoveOnly());
   testContainerAA(galois::gslist<MoveOnly>(), MoveOnly());
-  //testContainerAA(galois::concurrent_gslist<MoveOnly>(), MoveOnly());
+  // testContainerAA(galois::concurrent_gslist<MoveOnly>(), MoveOnly());
   testContainerA(galois::InsertBag<MoveOnly>(), MoveOnly());
 #ifdef GALOIS_USE_EXP
-  testContainerB(galois::concurrent_flat_map<int, MoveOnly>(), std::make_pair(1, MoveOnly()));
+  testContainerB(galois::concurrent_flat_map<int, MoveOnly>(),
+                 std::make_pair(1, MoveOnly()));
 #endif
   testContainerC(galois::gdeque<MoveOnly>(), MoveOnly());
 

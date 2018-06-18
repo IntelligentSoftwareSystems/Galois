@@ -6,10 +6,10 @@ int main() {
   uint32_t ID, Num;
   std::unique_ptr<galois::runtime::NetworkIO> net;
 
-  std::tie(net,ID,Num) = galois::runtime::makeNetworkIOMPI();
+  std::tie(net, ID, Num) = galois::runtime::makeNetworkIOMPI();
 
   std::cout << ID << " " << Num << "\n";
-  
+
   for (int x = 1; x <= 100; ++x) {
 
     for (int i = 0; i < Num; ++i) {
@@ -21,7 +21,7 @@ int main() {
         m.data[y] = ID;
       net->enqueue(std::move(m));
     }
-    
+
     for (int i = 0; i < Num; ++i) {
       galois::runtime::NetworkIO::message m;
       do {
@@ -33,7 +33,6 @@ int main() {
       std::cout << "\n";
     }
   }
-   
+
   return 0;
-  
 }

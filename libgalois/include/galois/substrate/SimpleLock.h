@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,14 +37,17 @@ class SimpleLock {
   void slow_lock() const;
 
 public:
-  constexpr SimpleLock(): _lock(0) { }
-  //relaxed order for copy
-  SimpleLock(const SimpleLock& p): _lock(p._lock.load(std::memory_order_relaxed)) { }
+  constexpr SimpleLock() : _lock(0) {}
+  // relaxed order for copy
+  SimpleLock(const SimpleLock& p)
+      : _lock(p._lock.load(std::memory_order_relaxed)) {}
 
   SimpleLock& operator=(const SimpleLock& p) {
-    if (&p == this) return *this;
-    //relaxed order for initialization
-    _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+    if (&p == this)
+      return *this;
+    // relaxed order for initialization
+    _lock.store(p._lock.load(std::memory_order_relaxed),
+                std::memory_order_relaxed);
     return *this;
   }
 
@@ -52,7 +55,8 @@ public:
     int oldval = 0;
     if (_lock.load(std::memory_order_relaxed))
       goto slow_path;
-    if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed))
+    if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel,
+                                     std::memory_order_relaxed))
       goto slow_path;
     assert(is_locked());
     return;
@@ -62,7 +66,7 @@ public:
 
   inline void unlock() const {
     assert(is_locked());
-    //HMMMM
+    // HMMMM
     _lock.store(0, std::memory_order_release);
     //_lock = 0;
   }
@@ -92,14 +96,14 @@ public:
   inline bool is_locked() const { return false; }
 };
 
-
 template <bool Enabled>
-using CondLock = typename std::conditional<Enabled, SimpleLock, DummyLock>::type;
+using CondLock =
+    typename std::conditional<Enabled, SimpleLock, DummyLock>::type;
 
+using lock_guard_galois = std::lock_guard<SimpleLock>;
 
-using lock_guard_galois =  std::lock_guard<SimpleLock>;
-
-#define MAKE_LOCK_GUARD(__x) galois::substrate::lock_guard_galois locker##___COUNTER__(__x)
+#define MAKE_LOCK_GUARD(__x)                                                   \
+  galois::substrate::lock_guard_galois locker##___COUNTER__(__x)
 
 } // end namespace substrate
 } // end namespace galois

@@ -37,23 +37,25 @@ using namespace std;
 //      in the new graph are the children in the bfs tree)
 // **************************************************************
 
-struct nonNegF{bool operator() (int a) {return (a>=0);}};
+struct nonNegF {
+  bool operator()(int a) { return (a >= 0); }
+};
 
-pair<int,int> BFS(vindex start, graph GA) {
+pair<int, int> BFS(vindex start, graph GA) {
   int numVertices = GA.n;
-  int numEdges = GA.m;
-  vertex *G = GA.V;
-  int* Offsets = newA(int,numVertices+1);
-  int* Parents = newA(int,numVertices);
-//  parallel_for (int i = 0; i < numVertices; i++) Parents[i] = INT_MAX;
-  parallel_doall(int, i, 0, numVertices) { Parents[i] = INT_MAX; } parallel_doall_end
-  vindex* Frontier = newA(vindex,numVertices);
-  vindex* FrontierNext = newA(vindex,numEdges);
+  int numEdges    = GA.m;
+  vertex* G       = GA.V;
+  int* Offsets    = newA(int, numVertices + 1);
+  int* Parents    = newA(int, numVertices);
+  //  parallel_for (int i = 0; i < numVertices; i++) Parents[i] = INT_MAX;
+  parallel_doall(int, i, 0, numVertices) { Parents[i] = INT_MAX; }
+  parallel_doall_end vindex* Frontier = newA(vindex, numVertices);
+  vindex* FrontierNext                = newA(vindex, numEdges);
 
-  Frontier[0] = start;
-  int fSize = 1;
-  Parents[start] = -1;
-  int round = 0;
+  Frontier[0]      = start;
+  int fSize        = 1;
+  Parents[start]   = -1;
+  int round        = 0;
   int totalVisited = 0;
 
   while (fSize > 0) {
@@ -61,46 +63,51 @@ pair<int,int> BFS(vindex start, graph GA) {
     round++;
 
     // For each vertex in the frontier try to "hook" unvisited neighbors.
-//    parallel_for(int i = 0; i < fSize; i++) {
-    parallel_doall(int, i, 0, fSize)  {
-      int k= 0;
+    //    parallel_for(int i = 0; i < fSize; i++) {
+    parallel_doall(int, i, 0, fSize) {
+      int k    = 0;
       vindex v = Frontier[i];
-      for (int j=0; j < G[v].degree; j++) {
+      for (int j = 0; j < G[v].degree; j++) {
         vindex ngh = G[v].Neighbors[j];
-	if (Parents[ngh] > v)
-	  if (utils::writeMin(&Parents[ngh],v))
-	    G[v].Neighbors[k++] = ngh;
+        if (Parents[ngh] > v)
+          if (utils::writeMin(&Parents[ngh], v))
+            G[v].Neighbors[k++] = ngh;
       }
       Offsets[i] = k;
-    } parallel_doall_end
+    }
+    parallel_doall_end
 
-    // Find offsets to write the next frontier for each v in this frontier
-    int nr=sequence::scan(Offsets,Offsets,fSize,utils::addF<int>(),0);
+        // Find offsets to write the next frontier for each v in this frontier
+        int nr = sequence::scan(Offsets, Offsets, fSize, utils::addF<int>(), 0);
     Offsets[fSize] = nr;
 
-    // Move hooked neighbors to next frontier.   
-//    parallel_for (int i = 0; i < fSize; i++) {
-    parallel_doall(int, i, 0, fSize)  {
-      int o = Offsets[i];
-      int d = Offsets[i+1]-o;
-      int k = 0;
+    // Move hooked neighbors to next frontier.
+    //    parallel_for (int i = 0; i < fSize; i++) {
+    parallel_doall(int, i, 0, fSize) {
+      int o    = Offsets[i];
+      int d    = Offsets[i + 1] - o;
+      int k    = 0;
       vindex v = Frontier[i];
-      for (int j=0; j < d; j++) {
-	vindex ngh = G[v].Neighbors[j];
-	if (Parents[ngh] == v) {
-	  FrontierNext[o+j] = G[v].Neighbors[k++] = ngh;
-	  Parents[ngh] = -1;
-	}
-	else FrontierNext[o+j] = -1;
+      for (int j = 0; j < d; j++) {
+        vindex ngh = G[v].Neighbors[j];
+        if (Parents[ngh] == v) {
+          FrontierNext[o + j] = G[v].Neighbors[k++] = ngh;
+          Parents[ngh]                              = -1;
+        } else
+          FrontierNext[o + j] = -1;
       }
       G[v].degree = k;
-    } parallel_doall_end
+    }
+    parallel_doall_end
 
-    // Filter out the empty slots (marked with -1)
-    fSize = sequence::filter(FrontierNext, Frontier, nr, nonNegF());
+        // Filter out the empty slots (marked with -1)
+        fSize = sequence::filter(FrontierNext, Frontier, nr, nonNegF());
   }
 
-  free(FrontierNext); free(Frontier); free(Offsets); free(Parents);
+  free(FrontierNext);
+  free(Frontier);
+  free(Offsets);
+  free(Parents);
 
-  return pair<int,int>(totalVisited,round);
+  return pair<int, int>(totalVisited, round);
 }

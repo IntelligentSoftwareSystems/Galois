@@ -5,7 +5,7 @@
 typedef int ticks;
 static double elapsed(ticks, ticks) { return 0; }
 static ticks getticks() { return 0; }
-static void printticks(const char* prefix, int count, ...) { }
+static void printticks(const char* prefix, int count, ...) {}
 #else
 #include "cycle_main.h"
 #include <stdio.h>

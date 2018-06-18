@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -26,82 +26,50 @@
 
 namespace kruskal {
 
-
 struct UnionFindUsingRuntime {
-  void operator () (
-      EdgeCtxWL& perThrdWL, 
-      VecRep_ty& repVec, 
-      VecAtomicCtxPtr& repOwnerCtxVec, 
-      size_t& mstWeight, 
-      size_t& totalIter,
-      galois::TimeAccumulator& sortTimer,
-      galois::TimeAccumulator& findTimer,
-      galois::TimeAccumulator& linkUpTimer,
-      Accumulator& findIter,
-      Accumulator& linkUpIter) const {
-
+  void operator()(EdgeCtxWL& perThrdWL, VecRep_ty& repVec,
+                  VecAtomicCtxPtr& repOwnerCtxVec, size_t& mstWeight,
+                  size_t& totalIter, galois::TimeAccumulator& sortTimer,
+                  galois::TimeAccumulator& findTimer,
+                  galois::TimeAccumulator& linkUpTimer, Accumulator& findIter,
+                  Accumulator& linkUpIter) const {
 
     EdgeCtxWL* nextWL = NULL; // not used actually
     Accumulator mstSum;
 
     // galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
-    galois::runtime::for_each_ordered_ikdg (galois::runtime::makeLocalRange (perThrdWL),
-        Edge::Comparator (),
-        FindLoop (repVec, repOwnerCtxVec, findIter),
-        LinkUpLoop<true> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-        std::make_tuple (
-          galois::needs_custom_locking<> (),
-          galois::loopname ("kruskal-ikdg")));
+    galois::runtime::for_each_ordered_ikdg(
+        galois::runtime::makeLocalRange(perThrdWL), Edge::Comparator(),
+        FindLoop(repVec, repOwnerCtxVec, findIter),
+        LinkUpLoop<true>(repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
+        std::make_tuple(galois::needs_custom_locking<>(),
+                        galois::loopname("kruskal-ikdg")));
 
-
-    totalIter += findIter.reduce ();
-    mstWeight += mstSum.reduce ();
-
-
+    totalIter += findIter.reduce();
+    mstWeight += mstSum.reduce();
   }
 };
 
+class KruskalOrdered : public Kruskal {
+protected:
+  virtual const std::string getVersion() const {
+    return "Parallel Kruskal using Ordered Runtime";
+  }
 
+  virtual void runMST(const size_t numNodes, VecEdge& edges, size_t& mstWeight,
+                      size_t& totalIter) {
 
-class KruskalOrdered: public Kruskal {
-  protected:
-
-  virtual const std::string getVersion () const { return "Parallel Kruskal using Ordered Runtime"; }
-
-  virtual void runMST (const size_t numNodes, VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    if (! bool(galois::runtime::useParaMeterOpt) && (edges.size () >= 2 * numNodes)) {
-      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
+    if (!bool(galois::runtime::useParaMeterOpt) &&
+        (edges.size() >= 2 * numNodes)) {
+      runMSTfilter(numNodes, edges, mstWeight, totalIter,
+                   UnionFindUsingRuntime());
     } else {
-      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
+      runMSTsimple(numNodes, edges, mstWeight, totalIter,
+                   UnionFindUsingRuntime());
     }
   }
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-}// end namespace kruskal
-
-
-
+} // end namespace kruskal
 
 #endif //  KRUSKAL_ORDERED_H
-

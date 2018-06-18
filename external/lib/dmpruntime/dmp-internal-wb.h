@@ -15,7 +15,7 @@
 // This is thread-local, so it cannot have a constructor!
 //-----------------------------------------------------------------------
 
-template<typename T>
+template <typename T>
 struct BumpAllocator {
   T* alloc() {
     if (unlikely(currItem == itemsPerPage)) {
@@ -30,11 +30,11 @@ struct BumpAllocator {
 
   void init(int _itemsPerPage) {
     itemsPerPage = _itemsPerPage;
-    currItem = 0;
-    currPage = 0;
-    numPages = 0;
-    numSlots = 0;
-    pages = NULL;
+    currItem     = 0;
+    currPage     = 0;
+    numPages     = 0;
+    numSlots     = 0;
+    pages        = NULL;
     addpage();
   }
 
@@ -42,22 +42,16 @@ struct BumpAllocator {
     currItem = 0;
     currPage = 0;
   }
-  int size() const {
-    return currPage*itemsPerPage + currItem;
-  }
+  int size() const { return currPage * itemsPerPage + currItem; }
 
   struct iterator {
-    iterator(const BumpAllocator* b)
-      : bump(b), item(0), page(0)
-    {}
+    iterator(const BumpAllocator* b) : bump(b), item(0), page(0) {}
 
     const BumpAllocator* bump;
     int item;
     int page;
 
-    T* get() const {
-      return bump->pages[page] + item;
-    }
+    T* get() const { return bump->pages[page] + item; }
 
     void next() {
       if (++item >= bump->itemsPerPage) {
@@ -85,7 +79,7 @@ struct BumpAllocator {
       else
         numSlots *= 2;
       pages = (T**)real_realloc(pages, numSlots * sizeof(pages[0]));
-      memset(pages+numPages, 0, (numSlots - numPages) * sizeof(pages[0]));
+      memset(pages + numPages, 0, (numSlots - numPages) * sizeof(pages[0]));
     }
     // Alloc the new page, leaving it uninitalized.
     pages[numPages++] = (T*)real_malloc(itemsPerPage * sizeof(T));
@@ -106,11 +100,11 @@ struct BumpAllocator {
 //-----------------------------------------------------------------------
 
 #ifndef DMP_WB_GRANULARITY
-# ifdef DMP_MOT_GRANULARITY
-#  define DMP_WB_GRANULARITY DMP_MOT_GRANULARITY
-# else
-#  define DMP_WB_GRANULARITY 6
-# endif
+#ifdef DMP_MOT_GRANULARITY
+#define DMP_WB_GRANULARITY DMP_MOT_GRANULARITY
+#else
+#define DMP_WB_GRANULARITY 6
+#endif
 #endif
 
 #ifdef DMP_ENABLE_BUFFERED_MODE
@@ -120,28 +114,28 @@ struct BumpAllocator {
 #endif
 
 #ifndef DMP_WB_HASHSIZE
-#define DMP_WB_HASHSIZE 1024    // number of hash buckets (power-of-2)
+#define DMP_WB_HASHSIZE 1024 // number of hash buckets (power-of-2)
 #endif
 
-#define DMP_WB_HASHMASK    (DMP_WB_HASHSIZE - 1)
-#define DMP_WB_ENTRY_SIZE  (1 << DMP_WB_GRANULARITY)
+#define DMP_WB_HASHMASK (DMP_WB_HASHSIZE - 1)
+#define DMP_WB_ENTRY_SIZE (1 << DMP_WB_GRANULARITY)
 
 struct LogEntry {
-  void*     base;       // base address
-  LogEntry* next;       // linked list
-  uint64_t  bitfield;   // bitfield of valid bytes in data[]
+  void* base;        // base address
+  LogEntry* next;    // linked list
+  uint64_t bitfield; // bitfield of valid bytes in data[]
 #ifndef DMP_ENABLE_WB_PARALLEL_COMMIT
-  char      data[DMP_WB_ENTRY_SIZE];
+  char data[DMP_WB_ENTRY_SIZE];
 #else
   union {
-    char     data[DMP_WB_ENTRY_SIZE];  // normal usage
-    uint32_t threadID;                 // used after the data has been published
+    char data[DMP_WB_ENTRY_SIZE]; // normal usage
+    uint32_t threadID;            // used after the data has been published
   };
 #endif
 };
 
-extern __thread LogEntry* DMPwb[DMP_WB_HASHSIZE];   // the write buffer
-extern __thread BumpAllocator<LogEntry> DMPwbPool;  // allocation pool
+extern __thread LogEntry* DMPwb[DMP_WB_HASHSIZE];  // the write buffer
+extern __thread BumpAllocator<LogEntry> DMPwbPool; // allocation pool
 
 //-----------------------------------------------------------------------
 // Write Buffer API
@@ -152,11 +146,12 @@ static inline void* DMPwbBase(void* addr) {
 }
 
 static inline int DMPwbHash(void* addr) {
-  return ((((uintptr_t) addr) >> DMP_WB_GRANULARITY) & DMP_WB_HASHMASK);
+  return ((((uintptr_t)addr) >> DMP_WB_GRANULARITY) & DMP_WB_HASHMASK);
 }
 
 static inline int DMPwbMemoryIsContained(void* addr, size_t size) {
-  return ((uintptr_t)addr - (uintptr_t)DMPwbBase(addr) + size) <= DMP_WB_ENTRY_SIZE;
+  return ((uintptr_t)addr - (uintptr_t)DMPwbBase(addr) + size) <=
+         DMP_WB_ENTRY_SIZE;
 }
 
 LogEntry* DMPwbLookup(void* base);
@@ -176,12 +171,14 @@ void DMPwbFlushDeallocations();
 //   manyWriters = false
 //   if (DMPwbCommitLogEntryStart(e, &lock, &manyWriters)) {
 //      // It is safe to update things related to 'e'.
-//      // 'manyWriters == true' only if 2+ threads wrote to 'e' during this quantum.
+//      // 'manyWriters == true' only if 2+ threads wrote to 'e' during this
+//      quantum.
 //   }
 //   DMPwbCommitLogEntryEnd(lock)
 struct LogEntryCommitLock;
-bool DMPwbCommitLogEntryStart(LogEntry *e, LogEntryCommitLock** plock, bool* manyWriters);
-void DMPwbCommitLogEntryEnd(LogEntryCommitLock *lock);
+bool DMPwbCommitLogEntryStart(LogEntry* e, LogEntryCommitLock** plock,
+                              bool* manyWriters);
+void DMPwbCommitLogEntryEnd(LogEntryCommitLock* lock);
 
 void DMPwbLoadContained(void* addr, size_t size, void* outbuffer);
 void DMPwbStoreContained(void* addr, size_t size, void* inbuffer);
@@ -190,8 +187,10 @@ void DMPwbLoadRange(void* addr, size_t size, void* outbuffer);
 void DMPwbStoreRange(void* addr, size_t size, void* inbuffer);
 void DMPwbRemoveRange(void* addr, size_t size);
 
-template<typename T, bool isContained> T DMPwbLoadTyped(T* addr);
-template<typename T, bool isContained> void DMPwbStoreTyped(T* addr, T value);
+template <typename T, bool isContained>
+T DMPwbLoadTyped(T* addr);
+template <typename T, bool isContained>
+void DMPwbStoreTyped(T* addr, T value);
 
 // LibC stubs
 void DMPwbMemset(void* addr, int val, size_t size);
@@ -210,8 +209,10 @@ void DMPwbDoMemcpy(const WbIterator* dst, const WbIterator* src);
 
 struct WbIterator {
   inline WbIterator(void* startAddr, size_t startSize, void* startBuffer = NULL)
-    : buffer((char*)startBuffer), addr((char*)startAddr), remaining(startSize)
-  { update(); }
+      : buffer((char*)startBuffer), addr((char*)startAddr),
+        remaining(startSize) {
+    update();
+  }
 
   //
   // This iterates over a range of addresses in the WB,
@@ -220,12 +221,12 @@ struct WbIterator {
   //   [startBuffer, startBuffer + startSize).
   //
 
-  char* buffer;      // current address inside the side buffer (if any)
-  char* addr;        // current address inside the WB
-  char* base;        // base address of the current WB entry
-  ptrdiff_t remaining;   // remaining bytes in the range
-  ptrdiff_t currOffset;  // offset in the current WB entry
-  ptrdiff_t currSize;    // length in the current WB entry
+  char* buffer;         // current address inside the side buffer (if any)
+  char* addr;           // current address inside the WB
+  char* base;           // base address of the current WB entry
+  ptrdiff_t remaining;  // remaining bytes in the range
+  ptrdiff_t currOffset; // offset in the current WB entry
+  ptrdiff_t currSize;   // length in the current WB entry
 
   inline bool next() {
     if (currSize >= remaining)
@@ -238,7 +239,7 @@ struct WbIterator {
   }
 
   inline void update() {
-    base = (char*)DMPwbBase(addr);
+    base       = (char*)DMPwbBase(addr);
     currOffset = (uintptr_t)addr - (uintptr_t)base;
     currSize = std::min(remaining, (ptrdiff_t)(DMP_WB_ENTRY_SIZE - currOffset));
   }
@@ -248,12 +249,13 @@ struct WbIterator {
   //
 
   template <void Visit(const WbIterator* iter)>
-  static FORCE_INLINE
-  void foreach(void* startAddr, size_t startSize, void* startBuffer) {
+  static FORCE_INLINE void foreach (void* startAddr, size_t startSize,
+                                    void* startBuffer) {
     WbIterator iter(startAddr, startSize, startBuffer);
     for (;;) {
       Visit(&iter);
-      if (!iter.next()) break;
+      if (!iter.next())
+        break;
     }
   }
 
@@ -263,8 +265,8 @@ struct WbIterator {
   //
 
   template <void Visit(const WbIterator* iter)>
-  static FORCE_INLINE
-  void doone(void* startAddr, size_t startSize, void* startBuffer) {
+  static FORCE_INLINE void doone(void* startAddr, size_t startSize,
+                                 void* startBuffer) {
     WbIterator iter(startAddr, startSize, startBuffer);
     Visit(&iter);
   }
@@ -308,4 +310,4 @@ struct WbIterator {
   }
 };
 
-#endif  // _DMP_INTERNAL_WB_H_
+#endif // _DMP_INTERNAL_WB_H_

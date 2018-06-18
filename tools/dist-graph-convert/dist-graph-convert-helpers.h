@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,10 +34,10 @@
 #include "galois/graphs/BufferedGraph.h"
 
 // useful typedefs that shorten long declarations
-using Uint64Pair = std::pair<uint64_t, uint64_t>;
+using Uint64Pair       = std::pair<uint64_t, uint64_t>;
 using DoubleUint64Pair = std::pair<Uint64Pair, Uint64Pair>;
-using VoVUint32 = std::vector<std::vector<uint32_t>>;
-using PairVoVUint32 = std::pair<VoVUint32, VoVUint32>;
+using VoVUint32        = std::vector<std::vector<uint32_t>>;
+using PairVoVUint32    = std::pair<VoVUint32, VoVUint32>;
 
 /**
  * Given a binary node mapping, read a specified region into memory.
@@ -48,7 +48,7 @@ using PairVoVUint32 = std::pair<VoVUint32, VoVUint32>;
  * @returns Vector with the read in node mappings
  */
 std::vector<uint32_t> readRandomNodeMapping(const std::string& nodeMapBinary,
-                                            uint64_t nodeOffset, 
+                                            uint64_t nodeOffset,
                                             uint64_t numToRead);
 
 /**
@@ -64,7 +64,7 @@ void MPICheck(int errcode);
  * nodes and edges.
  *
  * @param grFile file name of gr
- * @param isVoid true if edge data shouldn't exist in the graph, 
+ * @param isVoid true if edge data shouldn't exist in the graph,
  * false otherwise; used for a safety check
  * @returns a pair with the number of nodes and number of edges in the gr file
  * in that order
@@ -74,7 +74,7 @@ Uint64Pair readV1GrHeader(const std::string& grFile, bool isVoid);
 /**
  * "Free" memory used by a vector by swapping it out with an empty one.
  *
- * @tparam VectorTy type of vector 
+ * @tparam VectorTy type of vector
  * @param toFree vector to free memory of
  */
 template <typename VectorTy>
@@ -92,19 +92,19 @@ void freeVector(VectorTy& toFree) {
  * data order (i.e. 3 elements)
  * @returns the number of edges represented by the vector
  */
-template<typename EdgeDataTy>
+template <typename EdgeDataTy>
 size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
   size_t numEdges;
   if (std::is_void<EdgeDataTy>::value) {
     numEdges = edgeVector.size() / 2;
   } else {
     numEdges = edgeVector.size() / 3;
-  } 
+  }
   return numEdges;
 }
 
 /**
- * Given an open ifstream of an edgelist and a range to read, 
+ * Given an open ifstream of an edgelist and a range to read,
  * read the edges into memory.
  *
  * @tparam EdgeDataTy type of edge data to read
@@ -117,13 +117,11 @@ size_t getNumEdges(const std::vector<uint32_t>& edgeVector) {
  * @returns Vector representing the read in edges: every 2-3 elements represents
  * src, dest, and edge data (if the latter exists)
  */
-template<typename EdgeDataTy> 
-std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
-                                            uint64_t localStartByte,
-                                            uint64_t localEndByte,
-                                            uint64_t totalNumNodes,
-                                            bool startAtOne=false,
-                                            bool ignoreWeights=false) {
+template <typename EdgeDataTy>
+std::vector<uint32_t>
+loadEdgesFromEdgeList(std::ifstream& edgeListFile, uint64_t localStartByte,
+                      uint64_t localEndByte, uint64_t totalNumNodes,
+                      bool startAtOne = false, bool ignoreWeights = false) {
   // load edges into a vector
   uint64_t localNumEdges = 0;
   std::vector<uint32_t> localEdges; // v1 support only + only uint32_t data
@@ -164,9 +162,8 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
     GALOIS_ASSERT(localNumEdges == (localEdges.size() / 3));
   }
 
-  printf("[%u] Local num edges from file is %lu\n", 
-         galois::runtime::getSystemNetworkInterface().ID, 
-         localNumEdges);
+  printf("[%u] Local num edges from file is %lu\n",
+         galois::runtime::getSystemNetworkInterface().ID, localNumEdges);
 
   return localEdges;
 }
@@ -177,10 +174,10 @@ std::vector<uint32_t> loadEdgesFromEdgeList(std::ifstream& edgeListFile,
  *
  * @param numHosts total number of hosts
  * @param totalNumNodes total number of nodes
- * @returns A vector of pairs representing node -> host assignments. Evenly 
+ * @returns A vector of pairs representing node -> host assignments. Evenly
  * distributed nodes to hosts.
  */
-std::vector<Uint64Pair> getHostToNodeMapping(uint64_t numHosts, 
+std::vector<Uint64Pair> getHostToNodeMapping(uint64_t numHosts,
                                              uint64_t totalNumNodes);
 
 /**
@@ -191,7 +188,7 @@ std::vector<Uint64Pair> getHostToNodeMapping(uint64_t numHosts,
  * nodes
  * @returns Owner of requested ID on or -1 if it couldn't be found
  */
-uint32_t findOwner(const uint64_t gID, 
+uint32_t findOwner(const uint64_t gID,
                    const std::vector<Uint64Pair>& ownerMapping);
 
 /**
@@ -222,7 +219,7 @@ uint64_t accumulateValue(uint64_t value);
 /**
  * Find an index into the provided prefix sum that gets the desired "weight"
  * (weight comes from the units of the prefix sum).
- * 
+ *
  * @param targetWeight desired weight that you want the index returned to have
  * @param lb Lower bound of search
  * @param ub Upper bound of search
@@ -233,8 +230,8 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
                             const std::vector<uint64_t>& prefixSum);
 
 /**
- * Given a prefix sum, a partition ID, and the total number of partitions, 
- * find a good contiguous division using the prefix sum such that 
+ * Given a prefix sum, a partition ID, and the total number of partitions,
+ * find a good contiguous division using the prefix sum such that
  * partitions get roughly an even amount of units (based on prefix sum).
  *
  * @param id partition ID
@@ -244,9 +241,8 @@ uint64_t findIndexPrefixSum(uint64_t targetWeight, uint64_t lb, uint64_t ub,
  * @returns Pair representing the begin/end of the elements that partition
  * "id" is assigned based on the prefix sum
  */
-Uint64Pair binSearchDivision(uint64_t id, uint64_t totalID, 
+Uint64Pair binSearchDivision(uint64_t id, uint64_t totalID,
                              const std::vector<uint64_t>& prefixSum);
-
 
 /**
  * Finds the unique source nodes of a set of edges in memory. Assumes
@@ -259,7 +255,7 @@ Uint64Pair binSearchDivision(uint64_t id, uint64_t totalID,
  * on this host; should be pre-initialized before being passed into this
  * function
  */
-template<typename EdgeDataTy>
+template <typename EdgeDataTy>
 void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
                            galois::DynamicBitSet& uniqueNodeBitset) {
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
@@ -267,23 +263,22 @@ void findUniqueSourceNodes(const std::vector<uint32_t>& localEdges,
   uniqueNodeBitset.reset();
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      // src node
-      if (std::is_void<EdgeDataTy>::value) {
-        uniqueNodeBitset.set(localEdges[edgeIndex * 2]);
-      } else {
-        uniqueNodeBitset.set(localEdges[edgeIndex * 3]);
-      }
-    },
-    galois::loopname("FindUniqueNodes"));
+  galois::do_all(galois::iterate((uint64_t)0, localNumEdges),
+                 [&](uint64_t edgeIndex) {
+                   // src node
+                   if (std::is_void<EdgeDataTy>::value) {
+                     uniqueNodeBitset.set(localEdges[edgeIndex * 2]);
+                   } else {
+                     uniqueNodeBitset.set(localEdges[edgeIndex * 3]);
+                   }
+                 },
+                 galois::loopname("FindUniqueNodes"));
 
   printf("[%lu] Unique nodes found\n", hostID);
 }
 
 /**
- * Given a chunk to node mapping and a set of unique nodes, find the unique 
+ * Given a chunk to node mapping and a set of unique nodes, find the unique
  * chunks corresponding to the unique nodes provided.
  *
  * @param uniqueNodeBitset Bitset specifying which source nodes exist on the
@@ -305,15 +300,14 @@ void findUniqueChunks(galois::DynamicBitSet& uniqueNodeBitset,
  * this host; will be unusable at the end of the function (memory free)
  * @param localEdges loaded edge list laid out in src, dest, src, dest, etc.
  * @param chunkToNode specifies which chunks have which nodes
- * @param chunkCounts (input/output) a 0-initialized vector that will be 
+ * @param chunkCounts (input/output) a 0-initialized vector that will be
  * edited to have our local chunk edge counts
  */
-template<typename EdgeDataTy>
-void accumulateLocalEdgesToChunks(
-             galois::DynamicBitSet& uniqueChunkBitset,
-             const std::vector<uint32_t>& localEdges,
-             const std::vector<Uint64Pair>& chunkToNode,
-             std::vector<uint64_t>& chunkCounts) {
+template <typename EdgeDataTy>
+void accumulateLocalEdgesToChunks(galois::DynamicBitSet& uniqueChunkBitset,
+                                  const std::vector<uint32_t>& localEdges,
+                                  const std::vector<Uint64Pair>& chunkToNode,
+                                  std::vector<uint64_t>& chunkCounts) {
   std::map<uint64_t, std::atomic<uint64_t>> chunkToAccumulator;
 
   // default-initialize necessary chunk atomics
@@ -326,35 +320,34 @@ void accumulateLocalEdgesToChunks(
   freeVector(uniqueChunkBitset.get_vec());
 
   uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  printf("[%lu] Chunk accumulators created: %lu of them\n", hostID, 
+  printf("[%lu] Chunk accumulators created: %lu of them\n", hostID,
          chunkToAccumulator.size());
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine which chunk edges go to
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src;
-      if (std::is_void<EdgeDataTy>::value) {
-        src = localEdges[edgeIndex * 2];
-      } else {
-        src = localEdges[edgeIndex * 3];
-      }
-      uint32_t chunkNum = findOwner(src, chunkToNode);
-      GALOIS_ASSERT(chunkNum != (uint32_t)-1);
-      chunkToAccumulator[chunkNum] += 1;
-    },
-    galois::loopname("ChunkInspection"));
+  galois::do_all(galois::iterate((uint64_t)0, localNumEdges),
+                 [&](uint64_t edgeIndex) {
+                   uint32_t src;
+                   if (std::is_void<EdgeDataTy>::value) {
+                     src = localEdges[edgeIndex * 2];
+                   } else {
+                     src = localEdges[edgeIndex * 3];
+                   }
+                   uint32_t chunkNum = findOwner(src, chunkToNode);
+                   GALOIS_ASSERT(chunkNum != (uint32_t)-1);
+                   chunkToAccumulator[chunkNum] += 1;
+                 },
+                 galois::loopname("ChunkInspection"));
 
   printf("[%lu] Chunk accumulators done accumulating\n", hostID);
 
   // update chunk count
   galois::do_all(
-    galois::iterate(chunkToAccumulator.cbegin(), chunkToAccumulator.cend()),
-    [&] (auto& chunkAndCount) {
-      chunkCounts[chunkAndCount.first] += chunkAndCount.second.load();
-    },
-    galois::loopname("ChunkCountUpdate"));
+      galois::iterate(chunkToAccumulator.cbegin(), chunkToAccumulator.cend()),
+      [&](auto& chunkAndCount) {
+        chunkCounts[chunkAndCount.first] += chunkAndCount.second.load();
+      },
+      galois::loopname("ChunkCountUpdate"));
 }
 
 /**
@@ -376,24 +369,23 @@ void sendAndReceiveEdgeChunkCounts(std::vector<uint64_t>& chunkCounts);
  * @param chunkToNode specifies which chunks have which nodes
  * @returns A vector specifying the number of edges each chunk has
  */
-template<typename EdgeDataTy>
-std::vector<uint64_t> getChunkEdgeCounts(
-                galois::DynamicBitSet& uniqueChunkBitset,
-                const std::vector<uint32_t>& localEdges,
-                const std::vector<Uint64Pair>& chunkToNode) {
+template <typename EdgeDataTy>
+std::vector<uint64_t>
+getChunkEdgeCounts(galois::DynamicBitSet& uniqueChunkBitset,
+                   const std::vector<uint32_t>& localEdges,
+                   const std::vector<Uint64Pair>& chunkToNode) {
   std::vector<uint64_t> chunkCounts;
   chunkCounts.assign(uniqueChunkBitset.size(), 0);
-  accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunkBitset, localEdges, 
+  accumulateLocalEdgesToChunks<EdgeDataTy>(uniqueChunkBitset, localEdges,
                                            chunkToNode, chunkCounts);
   sendAndReceiveEdgeChunkCounts(chunkCounts);
 
   return chunkCounts;
 }
 
-
 /**
  * Given a chunk edge count prefix sum and the chunk to node mapping, assign
- * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even 
+ * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even
  * number of edges and return the node mapping.
  *
  * @param chunkCountsPrefixSum prefix sum of edges in chunks
@@ -401,13 +393,13 @@ std::vector<uint64_t> getChunkEdgeCounts(
  * @returns a host to node mapping where each host very roughly has a balanced
  * number of edges
  */
-std::vector<Uint64Pair> getChunkToHostMapping(
-      const std::vector<uint64_t>& chunkCountsPrefixSum,
-      const std::vector<Uint64Pair>& chunkToNode);
+std::vector<Uint64Pair>
+getChunkToHostMapping(const std::vector<uint64_t>& chunkCountsPrefixSum,
+                      const std::vector<Uint64Pair>& chunkToNode);
 
 /**
  * Given a chunk edge count prefix sum and the chunk to node mapping, assign
- * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even 
+ * chunks (i.e. nodes) to hosts in an attempt to keep hosts with an about even
  * number of edges and return the node mapping. LINEAR SEARCH VERSION.
  *
  * @param chunkCountsPrefixSum prefix sum of edges in chunks
@@ -416,14 +408,13 @@ std::vector<Uint64Pair> getChunkToHostMapping(
  * number of edges
  */
 // TODO this crashes for some reason
-std::vector<Uint64Pair> getChunkToHostMappingLinear(
-      const std::vector<uint64_t>& chunkCountsPrefixSum,
-      const std::vector<Uint64Pair>& chunkToNode);
-
+std::vector<Uint64Pair>
+getChunkToHostMappingLinear(const std::vector<uint64_t>& chunkCountsPrefixSum,
+                            const std::vector<Uint64Pair>& chunkToNode);
 
 /**
  * Attempts to evenly assign nodes to hosts such that each host roughly gets
- * an even number of edges. 
+ * an even number of edges.
  *
  * @tparam EdgeDataTy type of edge data to read
  * @param localEdges in-memory buffer of edges this host has loaded
@@ -432,13 +423,12 @@ std::vector<Uint64Pair> getChunkToHostMappingLinear(
  * @returns a mapping of host to nodes where each host gets an attempted
  * roughly even amount of edges
  */
-template<typename EdgeDataTy>
-std::vector<Uint64Pair> getEvenNodeToHostMapping(
-    const std::vector<uint32_t>& localEdges, uint64_t totalNodeCount, 
-    uint64_t totalEdgeCount
-) {
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  uint64_t hostID = net.ID;
+template <typename EdgeDataTy>
+std::vector<Uint64Pair>
+getEvenNodeToHostMapping(const std::vector<uint32_t>& localEdges,
+                         uint64_t totalNodeCount, uint64_t totalEdgeCount) {
+  auto& net              = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
   uint64_t numNodeChunks = totalEdgeCount / totalNumHosts;
@@ -455,10 +445,8 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
   }
 
   for (unsigned i = 0; i < numNodeChunks; i++) {
-    chunkToNode.emplace_back(
-      galois::block_range((uint64_t)0, (uint64_t)totalNodeCount, i, 
-                          numNodeChunks)
-    );
+    chunkToNode.emplace_back(galois::block_range(
+        (uint64_t)0, (uint64_t)totalNodeCount, i, numNodeChunks));
   }
 
   printf("[%lu] Determining edge to chunk counts\n", hostID);
@@ -471,8 +459,8 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
   uniqueChunkBitset.resize(numNodeChunks);
   findUniqueChunks(uniqueNodeBitset, chunkToNode, uniqueChunkBitset);
 
-  std::vector<uint64_t> chunkCounts = 
-     getChunkEdgeCounts<EdgeDataTy>(uniqueChunkBitset, localEdges, chunkToNode);
+  std::vector<uint64_t> chunkCounts = getChunkEdgeCounts<EdgeDataTy>(
+      uniqueChunkBitset, localEdges, chunkToNode);
   printf("[%lu] Edge to chunk counts determined\n", hostID);
 
   // prefix sum on the chunks (reuse array to save memory)
@@ -484,7 +472,7 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
   // access (without this access to chunkToNode[chunkSize] is out of bounds)
   chunkToNode.emplace_back(Uint64Pair(totalNodeCount, totalNodeCount));
 
-  std::vector<Uint64Pair> finalMapping = 
+  std::vector<Uint64Pair> finalMapping =
       getChunkToHostMapping(chunkCounts, chunkToNode);
 
   return finalMapping;
@@ -495,16 +483,16 @@ std::vector<Uint64Pair> getEvenNodeToHostMapping(
  * that each hosts gets roughly an even amount of edges to read.
  *
  * @param inputGr file name of the input Galois binary graph
- * @returns 2 pairs: 1 pair specifies what nodes this host is responsible 
+ * @returns 2 pairs: 1 pair specifies what nodes this host is responsible
  * for reading, the other pair specifies what edges this host is responsible
  * for reading
  */
 DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
 
 /**
- * Load a Galois binary graph into an BufferedGraph and load assigned nodes/edges
- * into memory such that srcs become dests and dests become srcs (i.e.
- * transpose graph).
+ * Load a Galois binary graph into an BufferedGraph and load assigned
+ * nodes/edges into memory such that srcs become dests and dests become srcs
+ * (i.e. transpose graph).
  *
  * @tparam EdgeDataTy type of edge data to read
  * @param inputFile path to input Galois binary graph
@@ -515,14 +503,13 @@ DoubleUint64Pair getNodesToReadFromGr(const std::string& inputGr);
  * @returns a vector with transposed edges corresponding to the nodes/edges
  * pass into the function
  */
-template<typename EdgeDataTy>
+template <typename EdgeDataTy>
 std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
-    const std::string& inputFile, Uint64Pair nodesToRead, 
-    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
-) {
+    const std::string& inputFile, Uint64Pair nodesToRead,
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges) {
   galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
   bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
-                            edgesToRead.first, edgesToRead.second, 
+                            edgesToRead.first, edgesToRead.second,
                             totalNumNodes, totalNumEdges);
 
   std::vector<uint32_t> edgeData;
@@ -535,45 +522,47 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
   }
 
   if (edgeData.size() > 0) {
-    galois::do_all(
-      galois::iterate(nodesToRead.first, nodesToRead.second),
-      [&] (uint32_t gID) {
-        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
+    galois::do_all(galois::iterate(nodesToRead.first, nodesToRead.second),
+                   [&](uint32_t gID) {
+                     uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+                     uint64_t edgeEnd   = *bufGraph.edgeEnd(gID);
 
-        // offset into which we should start writing data in edgeData
-        uint64_t edgeDataOffset; 
-        if (std::is_void<EdgeDataTy>::value) {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 2;
-        } else {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
-        }
+                     // offset into which we should start writing data in
+                     // edgeData
+                     uint64_t edgeDataOffset;
+                     if (std::is_void<EdgeDataTy>::value) {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 2;
+                     } else {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
+                     }
 
-        // loop through all edges
-        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeSource = bufGraph.edgeDestination(i);
-          // src is saved as dest and dest is saved as source (transpose)
-          edgeData[edgeDataOffset] = edgeSource;
-          edgeData[edgeDataOffset + 1] = gID;
+                     // loop through all edges
+                     for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+                       uint32_t edgeSource = bufGraph.edgeDestination(i);
+                       // src is saved as dest and dest is saved as source
+                       // (transpose)
+                       edgeData[edgeDataOffset]     = edgeSource;
+                       edgeData[edgeDataOffset + 1] = gID;
 
-          if (std::is_void<EdgeDataTy>::value) {
-            edgeDataOffset += 2;
-          } else {
-            edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
-            edgeDataOffset += 3;
-          }
-        }
-      },
-      galois::steal(),
-      galois::loopname("LoadTransposeEdgesBufferedGraph"));
+                       if (std::is_void<EdgeDataTy>::value) {
+                         edgeDataOffset += 2;
+                       } else {
+                         edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
+                         edgeDataOffset += 3;
+                       }
+                     }
+                   },
+                   galois::steal(),
+                   galois::loopname("LoadTransposeEdgesBufferedGraph"));
   }
-  
+
   return edgeData;
 }
 
 /**
- * Load a Galois binary graph into an BufferedGraph and load assigned nodes/edges
- * into memory such that each edge is loaded twice (extra in reverse direction).
+ * Load a Galois binary graph into an BufferedGraph and load assigned
+ * nodes/edges into memory such that each edge is loaded twice (extra in reverse
+ * direction).
  *
  * @tparam EdgeDataTy type of edge data to read
  * @param inputFile path to input Galois binary graph
@@ -584,15 +573,14 @@ std::vector<uint32_t> loadTransposedEdgesFromBufferedGraph(
  * @returns a vector with edges corresponding to the nodes/edges
  * passed into the function; 1 edge in original becomes 2
  */
-template<typename EdgeDataTy>
+template <typename EdgeDataTy>
 std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
-    const std::string& inputFile, Uint64Pair nodesToRead, 
-    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
-) {
+    const std::string& inputFile, Uint64Pair nodesToRead,
+    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges) {
   // TODO change this
   galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
   bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
-                            edgesToRead.first, edgesToRead.second, 
+                            edgesToRead.first, edgesToRead.second,
                             totalNumNodes, totalNumEdges);
 
   std::vector<uint32_t> edgeData;
@@ -605,47 +593,47 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
   }
 
   if (edgeData.size() > 0) {
-    galois::do_all(
-      galois::iterate(nodesToRead.first, nodesToRead.second),
-      [&] (uint32_t gID) {
-        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
+    galois::do_all(galois::iterate(nodesToRead.first, nodesToRead.second),
+                   [&](uint32_t gID) {
+                     uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+                     uint64_t edgeEnd   = *bufGraph.edgeEnd(gID);
 
-        // offset into which we should start writing data in edgeData
-        uint64_t edgeDataOffset; 
-        if (std::is_void<EdgeDataTy>::value) {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 4;
-        } else {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 6;
-        }
+                     // offset into which we should start writing data in
+                     // edgeData
+                     uint64_t edgeDataOffset;
+                     if (std::is_void<EdgeDataTy>::value) {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 4;
+                     } else {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 6;
+                     }
 
-        // loop through all edges, create 2 edges for every edge
-        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeDest = bufGraph.edgeDestination(i);
-          edgeData[edgeDataOffset] = gID;
-          edgeData[edgeDataOffset + 1] = edgeDest;
+                     // loop through all edges, create 2 edges for every edge
+                     for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+                       uint32_t edgeDest        = bufGraph.edgeDestination(i);
+                       edgeData[edgeDataOffset] = gID;
+                       edgeData[edgeDataOffset + 1] = edgeDest;
 
-          if (std::is_void<EdgeDataTy>::value) {
-            edgeData[edgeDataOffset + 2] = edgeDest;
-            edgeData[edgeDataOffset + 3] = gID;
-            edgeDataOffset += 4;
-          } else {
-            uint32_t edgeWeight = bufGraph.edgeData(i);
+                       if (std::is_void<EdgeDataTy>::value) {
+                         edgeData[edgeDataOffset + 2] = edgeDest;
+                         edgeData[edgeDataOffset + 3] = gID;
+                         edgeDataOffset += 4;
+                       } else {
+                         uint32_t edgeWeight = bufGraph.edgeData(i);
 
-            edgeData[edgeDataOffset + 2] = edgeWeight;
+                         edgeData[edgeDataOffset + 2] = edgeWeight;
 
-            edgeData[edgeDataOffset + 3] = edgeDest;
-            edgeData[edgeDataOffset + 4] = gID;
-            edgeData[edgeDataOffset + 5] = edgeWeight;
+                         edgeData[edgeDataOffset + 3] = edgeDest;
+                         edgeData[edgeDataOffset + 4] = gID;
+                         edgeData[edgeDataOffset + 5] = edgeWeight;
 
-            edgeDataOffset += 6;
-          }
-        }
-      },
-      galois::steal(),
-      galois::loopname("LoadSymmetricEdgesBufferedGraph"));
+                         edgeDataOffset += 6;
+                       }
+                     }
+                   },
+                   galois::steal(),
+                   galois::loopname("LoadSymmetricEdgesBufferedGraph"));
   }
-  
+
   return edgeData;
 }
 
@@ -661,10 +649,10 @@ std::vector<uint32_t> loadSymmetricEdgesFromBufferedGraph(
  * @returns a vector with edges corresponding to the nodes/edges
  * passed into the function; multi edges and self loops removed
  */
-std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
-    const std::string& inputFile, Uint64Pair nodesToRead, 
-    Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges
-);
+std::vector<uint32_t>
+loadCleanEdgesFromBufferedGraph(const std::string& inputFile,
+                                Uint64Pair nodesToRead, Uint64Pair edgesToRead,
+                                uint64_t totalNumNodes, uint64_t totalNumEdges);
 
 /**
  * Loads the node to new node mapping, then reads the edges that this host
@@ -688,14 +676,14 @@ std::vector<uint32_t> loadCleanEdgesFromBufferedGraph(
  * @returns A vector of transposed edges (with or without edge data
  * depending on edge data type)
  */
-template<typename EdgeDataTy>
+template <typename EdgeDataTy>
 std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
-    const std::string& inputFile, Uint64Pair nodesToRead, 
+    const std::string& inputFile, Uint64Pair nodesToRead,
     Uint64Pair edgesToRead, uint64_t totalNumNodes, uint64_t totalNumEdges,
     const std::string& mappedBinary) {
   galois::graphs::BufferedGraph<EdgeDataTy> bufGraph;
   bufGraph.loadPartialGraph(inputFile, nodesToRead.first, nodesToRead.second,
-                            edgesToRead.first, edgesToRead.second, 
+                            edgesToRead.first, edgesToRead.second,
                             totalNumNodes, totalNumEdges);
   std::vector<uint32_t> edgeData;
   // void = 2 elements per edge; non-void = 3 elements per edge
@@ -705,46 +693,44 @@ std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
     edgeData.resize((edgesToRead.second - edgesToRead.first) * 3);
   }
 
-  std::vector<uint32_t> node2NewNode = 
-      readRandomNodeMapping(mappedBinary, nodesToRead.first, 
-                            nodesToRead.second - nodesToRead.first);
+  std::vector<uint32_t> node2NewNode = readRandomNodeMapping(
+      mappedBinary, nodesToRead.first, nodesToRead.second - nodesToRead.first);
 
   if (edgeData.size() > 0) {
-    galois::do_all(
-      galois::iterate(nodesToRead.first, nodesToRead.second),
-      [&] (uint32_t gID) {
-        uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
-        uint64_t edgeEnd = *bufGraph.edgeEnd(gID);
+    galois::do_all(galois::iterate(nodesToRead.first, nodesToRead.second),
+                   [&](uint32_t gID) {
+                     uint64_t edgeBegin = *bufGraph.edgeBegin(gID);
+                     uint64_t edgeEnd   = *bufGraph.edgeEnd(gID);
 
-        // offset into which we should start writing data in edgeData
-        uint64_t edgeDataOffset; 
-        if (std::is_void<EdgeDataTy>::value) {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 2;
-        } else {
-          edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
-        }
+                     // offset into which we should start writing data in
+                     // edgeData
+                     uint64_t edgeDataOffset;
+                     if (std::is_void<EdgeDataTy>::value) {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 2;
+                     } else {
+                       edgeDataOffset = (edgeBegin - edgesToRead.first) * 3;
+                     }
 
-        uint32_t lID = gID - nodesToRead.first;
-        uint32_t mappedSource = node2NewNode[lID];
+                     uint32_t lID          = gID - nodesToRead.first;
+                     uint32_t mappedSource = node2NewNode[lID];
 
-        // loop through all edges
-        for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
-          uint32_t edgeSource = bufGraph.edgeDestination(i);
-          // src is saved as dest and dest is saved as source (transpose)
-          edgeData[edgeDataOffset] = edgeSource;
-          edgeData[edgeDataOffset + 1] = mappedSource;
+                     // loop through all edges
+                     for (uint64_t i = edgeBegin; i < edgeEnd; i++) {
+                       uint32_t edgeSource = bufGraph.edgeDestination(i);
+                       // src is saved as dest and dest is saved as source
+                       // (transpose)
+                       edgeData[edgeDataOffset]     = edgeSource;
+                       edgeData[edgeDataOffset + 1] = mappedSource;
 
-          if (std::is_void<EdgeDataTy>::value) {
-            edgeDataOffset += 2;
-          } else {
-            edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
-            edgeDataOffset += 3;
-          }
-        }
-      },
-      galois::steal(),
-      galois::loopname("RemapDestinations")
-    );
+                       if (std::is_void<EdgeDataTy>::value) {
+                         edgeDataOffset += 2;
+                       } else {
+                         edgeData[edgeDataOffset + 2] = bufGraph.edgeData(i);
+                         edgeDataOffset += 3;
+                       }
+                     }
+                   },
+                   galois::steal(), galois::loopname("RemapDestinations"));
   }
 
   return edgeData;
@@ -758,13 +744,11 @@ std::vector<uint32_t> loadMappedSourceEdgesFromBufferedGraph(
  * @param hostToNodes mapping of a host to the nodes it is assigned
  * @param localEdges in-memory buffer of edges this host has loaded
  */
-template<typename EdgeDataTy>
-void sendEdgeCounts(
-    const std::vector<Uint64Pair>& hostToNodes,
-    const std::vector<uint32_t>& localEdges
-) {
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  uint64_t hostID = net.ID;
+template <typename EdgeDataTy>
+void sendEdgeCounts(const std::vector<Uint64Pair>& hostToNodes,
+                    const std::vector<uint32_t>& localEdges) {
+  auto& net              = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
   printf("[%lu] Determinining edge counts\n", hostID);
@@ -773,30 +757,30 @@ void sendEdgeCounts(
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src;
-      if (std::is_void<EdgeDataTy>::value) {
-        src = localEdges[edgeIndex * 2];
-      } else {
-        src = localEdges[edgeIndex * 3];
-      }
+  galois::do_all(galois::iterate((uint64_t)0, localNumEdges),
+                 [&](uint64_t edgeIndex) {
+                   uint32_t src;
+                   if (std::is_void<EdgeDataTy>::value) {
+                     src = localEdges[edgeIndex * 2];
+                   } else {
+                     src = localEdges[edgeIndex * 3];
+                   }
 
-      uint32_t edgeOwner = findOwner(src, hostToNodes);
-      numEdgesPerHost[edgeOwner] += 1;
-    },
-    galois::loopname("EdgeInspection"));
+                   uint32_t edgeOwner = findOwner(src, hostToNodes);
+                   numEdgesPerHost[edgeOwner] += 1;
+                 },
+                 galois::loopname("EdgeInspection"));
 
   printf("[%lu] Sending edge counts\n", hostID);
 
   for (unsigned h = 0; h < totalNumHosts; h++) {
-    if (h == hostID) continue;
+    if (h == hostID)
+      continue;
     galois::runtime::SendBuffer b;
     galois::runtime::gSerialize(b, numEdgesPerHost[h].reduce());
     net.sendTagged(h, galois::runtime::evilPhase, b);
   }
-}; 
+};
 
 /**
  * Receive the messages from other hosts that tell this host how many edges
@@ -823,128 +807,124 @@ uint64_t receiveEdgeCounts();
 // TODO make implementation smaller/cleaner i.e. refactor
 // TODO merge with the non void version below because the code duplication
 // here is ugly and messy
-template<typename EdgeDataTy,
-     typename std::enable_if<std::is_void<EdgeDataTy>::value>::type* = nullptr>
-void sendAssignedEdges(
-    const std::vector<Uint64Pair>& hostToNodes,
-    const std::vector<uint32_t>& localEdges,
-    std::vector<std::vector<uint32_t>>& localSrcToDest,
-    std::vector<std::vector<uint32_t>>& localSrcToData,
-    std::vector<std::mutex>& nodeLocks)
-{
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  uint64_t hostID = net.ID;
+template <
+    typename EdgeDataTy,
+    typename std::enable_if<std::is_void<EdgeDataTy>::value>::type* = nullptr>
+void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
+                       const std::vector<uint32_t>& localEdges,
+                       std::vector<std::vector<uint32_t>>& localSrcToDest,
+                       std::vector<std::vector<uint32_t>>& localSrcToData,
+                       std::vector<std::mutex>& nodeLocks) {
+  auto& net              = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
   printf("[%lu] Going to send assigned edges\n", hostID);
 
   using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
-  galois::substrate::PerThreadStorage<EdgeVectorTy> 
-      dstVectors(totalNumHosts);
-  
+  galois::substrate::PerThreadStorage<EdgeVectorTy> dstVectors(totalNumHosts);
+
   using SendBufferVectorTy = std::vector<galois::runtime::SendBuffer>;
-  galois::substrate::PerThreadStorage<SendBufferVectorTy> 
-      sendBuffers(totalNumHosts);
-  galois::substrate::PerThreadStorage<std::vector<uint64_t>> 
+  galois::substrate::PerThreadStorage<SendBufferVectorTy> sendBuffers(
+      totalNumHosts);
+  galois::substrate::PerThreadStorage<std::vector<uint64_t>>
       lastSourceSentStorage(totalNumHosts);
 
   // initialize last source sent
-  galois::on_each(
-    [&] (unsigned tid, unsigned nthreads) {
-      for (unsigned h = 0; h < totalNumHosts; h++) {
-        (*(lastSourceSentStorage.getLocal()))[h] = 0;
-      }
-    });
+  galois::on_each([&](unsigned tid, unsigned nthreads) {
+    for (unsigned h = 0; h < totalNumHosts; h++) {
+      (*(lastSourceSentStorage.getLocal()))[h] = 0;
+    }
+  });
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
-  galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src = localEdges[edgeIndex * 2];
-      uint32_t edgeOwner = findOwner(src, hostToNodes);
-      uint32_t dst = localEdges[(edgeIndex * 2) + 1];
-      uint32_t localID = src - hostToNodes[edgeOwner].first;
+  galois::do_all(galois::iterate((uint64_t)0, localNumEdges),
+                 [&](uint64_t edgeIndex) {
+                   uint32_t src       = localEdges[edgeIndex * 2];
+                   uint32_t edgeOwner = findOwner(src, hostToNodes);
+                   uint32_t dst       = localEdges[(edgeIndex * 2) + 1];
+                   uint32_t localID   = src - hostToNodes[edgeOwner].first;
 
-      if (edgeOwner != hostID) {
-        // send off to correct host
-        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[edgeOwner];
-        auto& dstVector = (*(dstVectors.getLocal()))[edgeOwner];
-        auto& lastSourceSent = 
-            (*(lastSourceSentStorage.getLocal()))[edgeOwner];
+                   if (edgeOwner != hostID) {
+                     // send off to correct host
+                     auto& hostSendBuffer =
+                         (*(sendBuffers.getLocal()))[edgeOwner];
+                     auto& dstVector = (*(dstVectors.getLocal()))[edgeOwner];
+                     auto& lastSourceSent =
+                         (*(lastSourceSentStorage.getLocal()))[edgeOwner];
 
-        if (lastSourceSent == localID) {
-          dstVector.emplace_back(dst);
-        } else {
-          // serialize vector if anything exists in it + send buffer if
-          // reached some limit
-          if (dstVector.size() > 0) {
-            uint64_t globalSourceID = lastSourceSent + 
-                                      hostToNodes[edgeOwner].first;
-            galois::runtime::gSerialize(hostSendBuffer, globalSourceID, 
-                                        dstVector);
-            dstVector.clear();
-            if (hostSendBuffer.size() > 1400) {
-              net.sendTagged(edgeOwner, galois::runtime::evilPhase, 
-                             hostSendBuffer);
-              hostSendBuffer.getVec().clear();
-            }
-          }
+                     if (lastSourceSent == localID) {
+                       dstVector.emplace_back(dst);
+                     } else {
+                       // serialize vector if anything exists in it + send
+                       // buffer if reached some limit
+                       if (dstVector.size() > 0) {
+                         uint64_t globalSourceID =
+                             lastSourceSent + hostToNodes[edgeOwner].first;
+                         galois::runtime::gSerialize(hostSendBuffer,
+                                                     globalSourceID, dstVector);
+                         dstVector.clear();
+                         if (hostSendBuffer.size() > 1400) {
+                           net.sendTagged(edgeOwner, galois::runtime::evilPhase,
+                                          hostSendBuffer);
+                           hostSendBuffer.getVec().clear();
+                         }
+                       }
 
-          dstVector.emplace_back(dst);
-          lastSourceSent = localID;
-        }
-      } else {
-        // save to edge dest array
-        nodeLocks[localID].lock();
-        localSrcToDest[localID].emplace_back(dst);
-        nodeLocks[localID].unlock();
-      }
-    },
-    galois::loopname("Pass2"));
+                       dstVector.emplace_back(dst);
+                       lastSourceSent = localID;
+                     }
+                   } else {
+                     // save to edge dest array
+                     nodeLocks[localID].lock();
+                     localSrcToDest[localID].emplace_back(dst);
+                     nodeLocks[localID].unlock();
+                   }
+                 },
+                 galois::loopname("Pass2"));
 
   printf("[%lu] Buffer cleanup\n", hostID);
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
-    [&] (unsigned tid, unsigned nthreads) {
-      for (unsigned h = 0; h < totalNumHosts; h++) {
-        if (h == hostID) continue;
-        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[h];
-        auto& dstVector = (*(dstVectors.getLocal()))[h];
-        uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
+      [&](unsigned tid, unsigned nthreads) {
+        for (unsigned h = 0; h < totalNumHosts; h++) {
+          if (h == hostID)
+            continue;
+          auto& hostSendBuffer    = (*(sendBuffers.getLocal()))[h];
+          auto& dstVector         = (*(dstVectors.getLocal()))[h];
+          uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
 
-        if (dstVector.size() > 0) {
-          uint64_t globalSourceID = lastSourceSent + 
-                                    hostToNodes[h].first;
-          galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
-                                      dstVector);
-          dstVector.clear();
-        }
+          if (dstVector.size() > 0) {
+            uint64_t globalSourceID = lastSourceSent + hostToNodes[h].first;
+            galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
+                                        dstVector);
+            dstVector.clear();
+          }
 
-        if (hostSendBuffer.size() > 0) {
-          net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
-          hostSendBuffer.getVec().clear();
+          if (hostSendBuffer.size() > 0) {
+            net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
+            hostSendBuffer.getVec().clear();
+          }
         }
-      }
-    },
-    galois::loopname("Pass2Cleanup"));
+      },
+      galois::loopname("Pass2Cleanup"));
 }
 
 // Non-void variant of the above; uint32_t only
-template<typename EdgeDataTy,
-     typename std::enable_if<!std::is_void<EdgeDataTy>::value>::type* = nullptr>
-void sendAssignedEdges(
-    const std::vector<Uint64Pair>& hostToNodes,
-    const std::vector<uint32_t>& localEdges,
-    std::vector<std::vector<uint32_t>>& localSrcToDest,
-    std::vector<std::vector<uint32_t>>& localSrcToData,
-    std::vector<std::mutex>& nodeLocks)
-{
-  auto& net = galois::runtime::getSystemNetworkInterface();
-  uint64_t hostID = net.ID;
+template <
+    typename EdgeDataTy,
+    typename std::enable_if<!std::is_void<EdgeDataTy>::value>::type* = nullptr>
+void sendAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
+                       const std::vector<uint32_t>& localEdges,
+                       std::vector<std::vector<uint32_t>>& localSrcToDest,
+                       std::vector<std::vector<uint32_t>>& localSrcToData,
+                       std::vector<std::mutex>& nodeLocks) {
+  auto& net              = galois::runtime::getSystemNetworkInterface();
+  uint64_t hostID        = net.ID;
   uint64_t totalNumHosts = net.Num;
 
   printf("[%lu] Going to send assigned edges\n", hostID);
@@ -952,113 +932,110 @@ void sendAssignedEdges(
   // initialize localsrctodata
   GALOIS_ASSERT(localSrcToData.empty());
   using EdgeVectorTy = std::vector<std::vector<uint32_t>>;
-  EdgeVectorTy tmp = EdgeVectorTy(localSrcToDest.size());
+  EdgeVectorTy tmp   = EdgeVectorTy(localSrcToDest.size());
   localSrcToData.swap(tmp);
   GALOIS_ASSERT(localSrcToData.size() == localSrcToDest.size());
 
-  galois::substrate::PerThreadStorage<EdgeVectorTy> 
-      dstVectors(totalNumHosts);
+  galois::substrate::PerThreadStorage<EdgeVectorTy> dstVectors(totalNumHosts);
   // currently only uint32_t support for edge data
-  galois::substrate::PerThreadStorage<EdgeVectorTy> 
-      dataVectors(totalNumHosts);
- 
+  galois::substrate::PerThreadStorage<EdgeVectorTy> dataVectors(totalNumHosts);
+
   using SendBufferVectorTy = std::vector<galois::runtime::SendBuffer>;
-  galois::substrate::PerThreadStorage<SendBufferVectorTy> 
-      sendBuffers(totalNumHosts);
-  galois::substrate::PerThreadStorage<std::vector<uint64_t>> 
+  galois::substrate::PerThreadStorage<SendBufferVectorTy> sendBuffers(
+      totalNumHosts);
+  galois::substrate::PerThreadStorage<std::vector<uint64_t>>
       lastSourceSentStorage(totalNumHosts);
 
   // initialize last source sent
-  galois::on_each(
-    [&] (unsigned tid, unsigned nthreads) {
-      for (unsigned h = 0; h < totalNumHosts; h++) {
-        (*(lastSourceSentStorage.getLocal()))[h] = 0;
-      }
-    });
+  galois::on_each([&](unsigned tid, unsigned nthreads) {
+    for (unsigned h = 0; h < totalNumHosts; h++) {
+      (*(lastSourceSentStorage.getLocal()))[h] = 0;
+    }
+  });
 
   printf("[%lu] Passing through edges and assigning\n", hostID);
 
   uint64_t localNumEdges = getNumEdges<EdgeDataTy>(localEdges);
   // determine to which host each edge will go
   galois::do_all(
-    galois::iterate((uint64_t)0, localNumEdges),
-    [&] (uint64_t edgeIndex) {
-      uint32_t src = localEdges[edgeIndex * 3];
-      uint32_t edgeOwner = findOwner(src, hostToNodes);
-      uint32_t dst = localEdges[(edgeIndex * 3) + 1];
-      uint32_t localID = src - hostToNodes[edgeOwner].first;
-      uint32_t edgeData = localEdges[(edgeIndex * 3) + 2];
+      galois::iterate((uint64_t)0, localNumEdges),
+      [&](uint64_t edgeIndex) {
+        uint32_t src       = localEdges[edgeIndex * 3];
+        uint32_t edgeOwner = findOwner(src, hostToNodes);
+        uint32_t dst       = localEdges[(edgeIndex * 3) + 1];
+        uint32_t localID   = src - hostToNodes[edgeOwner].first;
+        uint32_t edgeData  = localEdges[(edgeIndex * 3) + 2];
 
-      if (edgeOwner != hostID) {
-        // send off to correct host
-        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[edgeOwner];
-        auto& dstVector = (*(dstVectors.getLocal()))[edgeOwner];
-        auto& dataVector = (*(dataVectors.getLocal()))[edgeOwner];
-        auto& lastSourceSent = 
-            (*(lastSourceSentStorage.getLocal()))[edgeOwner];
+        if (edgeOwner != hostID) {
+          // send off to correct host
+          auto& hostSendBuffer = (*(sendBuffers.getLocal()))[edgeOwner];
+          auto& dstVector      = (*(dstVectors.getLocal()))[edgeOwner];
+          auto& dataVector     = (*(dataVectors.getLocal()))[edgeOwner];
+          auto& lastSourceSent =
+              (*(lastSourceSentStorage.getLocal()))[edgeOwner];
 
-        if (lastSourceSent == localID) {
-          dstVector.emplace_back(dst);
-          dataVector.emplace_back(edgeData);
-        } else {
-          // serialize vector if anything exists in it + send buffer if
-          // reached some limit
-          if (dstVector.size() > 0) {
-            uint64_t globalSourceID = lastSourceSent + 
-                                      hostToNodes[edgeOwner].first;
-            galois::runtime::gSerialize(hostSendBuffer, globalSourceID, 
-                                        dstVector, dataVector);
-            dstVector.clear();
-            dataVector.clear();
-            if (hostSendBuffer.size() > 1400) {
-              net.sendTagged(edgeOwner, galois::runtime::evilPhase, 
-                             hostSendBuffer);
-              hostSendBuffer.getVec().clear();
+          if (lastSourceSent == localID) {
+            dstVector.emplace_back(dst);
+            dataVector.emplace_back(edgeData);
+          } else {
+            // serialize vector if anything exists in it + send buffer if
+            // reached some limit
+            if (dstVector.size() > 0) {
+              uint64_t globalSourceID =
+                  lastSourceSent + hostToNodes[edgeOwner].first;
+              galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
+                                          dstVector, dataVector);
+              dstVector.clear();
+              dataVector.clear();
+              if (hostSendBuffer.size() > 1400) {
+                net.sendTagged(edgeOwner, galois::runtime::evilPhase,
+                               hostSendBuffer);
+                hostSendBuffer.getVec().clear();
+              }
             }
-          }
 
-          dstVector.emplace_back(dst);
-          dataVector.emplace_back(edgeData);
-          lastSourceSent = localID;
+            dstVector.emplace_back(dst);
+            dataVector.emplace_back(edgeData);
+            lastSourceSent = localID;
+          }
+        } else {
+          // save to edge dest array
+          nodeLocks[localID].lock();
+          localSrcToDest[localID].emplace_back(dst);
+          localSrcToData[localID].emplace_back(edgeData);
+          nodeLocks[localID].unlock();
         }
-      } else {
-        // save to edge dest array
-        nodeLocks[localID].lock();
-        localSrcToDest[localID].emplace_back(dst);
-        localSrcToData[localID].emplace_back(edgeData);
-        nodeLocks[localID].unlock();
-      }
-    },
-    galois::loopname("Pass2"));
+      },
+      galois::loopname("Pass2"));
 
   printf("[%lu] Buffer cleanup\n", hostID);
 
   // cleanup: each thread serialize + send out remaining stuff
   galois::on_each(
-    [&] (unsigned tid, unsigned nthreads) {
-      for (unsigned h = 0; h < totalNumHosts; h++) {
-        if (h == hostID) continue;
-        auto& hostSendBuffer = (*(sendBuffers.getLocal()))[h];
-        auto& dstVector = (*(dstVectors.getLocal()))[h];
-        auto& dataVector = (*(dataVectors.getLocal()))[h];
-        uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
+      [&](unsigned tid, unsigned nthreads) {
+        for (unsigned h = 0; h < totalNumHosts; h++) {
+          if (h == hostID)
+            continue;
+          auto& hostSendBuffer    = (*(sendBuffers.getLocal()))[h];
+          auto& dstVector         = (*(dstVectors.getLocal()))[h];
+          auto& dataVector        = (*(dataVectors.getLocal()))[h];
+          uint64_t lastSourceSent = (*(lastSourceSentStorage.getLocal()))[h];
 
-        if (dstVector.size() > 0) {
-          uint64_t globalSourceID = lastSourceSent + 
-                                    hostToNodes[h].first;
-          galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
-                                      dstVector, dataVector);
-          dstVector.clear();
-          dataVector.clear();
-        }
+          if (dstVector.size() > 0) {
+            uint64_t globalSourceID = lastSourceSent + hostToNodes[h].first;
+            galois::runtime::gSerialize(hostSendBuffer, globalSourceID,
+                                        dstVector, dataVector);
+            dstVector.clear();
+            dataVector.clear();
+          }
 
-        if (hostSendBuffer.size() > 0) {
-          net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
-          hostSendBuffer.getVec().clear();
+          if (hostSendBuffer.size() > 0) {
+            net.sendTagged(h, galois::runtime::evilPhase, hostSendBuffer);
+            hostSendBuffer.getVec().clear();
+          }
         }
-      }
-    },
-    galois::loopname("Pass2Cleanup"));
+      },
+      galois::loopname("Pass2Cleanup"));
 }
 
 /**
@@ -1077,10 +1054,10 @@ void sendAssignedEdges(
  * are not thread safe
  */
 void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
-    const std::vector<Uint64Pair>& hostToNodes,
-    std::vector<std::vector<uint32_t>>& localSrcToDest,
-    std::vector<std::vector<uint32_t>>& localSrcToData,
-    std::vector<std::mutex>& nodeLocks);
+                          const std::vector<Uint64Pair>& hostToNodes,
+                          std::vector<std::vector<uint32_t>>& localSrcToDest,
+                          std::vector<std::vector<uint32_t>>& localSrcToData,
+                          std::vector<std::mutex>& nodeLocks);
 
 /**
  * Send/receive other hosts number of assigned edges.
@@ -1090,7 +1067,6 @@ void receiveAssignedEdges(std::atomic<uint64_t>& edgesToReceive,
  */
 std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
 
-
 /**
  * Given a vector of vectors, "flatten" it by merging them into 1 vector
  * in the order they appear the in the vector.
@@ -1099,7 +1075,7 @@ std::vector<uint64_t> getEdgesPerHost(uint64_t localAssignedEdges);
  * ALL DATA IN THE VECTOR.
  * @returns a flattened vector from vectorOfVectors
  */
-std::vector<uint32_t> 
+std::vector<uint32_t>
 flattenVectors(std::vector<std::vector<uint32_t>>& vectorOfVectors);
 
 /**
@@ -1124,8 +1100,8 @@ void writeGrHeader(MPI_File& gr, uint64_t version, uint64_t sizeOfEdge,
  * in graph tells you where to start looking for edges of some node, i.e.
  * it's a prefix sum)
  */
-void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite, 
-                        uint64_t nodeIndexOffset, 
+void writeNodeIndexData(MPI_File& gr, uint64_t nodesToWrite,
+                        uint64_t nodeIndexOffset,
                         const std::vector<uint64_t>& edgePrefixSum);
 
 /**
@@ -1176,7 +1152,7 @@ void writeEdgeDataData(MPI_File& gr, uint64_t edgeDataOffset,
  * the data of edges owned by local node i
  */
 void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
-               uint64_t totalNumEdges, uint64_t localNumNodes, 
+               uint64_t totalNumEdges, uint64_t localNumNodes,
                uint64_t localNodeBegin, uint64_t globalEdgeOffset,
                std::vector<std::vector<uint32_t>>& localSrcToDest,
                std::vector<std::vector<uint32_t>>& localSrcToData);
@@ -1190,7 +1166,7 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
  * @param upper upper bound of number to generate, inclusive
  * @returns Vector of random uint32_t numbers
  */
-std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed, 
+std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed,
                                             uint64_t lower, uint64_t upper);
 
 /**
@@ -1202,8 +1178,8 @@ std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed,
  * @param localEdgeBegin the edge to get the offset to
  * @returns offset into location of edge data of localEdgeBegin
  */
-uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes, 
-                                  uint64_t totalNumEdges, 
+uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
+                                  uint64_t totalNumEdges,
                                   uint64_t localEdgeBegin);
 
 /**
@@ -1214,7 +1190,6 @@ uint64_t getOffsetToLocalEdgeData(uint64_t totalNumNodes,
  * @returns pair specifying the range that this host is responsible for
  */
 Uint64Pair getLocalAssignment(uint64_t numToSplit);
-
 
 /**
  * Given a host to node assignment, send the edges we have to the appropriate
@@ -1227,14 +1202,13 @@ Uint64Pair getLocalAssignment(uint64_t numToSplit);
  * index i has destination ids for local node i and another vector of vectors
  * similar to the former except with edge weights (if EdgeTy is non-void)
  */
-template<typename EdgeTy>
-PairVoVUint32 sendAndReceiveAssignedEdges(
-    const std::vector<Uint64Pair>& hostToNodes, 
-    std::vector<uint32_t>& localEdges
-) {
+template <typename EdgeTy>
+PairVoVUint32
+sendAndReceiveAssignedEdges(const std::vector<Uint64Pair>& hostToNodes,
+                            std::vector<uint32_t>& localEdges) {
   uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
-  uint64_t localNumNodes = hostToNodes[hostID].second - 
-                           hostToNodes[hostID].first;
+  uint64_t localNumNodes =
+      hostToNodes[hostID].second - hostToNodes[hostID].first;
 
   sendEdgeCounts<EdgeTy>(hostToNodes, localEdges);
   std::atomic<uint64_t> edgesToReceive;
@@ -1247,18 +1221,17 @@ PairVoVUint32 sendAndReceiveAssignedEdges(
   VoVUint32 localSrcToData;
   std::vector<std::mutex> nodeLocks(localNumNodes);
 
-  sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest, 
+  sendAssignedEdges<EdgeTy>(hostToNodes, localEdges, localSrcToDest,
                             localSrcToData, nodeLocks);
   freeVector(localEdges);
-  receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest, 
+  receiveAssignedEdges(edgesToReceive, hostToNodes, localSrcToDest,
                        localSrcToData, nodeLocks);
   return PairVoVUint32(localSrcToDest, localSrcToData);
 }
 
-
 /**
- * Given a set of disjoint edges, assign/send edges to hosts. Then, each host 
- * writes the edges to the specified output file in the Galois binary graph 
+ * Given a set of disjoint edges, assign/send edges to hosts. Then, each host
+ * writes the edges to the specified output file in the Galois binary graph
  * format.
  *
  * @param localEdges Array of edges this host has
@@ -1266,14 +1239,14 @@ PairVoVUint32 sendAndReceiveAssignedEdges(
  * @param totalNumEdges total number of edges in entire graph
  * @param outputFile file to write new graph to
  */
-template<typename EdgeTy>
-void assignAndWriteEdges(std::vector<uint32_t>& localEdges, 
+template <typename EdgeTy>
+void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
                          uint64_t totalNumNodes, uint64_t totalNumEdges,
                          const std::string& outputFile) {
   uint32_t hostID = galois::runtime::getSystemNetworkInterface().ID;
 
-  std::vector<Uint64Pair> hostToNodes = 
-    getEvenNodeToHostMapping<EdgeTy>(localEdges, totalNumNodes, totalNumEdges);
+  std::vector<Uint64Pair> hostToNodes = getEvenNodeToHostMapping<EdgeTy>(
+      localEdges, totalNumNodes, totalNumEdges);
 
   PairVoVUint32 receivedEdgeInfo =
       sendAndReceiveAssignedEdges<EdgeTy>(hostToNodes, localEdges);
@@ -1281,7 +1254,7 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
   VoVUint32 localSrcToData = receivedEdgeInfo.second;
 
   uint64_t localNodeBegin = hostToNodes[hostID].first;
-  uint64_t localNumNodes = hostToNodes[hostID].second - localNodeBegin;
+  uint64_t localNumNodes  = hostToNodes[hostID].second - localNodeBegin;
   freeVector(hostToNodes);
 
   uint64_t totalAssignedEdges = 0;
@@ -1293,8 +1266,8 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
 
   // calculate global edge offset using edge counts from other hosts
   std::vector<uint64_t> edgesPerHost = getEdgesPerHost(totalAssignedEdges);
-  uint64_t globalEdgeOffset = 0;
-  uint64_t totalEdgeCount = 0;
+  uint64_t globalEdgeOffset          = 0;
+  uint64_t totalEdgeCount            = 0;
   for (unsigned h = 0; h < hostID; h++) {
     globalEdgeOffset += edgesPerHost[h];
     totalEdgeCount += edgesPerHost[h];
@@ -1309,7 +1282,7 @@ void assignAndWriteEdges(std::vector<uint32_t>& localEdges,
   GALOIS_ASSERT(totalNumEdges == totalEdgeCount);
   freeVector(edgesPerHost);
 
-  writeToGr(outputFile, totalNumNodes, totalEdgeCount, localNumNodes, 
+  writeToGr(outputFile, totalNumNodes, totalEdgeCount, localNumNodes,
             localNodeBegin, globalEdgeOffset, localSrcToDest, localSrcToData);
 }
 #endif

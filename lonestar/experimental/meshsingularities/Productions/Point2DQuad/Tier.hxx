@@ -16,42 +16,35 @@
 using namespace D2;
 namespace D2Quad {
 
-class Tier : public EquationSystem
-{
+class Tier : public EquationSystem {
 
 private:
-	Element** elements;
+  Element** elements;
 
-	int start_nr_adj;
-	int tier_size;
-	static const int tier_matrix_size = 72;
+  int start_nr_adj;
+  int tier_size;
+  static const int tier_matrix_size = 72;
 
 public:
-	Tier(Element** elements, IDoubleArgFunction* f, double** global_matrix, double* global_rhs, int tier_size) :
-		EquationSystem(tier_matrix_size), elements(elements), tier_size(tier_size)
+  Tier(Element** elements, IDoubleArgFunction* f, double** global_matrix,
+       double* global_rhs, int tier_size)
+      : EquationSystem(tier_matrix_size), elements(elements),
+        tier_size(tier_size)
 
-	{
-		start_nr_adj = elements[0]->get_bot_left_vertex_nr();
-		for(int i = 0; i<tier_size; i++)
-		{
-			elements[i]->fillMatrices(matrix, global_matrix, rhs, global_rhs, f, start_nr_adj);
-		}
+  {
+    start_nr_adj = elements[0]->get_bot_left_vertex_nr();
+    for (int i = 0; i < tier_size; i++) {
+      elements[i]->fillMatrices(matrix, global_matrix, rhs, global_rhs, f,
+                                start_nr_adj);
+    }
+  }
 
-	}
+  virtual ~Tier() { delete[] elements; }
 
-	virtual ~Tier()
-	{
-		delete[] elements;
-	}
+  double** get_tier_matrix() { return matrix; }
 
-	double** get_tier_matrix(){
-		return matrix;
-	}
-
-	double* get_tier_rhs(){
-		return rhs;
-	}
+  double* get_tier_rhs() { return rhs; }
 };
-}
- /* namespace D2Quad */
+} // namespace D2Quad
+  /* namespace D2Quad */
 #endif /* TIER_2D_QUAD_HXX_ */

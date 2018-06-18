@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,75 +28,61 @@ namespace galois {
 /**
  * Wrapper around a vector that is meant to be serializable. As such, the
  * vector needs to have a fixed size, and it cannot change in size unless
- * resize is explicitly called. 
+ * resize is explicitly called.
  *
  * @tparam T type that the wrapped vector will have elements of
  */
-template<typename T>
+template <typename T>
 class SerializableVector {
- public:
-  using VecType = std::vector<T>;
-  using iterator = typename VecType::iterator;
+public:
+  using VecType        = std::vector<T>;
+  using iterator       = typename VecType::iterator;
   using const_iterator = typename VecType::const_iterator;
 
- private:
+private:
   VecType wrappedVector;
   size_t vectorSize;
 
- public:
+public:
   /**
    * Initialize to empty vector.
    */
-  SerializableVector() : vectorSize(0) { }
+  SerializableVector() : vectorSize(0) {}
 
   /**
    * @returns iterator to beginning of vector
    */
-  iterator begin() {
-    return wrappedVector.begin();
-  }
+  iterator begin() { return wrappedVector.begin(); }
 
   /**
    * @returns constant iterator to beginning of vector
    */
-  const_iterator begin() const {
-    return wrappedVector.begin();
-  }
+  const_iterator begin() const { return wrappedVector.begin(); }
 
   /**
    * @returns constant iterator to beginning of vector
    */
-  const_iterator cbegin() const {
-    return wrappedVector.cbegin();
-  }
+  const_iterator cbegin() const { return wrappedVector.cbegin(); }
 
   /**
    * @returns iterator to end of vector
    */
-  iterator end() {
-    return wrappedVector.end();
-  }
- 
-  /**
-   * @returns constant iterator to end of vector
-   */
-  const_iterator end() const {
-    return wrappedVector.end();
-  }
+  iterator end() { return wrappedVector.end(); }
 
   /**
    * @returns constant iterator to end of vector
    */
-  const_iterator cend() const {
-    return wrappedVector.cend();
-  }
+  const_iterator end() const { return wrappedVector.end(); }
+
+  /**
+   * @returns constant iterator to end of vector
+   */
+  const_iterator cend() const { return wrappedVector.cend(); }
 
   /**
    * @returns Current size of the vector
    */
-  size_t size() const {
-    return vectorSize;
-  }
+  size_t size() const { return vectorSize; }
 
   /**
    * Resizes wrapped vector
@@ -129,36 +115,31 @@ class SerializableVector {
   /**
    * @returns reference to wrapped vector
    */
-  VecType& getVector() {
-    return wrappedVector;
-  }
+  VecType& getVector() { return wrappedVector; }
 
   /**
    * @returns constant reference to wrapped vector
    */
-  const VecType& getVector() const {
-    return wrappedVector;
-  }
+  const VecType& getVector() const { return wrappedVector; }
 
   // only make copyable if the inner type is copyable
-  //using tt_is_copyable = 
-  //  typename std::enable_if<galois::runtime::is_memory_copyable<T>::value, 
+  // using tt_is_copyable =
+  //  typename std::enable_if<galois::runtime::is_memory_copyable<T>::value,
   //                                                              int>::type;
 };
 
-} // end galois namespace
-
+} // namespace galois
 
 // below goes in Serialize.h if you wanted to use the above
 ///**
-// * Specialization for SerializableVector. Serializes the size (so other end 
+// * Specialization for SerializableVector. Serializes the size (so other end
 // * knows how much to deserialize) and the data itself.
 // *
 // * @param buf Buffer to serialize data into
 // * @param data Vector that needs to be serialized
 // */
-//template<typename T>
-//inline void gSerializeObj(SerializeBuffer& buf, 
+// template<typename T>
+// inline void gSerializeObj(SerializeBuffer& buf,
 //                          const galois::SerializableVector<T>& data) {
 //  gSerializeObj(buf, data.size());
 //  gSerializeObj(buf, data.getVector());
@@ -168,8 +149,8 @@ class SerializableVector {
 // * Specialization for SerializableVector. Gets the size of the vector, then
 // * loads that many elements from the buffer into the vector.
 // */
-//template <typename T>
-//inline void gDeserializeObj(DeSerializeBuffer& buf, 
+// template <typename T>
+// inline void gDeserializeObj(DeSerializeBuffer& buf,
 //                            galois::SerializableVector<T>& data) {
 //  size_t size = 0;
 //  gDeserializeObj(buf, size);

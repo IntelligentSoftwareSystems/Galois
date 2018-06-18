@@ -5,241 +5,146 @@
 #include "../MatrixGeneration/IFunction.hxx"
 #include <stdio.h>
 
-namespace D2
-{
+namespace D2 {
 
 double get_chi1(double var);
 double get_chi2(double var);
 double get_chi3(double var);
 
+class IDoubleArgFunction : public IFunction {
 
-class IDoubleArgFunction : public IFunction
-{
-	
-	public:
-		virtual double ComputeValue(double x, double y) = 0; 
+public:
+  virtual double ComputeValue(double x, double y) = 0;
 
-	IDoubleArgFunction(double* coordinates, bool* neighbours) : IFunction(coordinates,neighbours)
-	{
-
-	}
-	IDoubleArgFunction()
-	{
-
-	}
-	virtual ~IDoubleArgFunction()
-	{
-
-	}
+  IDoubleArgFunction(double* coordinates, bool* neighbours)
+      : IFunction(coordinates, neighbours) {}
+  IDoubleArgFunction() {}
+  virtual ~IDoubleArgFunction() {}
 };
 
-class DoubleArgFunctionWrapper : public IDoubleArgFunction
-{
-	private:
-		double (*f)(int,...);
-	public:
-		virtual double ComputeValue(double x, double y)
-		{
-			return (*f)(2,x,y);
-		}
+class DoubleArgFunctionWrapper : public IDoubleArgFunction {
+private:
+  double (*f)(int, ...);
 
-		DoubleArgFunctionWrapper(double (*f)(int,...)) : f(f)
-		{
+public:
+  virtual double ComputeValue(double x, double y) { return (*f)(2, x, y); }
 
-		}
+  DoubleArgFunctionWrapper(double (*f)(int, ...)) : f(f) {}
 
-		virtual ~DoubleArgFunctionWrapper()
-		{
-
-		}
-
+  virtual ~DoubleArgFunctionWrapper() {}
 };
 
+class ShapeFunction : public IDoubleArgFunction {
+protected:
+  double xl;
+  double yl;
+  double xr;
+  double yr;
+  EPosition position;
 
-class ShapeFunction : public IDoubleArgFunction
-{
-	protected :
-		double xl; 
-		double yl; 
-		double xr; 
-		double yr;
-		EPosition position; 
-		
-	
-		double getXValueOnElement(double x)
-		{
-			
-			return (x-xl)/(xr-xl); 
-		}
-		
-		double getYValueOnElement(double y)
-		{
-			return (y-yl)/(yr-yl); 
-		}
-		
-	
-	public:
-		ShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			:  IDoubleArgFunction(coordinates, neighbours), position(position)
-		{
-			xl = coordinates[0];
-			xr = coordinates[1];
-			yl = coordinates[2];
-			yr = coordinates[3];
-		}
-		
+  double getXValueOnElement(double x) { return (x - xl) / (xr - xl); }
 
+  double getYValueOnElement(double y) { return (y - yl) / (yr - yl); }
+
+public:
+  ShapeFunction(double* coordinates, bool* neighbours, EPosition position)
+      : IDoubleArgFunction(coordinates, neighbours), position(position) {
+    xl = coordinates[0];
+    xr = coordinates[1];
+    yl = coordinates[2];
+    yr = coordinates[3];
+  }
 };
 
+class VertexBotLeftShapeFunction : public ShapeFunction {
+public:
+  VertexBotLeftShapeFunction(double* coordinates, bool* neighbours,
+                             EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-class VertexBotLeftShapeFunction : public ShapeFunction
-{
-	public:
+  virtual double ComputeValue(double x, double y);
 
-		VertexBotLeftShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		
-		~VertexBotLeftShapeFunction()
-		{
-		}
-	
+  ~VertexBotLeftShapeFunction() {}
 };
 
-class VertexTopLeftShapeFunction : public ShapeFunction
-{
-	public:
+class VertexTopLeftShapeFunction : public ShapeFunction {
+public:
+  VertexTopLeftShapeFunction(double* coordinates, bool* neighbours,
+                             EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		VertexTopLeftShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~VertexTopLeftShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~VertexTopLeftShapeFunction() {}
 };
 
-class VertexTopRightShapeFunction : public ShapeFunction
-{
-	public:
+class VertexTopRightShapeFunction : public ShapeFunction {
+public:
+  VertexTopRightShapeFunction(double* coordinates, bool* neighbours,
+                              EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		VertexTopRightShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		virtual ~VertexTopRightShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  virtual ~VertexTopRightShapeFunction() {}
 };
 
-class VertexBotRightShapeFunction : public ShapeFunction
-{
-	public:
+class VertexBotRightShapeFunction : public ShapeFunction {
+public:
+  VertexBotRightShapeFunction(double* coordinates, bool* neighbours,
+                              EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		VertexBotRightShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~VertexBotRightShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~VertexBotRightShapeFunction() {}
 };
 
-class EdgeLeftShapeFunction : public ShapeFunction
-{
-	public:
-	
-		EdgeLeftShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-				
-		}
-			
-		virtual double ComputeValue(double x, double y);
-		~EdgeLeftShapeFunction()
-		{
-		}
+class EdgeLeftShapeFunction : public ShapeFunction {
+public:
+  EdgeLeftShapeFunction(double* coordinates, bool* neighbours,
+                        EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
+
+  virtual double ComputeValue(double x, double y);
+  ~EdgeLeftShapeFunction() {}
 };
 
-class EdgeTopShapeFunction : public ShapeFunction
-{
-	public:
+class EdgeTopShapeFunction : public ShapeFunction {
+public:
+  EdgeTopShapeFunction(double* coordinates, bool* neighbours,
+                       EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		EdgeTopShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~EdgeTopShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~EdgeTopShapeFunction() {}
 };
 
-class EdgeBotShapeFunction : public ShapeFunction
-{
-	public:
+class EdgeBotShapeFunction : public ShapeFunction {
+public:
+  EdgeBotShapeFunction(double* coordinates, bool* neighbours,
+                       EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		EdgeBotShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~EdgeBotShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~EdgeBotShapeFunction() {}
 };
 
-class EdgeRightShapeFunction : public ShapeFunction
-{	
-	public:
+class EdgeRightShapeFunction : public ShapeFunction {
+public:
+  EdgeRightShapeFunction(double* coordinates, bool* neighbours,
+                         EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		EdgeRightShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~EdgeRightShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~EdgeRightShapeFunction() {}
 };
 
-class InteriorShapeFunction : public ShapeFunction
-{
-	public:
+class InteriorShapeFunction : public ShapeFunction {
+public:
+  InteriorShapeFunction(double* coordinates, bool* neighbours,
+                        EPosition position)
+      : ShapeFunction(coordinates, neighbours, position) {}
 
-		InteriorShapeFunction(double* coordinates, bool* neighbours, EPosition position)
-			: ShapeFunction(coordinates, neighbours, position)
-		{
-			
-		}
-		
-		virtual double ComputeValue(double x, double y);
-		~InteriorShapeFunction()
-		{
-		}
+  virtual double ComputeValue(double x, double y);
+  ~InteriorShapeFunction() {}
 };
-}
+} // namespace D2
 #endif
-
-
-
-

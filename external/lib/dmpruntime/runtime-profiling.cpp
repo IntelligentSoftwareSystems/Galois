@@ -12,7 +12,6 @@
 #include "dmp-internal-wb.h"
 #endif
 
-
 #ifdef DMP_ENABLE_QUANTUM_TIMING
 bool DMPQuantumEndedWithAcquire = false;
 #endif
@@ -25,8 +24,8 @@ bool DMPQuantumEndedWithAcquire = false;
 
 typedef struct OwnershipRecord OwnershipRecord;
 struct OwnershipRecord {
-  int id;           // address hash or mutex ID
-  int nhistory;     // ownership history
+  int id;       // address hash or mutex ID
+  int nhistory; // ownership history
   int history[256];
 };
 
@@ -47,7 +46,7 @@ static OwnershipRecord* find_record(OwnershipRecord* histories, const int id) {
 
 static void update_record(OwnershipRecord* r, const int id, const int owner) {
   if (r->nhistory < 256) {
-    r->id = id;
+    r->id                     = id;
     r->history[r->nhistory++] = owner;
   }
 }
@@ -66,7 +65,8 @@ static void instrument_owner_change(int hash, int oldowner, int newowner) {
 static void instrument_resource_acquire(int id, int newowner) {
   if (DMPnumRunnableThreads >= DMP_NUM_PHYSICAL_PROCESSORS) {
     OwnershipRecord* r = find_record(resourceHistories, id);
-    if (r != NULL) update_record(r, id, newowner);
+    if (r != NULL)
+      update_record(r, id, newowner);
   }
 }
 
@@ -81,7 +81,7 @@ void DMPinstrument_resource_acquire(DMPresource* r, int oldowner) {
   r->lastRoundAcquired = DMProundNumber;
 }
 
-#endif  // DMP_ENABLE_INSTRUMENT_ACQUIRES
+#endif // DMP_ENABLE_INSTRUMENT_ACQUIRES
 
 //--------------------------------------------------------------
 // Instrumenting Quantum Timing
@@ -90,7 +90,7 @@ void DMPinstrument_resource_acquire(DMPresource* r, int oldowner) {
 #if defined(DMP_ENABLE_QUANTUM_TIMING) || defined(DMP_ENABLE_ROUND_TIMING)
 
 //#define DMP_QUANTUM_TIMING_CLOCK  CLOCK_MONOTONIC
-#define DMP_QUANTUM_TIMING_CLOCK  CLOCK_THREAD_CPUTIME_ID
+#define DMP_QUANTUM_TIMING_CLOCK CLOCK_THREAD_CPUTIME_ID
 
 static inline uint64_t timespec_to_nanoseconds(struct timespec* ts) {
   return (uint64_t)ts->tv_sec * 1000000000ull + (uint64_t)ts->tv_nsec;
@@ -154,8 +154,8 @@ static void update_quantum_timings() {
   //
 
   for (int state = 0; state <= RunSerial; ++state) {
-    uint64_t t_max = 0;
-    uint64_t t_min = 0;
+    uint64_t t_max   = 0;
+    uint64_t t_min   = 0;
     uint64_t t_total = 0;
     uint64_t threads = 0;
 
@@ -179,8 +179,8 @@ static void update_quantum_timings() {
     if (t_max != 0 && threads > 1) {
       DmpThreadInfo::Timing* timing = &DMPthreadInfos[0]->timing[state];
 
-      double total = (double)t_total / (double)threads;
-      double temp_spread = (double)(t_max - t_min) / total;
+      double total        = (double)t_total / (double)threads;
+      double temp_spread  = (double)(t_max - t_min) / total;
       double delta_spread = temp_spread - timing->spread_mean;
 
       timing->spread_mean += delta_spread / DMPtimingRoundCount;
@@ -188,7 +188,6 @@ static void update_quantum_timings() {
       timing->spread_m2 += delta_spread * (temp_spread - timing->spread_mean);
     }
   }
-
 
   //
   // Reset!
@@ -201,7 +200,7 @@ static void update_quantum_timings() {
   }
 }
 
-#endif  // DMP_ENABLE_QUANTUM_TIMING
+#endif // DMP_ENABLE_QUANTUM_TIMING
 
 #ifdef DMP_ENABLE_ROUND_TIMING
 
@@ -229,7 +228,7 @@ void DMProundTimeTransition(DmpRoundTime* from, DmpRoundTime* to) {
   to->last_tsc = now;
 }
 
-#endif  // DMP_ENABLE_ROUND_TIMING
+#endif // DMP_ENABLE_ROUND_TIMING
 
 //--------------------------------------------------------------
 // Wrapper: DMP_resetRound
@@ -244,13 +243,13 @@ void DMP_resetRound(const int oldRoundSync) {
   if (!DMPQuantumEndedWithAcquire && DMPnumRunnableThreads > 1) {
     update_quantum_timings();
   }
-  DMPMAP->timing_last_tsc = 0;
+  DMPMAP->timing_last_tsc    = 0;
   DMPQuantumEndedWithAcquire = false;
 #endif
   __DMP_resetRound__(oldRoundSync);
 }
 
-#endif  // DMP_resetRound
+#endif // DMP_resetRound
 
 //--------------------------------------------------------------
 // Wrapper: DMP_setState
@@ -292,7 +291,7 @@ void DMP_setState(DmpThreadInfo* dmp, const DmpThreadState s) {
   __DMP_setState__(dmp, s);
 }
 
-#endif  // DMP_setState
+#endif // DMP_setState
 
 //-----------------------------------------------------------------------
 // Stats printing
@@ -333,20 +332,20 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
     uint64_t total = DMPparallelModeTime.total + DMPcommitModeTime.total +
                      DMPserialModeTime.total;
     printStatf(dmp, "ParallelModePercent",
-        100.0 * ((double)DMPparallelModeTime.total / (double)total));
+               100.0 * ((double)DMPparallelModeTime.total / (double)total));
     printStatf(dmp, "CommitModePercent",
-        100.0 * ((double)DMPcommitModeTime.total / (double)total));
+               100.0 * ((double)DMPcommitModeTime.total / (double)total));
     printStatf(dmp, "SerialModePercent",
-        100.0 * ((double)DMPserialModeTime.total / (double)total));
+               100.0 * ((double)DMPserialModeTime.total / (double)total));
   }
 #endif
 
 #ifdef DMP_ENABLE_QUANTUM_TIMING
   if (dmp->threadID == 0) {
-    for (int s = 0; s < RunSerial+1; ++s) {
+    for (int s = 0; s < RunSerial + 1; ++s) {
       DmpThreadInfo::Timing* t = &dmp->timing[s];
-      const char* name = threadStateString((DmpThreadState)s);
-      double spread_variance = t->spread_m2 / (double)DMPtimingRoundCount;
+      const char* name         = threadStateString((DmpThreadState)s);
+      double spread_variance   = t->spread_m2 / (double)DMPtimingRoundCount;
       printf("%s Normalized-Spread Mean: %f\n", name, t->spread_mean);
       printf("%s Normalized-Spread StdDev: %f\n", name, sqrt(spread_variance));
     }
@@ -356,14 +355,15 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
   }
 
   printf("Thread %d NQuanta: %d\n", dmp->threadID, dmp->timing_total_quanta);
-  for (int s = 0; s < RunSerial+1; ++s) {
+  for (int s = 0; s < RunSerial + 1; ++s) {
     DmpThreadInfo::Timing* t = &dmp->timing[s];
-    const char* name = threadStateString((DmpThreadState)s);
-    double variance = t->m2 / dmp->timing_total_quanta;
+    const char* name         = threadStateString((DmpThreadState)s);
+    double variance          = t->m2 / dmp->timing_total_quanta;
     printf("Thread %d %s %%-time Max: %f\n", dmp->threadID, name, t->max);
     printf("Thread %d %s %%-time Min: %f\n", dmp->threadID, name, t->min);
     printf("Thread %d %s %%-time Mean: %f\n", dmp->threadID, name, t->mean);
-    printf("Thread %d %s %%-time StdDev: %f\n", dmp->threadID, name, sqrt(variance));
+    printf("Thread %d %s %%-time StdDev: %f\n", dmp->threadID, name,
+           sqrt(variance));
   }
 #endif
 
@@ -403,37 +403,37 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
 
 #ifdef DMP_ENABLE_INSTRUMENT_WORK
   if (dmp->threadID == 0) {
-    uint64_t work[RunSerial+1];
-    uint64_t t_work = 0;
-    uint64_t t_threads = 0;
-    uint64_t t_toserial_total = 0;
-    uint64_t t_toserial_excall = 0;
-    uint64_t t_toserial_mb = 0;
+    uint64_t work[RunSerial + 1];
+    uint64_t t_work                = 0;
+    uint64_t t_threads             = 0;
+    uint64_t t_toserial_total      = 0;
+    uint64_t t_toserial_excall     = 0;
+    uint64_t t_toserial_mb         = 0;
     uint64_t t_toserial_mbresource = 0;
     memset(work, 0, sizeof work);
 #ifdef DMP_ENABLE_BUFFERED_MODE
-    uint64_t t_wb_quanta = 0;
-    uint64_t t_wb_size = 0;
-    uint64_t t_wb_maxsize = 0;
-    uint64_t t_wb_used = 0;
-    uint64_t t_wb_maxused = 0;
-    uint64_t t_wb_maxhashchain = 0;
-    uint64_t t_wb_totalhashbuckets = 0;
+    uint64_t t_wb_quanta             = 0;
+    uint64_t t_wb_size               = 0;
+    uint64_t t_wb_maxsize            = 0;
+    uint64_t t_wb_used               = 0;
+    uint64_t t_wb_maxused            = 0;
+    uint64_t t_wb_maxhashchain       = 0;
+    uint64_t t_wb_totalhashbuckets   = 0;
     uint64_t t_wb_totalcommitslocked = 0;
-    uint64_t t_wb_synctotal = 0;         // HB_SYNC only
-    uint64_t t_wb_syncwithoutwait = 0;   // HB_SYNC only
+    uint64_t t_wb_synctotal          = 0; // HB_SYNC only
+    uint64_t t_wb_syncwithoutwait    = 0; // HB_SYNC only
 #endif
     // Summarize.
     for (int i = 0; i < DMPthreadInfosSize; ++i) {
       DmpThreadInfo* dmp = DMPthreadInfos[i];
-      for (int s = 0; s < RunSerial+1; ++s) {
+      for (int s = 0; s < RunSerial + 1; ++s) {
         work[s] += dmp->work[s];
         t_work += dmp->work[s];
       }
       t_threads++;
-      t_toserial_total  += dmp->toserial_total;
+      t_toserial_total += dmp->toserial_total;
       t_toserial_excall += dmp->toserial_excall;
-      t_toserial_mb     += dmp->toserial_mb;
+      t_toserial_mb += dmp->toserial_mb;
       t_toserial_mbresource += dmp->toserial_mbresource;
 #ifdef DMP_ENABLE_BUFFERED_MODE
       t_wb_quanta += dmp->wb_totalquanta;
@@ -441,7 +441,7 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
       t_wb_used += dmp->wb_totalused;
       t_wb_totalhashbuckets += dmp->wb_totalhashbuckets;
       t_wb_totalcommitslocked += dmp->wb_totalcommitslocked;
-      t_wb_synctotal       += dmp->wb_synctotal;
+      t_wb_synctotal += dmp->wb_synctotal;
       t_wb_syncwithoutwait += dmp->wb_syncwithoutwait;
       if (dmp->wb_maxsize > t_wb_maxsize)
         t_wb_maxsize = dmp->wb_maxsize;
@@ -452,9 +452,10 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
 #endif
     }
     // Output.
-    for (int s = 0; s < RunSerial+1; ++s) {
+    for (int s = 0; s < RunSerial + 1; ++s) {
       char stat[512];
-      snprintf(stat, sizeof stat, "TotalWork%s", threadStateString((DmpThreadState)s));
+      snprintf(stat, sizeof stat, "TotalWork%s",
+               threadStateString((DmpThreadState)s));
       if (t_work == 0) {
         printStat(dmp, stat, 0);
       } else {
@@ -463,55 +464,77 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
       }
     }
     printStatf(dmp, "TotalToSerialForExternalCall",
-        (t_toserial_total == 0)
-          ? 0 : ((double)t_toserial_excall/(double)t_toserial_total) * 100.0);
+               (t_toserial_total == 0)
+                   ? 0
+                   : ((double)t_toserial_excall / (double)t_toserial_total) *
+                         100.0);
     printStatf(dmp, "TotalToSerialForMemBarrier",
-        (t_toserial_total == 0)
-          ? 0 : ((double)t_toserial_mb/(double)t_toserial_total) * 100.0);
+               (t_toserial_total == 0)
+                   ? 0
+                   : ((double)t_toserial_mb / (double)t_toserial_total) *
+                         100.0);
     printStatf(dmp, "TotalToSerialForResource",
-        (t_toserial_total == 0)
-          ? 0 : ((double)t_toserial_mbresource/(double)t_toserial_total) * 100.0);
+               (t_toserial_total == 0) ? 0
+                                       : ((double)t_toserial_mbresource /
+                                          (double)t_toserial_total) *
+                                             100.0);
 #ifdef DMP_ENABLE_BUFFERED_MODE
     printStatf(dmp, "AvgWriteBufferCommitsLocked",
-        (t_wb_size == 0) ? 0 : ((double)t_wb_totalcommitslocked/(double)t_wb_size));
+               (t_wb_size == 0)
+                   ? 0
+                   : ((double)t_wb_totalcommitslocked / (double)t_wb_size));
     printStatf(dmp, "AvgWriteBufferEntries",
-        (t_wb_quanta == 0) ? 0 : ((double)t_wb_size/(double)t_wb_quanta));
+               (t_wb_quanta == 0) ? 0
+                                  : ((double)t_wb_size / (double)t_wb_quanta));
     printStatf(dmp, "AvgWriteBufferBytesUsed",
-        (t_wb_quanta == 0) ? 0 : ((double)t_wb_used/(double)t_wb_quanta));
+               (t_wb_quanta == 0) ? 0
+                                  : ((double)t_wb_used / (double)t_wb_quanta));
     printStat(dmp, "MaxWriteBufferEntries", t_wb_maxsize);
     printStat(dmp, "MaxWriteBufferBytesUsed", t_wb_maxused);
     printStat(dmp, "OverallWriteBufferMaxChainLength", t_wb_maxhashchain);
     printStatf(dmp, "OverallWriteBufferAvgBucketsUsed",
-        (t_wb_quanta == 0) ?
-          0 : (double)t_wb_totalhashbuckets / (double)(t_threads * t_wb_quanta));
+               (t_wb_quanta == 0) ? 0
+                                  : (double)t_wb_totalhashbuckets /
+                                        (double)(t_threads * t_wb_quanta));
     printStat(dmp, "TotalSyncs", t_wb_synctotal);
     printStat(dmp, "TotalSyncsWithoutWait", t_wb_syncwithoutwait);
 #endif
   }
   {
     uint64_t t_work = 0;
-    for (int s = 0; s < RunSerial+1; ++s)
+    for (int s = 0; s < RunSerial + 1; ++s)
       t_work += dmp->work[s];
     printStat(dmp, "SerialWork",
-      (t_work == 0) ? 0 : ((double)dmp->work[RunSerial] / (double)t_work) * 100.0);
+              (t_work == 0)
+                  ? 0
+                  : ((double)dmp->work[RunSerial] / (double)t_work) * 100.0);
   }
   printStatf(dmp, "ToSerialForExternalCall",
-      (dmp->toserial_total == 0)
-        ? 0 : ((double)dmp->toserial_excall/(double)dmp->toserial_total) * 100.0);
+             (dmp->toserial_total == 0) ? 0
+                                        : ((double)dmp->toserial_excall /
+                                           (double)dmp->toserial_total) *
+                                              100.0);
   printStatf(dmp, "ToSerialForMemBarrier",
-      (dmp->toserial_total == 0)
-        ? 0 : ((double)dmp->toserial_mb/(double)dmp->toserial_total) * 100.0);
+             (dmp->toserial_total == 0)
+                 ? 0
+                 : ((double)dmp->toserial_mb / (double)dmp->toserial_total) *
+                       100.0);
   printStatf(dmp, "ToSerialForResource",
-      (dmp->toserial_total == 0)
-        ? 0 : ((double)dmp->toserial_mbresource/(double)dmp->toserial_total) * 100.0);
+             (dmp->toserial_total == 0) ? 0
+                                        : ((double)dmp->toserial_mbresource /
+                                           (double)dmp->toserial_total) *
+                                              100.0);
 #ifdef DMP_ENABLE_BUFFERED_MODE
   printStat(dmp, "WriteBufferHashMaxChainLength", dmp->wb_maxhashchain);
   printStatf(dmp, "WriteBufferHashAvgChainLength",
-      (dmp->wb_totalhashbuckets == 0) ?
-        0 : (double)dmp->wb_totalhashchains / (double)dmp->wb_totalhashbuckets);
+             (dmp->wb_totalhashbuckets == 0)
+                 ? 0
+                 : (double)dmp->wb_totalhashchains /
+                       (double)dmp->wb_totalhashbuckets);
   printStatf(dmp, "WriteBufferHashAvgBucketsUsed",
-      (dmp->wb_totalquanta == 0) ?
-        0 : (double)dmp->wb_totalhashbuckets / (double)dmp->wb_totalquanta);
+             (dmp->wb_totalquanta == 0) ? 0
+                                        : (double)dmp->wb_totalhashbuckets /
+                                              (double)dmp->wb_totalquanta);
   printStat(dmp, "Syncs", dmp->wb_synctotal);
   printStat(dmp, "SyncsWithoutWait", dmp->wb_syncwithoutwait);
 #endif
@@ -523,11 +546,10 @@ void DMPinstrumentation_print_thread_statistics(struct DmpThreadInfo* dmp) {
     extern uint64_t DMPstmSerialQuanta;
     uint64_t total = DMPstmParallelQuanta + DMPstmSerialQuanta;
     printStatf(dmp, "ParallelModePercent",
-        100.0 * ((double)DMPstmParallelQuanta / (double)total));
-    printStatf(dmp, "CommitModePercent",
-        100.0 * 0);
+               100.0 * ((double)DMPstmParallelQuanta / (double)total));
+    printStatf(dmp, "CommitModePercent", 100.0 * 0);
     printStatf(dmp, "SerialModePercent",
-        100.0 * ((double)DMPstmSerialQuanta / (double)total));
+               100.0 * ((double)DMPstmSerialQuanta / (double)total));
   }
 #endif
 
@@ -553,84 +575,102 @@ extern atomic_uint_t DMPscheduledThread;
 
 static const char* threadStateString(const DmpThreadState state) {
   switch (state) {
-    case Sleeping: return "Sleeping";
-    case JustWokeUp: return "JustWokeUp";
+  case Sleeping:
+    return "Sleeping";
+  case JustWokeUp:
+    return "JustWokeUp";
 #ifdef DMP_ENABLE_OWNERSHIP_MODE
-    case WaitForOwnership: return "WaitForOwnership";
-    case RunOwnership: return "RunOwnership";
+  case WaitForOwnership:
+    return "WaitForOwnership";
+  case RunOwnership:
+    return "RunOwnership";
 #endif
 #ifdef DMP_ENABLE_BUFFERED_MODE
-    case WaitForBuffered: return "WaitForBuffered";
-    case RunBuffered: return "RunBuffered";
-    case WaitForCommit: return "WaitForCommit";
-    case RunCommit: return "RunCommit";
+  case WaitForBuffered:
+    return "WaitForBuffered";
+  case RunBuffered:
+    return "RunBuffered";
+  case WaitForCommit:
+    return "WaitForCommit";
+  case RunCommit:
+    return "RunCommit";
 #endif
-    case WaitForSerial: return "WaitForSerial";
-    case WaitForSerialToken: return "WaitForSerialToken";
-    case RunSerial: return "RunSerial";
-    default: return "???";
+  case WaitForSerial:
+    return "WaitForSerial";
+  case WaitForSerialToken:
+    return "WaitForSerialToken";
+  case RunSerial:
+    return "RunSerial";
+  default:
+    return "???";
   }
 }
 
 static const char* resourceTypeString(DMPresource* r) {
-  if (!r) return "nil";
+  if (!r)
+    return "nil";
   switch (DMPresource_type(r)) {
-    case DMP_RESOURCE_TYPE_MUTEX: return "mutex";
-    case DMP_RESOURCE_TYPE_RWLOCK: return "rwlock";
-    case DMP_RESOURCE_TYPE_SEM: return "sem";
-    case DMP_RESOURCE_TYPE_CONDVAR: return "condvar";
-    case DMP_RESOURCE_TYPE_BARRIER: return "barrier";
-    case DMP_RESOURCE_TYPE_ONCE: return "once";
-    default: return "???";
+  case DMP_RESOURCE_TYPE_MUTEX:
+    return "mutex";
+  case DMP_RESOURCE_TYPE_RWLOCK:
+    return "rwlock";
+  case DMP_RESOURCE_TYPE_SEM:
+    return "sem";
+  case DMP_RESOURCE_TYPE_CONDVAR:
+    return "condvar";
+  case DMP_RESOURCE_TYPE_BARRIER:
+    return "barrier";
+  case DMP_RESOURCE_TYPE_ONCE:
+    return "once";
+  default:
+    return "???";
   }
 }
 
-__attribute__((used))
-void DMPprintThreadInfo(DmpThreadInfo* dmp) {
-  printf("THREAD%2d: %p\n"
-         "          (state %s) (blockedOn %s:%p) (resourceNesting %d) (chunk %d of %d)\n"
-         "          (canceled %d) (exited %d) (joiner %d/%p) (holds %s:%p/%s:%p)\n"
-         "          (prev %d/%p) (next %d/%p)\n",
-         dmp->threadID, dmp,
-         threadStateString(dmp->state),
+__attribute__((used)) void DMPprintThreadInfo(DmpThreadInfo* dmp) {
+  printf(
+      "THREAD%2d: %p\n"
+      "          (state %s) (blockedOn %s:%p) (resourceNesting %d) (chunk %d "
+      "of %d)\n"
+      "          (canceled %d) (exited %d) (joiner %d/%p) (holds %s:%p/%s:%p)\n"
+      "          (prev %d/%p) (next %d/%p)\n",
+      dmp->threadID, dmp, threadStateString(dmp->state),
 #ifdef DMP_ENABLE_FAST_HANDOFF
-         DEBUG_RESOURCE_PTR(dmp->blockedOn),
+      DEBUG_RESOURCE_PTR(dmp->blockedOn),
 #else
-         DEBUG_RESOURCE_PTR(NULL),
+      DEBUG_RESOURCE_PTR(NULL),
 #endif
 #ifdef DMP_ENABLE_TINY_SERIAL_MODE
-         dmp->resourceNesting,
+      dmp->resourceNesting,
 #else
-         0,
+      0,
 #endif
-         dmp->schedulingChunk, DMP_SCHEDULING_CHUNK_SIZE,
-         dmp->canceled, dmp->exited,
-         DEBUG_THREAD_PTR(dmp->joiner),
+      dmp->schedulingChunk, DMP_SCHEDULING_CHUNK_SIZE, dmp->canceled,
+      dmp->exited, DEBUG_THREAD_PTR(dmp->joiner),
 #ifdef DMP_ENABLE_DATA_GROUPING
-         DEBUG_RESOURCE_PTR(dmp->innerResource),
-         DEBUG_RESOURCE_PTR(dmp->nextResource),
+      DEBUG_RESOURCE_PTR(dmp->innerResource),
+      DEBUG_RESOURCE_PTR(dmp->nextResource),
 #else
-         DEBUG_RESOURCE_PTR(NULL),
-         DEBUG_RESOURCE_PTR(NULL),
+      DEBUG_RESOURCE_PTR(NULL), DEBUG_RESOURCE_PTR(NULL),
 #endif
-         DEBUG_THREAD_PTR(dmp->prevRunnable),
-         DEBUG_THREAD_PTR(dmp->nextRunnable));
+      DEBUG_THREAD_PTR(dmp->prevRunnable), DEBUG_THREAD_PTR(dmp->nextRunnable));
 }
 
-__attribute__((used))
-void DMPprintScheduler() {
-  printf("SCHED: (round %llu) (runnable %d) (live %d)",
-         DMProundNumber, DMPnumRunnableThreads, DMPnumLiveThreads);
+__attribute__((used)) void DMPprintScheduler() {
+  printf("SCHED: (round %llu) (runnable %d) (live %d)", DMProundNumber,
+         DMPnumRunnableThreads, DMPnumLiveThreads);
 #if defined(DMP_ENABLE_MODEL_O_B_S)
-  printf(" (bufferB %d) (commitB %d) (serialB %d) (roundB %d) (serialsched %d)\n",
-         DMPbufferingBarrier, DMPcommitBarrier, DMPserialBarrier, DMProundBarrier,
-         DMPscheduledThread);
+  printf(
+      " (bufferB %d) (commitB %d) (serialB %d) (roundB %d) (serialsched %d)\n",
+      DMPbufferingBarrier, DMPcommitBarrier, DMPserialBarrier, DMProundBarrier,
+      DMPscheduledThread);
 #elif defined(DMP_ENABLE_BUFFERED_MODE)
   printf(" (commitB %d) (serialB %d) (roundB %d) (serialsched %d)\n",
-         DMPcommitBarrier, DMPserialBarrier, DMProundBarrier, DMPscheduledThread);
+         DMPcommitBarrier, DMPserialBarrier, DMProundBarrier,
+         DMPscheduledThread);
 #else
-  printf(" (serialB %d) (roundB %d) (serialsched %d)\n",
-         DMPserialBarrier, DMProundBarrier, DMPscheduledThread);
+  printf(" (serialB %d) (roundB %d) (serialsched %d)\n", DMPserialBarrier,
+         DMProundBarrier, DMPscheduledThread);
 #endif
   printf("==RUNNABLE==\n");
   int printed[MaxThreads];
@@ -667,12 +707,11 @@ void DMPsetCodeLocation(int loc) {
   __sync_synchronize();
 }
 
-__attribute__((used))
-void DMPprintCodeLocationForThread(int id) {
+__attribute__((used)) void DMPprintCodeLocationForThread(int id) {
   printf("Thread %d code location: %d\n", id, DMPthreadInfos[id]->codeLocation);
 }
 
-__attribute__((used))
-void DMPprintCodeLocation() {
-  printf("Thread %d code location: %d\n", DMPMAP->threadID, DMPMAP->codeLocation);
+__attribute__((used)) void DMPprintCodeLocation() {
+  printf("Thread %d code location: %d\n", DMPMAP->threadID,
+         DMPMAP->codeLocation);
 }

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,7 +37,6 @@
 #include "galois/gIO.h"
 #include "galois/runtime/Mem.h"
 
-
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
@@ -49,52 +48,51 @@ namespace runtime {
 static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
-class NhoodItem: public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
+class NhoodItem : public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<NhoodItem, Ctxt, CtxtCmp>;
 
 public:
-  using PQ =  galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using PQ      = galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
   using Factory = OrdLocFactoryBase<NhoodItem, Ctxt, CtxtCmp>;
 
 protected:
   PQ sharers;
 
 public:
-  NhoodItem (Lockable* l, const CtxtCmp& ctxtcmp):  Base (l), sharers (ctxtcmp) {}
+  NhoodItem(Lockable* l, const CtxtCmp& ctxtcmp) : Base(l), sharers(ctxtcmp) {}
 
-  void add (const Ctxt* ctxt) {
+  void add(const Ctxt* ctxt) {
 
     // assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
-    sharers.push (const_cast<Ctxt*> (ctxt));
+    sharers.push(const_cast<Ctxt*>(ctxt));
   }
 
-  bool isHighestPriority (const Ctxt* ctxt) const {
-    return !sharers.empty () && (sharers.top () == ctxt);
+  bool isHighestPriority(const Ctxt* ctxt) const {
+    return !sharers.empty() && (sharers.top() == ctxt);
   }
 
-  Ctxt* getHighestPriority () const {
-    if (sharers.empty ()) {
+  Ctxt* getHighestPriority() const {
+    if (sharers.empty()) {
       return NULL;
 
     } else {
-      return sharers.top ();
+      return sharers.top();
     }
   }
 
-  void remove (const Ctxt* ctxt) {
-    sharers.remove (const_cast<Ctxt*> (ctxt));
+  void remove(const Ctxt* ctxt) {
+    sharers.remove(const_cast<Ctxt*>(ctxt));
     // XXX: may fail in parallel execution
-    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
+    assert(!sharers.find(const_cast<Ctxt*>(ctxt)));
   }
 
-  void print () const {
+  void print() const {
     // TODO
   }
 };
 
-
 template <typename T, typename Cmp>
-class LCorderedContext: public SimpleRuntimeContext {
+class LCorderedContext : public SimpleRuntimeContext {
 
 public:
   typedef T value_type;
@@ -117,41 +115,36 @@ public:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
 
 public:
+  LCorderedContext(const T& active, NhoodMgr& nhmgr)
+      : SimpleRuntimeContext(
+            true), // to make acquire call virtual function sub_acquire
+        active(active), nhood(), nhmgr(nhmgr), onWL(false) {}
 
-  LCorderedContext (const T& active, NhoodMgr& nhmgr)
-    :
-      SimpleRuntimeContext (true), // to make acquire call virtual function sub_acquire
-      active (active),
-      nhood (),
-      nhmgr (nhmgr),
-      onWL (false)
-  {}
-
-  const T& getActive () const { return active; }
+  const T& getActive() const { return active; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, galois::MethodFlag) {
-    NItem& nitem = nhmgr.getNhoodItem (l);
+  virtual void subAcquire(Lockable* l, galois::MethodFlag) {
+    NItem& nitem = nhmgr.getNhoodItem(l);
 
-    assert (NItem::getOwner (l) == &nitem);
+    assert(NItem::getOwner(l) == &nitem);
 
-    if (std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
-      nhood.push_back (&nitem);
-      nitem.add (this);
+    if (std::find(nhood.begin(), nhood.end(), &nitem) == nhood.end()) {
+      nhood.push_back(&nitem);
+      nitem.add(this);
     }
-
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
-    assert (!nhood.empty ()); // TODO: remove later
+  GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc() const {
+    assert(!nhood.empty()); // TODO: remove later
 
     bool ret = true;
 
     // TODO: use const_iterator instead
-    for (typename NhoodList::const_iterator n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
+    for (typename NhoodList::const_iterator n    = nhood.begin(),
+                                            endn = nhood.end();
+         n != endn; ++n) {
 
-      if (!(*n)->isHighestPriority (this)) {
+      if (!(*n)->isHighestPriority(this)) {
         ret = false;
         break;
       }
@@ -160,101 +153,94 @@ public:
     return ret;
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void removeFromNhood () {
-    for (typename NhoodList::iterator n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void removeFromNhood() {
+    for (typename NhoodList::iterator n = nhood.begin(), endn = nhood.end();
+         n != endn; ++n) {
 
-      (*n)->remove (this);
+      (*n)->remove(this);
     }
   }
 
-// for DEBUG
-  std::string str () const {
+  // for DEBUG
+  std::string str() const {
     std::stringstream ss;
 #if 0
     ss << "[" << this << ": " << active << "]";
 #endif
-    return ss.str ();
+    return ss.str();
   }
 
   template <typename SourceTest, typename WL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void findNewSources (const SourceTest& srcTest, WL& wl) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void findNewSources(const SourceTest& srcTest,
+                                                     WL& wl) {
 
-    for (typename NhoodList::iterator n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
+    for (typename NhoodList::iterator n = nhood.begin(), endn = nhood.end();
+         n != endn; ++n) {
 
-      LCorderedContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL)
-          && !bool (highest->onWL)
-          && srcTest (highest)
-          && highest->onWL.cas (false, true)) {
+      LCorderedContext* highest = (*n)->getHighestPriority();
+      if ((highest != NULL) && !bool(highest->onWL) && srcTest(highest) &&
+          highest->onWL.cas(false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
-        wl.push (highest);
+        wl.push(highest);
       }
     }
   }
 
   // TODO: combine with above method and reuse the code
   template <typename SourceTest, typename WL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void findSrcInNhood (const SourceTest& srcTest, WL& wl) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void findSrcInNhood(const SourceTest& srcTest,
+                                                     WL& wl) {
 
-    for (typename NhoodList::iterator n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
+    for (typename NhoodList::iterator n = nhood.begin(), endn = nhood.end();
+         n != endn; ++n) {
 
-      LCorderedContext* highest = (*n)->getHighestPriority ();
-      if ((highest != NULL)
-          && !bool (highest->onWL)
-          && srcTest (highest)
-          && highest->onWL.cas (false, true)) {
+      LCorderedContext* highest = (*n)->getHighestPriority();
+      if ((highest != NULL) && !bool(highest->onWL) && srcTest(highest) &&
+          highest->onWL.cas(false, true)) {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
-        wl.push_back (highest);
+        wl.push_back(highest);
       }
     }
   }
-
-
 };
-
-
 
 template <typename StableTest>
 struct SourceTest {
 
   StableTest stabilityTest;
 
-  explicit SourceTest (const StableTest& stabilityTest)
-    : stabilityTest (stabilityTest) {}
+  explicit SourceTest(const StableTest& stabilityTest)
+      : stabilityTest(stabilityTest) {}
 
   template <typename Ctxt>
-  bool operator () (const Ctxt* ctxt) const {
-    assert (ctxt != NULL);
-    return ctxt->isSrc () && stabilityTest (ctxt->active);
+  bool operator()(const Ctxt* ctxt) const {
+    assert(ctxt != NULL);
+    return ctxt->isSrc() && stabilityTest(ctxt->active);
   }
 };
 
 template <>
-struct SourceTest <void> {
+struct SourceTest<void> {
 
   template <typename Ctxt>
-  bool operator () (const Ctxt* ctxt) const {
-    assert (ctxt != NULL);
-    return ctxt->isSrc ();
+  bool operator()(const Ctxt* ctxt) const {
+    assert(ctxt != NULL);
+    return ctxt->isSrc();
   }
 };
 
 // TODO: remove template parameters that can be passed to execute
-template <typename OpFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
+template <typename OpFunc, typename NhoodFunc, typename Ctxt,
+          typename SourceTest>
 class LCorderedExec {
 
   // important paramters
   // TODO: add capability to the interface to express these constants
   static const size_t DELETE_CONTEXT_SIZE = 1024;
-  static const size_t UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
-  static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
-
-
+  static const size_t UNROLL_FACTOR       = OpFunc::UNROLL_FACTOR;
+  static const unsigned CHUNK_SIZE        = OpFunc::CHUNK_SIZE;
 
   // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
   // typedef NhoodItem<T, Cmp, NhoodMgr> NItem;
@@ -272,7 +258,6 @@ class LCorderedExec {
   typedef UserContextAccess<T> UserCtx;
   typedef substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
-
   typedef galois::GAccumulator<size_t> Accumulator;
 
   struct CreateCtxtExpandNhood {
@@ -281,35 +266,27 @@ class LCorderedExec {
     CtxtAlloc& ctxtAlloc;
     CtxtWL& ctxtWL;
 
-    CreateCtxtExpandNhood (
-        NhoodFunc& nhoodVisitor,
-        NhoodMgr& nhmgr,
-        CtxtAlloc& ctxtAlloc,
-        CtxtWL& ctxtWL)
-      :
-        nhoodVisitor (nhoodVisitor),
-        nhmgr (nhmgr),
-        ctxtAlloc (ctxtAlloc),
-        ctxtWL (ctxtWL)
-    {}
+    CreateCtxtExpandNhood(NhoodFunc& nhoodVisitor, NhoodMgr& nhmgr,
+                          CtxtAlloc& ctxtAlloc, CtxtWL& ctxtWL)
+        : nhoodVisitor(nhoodVisitor), nhmgr(nhmgr), ctxtAlloc(ctxtAlloc),
+          ctxtWL(ctxtWL) {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) const {
-      Ctxt* ctxt = ctxtAlloc.allocate (1);
-      assert (ctxt != NULL);
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const T& active) const {
+      Ctxt* ctxt = ctxtAlloc.allocate(1);
+      assert(ctxt != NULL);
       // new (ctxt) Ctxt (active, nhmgr);
-      //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
-      ctxtAlloc.construct (ctxt, active, nhmgr);
+      // ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      ctxtAlloc.construct(ctxt, active, nhmgr);
 
-      ctxtWL.get ().push_back (ctxt);
+      ctxtWL.get().push_back(ctxt);
 
-      galois::runtime::setThreadContext (ctxt);
-      int tmp=0;
+      galois::runtime::setThreadContext(ctxt);
+      int tmp = 0;
       // TODO: nhoodVisitor should take only one arg,
       // 2nd arg being passed due to compatibility with Deterministic executor
-      nhoodVisitor (ctxt->active, tmp);
-      galois::runtime::setThreadContext (NULL);
+      nhoodVisitor(ctxt->active, tmp);
+      galois::runtime::setThreadContext(NULL);
     }
-
   };
 
   struct FindInitSources {
@@ -317,33 +294,26 @@ class LCorderedExec {
     CtxtWL& initSrc;
     Accumulator& nsrc;
 
-    FindInitSources (
-        const SourceTest& sourceTest,
-        CtxtWL& initSrc,
-        Accumulator& nsrc)
-      :
-        sourceTest (sourceTest),
-        initSrc (initSrc),
-        nsrc (nsrc)
-    {}
+    FindInitSources(const SourceTest& sourceTest, CtxtWL& initSrc,
+                    Accumulator& nsrc)
+        : sourceTest(sourceTest), initSrc(initSrc), nsrc(nsrc) {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctxt) const {
-      assert (ctxt != NULL);
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(Ctxt* ctxt) const {
+      assert(ctxt != NULL);
       // assume nhood of ctxt is already expanded
 
       // if (ctxt->isSrc ()) {
-        // std::cout << "Testing source: " << ctxt->str () << std::endl;
+      // std::cout << "Testing source: " << ctxt->str () << std::endl;
       // }
       // if (sourceTest (ctxt)) {
-        // std::cout << "Initial source: " << ctxt->str () << std::endl;
+      // std::cout << "Initial source: " << ctxt->str () << std::endl;
       // }
-      if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
-        initSrc.get ().push_back (ctxt);
+      if (sourceTest(ctxt) && ctxt->onWL.cas(false, true)) {
+        initSrc.get().push_back(ctxt);
         nsrc += 1;
       }
     }
   };
-
 
   struct ApplyOperator {
 
@@ -360,85 +330,71 @@ class LCorderedExec {
     PerThreadUserCtx& perThUserCtx;
     Accumulator& niter;
 
-    ApplyOperator (
-        OpFunc& op,
-        NhoodFunc& nhoodVisitor,
-        NhoodMgr& nhmgr,
-        const SourceTest& sourceTest,
-        CtxtAlloc& ctxtAlloc,
-        CtxtWL& addCtxtWL,
-        CtxtLocalQ& ctxtLocalQ,
-        CtxtDelQ& ctxtDelQ,
-        PerThreadUserCtx& perThUserCtx,
-        Accumulator& niter)
-      :
-        op (op),
-        nhoodVisitor (nhoodVisitor),
-        nhmgr (nhmgr),
-        sourceTest (sourceTest),
-        ctxtAlloc (ctxtAlloc),
-        addCtxtWL (addCtxtWL),
-        ctxtLocalQ (ctxtLocalQ),
-        ctxtDelQ (ctxtDelQ),
-        perThUserCtx (perThUserCtx),
-        niter (niter)
-    {}
-
+    ApplyOperator(OpFunc& op, NhoodFunc& nhoodVisitor, NhoodMgr& nhmgr,
+                  const SourceTest& sourceTest, CtxtAlloc& ctxtAlloc,
+                  CtxtWL& addCtxtWL, CtxtLocalQ& ctxtLocalQ, CtxtDelQ& ctxtDelQ,
+                  PerThreadUserCtx& perThUserCtx, Accumulator& niter)
+        : op(op), nhoodVisitor(nhoodVisitor), nhmgr(nhmgr),
+          sourceTest(sourceTest), ctxtAlloc(ctxtAlloc), addCtxtWL(addCtxtWL),
+          ctxtLocalQ(ctxtLocalQ), ctxtDelQ(ctxtDelQ),
+          perThUserCtx(perThUserCtx), niter(niter) {}
 
     template <typename WL>
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* const in_src, WL& wl) {
-      assert (in_src != NULL);
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(Ctxt* const in_src, WL& wl) {
+      assert(in_src != NULL);
 
-      ctxtLocalQ.get ().clear ();
+      ctxtLocalQ.get().clear();
 
-      ctxtLocalQ.get ().push_back (in_src);
+      ctxtLocalQ.get().push_back(in_src);
 
       unsigned local_iter = 0;
 
-      while ((local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get ().empty ()) {
+      while ((local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get().empty()) {
 
         ++local_iter;
 
-        Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
+        Ctxt* src = ctxtLocalQ.get().front();
+        ctxtLocalQ.get().pop_front();
 
         // GALOIS_DEBUG ("Processing source: %s\n", src->str ().c_str ());
-        if (debug && !sourceTest (src)) {
-          std::cout << "Not found to be a source: " << src->str ()
-            << std::endl;
+        if (debug && !sourceTest(src)) {
+          std::cout << "Not found to be a source: " << src->str() << std::endl;
           // abort ();
         }
 
         niter += 1;
 
         // addWL.get ().clear ();
-        UserCtx& userCtx = *(perThUserCtx.getLocal ());
+        UserCtx& userCtx = *(perThUserCtx.getLocal());
 
         if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
-          userCtx.resetPushBuffer ();
-          userCtx.resetAlloc ();
+          userCtx.resetPushBuffer();
+          userCtx.resetAlloc();
         }
 
-        op (src->active, userCtx.data ());
-
+        op(src->active, userCtx.data());
 
         if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
 
-          addCtxtWL.get ().clear ();
-          CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
+          addCtxtWL.get().clear();
+          CreateCtxtExpandNhood addCtxt(nhoodVisitor, nhmgr, ctxtAlloc,
+                                        addCtxtWL);
 
           // for (typename AddWL::local_iterator a = addWL.get ().begin ()
           // , enda = addWL.get ().end (); a != enda; ++a) {
-          for (typename UserCtx::PushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
-              , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
+          for (typename UserCtx::PushBufferTy::iterator
+                   a    = userCtx.getPushBuffer().begin(),
+                   enda = userCtx.getPushBuffer().end();
+               a != enda; ++a) {
 
-
-            addCtxt (*a);
+            addCtxt(*a);
           }
 
-          for (typename CtxtWL::local_iterator c = addCtxtWL.get ().begin ()
-              , endc = addCtxtWL.get ().end (); c != endc; ++c) {
+          for (typename CtxtWL::local_iterator c    = addCtxtWL.get().begin(),
+                                               endc = addCtxtWL.get().end();
+               c != endc; ++c) {
 
-            (*c)->findNewSources (sourceTest, wl);
+            (*c)->findNewSources(sourceTest, wl);
             // // if is source add to workList;
             // if (sourceTest (*c) && (*c)->onWL.cas (false, true)) {
             // // std::cout << "Adding new source: " << *c << std::endl;
@@ -447,43 +403,41 @@ class LCorderedExec {
           }
         }
 
-        src->removeFromNhood ();
+        src->removeFromNhood();
 
-        src->findSrcInNhood (sourceTest, ctxtLocalQ.get ());
+        src->findSrcInNhood(sourceTest, ctxtLocalQ.get());
 
-        //TODO: use a ref count type wrapper for Ctxt;
-        ctxtDelQ.get ().push_back (src);
-
+        // TODO: use a ref count type wrapper for Ctxt;
+        ctxtDelQ.get().push_back(src);
       }
-
 
       // add remaining to global wl
-      for (typename CtxtLocalQ::local_iterator c = ctxtLocalQ.get ().begin ()
-          , endc = ctxtLocalQ.get ().end (); c != endc; ++c) {
+      for (typename CtxtLocalQ::local_iterator c    = ctxtLocalQ.get().begin(),
+                                               endc = ctxtLocalQ.get().end();
+           c != endc; ++c) {
 
-        wl.push (*c);
+        wl.push(*c);
       }
 
+      while (ctxtDelQ.get().size() >= DELETE_CONTEXT_SIZE) {
 
-      while (ctxtDelQ.get ().size () >= DELETE_CONTEXT_SIZE) {
-
-        Ctxt* c = ctxtDelQ.get ().front (); ctxtDelQ.get ().pop_front ();
-        ctxtAlloc.destroy (c);
-        ctxtAlloc.deallocate (c, 1);
+        Ctxt* c = ctxtDelQ.get().front();
+        ctxtDelQ.get().pop_front();
+        ctxtAlloc.destroy(c);
+        ctxtAlloc.deallocate(c, 1);
       }
     }
-
   };
 
   struct DelCtxt {
 
     CtxtAlloc& ctxtAlloc;
 
-    explicit DelCtxt (CtxtAlloc& ctxtAlloc): ctxtAlloc (ctxtAlloc) {}
+    explicit DelCtxt(CtxtAlloc& ctxtAlloc) : ctxtAlloc(ctxtAlloc) {}
 
-    void operator () (Ctxt* ctxt) const {
-      ctxtAlloc.destroy (ctxt);
-      ctxtAlloc.deallocate (ctxt, 1);
+    void operator()(Ctxt* ctxt) const {
+      ctxtAlloc.destroy(ctxt);
+      ctxtAlloc.deallocate(ctxt, 1);
     }
   };
 
@@ -494,23 +448,14 @@ private:
   NhoodMgr& nhmgr;
   SourceTest sourceTest;
 
-
 public:
-
-  LCorderedExec (
-      const NhoodFunc& nhoodVisitor,
-      const OpFunc& operFunc,
-      NhoodMgr& nhmgr,
-      const SourceTest& sourceTest)
-    :
-      nhoodVisitor (nhoodVisitor),
-      operFunc (operFunc),
-      nhmgr (nhmgr),
-      sourceTest (sourceTest)
-  {}
+  LCorderedExec(const NhoodFunc& nhoodVisitor, const OpFunc& operFunc,
+                NhoodMgr& nhmgr, const SourceTest& sourceTest)
+      : nhoodVisitor(nhoodVisitor), operFunc(operFunc), nhmgr(nhmgr),
+        sourceTest(sourceTest) {}
 
   template <typename R>
-  void execute (const R& range, const char* loopname) {
+  void execute(const R& range, const char* loopname) {
     CtxtAlloc ctxtAlloc;
     CtxtWL initCtxt;
     CtxtWL initSrc;
@@ -523,24 +468,22 @@ public:
     galois::TimeAccumulator t_for;
     galois::TimeAccumulator t_destroy;
 
-    t_create.start ();
+    t_create.start();
     galois::runtime::do_all_gen(
-        range,
-				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
-        std::make_tuple(
-          galois::loopname("create_initial_contexts")));
-    t_create.stop ();
+        range, CreateCtxtExpandNhood(nhoodVisitor, nhmgr, ctxtAlloc, initCtxt),
+        std::make_tuple(galois::loopname("create_initial_contexts")));
+    t_create.stop();
 
-    t_find.start ();
-    galois::runtime::do_all_gen(makeLocalRange(initCtxt),
-				 FindInitSources (sourceTest, initSrc, nInitSrc),
-         std::make_tuple(
-           galois::loopname("find_initial_sources")));
+    t_find.start();
+    galois::runtime::do_all_gen(
+        makeLocalRange(initCtxt),
+        FindInitSources(sourceTest, initSrc, nInitSrc),
+        std::make_tuple(galois::loopname("find_initial_sources")));
     //       "find_initial_sources");
-    t_find.stop ();
+    t_find.stop();
 
-    std::cout << "Number of initial sources found: " << nInitSrc.reduce ()
-      << std::endl;
+    std::cout << "Number of initial sources found: " << nInitSrc.reduce()
+              << std::endl;
 
     // AddWL addWL;
     PerThreadUserCtx perThUserCtx;
@@ -549,66 +492,70 @@ public:
     CtxtLocalQ ctxtLocalQ;
 
     typedef galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
-    // typedef galois::worklists::PerThreadChunkFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    // typedef galois::worklists::PerThreadChunkFIFO<CHUNK_SIZE, Ctxt*>
+    // SrcWL_ty;
     // TODO: code to find global min goes here
 
-    t_for.start ();
-    galois::for_each(galois::iterate(initSrc),
-        ApplyOperator (
-          operFunc,
-          nhoodVisitor,
-          nhmgr,
-          sourceTest,
-          ctxtAlloc,
-          addCtxtWL,
-          ctxtLocalQ,
-          ctxtDelQ,
-          perThUserCtx,
-          niter),
-        galois::loopname("apply_operator"),
-        galois::wl<SrcWL_ty>());
-    t_for.stop ();
+    t_for.start();
+    galois::for_each(
+        galois::iterate(initSrc),
+        ApplyOperator(operFunc, nhoodVisitor, nhmgr, sourceTest, ctxtAlloc,
+                      addCtxtWL, ctxtLocalQ, ctxtDelQ, perThUserCtx, niter),
+        galois::loopname("apply_operator"), galois::wl<SrcWL_ty>());
+    t_for.stop();
 
-    t_destroy.start ();
-    galois::runtime::do_all_gen(makeLocalRange(ctxtDelQ),
-				 DelCtxt (ctxtAlloc),
-         std::make_tuple(galois::loopname("delete_all_ctxt"))); //, "delete_all_ctxt");
-    t_destroy.stop ();
-
+    t_destroy.start();
+    galois::runtime::do_all_gen(
+        makeLocalRange(ctxtDelQ), DelCtxt(ctxtAlloc),
+        std::make_tuple(
+            galois::loopname("delete_all_ctxt"))); //, "delete_all_ctxt");
+    t_destroy.stop();
   }
 };
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename ST>
-void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const ST& sourceTest, const char* loopname) {
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc,
+          typename ST>
+void for_each_ordered_lc_impl(const R& range, const Cmp& cmp,
+                              const NhoodFunc& nhoodVisitor,
+                              const OpFunc& operFunc, const ST& sourceTest,
+                              const char* loopname) {
 
   typedef typename R::value_type T;
 
   typedef LCorderedContext<T, Cmp> Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
-  typedef typename Ctxt::CtxtCmp  CtxtCmp;
+  typedef typename Ctxt::CtxtCmp CtxtCmp;
 
   typedef LCorderedExec<OpFunc, NhoodFunc, Ctxt, ST> Exec;
 
-  CtxtCmp ctxtcmp (cmp);
+  CtxtCmp ctxtcmp(cmp);
   typename NItem::Factory factory(ctxtcmp);
-  NhoodMgr nhmgr (factory);
+  NhoodMgr nhmgr(factory);
 
-  Exec e (nhoodVisitor, operFunc, nhmgr, sourceTest);
+  Exec e(nhoodVisitor, operFunc, nhmgr, sourceTest);
   // e.template execute<CHUNK_SIZE> (abeg, aend);
-  e.execute (range, loopname);
+  e.execute(range, loopname);
 }
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc,
+          typename StableTest>
+void for_each_ordered_lc(const R& range, const Cmp& cmp,
+                         const NhoodFunc& nhoodVisitor, const OpFunc& operFunc,
+                         const StableTest& stabilityTest,
+                         const char* loopname) {
 
-  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
+  for_each_ordered_lc_impl(range, cmp, nhoodVisitor, operFunc,
+                           SourceTest<StableTest>(stabilityTest), loopname);
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const char* loopname) {
+void for_each_ordered_lc(const R& range, const Cmp& cmp,
+                         const NhoodFunc& nhoodVisitor, const OpFunc& operFunc,
+                         const char* loopname) {
 
-  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
+  for_each_ordered_lc_impl(range, cmp, nhoodVisitor, operFunc,
+                           SourceTest<void>(), loopname);
 }
 
 } // end namespace runtime

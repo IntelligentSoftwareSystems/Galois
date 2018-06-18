@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,20 +33,19 @@ class OnlineStat {
   double _max;
 
 public:
-  OnlineStat() :n(0), mean(0.0), M2(0.0), 
-                _min(std::numeric_limits<double>::max()),
-                _max(std::numeric_limits<double>::min())
-  {}
+  OnlineStat()
+      : n(0), mean(0.0), M2(0.0), _min(std::numeric_limits<double>::max()),
+        _max(std::numeric_limits<double>::min()) {}
 
   OnlineStat(const OnlineStat&) = default;
 
   void reset() {
     M2 = mean = 0.0;
-    n = 0;
-    _min = std::numeric_limits<double>::max();
-    _max = std::numeric_limits<double>::min();
+    n         = 0;
+    _min      = std::numeric_limits<double>::max();
+    _max      = std::numeric_limits<double>::min();
   }
-  
+
   void insert(double x) {
     n += 1;
     double delta = x - mean;
@@ -56,25 +55,21 @@ public:
     _max = std::max(x, _max);
   }
 
-  double getVariance() const { return M2/(n - 1); }
-  double getStdDeviation() const { return M2/n; }
+  double getVariance() const { return M2 / (n - 1); }
+  double getStdDeviation() const { return M2 / n; }
   unsigned int getCount() const { return n; }
   double getMean() const { return mean; }
   double getMin() const { return _min; }
   double getMax() const { return _max; }
-  
+
   friend std::ostream& operator<<(std::ostream& os, const OnlineStat& s) {
-    os << "{count " << s.getCount()
-       << ", mean " << s.getMean()
-       << ", stddev " << s.getStdDeviation()
-       << ", var " << s.getVariance()
-       << ", min " << s.getMin()
-       << ", max " << s.getMax()
-       << "}";
+    os << "{count " << s.getCount() << ", mean " << s.getMean() << ", stddev "
+       << s.getStdDeviation() << ", var " << s.getVariance() << ", min "
+       << s.getMin() << ", max " << s.getMax() << "}";
     return os;
   }
 };
 
-} //namespace galois
+} // namespace galois
 
 #endif

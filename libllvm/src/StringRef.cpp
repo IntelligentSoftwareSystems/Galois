@@ -25,9 +25,7 @@ static char ascii_tolower(char x) {
   return x;
 }
 
-static bool ascii_isdigit(char x) {
-  return x >= '0' && x <= '9';
-}
+static bool ascii_isdigit(char x) { return x >= '0' && x <= '9'; }
 
 /// compare_lower - Compare strings, ignoring case.
 int StringRef::compare_lower(StringRef RHS) const {
@@ -75,8 +73,7 @@ int StringRef::compare_numeric(StringRef RHS) const {
 }
 
 // Compute the edit distance between the two given strings.
-unsigned StringRef::edit_distance(llvm::StringRef Other,
-                                  bool AllowReplacements,
+unsigned StringRef::edit_distance(llvm::StringRef Other, bool AllowReplacements,
                                   unsigned MaxEditDistance) {
   // The algorithm implemented below is the "classic"
   // dynamic-programming algorithm for computing the Levenshtein
@@ -93,28 +90,30 @@ unsigned StringRef::edit_distance(llvm::StringRef Other,
   const unsigned SmallBufferSize = 64;
   unsigned SmallBuffer[SmallBufferSize];
   llvm::OwningArrayPtr<unsigned> Allocated;
-  unsigned *previous = SmallBuffer;
-  if (2*(n + 1) > SmallBufferSize) {
-    previous = new unsigned [2*(n+1)];
+  unsigned* previous = SmallBuffer;
+  if (2 * (n + 1) > SmallBufferSize) {
+    previous = new unsigned[2 * (n + 1)];
     Allocated.reset(previous);
   }
-  unsigned *current = previous + (n + 1);
+  unsigned* current = previous + (n + 1);
 
   for (unsigned i = 0; i <= n; ++i)
     previous[i] = i;
 
   for (size_type y = 1; y <= m; ++y) {
-    current[0] = y;
+    current[0]           = y;
     unsigned BestThisRow = current[0];
 
     for (size_type x = 1; x <= n; ++x) {
       if (AllowReplacements) {
-        current[x] = min(previous[x-1] + ((*this)[y-1] == Other[x-1]? 0u:1u),
-                         min(current[x-1], previous[x])+1);
-      }
-      else {
-        if ((*this)[y-1] == Other[x-1]) current[x] = previous[x-1];
-        else current[x] = min(current[x-1], previous[x]) + 1;
+        current[x] =
+            min(previous[x - 1] + ((*this)[y - 1] == Other[x - 1] ? 0u : 1u),
+                min(current[x - 1], previous[x]) + 1);
+      } else {
+        if ((*this)[y - 1] == Other[x - 1])
+          current[x] = previous[x - 1];
+        else
+          current[x] = min(current[x - 1], previous[x]) + 1;
       }
       BestThisRow = min(BestThisRow, current[x]);
     }
@@ -122,9 +121,9 @@ unsigned StringRef::edit_distance(llvm::StringRef Other,
     if (MaxEditDistance && BestThisRow > MaxEditDistance)
       return MaxEditDistance + 1;
 
-    unsigned *tmp = current;
-    current = previous;
-    previous = tmp;
+    unsigned* tmp = current;
+    current       = previous;
+    previous      = tmp;
   }
 
   unsigned Result = previous[n];
@@ -134,7 +133,6 @@ unsigned StringRef::edit_distance(llvm::StringRef Other,
 //===----------------------------------------------------------------------===//
 // String Searching
 //===----------------------------------------------------------------------===//
-
 
 /// find - Search for the first string \arg Str in the string.
 ///
@@ -231,7 +229,7 @@ StringRef::size_type StringRef::find_last_of(StringRef Chars,
 /// the string.
 size_t StringRef::count(StringRef Str) const {
   size_t Count = 0;
-  size_t N = Str.size();
+  size_t N     = Str.size();
   if (N > Length)
     return 0;
   for (size_t i = 0, e = Length - N + 1; i != e; ++i)
@@ -240,7 +238,7 @@ size_t StringRef::count(StringRef Str) const {
   return Count;
 }
 
-static unsigned GetAutoSenseRadix(StringRef &Str) {
+static unsigned GetAutoSenseRadix(StringRef& Str) {
   if (Str.startswith("0x")) {
     Str = Str.substr(2);
     return 16;
@@ -254,28 +252,28 @@ static unsigned GetAutoSenseRadix(StringRef &Str) {
   }
 }
 
-
 /// GetAsUnsignedInteger - Workhorse method that converts a integer character
 /// sequence of radix up to 36 to an unsigned long long value.
 static bool GetAsUnsignedInteger(StringRef Str, unsigned Radix,
-                                 unsigned long long &Result) {
+                                 unsigned long long& Result) {
   // Autosense radix if not specified.
   if (Radix == 0)
     Radix = GetAutoSenseRadix(Str);
 
   // Empty strings (after the radix autosense) are invalid.
-  if (Str.empty()) return true;
+  if (Str.empty())
+    return true;
 
   // Parse all the bytes of the string given this radix.  Watch for overflow.
   Result = 0;
   while (!Str.empty()) {
     unsigned CharVal;
     if (Str[0] >= '0' && Str[0] <= '9')
-      CharVal = Str[0]-'0';
+      CharVal = Str[0] - '0';
     else if (Str[0] >= 'a' && Str[0] <= 'z')
-      CharVal = Str[0]-'a'+10;
+      CharVal = Str[0] - 'a' + 10;
     else if (Str[0] >= 'A' && Str[0] <= 'Z')
-      CharVal = Str[0]-'A'+10;
+      CharVal = Str[0] - 'A' + 10;
     else
       return true;
 
@@ -286,7 +284,7 @@ static bool GetAsUnsignedInteger(StringRef Str, unsigned Radix,
 
     // Add in this character.
     unsigned long long PrevResult = Result;
-    Result = Result*Radix+CharVal;
+    Result                        = Result * Radix + CharVal;
 
     // Check for overflow.
     if (Result < PrevResult)
@@ -298,12 +296,11 @@ static bool GetAsUnsignedInteger(StringRef Str, unsigned Radix,
   return false;
 }
 
-bool StringRef::getAsInteger(unsigned Radix, unsigned long long &Result) const {
+bool StringRef::getAsInteger(unsigned Radix, unsigned long long& Result) const {
   return GetAsUnsignedInteger(*this, Radix, Result);
 }
 
-
-bool StringRef::getAsInteger(unsigned Radix, long long &Result) const {
+bool StringRef::getAsInteger(unsigned Radix, long long& Result) const {
   unsigned long long ULLVal;
 
   // Handle positive strings first.
@@ -328,25 +325,23 @@ bool StringRef::getAsInteger(unsigned Radix, long long &Result) const {
   return false;
 }
 
-bool StringRef::getAsInteger(unsigned Radix, int &Result) const {
+bool StringRef::getAsInteger(unsigned Radix, int& Result) const {
   long long Val;
-  if (getAsInteger(Radix, Val) ||
-      (int)Val != Val)
+  if (getAsInteger(Radix, Val) || (int)Val != Val)
     return true;
   Result = Val;
   return false;
 }
 
-bool StringRef::getAsInteger(unsigned Radix, unsigned &Result) const {
+bool StringRef::getAsInteger(unsigned Radix, unsigned& Result) const {
   unsigned long long Val;
-  if (getAsInteger(Radix, Val) ||
-      (unsigned)Val != Val)
+  if (getAsInteger(Radix, Val) || (unsigned)Val != Val)
     return true;
   Result = Val;
   return false;
 }
 
-bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
+bool StringRef::getAsInteger(unsigned Radix, APInt& Result) const {
   StringRef Str = *this;
 
   // Autosense radix if not specified.
@@ -356,7 +351,8 @@ bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
   assert(Radix > 1 && Radix <= 36);
 
   // Empty strings (after the radix autosense) are invalid.
-  if (Str.empty()) return true;
+  if (Str.empty())
+    return true;
 
   // Skip leading zeroes.  This can be a significant improvement if
   // it means we don't need > 64 bits.
@@ -371,7 +367,8 @@ bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
 
   // (Over-)estimate the required number of bits.
   unsigned Log2Radix = 0;
-  while ((1U << Log2Radix) < Radix) Log2Radix++;
+  while ((1U << Log2Radix) < Radix)
+    Log2Radix++;
   bool IsPowerOf2Radix = ((1U << Log2Radix) == Radix);
 
   unsigned BitWidth = Log2Radix * Str.size();
@@ -384,7 +381,7 @@ bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
   if (!IsPowerOf2Radix) {
     // These must have the same bit-width as Result.
     RadixAP = APInt(BitWidth, Radix);
-    CharAP = APInt(BitWidth, 0);
+    CharAP  = APInt(BitWidth, 0);
   }
 
   // Parse all the bytes of the string given this radix.
@@ -392,11 +389,11 @@ bool StringRef::getAsInteger(unsigned Radix, APInt &Result) const {
   while (!Str.empty()) {
     unsigned CharVal;
     if (Str[0] >= '0' && Str[0] <= '9')
-      CharVal = Str[0]-'0';
+      CharVal = Str[0] - '0';
     else if (Str[0] >= 'a' && Str[0] <= 'z')
-      CharVal = Str[0]-'a'+10;
+      CharVal = Str[0] - 'a' + 10;
     else if (Str[0] >= 'A' && Str[0] <= 'Z')
-      CharVal = Str[0]-'A'+10;
+      CharVal = Str[0] - 'A' + 10;
     else
       return true;
 

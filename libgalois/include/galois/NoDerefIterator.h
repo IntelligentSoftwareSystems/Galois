@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -25,13 +25,14 @@
 namespace galois {
 
 //! Modify an iterator so that *it == it
-template<typename Iterator>
-struct NoDerefIterator : public boost::iterator_adaptor<
-  NoDerefIterator<Iterator>, Iterator, Iterator, 
-  boost::use_default, const Iterator&>
-{
-  NoDerefIterator(): NoDerefIterator::iterator_adaptor_() { }
-  explicit NoDerefIterator(Iterator it): NoDerefIterator::iterator_adaptor_(it) { }
+template <typename Iterator>
+struct NoDerefIterator
+    : public boost::iterator_adaptor<NoDerefIterator<Iterator>, Iterator,
+                                     Iterator, boost::use_default,
+                                     const Iterator&> {
+  NoDerefIterator() : NoDerefIterator::iterator_adaptor_() {}
+  explicit NoDerefIterator(Iterator it)
+      : NoDerefIterator::iterator_adaptor_(it) {}
   const Iterator& dereference() const {
     return NoDerefIterator::iterator_adaptor_::base_reference();
   }
@@ -41,11 +42,11 @@ struct NoDerefIterator : public boost::iterator_adaptor<
 };
 
 //! Convenience function to create {@link NoDerefIterator}.
-template<typename Iterator>
+template <typename Iterator>
 NoDerefIterator<Iterator> make_no_deref_iterator(Iterator it) {
   return NoDerefIterator<Iterator>(it);
 }
 
-}
+} // namespace galois
 
 #endif

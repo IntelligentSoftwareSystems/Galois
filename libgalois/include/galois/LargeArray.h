@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -51,13 +51,11 @@ extern unsigned activeThreads;
  *
  * @tparam T value type of container
  */
-template<typename T>
+template <typename T>
 class LargeArray {
   substrate::LAptr m_realdata;
   T* m_data;
   size_t m_size;
-
-
 
 public:
   typedef T raw_value_type;
@@ -78,26 +76,28 @@ public:
   };
 
 protected:
-  enum AllocType {Blocked, Local, Interleaved, Floating};
+  enum AllocType { Blocked, Local, Interleaved, Floating };
   void allocate(size_type n, AllocType t) {
     assert(!m_data);
     m_size = n;
-    switch(t) {
+    switch (t) {
     case Blocked:
       galois::gDebug("Block-alloc'd");
-      m_realdata = substrate::largeMallocBlocked(n*sizeof(T), runtime::activeThreads);
+      m_realdata =
+          substrate::largeMallocBlocked(n * sizeof(T), runtime::activeThreads);
       break;
     case Interleaved:
       galois::gDebug("Interleave-alloc'd");
-      m_realdata = substrate::largeMallocInterleaved(n*sizeof(T), runtime::activeThreads);
+      m_realdata = substrate::largeMallocInterleaved(n * sizeof(T),
+                                                     runtime::activeThreads);
       break;
     case Local:
       galois::gDebug("Local-allocd");
-      m_realdata = substrate::largeMallocLocal(n*sizeof(T));
+      m_realdata = substrate::largeMallocLocal(n * sizeof(T));
       break;
     case Floating:
       galois::gDebug("Floating-alloc'd");
-      m_realdata = substrate::largeMallocFloating(n*sizeof(T));
+      m_realdata = substrate::largeMallocFloating(n * sizeof(T));
       break;
     };
     m_data = reinterpret_cast<T*>(m_realdata.get());
@@ -109,57 +109,63 @@ private:
    */
   friend class boost::serialization::access;
   template <typename Archive>
-  void save(Archive &ar, const unsigned int version) const {
+  void save(Archive& ar, const unsigned int version) const {
 
     // TODO DON'T USE CERR
-    //std::cerr << "save m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
+    // std::cerr << "save m_size : " << m_size << " Threads : " <<
+    // runtime::activeThreads << "\n";
     ar << m_size;
-    //for(size_t i = 0; i < m_size; ++i){
-      //ar << m_data[i];
+    // for(size_t i = 0; i < m_size; ++i){
+    // ar << m_data[i];
     //}
-    ar << boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    ar << boost::serialization::make_binary_object(m_data, m_size * sizeof(T));
     /*
      * Cas use make_array too as shown below
-     * IMPORTANT: Use make_array as temp fix for benchmarks using non-trivial structures in nodeData (Eg. SGD)
-     *            This also requires changes in libgalois/include/galois/graphs/Details.h (specified in the file).
+     * IMPORTANT: Use make_array as temp fix for benchmarks using non-trivial
+     * structures in nodeData (Eg. SGD) This also requires changes in
+     * libgalois/include/galois/graphs/Details.h (specified in the file).
      */
-    //ar << boost::serialization::make_array<T>(m_data, m_size);
+    // ar << boost::serialization::make_array<T>(m_data, m_size);
   }
   template <typename Archive>
-  void load(Archive &ar, const unsigned int version) {
+  void load(Archive& ar, const unsigned int version) {
     ar >> m_size;
 
     // TODO DON'T USE CERR
-    //std::cerr << "load m_size : " << m_size << " Threads : " << runtime::activeThreads << "\n";
+    // std::cerr << "load m_size : " << m_size << " Threads : " <<
+    // runtime::activeThreads << "\n";
 
-    //TODO: For now, always use allocateInterleaved
-    //Allocates and sets m_data pointer
-    if(!m_data)
+    // TODO: For now, always use allocateInterleaved
+    // Allocates and sets m_data pointer
+    if (!m_data)
       allocateInterleaved(m_size);
 
-    //for(size_t i = 0; i < m_size; ++i){
-      //ar >> m_data[i];
+    // for(size_t i = 0; i < m_size; ++i){
+    // ar >> m_data[i];
     //}
-    ar >> boost::serialization::make_binary_object(m_data, m_size*sizeof(T));
+    ar >> boost::serialization::make_binary_object(m_data, m_size * sizeof(T));
     /*
      * Cas use make_array too as shown below
      * IMPORTANT: Use make_array as temp fix for SGD
-     *            This also requires changes in libgalois/include/galois/graphs/Details.h (specified in the file).
+     *            This also requires changes in
+     * libgalois/include/galois/graphs/Details.h (specified in the file).
      */
-    //ar >> boost::serialization::make_array<T>(m_data, m_size);
+    // ar >> boost::serialization::make_array<T>(m_data, m_size);
   }
-  //The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes the save or load depending on whether the archive is used for saving or loading
+  // The macro BOOST_SERIALIZATION_SPLIT_MEMBER() generates code which invokes
+  // the save or load depending on whether the archive is used for saving or
+  // loading
   BOOST_SERIALIZATION_SPLIT_MEMBER()
 
 public:
   /**
    * Wraps existing buffer in LargeArray interface.
    */
-  LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s) { }
+  LargeArray(void* d, size_t s) : m_data(reinterpret_cast<T*>(d)), m_size(s) {}
 
-  LargeArray(): m_data(0), m_size(0) { }
+  LargeArray() : m_data(0), m_size(0) {}
 
-  LargeArray(LargeArray&& o): m_data(0), m_size(0) {
+  LargeArray(LargeArray&& o) : m_data(0), m_size(0) {
     std::swap(this->m_realdata, o.m_realdata);
     std::swap(this->m_data, o.m_data);
     std::swap(this->m_size, o.m_size);
@@ -186,7 +192,6 @@ public:
     std::swap(lhs.allocated, rhs.allocated);
   }
 
-
   const_reference at(difference_type x) const { return m_data[x]; }
   reference at(difference_type x) { return m_data[x]; }
   const_reference operator[](size_type x) const { return m_data[x]; }
@@ -206,9 +211,9 @@ public:
    * Allocates using default memory policy (usually first-touch)
    *
    * @param  n         number of elements to allocate
-   * @param  prefault  Prefault/touch memory to place it local to the currently executing
-   *                   thread. By default, true because concurrent page-faulting can be a
-   *                   scalability bottleneck.
+   * @param  prefault  Prefault/touch memory to place it local to the currently
+   * executing thread. By default, true because concurrent page-faulting can be
+   * a scalability bottleneck.
    */
   void allocateBlocked(size_type n) { allocate(n, Blocked); }
 
@@ -236,34 +241,33 @@ public:
    * @param threadRanges An array specifying how elements should be split
    * among threads
    */
-  template<typename RangeArrayTy>
+  template <typename RangeArrayTy>
   void allocateSpecified(size_type numberOfElements,
                          RangeArrayTy& threadRanges) {
     assert(!m_data);
 
-    m_realdata = substrate::largeMallocSpecified(
-                   numberOfElements * sizeof(T),
-                   runtime::activeThreads, threadRanges,
-                   sizeof(T));
+    m_realdata = substrate::largeMallocSpecified(numberOfElements * sizeof(T),
+                                                 runtime::activeThreads,
+                                                 threadRanges, sizeof(T));
 
     m_size = numberOfElements;
     m_data = reinterpret_cast<T*>(m_realdata.get());
   }
   //! [allocatefunctions]
 
-  template<typename... Args>
+  template <typename... Args>
   void construct(Args&&... args) {
-    for (T* ii = m_data, *ei = m_data + m_size; ii != ei; ++ii)
+    for (T *ii = m_data, *ei = m_data + m_size; ii != ei; ++ii)
       new (ii) T(std::forward<Args>(args)...);
   }
 
-  template<typename... Args>
+  template <typename... Args>
   void constructAt(size_type n, Args&&... args) {
     new (&m_data[n]) T(std::forward<Args>(args)...);
   }
 
   //! Allocate and construct
-  template<typename... Args>
+  template <typename... Args>
   void create(size_type n, Args&&... args) {
     allocateInterleaved(n);
     construct(std::forward<Args>(args)...);
@@ -276,17 +280,18 @@ public:
   }
 
   void destroy() {
-    if (!m_data) return;
+    if (!m_data)
+      return;
     galois::ParallelSTL::destroy(m_data, m_data + m_size);
   }
 
-  template<typename U = T>
+  template <typename U = T>
   std::enable_if_t<!std::is_scalar<U>::value> destroyAt(size_type n) {
     (&m_data[n])->~T();
   }
 
-  template<typename U = T>
-  std::enable_if_t<std::is_scalar<U>::value> destroyAt(size_type n) { }
+  template <typename U = T>
+  std::enable_if_t<std::is_scalar<U>::value> destroyAt(size_type n) {}
 
   // The following methods are not shared with void specialization
   const_pointer data() const { return m_data; }
@@ -294,7 +299,7 @@ public:
 };
 
 //! Void specialization
-template<>
+template <>
 class LargeArray<void> {
 
 private:
@@ -305,12 +310,11 @@ private:
    */
   friend class boost::serialization::access;
   template <typename Archive>
-  void serialize(Archive &ar, const unsigned int version) const {
-  }
+  void serialize(Archive& ar, const unsigned int version) const {}
 
 public:
-  LargeArray(void* d, size_t s) { }
-  LargeArray() = default;
+  LargeArray(void* d, size_t s) {}
+  LargeArray()                  = default;
   LargeArray(const LargeArray&) = delete;
   LargeArray& operator=(const LargeArray&) = delete;
 
@@ -334,34 +338,36 @@ public:
   const_reference at(difference_type x) const { return 0; }
   reference at(difference_type x) { return 0; }
   const_reference operator[](size_type x) const { return 0; }
-  template<typename AnyTy>
-  void set(difference_type x, AnyTy v) { }
+  template <typename AnyTy>
+  void set(difference_type x, AnyTy v) {}
   size_type size() const { return 0; }
   iterator begin() { return 0; }
   const_iterator begin() const { return 0; }
   iterator end() { return 0; }
   const_iterator end() const { return 0; }
 
-  void allocateInterleaved(size_type n) { }
-  void allocateBlocked(size_type n) { }
-  void allocateLocal(size_type n, bool prefault = true) { }
-  void allocateFloating(size_type n) { }
-  template<typename RangeArrayTy>
+  void allocateInterleaved(size_type n) {}
+  void allocateBlocked(size_type n) {}
+  void allocateLocal(size_type n, bool prefault = true) {}
+  void allocateFloating(size_type n) {}
+  template <typename RangeArrayTy>
   void allocateSpecified(size_type number_of_elements,
-                         RangeArrayTy threadRanges) { }
+                         RangeArrayTy threadRanges) {}
 
+  template <typename... Args>
+  void construct(Args&&... args) {}
+  template <typename... Args>
+  void constructAt(size_type n, Args&&... args) {}
+  template <typename... Args>
+  void create(size_type n, Args&&... args) {}
 
-  template<typename... Args> void construct(Args&&... args) { }
-  template<typename... Args> void constructAt(size_type n, Args&&... args) { }
-  template<typename... Args> void create(size_type n, Args&&... args) { }
-
-  void deallocate() { }
-  void destroy() { }
-  void destroyAt(size_type n) { }
+  void deallocate() {}
+  void destroy() {}
+  void destroyAt(size_type n) {}
 
   const_pointer data() const { return 0; }
   pointer data() { return 0; }
 };
 
-}
+} // namespace galois
 #endif

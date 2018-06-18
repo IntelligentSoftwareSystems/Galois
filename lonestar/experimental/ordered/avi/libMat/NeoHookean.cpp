@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 10/24/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -29,17 +29,19 @@
 #include "Material.h"
 
 // calling default constructor
-galois::substrate::PerThreadStorage<NeoHookean::NeoHookenTmpVec> NeoHookean::perCPUtmpVec;
+galois::substrate::PerThreadStorage<NeoHookean::NeoHookenTmpVec>
+    NeoHookean::perCPUtmpVec;
 
-static double matlib_determinant(const double *A) {
+static double matlib_determinant(const double* A) {
   double det;
 
-  det = A[0] * (A[4] * A[8] - A[5] * A[7]) - A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
+  det = A[0] * (A[4] * A[8] - A[5] * A[7]) -
+        A[1] * (A[3] * A[8] - A[5] * A[6]) + A[2] * (A[3] * A[7] - A[4] * A[6]);
 
   return det;
 }
 
-static double matlib_inverse(const double *A, double *Ainv) {
+static double matlib_inverse(const double* A, double* Ainv) {
   double det, detinv;
 
   det = matlib_determinant(A);
@@ -47,7 +49,7 @@ static double matlib_inverse(const double *A, double *Ainv) {
     return 0.e0;
   }
 
-  detinv = 1. / det;
+  detinv  = 1. / det;
   Ainv[0] = detinv * (A[4] * A[8] - A[5] * A[7]);
   Ainv[1] = detinv * (-A[1] * A[8] + A[2] * A[7]);
   Ainv[2] = detinv * (A[1] * A[5] - A[2] * A[4]);
@@ -61,7 +63,7 @@ static double matlib_inverse(const double *A, double *Ainv) {
   return det;
 }
 
-static void matlib_mults(const double *A, const double *B, double *C) {
+static void matlib_mults(const double* A, const double* B, double* C) {
   C[0] = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
   C[1] = A[3] * B[0] + A[4] * B[1] + A[5] * B[2];
   C[2] = A[6] * B[0] + A[7] * B[1] + A[8] * B[2];
@@ -73,9 +75,11 @@ static void matlib_mults(const double *A, const double *B, double *C) {
   C[8] = A[6] * B[6] + A[7] * B[7] + A[8] * B[8];
 }
 
-bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& stress, VecDouble& tangents
-    , const ConstRespMode& mode) const {
-  // XXX: (amber) replaced unknown 3's with NDM, 9 & 81 with MAT_SIZE & MAT_SIZE ^ 2
+bool NeoHookean::getConstitutiveResponse(const VecDouble& strain,
+                                         VecDouble& stress, VecDouble& tangents,
+                                         const ConstRespMode& mode) const {
+  // XXX: (amber) replaced unknown 3's with NDM, 9 & 81 with MAT_SIZE & MAT_SIZE
+  // ^ 2
 
   size_t i;
   size_t j;
@@ -104,20 +108,19 @@ bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& str
   double p;
   // double trace;
 
-  NeoHookenTmpVec& tmpVec = *perCPUtmpVec.getLocal ();
-  double* F = tmpVec.F;
+  NeoHookenTmpVec& tmpVec = *perCPUtmpVec.getLocal();
+  double* F               = tmpVec.F;
   // double* Finv = tmpVec.Finv;
-  double* C = tmpVec.C;
+  double* C    = tmpVec.C;
   double* Cinv = tmpVec.Cinv;
-  double* S = tmpVec.S;
-  double* M = tmpVec.M;
+  double* S    = tmpVec.S;
+  double* M    = tmpVec.M;
 
-  
   // double detF;
 
   size_t J;
 
-  std::copy (I_MAT, I_MAT + MAT_SIZE, F);
+  std::copy(I_MAT, I_MAT + MAT_SIZE, F);
 
   /*Fill in the deformation gradient*/
   for (i = 0; i < NDF; i++) {
@@ -134,12 +137,13 @@ bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& str
   // detF = matlib_inverse(F, Finv);
 
   if (detC < DET_MIN) {
-    std::cerr << "NeoHookean::GetConstitutiveResponse:  close to negative jacobian\n";
+    std::cerr
+        << "NeoHookean::GetConstitutiveResponse:  close to negative jacobian\n";
     return false;
   }
 
   defVol = 0.5 * log(detC);
-  p = Lambda * defVol;
+  p      = Lambda * defVol;
 
   // trace = C[0] + C[4] + C[8];
 
@@ -157,8 +161,10 @@ bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& str
     for (l = 0, kl = 0, ijkl = 0; l < NDM; l++) {
       for (k = 0, jk = 0; k < NDM; k++, kl++) {
         for (j = 0, ij = 0, jl = l * NDM; j < NDM; j++, jk++, jl++) {
-          for (i = 0, ik = k * NDM, il = l * NDM; i < NDM; i++, ij++, ik++, il++, ijkl++) {
-            M[ijkl] = Lambda * Cinv[ij] * Cinv[kl] + coef * (Cinv[ik] * Cinv[jl] + Cinv[il] * Cinv[jk]);
+          for (i = 0, ik = k * NDM, il = l * NDM; i < NDM;
+               i++, ij++, ik++, il++, ijkl++) {
+            M[ijkl] = Lambda * Cinv[ij] * Cinv[kl] +
+                      coef * (Cinv[ik] * Cinv[jl] + Cinv[il] * Cinv[jk]);
           }
         }
       }
@@ -204,7 +210,6 @@ bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& str
             if (i == k) {
               tangents[ijkl] += S[jl];
             }
-
           }
         }
       }

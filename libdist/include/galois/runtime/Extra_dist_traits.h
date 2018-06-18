@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,37 +35,39 @@
 #define __is_trivially_copyable(type) __has_trivial_copy(type)
 #else
 //! Defines what it means to be trivially copyable
-#define __is_trivially_copyable(type) std::is_trivially_copyable<type>::value 
+#define __is_trivially_copyable(type)                                          \
+        std::is_trivially_copyable < type > ::value
 #endif
 
 namespace galois {
 namespace runtime {
 
-  BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
-  //! Indicates if T has the serialize trait
-  template<typename T>
-  struct has_serialize : public has_tt_has_serialize<T> {};
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
+//! Indicates if T has the serialize trait
+template <typename T>
+struct has_serialize : public has_tt_has_serialize<T> {};
 
-  BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_copyable)
-  //! Indicates if T is trivially copyable
-  template<typename T>
-  struct is_copyable :  public has_tt_is_copyable<T> {};
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_copyable)
+//! Indicates if T is trivially copyable
+template <typename T>
+struct is_copyable : public has_tt_is_copyable<T> {};
 
-  //! Indicates if T is serializable
-  template<typename T>
-  struct is_serializable {
-    //! true if T is serializable
-    static const bool value = has_serialize<T>::value || is_copyable<T>::value || __is_trivially_copyable(T);
-  };
+//! Indicates if T is serializable
+template <typename T>
+struct is_serializable {
+  //! true if T is serializable
+  static const bool value = has_serialize<T>::value || is_copyable<T>::value ||
+                            __is_trivially_copyable(T);
+};
 
-  //! Indicates if T is memory copyable
-  template<typename T>
-  struct is_memory_copyable {
-    //! true if T is memory copyable
-    static const bool value = is_copyable<T>::value || __is_trivially_copyable(T);
-  };
+//! Indicates if T is memory copyable
+template <typename T>
+struct is_memory_copyable {
+  //! true if T is memory copyable
+  static const bool value = is_copyable<T>::value || __is_trivially_copyable(T);
+};
 
-} // namepace runtime
-} // namepace galois
+} // namespace runtime
+} // namespace galois
 
 #endif

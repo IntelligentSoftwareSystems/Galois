@@ -11,12 +11,12 @@
 using namespace galois::graphs;
 using namespace galois::runtime;
 
-typedef galois::DGReducible<unsigned, std::plus<unsigned> > RD1;
+typedef galois::DGReducible<unsigned, std::plus<unsigned>> RD1;
 
 struct op1 {
   gptr<RD1> count;
 
-  op1(gptr<RD1> c): count(c) {}
+  op1(gptr<RD1> c) : count(c) {}
   op1() {}
 
   void operator()(const int& nodeval, const galois::UserContext<int>&) {
@@ -32,7 +32,8 @@ void check1() {
   gptr<RD1> Cr(new RD1());
 
   std::cout << "Loop\n";
-  galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op1(Cr));
+  galois::for_each<>(boost::counting_iterator<int>(0),
+                     boost::counting_iterator<int>(20), op1(Cr));
   std::cout << "\n";
 
   for (int i = 0; i < 4; ++i) {
@@ -50,12 +51,13 @@ typedef galois::DGReducibleVector<int, std::plus<int>> RD2;
 
 struct Show {
   gptr<RD2> count;
-  Show() { }
-  Show(gptr<RD2> c): count(c) { }
+  Show() {}
+  Show(gptr<RD2> c) : count(c) {}
 
   void operator()(unsigned tid, unsigned) {
     for (int i = 0; i < 20; ++i) {
-      std::cout << networkHostID << " " << tid << " c[" << i << "]: " << count->get(i) << "\n";
+      std::cout << networkHostID << " " << tid << " c[" << i
+                << "]: " << count->get(i) << "\n";
     }
   }
 
@@ -66,12 +68,10 @@ struct Show {
 
 struct op2 {
   gptr<RD2> count;
-  op2() { }
-  op2(gptr<RD2> c): count(c) { }
+  op2() {}
+  op2(gptr<RD2> c) : count(c) {}
 
-  void operator()(int n, galois::UserContext<int>&) {
-    count->update(n, n);
-  }
+  void operator()(int n, galois::UserContext<int>&) { count->update(n, n); }
 
   typedef int tt_has_serialize;
   void serialize(SerializeBuffer& s) const { gSerialize(s, count); }
@@ -82,8 +82,10 @@ void check2() {
   gptr<RD2> p(new RD2());
   p->allocate(20);
 
-  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
-  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0),
+                   boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0),
+                   boost::counting_iterator<int>(20), op2(p));
   for (int i = 0; i < 20; ++i) {
     std::cout << "local[" << i << "]: " << p->get(i) << "\n";
   }
@@ -92,12 +94,14 @@ void check2() {
     std::cout << "reduced[" << i << "]: " << p->get(i) << "\n";
   }
 
-  //galois::on_each(Show(p)); 
+  // galois::on_each(Show(p));
   p->doReset();
   distWait();
 
-  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
-  galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0),
+                   boost::counting_iterator<int>(20), op2(p));
+  galois::for_each(boost::counting_iterator<int>(0),
+                   boost::counting_iterator<int>(20), op2(p));
   for (int i = 0; i < 20; ++i) {
     std::cout << "local[" << i << "]: " << p->get(i) << "\n";
   }
@@ -115,9 +119,11 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
   networkStart();
 
-  std::cout << "====Check1====\n"; check1();
-  std::cout << "====Check2====\n"; check2();
-  
+  std::cout << "====Check1====\n";
+  check1();
+  std::cout << "====Check2====\n";
+  check2();
+
   networkTerminate();
   return 0;
 }

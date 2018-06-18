@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,15 +39,14 @@ namespace internal {
 /**
  * Base case for traceImpl; ends the line with a new line.
  */
-static inline void traceImpl(std::ostringstream& os) {
-  os << "\n";
-}
+static inline void traceImpl(std::ostringstream& os) { os << "\n"; }
 
 /**
  * Prints out a value to the output stream.
  */
-template<typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, T&& value, Args&&... args) {
+template <typename T, typename... Args>
+static inline void traceImpl(std::ostringstream& os, T&& value,
+                             Args&&... args) {
   os << value << " ";
   traceImpl(os, std::forward<Args>(args)...);
 }
@@ -62,8 +61,8 @@ static inline void traceFormatImpl(std::ostringstream& os, const char* format) {
 /**
  * Format string to os as well as something else to print.
  */
-template<typename T, typename... Args>
-static inline void traceFormatImpl(std::ostringstream& os, const char* format, 
+template <typename T, typename... Args>
+static inline void traceFormatImpl(std::ostringstream& os, const char* format,
                                    T&& value, Args&&... args) {
   for (; *format != '\0'; format++) {
     if (*format == '%') {
@@ -75,14 +74,15 @@ static inline void traceFormatImpl(std::ostringstream& os, const char* format,
   }
 }
 
-/** 
+/**
  * Class to print a vector.
  */
-template<typename T, typename A>
+template <typename T, typename A>
 class vecPrinter {
-  const std::vector<T,A>& v;
+  const std::vector<T, A>& v;
+
 public:
-  vecPrinter(const std::vector<T,A>& _v) :v(_v) {}
+  vecPrinter(const std::vector<T, A>& _v) : v(_v) {}
   void print(std::ostream& os) const {
     os << "< " << v.size() << " : ";
     for (auto& i : v)
@@ -94,8 +94,8 @@ public:
 /**
  * Operator to print a vector given a vecPrinter object
  */
-template<typename T, typename A>
-std::ostream& operator<<(std::ostream& os, const vecPrinter<T,A>& vp) {
+template <typename T, typename A>
+std::ostream& operator<<(std::ostream& os, const vecPrinter<T, A>& vp) {
   vp.print(os);
   return os;
 }
@@ -119,22 +119,22 @@ extern bool initTrace;
  * Given a vector, returns a vector printer object that is able
  * to print the vector out onto an output stream.
  */
-template<typename T, typename A>
-internal::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
-  return internal::vecPrinter<T,A>(v);
+template <typename T, typename A>
+internal::vecPrinter<T, A> printVec(const std::vector<T, A>& v) {
+  return internal::vecPrinter<T, A>(v);
 };
 
 /**
  * Prints a trace log of the provided arguments if debug mode is on.
  */
 #ifdef NDEBUG
-template<typename... Args>
-static inline void trace(Args&& ...) {}
+template <typename... Args>
+static inline void trace(Args&&...) {}
 #else
-template<typename... Args>
+template <typename... Args>
 static inline void trace(Args&&... args) {
   if (!internal::initTrace) {
-    internal::doTrace = substrate::EnvCheck("GALOIS_DEBUG_TRACE");
+    internal::doTrace   = substrate::EnvCheck("GALOIS_DEBUG_TRACE");
     internal::initTrace = true;
   }
   if (internal::doTrace) {
@@ -148,10 +148,10 @@ static inline void trace(Args&&... args) {
 /**
  * Prints data to an output stream.
  *
- * @param format Format string 
+ * @param format Format string
  * @param args data to print
  */
-template<typename... Args>
+template <typename... Args>
 static inline void printOutput(const char* format, Args&&... args) {
   std::ostringstream os;
   internal::traceFormatImpl(os, format, std::forward<Args>(args)...);

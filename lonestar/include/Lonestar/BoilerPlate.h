@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,6 +30,6 @@ extern llvm::cl::opt<int> numThreads;
 extern llvm::cl::opt<std::string> statFile;
 
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, const char* app, 
+void LonestarStart(int argc, char** argv, const char* app,
                    const char* desc = nullptr, const char* url = nullptr);
 #endif

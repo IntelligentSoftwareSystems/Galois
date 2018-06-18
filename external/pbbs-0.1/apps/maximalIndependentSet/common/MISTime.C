@@ -36,18 +36,19 @@ using namespace benchIO;
 static bool CheckResult;
 
 int checkMaximalIndependentSet(graph G, char* Flags) {
-  int n = G.n;
+  int n     = G.n;
   vertex* V = G.V;
-  for (int i=0; i < n; i++) {
+  for (int i = 0; i < n; i++) {
     int nflag;
-    for (int j=0; j < V[i].degree; j++) {
+    for (int j = 0; j < V[i].degree; j++) {
       vindex ngh = V[i].Neighbors[j];
       if (Flags[ngh] == 1)
-	if (Flags[i] == 1) {
-	  cout << "checkMaximalIndependentSet: bad edge " 
-	       << i << "," << ngh << endl;
-	  return 1;
-	} else nflag = 1;
+        if (Flags[i] == 1) {
+          cout << "checkMaximalIndependentSet: bad edge " << i << "," << ngh
+               << endl;
+          return 1;
+        } else
+          nflag = 1;
     }
     if ((Flags[i] != 1) && (nflag != 1)) {
       cout << "checkMaximalIndependentSet: bad vertex " << i << endl;
@@ -59,8 +60,8 @@ int checkMaximalIndependentSet(graph G, char* Flags) {
 
 void timeMIS(graph G, int rounds, char* outFile) {
   char* flags = NULL;
-  //maximalIndependentSet(G);
-  for (int i=0; i < rounds; i++) {
+  // maximalIndependentSet(G);
+  for (int i = 0; i < rounds; i++) {
     if (flags)
       free(flags);
     startTime();
@@ -70,17 +71,26 @@ void timeMIS(graph G, int rounds, char* outFile) {
   cout << endl;
 
   int matched = 0;
-  for (int i=0; i < G.n; i++) if (flags[i] == 1) matched++;
+  for (int i = 0; i < G.n; i++)
+    if (flags[i] == 1)
+      matched++;
   cout << "matched = " << matched << "\n";
 
   if (outFile != NULL) {
     int* F = newA(int, G.n);
-    for (int i=0; i < G.n; i++) F[i] = flags[i];
+    for (int i = 0; i < G.n; i++)
+      F[i] = flags[i];
     writeIntArrayToFile(F, G.n, outFile);
     free(F);
   }
 
-  if (CheckResult) { if (!checkMaximalIndependentSet(G, flags)) { cout << "result ok\n"; } else { abort(); } }
+  if (CheckResult) {
+    if (!checkMaximalIndependentSet(G, flags)) {
+      cout << "result ok\n";
+    } else {
+      abort();
+    }
+  }
 
   free(flags);
   G.del();
@@ -91,7 +101,7 @@ int parallel_main(int argc, char* argv[]) {
   commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  int rounds  = P.getOptionIntValue("-r", 1);
   CheckResult = P.getOption("-c");
 
   graph G = readGraphFromFile(iFile);

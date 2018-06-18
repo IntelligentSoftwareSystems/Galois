@@ -32,51 +32,56 @@ using namespace std;
 using namespace benchIO;
 
 struct strCmp {
-  bool operator() (char* s1c, char* s2c) {
-    char* s1 = s1c, *s2 = s2c;
-    while (*s1 && *s1==*s2) {s1++; s2++;};
+  bool operator()(char* s1c, char* s2c) {
+    char *s1 = s1c, *s2 = s2c;
+    while (*s1 && *s1 == *s2) {
+      s1++;
+      s2++;
+    };
     return (*s1 < *s2);
   }
 };
 
 template <class T, class CMP>
 void timeSort(T* A, int n, CMP f, int rounds, bool permute, char* outFile) {
-  if (permute) randPerm(A, n);
+  if (permute)
+    randPerm(A, n);
   T* B = new T[n];
-//  parallel_for (int i=0; i < n; i++) B[i] = A[i];
-  parallel_doall(int, i, 0, n) { B[i] = A[i]; } parallel_doall_end
-  compSort(B, n, f); // run one sort to "warm things up"
-  for (int i=0; i < rounds; i++) {
-//    parallel_for (int i=0; i < n; i++) B[i] = A[i];
-    parallel_doall(int, i, 0, n) { B[i] = A[i]; } parallel_doall_end
-    startTime();
+  //  parallel_for (int i=0; i < n; i++) B[i] = A[i];
+  parallel_doall(int, i, 0, n) { B[i] = A[i]; }
+  parallel_doall_end compSort(B, n, f); // run one sort to "warm things up"
+  for (int i = 0; i < rounds; i++) {
+    //    parallel_for (int i=0; i < n; i++) B[i] = A[i];
+    parallel_doall(int, i, 0, n) { B[i] = A[i]; }
+    parallel_doall_end startTime();
     compSort(B, n, f);
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) writeSequenceToFile(B, n, outFile);
-  delete B; 
+  if (outFile != NULL)
+    writeSequenceToFile(B, n, outFile);
+  delete B;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-p] [-o <outFile>] [-r <rounds>] <inFile>");
-  char* iFile = P.getArgument(0);
-  char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  commandLine P(argc, argv, "[-p] [-o <outFile>] [-r <rounds>] <inFile>");
+  char* iFile  = P.getArgument(0);
+  char* oFile  = P.getOptionValue("-o");
+  int rounds   = P.getOptionIntValue("-r", 1);
   bool permute = P.getOption("-p");
-  seqData D = readSequenceFromFile(iFile);
-  int dt = D.dt;
+  seqData D    = readSequenceFromFile(iFile);
+  int dt       = D.dt;
 
   switch (dt) {
   case doubleT:
-    timeSort((double*) D.A, D.n, less<double>(), rounds, permute, oFile);
+    timeSort((double*)D.A, D.n, less<double>(), rounds, permute, oFile);
     break;
   case stringT:
-    timeSort((char**) D.A, D.n, strCmp(), rounds, permute, oFile); 
+    timeSort((char**)D.A, D.n, strCmp(), rounds, permute, oFile);
     break;
   default:
     cout << "comparisonSort: input file not of right type" << endl;
-    return(1);
+    return (1);
   }
 }

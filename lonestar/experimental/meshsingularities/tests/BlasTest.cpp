@@ -33,264 +33,210 @@ extern "C" {
 #include "clapack.h"
 }
 
-void test_lu_fact()
-{
-    int error = 0;
+void test_lu_fact() {
+  int error = 0;
 
-    const int n = 4;
-    const int m = 2;
-    const int k = 2;
-    int ipiv[m] = {0,0};
+  const int n = 4;
+  const int m = 2;
+  const int k = 2;
+  int ipiv[m] = {0, 0};
 
-    double ** matrix;
-    double *rhs;
+  double** matrix;
+  double* rhs;
 
-    double data[4][4] = {
-        {1, 1, 0, 3},
-        {2, 1,-1, 1},
-        {3,-1,-1, 2},
-        {2, 2, 3,-1}
-    };
+  double data[4][4] = {
+      {1, 1, 0, 3}, {2, 1, -1, 1}, {3, -1, -1, 2}, {2, 2, 3, -1}};
 
-    double data_r[4] = {4, 1, -3, 4};
+  double data_r[4] = {4, 1, -3, 4};
 
-    matrix = new double*[n];
-    matrix[0] = new double[n*(n+1)];
-    matrix[1] = matrix[0] + n;
-    matrix[2] = matrix[0] + 2*n;
-    matrix[3] = matrix[0] + 3*n;
-    rhs = matrix[0] + 4*n;
+  matrix    = new double*[n];
+  matrix[0] = new double[n * (n + 1)];
+  matrix[1] = matrix[0] + n;
+  matrix[2] = matrix[0] + 2 * n;
+  matrix[3] = matrix[0] + 3 * n;
+  rhs       = matrix[0] + 4 * n;
 
-    for (int i=0; i<n; ++i) {
-        for (int j=0; j<n; ++j) { // col-major!
-            matrix[i][j] = data[j][i];
-        }
-        rhs[i] = data_r[i];
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) { // col-major!
+      matrix[i][j] = data[j][i];
     }
+    rhs[i] = data_r[i];
+  }
 
-    printf("Input matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
+  printf("Input matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
+  error = clapack_dgetrf(CblasColMajor,
+                         m, // size
+                         m,
+                         matrix[0], // pointer to data
+                         n,         // LDA = matrix_size
+                         ipiv);     // pivot vector
 
-    error = clapack_dgetrf(CblasColMajor,
-                           m, // size
-                           m,
-                           matrix[0], // pointer to data
-                           n, // LDA = matrix_size
-                           ipiv); // pivot vector
+  if (!error) {
+    printf("DGETRF error: %d\n", error);
+  }
 
-    if (!error) {
-        printf("DGETRF error: %d\n", error);
+  printf("after DGETRF matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-    printf("after DGETRF matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
+  printf("IPIV vector: ");
+  for (int i = 0; i < m; ++i) {
+    printf("%d ", ipiv[i]);
+  }
+  printf("\n");
+
+  clapack_dgetrs(CblasColMajor, CblasNoTrans, m, k, matrix[0], n, ipiv,
+                 matrix[m], n);
+
+  printf("after DGETRS matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-    printf("IPIV vector: ");
-    for (int i=0; i<m; ++i) {
-        printf("%d ", ipiv[i]);
+  printf("IPIV vector: ");
+  for (int i = 0; i < m; ++i) {
+    printf("%d ", ipiv[i]);
+  }
+  printf("\n");
+
+  // void cblas_dgemm(const enum CBLAS_ORDER Order,
+  //                 const enum CBLAS_TRANSPOSE TransA,
+  //                 const enum CBLAS_TRANSPOSE TransB,
+  //                 const int M,
+  //                 const int N,
+  //                 const int K,
+  //                 const double alpha,
+  //                 const double *A,
+  //                 const int lda,
+  //                 const double *B,
+  //                 const int ldb,
+  //                 const double beta,
+  //                 double *C,
+  //                 const int ldc);
+  cblas_dgemm(CblasColMajor, CblasNoTrans, CblasNoTrans, k, k, m, -1.0,
+              matrix[0] + m, // C
+              n,
+              matrix[m], // B
+              n, 1.0,
+              matrix[m] + m, // D
+              n);
+  printf("after DGEMM matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
-    printf("\n");
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-    clapack_dgetrs (CblasColMajor,
-                    CblasNoTrans,
-                    m,
-                    k,
-                    matrix[0],
-                    n,
-                    ipiv,
-                    matrix[m],
-                    n);
+  printf("IPIV vector: ");
+  for (int i = 0; i < m; ++i) {
+    printf("%d ", ipiv[i]);
+  }
+  printf("\n");
 
-    printf("after DGETRS matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
-    }
-
-    printf("IPIV vector: ");
-    for (int i=0; i<m; ++i) {
-        printf("%d ", ipiv[i]);
-    }
-    printf("\n");
-
-
-    //void cblas_dgemm(const enum CBLAS_ORDER Order,
-    //                 const enum CBLAS_TRANSPOSE TransA,
-    //                 const enum CBLAS_TRANSPOSE TransB,
-    //                 const int M,
-    //                 const int N,
-    //                 const int K,
-    //                 const double alpha,
-    //                 const double *A,
-    //                 const int lda,
-    //                 const double *B,
-    //                 const int ldb,
-    //                 const double beta,
-    //                 double *C,
-    //                 const int ldc);
-    cblas_dgemm(CblasColMajor,
-                CblasNoTrans,
-                CblasNoTrans,
-                k,
-                k,
-                m,
-                -1.0,
-                matrix[0]+m, // C
-                n,
-                matrix[m], // B
-                n,
-                1.0,
-                matrix[m]+m, // D
-                n);
-    printf("after DGEMM matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
-    }
-
-    printf("IPIV vector: ");
-    for (int i=0; i<m; ++i) {
-        printf("%d ", ipiv[i]);
-    }
-    printf("\n");
-
-
-    delete [] matrix[0];
-    delete [] matrix;
-
+  delete[] matrix[0];
+  delete[] matrix;
 }
 
-void test_ll_fact()
-{
-    int error = 0;
+void test_ll_fact() {
+  int error = 0;
 
-    const int n = 4;
-    const int m = 2;
-    const int k = 2;
+  const int n = 4;
+  const int m = 2;
+  const int k = 2;
 
-    double ** matrix;
-    double *rhs;
-    double data[4][4] = {
-        {2, 1, 3, 2},
-        {1, 2, 2, 3},
-        {3, 2, 9, 7},
-        {2, 3, 7, 9}
-    };
+  double** matrix;
+  double* rhs;
+  double data[4][4] = {{2, 1, 3, 2}, {1, 2, 2, 3}, {3, 2, 9, 7}, {2, 3, 7, 9}};
 
-    double data_r[4] = {4, 1, -3, 4};
+  double data_r[4] = {4, 1, -3, 4};
 
+  matrix    = new double*[n];
+  matrix[0] = new double[n * (n + 1)];
+  matrix[1] = matrix[0] + n;
+  matrix[2] = matrix[0] + 2 * n;
+  matrix[3] = matrix[0] + 3 * n;
+  rhs       = matrix[0] + 4 * n;
 
-    matrix = new double*[n];
-    matrix[0] = new double[n*(n+1)];
-    matrix[1] = matrix[0] + n;
-    matrix[2] = matrix[0] + 2*n;
-    matrix[3] = matrix[0] + 3*n;
-    rhs = matrix[0] + 4*n;
-
-    for (int i=0; i<n; ++i) {
-        for (int j=0; j<n; ++j) { // col-major!
-            matrix[i][j] = data[j][i];
-        }
-        rhs[i] = data_r[i];
+  for (int i = 0; i < n; ++i) {
+    for (int j = 0; j < n; ++j) { // col-major!
+      matrix[i][j] = data[j][i];
     }
+    rhs[i] = data_r[i];
+  }
 
-    printf("Input matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
+  printf("Input matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-    error = clapack_dpotrf(CblasColMajor,
-                           CblasUpper,
-                           m, // size
-                           matrix[0], // pointer to data
-                           n // LDA = matrix_size
-                           ); // pivot vector
+  error = clapack_dpotrf(CblasColMajor, CblasUpper,
+                         m,         // size
+                         matrix[0], // pointer to data
+                         n          // LDA = matrix_size
+  );                                // pivot vector
 
-    if (!error) {
-        printf("DPOTRF error: %d\n", error);
+  if (!error) {
+    printf("DPOTRF error: %d\n", error);
+  }
+
+  printf("after DPOTRF matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-    printf("after DPOTRF matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
+  cblas_dtrsm(CblasColMajor, CblasLeft, CblasUpper, CblasTrans, CblasNonUnit, m,
+              k, 1.0, matrix[0], n, matrix[m], n);
+  printf("after DTRSM matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-
-
-    cblas_dtrsm(CblasColMajor,
-                CblasLeft,
-                CblasUpper,
-                CblasTrans,
-                CblasNonUnit,
-                m,
-                k,
-                1.0,
-                matrix[0],
-                n,
-                matrix[m],
-                n);
-    printf("after DTRSM matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
+  cblas_dsyrk(CblasColMajor, CblasUpper, CblasTrans, k, m, -1.0,
+              matrix[m], // L**(-1) * B
+              n, 1.0,
+              matrix[m] + m, // D
+              n);
+  printf("after DSYRK matrix is: \n");
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) {
+      printf("%8.3lf ", matrix[j][i]);
     }
+    printf(" | %8.3lf\n", rhs[i]);
+  }
 
-
-    cblas_dsyrk(CblasColMajor,
-                CblasUpper,
-                CblasTrans,
-                k,
-                m,
-                -1.0,
-                matrix[m], // L**(-1) * B
-                n,
-                1.0,
-                matrix[m]+m, // D
-                n);
-    printf("after DSYRK matrix is: \n");
-    for (int i=0; i<4; ++i) {
-        for (int j=0; j<4; ++j) {
-            printf("%8.3lf ", matrix[j][i]);
-        }
-        printf (" | %8.3lf\n", rhs[i]);
-    }
-
-    delete [] matrix[0];
-    delete [] matrix;
-
-
+  delete[] matrix[0];
+  delete[] matrix;
 }
 
-int main()
-{
-    printf("\n==== LU FACTORIZATION ====\n");
-    test_lu_fact();
-    printf("\n==== LL* FACTORIZATION ====\n");
-    test_ll_fact();
+int main() {
+  printf("\n==== LU FACTORIZATION ====\n");
+  test_lu_fact();
+  printf("\n==== LL* FACTORIZATION ====\n");
+  test_ll_fact();
 
-    return 0;
+  return 0;
 }
-

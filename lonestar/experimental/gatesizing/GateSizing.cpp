@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,17 +39,19 @@
 
 const char* name = "Gate Sizing";
 const char* desc = 0;
-const char* url = 0;
+const char* url  = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputCircuit(cll::Positional, cll::desc("<input .v>"), cll::Required);
-static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"), cll::Required);
-static cll::opt<std::string> outputCircuit("o", cll::desc("output file for gate-sized .v"), cll::Required);
+static cll::opt<std::string>
+    inputCircuit(cll::Positional, cll::desc("<input .v>"), cll::Required);
+static cll::opt<std::string> lib("lib", cll::desc("path to the cell library"),
+                                 cll::Required);
+static cll::opt<std::string>
+    outputCircuit("o", cll::desc("output file for gate-sized .v"),
+                  cll::Required);
 static cll::opt<std::string> sdcFile("sdc", cll::desc("path to the sdc file"));
 
-void doGateSizing() {
-
-}
+void doGateSizing() {}
 
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
@@ -76,25 +78,27 @@ int main(int argc, char** argv) {
   graph.print();
   std::cout << "constructed circuit graph" << std::endl;
 
-//  SDC sdc(&cellLib, &vModule, &graph);
-//  sdc.setConstraints(sdcFile);
-//  graph.print();
-//  std::cout << "set constraints from sdc file to circuit graph" << std::endl;
+  //  SDC sdc(&cellLib, &vModule, &graph);
+  //  sdc.setConstraints(sdcFile);
+  //  graph.print();
+  //  std::cout << "set constraints from sdc file to circuit graph" <<
+  //  std::endl;
 
-//  doStaticTimingAnalysis(graph);
-//  graph.print();
-//  std::cout << "finished static timinig analysis" << std::endl;
+  //  doStaticTimingAnalysis(graph);
+  //  graph.print();
+  //  std::cout << "finished static timinig analysis" << std::endl;
 
-//  doGateSizing();
-//  vModule.printDebug();
-//  graph.print();
-//  std::cout << "finished gate sizing" << std::endl;
+  //  doGateSizing();
+  //  vModule.printDebug();
+  //  graph.print();
+  //  std::cout << "finished gate sizing" << std::endl;
 
   T.stop();
   vModule.write(outputCircuit);
   std::cout << "wrote modified verilog module" << std::endl;
 
   auto gStat = graph.getStatistics();
-  std::cout << gStat.first << " nodes, " << gStat.second << " edges" << std::endl;
+  std::cout << gStat.first << " nodes, " << gStat.second << " edges"
+            << std::endl;
   return 0;
 }

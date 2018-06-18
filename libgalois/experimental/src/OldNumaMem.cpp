@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,9 +35,10 @@ namespace galois {
 namespace runtime {
 extern unsigned activeThreads;
 }
-}
+} // namespace galois
 
-//! Define to get version of library that does not depend on Galois thread primatives
+//! Define to get version of library that does not depend on Galois thread
+//! primatives
 //#define GALOIS_FORCE_STANDALONE
 
 void galois::runtime::printInterleavedStats(int minPages) {
@@ -50,11 +51,11 @@ void galois::runtime::printInterleavedStats(int minPages) {
 
   char line[2048];
   gInfo("INTERLEAVED STATS BEGIN");
-  while (f.getline(line, sizeof(line)/sizeof(*line))) { 
+  while (f.getline(line, sizeof(line) / sizeof(*line))) {
     // Chomp \n
     size_t len = strlen(line);
-    if (len && line[len-1] == '\n')
-      line[len-1] = '\0';
+    if (len && line[len - 1] == '\n')
+      line[len - 1] = '\0';
 
     char* start;
     if (strstr(line, "interleave") != 0) {
@@ -87,7 +88,7 @@ static int numNumaPagesFor(unsigned nodeid) {
 
   char line[2048];
   int totalPages = 0;
-  while (f.getline(line, sizeof(line)/sizeof(*line))) {
+  while (f.getline(line, sizeof(line) / sizeof(*line))) {
     char* start;
     if ((start = strstr(line, search)) != 0) {
       int pages;
@@ -105,8 +106,8 @@ int galois::runtime::numNumaAllocForNode(unsigned nodeid) {
 }
 
 #ifdef GALOIS_USE_NUMA
-static void *allocInterleaved(size_t len, unsigned num) {
-  auto& tp = galois::substrate::getThreadPool();
+static void* allocInterleaved(size_t len, unsigned num) {
+  auto& tp    = galois::substrate::getThreadPool();
   bitmask* nm = numa_allocate_nodemask();
   for (unsigned i = 0; i < num; ++i) {
     numa_bitmask_setbit(nm, tp.getOSNumaNode(i));
@@ -127,30 +128,35 @@ static bool checkIfInterleaved(void* data, size_t len, unsigned total) {
   if (len < galois::runtime::hugePageSize * galois::runtime::numNumaNodes())
     return true;
 
-  union { void* as_vptr; char* as_cptr; uintptr_t as_uint; } d = { data };
+  union {
+    void* as_vptr;
+    char* as_cptr;
+    uintptr_t as_uint;
+  } d             = {data};
   size_t pageSize = galois::runtime::pageSize;
-  int numNodes = galois::runtime::numNumaNodes();
+  int numNodes    = galois::runtime::numNumaNodes();
 
   std::vector<size_t> hist(numNodes);
   for (size_t i = 0; i < len; i += pageSize) {
     int node;
-    char *mem = d.as_cptr + i;
-    if (get_mempolicy(&node, NULL, 0, mem, MPOL_F_NODE|MPOL_F_ADDR) < 0) {
-      //galois::runtime::LL::gInfo("unknown status[", mem, "]: ", strerror(errno));
+    char* mem = d.as_cptr + i;
+    if (get_mempolicy(&node, NULL, 0, mem, MPOL_F_NODE | MPOL_F_ADDR) < 0) {
+      // galois::runtime::LL::gInfo("unknown status[", mem, "]: ",
+      // strerror(errno));
     } else {
       hist[node] += 1;
     }
   }
 
-  size_t least = std::numeric_limits<size_t>::max();
+  size_t least    = std::numeric_limits<size_t>::max();
   size_t greatest = std::numeric_limits<size_t>::min();
   for (unsigned i = 0; i < total; ++i) {
     int node = getNumaNode(i);
-    least = std::min(least, hist[node]);
+    least    = std::min(least, hist[node]);
     greatest = std::max(greatest, hist[node]);
   }
 
-  return !total || least / (double) greatest > 0.5;
+  return !total || least / (double)greatest > 0.5;
 }
 #endif
 
@@ -171,7 +177,8 @@ static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
 #endif
 
 #ifndef GALOIS_FORCE_STANDALONE
-static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping, unsigned numNodes) {
+static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping,
+                              unsigned numNodes) {
   // XXX Don't know whether memory is backed by hugepages or not, so stick with
   // smaller page size
   size_t blockSize = galois::runtime::pageSize;
@@ -183,31 +190,40 @@ static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping,
   int id = mapping[tid] - 1;
   if (id < 0)
     return;
-  size_t start = id * blockSize;
+  size_t start  = id * blockSize;
   size_t stride = numNodes * blockSize;
   if (len <= start)
     return;
-  union { void* as_vptr; char* as_cptr; } d = { data };
+  union {
+    void* as_vptr;
+    char* as_cptr;
+  } d = {data};
 
   galois::runtime::pageIn(d.as_cptr + start, len - start, stride);
 }
 #endif
 
 static inline bool isNumaAlloc(void* data, size_t len) {
-  union { void* as_vptr; char* as_cptr; } d = { data };
-  return d.as_cptr[len-1] != 0;
+  union {
+    void* as_vptr;
+    char* as_cptr;
+  } d = {data};
+  return d.as_cptr[len - 1] != 0;
 }
 
 static inline void setNumaAlloc(void* data, size_t len, bool isNuma) {
-  union { void* as_vptr; char* as_cptr; } d = { data };
-  d.as_cptr[len-1] = isNuma;
+  union {
+    void* as_vptr;
+    char* as_cptr;
+  } d                = {data};
+  d.as_cptr[len - 1] = isNuma;
 }
 
 void* galois::runtime::largeInterleavedAlloc(size_t len, bool full) {
   void* data;
 #ifdef GALOIS_FORCE_STANDALONE
   unsigned __attribute__((unused)) total = 1;
-  bool inForEach = false;
+  bool inForEach                         = false;
 #else
   unsigned total = full ? getThreadPool().getMaxCores() : activeThreads;
   bool inForEach = substrate::getThreadPool().isRunning();
@@ -219,7 +235,7 @@ void* galois::runtime::largeInterleavedAlloc(size_t len, bool full) {
   if (inForEach) {
     if (checkNuma()) {
 #ifdef GALOIS_USE_NUMA
-      data = allocInterleaved(len, total);
+      data      = allocInterleaved(len, total);
       numaAlloc = true;
 #else
       data = largeAlloc(len, false);
@@ -236,7 +252,9 @@ void* galois::runtime::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    substrate::getThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    substrate::getThreadPool().run(total,
+                                   std::bind(pageInInterleaved, data, len,
+                                             std::ref(mapping), uniqueNodes));
 #endif
   }
 

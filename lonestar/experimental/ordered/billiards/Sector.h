@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,8 +29,8 @@
 #include "Ball.h"
 #include "Cushion.h"
 
-class Sector: public CollidingObject {
-public: 
+class Sector : public CollidingObject {
+public:
   using Ball_t = BallSectored;
 
   using Lock_t = galois::substrate::SimpleLock;
@@ -51,10 +51,10 @@ public:
   galois::FlatSet<Cushion*> cushions;
   galois::FlatSet<Ball_t*> balls;
 
-  void init (const Vec2& bottomLeft, const FP& sectorSize) {
+  void init(const Vec2& bottomLeft, const FP& sectorSize) {
 
-    Vec2 delX (sectorSize, 0.0);
-    Vec2 delY (0.0, sectorSize);
+    Vec2 delX(sectorSize, 0.0);
+    Vec2 delY(0.0, sectorSize);
 
     Vec2 topLeft = bottomLeft + delY;
 
@@ -62,137 +62,116 @@ public:
 
     Vec2 bottomRight = bottomLeft + delX;
 
-    sides.clear ();
-    assert (sides.empty ());
-    sides.emplace_back (bottomLeft, topLeft);
-    sides.emplace_back (topLeft, topRight);
-    sides.emplace_back (topRight, bottomRight);
-    sides.emplace_back (bottomRight, bottomLeft);
+    sides.clear();
+    assert(sides.empty());
+    sides.emplace_back(bottomLeft, topLeft);
+    sides.emplace_back(topLeft, topRight);
+    sides.emplace_back(topRight, bottomRight);
+    sides.emplace_back(bottomRight, bottomLeft);
 
+    neighbors.resize(sides.size(), nullptr);
 
-    neighbors.resize (sides.size (), nullptr);
-
-    boundbox.update (bottomLeft);
-    boundbox.update (topLeft);
-    boundbox.update (topRight);
-    boundbox.update (bottomRight);
+    boundbox.update(bottomLeft);
+    boundbox.update(topLeft);
+    boundbox.update(topRight);
+    boundbox.update(bottomRight);
   }
 
 public:
-
-  Sector (unsigned id, const Vec2& bottomLeft, const FP& sectorSize)
-    : CollidingObject (), mutex (), id (id) 
-  {
-    init (bottomLeft, sectorSize);
+  Sector(unsigned id, const Vec2& bottomLeft, const FP& sectorSize)
+      : CollidingObject(), mutex(), id(id) {
+    init(bottomLeft, sectorSize);
   }
 
-  virtual ~Sector (void) {
-  }
+  virtual ~Sector(void) {}
 
-  virtual unsigned collCounter (void) const { 
-    return 0;
-  }
+  virtual unsigned collCounter(void) const { return 0; }
 
-  virtual void incrCollCounter (void) {
-  }
+  virtual void incrCollCounter(void) {}
 
-  virtual bool isStationary (void) const {
-    return true;
-  }
+  virtual bool isStationary(void) const { return true; }
 
-  virtual unsigned getID (void) const { 
-    return id;
-  }
+  virtual unsigned getID(void) const { return id; }
 
-  virtual std::string str (void) const {
+  virtual std::string str(void) const {
     char s[256];
 
-    std::sprintf (s, "Sector-%d: %s", id, boundbox.str ().c_str ());
+    std::sprintf(s, "Sector-%d: %s", id, boundbox.str().c_str());
 
     return s;
   }
 
+  void addNeighbor(const RectSide& sd, Sector* sec) {
+    assert(sec != nullptr);
+    assert(int(sd) < int(sides.size()));
 
-  void addNeighbor (const RectSide& sd, Sector* sec) {
-    assert (sec != nullptr);
-    assert (int (sd) < int (sides.size ()));
-
-    assert (neighbors.at (int (sd)) == nullptr);
-    neighbors[int (sd)] = sec;
+    assert(neighbors.at(int(sd)) == nullptr);
+    neighbors[int(sd)] = sec;
   }
 
-  void addCushion (Cushion* c) {
-    assert (c != nullptr);
+  void addCushion(Cushion* c) {
+    assert(c != nullptr);
 
-    cushions.insert (c);
+    cushions.insert(c);
   }
 
-  void addBall (Ball_t* b) {
-    mutex.lock ();
-    assert (b != nullptr);
+  void addBall(Ball_t* b) {
+    mutex.lock();
+    assert(b != nullptr);
 
-    balls.insert (b);
-    assert (balls.contains (b));
-    mutex.unlock ();
+    balls.insert(b);
+    assert(balls.contains(b));
+    mutex.unlock();
   }
 
-  void removeBall (Ball_t* b) {
-    mutex.lock ();
-    assert (balls.contains (b));
-    balls.erase (b);
+  void removeBall(Ball_t* b) {
+    mutex.lock();
+    assert(balls.contains(b));
+    balls.erase(b);
 
-    assert (!balls.contains (b));
-    mutex.unlock ();
+    assert(!balls.contains(b));
+    mutex.unlock();
   }
 
-  bool hasBall (const Ball_t* b) const { 
-    assert (b);
-    return balls.contains (const_cast<Ball_t*> (b));
+  bool hasBall(const Ball_t* b) const {
+    assert(b);
+    return balls.contains(const_cast<Ball_t*>(b));
   }
 
-  void removeAllBalls (void) {
-    balls.clear ();
-  }
+  void removeAllBalls(void) { balls.clear(); }
 
-  void removeAllCushions (void) {
-    cushions.clear ();
-  }
+  void removeAllCushions(void) { cushions.clear(); }
 
-  bool intersects (const Ball_t* ball) const {
+  bool intersects(const Ball_t* ball) const {
 
-    const Vec2& p = ball->pos ();
+    const Vec2& p = ball->pos();
 
-    if (boundbox.isInside (p)) {
+    if (boundbox.isInside(p)) {
       return true;
-
     }
 
     // measure distance from ball to all sides of the sector
     // if distance < radius, return true
-    for (const LineSegment& l: sides) {
-      if (l.distanceFrom (p) < ball->radius ()) {
+    for (const LineSegment& l : sides) {
+      if (l.distanceFrom(p) < ball->radius()) {
         return true;
       }
     }
 
-
     return false;
   }
 
-  virtual void simulate (const Event& e);
+  virtual void simulate(const Event& e);
 
-  galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const;
+  galois::optional<Event> computeEarliestEvent(const Ball_t* ball,
+                                               const FP& endtime,
+                                               const Event* prevEvent) const;
 
+  galois::optional<Event> earliestSectorEntry(const Ball_t* ball,
+                                              const FP& endtime) const;
 
-  galois::optional<Event> earliestSectorEntry (const Ball_t* ball, const FP& endtime) const;
-
-
-  galois::optional<Event> earliestSectorLeave (const Ball_t* b, const FP& endtime) const;
-
-
+  galois::optional<Event> earliestSectorLeave(const Ball_t* b,
+                                              const FP& endtime) const;
 };
-
-
-
 
 #endif // SECTOR_H_

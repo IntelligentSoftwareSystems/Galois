@@ -12,13 +12,14 @@
 #include <sstream>
 #include <string>
 
-class semantic_error: public std::exception {
-	unsigned l,c;
-	std::string msg;
+class semantic_error : public std::exception {
+  unsigned l, c;
+  std::string msg;
+
 public:
-	semantic_error(unsigned l, unsigned c, std::string msg = "");
-	virtual const char * what() const throw ();
-	virtual ~semantic_error() throw ();
+  semantic_error(unsigned l, unsigned c, std::string msg = "");
+  virtual const char* what() const throw();
+  virtual ~semantic_error() throw();
 };
 
 #endif /* SEMANTIC_ERROR_H_ */

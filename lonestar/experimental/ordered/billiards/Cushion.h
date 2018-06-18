@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,8 +30,7 @@
 #include "GeomUtils.h"
 #include "CollidingObject.h"
 
-
-class Cushion: public CollidingObject {
+class Cushion : public CollidingObject {
 
 public:
   // return velocity is REFLECTION_COEFF * incident velocity
@@ -49,34 +48,29 @@ private:
   LineSegment m_line;
 
 public:
-  Cushion (const unsigned id, const Vec2& start, const Vec2& end) 
-    : CollidingObject (), m_id (id), m_line (start, end) {}
+  Cushion(const unsigned id, const Vec2& start, const Vec2& end)
+      : CollidingObject(), m_id(id), m_line(start, end) {}
 
+  const LineSegment& getLineSegment(void) const { return m_line; }
 
-  const LineSegment& getLineSegment (void) const {
-    return m_line;
-  }
-
-  virtual bool isStationary () const { return true; }
+  virtual bool isStationary() const { return true; }
 
   // Collision Counter for Cushion and other stationary objects
   // remains fixed
-  virtual unsigned collCounter () const { return 0; }
+  virtual unsigned collCounter() const { return 0; }
 
-  virtual unsigned getID () const { return m_id; }
+  virtual unsigned getID() const { return m_id; }
 
-  virtual void incrCollCounter () {}
+  virtual void incrCollCounter() {}
 
-  virtual void simulate (const Event& e);
+  virtual void simulate(const Event& e);
 
-  virtual std::string str () const {
+  virtual std::string str() const {
 
-    char s [256];
-    sprintf (s, "[Cushion-%d, %s]", m_id, m_line.str ().c_str ());
+    char s[256];
+    sprintf(s, "[Cushion-%d, %s]", m_id, m_line.str().c_str());
     return s;
   }
 };
-
-
 
 #endif // _CUSHION_H_

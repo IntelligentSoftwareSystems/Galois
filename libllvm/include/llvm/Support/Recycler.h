@@ -33,25 +33,23 @@ struct RecyclerStruct {
   RecyclerStruct *Prev, *Next;
 };
 
-template<>
-struct ilist_traits<RecyclerStruct> :
-    public ilist_default_traits<RecyclerStruct> {
-  static RecyclerStruct *getPrev(const RecyclerStruct *t) { return t->Prev; }
-  static RecyclerStruct *getNext(const RecyclerStruct *t) { return t->Next; }
-  static void setPrev(RecyclerStruct *t, RecyclerStruct *p) { t->Prev = p; }
-  static void setNext(RecyclerStruct *t, RecyclerStruct *n) { t->Next = n; }
+template <>
+struct ilist_traits<RecyclerStruct>
+    : public ilist_default_traits<RecyclerStruct> {
+  static RecyclerStruct* getPrev(const RecyclerStruct* t) { return t->Prev; }
+  static RecyclerStruct* getNext(const RecyclerStruct* t) { return t->Next; }
+  static void setPrev(RecyclerStruct* t, RecyclerStruct* p) { t->Prev = p; }
+  static void setNext(RecyclerStruct* t, RecyclerStruct* n) { t->Next = n; }
 
   mutable RecyclerStruct Sentinel;
-  RecyclerStruct *createSentinel() const {
-    return &Sentinel;
-  }
-  static void destroySentinel(RecyclerStruct *) {}
+  RecyclerStruct* createSentinel() const { return &Sentinel; }
+  static void destroySentinel(RecyclerStruct*) {}
 
-  RecyclerStruct *provideInitialHead() const { return createSentinel(); }
-  RecyclerStruct *ensureHead(RecyclerStruct*) const { return createSentinel(); }
+  RecyclerStruct* provideInitialHead() const { return createSentinel(); }
+  RecyclerStruct* ensureHead(RecyclerStruct*) const { return createSentinel(); }
   static void noteHead(RecyclerStruct*, RecyclerStruct*) {}
 
-  static void deleteNode(RecyclerStruct *) {
+  static void deleteNode(RecyclerStruct*) {
     assert(0 && "Recycler's ilist_traits shouldn't see a deleteNode call!");
   }
 };
@@ -60,7 +58,8 @@ struct ilist_traits<RecyclerStruct> :
 /// and facilitates reusing deallocated memory in place of allocating
 /// new memory.
 ///
-template<class T, size_t Size = sizeof(T), size_t Align = AlignOf<T>::Alignment>
+template <class T, size_t Size = sizeof(T),
+          size_t Align = AlignOf<T>::Alignment>
 class Recycler {
   /// FreeList - Doubly-linked list of nodes that have deleted contents and
   /// are not in active use.
@@ -78,40 +77,38 @@ public:
   /// clear - Release all the tracked allocations to the allocator. The
   /// recycler must be free of any tracked allocations before being
   /// deleted; calling clear is one way to ensure this.
-  template<class AllocatorType>
-  void clear(AllocatorType &Allocator) {
+  template <class AllocatorType>
+  void clear(AllocatorType& Allocator) {
     while (!FreeList.empty()) {
-      T *t = reinterpret_cast<T *>(FreeList.remove(FreeList.begin()));
+      T* t = reinterpret_cast<T*>(FreeList.remove(FreeList.begin()));
       Allocator.Deallocate(t);
     }
   }
 
-  template<class SubClass, class AllocatorType>
-  SubClass *Allocate(AllocatorType &Allocator) {
+  template <class SubClass, class AllocatorType>
+  SubClass* Allocate(AllocatorType& Allocator) {
     assert(sizeof(SubClass) <= Size &&
            "Recycler allocation size is less than object size!");
     assert(AlignOf<SubClass>::Alignment <= Align &&
            "Recycler allocation alignment is less than object alignment!");
-    return !FreeList.empty() ?
-           reinterpret_cast<SubClass *>(FreeList.remove(FreeList.begin())) :
-           static_cast<SubClass *>(Allocator.Allocate(Size, Align));
+    return !FreeList.empty()
+               ? reinterpret_cast<SubClass*>(FreeList.remove(FreeList.begin()))
+               : static_cast<SubClass*>(Allocator.Allocate(Size, Align));
   }
 
-  template<class AllocatorType>
-  T *Allocate(AllocatorType &Allocator) {
+  template <class AllocatorType>
+  T* Allocate(AllocatorType& Allocator) {
     return Allocate<T>(Allocator);
   }
 
-  template<class SubClass, class AllocatorType>
-  void Deallocate(AllocatorType & /*Allocator*/, SubClass* Element) {
-    FreeList.push_front(reinterpret_cast<RecyclerStruct *>(Element));
+  template <class SubClass, class AllocatorType>
+  void Deallocate(AllocatorType& /*Allocator*/, SubClass* Element) {
+    FreeList.push_front(reinterpret_cast<RecyclerStruct*>(Element));
   }
 
-  void PrintStats() {
-    PrintRecyclerStats(Size, Align, FreeList.size());
-  }
+  void PrintStats() { PrintRecyclerStats(Size, Align, FreeList.size()); }
 };
 
-}
+} // namespace llvm
 
 #endif

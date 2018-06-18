@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -28,12 +28,12 @@
 
 #endif
 
-
-#if defined(GALOIS_HAVE_PTHREAD) && defined(_POSIX_BARRIERS) && (_POSIX_BARRIERS > 0)
+#if defined(GALOIS_HAVE_PTHREAD) && defined(_POSIX_BARRIERS) &&                \
+    (_POSIX_BARRIERS > 0)
 
 namespace {
 
-class PthreadBarrier: public galois::substrate::Barrier {
+class PthreadBarrier : public galois::substrate::Barrier {
   pthread_barrier_t bar;
 
 public:
@@ -68,17 +68,18 @@ public:
   virtual const char* name() const { return "PthreadBarrier"; }
 };
 
-}
+} // namespace
 
-std::unique_ptr<galois::substrate::Barrier> galois::substrate::createPthreadBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier>
+galois::substrate::createPthreadBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(new PthreadBarrier(activeThreads));
 }
 
 #else
 
-std::unique_ptr<galois::substrate::Barrier> galois::substrate::createPthreadBarrier(unsigned activeThreads) {
+std::unique_ptr<galois::substrate::Barrier>
+galois::substrate::createPthreadBarrier(unsigned activeThreads) {
   return std::unique_ptr<Barrier>(nullptr);
 }
 
 #endif
-

@@ -33,34 +33,34 @@ using namespace std;
 using namespace benchIO;
 
 double check(point3d* p, vect3d* forces, int n) {
-  int nCheck = min(n,200);
-  double* Err = newA(double,nCheck);
+  int nCheck  = min(n, 200);
+  double* Err = newA(double, nCheck);
   double mass = 1.0; // all masses are 1 for now
-  
-//  parallel_for (int i=0; i < nCheck; i++) {
-  parallel_doall(int, i, 0, nCheck)  {
-    int idx = utils::hash(i)%n;
-    vect3d force(0.,0.,0.);
-    for (int j=0; j < n; j++) {
+
+  //  parallel_for (int i=0; i < nCheck; i++) {
+  parallel_doall(int, i, 0, nCheck) {
+    int idx = utils::hash(i) % n;
+    vect3d force(0., 0., 0.);
+    for (int j = 0; j < n; j++) {
       if (idx != j) {
-	vect3d v = p[j] - p[idx];
-	double r2 = v.dot(v);
-	force = force + (v * (mass * mass / (r2*sqrt(r2))));
+        vect3d v  = p[j] - p[idx];
+        double r2 = v.dot(v);
+        force     = force + (v * (mass * mass / (r2 * sqrt(r2))));
       }
     }
-    Err[i] = (force - forces[idx]).Length()/force.Length();
-  } parallel_doall_end
-  double total = 0.0;
-  for(int i=0; i < nCheck; i++) 
+    Err[i] = (force - forces[idx]).Length() / force.Length();
+  }
+  parallel_doall_end double total = 0.0;
+  for (int i = 0; i < nCheck; i++)
     total += Err[i];
-  return total/nCheck;
+  return total / nCheck;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv, "[-e <errbound>] <inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  double errorBound = P.getOptionDoubleValue("-e", 1e-6);
+  commandLine P(argc, argv, "[-e <errbound>] <inFile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  double errorBound         = P.getOptionDoubleValue("-e", 1e-6);
 
   char* iFile = fnames.first;
   char* oFile = fnames.second;
@@ -73,8 +73,8 @@ int parallel_main(int argc, char* argv[]) {
   }
   double err = check(PIn.A, POut.A, PIn.n);
   if (err > errorBound) {
-    cout << "nbody Check: RMS error is " << err 
-	 << " needs to be less than " << errorBound << endl;
+    cout << "nbody Check: RMS error is " << err << " needs to be less than "
+         << errorBound << endl;
     return 1;
   }
   return 0;

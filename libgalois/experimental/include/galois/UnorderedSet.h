@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -53,14 +53,13 @@ private:
   Set unorderedSet;
 
 public:
-  template<typename _T>
+  template <typename _T>
   using retype = ThreadSafeUnorderedSet<_T>;
 
   explicit ThreadSafeUnorderedSet() {}
 
   template <typename Iter>
-  ThreadSafeUnorderedSet(Iter b, Iter e)
-  {
+  ThreadSafeUnorderedSet(Iter b, Iter e) {
     for (; b != e; ++b) {
       unorderedSet.insert(*b);
     }
@@ -99,22 +98,22 @@ public:
   bool remove(const value_type& x) {
     mutex.lock();
     size_type s = unorderedSet.erase(x);
-    bool ret = (s > 0);
+    bool ret    = (s > 0);
     mutex.unlock();
 
     return ret;
   }
 
-  void clear () {
-    mutex.lock ();
-    unorderedSet.clear ();
-    mutex.unlock ();
+  void clear() {
+    mutex.lock();
+    unorderedSet.clear();
+    mutex.unlock();
   }
 
   const_iterator begin() const { return unorderedSet.begin(); }
   const_iterator end() const { return unorderedSet.end(); }
 };
 
-}
+} // namespace galois
 
 #endif

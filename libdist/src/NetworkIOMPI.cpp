@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -54,7 +54,7 @@ private:
     handleError(MPI_Comm_size(MPI_COMM_WORLD, &numTasks));
     return numTasks;
   }
-  
+
   /**
    * Get both the ID of the caller + number of hosts.
    */
@@ -70,11 +70,12 @@ private:
     uint32_t tag;
     std::vector<uint8_t> data;
     MPI_Request req;
-    //mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
-    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data) 
-      : host(host), tag(tag), data(std::move(data)) {}
-    mpiMessage(uint32_t host, uint32_t tag, size_t len) 
-      : host(host), tag(tag), data(len) {}
+    // mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req)
+    // {}
+    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data)
+        : host(host), tag(tag), data(std::move(data)) {}
+    mpiMessage(uint32_t host, uint32_t tag, size_t len)
+        : host(host), tag(tag), data(len) {}
   };
 
   /**
@@ -85,21 +86,20 @@ private:
 
     galois::runtime::MemUsageTracker& memUsageTracker;
 
-    sendQueueTy(galois::runtime::MemUsageTracker& tracker) 
-      : memUsageTracker(tracker) {}
+    sendQueueTy(galois::runtime::MemUsageTracker& tracker)
+        : memUsageTracker(tracker) {}
 
     void complete() {
       while (!inflight.empty()) {
         int flag = 0;
         MPI_Status status;
         auto& f = inflight.front();
-        int rv = MPI_Test(&f.req, &flag, &status);
+        int rv  = MPI_Test(&f.req, &flag, &status);
         handleError(rv);
         if (flag) {
           memUsageTracker.decrementMemUsage(f.data.size());
           inflight.pop_front();
-        }
-        else
+        } else
           break;
       }
     }
@@ -107,7 +107,7 @@ private:
     void send(message m) {
       inflight.emplace_back(m.host, m.tag, std::move(m.data));
       auto& f = inflight.back();
-      galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(), 
+      galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(),
                              galois::runtime::printVec(f.data));
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
                          MPI_COMM_WORLD, &f.req);
@@ -124,8 +124,8 @@ private:
 
     galois::runtime::MemUsageTracker& memUsageTracker;
 
-    recvQueueTy(galois::runtime::MemUsageTracker& tracker) 
-      : memUsageTracker(tracker) {}
+    recvQueueTy(galois::runtime::MemUsageTracker& tracker)
+        : memUsageTracker(tracker) {}
 
     // FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
@@ -139,28 +139,28 @@ private:
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-        #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         assert(status.MPI_TAG <= 32767);
         if (status.MPI_TAG != 32767) {
-        #endif
+#endif
           inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
           auto& m = inflight.back();
           memUsageTracker.incrementMemUsage(m.data.size());
-          rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, 
+          rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE,
                          status.MPI_TAG, MPI_COMM_WORLD, &m.req);
           handleError(rv);
-          galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, 
-                                 status.MPI_TAG, m.data.size());
-        #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+          galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG,
+                                 m.data.size());
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         }
-        #endif
+#endif
       }
 
       // complete messages
       if (!inflight.empty()) {
-        auto& m = inflight.front();
+        auto& m  = inflight.front();
         int flag = 0;
-        rv = MPI_Test(&m.req, &flag, MPI_STATUS_IGNORE);
+        rv       = MPI_Test(&m.req, &flag, MPI_STATUS_IGNORE);
         handleError(rv);
         if (flag) {
           done.emplace_back(m.host, m.tag, std::move(m.data));
@@ -181,11 +181,12 @@ public:
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */
-  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID, uint32_t& NUM)
-    : NetworkIO(tracker), sendQueue(tracker), recvQueue(tracker) {
+  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID,
+               uint32_t& NUM)
+      : NetworkIO(tracker), sendQueue(tracker), recvQueue(tracker) {
     auto p = getIDAndHostNum();
-    ID = p.first;
-    NUM = p.second;
+    ID     = p.first;
+    NUM    = p.second;
   }
 
   /**
@@ -217,9 +218,10 @@ public:
   }
 }; // end NetworkIOMPI class
 
-std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t> 
+std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>
 galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker) {
   uint32_t ID, NUM;
-  std::unique_ptr<galois::runtime::NetworkIO> n{new NetworkIOMPI(tracker, ID, NUM)};
+  std::unique_ptr<galois::runtime::NetworkIO> n{
+      new NetworkIOMPI(tracker, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }

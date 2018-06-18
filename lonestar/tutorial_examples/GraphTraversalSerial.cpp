@@ -1,6 +1,6 @@
-// This example shows 
+// This example shows
 // 0. reading in a graph from a file
-// 1. serial iteration over nodes 
+// 1. serial iteration over nodes
 // 2. access to node and edge data
 // 3. usage of galois::StatTimer
 #include "galois/Galois.h"
@@ -8,7 +8,7 @@
 #include "galois/Timer.h"
 #include <iostream>
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   galois::SharedMemSys G;
 
   if (argc < 2) {
@@ -16,7 +16,7 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
-  //! [Define LC_CSR_Graph] 
+  //! [Define LC_CSR_Graph]
   // An LC_CSR_Graph whose node data type is int and edge data type is int
   using Graph = galois::graphs::LC_CSR_Graph<int, int>;
   //! [Define LC_CSR_Graph]
@@ -33,11 +33,11 @@ int main(int argc, char *argv[]) {
   T.start();
   //! [Graph traversal]
   // iterate over nodes
-  for (auto n: g) {
+  for (auto n : g) {
     auto& sum = g.getData(n); // get node data of n
-    sum = 0;
+    sum       = 0;
     // iterate over edges from node n
-    for (auto e: g.edges(n)) {
+    for (auto e : g.edges(n)) {
       sum += g.getEdgeData(e); // get edge data of e
     }
   }

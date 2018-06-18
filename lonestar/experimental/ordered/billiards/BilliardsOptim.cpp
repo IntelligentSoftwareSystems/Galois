@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,14 +27,14 @@
 #include "Billiards.h"
 #include "BilliardsParallel.h"
 
-class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
+class BilliardsOptim : public Billiards<BilliardsOptim, Table<BallOptim<>>> {
 
-  using Graph = galois::graphs::MorphGraph<void*, void, true>;
-  using GNode = Graph::GraphNode;
-  using VecNodes = std::vector<GNode>;
+  using Graph     = galois::graphs::MorphGraph<void*, void, true>;
+  using GNode     = Graph::GraphNode;
+  using VecNodes  = std::vector<GNode>;
   using AddListTy = galois::PerThreadVector<Event>;
 
-  using Tbl_t = Table<BallOptim<> >;
+  using Tbl_t  = Table<BallOptim<>>;
   using Ball_t = typename Tbl_t::Ball_t;
 
   struct ExecSourcesOptim {
@@ -45,80 +45,80 @@ class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
     bool logEvents;
 
     template <typename C>
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e, C& ctx) const {
-
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Event& e,
+                                                   C& ctx) const {
 
       if (enablePrints) {
-        std::cout << "Processing event=" << e.str () << std::endl;
+        std::cout << "Processing event=" << e.str() << std::endl;
       }
 
       using Wrapper = typename Ball_t::Wrapper;
 
-      Wrapper* bw1 = static_cast<Ball_t*> (e.getBall ())->getWrapper ();
+      Wrapper* bw1 = static_cast<Ball_t*>(e.getBall())->getWrapper();
       Wrapper* bw2 = nullptr;
 
-      if (e.getKind () == Event::BALL_COLLISION) {
-        bw2 = static_cast<Ball_t*> (e.getOtherBall ())->getWrapper ();
+      if (e.getKind() == Event::BALL_COLLISION) {
+        bw2 = static_cast<Ball_t*>(e.getOtherBall())->getWrapper();
       }
 
-      Ball_t* b1 = bw1->checkpoint (e);
+      Ball_t* b1 = bw1->checkpoint(e);
       Ball_t* b2 = nullptr;
-      
+
       if (bw2) {
-        b2 = bw2->checkpoint (e);
+        b2 = bw2->checkpoint(e);
       }
 
-      auto ccopy = e.getCounterCopies ();
+      auto ccopy = e.getCounterCopies();
 
-      auto restore = [bw1, bw2, b1, b2, &e, ccopy] (void) {
-        bw1->restore (b1);
-        
+      auto restore = [bw1, bw2, b1, b2, &e, ccopy](void) {
+        bw1->restore(b1);
+
         if (bw2) {
-          assert (b2);
-          bw2->restore (b2);
+          assert(b2);
+          bw2->restore(b2);
         }
 
-        const_cast<Event&> (e).restoreCounters (ccopy);
+        const_cast<Event&>(e).restoreCounters(ccopy);
       };
 
-      ctx.addUndoAction (restore);
+      ctx.addUndoAction(restore);
 
-      auto reclaim = [bw1, bw2, b1, b2, &e, this] (void) {
-        bw1->reclaim (e, b1);
+      auto reclaim = [bw1, bw2, b1, b2, &e, this](void) {
+        bw1->reclaim(e, b1);
 
         if (bw2) {
-          assert (b2);
-          bw2->reclaim (e, b2);
+          assert(b2);
+          bw2->reclaim(e, b2);
         }
 
         if (logEvents) {
-          table.logCollisionEvent (e);
+          table.logCollisionEvent(e);
         }
 
         if (enablePrints) {
-          std::cout << "Committing event=" << e.str () << std::endl;
+          std::cout << "Committing event=" << e.str() << std::endl;
         }
       };
 
-      ctx.addCommitAction (reclaim);
+      ctx.addCommitAction(reclaim);
 
-      if (e.notStale ()) {
+      if (e.notStale()) {
         // assert (Collision::isValidCollision (e));
       }
 
-      if (e.notStale () && Collision::isValidCollision (e)) {
-        const_cast<Event&> (e).simulate ();
+      if (e.notStale() && Collision::isValidCollision(e)) {
+        const_cast<Event&>(e).simulate();
       }
     }
   };
 
-
-
 public:
+  virtual const std::string version() const {
+    return "using Speculative Executor";
+  }
 
-  virtual const std::string version () const { return "using Speculative Executor"; }
-
-  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, const bool enablePrints=false, const bool logEvents=false) {
+  size_t runSim(Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime,
+                const bool enablePrints = false, const bool logEvents = false) {
 
     Graph graph;
     VecNodes nodes;
@@ -126,35 +126,32 @@ public:
     Accumulator iter;
     AddListTy addList;
 
-    createLocks (table, graph, nodes);
+    createLocks(table, graph, nodes);
 
-    galois::runtime::for_each_ordered_spec (
-        galois::runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
-        Event::Comparator (),
-        VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
-        ExecSourcesOptim {table, enablePrints, logEvents},
-        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints),
-        std::make_tuple (galois::loopname ("billiards-optimistic")));
+    galois::runtime::for_each_ordered_spec(
+        galois::runtime::makeStandardRange(initEvents.begin(),
+                                           initEvents.end()),
+        Event::Comparator(), VisitNhoodLocks<Graph, VecNodes>(graph, nodes),
+        ExecSourcesOptim{table, enablePrints, logEvents},
+        AddEvents<Tbl_t>(table, endtime, addList, iter, enablePrints),
+        std::make_tuple(galois::loopname("billiards-optimistic")));
 
+    for (unsigned i = 0; i < table.getNumBalls(); ++i) {
 
-    for (unsigned i = 0; i < table.getNumBalls (); ++i) {
-      
-      auto bw = table.getBallByID (i).getWrapper ();
-      assert (bw->hasEmptyHistory ());
+      auto bw = table.getBallByID(i).getWrapper();
+      assert(bw->hasEmptyHistory());
     }
 
     if (enablePrints) {
-      table.printState (std::cout);
+      table.printState(std::cout);
     }
 
-    return iter.reduce ();
-
+    return iter.reduce();
   }
-
 };
 
-int main (int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
   BilliardsOptim s;
-  s.run (argc, argv);
+  s.run(argc, argv);
   return 0;
 }

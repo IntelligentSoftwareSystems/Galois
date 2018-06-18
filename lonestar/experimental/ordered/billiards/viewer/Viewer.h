@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,7 +23,7 @@
 #include <QGLViewer/qglviewer.h>
 #include "Scene.h"
 
-class Viewer: public QGLViewer {
+class Viewer : public QGLViewer {
   Scene& scene;
   unsigned refdelay;
 
@@ -38,7 +38,7 @@ protected:
   virtual QString helpString() const override;
 
 public:
-  Viewer(Scene& s, unsigned refdelay): scene(s), refdelay (refdelay) { }
+  Viewer(Scene& s, unsigned refdelay) : scene(s), refdelay(refdelay) {}
 };
 
 #endif

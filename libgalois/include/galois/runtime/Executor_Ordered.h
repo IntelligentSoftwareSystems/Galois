@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,7 +34,9 @@ struct OrderedTraits {
 #endif
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp,
+                           const NhFunc& nhFunc, const OpFunc& opFunc,
+                           const char* loopname) {
 #if 0
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     // TODO: Remove-only/DAG executor
@@ -49,9 +51,12 @@ void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhF
 #endif
 }
 
-
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc,
+          typename StableTest>
+void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp,
+                           const NhFunc& nhFunc, const OpFunc& opFunc,
+                           const StableTest& stabilityTest,
+                           const char* loopname) {
 #if 0
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     GALOIS_DIE("no-adds + fixed-neighborhood == stable-source");

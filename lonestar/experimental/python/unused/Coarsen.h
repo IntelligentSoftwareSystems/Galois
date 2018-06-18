@@ -5,9 +5,7 @@
 
 extern "C" {
 
-void coarsen(Graph *fg, Graph *cg, const KeyAltTy key);
-
+void coarsen(Graph* fg, Graph* cg, const KeyAltTy key);
 }
 
-#endif  // GALOIS_PYTHON_COARSEN_H
-
+#endif // GALOIS_PYTHON_COARSEN_H

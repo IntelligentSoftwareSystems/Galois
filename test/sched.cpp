@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,10 +30,14 @@
 
 static const char* name = "Scheduler Micro Benchmark";
 static const char* desc = "Measures stuff";
-static const char* url = 0;
+static const char* url  = 0;
 
-static llvm::cl::opt<int> sval(llvm::cl::Positional, llvm::cl::desc("<start value>"), llvm::cl::init(-1));
-static llvm::cl::opt<int> ival(llvm::cl::Positional, llvm::cl::desc("<init num>"), llvm::cl::init(100));
+static llvm::cl::opt<int> sval(llvm::cl::Positional,
+                               llvm::cl::desc("<start value>"),
+                               llvm::cl::init(-1));
+static llvm::cl::opt<int> ival(llvm::cl::Positional,
+                               llvm::cl::desc("<init num>"),
+                               llvm::cl::init(100));
 
 int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
@@ -42,15 +46,14 @@ int main(int argc, char** argv) {
 
   std::cout << "Initial: " << (int)ival << " using " << (int)sval << "\n";
 
-
   galois::StatTimer T2("T2");
   T2.start();
   using namespace galois::worklists;
-  galois::for_each(galois::iterate(v), 
-      [&] (int item, auto& lwl) {
-        for (int i = 0; i < item; ++i)
-          lwl.push(item - 1);
-      },
-      galois::wl<PerSocketChunkLIFO<64>>());
+  galois::for_each(galois::iterate(v),
+                   [&](int item, auto& lwl) {
+                     for (int i = 0; i < item; ++i)
+                       lwl.push(item - 1);
+                   },
+                   galois::wl<PerSocketChunkLIFO<64>>());
   T2.stop();
 }

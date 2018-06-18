@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,7 +23,6 @@
 #include "galois/runtime/KDGaddRem.h"
 #include "galois/runtime/KDGtwoPhase.h"
 
-
 #include <boost/iterator/transform_iterator.hpp>
 
 #include <string>
@@ -42,23 +41,20 @@
 
 #include "AVIabstractMain.h"
 
-
 enum ExecType {
   useAddRem,
   useTwoPhase,
 };
 
-static cll::opt<ExecType> execType (
-    cll::desc ("Ordered Executor Type:"),
-    cll::values (
-      clEnumVal(useAddRem, "Use Add-Remove executor"),
-      clEnumVal(useTwoPhase, "Use Two-Phase executor"),
-      clEnumValEnd),
-    cll::init (useAddRem));
+static cll::opt<ExecType> execType(
+    cll::desc("Ordered Executor Type:"),
+    cll::values(clEnumVal(useAddRem, "Use Add-Remove executor"),
+                clEnumVal(useTwoPhase, "Use Two-Phase executor"), clEnumValEnd),
+    cll::init(useAddRem));
 
-class AVIodgOrdered: public AVIabstractMain {
+class AVIodgOrdered : public AVIabstractMain {
 protected:
-  typedef galois::graphs::MorphGraph<void*,void,true> Graph;
+  typedef galois::graphs::MorphGraph<void*, void, true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 
@@ -68,7 +64,7 @@ protected:
   virtual const std::string getVersion() const {
     return "Parallel version, ODG automatically managed";
   }
-  
+
   virtual void initRemaining(const MeshInit& meshInit, const GlobalVec& g) {
     assert(locks.empty());
     locks.reserve(meshInit.getNumNodes());
@@ -80,30 +76,30 @@ protected:
   struct Update {
     AVI* avi;
     double ts;
-    Update(AVI* a, double t): avi(a), ts(t) { }
+    Update(AVI* a, double t) : avi(a), ts(t) {}
 
-    Update updatedCopy () const {
-      return Update (avi, avi->getNextTimeStamp ());
-    }
+    Update updatedCopy() const { return Update(avi, avi->getNextTimeStamp()); }
 
-    friend std::ostream& operator << (std::ostream& out, const Update& up) {
-      return (out << "(id:" << up.avi->getGlobalIndex() << ", ts:" << up.ts << ")");
+    friend std::ostream& operator<<(std::ostream& out, const Update& up) {
+      return (out << "(id:" << up.avi->getGlobalIndex() << ", ts:" << up.ts
+                  << ")");
     }
   };
   struct Comparator {
 
-    bool operator() (const Update& a, const Update& b) const {
-      int c = DoubleComparator::compare (a.ts, b.ts);
-      if (c == 0) { 
-        c = a.avi->getGlobalIndex () - b.avi->getGlobalIndex ();
+    bool operator()(const Update& a, const Update& b) const {
+      int c = DoubleComparator::compare(a.ts, b.ts);
+      if (c == 0) {
+        c = a.avi->getGlobalIndex() - b.avi->getGlobalIndex();
       }
       return (c < 0);
     }
   };
 
-
-  struct MakeUpdate: public std::unary_function<AVI*,Update> {
-    Update operator()(AVI* avi) const { return Update(avi, avi->getNextTimeStamp ()); }
+  struct MakeUpdate : public std::unary_function<AVI*, Update> {
+    Update operator()(AVI* avi) const {
+      return Update(avi, avi->getNextTimeStamp());
+    }
   };
 
   struct NhoodVisit {
@@ -111,7 +107,7 @@ protected:
     Graph& graph;
     Locks& locks;
 
-    NhoodVisit(Graph& g, Locks& l): graph(g), locks(l) { }
+    NhoodVisit(Graph& g, Locks& l) : graph(g), locks(l) {}
 
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, C&) {
@@ -119,22 +115,22 @@ protected:
 
       const V& conn = item.avi->getGeometry().getConnectivity();
 
-      for (V::const_iterator ii = conn.begin(), ei = conn.end(); ii != ei; ++ii) {
+      for (V::const_iterator ii = conn.begin(), ei = conn.end(); ii != ei;
+           ++ii) {
         graph.getData(locks[*ii]);
       }
     }
   };
 
-  struct NhoodVisitAddRem: public NhoodVisit {
+  struct NhoodVisitAddRem : public NhoodVisit {
     typedef int tt_has_fixed_neighborhood;
-    NhoodVisitAddRem (Graph& g, Locks& l): NhoodVisit (g, l) {}
+    NhoodVisitAddRem(Graph& g, Locks& l) : NhoodVisit(g, l) {}
   };
 
   struct Process {
 
-    static const size_t CHUNK_SIZE = 4;
+    static const size_t CHUNK_SIZE    = 4;
     static const size_t UNROLL_FACTOR = 256;
-
 
     MeshInit& meshInit;
     GlobalVec& g;
@@ -142,19 +138,13 @@ protected:
     bool createSyncFiles;
     IterCounter& niter;
 
-    Process(
-        MeshInit& meshInit,
-        GlobalVec& g,
-        PerThrdLocalVec& perIterLocalVec,
-        bool createSyncFiles,
-        IterCounter& niter):
-      meshInit(meshInit),
-      g(g),
-      perIterLocalVec(perIterLocalVec),
-      createSyncFiles(createSyncFiles),
-      niter(niter) { }
+    Process(MeshInit& meshInit, GlobalVec& g, PerThrdLocalVec& perIterLocalVec,
+            bool createSyncFiles, IterCounter& niter)
+        : meshInit(meshInit), g(g), perIterLocalVec(perIterLocalVec),
+          createSyncFiles(createSyncFiles), niter(niter) {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, galois::UserContext<Update>& ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void
+    operator()(const Update& item, galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
 
@@ -163,11 +153,10 @@ protected:
       AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
 
       if (item.avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
-        ctx.push(item.updatedCopy ());
+        ctx.push(item.updatedCopy());
       }
     }
   };
-
 
 public:
   virtual void runLoop(MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
@@ -181,33 +170,32 @@ public:
     IterCounter niter;
 
     NhoodVisit nhVisitor(graph, locks);
-    NhoodVisitAddRem nhVisitorAddRem (graph, locks);
+    NhoodVisitAddRem nhVisitorAddRem(graph, locks);
     Process p(meshInit, g, perIterLocalVec, createSyncFiles, niter);
 
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     switch (execType) {
-      case useAddRem:
-        galois::runtime::for_each_ordered_ar (
-            galois::runtime::makeStandardRange (
+    case useAddRem:
+      galois::runtime::for_each_ordered_ar(
+          galois::runtime::makeStandardRange(
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
-              Comparator(), nhVisitor, p,
-              std::make_tuple (galois::loopname ("avi-kdg-ar")));
-        break;
-      case useTwoPhase:
-        galois::runtime::for_each_ordered_ikdg (
-            galois::runtime::makeStandardRange (
+          Comparator(), nhVisitor, p,
+          std::make_tuple(galois::loopname("avi-kdg-ar")));
+      break;
+    case useTwoPhase:
+      galois::runtime::for_each_ordered_ikdg(
+          galois::runtime::makeStandardRange(
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
-              Comparator(), nhVisitor, p,
-              std::make_tuple (galois::loopname ("avi-ikdg")));
-        break;
-      default:
-        GALOIS_DIE("Unknown executor type");
-        break;
+          Comparator(), nhVisitor, p,
+          std::make_tuple(galois::loopname("avi-ikdg")));
+      break;
+    default:
+      GALOIS_DIE("Unknown executor type");
+      break;
     }
-
 
     printf("iterations = %lu\n", niter.reduce());
   }

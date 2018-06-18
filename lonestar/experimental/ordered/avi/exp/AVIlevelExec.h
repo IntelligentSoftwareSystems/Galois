@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -43,9 +43,9 @@
 
 #include "AVIabstractMain.h"
 
-class AVIlevelExec: public AVIabstractMain {
+class AVIlevelExec : public AVIabstractMain {
 protected:
-  typedef galois::graphs::MorphGraph<void*,void,true> Graph;
+  typedef galois::graphs::MorphGraph<void*, void, true> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> Locks;
 
@@ -55,7 +55,7 @@ protected:
   virtual const std::string getVersion() const {
     return "Parallel version, Level-by-Level executor ";
   }
-  
+
   virtual void initRemaining(const MeshInit& meshInit, const GlobalVec& g) {
     assert(locks.empty());
     locks.reserve(meshInit.getNumNodes());
@@ -67,32 +67,31 @@ protected:
   struct Update {
     AVI* avi;
     double ts;
-    explicit Update(AVI* a, double t): avi(a), ts(t) { }
+    explicit Update(AVI* a, double t) : avi(a), ts(t) {}
 
-    Update updatedCopy () const {
-      return Update (avi, avi->getNextTimeStamp ());
-    }
+    Update updatedCopy() const { return Update(avi, avi->getNextTimeStamp()); }
 
-    friend std::ostream& operator << (std::ostream& out, const Update& up) {
-      return (out << "(id:" << up.avi->getGlobalIndex() << ", ts:" << up.ts << ")");
+    friend std::ostream& operator<<(std::ostream& out, const Update& up) {
+      return (out << "(id:" << up.avi->getGlobalIndex() << ", ts:" << up.ts
+                  << ")");
     }
   };
 
   struct GetNextTS {
-    double operator () (const Update& up) const {
-      return up.ts;
-    }
+    double operator()(const Update& up) const { return up.ts; }
   };
 
-  struct MakeUpdate: public std::unary_function<AVI*,Update> {
-    Update operator()(AVI* avi) const { return Update(avi, avi->getNextTimeStamp ()); }
+  struct MakeUpdate : public std::unary_function<AVI*, Update> {
+    Update operator()(AVI* avi) const {
+      return Update(avi, avi->getNextTimeStamp());
+    }
   };
 
   struct NhoodVisit {
     Graph& graph;
     Locks& locks;
 
-    NhoodVisit(Graph& g, Locks& l): graph(g), locks(l) { }
+    NhoodVisit(Graph& g, Locks& l) : graph(g), locks(l) {}
 
     template <typename C>
     void operator()(const Update& item, C&) const {
@@ -100,15 +99,16 @@ protected:
 
       const V& conn = item.avi->getGeometry().getConnectivity();
 
-      for (V::const_iterator ii = conn.begin(), ei = conn.end(); ii != ei; ++ii) {
+      for (V::const_iterator ii = conn.begin(), ei = conn.end(); ii != ei;
+           ++ii) {
         graph.getData(locks[*ii]);
       }
     }
   };
 
-  struct NhoodVisitAddRem: public NhoodVisit {
+  struct NhoodVisitAddRem : public NhoodVisit {
     typedef int tt_has_fixed_neighborhood;
-    NhoodVisitAddRem (Graph& g, Locks& l): NhoodVisit (g, l) {}
+    NhoodVisitAddRem(Graph& g, Locks& l) : NhoodVisit(g, l) {}
   };
 
   struct Process {
@@ -121,21 +121,14 @@ protected:
     bool createSyncFiles;
     IterCounter& niter;
 
-    Process(
-        MeshInit& meshInit,
-        GlobalVec& g,
-        galois::substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
-        bool createSyncFiles,
-        IterCounter& niter)
-      :
-        meshInit(meshInit),
-        g(g),
-        perIterLocalVec(perIterLocalVec),
-        createSyncFiles(createSyncFiles),
-        niter(niter) 
-    {}
+    Process(MeshInit& meshInit, GlobalVec& g,
+            galois::substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
+            bool createSyncFiles, IterCounter& niter)
+        : meshInit(meshInit), g(g), perIterLocalVec(perIterLocalVec),
+          createSyncFiles(createSyncFiles), niter(niter) {}
 
-    void operator () (const Update& item, galois::UserContext<Update>& ctx) const {
+    void operator()(const Update& item,
+                    galois::UserContext<Update>& ctx) const {
       // for debugging, remove later
       niter += 1;
       LocalVec& l = *perIterLocalVec.getLocal();
@@ -143,17 +136,16 @@ protected:
       AVI* avi = item.avi;
 
       if (createSyncFiles) {
-        meshInit.writeSync (*avi, g.vecQ, g.vecV_b, g.vecT);
+        meshInit.writeSync(*avi, g.vecQ, g.vecV_b, g.vecT);
       }
 
       AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
 
       if (avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
-        ctx.push (item.updatedCopy ());
+        ctx.push(item.updatedCopy());
       }
     }
   };
-
 
 public:
   virtual void runLoop(MeshInit& meshInit, GlobalVec& g, bool createSyncFiles) {
@@ -172,11 +164,11 @@ public:
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     // galois::for_each_ordered (
-    galois::runtime::for_each_ordered_level (
-        galois::runtime::makeStandardRange (
-        boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-        boost::make_transform_iterator(elems.end(), MakeUpdate())), 
-        GetNextTS (), std::less<double> (), nhVisitor, p, "level-by-level-avi");
+    galois::runtime::for_each_ordered_level(
+        galois::runtime::makeStandardRange(
+            boost::make_transform_iterator(elems.begin(), MakeUpdate()),
+            boost::make_transform_iterator(elems.end(), MakeUpdate())),
+        GetNextTS(), std::less<double>(), nhVisitor, p, "level-by-level-avi");
 
     printf("iterations = %lu\n", niter.reduce());
   }

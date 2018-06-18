@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,30 +23,27 @@
 #include "Kruskal.h"
 #include "KruskalParallel.h"
 
-
 namespace kruskal {
 
+class KruskalHand : public Kruskal {
+protected:
+  virtual const std::string getVersion() const {
+    return "Handwritten using window-based two-phase union-find";
+  }
 
-class KruskalHand: public Kruskal {
-  protected:
+  virtual void runMST(const size_t numNodes, VecEdge& edges, size_t& mstWeight,
+                      size_t& totalIter) {
 
-  virtual const std::string getVersion () const { return "Handwritten using window-based two-phase union-find"; }
-
-  virtual void runMST (const size_t numNodes, VecEdge& edges,
-      size_t& mstWeight, size_t& totalIter) {
-
-    if (edges.size () >= 2 * numNodes) {
-      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
+    if (edges.size() >= 2 * numNodes) {
+      runMSTfilter(numNodes, edges, mstWeight, totalIter, UnionFindWindow());
 
     } else {
 
-      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
+      runMSTsimple(numNodes, edges, mstWeight, totalIter, UnionFindWindow());
     }
   }
 };
 
-
-}// end namespace kruskal
+} // end namespace kruskal
 
 #endif //  KRUSKAL_HAND_H
-

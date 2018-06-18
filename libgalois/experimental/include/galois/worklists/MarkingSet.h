@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,8 +30,8 @@ namespace worklists {
 
 namespace internal {
 
-template<typename T, typename Marker,
-	 typename Scheduler = PerSocketChunkFIFO<64, T> >
+template <typename T, typename Marker,
+          typename Scheduler = PerSocketChunkFIFO<64, T>>
 struct MarkingWorkSetMaster : private boost::noncopyable {
 private:
   Scheduler scheduler;
@@ -40,70 +40,71 @@ private:
 
 public:
   typedef T value_type;
-  template<typename _T>
-  using retype = MarkingWorkSetMaster<_T, Marker, typename Scheduler::template retype<_T> >;
+  template <typename _T>
+  using retype =
+      MarkingWorkSetMaster<_T, Marker, typename Scheduler::template retype<_T>>;
 
-  MarkingWorkSetMaster(const Marker& m = Marker()): marker(m)
-  {
+  MarkingWorkSetMaster(const Marker& m = Marker()) : marker(m) {
     duplicate = new galois::Statistic("SchedulerDuplicates");
   }
 
-  template<typename... Args>
+  template <typename... Args>
   MarkingWorkSetMaster(const Marker& m, Separator dummy, Args... args)
-    :scheduler(std::forward<Args>(args)...), marker(m), duplicate(new galois::Statistic("SchedulerDuplicates"))
-  {
-  }
+      : scheduler(std::forward<Args>(args)...), marker(m),
+        duplicate(new galois::Statistic("SchedulerDuplicates")) {}
 
   ~MarkingWorkSetMaster() { delete duplicate; }
 
   void push(const value_type& val) {
     bool* mark = marker(val);
-    while(true) {
+    while (true) {
       bool inSet = *mark;
-      if(inSet) {
+      if (inSet) {
         *duplicate += 1;
         break;
       }
-      if(__sync_bool_compare_and_swap(mark, inSet, true)) {
+      if (__sync_bool_compare_and_swap(mark, inSet, true)) {
         scheduler.push(val);
         break;
       }
     }
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
   }
 
   galois::optional<value_type> pop() {
-    auto defaultRetVal = galois::optional<value_type>();
+    auto defaultRetVal                  = galois::optional<value_type>();
     galois::optional<value_type> retval = scheduler.pop();
 
-    if(retval == defaultRetVal)
+    if (retval == defaultRetVal)
       return defaultRetVal;
 
     bool* mark = marker(retval.get());
-    while(true) {
+    while (true) {
       bool inSet = *mark;
-      if(!inSet || __sync_bool_compare_and_swap(mark, inSet, false))
+      if (!inSet || __sync_bool_compare_and_swap(mark, inSet, false))
         break;
     }
     return retval;
   }
 };
 
-}  // end namespace internal
+} // end namespace internal
 
-template<typename Marker, int ChunkSize=64, typename T=int, bool Concurrent=true>
-using PerSocketChunkMarkingSetFIFO = internal::MarkingWorkSetMaster<T, Marker, PerSocketChunkFIFO<ChunkSize,T,Concurrent> >;
+template <typename Marker, int ChunkSize = 64, typename T = int,
+          bool Concurrent = true>
+using PerSocketChunkMarkingSetFIFO = internal::MarkingWorkSetMaster<
+    T, Marker, PerSocketChunkFIFO<ChunkSize, T, Concurrent>>;
 GALOIS_WLCOMPILECHECK(PerSocketChunkMarkingSetFIFO);
 
 } // end namespace worklists

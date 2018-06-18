@@ -10,29 +10,28 @@
 #include "Node.h"
 
 class AbstractProduction {
-  protected:
-	Vertex *S;
-	Graph *graph;
+protected:
+  Vertex* S;
+  Graph* graph;
 
-	std::vector<EquationSystem*> *inputData;
-	std::vector<int>* productionParameters;
+  std::vector<EquationSystem*>* inputData;
+  std::vector<int>* productionParameters;
 
-  public:
-	AbstractProduction(std::vector<int>* productionParameters, std::vector<EquationSystem*> *inputData) : productionParameters(productionParameters)
-    {
+public:
+  AbstractProduction(std::vector<int>* productionParameters,
+                     std::vector<EquationSystem*>* inputData)
+      : productionParameters(productionParameters) {}
 
-    }
+  virtual ~AbstractProduction() {
+    delete graph;
+    delete S;
+  }
 
-	virtual ~AbstractProduction() {
-		delete graph;
-		delete S;
-	}
-
-	virtual void Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input) = 0;
-	virtual std::vector<double> *getResult() = 0;
-	virtual Vertex *getRootVertex() = 0;
-	virtual Graph *getGraph() = 0;
-
+  virtual void Execute(EProduction productionToExecute, Vertex* v,
+                       EquationSystem* input) = 0;
+  virtual std::vector<double>* getResult()    = 0;
+  virtual Vertex* getRootVertex()             = 0;
+  virtual Graph* getGraph()                   = 0;
 };
 
 #endif

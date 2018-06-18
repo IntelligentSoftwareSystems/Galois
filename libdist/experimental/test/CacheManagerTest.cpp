@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,13 +24,13 @@
 
 using namespace galois::runtime;
 
-struct foo: public Lockable {
+struct foo : public Lockable {
   int x;
   int y;
   friend std::ostream& operator<<(std::ostream& os, const foo& v) {
     return os << "{" << v.x << "," << v.y << "}";
   }
-  foo(int _x, int _y) :x(_x), y(_y) {}
+  foo(int _x, int _y) : x(_x), y(_y) {}
   foo(galois::runtime::DeSerializeBuffer& buf) { deserialize(buf); }
   foo() = default;
 
@@ -48,26 +48,25 @@ void test_CM() {
   fatPointer fp{1, 0x010};
 
   std::cout << fp << " " << cm.resolve(fp) << "\n";
-  cm.create(fp, foo{1,2});
+  cm.create(fp, foo{1, 2});
   std::cout << fp << " " << cm.resolve(fp) << "\n";
   cm.evict(fp);
   std::cout << fp << " " << cm.resolve(fp) << "\n";
-  cm.create(fp, foo{1,2});
+  cm.create(fp, foo{1, 2});
   std::cout << fp << " " << cm.resolve(fp) << "\n";
 }
 
 void test_RP() {
-  foo lfoo{1,2};
+  foo lfoo{1, 2};
   gptr<foo> glfoo(&lfoo);
   gptr<foo> grfoo(1, reinterpret_cast<foo*>(0x10));
-  getCacheManager().create((fatPointer)grfoo, foo{3,4});
+  getCacheManager().create((fatPointer)grfoo, foo{3, 4});
 
   std::cout << "L: " << glfoo << "\n";
   std::cout << "R: " << grfoo << "\n";
   std::cout << "L: " << *glfoo << "\n";
   std::cout << "R: " << *grfoo << "\n";
 }
-
 
 int main() {
   std::cout << "test_CM\n";

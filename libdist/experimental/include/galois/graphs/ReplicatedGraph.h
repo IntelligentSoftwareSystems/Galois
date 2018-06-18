@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,7 +30,7 @@ namespace graphs {
 
 using namespace galois::runtime::Distributed;
 
-template<typename NodeTy, typename EdgeTy>
+template <typename NodeTy, typename EdgeTy>
 class ReplicatedGraph {
   typedef LC_CSR_InOutGraph<NodeTy, EdgeTy, true> Inner;
 
@@ -43,14 +43,18 @@ class ReplicatedGraph {
     std::string tname;
     bool symmetric;
 
-    StructureFromFile() { }
-    StructureFromFile(gptr<ReplicatedGraph> self, const std::string& f, bool s): self(self), fname(f), symmetric(s) { }
-    StructureFromFile(gptr<ReplicatedGraph> self, const std::string& f, const std::string& t): self(self), fname(f), tname(t), symmetric(false) { }
+    StructureFromFile() {}
+    StructureFromFile(gptr<ReplicatedGraph> self, const std::string& f, bool s)
+        : self(self), fname(f), symmetric(s) {}
+    StructureFromFile(gptr<ReplicatedGraph> self, const std::string& f,
+                      const std::string& t)
+        : self(self), fname(f), tname(t), symmetric(false) {}
 
     void operator()(unsigned tid, unsigned) {
-      if (tid != 0) return;
+      if (tid != 0)
+        return;
       assert(0 && "fixme");
-      //self->pGraph = &*self->graph;
+      // self->pGraph = &*self->graph;
 
       if (symmetric) {
         self->pGraph->structureFromFile(fname, symmetric);
@@ -60,8 +64,12 @@ class ReplicatedGraph {
     }
 
     typedef int tt_has_serialize;
-    void serialize(SendBuffer& buf) const { gSerialize(buf, self, fname, tname, symmetric); }
-    void deserialize(RecvBuffer& buf) { gDeserialize(buf, self, fname, tname, symmetric); }
+    void serialize(SendBuffer& buf) const {
+      gSerialize(buf, self, fname, tname, symmetric);
+    }
+    void deserialize(RecvBuffer& buf) {
+      gDeserialize(buf, self, fname, tname, symmetric);
+    }
   };
 
 public:
@@ -80,18 +88,16 @@ public:
   typedef typename Inner::local_iterator local_iterator;
   typedef typename Inner::const_local_iterator const_local_iterator;
 
-  ReplicatedGraph(): pGraph(0) { 
+  ReplicatedGraph() : pGraph(0) {
     graph = gptr<Inner>(new Inner);
-    //runtime::allocatePerHost(this);
+    // runtime::allocatePerHost(this);
   }
 
-  ReplicatedGraph(DeSerializeBuffer& s) {
-    deserialize(s);
-  }
+  ReplicatedGraph(DeSerializeBuffer& s) { deserialize(s); }
 
   ~ReplicatedGraph() {
     // XXX cannot deallocate
-    //runtime::deallocatePerHost(graph);
+    // runtime::deallocatePerHost(graph);
   }
 
   void serialize(SerializeBuffer& s) const { gSerialize(s, graph); }
@@ -101,13 +107,12 @@ public:
     return pGraph->getData(N, mflag);
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni,
+                                  MethodFlag mflag = MethodFlag::NONE) {
     return pGraph->getEdgeData(ni, mflag);
   }
 
-  GraphNode getEdgeDst(edge_iterator ni) {
-    return pGraph->getEdgeDst(ni);
-  }
+  GraphNode getEdgeDst(edge_iterator ni) { return pGraph->getEdgeDst(ni); }
 
   uint64_t size() const { return pGraph->size(); }
   uint64_t sizeEdges() const { return pGraph->sizeEdges(); }
@@ -126,27 +131,33 @@ public:
     return pGraph->edge_end(N, mflag);
   }
 
-  EdgesIterator<ReplicatedGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  EdgesIterator<ReplicatedGraph> out_edges(GraphNode N,
+                                           MethodFlag mflag = MethodFlag::ALL) {
     return EdgesIterator<ReplicatedGraph>(*this, N, mflag);
   }
 
   /**
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
-  template<typename CompTy>
-  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+  template <typename CompTy>
+  void sortEdgesByEdgeData(GraphNode N,
+                           const CompTy& comp = std::less<EdgeTy>(),
+                           MethodFlag mflag   = MethodFlag::ALL) {
     pGraph->sortEdgesByEdgeData(N, comp, mflag);
   }
 
   /**
-   * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   * Sorts outgoing edges of a node. Comparison function is over
+   * <code>EdgeSortValue<EdgeTy></code>.
    */
-  template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+  template <typename CompTy>
+  void sortEdges(GraphNode N, const CompTy& comp,
+                 MethodFlag mflag = MethodFlag::ALL) {
     pGraph->sortEdges(N, comp, mflag);
   }
 
-  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) { 
+  edge_data_reference getInEdgeData(in_edge_iterator ni,
+                                    MethodFlag mflag = MethodFlag::NONE) {
     return pGraph->getInEdgeData(ni, mflag);
   }
 
@@ -154,52 +165,57 @@ public:
     return pGraph->getInEdgeDst(ni);
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_begin(GraphNode N,
+                                 MethodFlag mflag = MethodFlag::ALL) {
     return pGraph->in_edge_begin(N, mflag);
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_end(GraphNode N,
+                               MethodFlag mflag = MethodFlag::ALL) {
     return pGraph->in_edge_end(N, mflag);
   }
 
-  InEdgesIterator<ReplicatedGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  InEdgesIterator<ReplicatedGraph>
+  in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     return InEdgesIterator<ReplicatedGraph>(*this, N, mflag);
   }
 
   /**
    * Sorts incoming edges of a node. Comparison function is over EdgeTy.
    */
-  template<typename CompTy>
-  void sortInEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+  template <typename CompTy>
+  void sortInEdgesByEdgeData(GraphNode N,
+                             const CompTy& comp = std::less<EdgeTy>(),
+                             MethodFlag mflag   = MethodFlag::ALL) {
     return pGraph->sortInEdgesByEdgeData(N, comp, mflag);
   }
 
   /**
-   * Sorts incoming edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
+   * Sorts incoming edges of a node. Comparison function is over
+   * <code>EdgeSortValue<EdgeTy></code>.
    */
-  template<typename CompTy>
-  void sortInEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+  template <typename CompTy>
+  void sortInEdges(GraphNode N, const CompTy& comp,
+                   MethodFlag mflag = MethodFlag::ALL) {
     return pGraph->sortInEdges(N, comp, mflag);
   }
 
-  size_t idFromNode(GraphNode N) {
-    return pGraph->idFromNode(N);
-  }
+  size_t idFromNode(GraphNode N) { return pGraph->idFromNode(N); }
 
-  GraphNode nodeFromId(size_t N) {
-    return pGraph->nodeFromId(N);
-  }
+  GraphNode nodeFromId(size_t N) { return pGraph->nodeFromId(N); }
 
   void structureFromFile(const std::string& fname, bool symmetric) {
-    galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, symmetric));
+    galois::on_each(
+        StructureFromFile(gptr<ReplicatedGraph>(this), fname, symmetric));
   }
 
   void structureFromFile(const std::string& fname, const std::string& tname) {
-    galois::on_each(StructureFromFile(gptr<ReplicatedGraph>(this), fname, tname));
+    galois::on_each(
+        StructureFromFile(gptr<ReplicatedGraph>(this), fname, tname));
   }
 };
 
-} // end namespace
-} // end namespace
+} // namespace graphs
+} // namespace galois
 
 #endif

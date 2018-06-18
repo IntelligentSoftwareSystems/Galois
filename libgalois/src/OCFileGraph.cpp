@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,23 +33,24 @@
 
 using namespace galois::graphs;
 
-//File format V1:
-//version (1) {uint64_t LE}
-//EdgeType size {uint64_t LE}
-//numNodes {uint64_t LE}
-//numEdges {uint64_t LE}
-//outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
-//outedges[numEdges] {uint32_t LE}
-//potential padding (32bit max) to Re-Align to 64bits
-//EdgeType[numEdges] {EdgeType size}
+// File format V1:
+// version (1) {uint64_t LE}
+// EdgeType size {uint64_t LE}
+// numNodes {uint64_t LE}
+// numEdges {uint64_t LE}
+// outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge
+// for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+// outedges[numEdges] {uint32_t LE}
+// potential padding (32bit max) to Re-Align to 64bits
+// EdgeType[numEdges] {EdgeType size}
 
 #ifdef HAVE_MMAP64
-template<typename... Args>
+template <typename... Args>
 void* mmap_big(Args... args) {
   return mmap64(std::forward<Args>(args)...);
 }
 #else
-template<typename... Args>
+template <typename... Args>
 void* mmap_big(Args... args) {
   return mmap(std::forward<Args>(args)...);
 }
@@ -72,17 +73,21 @@ void OCFileGraph::Block::unload() {
   m_mapping = 0;
 }
 
-void OCFileGraph::Block::load(int fd, offset_t offset, size_t begin, size_t len, size_t sizeof_data) {
+void OCFileGraph::Block::load(int fd, offset_t offset, size_t begin, size_t len,
+                              size_t sizeof_data) {
   assert(m_mapping == 0);
 
   offset_t start = offset + begin * sizeof_data;
-  offset_t aligned = start & ~static_cast<offset_t>(galois::runtime::pagePoolSize() - 1);
+  offset_t aligned =
+      start & ~static_cast<offset_t>(galois::runtime::pagePoolSize() - 1);
 
   int _MAP_BASE = MAP_PRIVATE;
 #ifdef MAP_POPULATE
   _MAP_BASE |= MAP_POPULATE;
 #endif
-  m_length = len * sizeof_data + galois::runtime::pagePoolSize(); // account for round off due to alignment
+  m_length =
+      len * sizeof_data +
+      galois::runtime::pagePoolSize(); // account for round off due to alignment
   m_mapping = mmap_big(nullptr, m_length, PROT_READ, _MAP_BASE, fd, aligned);
   if (m_mapping == MAP_FAILED) {
     GALOIS_SYS_DIE("failed allocating ", fd);
@@ -90,23 +95,25 @@ void OCFileGraph::Block::load(int fd, offset_t offset, size_t begin, size_t len,
 
   m_data = reinterpret_cast<char*>(m_mapping);
   assert(aligned <= start);
-  assert(start - aligned <= static_cast<offset_t>(galois::runtime::pagePoolSize()));
+  assert(start - aligned <=
+         static_cast<offset_t>(galois::runtime::pagePoolSize()));
   m_data += start - aligned;
-  m_begin = begin;
+  m_begin       = begin;
   m_sizeof_data = sizeof_data;
 }
 
-void OCFileGraph::load(segment_type& s, edge_iterator begin, edge_iterator end, size_t sizeof_data) {
-  size_t bb = *begin;
+void OCFileGraph::load(segment_type& s, edge_iterator begin, edge_iterator end,
+                       size_t sizeof_data) {
+  size_t bb  = *begin;
   size_t len = *end - *begin;
-  
+
   offset_t outs = (4 + numNodes) * sizeof(uint64_t);
   offset_t data = outs + (numEdges + (numEdges & 1)) * sizeof(uint32_t);
 
   s.outs.load(masterFD, outs, bb, len, sizeof(uint32_t));
   if (sizeof_data)
     s.edgeData.load(masterFD, data, bb, len, sizeof_data);
-  
+
   s.loaded = true;
 }
 
@@ -131,12 +138,12 @@ void OCFileGraph::fromFile(const std::string& filename) {
   if (masterFD == -1) {
     GALOIS_SYS_DIE("failed opening ", filename);
   }
-  
+
   readHeader(masterFD, numNodes, numEdges);
-  masterLength = 4 * sizeof(uint64_t) + numNodes * sizeof(uint64_t);
+  masterLength  = 4 * sizeof(uint64_t) + numNodes * sizeof(uint64_t);
   int _MAP_BASE = MAP_PRIVATE;
 #ifdef MAP_POPULATE
-    _MAP_BASE |= MAP_POPULATE;
+  _MAP_BASE |= MAP_POPULATE;
 #endif
   masterMapping = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
   if (masterMapping == MAP_FAILED) {

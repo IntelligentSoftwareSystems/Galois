@@ -3,7 +3,8 @@
 
 struct Function {
   void operator()(unsigned tid, unsigned total) {
-    galois::runtime::LL::gPrint("host: ", galois::runtime::NetworkInterface::ID, " tid: ", tid, "\n");
+    galois::runtime::LL::gPrint("host: ", galois::runtime::NetworkInterface::ID,
+                                " tid: ", tid, "\n");
   }
 };
 

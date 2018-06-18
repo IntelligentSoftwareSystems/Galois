@@ -23,34 +23,44 @@
 
 namespace Functional {
 
-enum Token { ANDop='*', ORop='+', XORop='^', LP='(', RP=')', NOTop='!', LIT, END=';', EMPTY };
+enum Token {
+  ANDop = '*',
+  ORop  = '+',
+  XORop = '^',
+  LP    = '(',
+  RP    = ')',
+  NOTop = '!',
+  LIT,
+  END = ';',
+  EMPTY
+};
 
 typedef unsigned long int word;
-typedef std::unordered_map< std::string, std::pair< word*, unsigned int > > StringFunctionMap;
+typedef std::unordered_map<std::string, std::pair<word*, unsigned int>>
+    StringFunctionMap;
 
 class FunctionUtil {
 
-	Token currentToken;
-	std::string tokenValue;
-	StringFunctionMap & literals;
-	BitVectorPool & functionPool;
-	int nVars;
-	int nWords;
+  Token currentToken;
+  std::string tokenValue;
+  StringFunctionMap& literals;
+  BitVectorPool& functionPool;
+  int nVars;
+  int nWords;
 
 public:
+  FunctionUtil(StringFunctionMap& entries, BitVectorPool& functionPool,
+               int nVars, int nWords);
 
-	FunctionUtil( StringFunctionMap & entries, BitVectorPool & functionPool, int nVars, int nWords );
+  virtual ~FunctionUtil();
 
-	virtual ~FunctionUtil();
-
-	word * parseExpression( std::string expression );
-	word * prim( std::istringstream & expression );
-	word * term( std::istringstream & expression );
-	word * expr2( std::istringstream & expression );
-	word * expr1( std::istringstream & expression );
-	Token getToken( std::istringstream & expression );
-	word * parseHexa( std::string hexa );
-
+  word* parseExpression(std::string expression);
+  word* prim(std::istringstream& expression);
+  word* term(std::istringstream& expression);
+  word* expr2(std::istringstream& expression);
+  word* expr1(std::istringstream& expression);
+  Token getToken(std::istringstream& expression);
+  word* parseHexa(std::string hexa);
 };
 
 } // namespace Functional

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -20,7 +20,7 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
-#include "galois/gIO.h"// TODO: remove
+#include "galois/gIO.h" // TODO: remove
 #include "galois/gtuple.h"
 #include "galois/Mem.h"
 #include "galois/Timer.h"
@@ -47,10 +47,12 @@ namespace galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace runtime {
 
-
-template<typename value_type>
+template <typename value_type>
 class AbortHandler {
-  struct Item { value_type val;  int retries; };
+  struct Item {
+    value_type val;
+    int retries;
+  };
 
   typedef worklists::GFIFO<Item> AbortedList;
   substrate::PerThreadStorage<AbortedList> queues;
@@ -60,7 +62,7 @@ class AbortHandler {
    * Policy: serialize via tree over sockets.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = substrate::getThreadPool();
+    auto& tp        = substrate::getThreadPool();
     unsigned socket = tp.getSocket();
     queues.getRemote(tp.getLeaderForSocket(socket / 2))->push(item);
   }
@@ -76,8 +78,8 @@ class AbortHandler {
       return;
     }
 
-    unsigned tid = substrate::ThreadPool::getTID();
-    auto& tp = substrate::getThreadPool();
+    unsigned tid    = substrate::ThreadPool::getTID();
+    auto& tp        = substrate::getThreadPool();
     unsigned socket = substrate::ThreadPool::getSocket();
     unsigned leader = substrate::ThreadPool::getLeader();
     if (tid != leader) {
@@ -99,8 +101,8 @@ class AbortHandler {
       return;
     }
 
-    unsigned tid = substrate::ThreadPool::getTID();
-    auto& tp = substrate::getThreadPool();
+    unsigned tid    = substrate::ThreadPool::getTID();
+    auto& tp        = substrate::getThreadPool();
     unsigned socket = substrate::ThreadPool::getSocket();
     unsigned leader = tp.getLeaderForSocket(socket);
     if (retries < 5 && tid != leader) {
@@ -114,9 +116,7 @@ class AbortHandler {
   /**
    * Retry locally only.
    */
-  void eagerPolicy(const Item& item) {
-    queues.getLocal()->push(item);
-  }
+  void eagerPolicy(const Item& item) { queues.getLocal()->push(item); }
 
 public:
   AbortHandler() {
@@ -128,12 +128,12 @@ public:
   value_type& value(value_type& val) const { return val; }
 
   void push(const value_type& val) {
-    Item item = { val, 1 };
+    Item item = {val, 1};
     queues.getLocal()->push(item);
   }
 
   void push(const Item& item) {
-    Item newitem = { item.val, item.retries + 1 };
+    Item newitem = {item.val, item.retries + 1};
     if (useBasicPolicy)
       basicPolicy(newitem);
     else
@@ -143,17 +143,22 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
-//TODO(ddn): Implement wrapper to allow calling without UserContext
-//TODO(ddn): Check for operators that implement both with and without context
-template<class WorkListTy, class FunctionTy, typename ArgsTy>
+// TODO(ddn): Implement wrapper to allow calling without UserContext
+// TODO(ddn): Check for operators that implement both with and without context
+template <class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
   static constexpr bool needStats = galois::internal::NeedStats<ArgsTy>::value;
-  static constexpr bool needsPush = !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
-  static constexpr bool needsAborts = !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
-  static constexpr bool needsPia = exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
-  static constexpr bool needsBreak = exists_by_supertype<parallel_break_tag, ArgsTy>::value;
-  static constexpr bool MORE_STATS = needStats && exists_by_supertype<more_stats_tag, ArgsTy>::value;
+  static constexpr bool needsPush =
+      !exists_by_supertype<no_pushes_tag, ArgsTy>::value;
+  static constexpr bool needsAborts =
+      !exists_by_supertype<no_conflicts_tag, ArgsTy>::value;
+  static constexpr bool needsPia =
+      exists_by_supertype<per_iter_alloc_tag, ArgsTy>::value;
+  static constexpr bool needsBreak =
+      exists_by_supertype<parallel_break_tag, ArgsTy>::value;
+  static constexpr bool MORE_STATS =
+      needStats && exists_by_supertype<more_stats_tag, ArgsTy>::value;
 
 protected:
   typedef typename WorkListTy::value_type value_type;
@@ -164,20 +169,16 @@ protected:
     FunctionTy function;
     SimpleRuntimeContext ctx;
 
-    explicit ThreadLocalBasics(const FunctionTy& fn): 
-      facing(), 
-      function(fn),
-      ctx() 
-    {}
+    explicit ThreadLocalBasics(const FunctionTy& fn)
+        : facing(), function(fn), ctx() {}
   };
 
   using LoopStat = LoopStatistics<needStats>;
 
-  struct ThreadLocalData: public ThreadLocalBasics, public LoopStat {
+  struct ThreadLocalData : public ThreadLocalBasics, public LoopStat {
 
     ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : ThreadLocalBasics(fn), LoopStat(ln)
-    {}
+        : ThreadLocalBasics(fn), LoopStat(ln) {}
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -197,10 +198,10 @@ protected:
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (needsPush) {
-      //auto ii = tld.facing.getPushBuffer().begin();
-      //auto ee = tld.facing.getPushBuffer().end();
+      // auto ii = tld.facing.getPushBuffer().begin();
+      // auto ee = tld.facing.getPushBuffer().end();
       auto& pb = tld.facing.getPushBuffer();
-      auto n = pb.size();
+      auto n   = pb.size();
       if (n) {
         tld.inc_pushes(n);
         wl.push(pb.begin(), pb.end());
@@ -214,17 +215,17 @@ protected:
     //++tld.stat_commits;
   }
 
-  template<typename Item>
-  GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(const Item& item, ThreadLocalData& tld) {
+  template <typename Item>
+  GALOIS_ATTRIBUTE_NOINLINE void abortIteration(const Item& item,
+                                                ThreadLocalData& tld) {
     assert(needsAborts);
     tld.ctx.cancelIteration();
     tld.inc_conflicts();
     aborted.push(item);
-    //clear push buffer
+    // clear push buffer
     if (needsPush)
       tld.facing.resetPushBuffer();
-    //reset allocator
+    // reset allocator
     if (needsPia)
       tld.facing.resetAlloc();
   }
@@ -248,7 +249,7 @@ protected:
     return didWork;
   }
 
-  template<unsigned int limit, typename WL>
+  template <unsigned int limit, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl) {
     galois::optional<typename WL::value_type> p;
     unsigned int num = 0;
@@ -289,12 +290,13 @@ protected:
 
   bool checkEmpty(WorkListTy&, ThreadLocalData&, ...) { return true; }
 
-  template<typename WL>
-  auto checkEmpty(WL& wl, ThreadLocalData& tld, int) -> decltype(wl.empty(), bool()) {
+  template <typename WL>
+  auto checkEmpty(WL& wl, ThreadLocalData& tld, int)
+      -> decltype(wl.empty(), bool()) {
     return wl.empty();
   }
 
-  template<bool couldAbort, bool isLeader>
+  template <bool couldAbort, bool isLeader>
   void go() {
 
     execTime.start();
@@ -306,8 +308,8 @@ protected:
     if (couldAbort)
       setThreadContext(&tld.ctx);
     if (needsPush && !couldAbort)
-      tld.facing.setFastPushBack(
-          std::bind(&ForEachExecutor::fastPushBack, this, std::placeholders::_1));
+      tld.facing.setFastPushBack(std::bind(&ForEachExecutor::fastPushBack, this,
+                                           std::placeholders::_1));
 
     while (true) {
       do {
@@ -316,15 +318,15 @@ protected:
         // Run some iterations
         if (couldAbort || needsBreak) {
           constexpr int __NUM = (needsBreak || isLeader) ? 64 : 0;
-          bool b = runQueue<__NUM>(tld, wl);
-          didWork = b || didWork;
+          bool b              = runQueue<__NUM>(tld, wl);
+          didWork             = b || didWork;
           // Check for abort
           if (couldAbort) {
-            b = handleAborts(tld);
+            b       = handleAborts(tld);
             didWork = b || didWork;
           }
         } else { // No try/catch
-          bool b = runQueueSimple(tld);
+          bool b  = runQueueSimple(tld);
           didWork = b || didWork;
         }
 
@@ -351,41 +353,38 @@ protected:
       setThreadContext(0);
   }
 
-  struct T1 {}; struct T2 {};
+  struct T1 {};
+  struct T2 {};
 
-  template<typename... WArgsTy>
-  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
-    term(substrate::getSystemTermination(activeThreads)),
-    barrier(getBarrier(activeThreads)),
-    wl(std::forward<WArgsTy>(wargs)...),
-    origFunction(f),
-    loopname(galois::internal::getLoopName(args)),
-    broke(false),
-    initTime(loopname, "Init"),
-    execTime(loopname, "Execute")
-  {
-  }
+  template <typename... WArgsTy>
+  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs)
+      : term(substrate::getSystemTermination(activeThreads)),
+        barrier(getBarrier(activeThreads)), wl(std::forward<WArgsTy>(wargs)...),
+        origFunction(f), loopname(galois::internal::getLoopName(args)),
+        broke(false), initTime(loopname, "Init"),
+        execTime(loopname, "Execute") {}
 
-  template<typename WArgsTy, int... Is>
-  ForEachExecutor(T1, const FunctionTy& f,
-                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<Is...>):
-    ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
+  template <typename WArgsTy, int... Is>
+  ForEachExecutor(T1, const FunctionTy& f, const ArgsTy& args,
+                  const WArgsTy& wlargs, int_seq<Is...>)
+      : ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
-  template<typename WArgsTy>
-  ForEachExecutor(T1, const FunctionTy& f,
-                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<>):
-    ForEachExecutor(T2{}, f, args) {}
+  template <typename WArgsTy>
+  ForEachExecutor(T1, const FunctionTy& f, const ArgsTy& args,
+                  const WArgsTy& wlargs, int_seq<>)
+      : ForEachExecutor(T2{}, f, args) {}
 
 public:
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args):
-    ForEachExecutor(T1{}, f, args,
-                    get_by_supertype<wl_tag>(args).args,
-                    typename make_int_seq<std::tuple_size<decltype(get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args)
+      : ForEachExecutor(
+            T1{}, f, args, get_by_supertype<wl_tag>(args).args,
+            typename make_int_seq<std::tuple_size<decltype(
+                get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
 
-  template<typename RangeTy>
-  void init(const RangeTy&) { }
+  template <typename RangeTy>
+  void init(const RangeTy&) {}
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void initThread(const RangeTy& range) {
 
     initTime.start();
@@ -397,7 +396,7 @@ public:
   }
 
   void operator()() {
-    bool isLeader = substrate::ThreadPool::isLeader();
+    bool isLeader   = substrate::ThreadPool::isLeader();
     bool couldAbort = needsAborts && activeThreads > 1;
     if (couldAbort && isLeader)
       go<true, true>();
@@ -410,33 +409,32 @@ public:
   }
 };
 
-template<typename WLTy>
-constexpr auto has_with_iterator(int)
-  -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool())
-{
+template <typename WLTy>
+constexpr auto has_with_iterator(int) -> decltype(
+    std::declval<typename WLTy::template with_iterator<int*>::type>(), bool()) {
   return true;
 }
 
-template<typename>
+template <typename>
 constexpr auto has_with_iterator(...) -> bool {
   return false;
 }
 
-template<typename WLTy, typename IterTy, typename Enable = void>
+template <typename WLTy, typename IterTy, typename Enable = void>
 struct reiterator {
   typedef WLTy type;
 };
 
-template<typename WLTy, typename IterTy>
+template <typename WLTy, typename IterTy>
 struct reiterator<WLTy, IterTy,
-  typename std::enable_if<has_with_iterator<WLTy>(0)>::type>
-{
+                  typename std::enable_if<has_with_iterator<WLTy>(0)>::type> {
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
 // template<typename Fn, typename T>
 // constexpr auto takes_context(int)
-//   -> decltype(std::declval<typename std::result_of<Fn(T&, UserContext<T>&)>::type>(), bool())
+//   -> decltype(std::declval<typename std::result_of<Fn(T&,
+//   UserContext<T>&)>::type>(), bool())
 // {
 //   return true;
 // }
@@ -458,7 +456,8 @@ struct reiterator<WLTy, IterTy,
 // };
 
 // template<typename Fn, typename T>
-// struct MakeTakeContext<Fn, T, typename std::enable_if<takes_context<Fn, T>(0)>::type>
+// struct MakeTakeContext<Fn, T, typename std::enable_if<takes_context<Fn,
+// T>(0)>::type>
 // {
 //   Fn fn;
 
@@ -467,8 +466,9 @@ struct reiterator<WLTy, IterTy,
 //   }
 // };
 
-// template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args)
+// template<typename WorkListTy, typename T, typename RangeTy, typename
+// FunctionTy, typename ArgsTy> auto for_each_impl_(const RangeTy& range, const
+// FunctionTy& fn, const ArgsTy& args)
 //   -> typename std::enable_if<takes_context<FunctionTy, T>(0)>::type
 // {
 //   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
@@ -481,8 +481,9 @@ struct reiterator<WLTy, IterTy,
 //                             std::ref(W));
 // }
 
-// template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args)
+// template<typename WorkListTy, typename T, typename RangeTy, typename
+// FunctionTy, typename ArgsTy> auto for_each_impl_(const RangeTy& range, const
+// FunctionTy& fn, const ArgsTy& args)
 //   -> typename std::enable_if<!takes_context<FunctionTy, T>(0)>::type
 // {
 //   typedef MakeTakeContext<FunctionTy, T> WrappedFunction;
@@ -490,62 +491,74 @@ struct reiterator<WLTy, IterTy,
 //       get_default_trait_values(args,
 //         std::make_tuple(no_pushes_tag {}),
 //         std::make_tuple(no_pushes{})));
-//   typedef ForEachExecutor<WorkListTy, WrappedFunction, decltype(newArgs)> WorkTy;
-//   Barrier& barrier = getSystemBarrier();
-//   WorkTy W(WrappedFunction {fn}, newArgs);
-//   W.init(range);
-//   getThreadPool().run(activeThreads,
+//   typedef ForEachExecutor<WorkListTy, WrappedFunction, decltype(newArgs)>
+//   WorkTy; Barrier& barrier = getSystemBarrier(); WorkTy W(WrappedFunction
+//   {fn}, newArgs); W.init(range); getThreadPool().run(activeThreads,
 //                             [&W, &range]() { W.initThread(range); },
 //                             std::ref(barrier),
 //                             std::ref(W));
 // }
 
-//TODO(ddn): Think about folding in range into args too
-template<typename RangeTy, typename FunctionTy, typename ArgsTy>
-void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
-  typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type;
-  typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
-  typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
-    ::template retype<value_type> WorkListTy;
-  //typedef typename WorkListTy::value_type g;
+// TODO(ddn): Think about folding in range into args too
+template <typename RangeTy, typename FunctionTy, typename ArgsTy>
+void for_each_impl(const RangeTy& range, const FunctionTy& fn,
+                   const ArgsTy& args) {
+  typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type
+      value_type;
+  typedef
+      typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
+  typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::
+      type ::template retype<value_type>
+          WorkListTy;
+  // typedef typename WorkListTy::value_type g;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
   substrate::getThreadPool().run(activeThreads,
-             [&W, &range]() { W.initThread(range); },
-             std::ref(barrier),
-             std::ref(W));
+                                 [&W, &range]() { W.initThread(range); },
+                                 std::ref(barrier), std::ref(W));
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
-
 
 // TODO: Need to decide whether user should provide num_run tag or
 // num_run can be provided by loop instance which is guaranteed to be unique
 
 //! Normalize arguments to for_each
-template<typename RangeTy, typename FunctionTy, typename TupleTy>
+template <typename RangeTy, typename FunctionTy, typename TupleTy>
 void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
-  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const*, TupleTy>::value,
+                "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
 
   static constexpr bool forceNew = true;
-  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
-  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
-  static_assert(!forceNew || runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
-  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
-  static_assert(!forceNew || !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  static_assert(!forceNew ||
+                    runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts,
+                "old type trait");
+  static_assert(!forceNew ||
+                    runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats,
+                "old type trait");
+  static_assert(!forceNew ||
+                    runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush,
+                "old type trait");
+  static_assert(!forceNew ||
+                    !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak,
+                "old type trait");
+  static_assert(!forceNew ||
+                    !runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA,
+                "old type trait");
   if (forceNew) {
-    auto ftpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+    auto ftpl =
+        std::tuple_cat(tpl, typename function_traits<FunctionTy>::type{});
 
-    auto xtpl = std::tuple_cat(ftpl,
-          get_default_trait_values(tpl,
-            std::make_tuple(wl_tag {}),
-            std::make_tuple(wl<defaultWL>())));
+    auto xtpl = std::tuple_cat(
+        ftpl, get_default_trait_values(tpl, std::make_tuple(wl_tag{}),
+                                       std::make_tuple(wl<defaultWL>())));
 
-    constexpr bool TIME_IT = exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
+    constexpr bool TIME_IT =
+        exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(xtpl));
 
     timer.start();
@@ -556,18 +569,21 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   } else {
     // TODO: not needed any more? Remove once sure
-    auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
-    auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
+    auto tags =
+        typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type{};
+    auto values =
+        typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type{};
     auto ttpl = get_default_trait_values(tpl, tags, values);
     auto dtpl = std::tuple_cat(tpl, ttpl);
-    auto ftpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+    auto ftpl =
+        std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type{});
 
-    auto xtpl = std::tuple_cat(ftpl,
-          get_default_trait_values(tpl,
-            std::make_tuple(wl_tag {}),
-            std::make_tuple(wl<defaultWL>())));
+    auto xtpl = std::tuple_cat(
+        ftpl, get_default_trait_values(tpl, std::make_tuple(wl_tag{}),
+                                       std::make_tuple(wl<defaultWL>())));
 
-    constexpr bool TIME_IT = exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
+    constexpr bool TIME_IT =
+        exists_by_supertype<loopname_tag, decltype(xtpl)>::value;
     CondStatTimer<TIME_IT> timer(galois::internal::getLoopName(xtpl));
 
     timer.start();

@@ -27,43 +27,46 @@ using namespace dataGen;
 using namespace benchIO;
 
 template <class T1>
-pair<T1,int>* addIntData(T1* A, int n, int range) {
-  pair<T1,int>* R = new pair<T1,int>[n];
-  for (int ii=0; ii < n; ii++) {
-    R[ii].first = A[ii];
-    R[ii].second = dataGen::hash<int>(n+ii) % range;
+pair<T1, int>* addIntData(T1* A, int n, int range) {
+  pair<T1, int>* R = new pair<T1, int>[n];
+  for (int ii = 0; ii < n; ii++) {
+    R[ii].first  = A[ii];
+    R[ii].second = dataGen::hash<int>(n + ii) % range;
   }
   return R;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv, "[-r <range>] [-t {int,double}] <inFile> <outFile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* ifile = fnames.first;
-  char* ofile = fnames.second;
-  seqData D = readSequenceFromFile(ifile);
-  elementType dt = D.dt;
-  int n = D.n;
-  elementType dataDT = elementTypeFromString(P.getOptionValue("-t","int"));
-  if (dataDT == none) dataDT = dt;
+  commandLine P(argc, argv,
+                "[-r <range>] [-t {int,double}] <inFile> <outFile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* ifile               = fnames.first;
+  char* ofile               = fnames.second;
+  seqData D                 = readSequenceFromFile(ifile);
+  elementType dt            = D.dt;
+  int n                     = D.n;
+  elementType dataDT = elementTypeFromString(P.getOptionValue("-t", "int"));
+  if (dataDT == none)
+    dataDT = dt;
 
   char* rangeString = P.getOptionValue("-r");
-  int range = n;
-  if (rangeString != NULL) range = atoi(rangeString);
+  int range         = n;
+  if (rangeString != NULL)
+    range = atoi(rangeString);
 
-  switch(dt) {
-  case intT: 
+  switch (dt) {
+  case intT:
     switch (dataDT) {
-    case intT: 
-      return writeSequenceToFile(addIntData((int*) D.A, n, range),n,ofile);
+    case intT:
+      return writeSequenceToFile(addIntData((int*)D.A, n, range), n, ofile);
     default:
       cout << "addData: not a valid type" << endl;
     }
-  case stringT: 
+  case stringT:
     switch (dataDT) {
-    case intT: 
-      return writeSequenceToFile(addIntData((char**) D.A, n, range),n,ofile);
+    case intT:
+      return writeSequenceToFile(addIntData((char**)D.A, n, range), n, ofile);
     default:
       cout << "addData: not a valid type" << endl;
     }

@@ -34,52 +34,56 @@ using namespace benchIO;
 // Checks for every vertex if locally maximally matched
 int checkMaximalMatching(edgeArray EA, int* EI, int nMatches) {
   edge* E = EA.E;
-  int m = EA.nonZeros;
-  int n = EA.numRows;
-  int* V = newA(int, n);
-//  parallel_for (int i=0; i < n; i++) V[i] = -1;
-  parallel_doall(int, i, 0, n) { V[i] = -1; } parallel_doall_end
-  bool *flags = newA(bool,m);
-//  parallel_for (int i=0; i < m; i++) flags[i] = 0;
-  parallel_doall(int, i, 0, m) { flags[i] = 0; } parallel_doall_end
+  int m   = EA.nonZeros;
+  int n   = EA.numRows;
+  int* V  = newA(int, n);
+  //  parallel_for (int i=0; i < n; i++) V[i] = -1;
+  parallel_doall(int, i, 0, n) { V[i] = -1; }
+  parallel_doall_end bool* flags = newA(bool, m);
+  //  parallel_for (int i=0; i < m; i++) flags[i] = 0;
+  parallel_doall(int, i, 0, m) { flags[i] = 0; }
+  parallel_doall_end
 
-//  parallel_for (int i=0; i < nMatches; i++) {
-  parallel_doall(int, i, 0, nMatches)  {
-    int idx = EI[i];
+  //  parallel_for (int i=0; i < nMatches; i++) {
+  parallel_doall(int, i, 0, nMatches) {
+    int idx     = EI[i];
     V[E[idx].u] = V[E[idx].v] = idx;
-    flags[idx] = 1;
-  } parallel_doall_end
+    flags[idx]                = 1;
+  }
+  parallel_doall_end
 
-  for (int i=0; i < m; i++) {
-      int u = E[i].u;
-      int v = E[i].v;
+      for (int i = 0; i < m; i++) {
+    int u = E[i].u;
+    int v = E[i].v;
     if (flags[i]) {
       if (V[u] != i) {
-	cout << "maximalMatchingCheck: edges share vertex " << u << endl;
-	return 1;
+        cout << "maximalMatchingCheck: edges share vertex " << u << endl;
+        return 1;
       }
       if (V[v] != i) {
-	cout << "maximalMatchingCheck: edges share vertex " << v << endl;
-	return 1;
+        cout << "maximalMatchingCheck: edges share vertex " << v << endl;
+        return 1;
       }
     } else {
 
       if (u != v && V[u] == -1 && V[v] == -1) {
-	cout << "maximalMatchingCheck: neither endpoint matched for edge " << i << endl;
-	return 1;
+        cout << "maximalMatchingCheck: neither endpoint matched for edge " << i
+             << endl;
+        return 1;
       }
     }
   }
 
-  free(V); free(flags);
+  free(V);
+  free(flags);
   return 0;
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<inFile> <outfile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  edgeArray E = readEdgeArrayFromFile(fnames.first);
-  _seq<int> Out = readIntArrayFromFile(fnames.second);
+  commandLine P(argc, argv, "<inFile> <outfile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  edgeArray E               = readEdgeArrayFromFile(fnames.first);
+  _seq<int> Out             = readIntArrayFromFile(fnames.second);
   return checkMaximalMatching(E, Out.A, Out.n);
 }

@@ -19,7 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @section Description
- * 
+ *
  * Prints node ids that have an outgoing edge.
  *
  * @author Loc Hoang <l_hoang@utexas.edu>
@@ -50,10 +50,10 @@ typedef galois::graphs::DistGraphEdgeCut<NodeData, unsigned> Graph_edgeCut;
 
 constexpr static const char* const name = "Print Nodes with Edges";
 constexpr static const char* const desc = "Print node ids with edges.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 /**
- * Partitions the graph with an outgoing edges cut, then loops through owned 
+ * Partitions the graph with an outgoing edges cut, then loops through owned
  * nodes to determine which node has the highest out-degree. Prints
  * it to a line.
  */

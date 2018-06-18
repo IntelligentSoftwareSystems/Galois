@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -27,21 +27,17 @@
 
 namespace des {
 
-class BasicPort: public OneInputGate {
+class BasicPort : public OneInputGate {
 private:
   static const BUF& BUFFER;
 
 public:
-  BasicPort (const std::string&  outputName, const std::string& inputName)
-    : OneInputGate (BUFFER, outputName, inputName)  {}
+  BasicPort(const std::string& outputName, const std::string& inputName)
+      : OneInputGate(BUFFER, outputName, inputName) {}
 
-  BasicPort* makeClone () const { return new BasicPort (*this); }
-
-
+  BasicPort* makeClone() const { return new BasicPort(*this); }
 };
 
-
 } // namespace des
-
 
 #endif // DES_BASIC_PORT_H

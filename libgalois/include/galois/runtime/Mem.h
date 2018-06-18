@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -46,40 +46,37 @@ extern unsigned activeThreads;
 
 void preAlloc_impl(unsigned num);
 
-//const size_t hugePageSize = 2*1024*1024;
+// const size_t hugePageSize = 2*1024*1024;
 
 //! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
 //! Forces the given block to be paged into physical memory
-void pageIn(void *buf, size_t len, size_t stride);
+void pageIn(void* buf, size_t len, size_t stride);
 //! Forces the given readonly block to be paged into physical memory
-void pageInReadOnly(void *buf, size_t len, size_t stride);
+void pageInReadOnly(void* buf, size_t len, size_t stride);
 
 //! Returns total small pages allocated by OS on a NUMA node
 int numNumaAllocForNode(unsigned nodeid);
 
-//! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
-void printInterleavedStats(int minPages = 16*1024);
+//! Print lines from /proc/pid/numa_maps that contain at least n (non-huge)
+//! pages
+void printInterleavedStats(int minPages = 16 * 1024);
 
 //! [Example Third Party Allocator]
 class MallocHeap {
 public:
-  //! Supported allocation size in bytes. If 0, heap supports variable sized allocations
+  //! Supported allocation size in bytes. If 0, heap supports variable sized
+  //! allocations
   enum { AllocSize = 0 };
 
-  void* allocate(size_t size) {
-    return malloc(size);
-  }
+  void* allocate(size_t size) { return malloc(size); }
 
-  void deallocate(void* ptr) {
-    free(ptr);
-  }
+  void deallocate(void* ptr) { free(ptr); }
 };
 //! [Example Third Party Allocator]
 
-
 //! Per-thread heaps using Galois thread aware construct
-template<class SourceHeap>
+template <class SourceHeap>
 class ThreadPrivateHeap {
   substrate::PerThreadStorage<SourceHeap> heaps;
 
@@ -87,18 +84,14 @@ public:
   enum { AllocSize = SourceHeap::AllocSize };
 
   ThreadPrivateHeap() {}
-  ~ThreadPrivateHeap() {
-    clear();
-  }
+  ~ThreadPrivateHeap() { clear(); }
 
-  template<typename... Args>
+  template <typename... Args>
   inline void* allocate(size_t size, Args&&... args) {
     return heaps.getLocal()->allocate(size, std::forward<Args>(args)...);
   }
 
-  inline void deallocate(void* ptr) {
-    heaps.getLocal()->deallocate(ptr);
-  }
+  inline void deallocate(void* ptr) { heaps.getLocal()->deallocate(ptr); }
 
   void clear() {
     for (unsigned int i = 0; i < heaps.size(); i++)
@@ -107,7 +100,7 @@ public:
 };
 
 //! Apply a lock to a heap
-template<class SourceHeap>
+template <class SourceHeap>
 class LockedHeap : public SourceHeap {
   substrate::SimpleLock lock;
 
@@ -128,7 +121,7 @@ public:
   }
 };
 
-template<typename SourceHeap>
+template <typename SourceHeap>
 class ZeroOut : public SourceHeap {
 public:
   enum { AllocSize = SourceHeap::AllocSize };
@@ -139,27 +132,25 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr) {
-    SourceHeap::deallocate(ptr);
-  }
+  inline void deallocate(void* ptr) { SourceHeap::deallocate(ptr); }
 };
 
 //! Add a header to objects
-template<typename Header, typename SourceHeap>
+template <typename Header, typename SourceHeap>
 class AddHeader : public SourceHeap {
-  enum { offset = (sizeof(Header) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
+  enum {
+    offset = (sizeof(Header) + (sizeof(double) - 1)) & ~(sizeof(double) - 1)
+  };
 
 public:
   inline void* allocate(size_t size) {
-    //First increase the size of the header to be aligned to a double
+    // First increase the size of the header to be aligned to a double
     void* ptr = SourceHeap::allocate(size + offset);
-    //Now return the offseted pointer
+    // Now return the offseted pointer
     return (char*)ptr + offset;
   }
 
-  inline void deallocate(void* ptr) {
-    SourceHeap::deallocate(getHeader(ptr));
-  }
+  inline void deallocate(void* ptr) { SourceHeap::deallocate(getHeader(ptr)); }
 
   inline static Header* getHeader(void* ptr) {
     return (Header*)((char*)ptr - offset);
@@ -167,13 +158,13 @@ public:
 };
 
 //! Allow looking up parent heap pointers
-template<class SourceHeap>
+template <class SourceHeap>
 class OwnerTaggedHeap : public AddHeader<void*, SourceHeap> {
   typedef AddHeader<OwnerTaggedHeap*, SourceHeap> Src;
 
 public:
   inline void* allocate(size_t size) {
-    void* retval = Src::allocate(size);
+    void* retval              = Src::allocate(size);
     *(Src::getHeader(retval)) = this;
     return retval;
   }
@@ -189,7 +180,7 @@ public:
 };
 
 //! Maintain a freelist
-template<class SourceHeap>
+template <class SourceHeap>
 class FreeListHeap : public SourceHeap {
   struct FreeNode {
     FreeNode* next;
@@ -197,48 +188,47 @@ class FreeListHeap : public SourceHeap {
   FreeNode* head;
 
   using dbg = galois::debug<0>;
+
 public:
   enum { AllocSize = SourceHeap::AllocSize };
 
   void clear() {
     while (head) {
       FreeNode* N = head;
-      head = N->next;
+      head        = N->next;
       SourceHeap::deallocate(N);
     }
   }
 
   FreeListHeap() : head(0) {}
-  ~FreeListHeap() {
-    clear();
-  }
+  ~FreeListHeap() { clear(); }
 
   inline void* allocate(size_t size) {
     if (head) {
       void* ptr = head;
-      head = head->next;
-      dbg::print (this, " picking from free list, ptr = ", ptr);
+      head      = head->next;
+      dbg::print(this, " picking from free list, ptr = ", ptr);
       return ptr;
     } else {
       void* ptr = SourceHeap::allocate(size);
-      dbg::print (this, " allocating from SourceHeap, ptr = ", ptr);
+      dbg::print(this, " allocating from SourceHeap, ptr = ", ptr);
       return ptr;
     }
   }
 
   inline void deallocate(void* ptr) {
-    if (!ptr) return;
+    if (!ptr)
+      return;
     assert((uintptr_t)ptr > 0x100);
     FreeNode* NH = (FreeNode*)ptr;
-    NH->next = head;
-    head = NH;
-    dbg::print (this, " adding block to list, head = ", head);
-
+    NH->next     = head;
+    head         = NH;
+    dbg::print(this, " adding block to list, head = ", head);
   }
 };
 
 //! Maintain a freelist using a lock which doesn't cover SourceHeap
-template<class SourceHeap>
+template <class SourceHeap>
 class SelfLockFreeListHeap : public SourceHeap {
   struct FreeNode {
     FreeNode* next;
@@ -255,15 +245,13 @@ public:
     } while (!__sync_bool_compare_and_swap(&head, h, 0));
     while (h) {
       FreeNode* N = h;
-      h = N->next;
+      h           = N->next;
       SourceHeap::deallocate(N);
     }
   }
 
   SelfLockFreeListHeap() : head(0) {}
-  ~SelfLockFreeListHeap() {
-    clear();
-  }
+  ~SelfLockFreeListHeap() { clear(); }
 
   inline void* allocate(size_t size) {
     static substrate::SimpleLock lock;
@@ -274,10 +262,10 @@ public:
     do {
       OH = head;
       if (!OH) {
-	lock.unlock();
-	return SourceHeap::allocate(size);
+        lock.unlock();
+        return SourceHeap::allocate(size);
       }
-      NH = OH->next; //The lock protects this line
+      NH = OH->next; // The lock protects this line
     } while (!__sync_bool_compare_and_swap(&head, OH, NH));
     lock.unlock();
     assert(OH);
@@ -285,22 +273,23 @@ public:
   }
 
   inline void deallocate(void* ptr) {
-    if (!ptr) return;
+    if (!ptr)
+      return;
     FreeNode* OH;
     FreeNode* NH;
     do {
-      OH = head;
-      NH = (FreeNode*)ptr;
+      OH       = head;
+      NH       = (FreeNode*)ptr;
       NH->next = OH;
     } while (!__sync_bool_compare_and_swap(&head, OH, NH));
   }
 };
 
-
-template<unsigned ElemSize, typename SourceHeap>
+template <unsigned ElemSize, typename SourceHeap>
 class BlockHeap : public SourceHeap {
   struct TyEq {
-    double data[((ElemSize + sizeof(double) - 1) & ~(sizeof(double) - 1))/sizeof(double)];
+    double data[((ElemSize + sizeof(double) - 1) & ~(sizeof(double) - 1)) /
+                sizeof(double)];
   };
 
   struct Block_basic {
@@ -312,10 +301,10 @@ class BlockHeap : public SourceHeap {
   };
 
   enum {
-    BytesLeft = (SourceHeap::AllocSize - sizeof(Block_basic)),
+    BytesLeft  = (SourceHeap::AllocSize - sizeof(Block_basic)),
     BytesLeftR = BytesLeft & ~(sizeof(double) - 1),
-    FitLeft = BytesLeftR / sizeof(TyEq[1]),
-    TotalFit = FitLeft + 1
+    FitLeft    = BytesLeftR / sizeof(TyEq[1]),
+    TotalFit   = FitLeft + 1
   };
 
   struct Block {
@@ -330,10 +319,10 @@ class BlockHeap : public SourceHeap {
   int headIndex;
 
   void refill() {
-    void* P = SourceHeap::allocate(SourceHeap::AllocSize);
+    void* P   = SourceHeap::allocate(SourceHeap::AllocSize);
     Block* BP = (Block*)P;
-    BP->next = head;
-    head = BP;
+    BP->next  = head;
+    head      = BP;
     headIndex = 0;
   }
 
@@ -343,18 +332,16 @@ public:
   void clear() {
     while (head) {
       Block* B = head;
-      head = B->next;
+      head     = B->next;
       SourceHeap::deallocate(B);
     }
   }
 
-  BlockHeap() :SourceHeap(), head(0), headIndex(0) {
+  BlockHeap() : SourceHeap(), head(0), headIndex(0) {
     static_assert(sizeof(Block) <= SourceHeap::AllocSize, "");
   }
 
-  ~BlockHeap() {
-    clear();
-  }
+  ~BlockHeap() { clear(); }
 
   inline void* allocate(size_t size) {
     assert(size == ElemSize);
@@ -367,7 +354,7 @@ public:
 };
 
 //! This implements a bump pointer though chunks of memory
-template<typename SourceHeap>
+template <typename SourceHeap>
 class BumpHeap : public SourceHeap {
   struct Block {
     union {
@@ -380,26 +367,24 @@ class BumpHeap : public SourceHeap {
   int offset;
 
   void refill() {
-    void* P = SourceHeap::allocate(SourceHeap::AllocSize);
+    void* P   = SourceHeap::allocate(SourceHeap::AllocSize);
     Block* BP = (Block*)P;
-    BP->next = head;
-    head = BP;
-    offset = sizeof(Block);
+    BP->next  = head;
+    head      = BP;
+    offset    = sizeof(Block);
   }
 
 public:
   enum { AllocSize = 0 };
 
-  BumpHeap(): SourceHeap(), head(0), offset(0) {}
+  BumpHeap() : SourceHeap(), head(0), offset(0) {}
 
-  ~BumpHeap() {
-    clear();
-  }
+  ~BumpHeap() { clear(); }
 
   void clear() {
     while (head) {
       Block* B = head;
-      head = B->next;
+      head     = B->next;
       SourceHeap::deallocate(B);
     }
   }
@@ -434,7 +419,8 @@ public:
     // Check current block
     if (!head || offset + alignedSize > SourceHeap::AllocSize) {
       size_t remaining = SourceHeap::AllocSize - offset;
-      assert((remaining & (sizeof(double) - 1)) == 0); // should still be aligned
+      assert((remaining & (sizeof(double) - 1)) ==
+             0); // should still be aligned
       if (!remaining) {
         refill();
       } else {
@@ -455,7 +441,7 @@ public:
  * This implements a bump pointer though chunks of memory that falls back
  * to malloc if the source heap cannot accommodate an allocation.
  */
-template<typename SourceHeap>
+template <typename SourceHeap>
 class BumpWithMallocHeap : public SourceHeap {
   struct Block {
     union {
@@ -471,8 +457,8 @@ class BumpWithMallocHeap : public SourceHeap {
   //! Given block of memory P, update head pointer and offset metadata
   void refill(void* P, Block*& h, int* o) {
     Block* BP = (Block*)P;
-    BP->next = h;
-    h = BP;
+    BP->next  = h;
+    h         = BP;
     if (o)
       *o = sizeof(Block);
   }
@@ -480,20 +466,18 @@ class BumpWithMallocHeap : public SourceHeap {
 public:
   enum { AllocSize = 0 };
 
-  BumpWithMallocHeap(): SourceHeap(), head(0), fallbackHead(0), offset(0) { }
+  BumpWithMallocHeap() : SourceHeap(), head(0), fallbackHead(0), offset(0) {}
 
-  ~BumpWithMallocHeap() {
-    clear();
-  }
+  ~BumpWithMallocHeap() { clear(); }
 
   void clear() {
     while (head) {
       Block* B = head;
-      head = B->next;
+      head     = B->next;
       SourceHeap::deallocate(B);
     }
     while (fallbackHead) {
-      Block* B = fallbackHead;
+      Block* B     = fallbackHead;
       fallbackHead = B->next;
       free(B);
     }
@@ -523,30 +507,25 @@ public:
 //! It maintains a freelist of hunks acquired from the system
 class SystemHeap {
 public:
-  //FIXME: actually check!
-  enum { AllocSize = 2*1024*1024 };
+  // FIXME: actually check!
+  enum { AllocSize = 2 * 1024 * 1024 };
 
   SystemHeap();
   ~SystemHeap();
 
-  inline void* allocate(size_t size) {
-    return pagePoolAlloc();
-  }
+  inline void* allocate(size_t size) { return pagePoolAlloc(); }
 
-  inline void deallocate(void* ptr) {
-    pagePoolFree(ptr);
-  }
+  inline void deallocate(void* ptr) { pagePoolFree(ptr); }
 };
 
-
 template <typename Derived>
-class StaticSingleInstance: private boost::noncopyable {
+class StaticSingleInstance : private boost::noncopyable {
 
   // static std::unique_ptr<Derived> instance;
   static substrate::PtrLock<Derived> ptr;
 
 public:
-  static Derived* getInstance (void) {
+  static Derived* getInstance(void) {
     Derived* f = ptr.getValue();
     if (f) {
       // assert (f == instance.get ());
@@ -569,70 +548,64 @@ public:
 };
 
 // template <typename Derived>
-// std::unique_ptr<Derived> StaticSingleInstance<Derived>::instance = std::unique_ptr<Derived>();
+// std::unique_ptr<Derived> StaticSingleInstance<Derived>::instance =
+// std::unique_ptr<Derived>();
 
 template <typename Derived>
-substrate::PtrLock<Derived> StaticSingleInstance<Derived>::ptr = substrate::PtrLock<Derived>();
+substrate::PtrLock<Derived>
+    StaticSingleInstance<Derived>::ptr = substrate::PtrLock<Derived>();
 
-
-class PageHeap: public StaticSingleInstance<PageHeap> {
+class PageHeap : public StaticSingleInstance<PageHeap> {
 
   using Base = StaticSingleInstance<PageHeap>;
 
-  /* template <typename _U> */  friend class StaticSingleInstance<PageHeap>;
+  /* template <typename _U> */ friend class StaticSingleInstance<PageHeap>;
 
-  using InnerHeap = ThreadPrivateHeap<FreeListHeap<SystemHeap> >;
+  using InnerHeap = ThreadPrivateHeap<FreeListHeap<SystemHeap>>;
   // using InnerHeap = SystemHeap;
 
   InnerHeap innerHeap;
 
   using dbg = galois::debug<0>;
 
-  PageHeap (): innerHeap () {
-    dbg::print ("New instance of PageHeap: ", this);
-  }
+  PageHeap() : innerHeap() { dbg::print("New instance of PageHeap: ", this); }
 
 public:
+  enum { AllocSize = InnerHeap::AllocSize };
 
-  enum {AllocSize = InnerHeap::AllocSize};
-
-  inline void* allocate (size_t size) {
-    assert (size <= AllocSize);
-    void* ptr = innerHeap.allocate (size);
-    dbg::print (this, " PageHeap allocate, ptr = ", ptr);
+  inline void* allocate(size_t size) {
+    assert(size <= AllocSize);
+    void* ptr = innerHeap.allocate(size);
+    dbg::print(this, " PageHeap allocate, ptr = ", ptr);
     return ptr;
   }
 
-  inline void deallocate (void* ptr) {
-    assert (ptr);
-    dbg::print (this, " PageHeap  deallocate ptr = ", ptr);
-    innerHeap.deallocate (ptr);
+  inline void deallocate(void* ptr) {
+    assert(ptr);
+    dbg::print(this, " PageHeap  deallocate ptr = ", ptr);
+    innerHeap.deallocate(ptr);
   }
-
 };
 
-
 #ifdef GALOIS_FORCE_STANDALONE
-class SizedHeapFactory: private boost::noncopyable {
+class SizedHeapFactory : private boost::noncopyable {
 public:
   typedef MallocHeap SizedHeap;
 
-  static SizedHeap* getHeapForSize(const size_t) {
-    return &alloc;
-  }
+  static SizedHeap* getHeapForSize(const size_t) { return &alloc; }
 
 private:
   static SizedHeap alloc;
 };
 #else
-class SizedHeapFactory: public StaticSingleInstance<SizedHeapFactory> {
+class SizedHeapFactory : public StaticSingleInstance<SizedHeapFactory> {
   using Base = StaticSingleInstance<SizedHeapFactory>;
-  /* template <typename> */  friend class StaticSingleInstance<SizedHeapFactory>;
+  /* template <typename> */ friend class StaticSingleInstance<SizedHeapFactory>;
+
 public:
-//! [FixedSizeAllocator example]
-  typedef ThreadPrivateHeap<
-    FreeListHeap<BumpHeap<SystemHeap> > > SizedHeap;
-//! [FixedSizeAllocator example]
+  //! [FixedSizeAllocator example]
+  typedef ThreadPrivateHeap<FreeListHeap<BumpHeap<SystemHeap>>> SizedHeap;
+  //! [FixedSizeAllocator example]
 
   static SizedHeap* getHeapForSize(const size_t);
 
@@ -659,7 +632,7 @@ public:
  * Users should call {@link allocate(size_t, size_t&)} multiple times to split
  * large allocations over multiple pages.
  */
-struct VariableSizeHeap: public ThreadPrivateHeap<BumpHeap<SystemHeap>> {
+struct VariableSizeHeap : public ThreadPrivateHeap<BumpHeap<SystemHeap>> {
   enum { AllocSize = 0 };
 };
 
@@ -668,17 +641,11 @@ class FixedSizeHeap {
   SizedHeapFactory::SizedHeap* heap;
 
 public:
-  FixedSizeHeap(size_t size) {
-    heap = SizedHeapFactory::getHeapForSize(size);
-  }
+  FixedSizeHeap(size_t size) { heap = SizedHeapFactory::getHeapForSize(size); }
 
-  inline void* allocate(size_t size) {
-    return heap->allocate(size);
-  }
+  inline void* allocate(size_t size) { return heap->allocate(size); }
 
-  inline void deallocate(void* ptr) {
-    heap->deallocate(ptr);
-  }
+  inline void deallocate(void* ptr) { heap->deallocate(ptr); }
 
   inline bool operator!=(const FixedSizeHeap& rhs) const {
     return heap != rhs.heap;
@@ -690,14 +657,18 @@ public:
 };
 
 class SerialNumaHeap {
-  enum { offset = (sizeof(substrate::LAptr) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
+  enum {
+    offset = (sizeof(substrate::LAptr) + (sizeof(double) - 1)) &
+             ~(sizeof(double) - 1)
+  };
 
 public:
   enum { AllocSize = 0 };
 
   void* allocate(size_t size) {
-    auto ptr = substrate::largeMallocInterleaved(size+offset, activeThreads);
-    substrate::LAptr* header = new ((char*)ptr.get()) substrate::LAptr{std::move(ptr)};
+    auto ptr = substrate::largeMallocInterleaved(size + offset, activeThreads);
+    substrate::LAptr* header =
+        new ((char*)ptr.get()) substrate::LAptr{std::move(ptr)};
     return (char*)(header->get()) + offset;
   }
 
@@ -707,16 +678,15 @@ public:
   }
 };
 
-
 ////////////////////////////////////////////////////////////////////////////////
 // Now adapt to standard std allocators
 ////////////////////////////////////////////////////////////////////////////////
 
-//!A fixed size block allocator
-template<typename Ty>
+//! A fixed size block allocator
+template <typename Ty>
 class FixedSizeAllocator;
 
-template<>
+template <>
 class FixedSizeAllocator<void> {
 public:
   typedef size_t size_type;
@@ -725,32 +695,40 @@ public:
   typedef const void* const_pointer;
   typedef void value_type;
 
-  template<typename Other>
-  struct rebind { typedef FixedSizeAllocator<Other> other; };
+  template <typename Other>
+  struct rebind {
+    typedef FixedSizeAllocator<Other> other;
+  };
 };
 
-template<typename Ty>
+template <typename Ty>
 class FixedSizeAllocator {
-  inline void destruct(char*) const { }
-  inline void destruct(wchar_t*) const { }
-  template<typename T> inline void destruct(T* t) const { t->~T(); }
+  inline void destruct(char*) const {}
+  inline void destruct(wchar_t*) const {}
+  template <typename T>
+  inline void destruct(T* t) const {
+    t->~T();
+  }
 
   FixedSizeHeap heap;
 
 public:
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef Ty *pointer;
-  typedef const Ty *const_pointer;
+  typedef Ty* pointer;
+  typedef const Ty* const_pointer;
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
 
-  template<class Other>
-  struct rebind { typedef FixedSizeAllocator<Other> other; };
+  template <class Other>
+  struct rebind {
+    typedef FixedSizeAllocator<Other> other;
+  };
 
-  FixedSizeAllocator() throw(): heap(sizeof(Ty)) {}
-  template <class U> FixedSizeAllocator(const FixedSizeAllocator<U>&) throw(): heap(sizeof(Ty)) {}
+  FixedSizeAllocator() throw() : heap(sizeof(Ty)) {}
+  template <class U>
+  FixedSizeAllocator(const FixedSizeAllocator<U>&) throw() : heap(sizeof(Ty)) {}
 
   inline pointer address(reference val) const { return &val; }
   inline const_pointer address(const_reference val) const { return &val; }
@@ -766,108 +744,100 @@ public:
     heap.deallocate(ptr);
   }
 
-  template<class U, class... Args>
-  inline void construct(U* p, Args&&... args ) const {
-    ::new((void*)p) U(std::forward<Args>(args)...);
+  template <class U, class... Args>
+  inline void construct(U* p, Args&&... args) const {
+    ::new ((void*)p) U(std::forward<Args>(args)...);
   }
 
-  inline void destroy(pointer ptr) const {
-    destruct(ptr);
-  }
+  inline void destroy(pointer ptr) const { destruct(ptr); }
 
   size_type max_size() const throw() { return 1; }
 
-  template<typename T1>
+  template <typename T1>
   inline bool operator!=(const FixedSizeAllocator<T1>& rhs) const {
     return heap != rhs.heap;
   }
 
-  template<typename T1>
+  template <typename T1>
   inline bool operator==(const FixedSizeAllocator<T1>& rhs) const {
     return heap == rhs.heap;
   }
 };
 
-class Pow_2_BlockHeap: public StaticSingleInstance<Pow_2_BlockHeap> {
+class Pow_2_BlockHeap : public StaticSingleInstance<Pow_2_BlockHeap> {
 
 private:
-
   using Base = StaticSingleInstance<Pow_2_BlockHeap>;
   /* template <typename> */ friend class StaticSingleInstance<Pow_2_BlockHeap>;
 
   static const bool USE_MALLOC_AS_BACKUP = true;
 
-  static const size_t LOG2_MIN_SIZE = 3; // 2^3 == 8 bytes
+  static const size_t LOG2_MIN_SIZE = 3;  // 2^3 == 8 bytes
   static const size_t LOG2_MAX_SIZE = 16; // 64k
 
   typedef FixedSizeHeap Heap_ty;
 
   std::vector<Heap_ty> heapTable;
 
-  static inline size_t pow2 (unsigned i) {
-    return (1U << i);
-  }
+  static inline size_t pow2(unsigned i) { return (1U << i); }
 
-  static unsigned nextLog2 (const size_t allocSize) {
+  static unsigned nextLog2(const size_t allocSize) {
 
     unsigned i = LOG2_MIN_SIZE;
 
-    while (pow2 (i) < allocSize) {
+    while (pow2(i) < allocSize) {
       ++i;
     }
 
     // if (pow2 (i) > pow2 (LOG2_MAX_SIZE)) {
-      // std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
-      // throw std::bad_alloc();
+    // std::fprintf (stderr, "ERROR: block bigger than huge page size
+    // requested\n"); throw std::bad_alloc();
     // }
 
     return i;
   }
 
+  void populateTable(void) {
+    assert(heapTable.empty());
 
-  void populateTable (void) {
-    assert (heapTable.empty ());
-
-    heapTable.clear ();
+    heapTable.clear();
     for (unsigned i = 0; i <= LOG2_MAX_SIZE; ++i) {
-      heapTable.push_back (Heap_ty (pow2 (i)));
+      heapTable.push_back(Heap_ty(pow2(i)));
     }
   }
 
-  Pow_2_BlockHeap (void) throw ();
+  Pow_2_BlockHeap(void) throw();
 
+public:
+  void* allocateBlock(const size_t allocSize) {
 
-  public:
-
-  void* allocateBlock (const size_t allocSize) {
-
-    if (allocSize > pow2 (LOG2_MAX_SIZE)) {
+    if (allocSize > pow2(LOG2_MAX_SIZE)) {
       if (USE_MALLOC_AS_BACKUP) {
-        return malloc (allocSize);
+        return malloc(allocSize);
       } else {
-        fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        fprintf(stderr, "ERROR: block bigger than huge page size requested\n");
         throw std::bad_alloc();
       }
     } else {
 
-      unsigned i = nextLog2 (allocSize);
-      assert (i < heapTable.size());
-      return heapTable[i].allocate (pow2 (i));
+      unsigned i = nextLog2(allocSize);
+      assert(i < heapTable.size());
+      return heapTable[i].allocate(pow2(i));
     }
   }
 
-  void deallocateBlock (void* ptr, const size_t allocSize) {
-    if (allocSize > pow2 (LOG2_MAX_SIZE)) {
+  void deallocateBlock(void* ptr, const size_t allocSize) {
+    if (allocSize > pow2(LOG2_MAX_SIZE)) {
       if (USE_MALLOC_AS_BACKUP) {
-        free (ptr);
+        free(ptr);
       } else {
-        fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        fprintf(stderr, "ERROR: block bigger than huge page size requested\n");
         throw std::bad_alloc();
       }
     } else {
-      unsigned i = nextLog2 (allocSize);
-      assert (i < heapTable.size());
-      heapTable[i].deallocate (ptr);
+      unsigned i = nextLog2(allocSize);
+      assert(i < heapTable.size());
+      heapTable[i].deallocate(ptr);
     }
   }
 };
@@ -875,69 +845,66 @@ private:
 template <typename Ty>
 class Pow_2_BlockAllocator {
 
-
-  template<typename T>
+  template <typename T>
   static inline void destruct(T* t) {
     if (!std::is_scalar<T>::value) {
       t->~T();
     }
   }
 
-
 public:
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef Ty *pointer;
-  typedef const Ty *const_pointer;
+  typedef Ty* pointer;
+  typedef const Ty* const_pointer;
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
 
-  template<class Other>
-  struct rebind { typedef Pow_2_BlockAllocator<Other> other; };
+  template <class Other>
+  struct rebind {
+    typedef Pow_2_BlockAllocator<Other> other;
+  };
 
   Pow_2_BlockHeap* heap;
 
-  Pow_2_BlockAllocator() throw(): heap (Pow_2_BlockHeap::getInstance ()) {
-  }
+  Pow_2_BlockAllocator() throw() : heap(Pow_2_BlockHeap::getInstance()) {}
 
   // template <typename U>
   // friend class Pow_2_BlockAllocator<U>;
 
   template <typename U>
   Pow_2_BlockAllocator(const Pow_2_BlockAllocator<U>& that) throw()
-  : heap (that.heap) {}
+      : heap(that.heap) {}
 
   inline pointer address(reference val) const { return &val; }
 
   inline const_pointer address(const_reference val) const { return &val; }
 
   pointer allocate(size_type size) {
-    return static_cast<pointer>(heap->allocateBlock (size * sizeof (Ty)));
+    return static_cast<pointer>(heap->allocateBlock(size * sizeof(Ty)));
   }
 
   void deallocate(pointer ptr, size_type len) {
     heap->deallocateBlock(ptr, len * sizeof(Ty));
   }
 
-  template<class U, class... Args>
-  inline void construct(U* p, Args&&... args ) const {
-    ::new((void*)p) U(std::forward<Args>(args)...);
+  template <class U, class... Args>
+  inline void construct(U* p, Args&&... args) const {
+    ::new ((void*)p) U(std::forward<Args>(args)...);
   }
 
-  inline void destroy(pointer ptr) const {
-    destruct (ptr);
-  }
+  inline void destroy(pointer ptr) const { destruct(ptr); }
 
-  size_type max_size() const throw() { return size_type (-1); }
+  size_type max_size() const throw() { return size_type(-1); }
 
-  template<typename T1>
-  bool operator != (const Pow_2_BlockAllocator<T1>& rhs) const {
+  template <typename T1>
+  bool operator!=(const Pow_2_BlockAllocator<T1>& rhs) const {
     return heap != rhs.heap;
   }
 
-  template<typename T1>
-  bool operator == (const Pow_2_BlockAllocator<T1>& rhs) const {
+  template <typename T1>
+  bool operator==(const Pow_2_BlockAllocator<T1>& rhs) const {
     return heap == rhs.heap;
   }
 };
@@ -951,15 +918,17 @@ public:
   typedef const void* const_pointer;
   typedef void value_type;
 
-  template<typename Other>
-  struct rebind { typedef Pow_2_BlockAllocator<Other> other; };
+  template <typename Other>
+  struct rebind {
+    typedef Pow_2_BlockAllocator<Other> other;
+  };
 };
 
 //! Keep a reference to an external allocator
-template<typename Ty, typename HeapTy>
+template <typename Ty, typename HeapTy>
 class ExternalHeapAllocator;
 
-template<typename HeapTy>
+template <typename HeapTy>
 class ExternalHeapAllocator<void, HeapTy> {
 public:
   typedef size_t size_type;
@@ -968,36 +937,41 @@ public:
   typedef const void* const_pointer;
   typedef void value_type;
 
-  template<typename Other>
-  struct rebind { typedef ExternalHeapAllocator<Other,HeapTy> other; };
+  template <typename Other>
+  struct rebind {
+    typedef ExternalHeapAllocator<Other, HeapTy> other;
+  };
 };
 
-template<typename Ty, typename HeapTy>
+template <typename Ty, typename HeapTy>
 class ExternalHeapAllocator {
   inline void destruct(char*) const {}
-  inline void destruct(wchar_t*) const { }
-  template<typename T> inline void destruct(T* t) const { t->~T(); }
+  inline void destruct(wchar_t*) const {}
+  template <typename T>
+  inline void destruct(T* t) const {
+    t->~T();
+  }
 
 public:
   HeapTy* heap; // Should be private except that makes copy hard
 
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
-  typedef Ty *pointer;
-  typedef const Ty *const_pointer;
+  typedef Ty* pointer;
+  typedef const Ty* const_pointer;
   typedef Ty& reference;
   typedef const Ty& const_reference;
   typedef Ty value_type;
 
-  template<class Other>
+  template <class Other>
   struct rebind {
     typedef ExternalHeapAllocator<Other, HeapTy> other;
   };
 
-  explicit ExternalHeapAllocator(HeapTy* a) throw(): heap(a) {}
+  explicit ExternalHeapAllocator(HeapTy* a) throw() : heap(a) {}
 
-  template<class T1>
-  ExternalHeapAllocator(const ExternalHeapAllocator<T1,HeapTy>& rhs) throw() {
+  template <class T1>
+  ExternalHeapAllocator(const ExternalHeapAllocator<T1, HeapTy>& rhs) throw() {
     heap = rhs.heap;
   }
 
@@ -1008,51 +982,50 @@ public:
   pointer allocate(size_type size) {
     if (size > max_size())
       throw std::bad_alloc();
-    return static_cast<pointer>(heap->allocate(size*sizeof(Ty)));
+    return static_cast<pointer>(heap->allocate(size * sizeof(Ty)));
   }
 
-  void deallocate(pointer ptr, size_type len) {
-    heap->deallocate(ptr);
-  }
+  void deallocate(pointer ptr, size_type len) { heap->deallocate(ptr); }
 
   inline void construct(pointer ptr, const_reference val) const {
     new (ptr) Ty(val);
   }
 
-  template<class U, class... Args >
-  inline void construct(U* p, Args&&... args ) const {
-    ::new((void*)p) U(std::forward<Args>(args)...);
+  template <class U, class... Args>
+  inline void construct(U* p, Args&&... args) const {
+    ::new ((void*)p) U(std::forward<Args>(args)...);
   }
 
-  void destroy(pointer ptr) const {
-    destruct(ptr);
+  void destroy(pointer ptr) const { destruct(ptr); }
+
+  size_type max_size() const throw() {
+    return (HeapTy::AllocSize == 0) ? size_t(-1) / sizeof(Ty)
+                                    : HeapTy::AllocSize / sizeof(Ty);
   }
 
-  size_type max_size() const throw() { return (HeapTy::AllocSize == 0) ? size_t(-1)/sizeof(Ty) : HeapTy::AllocSize/sizeof(Ty); }
-
-  template<typename T1,typename A1>
-  bool operator!=(const ExternalHeapAllocator<T1,A1>& rhs) const {
+  template <typename T1, typename A1>
+  bool operator!=(const ExternalHeapAllocator<T1, A1>& rhs) const {
     return heap != rhs.heap;
   }
 
-  template<typename T1,typename A1>
-  bool operator==(const ExternalHeapAllocator<T1,A1>& rhs) const {
+  template <typename T1, typename A1>
+  bool operator==(const ExternalHeapAllocator<T1, A1>& rhs) const {
     return heap == rhs.heap;
   }
 };
 
-template<typename T>
-class SerialNumaAllocator: public ExternalHeapAllocator<T, SerialNumaHeap> {
+template <typename T>
+class SerialNumaAllocator : public ExternalHeapAllocator<T, SerialNumaHeap> {
   using Super = ExternalHeapAllocator<T, SerialNumaHeap>;
   SerialNumaHeap heap;
 
 public:
-  template<class Other>
+  template <class Other>
   struct rebind {
     typedef SerialNumaAllocator<Other> other;
   };
 
-  SerialNumaAllocator(): Super(&heap) {}
+  SerialNumaAllocator() : Super(&heap) {}
 };
 
 } // end namespace runtime

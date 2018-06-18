@@ -33,67 +33,71 @@ using namespace std;
 
 struct rMat {
   double a, ab, abc;
-  int n; 
+  int n;
   unsigned int h;
-  rMat(int _n, unsigned int _seed, 
-       double _a, double _b, double _c) {
-    n = _n; a = _a; ab = _a + _b; abc = _a+_b+_c;
-    h = dataGen::hash<unsigned int>(_seed);
-    utils::myAssert(abc <= 1.0,
-		    "in rMat: a + b + c add to more than 1");
-    utils::myAssert((1 << utils::log2Up(n)) == n, 
-		    "in rMat: n not a power of 2");
+  rMat(int _n, unsigned int _seed, double _a, double _b, double _c) {
+    n   = _n;
+    a   = _a;
+    ab  = _a + _b;
+    abc = _a + _b + _c;
+    h   = dataGen::hash<unsigned int>(_seed);
+    utils::myAssert(abc <= 1.0, "in rMat: a + b + c add to more than 1");
+    utils::myAssert((1 << utils::log2Up(n)) == n,
+                    "in rMat: n not a power of 2");
   }
 
   edge rMatRec(int nn, int randStart, int randStride) {
-    if (nn==1) return edge(0,0);
+    if (nn == 1)
+      return edge(0, 0);
     else {
-      edge x = rMatRec(nn/2, randStart + randStride, randStride);
+      edge x   = rMatRec(nn / 2, randStart + randStride, randStride);
       double r = dataGen::hash<double>(randStart);
-      if (r < a) return x;
-      else if (r < ab) return edge(x.u,x.v+nn/2);
-      else if (r < abc) return edge(x.u+nn/2, x.v);
-      else return edge(x.u+nn/2, x.v+nn/2);
+      if (r < a)
+        return x;
+      else if (r < ab)
+        return edge(x.u, x.v + nn / 2);
+      else if (r < abc)
+        return edge(x.u + nn / 2, x.v);
+      else
+        return edge(x.u + nn / 2, x.v + nn / 2);
     }
   }
 
-  edge operator() (int i) {
-    unsigned int randStart = dataGen::hash<unsigned int>((2*i)*h);
-    unsigned int randStride = dataGen::hash<unsigned int>((2*i+1)*h);
+  edge operator()(int i) {
+    unsigned int randStart  = dataGen::hash<unsigned int>((2 * i) * h);
+    unsigned int randStride = dataGen::hash<unsigned int>((2 * i + 1) * h);
     return rMatRec(n, randStart, randStride);
   }
 };
 
-edgeArray edgeRmat(int n, int m, unsigned int seed, 
-		   float a, float b, float c) {
+edgeArray edgeRmat(int n, int m, unsigned int seed, float a, float b, float c) {
   int nn = (1 << utils::log2Up(n));
-  rMat g(nn,seed,a,b,c);
-  edge* E = newA(edge,m);
-//  parallel_for (int i = 0; i < m; i++) 
-  parallel_doall(int, i, 0, m) {
-    E[i] = g(i);
-  } parallel_doall_end
-  return edgeArray(E,nn,nn,m);
+  rMat g(nn, seed, a, b, c);
+  edge* E = newA(edge, m);
+  //  parallel_for (int i = 0; i < m; i++)
+  parallel_doall(int, i, 0, m) { E[i] = g(i); }
+  parallel_doall_end return edgeArray(E, nn, nn, m);
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,
-		"[-m <numedges>] [-s <intseed>] [-o] [-j] [-a <a>] [-b <b>] [-c <c>] n <outFile>");
-  pair<int,char*> in = P.sizeAndFileName();
-  int n = in.first;
-  char* fname = in.second;
-  double a = P.getOptionDoubleValue("-a",.5);
-  double b = P.getOptionDoubleValue("-b",.1);
-  double c = P.getOptionDoubleValue("-c", b);
-  int m = P.getOptionIntValue("-m", 10*n);
-  int seed = P.getOptionIntValue("-s", 1);
-  bool adjArray = P.getOption("-j");
-  bool ordered = P.getOption("-o");
+  commandLine P(argc, argv,
+                "[-m <numedges>] [-s <intseed>] [-o] [-j] [-a <a>] [-b <b>] "
+                "[-c <c>] n <outFile>");
+  pair<int, char*> in = P.sizeAndFileName();
+  int n               = in.first;
+  char* fname         = in.second;
+  double a            = P.getOptionDoubleValue("-a", .5);
+  double b            = P.getOptionDoubleValue("-b", .1);
+  double c            = P.getOptionDoubleValue("-c", b);
+  int m               = P.getOptionIntValue("-m", 10 * n);
+  int seed            = P.getOptionIntValue("-s", 1);
+  bool adjArray       = P.getOption("-j");
+  bool ordered        = P.getOption("-o");
 
   edgeArray EA = edgeRmat(n, m, seed, a, b, c);
   if (!ordered) {
-    graph G = graphFromEdges(EA,adjArray);
+    graph G = graphFromEdges(EA, adjArray);
     EA.del();
     G = graphReorder(G, NULL);
     if (adjArray) {

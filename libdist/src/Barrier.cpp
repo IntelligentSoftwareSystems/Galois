@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -45,7 +45,7 @@ class HostFence : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostFence"; }
 
-  virtual void reinit(unsigned val) { }
+  virtual void reinit(unsigned val) {}
 
   //! control-flow barrier across distributed hosts
   //! acts as a distributed-memory fence as well (flushes send and receives)
@@ -53,9 +53,10 @@ public:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     for (unsigned h = 0; h < net.Num; ++h) {
-      if (h == net.ID) continue;
+      if (h == net.ID)
+        continue;
       galois::runtime::SendBuffer b;
-      galois::runtime::gSerialize(b, net.ID+1); // non-zero message
+      galois::runtime::gSerialize(b, net.ID + 1); // non-zero message
       net.sendTagged(h, galois::runtime::evilPhase, b);
     }
     net.flush(); // flush all sends
@@ -64,7 +65,8 @@ public:
     while (received < net.Num) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
-        net.handleReceives(); // flush all receives from net.sendMsg() or net.sendSimple()
+        net.handleReceives(); // flush all receives from net.sendMsg() or
+                              // net.sendSimple()
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
       } while (!p);
       assert(p->first != net.ID);
@@ -72,7 +74,8 @@ public:
       ++received;
     }
     ++galois::runtime::evilPhase;
-    if (galois::runtime::evilPhase >= std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
+    if (galois::runtime::evilPhase >=
+        std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
     }
   }
@@ -82,15 +85,15 @@ class HostBarrier : public galois::substrate::Barrier {
 public:
   virtual const char* name() const { return "HostBarrier"; }
 
-  virtual void reinit(unsigned val) { }
+  virtual void reinit(unsigned val) {}
 
   //! Control-flow barrier across distributed hosts
   virtual void wait() {
-    #ifdef GALOIS_USE_LWCI
+#ifdef GALOIS_USE_LWCI
     lc_barrier(mv);
-    #else
+#else
     MPI_Barrier(MPI_COMM_WORLD); // assumes MPI_THREAD_MULTIPLE
-    #endif
+#endif
   }
 };
 

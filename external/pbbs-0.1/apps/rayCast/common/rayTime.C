@@ -33,38 +33,41 @@
 using namespace std;
 using namespace benchIO;
 
-void timeRayCast(triangles<pointT> T, ray<pointT>* rays, int nRays, 
-	    int rounds, char* outFile) {
+void timeRayCast(triangles<pointT> T, ray<pointT>* rays, int nRays, int rounds,
+                 char* outFile) {
   int* m = NULL;
-  for (int i=0; i < rounds; i++) {
-    if (m != NULL) free(m);
+  for (int i = 0; i < rounds; i++) {
+    if (m != NULL)
+      free(m);
     startTime();
     m = rayCast(T, rays, nRays);
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) writeIntArrayToFile(m, nRays, outFile);
+  if (outFile != NULL)
+    writeIntArrayToFile(m, nRays, outFile);
   free(m);
 }
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <triangleFile> <rayFile>");
-   pair<char*,char*> fnames = P.IOFileNames();
-  char* triFile = fnames.first;
-  char* rayFile = fnames.second;
-  char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  commandLine P(argc, argv,
+                "[-o <outFile>] [-r <rounds>] <triangleFile> <rayFile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* triFile             = fnames.first;
+  char* rayFile             = fnames.second;
+  char* oFile               = P.getOptionValue("-o");
+  int rounds                = P.getOptionIntValue("-r", 1);
 
   // the 1 argument means that the vertices are labeled starting at 1
-  triangles<pointT> T = readTrianglesFromFile<pointT>(triFile,1);
-  _seq<pointT> Pts = readPointsFromFile<pointT>(rayFile);
-  int n = Pts.n/2;
-  ray<pointT>* rays = newA(ray<pointT>, n);
-//  parallel_for (int i=0; i < n; i++) {
-  parallel_doall(int, i, 0, n)  {
-    rays[i].o = Pts.A[2*i];
-    rays[i].d = Pts.A[2*i+1]-pointT(0,0,0);
-  } parallel_doall_end
-  timeRayCast(T, rays, n, rounds, oFile);
+  triangles<pointT> T = readTrianglesFromFile<pointT>(triFile, 1);
+  _seq<pointT> Pts    = readPointsFromFile<pointT>(rayFile);
+  int n               = Pts.n / 2;
+  ray<pointT>* rays   = newA(ray<pointT>, n);
+  //  parallel_for (int i=0; i < n; i++) {
+  parallel_doall(int, i, 0, n) {
+    rays[i].o = Pts.A[2 * i];
+    rays[i].d = Pts.A[2 * i + 1] - pointT(0, 0, 0);
+  }
+  parallel_doall_end timeRayCast(T, rays, n, rounds, oFile);
 }

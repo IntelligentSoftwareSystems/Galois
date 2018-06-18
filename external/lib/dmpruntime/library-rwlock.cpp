@@ -12,9 +12,9 @@
 
 #include "dmp-internal.h"
 
-#define RWLOCK_DEBUG_MSG(L,msg) DEBUG_MSG( DEBUG_MUTEX, \
-                                           msg "(%p) @%llu T:%d", \
-                                           (L), DMProundNumber, DMPMAP->threadID )
+#define RWLOCK_DEBUG_MSG(L, msg)                                               \
+  DEBUG_MSG(DEBUG_MUTEX, msg "(%p) @%llu T:%d", (L), DMProundNumber,           \
+            DMPMAP->threadID)
 
 // For lock(), this is how we adjust waiting_writers:
 //   w->rounds == 0 :: increment
@@ -37,11 +37,13 @@ inline bool rwlock_rd_tryacquire(DMPrwlock* rwlock, DMPwaiter* w) {
 inline bool rwlock_wr_tryacquire(DMPrwlock* rwlock, DMPwaiter* w) {
   if (rwlock->state == 0) {
     rwlock->state = -1;
-    if (w && w->rounds > 0) rwlock->waiting_writers--;
+    if (w && w->rounds > 0)
+      rwlock->waiting_writers--;
     __sync_synchronize();
     return true;
   } else {
-    if (w && w->rounds == 0) rwlock->waiting_writers++;
+    if (w && w->rounds == 0)
+      rwlock->waiting_writers++;
     return false;
   }
 }
@@ -67,9 +69,7 @@ struct DmpRdlockTraits {
     return Wrapper::tryacquire_serial(rwlock, w);
   }
 
-  static void release(DMPrwlock* rwlock) {
-    rwlock_release(rwlock);
-  }
+  static void release(DMPrwlock* rwlock) { rwlock_release(rwlock); }
 
   static void update_predictor(DMPresource* r, int oldowner) {
     DmpDefaultPredictor::update(r, oldowner);
@@ -79,10 +79,11 @@ struct DmpRdlockTraits {
     return DmpDefaultPredictor::predict(r);
   }
 
-#if defined(DMP_ENABLE_DATA_GROUP_BY_MUTEX) || defined(DMP_ENABLE_TINY_SERIAL_MODE)
+#if defined(DMP_ENABLE_DATA_GROUP_BY_MUTEX) ||                                 \
+    defined(DMP_ENABLE_TINY_SERIAL_MODE)
   static const bool nest_globally = true;
 #else
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
 #endif
 
 #ifdef DMP_ENABLE_MUTEX_LOCK_ENDQUANTUM
@@ -112,9 +113,7 @@ struct DmpWrlockTraits {
 
   // Same as DmpRdlockTraits
 
-  static void release(DMPrwlock* rwlock) {
-    rwlock_release(rwlock);
-  }
+  static void release(DMPrwlock* rwlock) { rwlock_release(rwlock); }
   static void update_predictor(DMPresource* r, int oldowner) {
     DmpDefaultPredictor::update(r, oldowner);
   }
@@ -123,8 +122,10 @@ struct DmpWrlockTraits {
   }
 
   static const bool nest_globally = DmpRdlockTraits::nest_globally;
-  static const bool acquire_ends_quantum = DmpRdlockTraits::acquire_ends_quantum;
-  static const bool release_ends_quantum = DmpRdlockTraits::release_ends_quantum;
+  static const bool acquire_ends_quantum =
+      DmpRdlockTraits::acquire_ends_quantum;
+  static const bool release_ends_quantum =
+      DmpRdlockTraits::release_ends_quantum;
 };
 
 //--------------------------------------------------------------
@@ -135,7 +136,7 @@ int DMPrwlock_init(DMPrwlock* rwlock, void* attr) {
   ASSERT(attr == NULL);
   DMP_waitForSerialMode();
   DMPresource_init(&rwlock->resource, 0 | DMP_RESOURCE_TYPE_RWLOCK);
-  rwlock->state = 0;
+  rwlock->state           = 0;
   rwlock->waiting_writers = 0;
   return 0;
 }

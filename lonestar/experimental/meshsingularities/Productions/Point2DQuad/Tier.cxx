@@ -7,7 +7,4 @@
 
 #include "Tier.hxx"
 
-namespace D2Quad {
-
-
-} /* namespace D2Quad */
+namespace D2Quad {} /* namespace D2Quad */

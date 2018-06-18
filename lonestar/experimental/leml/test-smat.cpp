@@ -10,16 +10,13 @@
 
 #include "smat.h"
 
-
 using namespace std;
 
+int main(int argc, char* argv[]) {
 
-int main(int argc, char* argv[]){
+  smat_t Y;
+  Y.load_from_binary(argv[1]);
+  printf("m %ld n %ld nnz %ld\n", Y.rows, Y.cols, Y.nnz);
 
-	smat_t Y;
-	Y.load_from_binary(argv[1]);
-	printf("m %ld n %ld nnz %ld\n", Y.rows, Y.cols, Y.nnz);
-
-	return 0;
+  return 0;
 }
-

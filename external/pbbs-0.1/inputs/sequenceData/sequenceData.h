@@ -28,71 +28,73 @@
 
 namespace dataGen {
 
-  struct payload {
-    double key;
-    double payload[2];
-  };
-
-  class payloadCmp : public std::binary_function <payload, payload, bool> {
-  public:
-    bool operator()(payload const& A, payload const& B) const {
-      return A.key<B.key;
-    }
-  };
-
-  template <class T>
-  T* rand(int s, int e) { 
-    int n = e - s;
-    T *A = newA(T, n);
-    for (int i = 0; i < n; i++) { // for some reason cilk_for does not work
-      A[i] = hash<T>(i+s);
-    }
-    return A;
-  }
-
-  int* randIntRange(int s, int e, int m) { 
-    int n = e - s;
-    int *A = newA(int, n);
-    for (int i = 0; i < n; i++) // for some reason cilk_for does not work
-      A[i] = hash<int>(i+s)%m;
-    return A;
-  }
-
-  payload* randPayload(int s, int e) { 
-    int n = e - s;
-    payload *A = newA(payload, n);
-    for (int i = 0; i < n; i++) 
-      A[i].key = hash<double>(i+s); // breaks with cilk_for
-    return A;
-  }
-
-  template <class T>
-  T* almostSorted(int s, int e, int swaps) { 
-    int n = e - s;
-    T *A = newA(T,n);
-    for (int i = 0; i < n; i++) A[i] = (T) i;
-    for (int i = s; i < s+swaps; i++)
-      swap(A[utils::hash(2*i)%n],A[utils::hash(2*i+1)%n]);
-    return A;
-  }
-
-  template <class T>
-  T* same(int n, T v) { 
-    T *A = newA(T,n);
-    for (int i = 0; i < n; i++) A[i] = v;
-    return A;
-  }
-
-  template <class T>
-  T* expDist(int s, int e) { 
-    int n = e - s;
-    T *A = newA(T,n);
-    int lg = utils::log2Up(n)+1;
-    for (int i = 0; i < n; i++) {
-      int range = (1 << (utils::hash(2*(i+s))%lg));
-      A[i] = hash<T>(range + utils::hash(2*(i+s)+1)%range);
-    }
-    return A;
-  }
-
+struct payload {
+  double key;
+  double payload[2];
 };
+
+class payloadCmp : public std::binary_function<payload, payload, bool> {
+public:
+  bool operator()(payload const& A, payload const& B) const {
+    return A.key < B.key;
+  }
+};
+
+template <class T>
+T* rand(int s, int e) {
+  int n = e - s;
+  T* A  = newA(T, n);
+  for (int i = 0; i < n; i++) { // for some reason cilk_for does not work
+    A[i] = hash<T>(i + s);
+  }
+  return A;
+}
+
+int* randIntRange(int s, int e, int m) {
+  int n  = e - s;
+  int* A = newA(int, n);
+  for (int i = 0; i < n; i++) // for some reason cilk_for does not work
+    A[i] = hash<int>(i + s) % m;
+  return A;
+}
+
+payload* randPayload(int s, int e) {
+  int n      = e - s;
+  payload* A = newA(payload, n);
+  for (int i = 0; i < n; i++)
+    A[i].key = hash<double>(i + s); // breaks with cilk_for
+  return A;
+}
+
+template <class T>
+T* almostSorted(int s, int e, int swaps) {
+  int n = e - s;
+  T* A  = newA(T, n);
+  for (int i = 0; i < n; i++)
+    A[i] = (T)i;
+  for (int i = s; i < s + swaps; i++)
+    swap(A[utils::hash(2 * i) % n], A[utils::hash(2 * i + 1) % n]);
+  return A;
+}
+
+template <class T>
+T* same(int n, T v) {
+  T* A = newA(T, n);
+  for (int i = 0; i < n; i++)
+    A[i] = v;
+  return A;
+}
+
+template <class T>
+T* expDist(int s, int e) {
+  int n  = e - s;
+  T* A   = newA(T, n);
+  int lg = utils::log2Up(n) + 1;
+  for (int i = 0; i < n; i++) {
+    int range = (1 << (utils::hash(2 * (i + s)) % lg));
+    A[i]      = hash<T>(range + utils::hash(2 * (i + s) + 1) % range);
+  }
+  return A;
+}
+
+}; // namespace dataGen

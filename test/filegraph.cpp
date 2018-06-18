@@ -14,7 +14,7 @@ void checkGraph(Graph& g) {
   GALOIS_ASSERT(numEdges == 0);
 }
 
-template<typename Fn>
+template <typename Fn>
 void testBasic(Graph&& graph, const std::string& filename, Fn fn) {
   Graph g = std::move(graph);
   fn(g, filename);
@@ -35,7 +35,7 @@ void testPart(const std::string& filename, int numParts) {
     auto ranges = g.divideByNode(nodeSize, edgeSize, i, numParts);
     GALOIS_ASSERT(nlast == ranges.first.first, "non-consecutive ranges");
     partsByNode[i].partFromFile(filename, ranges.first, ranges.second);
-    checkGraph(partsByNode[i]);   
+    checkGraph(partsByNode[i]);
     nlast = ranges.first.second;
   }
   GALOIS_ASSERT(nlast == g.end(), "sum of partitions != original graph");
@@ -52,7 +52,8 @@ void testPart(const std::string& filename, int numParts) {
     elast = ranges.second.second;
   }
   if (g.begin() != g.end())
-    GALOIS_ASSERT(elast == g.edge_end(*(g.end() - 1)), "sum of partitions != original graph");
+    GALOIS_ASSERT(elast == g.edge_end(*(g.end() - 1)),
+                  "sum of partitions != original graph");
 
   //! [Reading part of graph]
 }
@@ -60,7 +61,8 @@ void testPart(const std::string& filename, int numParts) {
 int main(int argc, char** argv) {
   GALOIS_ASSERT(argc > 1);
   testBasic(Graph(), argv[1], [](Graph& g, std::string f) { g.fromFile(f); });
-  testBasic(Graph(), argv[1], [](Graph& g, std::string f) { g.fromFileInterleaved<void>(f); });
+  testBasic(Graph(), argv[1],
+            [](Graph& g, std::string f) { g.fromFileInterleaved<void>(f); });
   testPart(argv[1], 7);
 
   return 0;

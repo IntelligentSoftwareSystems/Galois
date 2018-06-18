@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -43,18 +43,18 @@
 
 namespace { // anon
 template <class F, class Tuple, size_t... I>
-constexpr decltype(auto) apply_impl(  // exposition only
-        F&& f, Tuple&& t, std::index_sequence<I...>) {
-    return std::forward<F>(f)(std::get<I>(std::forward<Tuple>(t))...);
+constexpr decltype(auto) apply_impl( // exposition only
+    F&& f, Tuple&& t, std::index_sequence<I...>) {
+  return std::forward<F>(f)(std::get<I>(std::forward<Tuple>(t))...);
 }
 template <class F, class Tuple>
 constexpr decltype(auto) apply(F&& f, Tuple&& t) {
-  return apply_impl(std::forward<F>(f), std::forward<Tuple>(t),
-    std::make_index_sequence<std::tuple_size<
-      typename std::decay<Tuple>::type
-    >::value>{});
+  return apply_impl(
+      std::forward<F>(f), std::forward<Tuple>(t),
+      std::make_index_sequence<
+          std::tuple_size<typename std::decay<Tuple>::type>::value>{});
 }
-} // end anon namespace
+} // namespace
 #include <boost/optional.hpp>
 #endif
 
@@ -69,7 +69,7 @@ using SendBuffer = SerializeBuffer;
 using RecvBuffer = DeSerializeBuffer;
 
 //! Optional type wrapper
-template<typename T>
+template <typename T>
 /* Test for GCC >= 5.2.0 */
 #if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
 using optional_t = std::experimental::optional<T>;
@@ -83,15 +83,15 @@ using optional_t = boost::optional<T>;
  * as the network layer itself is up to the implemention of the class.
  */
 class NetworkInterface {
- protected:
+protected:
   //! Initialize the MPI system. Should only be called once per process.
   void initializeMPI();
 
   //! Memory usage tracker
   MemUsageTracker memUsageTracker;
 
- #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
- public:
+#ifdef __GALOIS_BARE_MPI_COMMUNICATION__
+public:
   //! Wrapper that calls into increment mem usage on the memory usage tracker
   inline void incrementMemUsage(uint64_t size) {
     memUsageTracker.incrementMemUsage(size);
@@ -100,9 +100,9 @@ class NetworkInterface {
   inline void decrementMemUsage(uint64_t size) {
     memUsageTracker.decrementMemUsage(size);
   }
- #endif
+#endif
 
- public:
+public:
   //! This machine's host ID
   static uint32_t ID;
   //! The total number of machines in the current program
@@ -122,12 +122,14 @@ class NetworkInterface {
   //! landing pad (recv, funciton pointer) and some data (buf)
   //! on the receiver, recv(buf) will be called durring handleReceives()
   //! buf is invalidated by this operation
-  void sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf);
+  void sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&),
+               SendBuffer& buf);
 
-  //! Send a message letting the network handle the serialization and deserialization
-  //! slightly slower
-  template<typename... Args>
-  void sendSimple(uint32_t dest, void (*recv)(uint32_t, Args...), Args... param);
+  //! Send a message letting the network handle the serialization and
+  //! deserialization slightly slower
+  template <typename... Args>
+  void sendSimple(uint32_t dest, void (*recv)(uint32_t, Args...),
+                  Args... param);
 
   //! Send a message to a given (dest) host.  A message is simply a
   //! tag (tag) and some data (buf)
@@ -138,27 +140,26 @@ class NetworkInterface {
   //! Send a message to all hosts.  A message is simply a
   //! landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
-  void broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf, bool self = false);
+  void broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf,
+                 bool self = false);
 
-  //! Broadcast a message allowing the network to handle serialization and 
+  //! Broadcast a message allowing the network to handle serialization and
   //! deserialization
-  template<typename... Args>
+  template <typename... Args>
   void broadcastSimple(void (*recv)(uint32_t, Args...), Args... param);
 
   //! Receive and dispatch messages
   void handleReceives();
 
   //! Wrapper to reset the mem usage tracker's stats
-  inline void resetMemUsage() {
-    memUsageTracker.resetMemUsage();
-  }
+  inline void resetMemUsage() { memUsageTracker.resetMemUsage(); }
 
   //! Reports the memory usage tracker's statistics to the stat manager
   void reportMemUsage() const;
 
   //! Receive a tagged message
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, 
-    std::unique_lock<substrate::SimpleLock>* rlg) = 0;
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>>
+  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg) = 0;
 
   //! move send buffers out to network
   virtual void flush() = 0;
@@ -181,15 +182,16 @@ class NetworkInterface {
   virtual std::vector<unsigned long> reportExtra() const = 0;
   //! Get the names of the extra things that are returned by reportExtra
   //! @returns vector of the names of the reported extra things
-  virtual std::vector<std::pair<std::string, unsigned long>> reportExtraNamed() const = 0;
+  virtual std::vector<std::pair<std::string, unsigned long>>
+  reportExtraNamed() const = 0;
 };
 
-//! Variable that keeps track of which network send/recv phase a program is 
+//! Variable that keeps track of which network send/recv phase a program is
 //! currently on. Can be seen as a count of send/recv rounds that have occured.
 extern uint32_t evilPhase;
 
-//! Get the network interface 
-//! @returns network interface 
+//! Get the network interface
+//! @returns network interface
 NetworkInterface& getSystemNetworkInterface();
 //! Gets this host's ID
 //! @returns ID of this host
@@ -199,50 +201,52 @@ uint32_t getHostID();
 NetworkInterface& makeNetworkBuffered();
 
 //! Returns a host barrier, which is a regular MPI-Like Barrier for all hosts.
-//! @warning Should not be called within a parallel region; assumes only one 
+//! @warning Should not be called within a parallel region; assumes only one
 //! thread is calling it
 substrate::Barrier& getHostBarrier();
-//! Returns a fence that ensures all pending messages are delivered, acting 
+//! Returns a fence that ensures all pending messages are delivered, acting
 //! like a memory-barrier
-substrate::Barrier& getHostFence(); 
+substrate::Barrier& getHostFence();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
-namespace { //anon
-template<typename... Args>
+namespace { // anon
+template <typename... Args>
 
 static void genericLandingPad(uint32_t src, RecvBuffer& buf) {
   void (*fp)(uint32_t, Args...);
   std::tuple<Args...> args;
   gDeserialize(buf, fp, args);
-  /* Test for GCC >= 5.2.0 */
-  #if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
-  std::experimental::apply([fp, src](Args... params) { fp(src, params...); }, args);
-  #else
+/* Test for GCC >= 5.2.0 */
+#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
+  std::experimental::apply([fp, src](Args... params) { fp(src, params...); },
+                           args);
+#else
   apply([fp, src](Args... params) { fp(src, params...); }, args);
-  #endif
+#endif
 }
 
-} //end anon namespace
+} // namespace
 
-template<typename... Args>
+template <typename... Args>
 void NetworkInterface::sendSimple(uint32_t dest,
                                   void (*recv)(uint32_t, Args...),
                                   Args... param) {
   SendBuffer buf;
-  gSerialize(buf, (uintptr_t)recv, param..., (uintptr_t)genericLandingPad<Args...>);
+  gSerialize(buf, (uintptr_t)recv, param...,
+             (uintptr_t)genericLandingPad<Args...>);
   sendTagged(dest, 0, buf);
 }
 
-template<typename... Args>
-void NetworkInterface::broadcastSimple(void (*recv)(uint32_t, Args...), 
+template <typename... Args>
+void NetworkInterface::broadcastSimple(void (*recv)(uint32_t, Args...),
                                        Args... param) {
   SendBuffer buf;
   gSerialize(buf, (uintptr_t)recv, param...);
   broadcast(genericLandingPad<Args...>, buf, false);
 }
 
-} // runtime
-} // galois
+} // namespace runtime
+} // namespace galois
 #endif

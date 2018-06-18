@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -36,56 +36,59 @@ namespace cll = llvm::cl;
 
 static const char* name = "Maximum cardinality matching in bipartite graphs";
 static const char* desc =
-  "Computes maximum cardinality matching in bipartite graphs. "
-  "A matching of G is a subset of edges that do not share an endpoint. "
-  "The maximum cardinality matching is the matching with the most number of edges.";
+    "Computes maximum cardinality matching in bipartite graphs. "
+    "A matching of G is a subset of edges that do not share an endpoint. "
+    "The maximum cardinality matching is the matching with the most number of "
+    "edges.";
 static const char* url = "bipartite_mcm";
 
-enum MatchingAlgo {
-  ffAlgo,
-  abmpAlgo
-};
+enum MatchingAlgo { ffAlgo, abmpAlgo };
 
-enum ExecutionType {
-  serial,
-  parallel
-};
+enum ExecutionType { serial, parallel };
 
-enum InputType {
-  generated,
-  fromFile
-};
+enum InputType { generated, fromFile };
 
-static cll::opt<MatchingAlgo> algo(cll::desc("Choose an algorithm:"),
-    cll::values(
-      clEnumVal(ffAlgo, "Ford-Fulkerson augmenting paths"),
-      clEnumVal(abmpAlgo, "Alt-Blum-Mehlhorn-Paul"),
-      clEnumValEnd), cll::init(abmpAlgo));
-static cll::opt<ExecutionType> executionType(cll::desc("Choose execution type:"),
-    cll::values(
-      clEnumVal(serial, "Serial"),
-      clEnumVal(parallel, "Parallel"),
-      clEnumValEnd), cll::init(parallel));
-static cll::opt<InputType> inputType("inputType", cll::desc("Input type:"),
-    cll::values(
-      clEnumVal(generated, "Generated"),
-      clEnumVal(fromFile, "From file"),
-      clEnumValEnd), cll::init(fromFile));
-static cll::opt<int> N("n", cll::desc("Size of each set of nodes in generated input"), cll::init(100));
-static cll::opt<int> numEdges("numEdges", cll::desc("Number of edges in generated input"), cll::init(1000));
-static cll::opt<int> numGroups("numGroups", cll::desc("Number of groups in generated input"), cll::init(10));
-static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"), cll::init(0));
-static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"), cll::init(""));
-static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding matching, removed matched edges and repeat"), cll::init(false));
+static cll::opt<MatchingAlgo> algo(
+    cll::desc("Choose an algorithm:"),
+    cll::values(clEnumVal(ffAlgo, "Ford-Fulkerson augmenting paths"),
+                clEnumVal(abmpAlgo, "Alt-Blum-Mehlhorn-Paul"), clEnumValEnd),
+    cll::init(abmpAlgo));
+static cll::opt<ExecutionType>
+    executionType(cll::desc("Choose execution type:"),
+                  cll::values(clEnumVal(serial, "Serial"),
+                              clEnumVal(parallel, "Parallel"), clEnumValEnd),
+                  cll::init(parallel));
+static cll::opt<InputType>
+    inputType("inputType", cll::desc("Input type:"),
+              cll::values(clEnumVal(generated, "Generated"),
+                          clEnumVal(fromFile, "From file"), clEnumValEnd),
+              cll::init(fromFile));
+static cll::opt<int>
+    N("n", cll::desc("Size of each set of nodes in generated input"),
+      cll::init(100));
+static cll::opt<int> numEdges("numEdges",
+                              cll::desc("Number of edges in generated input"),
+                              cll::init(1000));
+static cll::opt<int> numGroups("numGroups",
+                               cll::desc("Number of groups in generated input"),
+                               cll::init(10));
+static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"),
+                          cll::init(0));
+static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"),
+                                           cll::init(""));
+static cll::opt<bool> runIteratively(
+    "runIteratively",
+    cll::desc("After finding matching, removed matched edges and repeat"),
+    cll::init(false));
 
 //******************************** Common ************************
 
 typedef std::atomic<int> sharedEdgeData;
 
-template<typename G>
+template <typename G>
 struct GraphTypes {
   typedef typename G::GraphNode GraphNode;
-  typedef std::pair<GraphNode,GraphNode> Edge;
+  typedef std::pair<GraphNode, GraphNode> Edge;
   typedef std::vector<Edge> Matching;
 };
 
@@ -94,12 +97,13 @@ struct BaseNode {
   int degree;
   bool covered;
   bool free;
-  bool reachable;  // for preparing node cover
-  BaseNode(size_t i = -1): id(i), degree(0), covered(false), free(true), reachable(false) { }
+  bool reachable; // for preparing node cover
+  BaseNode(size_t i = -1)
+      : id(i), degree(0), covered(false), free(true), reachable(false) {}
   void reset() {
-    degree = 0;
-    covered = false;
-    free = true;
+    degree    = 0;
+    covered   = false;
+    free      = true;
     reachable = false;
   }
 };
@@ -126,15 +130,16 @@ void markReachable(G& g, const typename G::GraphNode& root, const size_t numA) {
   }
 }
 
-template<typename G, template<typename, bool> class Algo>
-void prepareForVerifier(G &g, typename GraphTypes<G>::Matching *matching, size_t numA) {
+template <typename G, template <typename, bool> class Algo>
+void prepareForVerifier(G& g, typename GraphTypes<G>::Matching* matching,
+                        size_t numA) {
   typedef typename GraphTypes<G>::Edge Edge;
   typedef typename GraphTypes<G>::Matching Matching;
   typedef typename G::GraphNode GraphNode;
 
   for (size_t src = numA; src < g.size(); src++) {
     for (auto ii : g.edges(src)) {
-      if (*g.getEdgeData(ii)){
+      if (*g.getEdgeData(ii)) {
         GraphNode dst = g.getEdgeDst(ii);
         matching->push_back(Edge(src, dst));
       }
@@ -147,7 +152,8 @@ void prepareForVerifier(G &g, typename GraphTypes<G>::Matching *matching, size_t
     }
   }
 
-  for (typename Matching::iterator ii = matching->begin(), ei = matching->end(); ii != ei; ++ii) {
+  for (typename Matching::iterator ii = matching->begin(), ei = matching->end();
+       ii != ei; ++ii) {
     if (g.getData(ii->first).reachable) {
       // Reachable from a free node in A
       g.getData(ii->first).covered = true;
@@ -159,50 +165,51 @@ void prepareForVerifier(G &g, typename GraphTypes<G>::Matching *matching, size_t
 
 //********************** FF Algorithm **************************
 
-struct FFNode: public BaseNode {
+struct FFNode : public BaseNode {
   int pred;
   bool reached;
-  FFNode(size_t i = -1): BaseNode(i), pred(-1), reached(false) { }
+  FFNode(size_t i = -1) : BaseNode(i), pred(-1), reached(false) {}
   void reset() {
     BaseNode::reset();
     reached = false;
-    pred = -1;
+    pred    = -1;
   }
 };
 
 //! Switch between concurrent and serial instances
-template<typename T1,typename T2,bool B> struct InstanceWrapper;
-template<typename T1,typename T2>
-struct InstanceWrapper<T1,T2,true> {
+template <typename T1, typename T2, bool B>
+struct InstanceWrapper;
+template <typename T1, typename T2>
+struct InstanceWrapper<T1, T2, true> {
   T1& m_t1;
   T2& m_t2;
   typedef T2 Type;
-  InstanceWrapper(T1& t1, T2& t2): m_t1(t1), m_t2(t2) { }
+  InstanceWrapper(T1& t1, T2& t2) : m_t1(t1), m_t2(t2) {}
   T2& get() { return m_t2; }
 };
-template<typename T1,typename T2>
-struct InstanceWrapper<T1,T2,false> {
+template <typename T1, typename T2>
+struct InstanceWrapper<T1, T2, false> {
   T1& m_t1;
   T2& m_t2;
   typedef T1 Type;
-  InstanceWrapper(T1& t1, T2& t2): m_t1(t1), m_t2(t2) { }
+  InstanceWrapper(T1& t1, T2& t2) : m_t1(t1), m_t2(t2) {}
   T1& get() { return m_t1; }
 };
 
 //! Switch between concurrent and serial types
-template<typename T1,typename T2,bool B> struct TypeWrapper;
-template<typename T1,typename T2>
-struct TypeWrapper<T1,T2,true> {
+template <typename T1, typename T2, bool B>
+struct TypeWrapper;
+template <typename T1, typename T2>
+struct TypeWrapper<T1, T2, true> {
   typedef T2 Type;
 };
-template<typename T1,typename T2>
-struct TypeWrapper<T1,T2,false> {
+template <typename T1, typename T2>
+struct TypeWrapper<T1, T2, false> {
   typedef T1 Type;
 };
 
-
 //! Matching algorithm of Ford and Fulkerson
-template<typename G, bool Concurrent>
+template <typename G, bool Concurrent>
 struct MatchingFF {
   typedef typename G::GraphNode GraphNode;
   typedef typename G::node_data_type node_data_type;
@@ -212,31 +219,44 @@ struct MatchingFF {
   typedef std::vector<Edge> SerialRevs;
   typedef std::vector<GraphNode> SerialReached;
 
-  typedef std::vector<Edge, typename galois::PerIterAllocTy::rebind<Edge>::other> ParallelRevs;
+  typedef std::vector<Edge,
+                      typename galois::PerIterAllocTy::rebind<Edge>::other>
+      ParallelRevs;
   typedef std::vector<GraphNode,
-          typename galois::PerIterAllocTy::rebind<GraphNode>::other> ParallelReached;
+                      typename galois::PerIterAllocTy::rebind<GraphNode>::other>
+      ParallelReached;
 
-  typedef InstanceWrapper<SerialRevs,ParallelRevs,Concurrent> RevsWrapper;
-  typedef InstanceWrapper<SerialReached,ParallelReached,Concurrent> ReachedWrapper;
+  typedef InstanceWrapper<SerialRevs, ParallelRevs, Concurrent> RevsWrapper;
+  typedef InstanceWrapper<SerialReached, ParallelReached, Concurrent>
+      ReachedWrapper;
 
-  typedef std::deque<GraphNode, typename galois::PerIterAllocTy::rebind<GraphNode>::other> Queue;
-  typedef std::vector<GraphNode, typename galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
-  
-  static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
+  typedef std::deque<GraphNode,
+                     typename galois::PerIterAllocTy::rebind<GraphNode>::other>
+      Queue;
+  typedef std::vector<GraphNode,
+                      typename galois::PerIterAllocTy::rebind<GraphNode>::other>
+      Preds;
+
+  static const galois::MethodFlag flag =
+      Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
-  std::string name() { return std::string(Concurrent ? "Concurrent" : "Serial") + " Ford-Fulkerson"; }
+  std::string name() {
+    return std::string(Concurrent ? "Concurrent" : "Serial") +
+           " Ford-Fulkerson";
+  }
 
   template <typename C>
   bool findAugmentingPath(G& g, const GraphNode& root, C& ctx,
-      typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached, size_t numA) {
+                          typename RevsWrapper::Type& revs,
+                          typename ReachedWrapper::Type& reached, size_t numA) {
     Queue queue(ctx.getPerIterAlloc());
     Preds preds(ctx.getPerIterAlloc());
 
     // Order matters between (1) and (2)
     g.getData(root, flag).reached = true; // (1)
-    reached.push_back(root); // (2)
+    reached.push_back(root);              // (2)
 
     queue.push_back(root);
 
@@ -250,7 +270,7 @@ struct MatchingFF {
           continue;
         }
 
-        GraphNode dst = g.getEdgeDst(ii);
+        GraphNode dst        = g.getEdgeDst(ii);
         node_data_type& ddst = g.getData(dst, flag);
         if (ddst.reached)
           continue;
@@ -263,16 +283,17 @@ struct MatchingFF {
 
         if (ddst.free) {
           // Fail-safe point modulo ``reached'' which is handled separately
-          ddst.free = false;
+          ddst.free     = false;
           GraphNode cur = dst;
           while (cur != root) {
-            auto pred = preds[g.getData(cur, galois::MethodFlag::UNPROTECTED).pred];
+            auto pred =
+                preds[g.getData(cur, galois::MethodFlag::UNPROTECTED).pred];
             revs.push_back(Edge(pred, cur));
             cur = pred;
           }
           return true;
         } else {
-          //assert(std::distance(g.edge_begin(dst), g.edge_end(dst)) == 1);
+          // assert(std::distance(g.edge_begin(dst), g.edge_end(dst)) == 1);
           for (auto jj : g.edges(dst, galois::MethodFlag::UNPROTECTED)) {
             auto edge = g.getEdgeData(jj);
             if ((dst < numA) == *edge) {
@@ -286,7 +307,7 @@ struct MatchingFF {
 
             g.getData(cur, galois::MethodFlag::UNPROTECTED).reached = true;
             reached.push_back(cur);
- 
+
             queue.push_back(cur);
           }
         }
@@ -300,11 +321,9 @@ struct MatchingFF {
     G& g;
     typename ReachedWrapper::Type& reached;
 
-    ReachedCleanup(G& g, typename ReachedWrapper::Type& r): g(g), reached(r) { }
-    
-    ~ReachedCleanup() {
-      cleanup();
-    }
+    ReachedCleanup(G& g, typename ReachedWrapper::Type& r) : g(g), reached(r) {}
+
+    ~ReachedCleanup() { cleanup(); }
 
     virtual void release() { cleanup(); }
 
@@ -315,7 +334,9 @@ struct MatchingFF {
     }
 
     void clear() {
-      for (typename ReachedWrapper::Type::iterator ii = reached.begin(), ei = reached.end(); ii != ei; ++ii) {
+      for (typename ReachedWrapper::Type::iterator ii = reached.begin(),
+                                                   ei = reached.end();
+           ii != ei; ++ii) {
         assert(g.getData(*ii, galois::MethodFlag::UNPROTECTED).reached);
         g.getData(*ii, galois::MethodFlag::UNPROTECTED).reached = false;
       }
@@ -325,7 +346,8 @@ struct MatchingFF {
 
   template <typename C>
   void propagate(G& g, const GraphNode& src, C& ctx,
-      typename RevsWrapper::Type& revs, typename ReachedWrapper::Type& reached, size_t numA) {
+                 typename RevsWrapper::Type& revs,
+                 typename ReachedWrapper::Type& reached, size_t numA) {
 
     ReachedCleanup cleanup(g, reached);
 
@@ -333,13 +355,15 @@ struct MatchingFF {
       g.getData(src, galois::MethodFlag::UNPROTECTED).free = false;
 
       // Reverse edges in augmenting path
-      for (typename RevsWrapper::Type::iterator jj = revs.begin(), ej = revs.end(); jj != ej; ++jj) {
-        sharedEdgeData *edge_data;
+      for (typename RevsWrapper::Type::iterator jj = revs.begin(),
+                                                ej = revs.end();
+           jj != ej; ++jj) {
+        sharedEdgeData* edge_data;
         bool found = false;
         for (auto kk : g.edges(jj->first, galois::MethodFlag::UNPROTECTED)) {
           if (g.getEdgeDst(kk) == jj->second) {
             edge_data = g.getEdgeData(kk);
-            found = true;
+            found     = true;
             break;
           }
         }
@@ -354,73 +378,79 @@ struct MatchingFF {
     }
   }
 
-
   void operator()(G& g, size_t numA) {
     SerialRevs revs;
     SerialReached reached;
 
     galois::setActiveThreads(Concurrent ? numThreads : 1);
     galois::for_each(galois::iterate(size_t(0), numA),
-        [&, outer=this] (const GraphNode& node, auto& ctx) {
-          if (!g.getData(node, flag).free)
-            return;
+                     [&, outer = this](const GraphNode& node, auto& ctx) {
+                       if (!g.getData(node, flag).free)
+                         return;
 
-          ParallelRevs parallelRevs(ctx.getPerIterAlloc());
-          ParallelReached parallelReached(ctx.getPerIterAlloc());
+                       ParallelRevs parallelRevs(ctx.getPerIterAlloc());
+                       ParallelReached parallelReached(ctx.getPerIterAlloc());
 
-          outer->propagate(g, node, ctx,
-              RevsWrapper(revs, parallelRevs).get(),
-              ReachedWrapper(reached, parallelReached).get(),
-              numA);
-        },
-        galois::loopname("MatchingFF"),
-        galois::per_iter_alloc(),
-        galois::wl<galois::worklists::PerSocketChunkFIFO<32> >());
+                       outer->propagate(
+                           g, node, ctx, RevsWrapper(revs, parallelRevs).get(),
+                           ReachedWrapper(reached, parallelReached).get(),
+                           numA);
+                     },
+                     galois::loopname("MatchingFF"), galois::per_iter_alloc(),
+                     galois::wl<galois::worklists::PerSocketChunkFIFO<32>>());
   }
 };
 
-
 //********************** ABMP Algorithm **************************
 
-struct ABMPNode: public FFNode {
+struct ABMPNode : public FFNode {
   unsigned layer;
   int next;
-  ABMPNode(size_t i = -1): FFNode(i), layer(0), next(0) { }
+  ABMPNode(size_t i = -1) : FFNode(i), layer(0), next(0) {}
   void reset() {
     FFNode::reset();
     layer = 0;
-    next = 0;
+    next  = 0;
   }
 };
 
 //! Matching algorithm of Alt, Blum, Mehlhorn and Paul
-template<typename G, bool Concurrent>
+template <typename G, bool Concurrent>
 struct MatchingABMP {
   typedef typename G::GraphNode GraphNode;
   typedef typename G::edge_iterator edge_iterator;
   typedef typename G::node_data_type node_data_type;
   typedef typename GraphTypes<G>::Edge Edge;
-  typedef std::vector<Edge, typename galois::PerIterAllocTy::rebind<Edge>::other> Revs;
-  typedef std::pair<GraphNode,unsigned> WorkItem;
+  typedef std::vector<Edge,
+                      typename galois::PerIterAllocTy::rebind<Edge>::other>
+      Revs;
+  typedef std::pair<GraphNode, unsigned> WorkItem;
 
-  static const galois::MethodFlag flag = Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
+  static const galois::MethodFlag flag =
+      Concurrent ? galois::MethodFlag::WRITE : galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
-  std::string name() { 
-    return std::string(Concurrent ? "Concurrent" : "Serial") + " Alt-Blum-Mehlhorn-Paul"; 
+  std::string name() {
+    return std::string(Concurrent ? "Concurrent" : "Serial") +
+           " Alt-Blum-Mehlhorn-Paul";
   }
 
-  sharedEdgeData *nextEdge(G& g, const GraphNode& src, GraphNode& next, size_t numA) {
+  sharedEdgeData* nextEdge(G& g, const GraphNode& src, GraphNode& next,
+                           size_t numA) {
     node_data_type& dsrc = g.getData(src, galois::MethodFlag::UNPROTECTED);
-    unsigned l = dsrc.layer - 1;
+    unsigned l           = dsrc.layer - 1;
 
     // Start search where we last left off
     edge_iterator ii = g.edge_begin(src, galois::MethodFlag::UNPROTECTED);
     edge_iterator ei = g.edge_end(src, galois::MethodFlag::UNPROTECTED);
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
-    for (; ii != ei && (src < numA == *g.getEdgeData(ii) || g.getData(g.getEdgeDst(ii), flag).layer != l); ++ii, ++dsrc.next) { ; }
+    for (; ii != ei && (src < numA == *g.getEdgeData(ii) ||
+                        g.getData(g.getEdgeDst(ii), flag).layer != l);
+         ++ii, ++dsrc.next) {
+      ;
+    }
 
     if (ii == ei) {
       return nullptr;
@@ -431,7 +461,7 @@ struct MatchingABMP {
   }
 
   //! Returns true if we've added a new element
-  //TODO: better name here
+  // TODO: better name here
   template <typename C>
   bool propagate(G& g, const GraphNode& root, C& ctx, size_t numA) {
     Revs revs(ctx.getPerIterAlloc());
@@ -442,10 +472,12 @@ struct MatchingABMP {
 
     while (true) {
       GraphNode next;
-      if (g.getData(cur, galois::MethodFlag::UNPROTECTED).free && g.getData(cur, galois::MethodFlag::UNPROTECTED).layer == 0) {
+      if (g.getData(cur, galois::MethodFlag::UNPROTECTED).free &&
+          g.getData(cur, galois::MethodFlag::UNPROTECTED).layer == 0) {
         assert(g.getData(root, galois::MethodFlag::UNPROTECTED).free);
         // (1) Breakthrough
-        g.getData(cur, galois::MethodFlag::UNPROTECTED).free = g.getData(root, galois::MethodFlag::UNPROTECTED).free = false;
+        g.getData(cur, galois::MethodFlag::UNPROTECTED).free =
+            g.getData(root, galois::MethodFlag::UNPROTECTED).free = false;
 
         // Reverse edges in augmenting path
         for (auto ii = revs.begin(), ei = revs.end(); ii != ei; ++ii) {
@@ -455,7 +487,7 @@ struct MatchingABMP {
           bool found = false;
           for (auto kk : g.edges(ii->first, galois::MethodFlag::UNPROTECTED)) {
             if (g.getEdgeDst(kk) == ii->second) {
-              found = true;
+              found          = true;
               auto edge_flag = g.getEdgeData(kk);
               edge_flag->fetch_xor(true, std::memory_order_acq_rel);
               break;
@@ -463,14 +495,14 @@ struct MatchingABMP {
           }
           assert(found);
         }
-        //revs.clear();
+        // revs.clear();
         if (revs.size() > 1024) {
-          std::cout << "WARNING: allocating large amounts in parallel: " 
-            << revs.size() << "elements\n";
+          std::cout << "WARNING: allocating large amounts in parallel: "
+                    << revs.size() << "elements\n";
         }
         return false;
       }
-      sharedEdgeData *edge = nextEdge(g, cur, next, numA);
+      sharedEdgeData* edge = nextEdge(g, cur, next, numA);
       if (edge != nullptr) {
         // (2) Advance
         revs.push_back(Edge(cur, next));
@@ -502,44 +534,42 @@ struct MatchingABMP {
     }
     t.stop();
 
-    unsigned maxLayer = (unsigned) (0.1*sqrt(std::distance(g.begin(), g.end())));
+    unsigned maxLayer =
+        (unsigned)(0.1 * sqrt(std::distance(g.begin(), g.end())));
     // size_t size = initial.size();
     galois::setActiveThreads(Concurrent ? numThreads : 1);
-    
+
     using namespace galois::worklists;
 
-    auto indexer = [] (const WorkItem& n) {
-      return n.second;
-    };
-
+    auto indexer = [](const WorkItem& n) { return n.second; };
 
     typedef PerSocketChunkFIFO<1024> PSchunk;
-    typedef OrderedByIntegerMetric<decltype(indexer),PSchunk> OBIM;
-    
+    typedef OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
+
     galois::for_each(galois::iterate(initial),
-        [&, outer=this] (const WorkItem& item, auto& ctx) {
-          unsigned curLayer = item.second;
-          if (curLayer > maxLayer) {
-            //std::cout << "Reached max layer: " << curLayer << "\n";
-            ctx.breakLoop();
-            return;
-          }
-          //if (size <= 50 * curLayer) {
-          //  std::cout << "Reached min size: " << size << "\n";
-          //  ctx.breakLoop();
-          //}
-          if (!outer->propagate(g, item.first, ctx, numA)) {
-            //__sync_fetch_and_add(&size, -1);
-          }
-        }, 
-        galois::per_iter_alloc(),
-        galois::parallel_break(),
-        galois::loopname("MatchingABMP"),
-        galois::wl<OBIM>(indexer));
+                     [&, outer = this](const WorkItem& item, auto& ctx) {
+                       unsigned curLayer = item.second;
+                       if (curLayer > maxLayer) {
+                         // std::cout << "Reached max layer: " << curLayer <<
+                         // "\n";
+                         ctx.breakLoop();
+                         return;
+                       }
+                       // if (size <= 50 * curLayer) {
+                       //  std::cout << "Reached min size: " << size << "\n";
+                       //  ctx.breakLoop();
+                       //}
+                       if (!outer->propagate(g, item.first, ctx, numA)) {
+                         //__sync_fetch_and_add(&size, -1);
+                       }
+                     },
+                     galois::per_iter_alloc(), galois::parallel_break(),
+                     galois::loopname("MatchingABMP"),
+                     galois::wl<OBIM>(indexer));
 
     t.start();
-    MatchingFF<G,false> algo;
-    //std::cout << "Switching to " << algo.name() << "\n";
+    MatchingFF<G, false> algo;
+    // std::cout << "Switching to " << algo.name() << "\n";
     algo(g, numA);
     t.stop();
   }
@@ -547,7 +577,7 @@ struct MatchingABMP {
 
 // ******************* Verification ***************************
 
-template<typename G>
+template <typename G>
 struct Verifier {
   typedef typename G::GraphNode GraphNode;
   typedef typename G::node_data_type node_data_type;
@@ -570,22 +600,25 @@ struct Verifier {
     }
     size_t count = 0;
     for (auto n : g) {
-      auto &dii = g.getData(n);
+      auto& dii = g.getData(n);
       if (dii.degree > 1) {
-        std::cerr << "Error: not a matching, node " << dii.id << " incident to " << dii.degree << " edges\n";
+        std::cerr << "Error: not a matching, node " << dii.id << " incident to "
+                  << dii.degree << " edges\n";
         return false;
       }
       if (dii.covered) {
-        count ++;
+        count++;
       }
       if (!(dii.covered || hasCoveredNeighbors(g, n))) {
         std::cerr << "Error: not a node cover, node " << dii.id
-          << " with degree " << dii.degree << " not covered nor incident to covered node\n";
+                  << " with degree " << dii.degree
+                  << " not covered nor incident to covered node\n";
         return false;
       }
     }
     if (count != matching.size()) {
-      std::cerr << "Error: matching is different than node cover " << matching.size() << " vs " << count << "\n";
+      std::cerr << "Error: matching is different than node cover "
+                << matching.size() << " vs " << count << "\n";
       return false;
     }
     return true;
@@ -600,14 +633,12 @@ struct Verifier {
  * i-1  of B. If numGroups == 0, just randomly assign nodes of A to nodes of
  * B.
  */
-template<typename G>
-decltype(auto) generateRandomInput(int &numA, int &numB, int numEdges, int numGroups, int seed, G& g) {
+template <typename G>
+decltype(auto) generateRandomInput(int& numA, int& numB, int numEdges,
+                                   int numGroups, int seed, G& g) {
   typedef typename G::edge_data_type edge_data_type;
-  
-  std::cout 
-    << "numGroups: " << numGroups
-    << " seed: " << seed
-    << "\n";
+
+  std::cout << "numGroups: " << numGroups << " seed: " << seed << "\n";
 
   galois::graphs::FileGraphWriter p;
   p.setNumNodes(numA + numB);
@@ -635,7 +666,7 @@ decltype(auto) generateRandomInput(int &numA, int &numB, int numEdges, int numGr
 
     assert(numA > 0 && numB > 0);
 
-    int d = numEdges/numA;
+    int d = numEdges / numA;
     if (numGroups > numA)
       numGroups = numA;
     if (numGroups > numB)
@@ -643,46 +674,51 @@ decltype(auto) generateRandomInput(int &numA, int &numB, int numEdges, int numGr
 
     int count = 0;
     if (numGroups > 0) {
-      int aSize = numA/numGroups;
-      int bSize = numB/numGroups;
+      int aSize = numA / numGroups;
+      int bSize = numB / numGroups;
 
       for (int ii = 0; ii < numA; ++ii, ++count) {
-        int group = count/aSize;
+        int group = count / aSize;
         if (group == numGroups)
           break;
-        int base1 = group == 0 ? (numGroups-1)*bSize : (group-1)*bSize;
-        int base2 = group == numGroups-1 ? 0 : (group+1)*bSize;
+        int base1 = group == 0 ? (numGroups - 1) * bSize : (group - 1) * bSize;
+        int base2 = group == numGroups - 1 ? 0 : (group + 1) * bSize;
         for (int i = 0; i < d; ++i) {
-          int b = dist(gen) < 0.5 ? base1 : base2;
-          int off = (int)(dist(gen) * (bSize-1));
+          int b   = dist(gen) < 0.5 ? base1 : base2;
+          int off = (int)(dist(gen) * (bSize - 1));
           if (phase == 0) {
             p.incrementDegree(ii);
           } else {
             assert(!bidirectional_edge_data[current_bidirectional_index]);
-            edgeData.set(p.addNeighbor(ii, b + off + numA), &bidirectional_edge_data[current_bidirectional_index++]);
+            edgeData.set(
+                p.addNeighbor(ii, b + off + numA),
+                &bidirectional_edge_data[current_bidirectional_index++]);
           }
         }
       }
     }
 
-    int r = numEdges - count*d;
+    int r = numEdges - count * d;
     while (r--) {
-      int ind_a = (int)(dist(gen)*(numA-1));
-      int ind_b = (int)(dist(gen)*(numB-1));
+      int ind_a = (int)(dist(gen) * (numA - 1));
+      int ind_b = (int)(dist(gen) * (numB - 1));
       if (phase == 0) {
         p.incrementDegree(ind_a);
       } else {
         assert(!bidirectional_edge_data[current_bidirectional_index]);
-        edgeData.set(p.addNeighbor(ind_a, ind_b + numA), &bidirectional_edge_data[current_bidirectional_index++]);
+        edgeData.set(p.addNeighbor(ind_a, ind_b + numA),
+                     &bidirectional_edge_data[current_bidirectional_index++]);
       }
     }
   }
   // Check that the bidirectional edge data has been exhausted.
-  // Otherwise, something has gone wrong and the wrong number of edges was created/initialized somehow.
+  // Otherwise, something has gone wrong and the wrong number of edges was
+  // created/initialized somehow.
   assert(current_bidirectional_index == numEdges);
 
-  auto *rawEdgeData = p.finish<edge_data_type>();
-  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+  auto* rawEdgeData = p.finish<edge_data_type>();
+  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()),
+                          std::make_move_iterator(edgeData.end()), rawEdgeData);
   galois::graphs::FileGraphWriter q;
   galois::graphs::makeSymmetric<edge_data_type>(p, q);
   galois::graphs::readGraph(g, q);
@@ -696,12 +732,12 @@ decltype(auto) generateRandomInput(int &numA, int &numB, int numEdges, int numGr
  *  (1) nodes in set A have edges while nodes in set B don't
  *  (2) nodes in set A are the first numA nodes (followed by nodes in set B)
  */
-template<typename G>
+template <typename G>
 void readInput(const std::string& filename, G& g) {
   galois::graphs::readGraph(g, filename);
 }
 
-template<template<typename,bool> class Algo, typename G>
+template <template <typename, bool> class Algo, typename G>
 size_t countMatching(G& g, size_t numA) {
   size_t count = 0;
   for (size_t n = numA; n < g.size(); n++) {
@@ -714,10 +750,9 @@ size_t countMatching(G& g, size_t numA) {
   return count;
 }
 
-
-template<template<typename,bool> class Algo, typename G, bool Concurrent>
+template <template <typename, bool> class Algo, typename G, bool Concurrent>
 void start(int N, int numEdges, int numGroups) {
-  typedef Algo<G,Concurrent> A;
+  typedef Algo<G, Concurrent> A;
 
   A algo;
   G g;
@@ -728,10 +763,15 @@ void start(int N, int numEdges, int numGroups) {
     GALOIS_DIE("algo does not support iterative execution");
 
   switch (inputType) {
-    case generated: bidirectional_edge_data = generateRandomInput(N, N, numEdges, numGroups, seed, g);
-         numA = N; numB = N; break;
-    //case fromFile: readInput(inputFilename, g); break;
-    default: GALOIS_DIE("unknown input type");
+  case generated:
+    bidirectional_edge_data =
+        generateRandomInput(N, N, numEdges, numGroups, seed, g);
+    numA = N;
+    numB = N;
+    break;
+  // case fromFile: readInput(inputFilename, g); break;
+  default:
+    GALOIS_DIE("unknown input type");
   }
 
   /*size_t id = 0;
@@ -744,10 +784,7 @@ void start(int N, int numEdges, int numGroups) {
   }
   */
 
-  std::cout 
-    << "numA: " << numA
-    << " numB: " << numB
-    << "\n";
+  std::cout << "numA: " << numA << " numB: " << numB << "\n";
 
   std::cout << "Starting " << algo.name() << "\n";
 
@@ -760,7 +797,7 @@ void start(int N, int numEdges, int numGroups) {
 
     if (!skipVerify) {
       typename GraphTypes<G>::Matching matching;
-      prepareForVerifier<G,Algo>(g, &matching, numA);
+      prepareForVerifier<G, Algo>(g, &matching, numA);
       if (!Verifier<G>()(g, matching, numA)) {
         GALOIS_DIE("Verification failed");
       } else {
@@ -776,16 +813,19 @@ void start(int N, int numEdges, int numGroups) {
   }
 }
 
-
-template<bool Concurrent>
+template <bool Concurrent>
 void start() {
   switch (algo) {
-    case abmpAlgo:
-      start<MatchingABMP, galois::graphs::LC_CSR_Graph<ABMPNode, sharedEdgeData*>, Concurrent>(N, numEdges, numGroups); break;
-    case ffAlgo:
-      start<MatchingFF, galois::graphs::LC_CSR_Graph<FFNode, sharedEdgeData*>, Concurrent>(N, numEdges, numGroups); break;
-    default:
-      GALOIS_DIE("unknown algo");
+  case abmpAlgo:
+    start<MatchingABMP, galois::graphs::LC_CSR_Graph<ABMPNode, sharedEdgeData*>,
+          Concurrent>(N, numEdges, numGroups);
+    break;
+  case ffAlgo:
+    start<MatchingFF, galois::graphs::LC_CSR_Graph<FFNode, sharedEdgeData*>,
+          Concurrent>(N, numEdges, numGroups);
+    break;
+  default:
+    GALOIS_DIE("unknown algo");
   }
 }
 
@@ -794,10 +834,14 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   switch (executionType) {
-    case serial: start<false>(); break;
-    case parallel: start<true>(); break;
-    default:
-      GALOIS_DIE("unknown execution type");
+  case serial:
+    start<false>();
+    break;
+  case parallel:
+    start<true>();
+    break;
+  default:
+    GALOIS_DIE("unknown execution type");
   }
 
   return 0;

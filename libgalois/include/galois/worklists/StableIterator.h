@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,26 +34,35 @@ namespace worklists {
  * @tparam Container Worklist to manage work enqueued by the operator
  * @tparam Iterator  (inferred by library)
  */
-template<bool Steal = false, typename Container = PerSocketChunkFIFO<>, typename Iterator=int*>
+template <bool Steal = false, typename Container = PerSocketChunkFIFO<>,
+          typename Iterator = int*>
 struct StableIterator {
   typedef typename std::iterator_traits<Iterator>::value_type value_type;
   typedef Iterator iterator;
 
   //! change the type the worklist holds
-  template<typename _T>
-  using retype =  StableIterator<Steal, typename Container::template retype<_T>, Iterator>;
+  template <typename _T>
+  using retype =
+      StableIterator<Steal, typename Container::template retype<_T>, Iterator>;
 
-  template<bool b>
-  using rethread = StableIterator<Steal, typename Container::template rethread<b>, Iterator>;
+  template <bool b>
+  using rethread =
+      StableIterator<Steal, typename Container::template rethread<b>, Iterator>;
 
-  template<typename _iterator>
-  struct with_iterator { typedef StableIterator<Steal, Container, _iterator> type; };
+  template <typename _iterator>
+  struct with_iterator {
+    typedef StableIterator<Steal, Container, _iterator> type;
+  };
 
-  template<bool _steal>
-  struct with_steal { typedef StableIterator<_steal, Container, Iterator> type; };
+  template <bool _steal>
+  struct with_steal {
+    typedef StableIterator<_steal, Container, Iterator> type;
+  };
 
-  template<typename _container>
-  struct with_container { typedef StableIterator<Steal, _container, Iterator> type; };
+  template <typename _container>
+  struct with_container {
+    typedef StableIterator<Steal, _container, Iterator> type;
+  };
 
 private:
   struct shared_state {
@@ -72,13 +81,13 @@ private:
 
     void populateSteal() {
       if (Steal && localBegin != localEnd) {
-	shared_state& s = stealState.data;
-	s.stealLock.lock();
-	s.stealEnd = localEnd;
-	s.stealBegin = localEnd = galois::split_range(localBegin, localEnd);
-	if (s.stealBegin != s.stealEnd)
+        shared_state& s = stealState.data;
+        s.stealLock.lock();
+        s.stealEnd   = localEnd;
+        s.stealBegin = localEnd = galois::split_range(localBegin, localEnd);
+        if (s.stealBegin != s.stealEnd)
           s.stealAvail = true;
-	s.stealLock.unlock();
+        s.stealLock.unlock();
       }
     }
   };
@@ -95,8 +104,9 @@ private:
         return false;
       }
       if (s.stealBegin != s.stealEnd) {
-	dst.localBegin = s.stealBegin;
-	s.stealBegin = dst.localEnd = galois::split_range(s.stealBegin, s.stealEnd);
+        dst.localBegin = s.stealBegin;
+        s.stealBegin   = dst.localEnd =
+            galois::split_range(s.stealBegin, s.stealEnd);
         s.stealAvail = s.stealBegin != s.stealEnd;
       }
       s.stealLock.unlock();
@@ -104,16 +114,16 @@ private:
     return dst.localBegin != dst.localEnd;
   }
 
-  //pop already failed, try again with stealing
+  // pop already failed, try again with stealing
   galois::optional<value_type> pop_steal(state& data) {
-    //always try stealing self
+    // always try stealing self
     if (doSteal(data, data, true))
       return *data.localBegin++;
-    //only try stealing one other
+    // only try stealing one other
     if (doSteal(data, *TLDS.getRemote(data.nextVictim), false)) {
-      //share the wealth
+      // share the wealth
       if (data.nextVictim != substrate::ThreadPool::getTID())
-	data.populateSteal();
+        data.populateSteal();
       return *data.localBegin++;
     }
     ++data.nextVictim;
@@ -125,13 +135,13 @@ private:
 public:
   //! push initial range onto the queue
   //! called with the same b and e on each thread
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(const RangeTy& r) {
-    state& data = *TLDS.getLocal();
-    auto lp = r.local_pair();
-    data.localBegin = lp.first;
-    data.localEnd = lp.second;
-    data.nextVictim = substrate::ThreadPool::getTID();
+    state& data           = *TLDS.getLocal();
+    auto lp               = r.local_pair();
+    data.localBegin       = lp.first;
+    data.localEnd         = lp.second;
+    data.nextVictim       = substrate::ThreadPool::getTID();
     data.numStealFailures = 0;
     data.populateSteal();
   }
@@ -153,11 +163,9 @@ public:
     return item;
   }
 
-  void push(const value_type& val) {
-    inner.push(val);
-  }
+  void push(const value_type& val) { inner.push(val); }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
@@ -165,6 +173,6 @@ public:
 };
 GALOIS_WLCOMPILECHECK(StableIterator)
 
-}
-}
+} // namespace worklists
+} // namespace galois
 #endif

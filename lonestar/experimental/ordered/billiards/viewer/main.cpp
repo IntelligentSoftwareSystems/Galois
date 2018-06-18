@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,9 +23,15 @@
 
 namespace cll = llvm::cl;
 
-static cll::opt<unsigned> refdelay("refdelay", cll::desc("Delay between frame refreshes (ms)"), cll::init(100));
-static cll::opt<std::string> configFilename(cll::Positional, cll::desc("<input file>"), cll::init("config.csv"));
-static cll::opt<std::string> eventLogFilename(cll::Positional, cll::desc("<event log file>"), cll::init("simLog.csv"));
+static cll::opt<unsigned>
+    refdelay("refdelay", cll::desc("Delay between frame refreshes (ms)"),
+             cll::init(100));
+static cll::opt<std::string> configFilename(cll::Positional,
+                                            cll::desc("<input file>"),
+                                            cll::init("config.csv"));
+static cll::opt<std::string> eventLogFilename(cll::Positional,
+                                              cll::desc("<event log file>"),
+                                              cll::init("simLog.csv"));
 
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);

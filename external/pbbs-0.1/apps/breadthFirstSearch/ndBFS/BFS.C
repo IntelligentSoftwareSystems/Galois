@@ -36,60 +36,67 @@ using namespace std;
 //      in the new graph are the children in the bfs tree)
 // **************************************************************
 
-struct nonNegF{bool operator() (int a) {return (a>=0);}};
+struct nonNegF {
+  bool operator()(int a) { return (a >= 0); }
+};
 
-pair<int,int> BFS(vindex start, graph GA) {
-  int numVertices = GA.n;
-  int numEdges = GA.m;
-  vertex *G = GA.V;
-  vindex* Frontier = newA(vindex,numEdges);
-  int* Visited = newA(vindex,numVertices);
-  vindex* FrontierNext = newA(vindex,numEdges);
-  int* Counts = newA(int,numVertices);
-//  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
-  {parallel_doall(int, i, 0, numVertices) { Visited[i] = 0;} parallel_doall_end }
-
-  Frontier[0] = start;
-  int frontierSize = 1;
-  Visited[start] = 1;
-
-  int totalVisited = 0;
-  int round = 0;
-
-  while (frontierSize > 0) {
-    round++;
-    totalVisited += frontierSize;
-
-//    {parallel_for (int i=0; i < frontierSize; i++) 
-    {
-      parallel_doall(int, i, 0, frontierSize) {
-	Counts[i] = G[Frontier[i]].degree;
-      } parallel_doall_end
-    }
-    int nr = sequence::scan(Counts,Counts,frontierSize,utils::addF<int>(),0);
-
-    // For each vertexB in the frontier try to "hook" unvisited neighbors.
-//    {parallel_for(int i = 0; i < frontierSize; i++) {
-    {parallel_doall(int, i, 0, frontierSize)  {
-      int k= 0;
-      vindex v = Frontier[i];
-      int o = Counts[i];
-      for (int j=0; j < G[v].degree; j++) {
-        vindex ngh = G[v].Neighbors[j];
-	if (Visited[ngh] == 0 && utils::CAS(&Visited[ngh],0,1)) {
-	  FrontierNext[o+j] = G[v].Neighbors[k++] = ngh;
-	}
-	else FrontierNext[o+j] = -1;
-      }
-      G[v].degree = k;
-      } parallel_doall_end
-    }
-
-    // Filter out the empty slots (marked with -1)
-    frontierSize = sequence::filter(FrontierNext,Frontier,nr,nonNegF());
-  }
-  free(FrontierNext); free(Frontier); free(Counts); free(Visited);
-  return pair<int,int>(totalVisited,round);
+pair<int, int> BFS(vindex start, graph GA) {
+  int numVertices      = GA.n;
+  int numEdges         = GA.m;
+  vertex* G            = GA.V;
+  vindex* Frontier     = newA(vindex, numEdges);
+  int* Visited         = newA(vindex, numVertices);
+  vindex* FrontierNext = newA(vindex, numEdges);
+  int* Counts          = newA(int, numVertices);
+  //  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
+  {parallel_doall(int, i, 0, numVertices){Visited[i] = 0;
+}
+parallel_doall_end
 }
 
+Frontier[0]      = start;
+int frontierSize = 1;
+Visited[start]   = 1;
 
+int totalVisited = 0;
+int round        = 0;
+
+while (frontierSize > 0) {
+  round++;
+  totalVisited += frontierSize;
+
+  //    {parallel_for (int i=0; i < frontierSize; i++)
+  {
+    parallel_doall(int, i, 0, frontierSize) {
+      Counts[i] = G[Frontier[i]].degree;
+    }
+    parallel_doall_end
+  }
+  int nr = sequence::scan(Counts, Counts, frontierSize, utils::addF<int>(), 0);
+
+  // For each vertexB in the frontier try to "hook" unvisited neighbors.
+  //    {parallel_for(int i = 0; i < frontierSize; i++) {
+  {parallel_doall(int, i, 0, frontierSize){int k = 0;
+  vindex v = Frontier[i];
+  int o    = Counts[i];
+  for (int j = 0; j < G[v].degree; j++) {
+    vindex ngh = G[v].Neighbors[j];
+    if (Visited[ngh] == 0 && utils::CAS(&Visited[ngh], 0, 1)) {
+      FrontierNext[o + j] = G[v].Neighbors[k++] = ngh;
+    } else
+      FrontierNext[o + j] = -1;
+  }
+  G[v].degree = k;
+}
+parallel_doall_end
+}
+
+// Filter out the empty slots (marked with -1)
+frontierSize = sequence::filter(FrontierNext, Frontier, nr, nonNegF());
+}
+free(FrontierNext);
+free(Frontier);
+free(Counts);
+free(Visited);
+return pair<int, int>(totalVisited, round);
+}

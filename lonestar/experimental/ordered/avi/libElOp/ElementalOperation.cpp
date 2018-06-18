@@ -3,20 +3,20 @@
  * DG++
  *
  * Created by Adrian Lew on 10/25/06.
- *  
+ *
  * Copyright (c) 2006 Adrian Lew
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software without restriction, including 
- * without limitation the rights to use, copy, modify, merge, publish, 
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject
  * to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included 
+ *
+ * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
  * OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -33,7 +33,9 @@
 #include "util.h"
 #include "ElementalOperation.h"
 
-bool DResidue::consistencyTest(const DResidue & DRes, const VecSize_t& DofPerField, const MatDouble &argval) {
+bool DResidue::consistencyTest(const DResidue& DRes,
+                               const VecSize_t& DofPerField,
+                               const MatDouble& argval) {
   size_t NFields = DRes.getFields().size();
 
   MatDouble largval(argval);
@@ -82,18 +84,17 @@ bool DResidue::consistencyTest(const DResidue & DRes, const VecSize_t& DofPerFie
 
       for (size_t g = 0; g < NFields; g++) {
         for (size_t b = 0; b < DofPerField[g]; b++) {
-          dfuncvalnum[g][b][f][a] = (funcvalplus[g][b] - funcvalminus[g][b]) / (2 * EPS * maxval);
+          dfuncvalnum[g][b][f][a] =
+              (funcvalplus[g][b] - funcvalminus[g][b]) / (2 * EPS * maxval);
         }
       }
-
-
     }
   }
 
   DRes.getDVal(largval, funcval, dfuncval);
 
   double error = 0;
-  double norm = 0;
+  double norm  = 0;
   for (size_t f = 0; f < dfuncval.size(); f++) {
     for (size_t a = 0; a < dfuncval[f].size(); a++) {
       for (size_t g = 0; g < dfuncval[f][a].size(); g++) {
@@ -106,7 +107,7 @@ bool DResidue::consistencyTest(const DResidue & DRes, const VecSize_t& DofPerFie
   }
 
   error = sqrt(error);
-  norm = sqrt(norm);
+  norm  = sqrt(norm);
 
   if (error / norm > EPS * 100) {
     std::cerr << "DResidue::ConsistencyTest. DResidue not consistent\n";
@@ -121,17 +122,18 @@ enum AssembleMode {
   DRESIDUE,
 };
 
-template<typename T> 
-static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
-    , const VecDouble & Dofs, VecDouble&  ResVec, MatDouble& DResMat, const AssembleMode& mode) {
+template <typename T>
+static bool _Assemble(std::vector<T*>& DResArray, const LocalToGlobalMap& L2G,
+                      const VecDouble& Dofs, VecDouble& ResVec,
+                      MatDouble& DResMat, const AssembleMode& mode) {
 
   // VecZeroEntries(*ResVec);
-  std::fill (ResVec.begin(), ResVec.end (), 0.0 );
+  std::fill(ResVec.begin(), ResVec.end(), 0.0);
 
   if (mode == DRESIDUE) {
     // MatZeroEntries(DResMat);
-    for (MatDouble::iterator i = DResMat.begin (); i != DResMat.end (); ++i) {
-      std::fill (i->begin(), i->end (), 0.0);
+    for (MatDouble::iterator i = DResMat.begin(); i != DResMat.end(); ++i) {
+      std::fill(i->begin(), i->end(), 0.0);
     }
   }
 
@@ -145,7 +147,7 @@ static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
 
   for (size_t e = 0; e < DResArray.size(); e++) {
     const VecSize_t& DPF = DResArray[e]->getFields();
-    size_t localsize = 0;
+    size_t localsize     = 0;
 
     if (argval.size() < DPF.size()) {
       argval.resize(DPF.size());
@@ -164,36 +166,40 @@ static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
     }
 
     if (mode == DRESIDUE) {
-      // I am using a dynamic_cast to prevent writing two versions of essentially the
-      // same code, one for residue and another for dresidue. However, I think that there is
-      // a flaw in the abstraction, since I cannot apparently do it with polymorphism here.
+      // I am using a dynamic_cast to prevent writing two versions of
+      // essentially the same code, one for residue and another for dresidue.
+      // However, I think that there is a flaw in the abstraction, since I
+      // cannot apparently do it with polymorphism here.
 
-      DResidue * dr = dynamic_cast<DResidue *> (DResArray[e]);
+      DResidue* dr = dynamic_cast<DResidue*>(DResArray[e]);
       if (dr) {
         if (!dr->getDVal(argval, funcval, dfuncval)) {
-          std::cerr << "ElementalOperation.cpp::Assemble Error in residual computation\n";
+          std::cerr << "ElementalOperation.cpp::Assemble Error in residual "
+                       "computation\n";
           return false;
         }
       } else {
-        std::cerr << "ElementalOperation.cpp::Assemble Error. Attempted to compute"
-          " derivatives of a non-dresidue type\n";
+        std::cerr
+            << "ElementalOperation.cpp::Assemble Error. Attempted to compute"
+               " derivatives of a non-dresidue type\n";
         return false;
       }
     } else if (!DResArray[e]->getVal(argval, funcval)) {
-      std::cerr << "ElementalOperation.cpp::Assemble Error in residual computation\n";
+      std::cerr
+          << "ElementalOperation.cpp::Assemble Error in residual computation\n";
       return false;
     }
 
 #ifdef DEBUG
     std::cout << "Assemble:: element " << e << std::endl;
-    for (size_t f = 0; f < DPF.size (); ++f) {
-      printIter (std::cout, funcval[f].begin(), funcval[f].end());
+    for (size_t f = 0; f < DPF.size(); ++f) {
+      printIter(std::cout, funcval[f].begin(), funcval[f].end());
     }
 #endif
 
-    double * resvals = new double[localsize];
-    size_t * indices = new size_t[localsize];
-    double * dresvals = nullptr;
+    double* resvals  = new double[localsize];
+    size_t* indices  = new size_t[localsize];
+    double* dresvals = nullptr;
 
     if (mode == DRESIDUE) {
       dresvals = new double[localsize * localsize];
@@ -218,17 +224,19 @@ static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
     }
 
     if (mode == DRESIDUE) {
-      // signature (Mat, nrows_of_indices, size_t row_indices[], ncols_of_indices, size_t col_indices[],
+      // signature (Mat, nrows_of_indices, size_t row_indices[],
+      // ncols_of_indices, size_t col_indices[],
       //       double vals[], Mode)
       // algo
       // for i in 0..nrows {
       //   for j in 0..ncols {
       //     Mat[row_indices[i]][col_indices[j] += or = vals[ncols * i + j];
 
-      // MatSetValues(*DResMat, localsize, indices, localsize, indices, dresvals, ADD_VALUES);
+      // MatSetValues(*DResMat, localsize, indices, localsize, indices,
+      // dresvals, ADD_VALUES);
       for (size_t i = 0; i < localsize; ++i) {
         for (size_t j = 0; j < localsize; ++j) {
-          DResMat[ indices[i] ][ indices[j] ] += dresvals [localsize * i + j];
+          DResMat[indices[i]][indices[j]] += dresvals[localsize * i + j];
         }
       }
     }
@@ -245,12 +253,15 @@ static bool _Assemble(std::vector<T*> &DResArray, const LocalToGlobalMap & L2G
 
   return true;
 }
-bool Residue::assemble(std::vector<Residue*> &ResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble&  ResVec) {
+bool Residue::assemble(std::vector<Residue*>& ResArray,
+                       const LocalToGlobalMap& L2G, const VecDouble& Dofs,
+                       VecDouble& ResVec) {
   MatDouble d;
-  return _Assemble<Residue> (ResArray, L2G, Dofs, ResVec, d, RESIDUE);
+  return _Assemble<Residue>(ResArray, L2G, Dofs, ResVec, d, RESIDUE);
 }
 
-bool DResidue::assemble(std::vector<DResidue*> &DResArray, const LocalToGlobalMap & L2G, const VecDouble & Dofs, VecDouble& ResVec, MatDouble& DResMat) {
-  return _Assemble<DResidue> (DResArray, L2G, Dofs, ResVec, DResMat, DRESIDUE);
+bool DResidue::assemble(std::vector<DResidue*>& DResArray,
+                        const LocalToGlobalMap& L2G, const VecDouble& Dofs,
+                        VecDouble& ResVec, MatDouble& DResMat) {
+  return _Assemble<DResidue>(DResArray, L2G, Dofs, ResVec, DResMat, DRESIDUE);
 }
-

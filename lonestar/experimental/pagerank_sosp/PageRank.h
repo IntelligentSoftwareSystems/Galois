@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -22,61 +22,77 @@
 
 #include "llvm/Support/CommandLine.h"
 
-static const float alpha = 0.85; 
+static const float alpha = 0.85;
 extern bool outOnly;
 
 typedef double PRTy;
 
-template<typename Graph>
+template <typename Graph>
 unsigned nout(Graph& g, typename Graph::GraphNode n, galois::MethodFlag flag) {
   return std::distance(g.edge_begin(n, flag), g.edge_end(n, flag));
 }
 
-template<typename Graph>
-unsigned ninout(Graph& g, typename Graph::GraphNode n, galois::MethodFlag flag) {
-  return std::distance(g.in_edge_begin(n, flag), g.in_edge_end(n, flag)) + nout(g, n, flag);
+template <typename Graph>
+unsigned ninout(Graph& g, typename Graph::GraphNode n,
+                galois::MethodFlag flag) {
+  return std::distance(g.in_edge_begin(n, flag), g.in_edge_end(n, flag)) +
+         nout(g, n, flag);
 }
 
-template<typename Graph>
-double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, galois::MethodFlag lockflag) {
+template <typename Graph>
+double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg,
+                            galois::MethodFlag lockflag) {
   double sum = 0;
-  for (auto jj = g.in_edge_begin(src, lockflag), ej = g.in_edge_end(src, lockflag); jj != ej; ++jj) {
-    auto dst = g.getInEdgeDst(jj);
+  for (auto jj = g.in_edge_begin(src, lockflag),
+            ej = g.in_edge_end(src, lockflag);
+       jj != ej; ++jj) {
+    auto dst    = g.getInEdgeDst(jj);
     auto& ddata = g.getData(dst, lockflag);
     sum += ddata.getPageRank(prArg) / nout(g, dst, lockflag);
   }
-  return alpha*sum + (1.0 - alpha);
+  return alpha * sum + (1.0 - alpha);
 }
 
-template<typename Graph>
+template <typename Graph>
 void initResidual(Graph& graph) {
-  galois::do_all(graph, [&graph] (const typename Graph::GraphNode& src) {
-      auto& data = graph.getData(src);
-      // for each in-coming neighbour, add residual
-      PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
-        auto dst = graph.getInEdgeDst(jj);
-        auto& ddata = graph.getData(dst);
-        sum += 1.0/nout(graph,dst, galois::MethodFlag::UNPROTECTED);  
-      }
-      data.residual = sum * alpha * (1.0-alpha);
-    }, galois::steal());
+  galois::do_all(
+      graph,
+      [&graph](const typename Graph::GraphNode& src) {
+        auto& data = graph.getData(src);
+        // for each in-coming neighbour, add residual
+        PRTy sum = 0.0;
+        for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src);
+             jj != ej; ++jj) {
+          auto dst    = graph.getInEdgeDst(jj);
+          auto& ddata = graph.getData(dst);
+          sum += 1.0 / nout(graph, dst, galois::MethodFlag::UNPROTECTED);
+        }
+        data.residual = sum * alpha * (1.0 - alpha);
+      },
+      galois::steal());
 }
 
-template<typename Graph, typename PriFn>
-void initResidual(Graph& graph, galois::InsertBag<std::pair<typename Graph::GraphNode, int> >& b, const PriFn& pri) {
-  galois::do_all(graph, [&graph, &b, &pri] (const typename Graph::GraphNode& src) {
-      auto& data = graph.getData(src);
-      // for each in-coming neighbour, add residual
-      PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
-        auto dst = graph.getInEdgeDst(jj);
-        auto& ddata = graph.getData(dst);
-        sum += 1.0/nout(graph,dst, galois::MethodFlag::UNPROTECTED);  
-      }
-      data.residual = sum * alpha * (1.0-alpha);
-      b.push(std::make_pair(src, pri(graph, src)));
-    }, galois::steal());
+template <typename Graph, typename PriFn>
+void initResidual(
+    Graph& graph,
+    galois::InsertBag<std::pair<typename Graph::GraphNode, int>>& b,
+    const PriFn& pri) {
+  galois::do_all(
+      graph,
+      [&graph, &b, &pri](const typename Graph::GraphNode& src) {
+        auto& data = graph.getData(src);
+        // for each in-coming neighbour, add residual
+        PRTy sum = 0.0;
+        for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src);
+             jj != ej; ++jj) {
+          auto dst    = graph.getInEdgeDst(jj);
+          auto& ddata = graph.getData(dst);
+          sum += 1.0 / nout(graph, dst, galois::MethodFlag::UNPROTECTED);
+        }
+        data.residual = sum * alpha * (1.0 - alpha);
+        b.push(std::make_pair(src, pri(graph, src)));
+      },
+      galois::steal());
 }
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
@@ -87,25 +103,37 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   return old;
 }
 
-template<typename Graph>
+template <typename Graph>
 void verifyInOut(Graph& graph, PRTy tolerance) {
-  for(auto N : graph) {
-    auto& data = graph.getData(N);
-    auto residual = std::fabs(data.getPageRank() - computePageRankInOut(graph, N, 1, galois::MethodFlag::UNPROTECTED));
+  for (auto N : graph) {
+    auto& data    = graph.getData(N);
+    auto residual = std::fabs(
+        data.getPageRank() -
+        computePageRankInOut(graph, N, 1, galois::MethodFlag::UNPROTECTED));
     if (residual > tolerance) {
-      std::cout << N << " residual " << residual << " pr " << data.getPageRank() << " data " << data << "\n";
+      std::cout << N << " residual " << residual << " pr " << data.getPageRank()
+                << " data " << data << "\n";
     }
   }
 }
 
-template<typename Graph, typename InnerGraph>
+template <typename Graph, typename InnerGraph>
 void check_types() {
-  static_assert(std::is_same<typename std::iterator_traits<typename Graph::edge_iterator>::iterator_category,
-                std::random_access_iterator_tag>::value, "Not random");
-  static_assert(std::is_same<typename std::iterator_traits<typename InnerGraph::edge_iterator>::iterator_category,
-                std::random_access_iterator_tag>::value, "Not random");
-  static_assert(std::is_same<typename std::iterator_traits<typename Graph::in_edge_iterator>::iterator_category,
-                std::random_access_iterator_tag>::value, "Not random");
+  static_assert(
+      std::is_same<typename std::iterator_traits<
+                       typename Graph::edge_iterator>::iterator_category,
+                   std::random_access_iterator_tag>::value,
+      "Not random");
+  static_assert(
+      std::is_same<typename std::iterator_traits<
+                       typename InnerGraph::edge_iterator>::iterator_category,
+                   std::random_access_iterator_tag>::value,
+      "Not random");
+  static_assert(
+      std::is_same<typename std::iterator_traits<
+                       typename Graph::in_edge_iterator>::iterator_category,
+                   std::random_access_iterator_tag>::value,
+      "Not random");
 }
 
 #endif

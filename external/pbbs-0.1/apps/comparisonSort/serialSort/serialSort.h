@@ -3,6 +3,8 @@
 #include <algorithm>
 
 template <class E, class BinPred>
-void compSort(E* A, int n, BinPred f) { std::sort(A,A+n,f);}
+void compSort(E* A, int n, BinPred f) {
+  std::sort(A, A + n, f);
+}
 
 #endif // _A_STLSORT_INCLUDED

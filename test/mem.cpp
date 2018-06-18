@@ -7,7 +7,7 @@ using namespace galois::substrate;
 struct element {
   unsigned val;
   element* next;
-  element(int i): val(i), next(0) { }
+  element(int i) : val(i), next(0) {}
 };
 
 int main(int argc, char** argv) {
@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
     element* ptr = falloc.allocate(1);
     falloc.construct(ptr, i);
     ptr->next = last;
-    last = ptr;
+    last      = ptr;
   }
   for (unsigned i = 0; i < baseAllocSize; ++i) {
     GALOIS_ASSERT(last);

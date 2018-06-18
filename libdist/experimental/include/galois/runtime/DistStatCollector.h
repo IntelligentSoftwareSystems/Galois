@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -17,7 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#if 0// disabled
+#if 0 // disabled
 #ifndef GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #define GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 
@@ -52,5 +52,5 @@ private:
 } // end namespace runtime
 } // end namespace galois
 
-#endif// GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
+#endif // GALOIS_RUNTIME_DIST_STAT_COLLECTOR_H
 #endif

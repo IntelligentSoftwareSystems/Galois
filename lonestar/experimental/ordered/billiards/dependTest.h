@@ -1,8 +1,8 @@
 
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -39,146 +39,140 @@ class OrderDepTest {
   const FP V_MAX;
 
 public:
-
-  OrderDepTest (void): V_MAX (DefaultValues::MAX_SPEED * FP(unsigned(vmaxFactor))) {
-  }
+  OrderDepTest(void)
+      : V_MAX(DefaultValues::MAX_SPEED * FP(unsigned(vmaxFactor))) {}
 
   bool dependsOn(const Event& later, const Event& earlier) const {
 
-    assert (earlier < later);
+    assert(earlier < later);
 
-    return dependsOnInternal (later, earlier);
+    return dependsOnInternal(later, earlier);
   }
 
 private:
+  bool dependsOnInternal(const Event& e2, const Event& e1) const {
+    assert(e1 < e2);
 
-  bool dependsOnInternal (const Event& e2, const Event& e1) const {
-    assert (e1 < e2);
+    GALOIS_ASSERT(e1.getBall()->vel().mag() < V_MAX);
+    GALOIS_ASSERT(e2.getBall()->vel().mag() < V_MAX);
 
-    GALOIS_ASSERT (e1.getBall ()->vel ().mag () < V_MAX);
-    GALOIS_ASSERT (e2.getBall ()->vel ().mag () < V_MAX);
-
-    if (e1.getKind () == Event::BALL_COLLISION) {
-      GALOIS_ASSERT (e1.getOtherBall ()->vel ().mag () < V_MAX);
+    if (e1.getKind() == Event::BALL_COLLISION) {
+      GALOIS_ASSERT(e1.getOtherBall()->vel().mag() < V_MAX);
     }
 
-    if (e2.getKind () == Event::BALL_COLLISION) {
-      GALOIS_ASSERT (e2.getOtherBall ()->vel ().mag () < V_MAX);
+    if (e2.getKind() == Event::BALL_COLLISION) {
+      GALOIS_ASSERT(e2.getOtherBall()->vel().mag() < V_MAX);
     }
 
-    bool haveSameBall = checkCommonBall (e1, e2);
+    bool haveSameBall = checkCommonBall(e1, e2);
 
-    if (haveSameBall) { return true; }
+    if (haveSameBall) {
+      return true;
+    }
 
-    FP minDist = computeMinDist (e1, e2);
+    FP minDist = computeMinDist(e1, e2);
 
-    assert (V_MAX > FP(0.0));
+    assert(V_MAX > FP(0.0));
     FP vmaxTime = minDist / V_MAX;
 
     // std::cout << "V_MAX = " << V_MAX << std::endl;
 
-    FP tdiff = e2.getTime () - e1.getTime ();
+    FP tdiff = e2.getTime() - e1.getTime();
 
-    assert (tdiff >= FP (0.0));
+    assert(tdiff >= FP(0.0));
 
-    assert (!FPutils::almostEqual (vmaxTime, tdiff));
+    assert(!FPutils::almostEqual(vmaxTime, tdiff));
 
     return (vmaxTime < tdiff);
-
   }
 
-  static bool checkCommonBall (const Event& e1, const Event& e2) {
+  static bool checkCommonBall(const Event& e1, const Event& e2) {
     bool result = false;
 
     // fast check
-    result = isSame (e1.getBall (), e2.getBall ());
+    result = isSame(e1.getBall(), e2.getBall());
 
     if (!result) {
       // slow check
-      if (e1.getKind () == Event::BALL_COLLISION && e2.getKind () == Event::BALL_COLLISION) {
+      if (e1.getKind() == Event::BALL_COLLISION &&
+          e2.getKind() == Event::BALL_COLLISION) {
 
-        result = result || isSame (e1.getOtherBall (), e2.getOtherBall ())
-          || isSame (e1.getBall (), e2.getOtherBall ())
-          || isSame (e1.getOtherBall (), e2.getBall ());
+        result = result || isSame(e1.getOtherBall(), e2.getOtherBall()) ||
+                 isSame(e1.getBall(), e2.getOtherBall()) ||
+                 isSame(e1.getOtherBall(), e2.getBall());
 
-      } else if (e1.getKind () == Event::BALL_COLLISION) {
+      } else if (e1.getKind() == Event::BALL_COLLISION) {
 
-        result = result || isSame (e1.getOtherBall (), e2.getBall ());
+        result = result || isSame(e1.getOtherBall(), e2.getBall());
 
-      } else if (e2.getKind () == Event::BALL_COLLISION) {
+      } else if (e2.getKind() == Event::BALL_COLLISION) {
 
-        result = result || isSame (e1.getBall (), e2.getOtherBall ());
+        result = result || isSame(e1.getBall(), e2.getOtherBall());
 
       } else {
 
-        result = result || isSame (e1.getBall (), e2.getBall ());
+        result = result || isSame(e1.getBall(), e2.getBall());
       }
     }
 
     return result;
   }
 
-  static bool isSame (const Ball* b1, const Ball* b2) {
-    return (b1->getID () == b2->getID ());
+  static bool isSame(const Ball* b1, const Ball* b2) {
+    return (b1->getID() == b2->getID());
   }
 
-  static FP computeMinDist (const Event& e1, const Event& e2) {
+  static FP computeMinDist(const Event& e1, const Event& e2) {
 
-    FP minDist = finalDist (e1, e1.getBall (), e2, e2.getBall ());
+    FP minDist = finalDist(e1, e1.getBall(), e2, e2.getBall());
 
-    if (e1.getKind () == Event::BALL_COLLISION && e2.getKind () == Event::BALL_COLLISION) {
+    if (e1.getKind() == Event::BALL_COLLISION &&
+        e2.getKind() == Event::BALL_COLLISION) {
 
+      FP d12 = finalDist(e1, e1.getBall(), e2, e2.getOtherBall());
+      FP d21 = finalDist(e1, e1.getOtherBall(), e2, e2.getBall());
+      FP d22 = finalDist(e1, e1.getOtherBall(), e2, e2.getOtherBall());
 
-      FP d12 = finalDist (e1, e1.getBall ()     , e2, e2.getOtherBall ());
-      FP d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
-      FP d22 = finalDist (e1, e1.getOtherBall (), e2, e2.getOtherBall ());
+      minDist = std::min(std::min(minDist, d22), std::min(d12, d21));
 
+    } else if (e1.getKind() == Event::BALL_COLLISION) {
 
-      minDist = std::min (
-          std::min (minDist, d22), 
-          std::min (d12, d21));
+      FP d21  = finalDist(e1, e1.getOtherBall(), e2, e2.getBall());
+      minDist = std::min(minDist, d21);
 
-    } else if (e1.getKind () == Event::BALL_COLLISION) {
+    } else if (e2.getKind() == Event::BALL_COLLISION) {
 
-      FP d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
-      minDist = std::min (minDist, d21);
-
-    } else if (e2.getKind () == Event::BALL_COLLISION) {
-
-      FP d12 = finalDist (e1, e1.getBall (), e2, e2.getOtherBall ());
-      minDist = std::min (minDist, d12);
+      FP d12  = finalDist(e1, e1.getBall(), e2, e2.getOtherBall());
+      minDist = std::min(minDist, d12);
 
     } else {
     }
 
     return minDist;
-
   }
 
   //! distance between ball1 of e1 and ball2 of e2, such
   //! that position of ball1 is evaluated at time of e1
   //! and position of ball2 is evaluated at time of e2
-  //! We also subtract sum of radii of ball1 and ball2 
+  //! We also subtract sum of radii of ball1 and ball2
   //! to compute touching distance
   //
-  static FP finalDist (const Event& e1, const Ball* ball1, const Event& e2, const Ball* ball2) {
+  static FP finalDist(const Event& e1, const Ball* ball1, const Event& e2,
+                      const Ball* ball2) {
 
-    Vec2 ball1Pos = finalPos (e1, ball1);
-    Vec2 ball2Pos = finalPos (e2, ball2);
+    Vec2 ball1Pos = finalPos(e1, ball1);
+    Vec2 ball2Pos = finalPos(e2, ball2);
 
-    FP sumRadii = (ball1->radius () + ball2->radius ());
+    FP sumRadii = (ball1->radius() + ball2->radius());
 
-    return (ball1Pos.dist (ball2Pos) - sumRadii);
+    return (ball1Pos.dist(ball2Pos) - sumRadii);
   }
 
-  static Vec2 finalPos (const Event& e, const Ball* ball) {
-    assert (isSame (e.getBall (), ball) || isSame (e.getOtherBall (), ball));
+  static Vec2 finalPos(const Event& e, const Ball* ball) {
+    assert(isSame(e.getBall(), ball) || isSame(e.getOtherBall(), ball));
 
-    return (ball->pos () + ball->vel () * (e.getTime () - ball->time ()));
+    return (ball->pos() + ball->vel() * (e.getTime() - ball->time()));
   }
-
 };
-
-
 
 #endif // _ORDER_DEP_TEST_H_

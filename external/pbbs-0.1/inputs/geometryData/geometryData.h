@@ -29,17 +29,17 @@
 point2d rand2d(unsigned int i) {
   unsigned int s1 = i;
   unsigned int s2 = i + dataGen::hash<unsigned int>(s1);
-  return point2d(2*dataGen::hash<double>(s1)-1,
-		 2*dataGen::hash<double>(s2)-1);
+  return point2d(2 * dataGen::hash<double>(s1) - 1,
+                 2 * dataGen::hash<double>(s2) - 1);
 }
 
 point3d rand3d(int i) {
   unsigned int s1 = i;
   unsigned int s2 = i + dataGen::hash<unsigned int>(s1);
-  unsigned int s3 = 2*i + dataGen::hash<unsigned int>(s2);
-  return point3d(2*dataGen::hash<double>(s1)-1,
-		 2*dataGen::hash<double>(s2)-1,
-		 2*dataGen::hash<double>(s3)-1);
+  unsigned int s3 = 2 * i + dataGen::hash<unsigned int>(s2);
+  return point3d(2 * dataGen::hash<double>(s1) - 1,
+                 2 * dataGen::hash<double>(s2) - 1,
+                 2 * dataGen::hash<double>(s3) - 1);
 }
 
 point2d randInUnitSphere2d(int i) {
@@ -47,7 +47,7 @@ point2d randInUnitSphere2d(int i) {
   vect2d v;
   do {
     int o = dataGen::hash<int>(j++);
-    v = vect2d(rand2d(o+i));
+    v     = vect2d(rand2d(o + i));
   } while (v.Length() > 1.0);
   return point2d(v);
 }
@@ -57,19 +57,19 @@ point3d randInUnitSphere3d(int i) {
   vect3d v;
   do {
     int o = dataGen::hash<int>(j++);
-    v = vect3d(rand3d(o+i));
+    v     = vect3d(rand3d(o + i));
   } while (v.Length() > 1.0);
   return point3d(v);
 }
 
 point2d randOnUnitSphere2d(int i) {
   vect2d v = vect2d(randInUnitSphere2d(i));
-  return point2d(v/v.Length());
+  return point2d(v / v.Length());
 }
 
 point3d randOnUnitSphere3d(int i) {
   vect3d v = vect3d(randInUnitSphere3d(i));
-  return point3d(v/v.Length());
+  return point3d(v / v.Length());
 }
 
 #endif // _GEOMETRY_DATA

@@ -35,19 +35,20 @@ using namespace std;
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"<inFile> <outFile>");
-  pair<char*,char*> fnames = P.IOFileNames();
-  char* iFile = fnames.first;
-  char* oFile = fnames.second;
+  commandLine P(argc, argv, "<inFile> <outFile>");
+  pair<char*, char*> fnames = P.IOFileNames();
+  char* iFile               = fnames.first;
+  char* oFile               = fnames.second;
 
   edgeArray In = readEdgeArrayFromFile(iFile);
-  int m = In.nonZeros;
-  int n = max(In.numCols, In.numRows);
-  edge* E = In.E;
-  wghEdge* WE = newA(wghEdge, m);
-//  parallel_for(int i=0; i < m; i++) {
-  parallel_doall(int, i, 0, m)  {
+  int m        = In.nonZeros;
+  int n        = max(In.numCols, In.numRows);
+  edge* E      = In.E;
+  wghEdge* WE  = newA(wghEdge, m);
+  //  parallel_for(int i=0; i < m; i++) {
+  parallel_doall(int, i, 0, m) {
     WE[i] = wghEdge(E[i].u, E[i].v, dataGen::hash<double>(i));
-  } parallel_doall_end
-  return writeWghEdgeArrayToFile(wghEdgeArray(WE,n,m), oFile);
+  }
+  parallel_doall_end return writeWghEdgeArrayToFile(wghEdgeArray(WE, n, m),
+                                                    oFile);
 }

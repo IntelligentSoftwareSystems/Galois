@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -23,40 +23,41 @@
 #include <sstream>
 
 //! standard global options to the benchmarks
-llvm::cl::opt<bool> skipVerify("noverify", 
-                               llvm::cl::desc("Skip verification step (default value false)"), 
-                               llvm::cl::init(false));
-llvm::cl::opt<int> numThreads("t", 
-                              llvm::cl::desc("Number of threads (default value 1)"),
-                              llvm::cl::init(1));
-llvm::cl::opt<std::string> statFile("statFile", 
-                                    llvm::cl::desc("ouput file to print stats to (default value empty)"), 
-                                    llvm::cl::init(""));
+llvm::cl::opt<bool>
+    skipVerify("noverify",
+               llvm::cl::desc("Skip verification step (default value false)"),
+               llvm::cl::init(false));
+llvm::cl::opt<int>
+    numThreads("t", llvm::cl::desc("Number of threads (default value 1)"),
+               llvm::cl::init(1));
+llvm::cl::opt<std::string> statFile(
+    "statFile",
+    llvm::cl::desc("ouput file to print stats to (default value empty)"),
+    llvm::cl::init(""));
 
 static void LonestarPrintVersion() {
-  std::cout << "LoneStar Benchmark Suite v" << galois::getVersion() << " (" 
+  std::cout << "LoneStar Benchmark Suite v" << galois::getVersion() << " ("
             << galois::getRevision() << ")\n";
 }
 
-
 //! initialize lonestar benchmark
-void LonestarStart(int argc, char** argv, const char* app, const char* desc, 
+void LonestarStart(int argc, char** argv, const char* app, const char* desc,
                    const char* url) {
   llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  numThreads = galois::setActiveThreads(numThreads); 
+  numThreads = galois::setActiveThreads(numThreads);
 
   galois::runtime::setStatFile(statFile);
 
   LonestarPrintVersion();
-  std::cout << "Copyright (C) " << galois::getCopyrightYear() 
+  std::cout << "Copyright (C) " << galois::getCopyrightYear()
             << " The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
-  std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
+  std::cout << "application: " << (app ? app : "unspecified") << "\n";
   if (desc)
     std::cout << desc << "\n";
   if (url)
-    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/" 
+    std::cout << "http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/"
               << url << "\n";
   std::cout << "\n";
 

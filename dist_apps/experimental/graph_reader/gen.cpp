@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -33,14 +33,13 @@ constexpr static const char* const regionname = "GraphReader";
 
 namespace cll = llvm::cl;
 
-static cll::opt<bool> withEdgeData("dataOn", 
+static cll::opt<bool> withEdgeData("dataOn",
                                    cll::desc("Read or don't read edge data"),
                                    cll::init(false));
 
-static cll::opt<bool> iterateIn("iterateIn", 
+static cll::opt<bool> iterateIn("iterateIn",
                                 cll::desc("Read as if iterating over in edges"),
                                 cll::init(false));
-
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -56,13 +55,13 @@ struct NodeData {
 
 constexpr static const char* const name = "GraphReader";
 constexpr static const char* const desc = "Reads a Galois graph.";
-constexpr static const char* const url = 0;
+constexpr static const char* const url  = 0;
 
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  galois::StatTimer StatTimer_total("TimerTotal", regionname); 
+  galois::StatTimer StatTimer_total("TimerTotal", regionname);
 
   StatTimer_total.start();
 
@@ -74,7 +73,7 @@ int main(int argc, char** argv) {
       distGraphInitialization<NodeData, void>();
     }
   } else {
-  // iterate over in edges
+    // iterate over in edges
     if (withEdgeData) {
       distGraphInitialization<NodeData, unsigned, false>();
     } else {

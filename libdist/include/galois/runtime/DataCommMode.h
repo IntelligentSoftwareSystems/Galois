@@ -11,7 +11,7 @@
 
 //! Enumeration of data communication modes that can be used in sychronization
 //! @todo document the enums in doxygen
-enum DataCommMode { 
+enum DataCommMode {
   noData, //!< send no data
   bitsetData,
   offsetsData,
@@ -25,9 +25,9 @@ enum DataCommMode {
 extern DataCommMode enforce_data_mode;
 
 /**
- * Given a size of a subset of elements to send and the total number of elements,
- * determine an appropriate data mode to use for sending out the data during
- * synchronization.
+ * Given a size of a subset of elements to send and the total number of
+ * elements, determine an appropriate data mode to use for sending out the data
+ * during synchronization.
  *
  * @tparam DataType type of the data to be synchronized
  *
@@ -36,7 +36,7 @@ extern DataCommMode enforce_data_mode;
  *
  * @returns an appropriate DataCommMode to use for synchronization
  */
-template<typename DataType>
+template <typename DataType>
 DataCommMode get_data_mode(size_t num_selected, size_t num_total) {
   DataCommMode data_mode = noData;
   if (enforce_data_mode != noData) {
@@ -45,16 +45,15 @@ DataCommMode get_data_mode(size_t num_selected, size_t num_total) {
     if (num_selected == 0) {
       data_mode = noData;
     } else {
-      size_t bitset_alloc_size = ((num_total + 63)/64) * sizeof(uint64_t) +
-                                 (2 * sizeof(size_t));
+      size_t bitset_alloc_size =
+          ((num_total + 63) / 64) * sizeof(uint64_t) + (2 * sizeof(size_t));
 
-      size_t onlyDataSize = (num_total * sizeof(DataType));
+      size_t onlyDataSize   = (num_total * sizeof(DataType));
       size_t bitsetDataSize = (num_selected * sizeof(DataType)) +
-                  bitset_alloc_size +
-                  sizeof(num_selected);
+                              bitset_alloc_size + sizeof(num_selected);
       size_t offsetsDataSize = (num_selected * sizeof(DataType)) +
-                  (num_selected * sizeof(unsigned int)) + sizeof(size_t) +
-                  sizeof(num_selected);
+                               (num_selected * sizeof(unsigned int)) +
+                               sizeof(size_t) + sizeof(num_selected);
       // find the minimum size one
       if (bitsetDataSize < offsetsDataSize) {
         if (bitsetDataSize < onlyDataSize) {

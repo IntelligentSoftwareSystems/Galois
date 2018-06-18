@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,18 +29,28 @@
 #include "galois/DistAccumulator.h"
 #include "galois/runtime/Tracer.h"
 
-
-static const char* const name = "sssp - Distributed Heterogeneous using vertex cut";
+static const char* const name =
+    "sssp - Distributed Heterogeneous using vertex cut";
 static const char* const desc = "Bellman-Ford sssp on Distributed Galois.";
-static const char* const url = 0;
+static const char* const url  = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
-static cll::opt<unsigned int> src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+static cll::opt<std::string>
+    inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<unsigned int>
+    maxIterations("maxIterations",
+                  cll::desc("Maximum iterations: Default 1024"),
+                  cll::init(1024));
+static cll::opt<unsigned int>
+    src_node("startNode", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<bool>
+    verify("verify",
+           cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"),
+           cll::init(false));
 
-static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
+static cll::opt<std::string> partFolder("partFolder",
+                                        cll::desc("path to partitionFolder"),
+                                        cll::init(""));
 
 struct NodeData {
   std::atomic<unsigned long long> dist_current;
@@ -49,24 +59,28 @@ struct NodeData {
 typedef vGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
-
 struct InitializeGraph {
-  Graph *graph;
-  llvm::cl::opt<unsigned int> &local_src_node;
+  Graph* graph;
+  llvm::cl::opt<unsigned int>& local_src_node;
 
-  InitializeGraph(llvm::cl::opt<unsigned int>& _src_node, Graph* _graph) : local_src_node(_src_node), graph(_graph){}
+  InitializeGraph(llvm::cl::opt<unsigned int>& _src_node, Graph* _graph)
+      : local_src_node(_src_node), graph(_graph) {}
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
-      static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
+      static unsigned long long extract(uint32_t node_id,
+                                        const struct NodeData& node) {
 #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
-        assert (personality == CPU);
+        if (personality == GPU_CUDA)
+          return get_node_dist_current_cuda(cuda_ctx, node_id);
+        assert(personality == CPU);
 #endif
         return node.dist_current;
       }
-      static void setVal (uint32_t node_id, struct NodeData & node, unsigned long long y) {
+      static void setVal(uint32_t node_id, struct NodeData& node,
+                         unsigned long long y) {
 #ifdef __GALOIS_HET_CUDA__
-        if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
+        if (personality == GPU_CUDA)
+          set_node_dist_current_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
 #endif
           node.dist_current = y;
@@ -78,21 +92,23 @@ struct InitializeGraph {
     if (personality == GPU_CUDA) {
       InitializeGraph_cuda(cuda_ctx);
     } else if (personality == CPU)
-    #endif
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(cuda_ctx);
-    	} else if (personality == CPU)
-    #endif
-    galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, galois::loopname("InitGraph"));
+#endif
+#ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        InitializeGraph_cuda(cuda_ctx);
+      } else if (personality == CPU)
+#endif
+        galois::do_all(_graph.begin(), _graph.end(),
+                       InitializeGraph{src_node, &_graph},
+                       galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
 
   void operator()(GNode src) const {
-    NodeData& sdata = graph->getData(src);
-    sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
-    if(graph->getGID(src) == local_src_node){
+    NodeData& sdata    = graph->getData(src);
+    sdata.dist_current = std::numeric_limits<unsigned long long>::max() / 4;
+    if (graph->getGID(src) == local_src_node) {
       sdata.dist_current = 0;
     }
   }
@@ -102,98 +118,124 @@ struct sssp {
   Graph* graph;
   static galois::DGAccumulator<int> DGAccumulator_accum;
 
-  sssp(Graph* _graph) : graph(_graph){}
-  void static go(Graph& _graph){
+  sssp(Graph* _graph) : graph(_graph) {}
+  void static go(Graph& _graph) {
     unsigned iteration = 0;
-    do{
+    do {
       DGAccumulator_accum.reset();
 
-      #ifdef __GALOIS_HET_CUDA__
-      	if (personality == GPU_CUDA) {
-      		sssp_cuda(cuda_ctx);
-      	} else if (personality == CPU)
-      #endif
-      	struct Syncer_0 {
-      		static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.dist_current;
-      		}
-      		static void reduce (uint32_t node_id, struct NodeData & node, unsigned long long y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ galois::atomicMin(node.dist_current, y);}
-      		}
-      		static void reset (uint32_t node_id, struct NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, 0);
-      			else if (personality == CPU)
-      		#endif
-      				{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }
-      		}
-      		typedef unsigned long long ValTy;
-      	};
-      	struct SyncerPull_0 {
-      		static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.dist_current;
-      		}
-      		static void setVal (uint32_t node_id, struct NodeData & node, unsigned long long y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				node.dist_current = y;
-      		}
-      		typedef unsigned long long ValTy;
-      	};
-      #ifdef __GALOIS_HET_CUDA__
-      	if (personality == GPU_CUDA) {
-      		sssp_cuda(cuda_ctx);
-      	} else if (personality == CPU)
-      #endif
-      galois::do_all(_graph.begin(), _graph.end(), sssp { &_graph }, galois::loopname("sssp"), galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
+#ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        sssp_cuda(cuda_ctx);
+      } else if (personality == CPU)
+#endif
+        struct Syncer_0 {
+          static unsigned long long extract(uint32_t node_id,
+                                            const struct NodeData& node) {
+#ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA)
+              return get_node_dist_current_cuda(cuda_ctx, node_id);
+            assert(personality == CPU);
+#endif
+            return node.dist_current;
+          }
+          static void reduce(uint32_t node_id, struct NodeData& node,
+                             unsigned long long y) {
+#ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA)
+              add_node_dist_current_cuda(cuda_ctx, node_id, y);
+            else if (personality == CPU)
+#endif
+            {
+              galois::atomicMin(node.dist_current, y);
+            }
+          }
+          static void reset(uint32_t node_id, struct NodeData& node) {
+#ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA)
+              set_node_dist_current_cuda(cuda_ctx, node_id, 0);
+            else if (personality == CPU)
+#endif
+            {
+              node.dist_current =
+                  std::numeric_limits<unsigned long long>::max() / 4;
+            }
+          }
+          typedef unsigned long long ValTy;
+        };
+      struct SyncerPull_0 {
+        static unsigned long long extract(uint32_t node_id,
+                                          const struct NodeData& node) {
+#ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA)
+            return get_node_dist_current_cuda(cuda_ctx, node_id);
+          assert(personality == CPU);
+#endif
+          return node.dist_current;
+        }
+        static void setVal(uint32_t node_id, struct NodeData& node,
+                           unsigned long long y) {
+#ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA)
+            set_node_dist_current_cuda(cuda_ctx, node_id, y);
+          else if (personality == CPU)
+#endif
+            node.dist_current = y;
+        }
+        typedef unsigned long long ValTy;
+      };
+#ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        sssp_cuda(cuda_ctx);
+      } else if (personality == CPU)
+#endif
+        galois::do_all(
+            _graph.begin(), _graph.end(), sssp{&_graph},
+            galois::loopname("sssp"),
+            galois::write_set(
+                "sync_push", "this->graph", "struct NodeData &",
+                "struct NodeData &", "dist_current", "unsigned long long",
+                "{ galois::atomicMin(node.dist_current, y);}",
+                "{node.dist_current = std::numeric_limits<unsigned long "
+                "long>::max()/4; }"),
+            galois::write_set("sync_pull", "this->graph", "struct NodeData &",
+                              "struct NodeData &", "dist_current",
+                              "unsigned long long"));
       _graph.sync_push<Syncer_0>();
-      
+
       _graph.sync_pull<SyncerPull_0>();
-      
-     ++iteration;
-    }while(DGAccumulator_accum.reduce());
+
+      ++iteration;
+    } while (DGAccumulator_accum.reduce());
 
     std::cout << " Total iteration run : " << iteration << "\n";
   }
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-    auto& sdist = snode.dist_current;
+    auto& sdist     = snode.dist_current;
 
     unsigned n = 0;
-    for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
+    for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej;
+         ++jj) {
       n++;
-      GNode dst = graph->getEdgeDst(jj);
-      auto& dnode = graph->getData(dst);
+      GNode dst                   = graph->getEdgeDst(jj);
+      auto& dnode                 = graph->getData(dst);
       unsigned long long new_dist = sdist + graph->getEdgeData(jj);
       auto old_dist = galois::atomicMin(dnode.dist_current, new_dist);
-      if(old_dist > new_dist){
+      if (old_dist > new_dist) {
         DGAccumulator_accum += 1;
       }
     }
   }
 };
-galois::DGAccumulator<int>  sssp::DGAccumulator_accum;
+galois::DGAccumulator<int> sssp::DGAccumulator_accum;
 
 /********Set source Node ************/
-void setSource(Graph& _graph){
+void setSource(Graph& _graph) {
   auto& net = galois::runtime::getSystemNetworkInterface();
-  if(net.ID == 0){
-    auto& nd = _graph.getData(src_node);
+  if (net.ID == 0) {
+    auto& nd        = _graph.getData(src_node);
     nd.dist_current = 0;
   }
 }
@@ -202,7 +244,8 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init, T_sssp1, T_sssp2, T_sssp3;
+    galois::Timer T_total, T_offlineGraph_init, T_DistGraph_init, T_init,
+        T_sssp1, T_sssp2, T_sssp3;
 
     std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
     std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
@@ -210,7 +253,7 @@ int main(int argc, char** argv) {
     T_total.start();
 
     T_DistGraph_init.start();
-    Graph hg(inputFile,partFolder,net.ID, net.Num);
+    Graph hg(inputFile, partFolder, net.ID, net.Num);
     T_DistGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
@@ -218,7 +261,7 @@ int main(int argc, char** argv) {
     InitializeGraph::go(hg);
     T_init.stop();
 
-  // Verify
+    // Verify
 #if 0
     if(verify){
       if(net.ID == 0) {
@@ -229,49 +272,70 @@ int main(int argc, char** argv) {
     }
 #endif
 
-
     std::cout << "sssp::go run1 called  on " << net.ID << "\n";
     T_sssp1.start();
-      sssp::go(hg);
+    sssp::go(hg);
     T_sssp1.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get()
+              << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "sssp::go run2 called  on " << net.ID << "\n";
     T_sssp2.start();
-      sssp::go(hg);
+    sssp::go(hg);
     T_sssp2.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get() << " sssp2 : " << T_sssp2.get()
+              << " (msec)\n\n";
 
     galois::runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "sssp::go run3 called  on " << net.ID << "\n";
     T_sssp3.start();
-      sssp::go(hg);
+    sssp::go(hg);
     T_sssp3.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp3 : " << T_sssp3.get() << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get() << " sssp3 : " << T_sssp3.get()
+              << " (msec)\n\n";
 
+    T_total.stop();
 
-   T_total.stop();
+    auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get()) / 3;
 
-    auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get())/3;
+    std::cout << "[" << net.ID << "]"
+              << " Total Time : " << T_total.get()
+              << " offlineGraph : " << T_offlineGraph_init.get()
+              << " DistGraph : " << T_DistGraph_init.get()
+              << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get()
+              << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get()
+              << " sssp mean time (3 runs ) (" << maxIterations
+              << ") : " << mean_time << "(msec)\n\n";
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " DistGraph : " << T_DistGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
-
-    if(verify){
-      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        galois::runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
+    if (verify) {
+      for (auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        galois::runtime::printOutput("% %\n", hg.getGID(*ii),
+                                     hg.getData(*ii).dist_current);
       }
     }
     return 0;
-  } catch(const char* c) {
+  } catch (const char* c) {
     std::cerr << "Error: " << c << "\n";
-      return 1;
+    return 1;
   }
 }

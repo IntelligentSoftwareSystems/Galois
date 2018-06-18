@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,10 +37,11 @@ struct start_now_t {};
 constexpr start_now_t start_now = start_now_t();
 
 //! A simple timer
-class Timer: private boost::noncopyable {
+class Timer : private boost::noncopyable {
   typedef std::chrono::steady_clock clockTy;
-  //typedef std::chrono::high_resolution_clock clockTy;
+  // typedef std::chrono::high_resolution_clock clockTy;
   std::chrono::time_point<clockTy> startT, stopT;
+
 public:
   Timer() = default;
   Timer(const start_now_t) { start(); }
@@ -52,13 +53,14 @@ public:
 
 //! A multi-start time accumulator.
 //! Gives the final runtime for a series of intervals
-class TimeAccumulator: private boost::noncopyable {
+class TimeAccumulator : private boost::noncopyable {
   Timer ltimer;
   unsigned long acc;
+
 public:
   TimeAccumulator();
   void start();
-  //!adds the current timed interval to the total
+  //! adds the current timed interval to the total
   void stop();
   unsigned long get() const;
   TimeAccumulator& operator+=(const TimeAccumulator& rhs);
@@ -75,9 +77,9 @@ class StatTimer : public TimeAccumulator {
 protected:
   void init(const char* n, const char* r, bool s) {
     n = n ? n : "Time";
-    r = r? r : "(NULL)";
+    r = r ? r : "(NULL)";
 
-    name = gstl::makeStr(n);
+    name   = gstl::makeStr(n);
     region = gstl::makeStr(r);
 
     valid = false;
@@ -90,7 +92,9 @@ public:
   StatTimer(const char* const n, start_now_t t) { init(n, nullptr, true); }
 
   StatTimer(const char* const n, const char* const r) { init(n, r, false); }
-  StatTimer(const char* const n, const char* const r, start_now_t t) { init(n, r, true); }
+  StatTimer(const char* const n, const char* const r, start_now_t t) {
+    init(n, r, true);
+  }
 
   StatTimer() { init(nullptr, nullptr, false); }
   StatTimer(start_now_t t) { init(nullptr, nullptr, true); }
@@ -114,10 +118,11 @@ public:
 };
 
 template <bool Enable>
-class CondStatTimer: public StatTimer {
+class CondStatTimer : public StatTimer {
 public:
-  CondStatTimer(const char* region): StatTimer("Time", region) {}
-  CondStatTimer(const char* const n, const char* region): StatTimer(n, region) {}
+  CondStatTimer(const char* region) : StatTimer("Time", region) {}
+  CondStatTimer(const char* const n, const char* region)
+      : StatTimer(n, region) {}
 };
 
 template <>
@@ -142,20 +147,18 @@ void timeThis(const F& f, const char* const name) {
 }
 
 template <bool enabled>
-class ThreadTimer: private boost::noncopyable {
+class ThreadTimer : private boost::noncopyable {
   timespec m_start;
   timespec m_stop;
-  int64_t  m_nsec;
+  int64_t m_nsec;
 
 public:
-  ThreadTimer (): m_nsec (0) {};
+  ThreadTimer() : m_nsec(0){};
 
-  void start (void) {
-    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_start);
-  }
+  void start(void) { clock_gettime(CLOCK_THREAD_CPUTIME_ID, &m_start); }
 
-  void stop (void) {
-    clock_gettime (CLOCK_THREAD_CPUTIME_ID, &m_stop);
+  void stop(void) {
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &m_stop);
     m_nsec += (m_stop.tv_nsec - m_start.tv_nsec);
     m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
   }
@@ -165,36 +168,30 @@ public:
   int64_t get_sec(void) const { return (m_nsec >> 30); }
 
   int64_t get_msec(void) const { return (m_nsec >> 20); }
-
 };
 
 template <>
 class ThreadTimer<false> {
 public:
-  void start (void) const  {}
-  void stop (void) const  {}
-  int64_t get_nsec (void) const { return 0; }
-  int64_t get_sec (void) const  { return 0; }
-  int64_t get_msec (void) const  { return 0; }
+  void start(void) const {}
+  void stop(void) const {}
+  int64_t get_nsec(void) const { return 0; }
+  int64_t get_sec(void) const { return 0; }
+  int64_t get_msec(void) const { return 0; }
 };
 
-
-
 template <bool enabled>
-class PerThreadTimer: private boost::noncopyable {
+class PerThreadTimer : private boost::noncopyable {
 
 protected:
-
   const char* const region;
   const char* const category;
 
-  substrate::PerThreadStorage<ThreadTimer<enabled> > timers;
-
+  substrate::PerThreadStorage<ThreadTimer<enabled>> timers;
 
   void reportTimes(void) {
 
     int64_t minTime = std::numeric_limits<int64_t>::max();
-
 
     for (unsigned i = 0; i < timers.size(); ++i) {
 
@@ -204,60 +201,50 @@ protected:
     }
 
     std::string timeCat = category + std::string("-per-thread-times(ns)");
-    std::string lagCat = category + std::string("-per-thread-lag(ns)");
+    std::string lagCat  = category + std::string("-per-thread-lag(ns)");
 
-    galois::substrate::getThreadPool(galois::getActiveThreads(),
-        [&] (void) {
-          auto ns = timers.getLocal()->get_nsec();
-          auto lag = ns - minTime;
-          assert(lag > 0 && "negative time lag from min is impossible");
+    galois::substrate::getThreadPool(galois::getActiveThreads(), [&](void) {
+      auto ns  = timers.getLocal()->get_nsec();
+      auto lag = ns - minTime;
+      assert(lag > 0 && "negative time lag from min is impossible");
 
-          galois::runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
-          galois::runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
-        });
+      galois::runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
+      galois::runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
+    });
 
     // for (unsigned i = 0; i < timers.size(); ++i) {
-//
-      // auto ns = timers.getRemote(i)->get_nsec();
-      // auto lag = ns - minTime;
-      // assert(lag > 0 && "negative time lag from min is impossible");
-//
-      // galois::runtime::reportStat(region, lagCat.c_str(), lag, i);
-      // galois::runtime::reportStat(region, timeCat.c_str(), ns, i);
+    //
+    // auto ns = timers.getRemote(i)->get_nsec();
+    // auto lag = ns - minTime;
+    // assert(lag > 0 && "negative time lag from min is impossible");
+    //
+    // galois::runtime::reportStat(region, lagCat.c_str(), lag, i);
+    // galois::runtime::reportStat(region, timeCat.c_str(), ns, i);
     // }
   }
 
 public:
+  explicit PerThreadTimer(const char* const _region,
+                          const char* const _category)
+      : region(_region), category(_category) {}
 
-  explicit PerThreadTimer(const char* const _region, const char* const _category)
-    :
-      region(_region),
-      category(_category)
-  {}
+  ~PerThreadTimer(void) { reportTimes(); }
 
-  ~PerThreadTimer(void) {
-    reportTimes();
-  }
+  void start(void) { timers.getLocal()->start(); }
 
-  void start(void) {
-    timers.getLocal()->start();
-  }
-
-  void stop(void) {
-    timers.getLocal()->stop();
-  }
+  void stop(void) { timers.getLocal()->stop(); }
 };
 
-template<> class PerThreadTimer<false> {
+template <>
+class PerThreadTimer<false> {
 
 public:
-  explicit PerThreadTimer(const char* const _region, const char* const _category)
-  {}
+  explicit PerThreadTimer(const char* const _region,
+                          const char* const _category) {}
 
   void start(void) const {}
 
   void stop(void) const {}
-
 };
 
 } // end namespace galois

@@ -26,9 +26,9 @@
 //     -- Normal   :: the thread ID of the owner
 //--------------------------------------------------------------
 
-#define DMP_MOT_OWNER_RESOURCE_BIT (1<<31)
-#define DMP_MOT_OWNER_MASK         ((1ul<<31) - 1)
-#define DMP_MOT_OWNER_SHARED       DMP_MOT_OWNER_MASK
+#define DMP_MOT_OWNER_RESOURCE_BIT (1 << 31)
+#define DMP_MOT_OWNER_MASK ((1ul << 31) - 1)
+#define DMP_MOT_OWNER_SHARED DMP_MOT_OWNER_MASK
 
 static inline uint32_t DMPmotOwnerFromThread(DmpThreadInfo* dmp) {
   return dmp->threadID;
@@ -37,7 +37,8 @@ static inline uint32_t DMPmotOwnerFromThread(DmpThreadInfo* dmp) {
 static inline uint32_t DMPmotOwnerFromResource(DMPresource* r) {
   // FIXME: this hash-based encoding is broken: two threads could hold
   // two different resources yet both may think they own the same data!
-#if defined(__LP_64__) || defined(__LP64__) || defined(__amd64__) || defined(__x64_64__)
+#if defined(__LP_64__) || defined(__LP64__) || defined(__amd64__) ||           \
+    defined(__x64_64__)
   return DMP_MOT_OWNER_RESOURCE_BIT |
          (((uint32_t)(uintptr_t)r >> 3) & DMP_MOT_OWNER_MASK);
 #else
@@ -57,8 +58,7 @@ void DMP_initRuntime() {
     DMPmot[i] = DMP_MOT_OWNER_SHARED;
 }
 
-void DMP_initRuntimeThread() {
-}
+void DMP_initRuntimeThread() {}
 
 //-----------------------------------------------------------------------
 // MOT Policies
@@ -80,8 +80,8 @@ static inline int slowOwnershipCheck(const int owner) {
   return 0;
 }
 
-__attribute__((noinline))
-static void waitAndChangeOwnerForRead(const int hash, const int owner) {
+__attribute__((noinline)) static void
+waitAndChangeOwnerForRead(const int hash, const int owner) {
   if (slowOwnershipCheck(owner))
     return;
 
@@ -98,15 +98,15 @@ static void waitAndChangeOwnerForRead(const int hash, const int owner) {
   DMPmot[hash] = newowner;
 }
 
-__attribute__((noinline))
-static void waitAndChangeOwnerForWrite(const int hash, const int owner) {
+__attribute__((noinline)) static void
+waitAndChangeOwnerForWrite(const int hash, const int owner) {
   if (slowOwnershipCheck(owner))
     return;
 
   DMP_waitForSerialMode();
 
 #ifndef DMP_DISABLE_SINGLE_THREADED_ALWAYS_SHARE
-  if(DMPnumLiveThreads == 1) {
+  if (DMPnumLiveThreads == 1) {
     DMPmot[hash] = DMP_MOT_OWNER_SHARED;
     return;
   }
@@ -163,11 +163,11 @@ void DMPstoreContained(void* addr) {
 //
 
 void DMPloadRange(void* addr, size_t size) {
-  MotIterator<LoadStoreTraits::doLoad>::foreach(addr, size);
+  MotIterator<LoadStoreTraits::doLoad>::foreach (addr, size);
 }
 
 void DMPstoreRange(void* addr, size_t size) {
-  MotIterator<LoadStoreTraits::doStore>::foreach(addr, size);
+  MotIterator<LoadStoreTraits::doStore>::foreach (addr, size);
 }
 
 //--------------------------------------------------------------
@@ -185,4 +185,4 @@ void DMPmemcpy(void* dst, const void* src, size_t size) {
   memcpy(dst, src, size);
 }
 
-#endif  // DMP_ENABLE_MODEL_O_S
+#endif // DMP_ENABLE_MODEL_O_S

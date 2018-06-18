@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,7 +30,7 @@ namespace runtime {
 class NetworkBackend {
 public:
   struct SendBlock : public boost::intrusive::list_base_hook<> {
-    SendBlock(unsigned char* d) :dest(~0), size(0), data(d) {}
+    SendBlock(unsigned char* d) : dest(~0), size(0), data(d) {}
     uint32_t dest, size, tag;
     unsigned char* data;
   };
@@ -52,7 +52,7 @@ public:
 
   //! Send a block; data is now owned by the Backend
   virtual void send(SendBlock* data) = 0;
-  
+
   //! Recieve a message; data is now owned by the caller
   //! and must be returned to this class
   virtual SendBlock* recv() = 0;
@@ -70,7 +70,7 @@ public:
 NetworkBackend& getSystemNetworkBackend();
 
 // implementations copied over from Network.cpp
-//NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
+// NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
 //  //FIXME: review for TBAA rules
 //  std::lock_guard<substrate::SimpleLock> lg(flLock);
 //  SendBlock* retval = nullptr;
@@ -86,12 +86,12 @@ NetworkBackend& getSystemNetworkBackend();
 //  return retval;
 //}
 //
-//void NetworkBackend::freeSendBlock(SendBlock* sb) {
+// void NetworkBackend::freeSendBlock(SendBlock* sb) {
 //  std::lock_guard<substrate::SimpleLock> lg(flLock);
 //  freelist.push_front(*sb);
 //}
 //
-//NetworkBackend::~NetworkBackend() {
+// NetworkBackend::~NetworkBackend() {
 //  while (!freelist.empty()) {
 //    SendBlock* sb = &freelist.front();
 //    freelist.pop_front();
@@ -100,8 +100,8 @@ NetworkBackend& getSystemNetworkBackend();
 //  }
 //}
 //
-//NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
+// NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
-} // end runtime
-} // end galois
+} // namespace runtime
+} // namespace galois
 #endif

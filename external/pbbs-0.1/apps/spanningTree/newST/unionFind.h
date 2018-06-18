@@ -29,26 +29,29 @@ struct unionFind {
   // initialize with all roots marked with -1
   unionFind(int n) {
     parents = newA(int, n);
-//    parallel_for(int i=0; i < n; i++) parents[i] = -1;
-    parallel_doall(int, i, 0, n) { parents[i] = -1; } parallel_doall_end
+    //    parallel_for(int i=0; i < n; i++) parents[i] = -1;
+    parallel_doall(int, i, 0, n) { parents[i] = -1; }
+    parallel_doall_end
   }
 
-  void del() {free(parents);}
+  void del() { free(parents); }
 
   vindex find(vindex i) {
-    if (parents[i] < 0) return i;
-    vindex j = parents[i];     
-    if (parents[j] < 0) return j;
-    do j = parents[j]; 
+    if (parents[i] < 0)
+      return i;
+    vindex j = parents[i];
+    if (parents[j] < 0)
+      return j;
+    do
+      j = parents[j];
     while (parents[j] >= 0);
     vindex tmp;
-    while ((tmp = parents[i]) != j) { 
+    while ((tmp = parents[i]) != j) {
       parents[i] = j;
-      i = tmp;
+      i          = tmp;
     }
     return j;
   }
 
-  void link(vindex u, vindex v) { 
-    parents[u] = v;}
+  void link(vindex u, vindex v) { parents[u] = v; }
 };

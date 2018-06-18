@@ -36,18 +36,19 @@ using namespace benchIO;
 void timeMatching(edgeArray EA, int rounds, char* outFile) {
   int m = EA.nonZeros;
   int n = EA.numRows;
-  pair<int*,int> EdgeIds(NULL,0);
-  edge *E = newA(edge,m);
-  for (int i=0; i < rounds; i++) {
-    if (EdgeIds.first != NULL) free(EdgeIds.first);
-//    parallel_for (int i=0; i < m; i++) E[i] = EA.E[i];
-    parallel_doall(int, i, 0, m) { E[i] = EA.E[i]; } parallel_doall_end
-    startTime();
-    EdgeIds = maximalMatching(edgeArray(E,n,n,m));
+  pair<int*, int> EdgeIds(NULL, 0);
+  edge* E = newA(edge, m);
+  for (int i = 0; i < rounds; i++) {
+    if (EdgeIds.first != NULL)
+      free(EdgeIds.first);
+    //    parallel_for (int i=0; i < m; i++) E[i] = EA.E[i];
+    parallel_doall(int, i, 0, m) { E[i] = EA.E[i]; }
+    parallel_doall_end startTime();
+    EdgeIds = maximalMatching(edgeArray(E, n, n, m));
     nextTimeN();
   }
   cout << endl;
-  if (outFile != NULL) 
+  if (outFile != NULL)
     writeIntArrayToFile(EdgeIds.first, EdgeIds.second, outFile);
   free(EdgeIds.first);
   free(E);
@@ -56,10 +57,10 @@ void timeMatching(edgeArray EA, int rounds, char* outFile) {
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
-  char* iFile = P.getArgument(0);
-  char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
+  char* iFile  = P.getArgument(0);
+  char* oFile  = P.getOptionValue("-o");
+  int rounds   = P.getOptionIntValue("-r", 1);
   edgeArray EA = readEdgeArrayFromFile(iFile);
   timeMatching(EA, rounds, oFile);
 }

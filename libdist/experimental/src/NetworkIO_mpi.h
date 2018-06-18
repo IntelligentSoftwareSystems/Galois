@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -29,30 +29,28 @@ namespace {
 
 static void handleError(int rc) {
   if (rc != MPI_SUCCESS) {
-    //GALOIS_ERROR(false, "MPI ERROR"); 
+    // GALOIS_ERROR(false, "MPI ERROR");
     MPI_Abort(MPI_COMM_WORLD, rc);
   }
 }
 
 std::pair<int, int> initMPI() {
   int provided;
-  int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
+  int rc = MPI_Init_thread(NULL, NULL, MPI_THREAD_FUNNELED, &provided);
   handleError(rc);
-  
+
   int numTasks, taskRank;
   MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
   MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
-  
+
   return std::make_pair(taskRank, numTasks);
 }
-
 
 class NetworkIOMPI : public galois::runtime::NetworkIO {
 public:
   using NetworkIO::message;
-  
-private:
 
+private:
   struct mpi_message {
     bool inflight;
     MPI_Request cur;
@@ -74,43 +72,46 @@ private:
   }
 
 public:
-  
-  NetworkIOMPI() :incount(0) {
+  NetworkIOMPI() : incount(0) {
     auto p = initMPI();
-    _ID = p.first;
-    _Num = p.second;
+    _ID    = p.first;
+    _Num   = p.second;
     outq.resize(_Num);
   }
   ~NetworkIOMPI() {
-   // MPI_Finalize();
+    // MPI_Finalize();
   }
 
   void operator()() {
     int rv;
-    
-    //Check for recv
+
+    // Check for recv
     MPI_Status status;
     int nbytes, flag;
-    rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+    rv =
+        MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
     handleError(rv);
-    if (flag) { //pending message
+    if (flag) { // pending message
       rv = MPI_Get_count(&status, MPI_CHAR, &nbytes);
       handleError(rv);
       assert(nbytes != MPI_UNDEFINED);
       std::vector<char> d(nbytes);
-      std::cerr << _ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
-      rv = MPI_Recv(d.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &status);
-      //printBuffer(true, _ID, status.MPI_SOURCE, d);
+      std::cerr << _ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE
+                << "\n";
+      rv = MPI_Recv(d.data(), nbytes, MPI_BYTE, status.MPI_SOURCE,
+                    status.MPI_TAG, MPI_COMM_WORLD, &status);
+      // printBuffer(true, _ID, status.MPI_SOURCE, d);
       handleError(rv);
       bool urg = status.MPI_TAG;
-      inq.push_back(message{static_cast<uint32_t>(status.MPI_SOURCE), std::move(d), urg});
+      inq.push_back(
+          message{static_cast<uint32_t>(status.MPI_SOURCE), std::move(d), urg});
       ++incount;
     }
-    
+
     for (int i = 0; i < _Num; ++i) {
       auto& q = outq[i];
       if (q.inflight) {
-        //try completing
+        // try completing
         MPI_Test(&q.cur, &flag, &status);
         if (flag)
           q.inflight = false;
@@ -118,25 +119,20 @@ public:
     }
   }
 
-  bool readySend() const {
-    return true;
-  }
+  bool readySend() const { return true; }
 
-  bool readySend(uint32_t dest) const {
-    return !outq[dest].inflight;
-  }
+  bool readySend(uint32_t dest) const { return !outq[dest].inflight; }
 
-  bool readyRecv() const {
-    return incount;
-  }
+  bool readyRecv() const { return incount; }
 
   void send(const message& m) {
     auto& q = outq[m.dest];
     assert(!q.inflight);
     q.inflight = true;
-    q.m = std::move(m);
-    //printBuffer(false, _ID, m.dest, q.m.data);
-    int rv = MPI_Isend(q.m.data.data(), q.m.data.size(), MPI_BYTE, q.m.dest, q.m.urgent, MPI_COMM_WORLD, &q.cur);
+    q.m        = std::move(m);
+    // printBuffer(false, _ID, m.dest, q.m.data);
+    int rv = MPI_Isend(q.m.data.data(), q.m.data.size(), MPI_BYTE, q.m.dest,
+                       q.m.urgent, MPI_COMM_WORLD, &q.cur);
     handleError(rv);
   }
 
@@ -150,7 +146,6 @@ public:
 
   uint32_t ID() const { return _ID; }
   uint32_t Num() const { return _Num; }
-
 };
 
-}
+} // namespace

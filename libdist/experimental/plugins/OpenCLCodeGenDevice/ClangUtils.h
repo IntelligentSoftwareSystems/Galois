@@ -37,55 +37,54 @@ using namespace llvm;
 using namespace std;
 
 struct ASTUtility {
-   Rewriter * rewriter;
-   ASTUtility() :
-         rewriter(nullptr) {
-   }
-   void init(Rewriter * r) {
-      rewriter = r;
-   }
-   std::string toString(Stmt * S) {
-      std::string s;
-      llvm::raw_string_ostream raw_s(s);
-      S->dump(raw_s);
-      return raw_s.str();
-   }
-   char * get_src_ptr(const clang::SourceLocation & s) {
-      return const_cast<char *>(rewriter->getSourceMgr().getCharacterData(s));
-   }
-   void print_expr(const clang::SourceLocation & b, const clang::SourceLocation & e) {
-      for (char * p = get_src_ptr(b); p <= get_src_ptr(e); ++p) {
-         llvm::outs() << *p;
-      }
-   }
-   std::string get_string(const clang::SourceLocation & b, const clang::SourceLocation & e) {
-      char * b_ptr = get_src_ptr(b);
-      char * e_ptr = get_src_ptr(e);
-      std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
-      return s;
-   }
-   std::string get_string(const clang::SourceRange & e) {
-      char * b_ptr = get_src_ptr(e.getBegin());
-      char * e_ptr = get_src_ptr(e.getEnd());
-      std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
-      return s;
-   }
-   void print_expr(const clang::SourceRange & c) {
-      for (char * p = get_src_ptr(c.getBegin()); p <= get_src_ptr(c.getEnd()); ++p) {
-         llvm::outs() << *p;
-      }
-   }
-   static std::string get_timestamp() {
-      time_t now = time(0);
-      struct tm tstruct;
-      char buf[80];
-      tstruct = *localtime(&now);
-      // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-      // for more information about date/time format
-      strftime(buf, sizeof(buf), "%Y-%m-%d - %X", &tstruct);
+  Rewriter* rewriter;
+  ASTUtility() : rewriter(nullptr) {}
+  void init(Rewriter* r) { rewriter = r; }
+  std::string toString(Stmt* S) {
+    std::string s;
+    llvm::raw_string_ostream raw_s(s);
+    S->dump(raw_s);
+    return raw_s.str();
+  }
+  char* get_src_ptr(const clang::SourceLocation& s) {
+    return const_cast<char*>(rewriter->getSourceMgr().getCharacterData(s));
+  }
+  void print_expr(const clang::SourceLocation& b,
+                  const clang::SourceLocation& e) {
+    for (char* p = get_src_ptr(b); p <= get_src_ptr(e); ++p) {
+      llvm::outs() << *p;
+    }
+  }
+  std::string get_string(const clang::SourceLocation& b,
+                         const clang::SourceLocation& e) {
+    char* b_ptr = get_src_ptr(b);
+    char* e_ptr = get_src_ptr(e);
+    std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
+    return s;
+  }
+  std::string get_string(const clang::SourceRange& e) {
+    char* b_ptr = get_src_ptr(e.getBegin());
+    char* e_ptr = get_src_ptr(e.getEnd());
+    std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
+    return s;
+  }
+  void print_expr(const clang::SourceRange& c) {
+    for (char* p = get_src_ptr(c.getBegin()); p <= get_src_ptr(c.getEnd());
+         ++p) {
+      llvm::outs() << *p;
+    }
+  }
+  static std::string get_timestamp() {
+    time_t now = time(0);
+    struct tm tstruct;
+    char buf[80];
+    tstruct = *localtime(&now);
+    // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+    // for more information about date/time format
+    strftime(buf, sizeof(buf), "%Y-%m-%d - %X", &tstruct);
 
-      return buf;
-   }
+    return buf;
+  }
 };
 
 #endif /* SRC_PLUGINS_OPENCLCODEGEN_CLANGUTILS_H_ */

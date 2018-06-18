@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,7 +31,7 @@
 static const char* name = "Betweenness Centrality";
 static const char* desc = "Computes the betweenness centrality of all nodes in "
                           "a graph";
-static const char* url  = "betweenness_centrality";
+static const char* url = "betweenness_centrality";
 
 static llvm::cl::opt<std::string> filename(llvm::cl::Positional,
                                            llvm::cl::desc("<input file>"),
@@ -52,9 +52,8 @@ static llvm::cl::opt<bool> printAll("printAll",
                                     llvm::cl::desc("Print betweenness values "
                                                    "for all nodes"));
 
-using Graph = galois::graphs::LC_CSR_Graph<void, void>
-                ::with_no_lockable<true>::type
-                ::with_numa_alloc<true>::type;
+using Graph = galois::graphs::LC_CSR_Graph<void, void>::with_no_lockable<
+    true>::type ::with_numa_alloc<true>::type;
 using GNode = Graph::GraphNode;
 
 class BCOuter {
@@ -71,16 +70,12 @@ public:
   /**
    * Constructor initializes thread local storage.
    */
-  BCOuter (Graph& g) : G(&g), NumNodes(g.size()) {
-    InitializeLocal();
-  }
+  BCOuter(Graph& g) : G(&g), NumNodes(g.size()) { InitializeLocal(); }
 
   /**
    * Constructor destroys thread local storage.
    */
-  ~BCOuter (void) {
-    DeleteLocal();
-  }
+  ~BCOuter(void) { DeleteLocal(); }
 
   /**
    * Runs betweeness-centrality proper.
@@ -95,73 +90,70 @@ public:
   void run(const Cont& v) {
     // Each thread works on an individual source node
     galois::do_all(
-      galois::iterate(v),
-      [&] (const GNode& curSource) {
-        galois::gdeque<GNode> SQ;
+        galois::iterate(v),
+        [&](const GNode& curSource) {
+          galois::gdeque<GNode> SQ;
 
-        double* sigma = *perThreadSigma.getLocal();
-        int* d = *perThreadD.getLocal();
-        double* delta = *perThreadDelta.getLocal();
-        galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+          double* sigma               = *perThreadSigma.getLocal();
+          int* d                      = *perThreadD.getLocal();
+          double* delta               = *perThreadDelta.getLocal();
+          galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
 
-        sigma[curSource] = 1;
-        d[curSource] = 1;
+          sigma[curSource] = 1;
+          d[curSource]     = 1;
 
-        SQ.push_back(curSource);
+          SQ.push_back(curSource);
 
-        // Do bfs while computing number of shortest paths (saved into sigma)
-        // and successors of nodes;
-        // Note this bfs makes it so source has distance of 1 instead of 0
-        for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
-          int src = *qq;
+          // Do bfs while computing number of shortest paths (saved into sigma)
+          // and successors of nodes;
+          // Note this bfs makes it so source has distance of 1 instead of 0
+          for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
+            int src = *qq;
 
-          for (auto edge : G->edges(src, galois::MethodFlag::UNPROTECTED)) {
-            int dest = G->getEdgeDst(edge);
+            for (auto edge : G->edges(src, galois::MethodFlag::UNPROTECTED)) {
+              int dest = G->getEdgeDst(edge);
 
-            if (!d[dest]) {
-              SQ.push_back(dest);
-              d[dest] = d[src] + 1;
-            }
+              if (!d[dest]) {
+                SQ.push_back(dest);
+                d[dest] = d[src] + 1;
+              }
 
-            if (d[dest] == d[src] + 1) {
-              sigma[dest] = sigma[dest] + sigma[src];
-              succ[src].push_back(dest);
+              if (d[dest] == d[src] + 1) {
+                sigma[dest] = sigma[dest] + sigma[src];
+                succ[src].push_back(dest);
+              }
             }
           }
-        }
 
-        // Back-propogate the dependency values (delta) along the BFS DAG
-        // ignore the source (hence SQ.size > 1 and not SQ.empty)
-        while (SQ.size() > 1) {
-          int leaf = SQ.back();
-          SQ.pop_back();
+          // Back-propogate the dependency values (delta) along the BFS DAG
+          // ignore the source (hence SQ.size > 1 and not SQ.empty)
+          while (SQ.size() > 1) {
+            int leaf = SQ.back();
+            SQ.pop_back();
 
-          double sigma_leaf = sigma[leaf]; // has finalized short path value
-          double delta_leaf = delta[leaf];
-          auto& succ_list = succ[leaf];
+            double sigma_leaf = sigma[leaf]; // has finalized short path value
+            double delta_leaf = delta[leaf];
+            auto& succ_list   = succ[leaf];
 
-          for (auto succ = succ_list.begin(), succ_end = succ_list.end();
-               succ != succ_end;
-               ++succ) {
-            delta_leaf += (sigma_leaf / sigma[*succ]) * (1.0 + delta[*succ]);
+            for (auto succ = succ_list.begin(), succ_end = succ_list.end();
+                 succ != succ_end; ++succ) {
+              delta_leaf += (sigma_leaf / sigma[*succ]) * (1.0 + delta[*succ]);
+            }
+            delta[leaf] = delta_leaf;
           }
-          delta[leaf] = delta_leaf;
-        }
 
-        // save result of this source's BC, reset all local values for next
-        // source
-        double* Vec = *CB.getLocal();
-        for (int i = 0; i < NumNodes; ++i) {
-          Vec[i] += delta[i];
-          delta[i] = 0;
-          sigma[i] = 0;
-          d[i] = 0;
-          succ[i].clear();
-        }
-      },
-      galois::steal(),
-      galois::loopname("Main")
-    );
+          // save result of this source's BC, reset all local values for next
+          // source
+          double* Vec = *CB.getLocal();
+          for (int i = 0; i < NumNodes; ++i) {
+            Vec[i] += delta[i];
+            delta[i] = 0;
+            sigma[i] = 0;
+            d[i]     = 0;
+            succ[i].clear();
+          }
+        },
+        galois::steal(), galois::loopname("Main"));
   }
 
   /**
@@ -171,7 +163,7 @@ public:
    */
   void verify() {
     double sampleBC = 0.0;
-    bool firstTime = true;
+    bool firstTime  = true;
     for (int i = 0; i < NumNodes; ++i) {
       double bc = (*CB.getRemote(0))[i];
 
@@ -187,7 +179,8 @@ public:
         if ((bc - sampleBC) > 0.0001) {
           galois::gInfo("If torus graph, verification failed ",
                         (bc - sampleBC));
-          if (forceVerify) abort();
+          if (forceVerify)
+            abort();
           return;
         }
       }
@@ -236,7 +229,7 @@ private:
    *
    * @param addr Address to initialize array at
    */
-  template<typename T>
+  template <typename T>
   void initArray(T** addr) {
     *addr = new T[NumNodes]();
   }
@@ -246,48 +239,44 @@ private:
    *
    * @param addr Address to destroy array at
    */
-  template<typename T>
+  template <typename T>
   void deleteArray(T** addr) {
-    delete [] *addr;
+    delete[] * addr;
   }
 
   /**
    * Initialize local thread storage.
    */
   void InitializeLocal(void) {
-    galois::on_each(
-      [this] (unsigned, unsigned) {
-        this->initArray(CB.getLocal());
-        this->initArray(perThreadSigma.getLocal());
-        this->initArray(perThreadD.getLocal());
-        this->initArray(perThreadDelta.getLocal());
-        this->initArray(perThreadSucc.getLocal());
-      }
-    );
+    galois::on_each([this](unsigned, unsigned) {
+      this->initArray(CB.getLocal());
+      this->initArray(perThreadSigma.getLocal());
+      this->initArray(perThreadD.getLocal());
+      this->initArray(perThreadDelta.getLocal());
+      this->initArray(perThreadSucc.getLocal());
+    });
   }
 
   /**
    * Destroy local thread storage.
    */
   void DeleteLocal(void) {
-    galois::on_each(
-      [this] (unsigned, unsigned) {
-        this->deleteArray(CB.getLocal());
-        this->deleteArray(perThreadSigma.getLocal());
-        this->deleteArray(perThreadD.getLocal());
-        this->deleteArray(perThreadDelta.getLocal());
-        this->deleteArray(perThreadSucc.getLocal());
-      }
-    );
+    galois::on_each([this](unsigned, unsigned) {
+      this->deleteArray(CB.getLocal());
+      this->deleteArray(perThreadSigma.getLocal());
+      this->deleteArray(perThreadD.getLocal());
+      this->deleteArray(perThreadDelta.getLocal());
+      this->deleteArray(perThreadSucc.getLocal());
+    });
   }
 };
 
 /**
  * Functor that indicates if a node contains outgoing edges
  */
-struct HasOut: public std::unary_function<GNode, bool> {
+struct HasOut : public std::unary_function<GNode, bool> {
   Graph* graph;
-  HasOut(Graph* g) : graph(g) { }
+  HasOut(Graph* g) : graph(g) {}
 
   bool operator()(const GNode& n) const {
     return graph->edge_begin(n) != graph->edge_end(n);
@@ -321,7 +310,7 @@ int main(int argc, char** argv) {
   // adjustedEnd = last node we will process based on how many iterations
   // (i.e. sources) we want to do
   boost::filter_iterator<HasOut, Graph::iterator> adjustedEnd =
-    iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
+      iterLimit ? galois::safe_advance(begin, end, (int)iterLimit) : end;
 
   size_t iterations = std::distance(begin, adjustedEnd);
 
@@ -329,7 +318,7 @@ int main(int argc, char** argv) {
   std::vector<GNode> v(begin, adjustedEnd);
 
   galois::gPrint("Num Nodes: ", NumNodes, " Start Node: ", startNode,
-                 " Iterations: ",  iterations, "\n");
+                 " Iterations: ", iterations, "\n");
 
   // execute algorithm
   galois::StatTimer T;
@@ -339,8 +328,10 @@ int main(int argc, char** argv) {
 
   bcOuter.printBCValues(0, std::min(10ul, NumNodes), std::cout, 6);
 
-  if (printAll) bcOuter.printBCcertificate();
-  if (forceVerify || !skipVerify) bcOuter.verify();
+  if (printAll)
+    bcOuter.printBCcertificate();
+  if (forceVerify || !skipVerify)
+    bcOuter.verify();
 
   galois::reportPageAlloc("MeminfoPost");
 

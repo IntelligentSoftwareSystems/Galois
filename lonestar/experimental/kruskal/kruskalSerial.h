@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -24,43 +24,39 @@
 #include "kruskalFunc.h"
 #include "kruskal.h"
 
-class KruskalSerial: public Kruskal<KNode> {
+class KruskalSerial : public Kruskal<KNode> {
 protected:
+  virtual const std::string getVersion() const {
+    return "Serial Ordered Kruskal";
+  }
 
-  virtual const std::string getVersion () const { return "Serial Ordered Kruskal"; }
+  virtual void runMST(VecKNode_ty& nodes, VecKEdge_ty& edges, size_t& mstWeight,
+                      size_t& totalIter) {
 
-  virtual void runMST (VecKNode_ty& nodes, VecKEdge_ty& edges,
-      size_t& mstWeight, size_t& totalIter) {
+    std::sort(edges.begin(), edges.end(), KEdge<KNode>::PtrComparator());
 
-
-    std::sort (edges.begin (), edges.end (), KEdge<KNode>::PtrComparator ());
-
-    size_t mstSum = 0;
-    size_t iter = 0;
+    size_t mstSum    = 0;
+    size_t iter      = 0;
     size_t numUnions = 0;
 
-    for (VecKEdge_ty::const_iterator i = edges.begin (), ei = edges.end ();
-        i != ei; ++i) {
+    for (VecKEdge_ty::const_iterator i = edges.begin(), ei = edges.end();
+         i != ei; ++i) {
 
       ++iter;
 
-      if (kruskal::contract (**i)) {
+      if (kruskal::contract(**i)) {
         ++numUnions;
         mstSum += (*i)->weight;
       }
-      
 
-      if (numUnions == (nodes.size () - 1)) {
+      if (numUnions == (nodes.size() - 1)) {
         break;
       }
-
     }
 
     mstWeight = mstSum;
     totalIter = iter;
-
   }
-
 };
 
 #endif // _KRUSKAL_SERIAL_H_

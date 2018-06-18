@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -32,45 +32,41 @@
 struct is_bad : public galois::runtime::Lockable {
   Graphp g;
   is_bad() {}
-  is_bad(Graphp _g): g(_g) {}
-  bool operator()(const GNode& n) const {
-    return g->getData(n).isBad();
-  }
+  is_bad(Graphp _g) : g(_g) {}
+  bool operator()(const GNode& n) const { return g->getData(n).isBad(); }
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(galois::runtime::SerializeBuffer& s) const {
-    gSerialize(s,g);
+    gSerialize(s, g);
   }
   void deserialize(galois::runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,g);
+    gDeserialize(s, g);
   }
 };
 
-
-//new create_nodes
+// new create_nodes
 struct create_nodes { //  : public galois::runtime::Lockable {
   Graphp g;
-  //create_nodes(Graphp _g): g(_g) {}
+  // create_nodes(Graphp _g): g(_g) {}
   void static go(Graphp g, std::deque<Element>& elements) {
-    galois::for_each(elements.begin(), elements.end(), create_nodes{g}, galois::loopname("create node"));
+    galois::for_each(elements.begin(), elements.end(), create_nodes{g},
+                     galois::loopname("create node"));
   }
 
-  void operator() (Element& item, galois::UserContext<Element>& cnx) const {
+  void operator()(Element& item, galois::UserContext<Element>& cnx) const {
     GNode n = g->createNode(item);
     g->addNode(n);
   }
 
-  //typedef int tt_is_copyable;
+  // typedef int tt_is_copyable;
   // serialization functions
   typedef int tt_has_serialize;
   void serialize(galois::runtime::SerializeBuffer& s) const {
-    gSerialize(s,g);
+    gSerialize(s, g);
   }
   void deserialize(galois::runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,g);
+    gDeserialize(s, g);
   }
-
-
 };
 
 /*
@@ -91,7 +87,6 @@ struct create_same {
 
 };
 */
-
 
 /*struct create_nodes : public galois::runtime::Lockable {
   Graphp g;
@@ -117,27 +112,28 @@ struct create_same {
 
 struct centerXCmp {
   bool operator()(const Element& lhs, const Element& rhs) const {
-    //return lhs.getCenter() < rhs.getCenter();
+    // return lhs.getCenter() < rhs.getCenter();
     return lhs.getPoint(0)[0] < rhs.getPoint(0)[0];
   }
 };
 
 struct centerYCmp {
   bool operator()(const Element& lhs, const Element& rhs) const {
-    //return lhs.getCenter() < rhs.getCenter();
+    // return lhs.getCenter() < rhs.getCenter();
     return lhs.getPoint(0)[1] < rhs.getPoint(0)[1];
   }
 };
 
 struct centerYCmpInv {
   bool operator()(const Element& lhs, const Element& rhs) const {
-    //return lhs.getCenter() < rhs.getCenter();
+    // return lhs.getCenter() < rhs.getCenter();
     return rhs.getPoint(0)[1] < lhs.getPoint(0)[1];
   }
 };
 
 /**
- * Helper class used providing methods to read in information and create the graph 
+ * Helper class used providing methods to read in information and create the
+ * graph
  *
  */
 class Mesh {
@@ -166,15 +162,15 @@ private:
     tuples.resize(ntups[0]);
     for (size_t i = 0; i < ntups[0]; i++) {
       struct record {
-	uint32_t index;
-	double x, y, z;
+        uint32_t index;
+        double x, y, z;
       };
       record R;
       if (fread(&R, sizeof(record), 1, pFile) < 1) {
         std::cerr << "Malformed binary file\n";
         abort();
       }
-      tuples[R.index] = Tuple(R.x,R.y);
+      tuples[R.index] = Tuple(R.x, R.y);
     }
     fclose(pFile);
     return true;
@@ -199,15 +195,15 @@ private:
       double x, y;
       r = fscanf(pFile, "%u %lf %lf %*f", &index, &x, &y);
       checkResults(r, 3, filename);
-      tuples[index] = Tuple(x,y);
+      tuples[index] = Tuple(x, y);
     }
     fclose(pFile);
   }
 
   void writeNodes(std::string filename) {
     std::string filename2 = filename;
-    FILE* pFile = fopen(filename.append(".node").c_str(), "r");
-    FILE* oFile = fopen(filename2.append(".node.bin").c_str(), "w");
+    FILE* pFile           = fopen(filename.append(".node").c_str(), "r");
+    FILE* oFile           = fopen(filename2.append(".node.bin").c_str(), "w");
     if (!pFile) {
       std::cerr << "Failed to load file " << filename << " (continuing)\n";
       return;
@@ -217,19 +213,20 @@ private:
       return;
     }
     unsigned ntups[4];
-    int r = fscanf(pFile, "%u %u %u %u", &ntups[0], &ntups[1], &ntups[2], &ntups[3]);
+    int r = fscanf(pFile, "%u %u %u %u", &ntups[0], &ntups[1], &ntups[2],
+                   &ntups[3]);
     checkResults(r, 4, filename);
     uint32_t ntups32[4] = {ntups[0], ntups[1], ntups[2], ntups[3]};
     fwrite(&ntups32[0], sizeof(uint32_t), 4, oFile);
 
     for (size_t i = 0; i < ntups[0]; i++) {
       struct record {
-	unsigned index;
-	double x, y, z;
+        unsigned index;
+        double x, y, z;
       };
       struct recordOut {
-	uint32_t index;
-	double x, y, z;
+        uint32_t index;
+        double x, y, z;
       };
       record R;
       r = fscanf(pFile, "%u %lf %lf %lf", &R.index, &R.x, &R.y, &R.z);
@@ -297,8 +294,8 @@ private:
 
   void writeElements(std::string filename) {
     std::string filename2 = filename;
-    FILE* pFile = fopen(filename.append(".ele").c_str(), "r");
-    FILE* oFile = fopen(filename2.append(".ele.bin").c_str(), "w");
+    FILE* pFile           = fopen(filename.append(".ele").c_str(), "r");
+    FILE* oFile           = fopen(filename2.append(".ele.bin").c_str(), "w");
     if (!pFile) {
       std::cerr << "Failed to load file " << filename << " (continuing)\n";
       return;
@@ -384,8 +381,8 @@ private:
 
   void writePoly(std::string filename) {
     std::string filename2 = filename;
-    FILE* pFile = fopen(filename.append(".poly").c_str(), "r");
-    FILE* oFile = fopen(filename2.append(".poly.bin").c_str(), "w");
+    FILE* pFile           = fopen(filename.append(".poly").c_str(), "r");
+    FILE* oFile           = fopen(filename2.append(".poly.bin").c_str(), "w");
     if (!pFile) {
       std::cerr << "Failed to load file " << filename << " (continuing)\n";
       return;
@@ -395,13 +392,15 @@ private:
       return;
     }
     unsigned nsegs[4];
-    int r = fscanf(pFile, "%u %u %u %u", &nsegs[0], &nsegs[1], &nsegs[2], &nsegs[3]);
+    int r = fscanf(pFile, "%u %u %u %u", &nsegs[0], &nsegs[1], &nsegs[2],
+                   &nsegs[3]);
     checkResults(r, 4, filename);
     uint32_t nsegs32[4] = {nsegs[0], nsegs[1], nsegs[2], nsegs[3]};
     fwrite(&nsegs32[0], sizeof(uint32_t), 4, oFile);
     r = fscanf(pFile, "%u %u", &nsegs[0], &nsegs[1]);
     checkResults(r, 2, filename);
-    nsegs32[0] = nsegs[0]; nsegs32[1] = nsegs[1];
+    nsegs32[0] = nsegs[0];
+    nsegs32[1] = nsegs[1];
     fwrite(&nsegs32[0], sizeof(uint32_t), 2, oFile);
     for (size_t i = 0; i < nsegs[0]; i++) {
       unsigned index, n1, n2, n3;
@@ -427,29 +426,31 @@ private:
     }
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void divide(const Iter& b, const Iter& e) {
-    if (std::distance(b,e) > 16) {
-      std::sort(b,e, centerXCmp());
-      Iter m = galois::split_range(b,e);
-      std::sort(b,m, centerYCmpInv());
-      std::sort(m,e, centerYCmp());
-      divide(b, galois::split_range(b,m));
-      divide(galois::split_range(b,m), m);
-      divide(m,galois::split_range(m,e));
-      divide(galois::split_range(m,e), e);
+    if (std::distance(b, e) > 16) {
+      std::sort(b, e, centerXCmp());
+      Iter m = galois::split_range(b, e);
+      std::sort(b, m, centerYCmpInv());
+      std::sort(m, e, centerYCmp());
+      divide(b, galois::split_range(b, m));
+      divide(galois::split_range(b, m), m);
+      divide(m, galois::split_range(m, e));
+      divide(galois::split_range(m, e), e);
     }
   }
 
   void makeGraph(Graphp mesh) {
-    //std::sort(elements.begin(), elements.end(), centerXCmp());
+    // std::sort(elements.begin(), elements.end(), centerXCmp());
     divide(elements.begin(), elements.end());
 
     // volatile int x = 1;
     // while (x) {}
 
     std::cout << "MakeGraph\n";
-    //galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),galois::loopname("create"), galois::wl<galois::worklists::StableIterator<>>());
+    // galois::for_each(elements.begin(), elements.end(),
+    // create_nodes(mesh),galois::loopname("create"),
+    // galois::wl<galois::worklists::StableIterator<>>());
     create_nodes::go(mesh, elements);
     std::cout << "... now adding edges\n";
 
@@ -466,11 +467,11 @@ private:
 
   void dummyFunc(Graphp g) {
 
-    //create_same::go(g,elements);
+    // create_same::go(g,elements);
   }
 
 public:
-  Mesh(): id(0) { }
+  Mesh() : id(0) {}
 
   void read(Graphp mesh, std::string basename) {
     std::deque<Tuple> tuples;
@@ -478,9 +479,9 @@ public:
     readElements(basename, tuples);
     readPoly(basename, tuples);
 
-    //std::cout << "XXXXXXXXXXXXXXXXXXXX calling dummy function\n";
+    // std::cout << "XXXXXXXXXXXXXXXXXXXX calling dummy function\n";
 
-    //dummyFunc(mesh);
+    // dummyFunc(mesh);
 
     makeGraph(mesh);
   }

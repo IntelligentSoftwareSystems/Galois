@@ -5,47 +5,44 @@
 
 namespace lookuptables {
 
-LookupTableParser::LookupTableParser() {
+LookupTableParser::LookupTableParser() {}
 
-}
+LookupTableParser::~LookupTableParser() {}
 
-LookupTableParser::~LookupTableParser() {
+void LookupTableParser::parseFile(std::string fileName,
+                                  LookupTableElement** lookupTable) {
 
-}
+  std::ifstream file(fileName);
+  std::string line;
+  std::string token, exp;
+  char lit, lev;
 
-void LookupTableParser::parseFile( std::string fileName, LookupTableElement ** lookupTable ) {
+  int i = 0;
+  int j = 0;
 
-	std::ifstream file( fileName ); 
-	std::string line;
-	std::string token, exp;
-	char lit, lev;
+  while (std::getline(file, line)) {
 
-	int i = 0;
-	int j = 0;
+    if (line.at(0) == '#') {
+      i++;
+      j = 0;
+      continue;
+    }
 
-	while ( std::getline( file, line ) ) {
+    std::stringstream tokenizer;
+    tokenizer << line;
 
-		if ( line.at(0) == '#' ) {
-			i++;
-			j = 0;
-			continue;
-		}	
-	
-		std::stringstream tokenizer;
-		tokenizer << line;
-		
-		std::getline( tokenizer, exp, ';' );
+    std::getline(tokenizer, exp, ';');
 
-		std::getline( tokenizer, token, ';' );
-		lit = std::stoi( token );
-		
-		std::getline( tokenizer, token, ';' );
-		lev = std::stoi( token );
-		
-		lookupTable[i][j] = LookupTableElement( exp, lit, lev );	
+    std::getline(tokenizer, token, ';');
+    lit = std::stoi(token);
 
-		j++;
-	}
+    std::getline(tokenizer, token, ';');
+    lev = std::stoi(token);
+
+    lookupTable[i][j] = LookupTableElement(exp, lit, lev);
+
+    j++;
+  }
 }
 
 } /* namespace lookuptables */

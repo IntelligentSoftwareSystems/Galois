@@ -30,40 +30,54 @@
 #include "unionFind.h"
 
 struct unionFindStep {
-  int u;  int v;  
-  edge *E;  reservation *R;  unionFind UF;
+  int u;
+  int v;
+  edge* E;
+  reservation* R;
+  unionFind UF;
   unionFindStep(edge* _E, unionFind _UF, reservation* _R)
-    : E(_E), R(_R), UF(_UF) {} 
+      : E(_E), R(_R), UF(_UF) {}
 
   bool reserve(int i) {
     u = UF.find(E[i].u);
     v = UF.find(E[i].v);
-    if (u > v) {int tmp = u; u = v; v = tmp;}
+    if (u > v) {
+      int tmp = u;
+      u       = v;
+      v       = tmp;
+    }
     if (u != v) {
       R[v].reserve(i);
       return 1;
-    } else return 0;
+    } else
+      return 0;
   }
 
   bool commit(int i) {
-    if (R[v].check(i)) { UF.link(v, u); return 1; }
-    else return 0;
+    if (R[v].check(i)) {
+      UF.link(v, u);
+      return 1;
+    } else
+      return 0;
   }
 };
 
-struct notMax { bool operator() (int i) {return i < INT_MAX;}};
+struct notMax {
+  bool operator()(int i) { return i < INT_MAX; }
+};
 
-pair<int*,int> st(edgeArray G){
+pair<int*, int> st(edgeArray G) {
   int m = G.nonZeros;
   int n = G.numRows;
   unionFind UF(n);
-  reservation *R = new reservation[n];
-  int l = (4*n)/3;
-  unionFindStep UFStep(G.E, UF, R); 
+  reservation* R = new reservation[n];
+  int l          = (4 * n) / 3;
+  unionFindStep UFStep(G.E, UF, R);
   speculative_for(UFStep, 0, m, 50);
-  //speculative_for(UFStep, l, m, 10);
-  _seq<int> stIdx = sequence::filter((int*) R, n, notMax());
+  // speculative_for(UFStep, l, m, 10);
+  _seq<int> stIdx = sequence::filter((int*)R, n, notMax());
   cout << "Tree size = " << stIdx.n << endl;
-  UF.del(); delete[] R;
-  return pair<int*,int>(stIdx.A, stIdx.n);
+  UF.del();
+  delete[] R;
+  return pair<int*, int>(stIdx.A, stIdx.n);
 }

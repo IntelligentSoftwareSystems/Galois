@@ -7,9 +7,9 @@
 
 #include "dmp-internal.h"
 
-#define BARRIER_DEBUG_MSG(B,msg) DEBUG_MSG( DEBUG_BARRIER, \
-                                            msg "(%p) @%llu T:%d arrived:%d", \
-                                            (B), DMProundNumber, DMPMAP->threadID, (B)->arrived )
+#define BARRIER_DEBUG_MSG(B, msg)                                              \
+  DEBUG_MSG(DEBUG_BARRIER, msg "(%p) @%llu T:%d arrived:%d", (B),              \
+            DMProundNumber, DMPMAP->threadID, (B)->arrived)
 
 struct DmpBarrierPredictor {
   // Since no thread blocked at a barrier can make progress until
@@ -62,7 +62,7 @@ struct DmpBarrierTraits {
     return Predictor::predict(r);
   }
 
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
   static const bool acquire_ends_quantum = false;
   static const bool release_ends_quantum = false;
 };
@@ -80,27 +80,27 @@ struct DmpBarrierTraits {
 #define PTHREAD_BARRIER_SERIAL_THREAD -1
 #endif
 
-int DMPbarrier_init(DMPbarrier *B, void* attr, unsigned needed) {
+int DMPbarrier_init(DMPbarrier* B, void* attr, unsigned needed) {
   if (needed == 0)
     return EINVAL;
   DMP_waitForSerialMode();
   DMPresource_init(&B->resource, 0 | DMP_RESOURCE_TYPE_BARRIER);
-  B->needed = needed;
+  B->needed  = needed;
   B->arrived = 0;
-  B->first = NULL;
+  B->first   = NULL;
   return 0;
 }
 
-int DMPbarrier_destroy(DMPbarrier *B) {
+int DMPbarrier_destroy(DMPbarrier* B) {
   DMPresource_take_ownership<DmpBarrierTraits>(&B->resource);
   if (B->arrived > 0)
     return EBUSY;
-  B->needed = 0;
+  B->needed  = 0;
   B->arrived = 0;
   return 0;
 }
 
-int DMPbarrier_wait(DMPbarrier *B) {
+int DMPbarrier_wait(DMPbarrier* B) {
   return DMPbarrier_wait_splash(B, B->needed);
 }
 
@@ -109,16 +109,16 @@ int DMPbarrier_wait(DMPbarrier *B) {
 // 'needed' is specified on wait
 //
 
-int DMPbarrier_init_splash(DMPbarrier *B) {
+int DMPbarrier_init_splash(DMPbarrier* B) {
   DMP_waitForSerialMode();
   DMPresource_init(&B->resource, 0 | DMP_RESOURCE_TYPE_BARRIER);
-  B->needed = 0;  // unused
+  B->needed  = 0; // unused
   B->arrived = 0;
-  B->first = NULL;
+  B->first   = NULL;
   return 0;
 }
 
-int DMPbarrier_wait_splash(DMPbarrier *B, unsigned needed) {
+int DMPbarrier_wait_splash(DMPbarrier* B, unsigned needed) {
   BARRIER_DEBUG_MSG(B, "BarrierArrive");
   DMPresource_take_ownership<DmpBarrierTraits>(&B->resource);
   B->arrived++;
@@ -131,7 +131,7 @@ int DMPbarrier_wait_splash(DMPbarrier *B, unsigned needed) {
       DMPwaiter_remove(&B->first, B->first);
     // Reset.
     B->arrived = 0;
-    r = PTHREAD_BARRIER_SERIAL_THREAD;
+    r          = PTHREAD_BARRIER_SERIAL_THREAD;
   } else {
     BARRIER_DEBUG_MSG(B, "BarrierWait");
     // Wait to be woken.

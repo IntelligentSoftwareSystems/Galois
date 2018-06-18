@@ -7,17 +7,15 @@
 
 #include "dmp-internal.h"
 
-#define MUTEX_DEBUG_MSG(M,msg) DEBUG_MSG( DEBUG_MUTEX, \
-                                          msg "(%p) @%llu T:%d", \
-                                          (M), DMProundNumber, DMPMAP->threadID )
+#define MUTEX_DEBUG_MSG(M, msg)                                                \
+  DEBUG_MSG(DEBUG_MUTEX, msg "(%p) @%llu T:%d", (M), DMProundNumber,           \
+            DMPMAP->threadID)
 
 inline bool mutex_tryacquire(DMPmutex* mutex, DMPwaiter* w) {
   return DMP_SPINLOCK_TRYLOCK(&mutex->spinlock);
 }
 
-inline bool mutex_isheld(DMPmutex* mutex) {
-  return mutex->spinlock != 0;
-}
+inline bool mutex_isheld(DMPmutex* mutex) { return mutex->spinlock != 0; }
 
 inline void mutex_release(DMPmutex* mutex) {
   DMP_SPINLOCK_UNLOCK(&mutex->spinlock);
@@ -35,9 +33,7 @@ struct DmpMutexTraits {
     return Wrapper::tryacquire_serial(mutex, w);
   }
 
-  static void release(DMPmutex* mutex) {
-    mutex_release(mutex);
-  }
+  static void release(DMPmutex* mutex) { mutex_release(mutex); }
 
   static void update_predictor(DMPresource* r, int oldowner) {
     DmpDefaultPredictor::update(r, oldowner);
@@ -47,10 +43,11 @@ struct DmpMutexTraits {
     return DmpDefaultPredictor::predict(r);
   }
 
-#if defined(DMP_ENABLE_DATA_GROUP_BY_MUTEX) || defined(DMP_ENABLE_TINY_SERIAL_MODE)
+#if defined(DMP_ENABLE_DATA_GROUP_BY_MUTEX) ||                                 \
+    defined(DMP_ENABLE_TINY_SERIAL_MODE)
   static const bool nest_globally = true;
 #else
-  static const bool nest_globally = false;
+  static const bool nest_globally        = false;
 #endif
 
 #ifdef DMP_ENABLE_MUTEX_LOCK_ENDQUANTUM
@@ -102,10 +99,10 @@ int DMPmutex_unlock(DMPmutex* mutex) {
   MUTEX_DEBUG_MSG(mutex, "MutexUnlock");
   // See comments for DMPresource_release().
 #ifdef DMP_ENABLE_WB_HBSYNC_UNLOCKOPT
-  const bool needs_ownership = (!mutex_isheld(mutex) ||
-                                !DMPresource_is_owner(&mutex->resource, DMPMAP));
+  const bool needs_ownership =
+      (!mutex_isheld(mutex) || !DMPresource_is_owner(&mutex->resource, DMPMAP));
 #elif defined(DMP_ENABLE_HANDOFF)
-  const bool needs_ownership = true;
+  const bool needs_ownership             = true;
 #else
   const bool needs_ownership = false;
 #endif

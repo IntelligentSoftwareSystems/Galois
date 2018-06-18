@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -19,16 +19,18 @@
 
 #include "galois/substrate/Barrier.h"
 
-//anchor vtable
+// anchor vtable
 galois::substrate::Barrier::~Barrier() {}
 
-//galois::substrate::Barrier& galois::substrate::getSystemBarrier(unsigned activeThreads) {
+// galois::substrate::Barrier& galois::substrate::getSystemBarrier(unsigned
+// activeThreads) {
 //  return benchmarking::getTopoBarrier(activeThreads);
 //}
 
 static galois::substrate::internal::BarrierInstance<>* BI = nullptr;
 
-void galois::substrate::internal::setBarrierInstance(internal::BarrierInstance<>* bi) {
+void galois::substrate::internal::setBarrierInstance(
+    internal::BarrierInstance<>* bi) {
   GALOIS_ASSERT(!(bi && BI), "Double initialization of BarrierInstance");
   BI = bi;
 }
@@ -37,4 +39,3 @@ galois::substrate::Barrier& galois::substrate::getBarrier(unsigned numT) {
   GALOIS_ASSERT(BI, "BarrierInstance not initialized");
   return BI->get(numT);
 }
-

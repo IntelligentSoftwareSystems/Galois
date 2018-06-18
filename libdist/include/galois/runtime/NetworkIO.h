@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -21,7 +21,7 @@
  * @file NetworkIO.h
  *
  * Contains NetworkIO, a base class that is inherited by classes that want to
- * implement the communication layer of Galois. (e.g. NetworkIOMPI and 
+ * implement the communication layer of Galois. (e.g. NetworkIOMPI and
  * NetworkIOLWCI)
  */
 
@@ -52,7 +52,7 @@ namespace runtime {
 class NetworkIO {
 protected:
   /**
-   * Wrapper for dealing with MPI error codes. Program dies if the error code 
+   * Wrapper for dealing with MPI error codes. Program dies if the error code
    * isn't MPI_SUCCESS.
    *
    * @param rc Error code to check for success
@@ -65,13 +65,14 @@ protected:
 
   //! memory usage tracker
   MemUsageTracker& memUsageTracker;
+
 public:
   /**
    * Message structure for sending data across the network.
    */
   struct message {
     uint32_t host; //!< destination of this message
-    uint32_t tag; //!< tag on message indicating distinct communication phases
+    uint32_t tag;  //!< tag on message indicating distinct communication phases
     std::vector<uint8_t> data; //!< data portion of message
 
     //! Default constructor initializes host and tag to large numbers.
@@ -79,8 +80,8 @@ public:
     //! @param h Host to send message to
     //! @param t Tag to associate with message
     //! @param d Data to save in message
-    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) 
-      : host(h), tag(t), data(d) {}
+    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d)
+        : host(h), tag(t), data(d) {}
 
     //! A message is valid if there is data to be sent
     //! @returns true if data is non-empty
@@ -89,7 +90,7 @@ public:
 
   //! The default constructor takes a memory usage tracker and saves it
   //! @param tracker reference to a memory usage tracker used by the system
-  NetworkIO(MemUsageTracker& tracker): memUsageTracker(tracker) {}
+  NetworkIO(MemUsageTracker& tracker) : memUsageTracker(tracker) {}
 
   //! Default destructor does nothing.
   virtual ~NetworkIO();
@@ -106,8 +107,8 @@ public:
 /**
  * Creates/returns a network IO layer that uses MPI to do communication.
  *
- * @returns tuple with pointer to the MPI IO layer, this host's ID, and the total
- * number of hosts in the system
+ * @returns tuple with pointer to the MPI IO layer, this host's ID, and the
+ * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
 makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
@@ -115,14 +116,14 @@ makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
 /**
  * Creates/returns a network IO layer that uses LWCI to do communication.
  *
- * @returns tuple with pointer to the LWCI IO layer, this host's ID, and the total
- * number of hosts in the system
+ * @returns tuple with pointer to the LWCI IO layer, this host's ID, and the
+ * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
 makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker);
 #endif
 
-} //namespace runtime
-} //namespace galois
+} // namespace runtime
+} // namespace galois
 
 #endif

@@ -26,81 +26,95 @@
 #include "parallel.h"
 //#include "speculative_for.h"
 
-template<class S>
+template <class S>
 struct GFn1 {
   int numberKeep;
   int numberDone;
-  vindex *I;
+  vindex* I;
   S* state;
   S step;
-  bool *keep;
-  GFn1(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
+  bool* keep;
+  GFn1(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step,
+       bool* _keep)
+      : numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state),
+        step(_step), keep(_keep) {}
   void operator()(int i) {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = state[i].reserve(I[i]);
-  }
-};
-
-template<class S>
-struct GFn2 {
-  int numberKeep;
-  int numberDone;
-  vindex *I;
-  S* state;
-  S step;
-  bool *keep;
-  GFn2(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step, bool* _keep): numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state), step(_step), keep(_keep) { }
-  void operator()(int i) {
-        if (keep[i]) keep[i] = !state[i].commit(I[i]);
+    if (i >= numberKeep)
+      I[i] = numberDone + i;
+    keep[i] = state[i].reserve(I[i]);
   }
 };
 
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=1, int maxTries=-1) {
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
-  vindex *I = newA(vindex,maxRoundSize);
-  vindex *Ihold = newA(vindex,maxRoundSize);
-  bool *keep = newA(bool,maxRoundSize);
-  S *state;
+struct GFn2 {
+  int numberKeep;
+  int numberDone;
+  vindex* I;
+  S* state;
+  S step;
+  bool* keep;
+  GFn2(int _numberKeep, int _numberDone, vindex* _I, S* _state, S _step,
+       bool* _keep)
+      : numberKeep(_numberKeep), numberDone(_numberDone), I(_I), state(_state),
+        step(_step), keep(_keep) {}
+  void operator()(int i) {
+    if (keep[i])
+      keep[i] = !state[i].commit(I[i]);
+  }
+};
+
+template <class S>
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 1,
+                     int maxTries = -1) {
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (e - s) / granularity + 1;
+  vindex* I        = newA(vindex, maxRoundSize);
+  vindex* Ihold    = newA(vindex, maxRoundSize);
+  bool* keep       = newA(bool, maxRoundSize);
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
-  int failed = 0;
+  int failed     = 0;
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-//      abort();
+      //      cerr << "speculativeLoop: too many iterations, increase maxTries
+      //      parameter\n"; abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
-//      parallel_for (int i =0; i < size; i++) {
+      //      parallel_for (int i =0; i < size; i++) {
       GFn1<S> gfn1(numberKeep, numberDone, I, state, step, keep);
-      parallel_doall_obj(int, i, 0, size, gfn1)  {
-	if (i >= numberKeep) I[i] = numberDone + i;
-	keep[i] = state[i].reserve(I[i]);
-      } parallel_doall_end
+      parallel_doall_obj(int, i, 0, size, gfn1) {
+        if (i >= numberKeep)
+          I[i] = numberDone + i;
+        keep[i] = state[i].reserve(I[i]);
+      }
+      parallel_doall_end
     } else {
-        abort();
+      abort();
     }
 
     if (hasState) {
-//      parallel_for (int i =0; i < size; i++) {
+      //      parallel_for (int i =0; i < size; i++) {
       GFn2<S> gfn2(numberKeep, numberDone, I, state, step, keep);
-      parallel_doall_obj(int, i, 0, size, gfn2)  {
-        if (keep[i]) keep[i] = !state[i].commit(I[i]);
-      } parallel_doall_end
+      parallel_doall_obj(int, i, 0, size, gfn2) {
+        if (keep[i])
+          keep[i] = !state[i].commit(I[i]);
+      }
+      parallel_doall_end
     } else {
-        abort();
+      abort();
     }
 
     // keep edges that failed to hook for next round
@@ -109,7 +123,10 @@ void speculative_for(S step, int s, int e, int granularity,
     swap(I, Ihold);
     numberDone += size - numberKeep;
   }
-  free(I); free(Ihold); free(keep); free(state);
+  free(I);
+  free(Ihold);
+  free(keep);
+  free(state);
   cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
@@ -125,33 +142,38 @@ using namespace std;
 //   Flags = 2 indicates a neighbor is chosen
 struct MISstep {
   char flag;
-  char *Flags;  vertex*G;
+  char* Flags;
+  vertex* G;
   MISstep(char* _F, vertex* _G) : Flags(_F), G(_G) {}
 
   bool reserve(int i) {
     int d = G[i].degree;
-    flag = 1;
+    flag  = 1;
     for (int j = 0; j < d; j++) {
       vindex ngh = G[i].Neighbors[j];
       if (ngh < i) {
-	if (Flags[ngh] == 1) { flag = 2; return 1;}
-	// need to wait for higher priority neighbor to decide
-	else if (Flags[ngh] == 0) flag = 0; 
+        if (Flags[ngh] == 1) {
+          flag = 2;
+          return 1;
+        }
+        // need to wait for higher priority neighbor to decide
+        else if (Flags[ngh] == 0)
+          flag = 0;
       }
     }
     return 1;
   }
 
-  bool commit(int i) { return (Flags[i] = flag) > 0;}
+  bool commit(int i) { return (Flags[i] = flag) > 0; }
 };
 
 char* maximalIndependentSet(graph GS) {
-  int n = GS.n;
-  vertex* G = GS.V;
-  char* Flags = newArray(n, (char) 0);
+  int n       = GS.n;
+  vertex* G   = GS.V;
+  char* Flags = newArray(n, (char)0);
   MISstep mis(Flags, G);
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds <= 0 ? 25 : numRounds;
+  numRounds     = numRounds <= 0 ? 25 : numRounds;
   speculative_for(mis, 0, n, numRounds);
   return Flags;
 }

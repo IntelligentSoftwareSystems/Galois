@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -31,45 +31,50 @@
 namespace galois {
 namespace worklists {
 
-template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
-  int BlockPeriod=0,
-  int MaxValue=64,
-  typename T=int,
-  bool Concurrent=true>
+template <typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
+          int BlockPeriod = 0, int MaxValue = 64, typename T = int,
+          bool Concurrent = true>
 struct Partitioned : private boost::noncopyable {
   static_assert(MaxValue > 0, "MaxValue must be positive");
 
-  template<bool _concurrent>
-  using rethread = Partitioned<Indexer, Container, BlockPeriod, MaxValue, T, _concurrent>;
+  template <bool _concurrent>
+  using rethread =
+      Partitioned<Indexer, Container, BlockPeriod, MaxValue, T, _concurrent>;
 
-  template<typename _T>
-  using retype = Partitioned<Indexer, typename Container::template retype<_T>, BlockPeriod, MaxValue, _T, Concurrent>;
+  template <typename _T>
+  using retype = Partitioned<Indexer, typename Container::template retype<_T>,
+                             BlockPeriod, MaxValue, _T, Concurrent>;
 
-  template<int _period>
-  using with_block_period = Partitioned<Indexer, Container, _period, MaxValue, T, Concurrent>;
+  template <int _period>
+  using with_block_period =
+      Partitioned<Indexer, Container, _period, MaxValue, T, Concurrent>;
 
-  template<int _max_value>
-  using with_max_value = Partitioned<Indexer, Container, BlockPeriod, _max_value, T, Concurrent>;
+  template <int _max_value>
+  using with_max_value =
+      Partitioned<Indexer, Container, BlockPeriod, _max_value, T, Concurrent>;
 
-  template<typename _container>
-  using with_container = Partitioned<Indexer, _container, BlockPeriod, MaxValue, T, Concurrent>;
+  template <typename _container>
+  using with_container =
+      Partitioned<Indexer, _container, BlockPeriod, MaxValue, T, Concurrent>;
 
-  template<typename _indexer>
-  using with_indexer = Partitioned<_indexer, Container, BlockPeriod, MaxValue, T, Concurrent>;
+  template <typename _indexer>
+  using with_indexer =
+      Partitioned<_indexer, Container, BlockPeriod, MaxValue, T, Concurrent>;
 
   typedef T value_type;
 
 private:
   typedef typename Container::template rethread<Concurrent> CTy;
 
-  //runtime::PerThreadStorage<unsigned> numPops;
+  // runtime::PerThreadStorage<unsigned> numPops;
   std::deque<CTy> items;
   Indexer indexer;
   substrate::CacheLineStorage<std::atomic_int> current;
   substrate::CacheLineStorage<std::atomic_bool> empty;
 
-  //XXX
-  //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
+  // XXX
+  // if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 &&
+  // betterBucket(p))
 
   GALOIS_ATTRIBUTE_NOINLINE
   galois::optional<value_type> slowPop(int cur) {
@@ -93,7 +98,8 @@ private:
   }
 
 public:
-  Partitioned(const Indexer& x = Indexer()): indexer(x), current(0), empty(false) {
+  Partitioned(const Indexer& x = Indexer())
+      : indexer(x), current(0), empty(false) {
     for (int i = 0; i < MaxValue; ++i)
       items.emplace_back();
   }
@@ -105,7 +111,7 @@ public:
       items.pop_back();
   }
 
-  void push(const value_type& val)  {
+  void push(const value_type& val) {
     int index = indexer(val);
     if (index < 0 || index >= MaxValue)
       index = 0;
@@ -114,13 +120,13 @@ public:
       empty.data.store(false, std::memory_order_release);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
@@ -136,20 +142,21 @@ public:
 };
 GALOIS_WLCOMPILECHECK(Partitioned)
 
-template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
-  typename T=int,
-  bool Concurrent=true>
+template <typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
+          typename T = int, bool Concurrent = true>
 struct ThreadPartitioned : private boost::noncopyable {
-  template<bool _concurrent>
+  template <bool _concurrent>
   using rethread = ThreadPartitioned<Indexer, Container, T, _concurrent>;
 
-  template<typename _T>
-  using retype = ThreadPartitioned<Indexer, typename Container::template retype<_T>, _T, Concurrent>;
+  template <typename _T>
+  using retype =
+      ThreadPartitioned<Indexer, typename Container::template retype<_T>, _T,
+                        Concurrent>;
 
-  template<typename _container>
+  template <typename _container>
   using with_container = ThreadPartitioned<Indexer, _container, T, Concurrent>;
 
-  template<typename _indexer>
+  template <typename _indexer>
   using with_indexer = ThreadPartitioned<_indexer, Container, T, Concurrent>;
 
   typedef T value_type;
@@ -160,7 +167,7 @@ private:
   struct Item {
     CTy wl;
     std::atomic_bool empty;
-    Item(): empty(true) { }
+    Item() : empty(true) {}
   };
 
   substrate::PerThreadStorage<Item> items;
@@ -169,8 +176,9 @@ private:
   substrate::CacheLineStorage<std::atomic_bool> empty;
   unsigned mask;
 
-  //XXX
-  //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
+  // XXX
+  // if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 &&
+  // betterBucket(p))
 
   GALOIS_ATTRIBUTE_NOINLINE
   galois::optional<value_type> slowPop() {
@@ -186,7 +194,7 @@ private:
   }
 
 public:
-  ThreadPartitioned(const Indexer& x = Indexer()): indexer(x), empty(false) {
+  ThreadPartitioned(const Indexer& x = Indexer()) : indexer(x), empty(false) {
     unsigned n = galois::getActiveThreads();
 
     for (mask = 1; mask < n; mask <<= 1)
@@ -196,19 +204,19 @@ public:
     mask -= 1;
   }
 
-  void push(const value_type& val)  {
-    int index = mapping[indexer(val) & mask];
+  void push(const value_type& val) {
+    int index  = mapping[indexer(val) & mask];
     Item* item = items.getRemote(index);
     item->wl.push(val);
   }
 
-  template<typename Iter>
+  template <typename Iter>
   void push(Iter b, Iter e) {
     while (b != e)
       push(*b++);
   }
 
-  template<typename RangeTy>
+  template <typename RangeTy>
   void push_initial(RangeTy range) {
     auto rp = range.local_pair();
     push(rp.first, rp.second);
@@ -216,12 +224,12 @@ public:
 
   galois::optional<value_type> pop() {
     galois::optional<value_type> r = items.getLocal()->wl.pop();
-    //if (r)
-      return r;
-    //return slowPop();
+    // if (r)
+    return r;
+    // return slowPop();
   }
 };
 GALOIS_WLCOMPILECHECK(ThreadPartitioned)
-}
-}
+} // namespace worklists
+} // namespace galois
 #endif

@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -30,7 +30,8 @@
 #include <tuple>
 
 /**
- * Main Galois namespace. All the core Galois functionality will be found in here.
+ * Main Galois namespace. All the core Galois functionality will be found in
+ * here.
  */
 namespace galois {
 
@@ -38,7 +39,7 @@ namespace galois {
  * explicit class to initialize the Galois Runtime
  * Runtime is destroyed when this object is destroyed
  */
-class DistMemSys: public runtime::SharedMemRuntime<runtime::DistStatManager> {
+class DistMemSys : public runtime::SharedMemRuntime<runtime::DistStatManager> {
 
 public:
   explicit DistMemSys(void);
@@ -52,8 +53,8 @@ public:
 
 /**
  * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item
+ * is a value from the iteration range and T is the type of item.
  *
  * @tparam WLTy Worklist policy {@see galois::worklists}
  * @param b begining of range of initial items
@@ -63,14 +64,15 @@ public:
  */
 // TODO: revive
 // template<typename IterTy, typename FunctionTy, typename... Args>
-// void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  // runtime::for_each_gen_dist(runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
+// void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const
+// Args&... args) { runtime::for_each_gen_dist(runtime::makeStandardRange(b,e),
+// fn, std::make_tuple(args...));
 // }
 
 /**
  * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T
- * is the type of item.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item
+ * is i and T is the type of item.
  *
  * @tparam WLTy Worklist policy {@link galois::worklists}
  * @param i initial item
@@ -80,10 +82,10 @@ public:
 // TODO: revive
 // template<typename ItemTy, typename FunctionTy, typename... Args>
 // void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
-  // ItemTy iwl[1] = {i};
-  // runtime::for_each_gen_dist(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+// ItemTy iwl[1] = {i};
+// runtime::for_each_gen_dist(runtime::makeStandardRange(&iwl[0], &iwl[1]), fn,
+// std::make_tuple(args...));
 // }
-
 
 } // namespace galois
 #endif

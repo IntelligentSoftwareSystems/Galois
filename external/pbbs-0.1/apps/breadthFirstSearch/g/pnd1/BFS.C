@@ -36,53 +36,58 @@ using namespace std;
 //      in the new graph are the children in the bfs tree)
 // **************************************************************
 
-struct nonNegF{bool operator() (int a) {return (a>=0);}};
+struct nonNegF {
+  bool operator()(int a) { return (a >= 0); }
+};
 
-template<class S>
+template <class S>
 struct GFn2 {
   int numberDone;
   S step;
-  GFn2(int _numberDone, S _step): numberDone(_numberDone), step(_step) { }
+  GFn2(int _numberDone, S _step) : numberDone(_numberDone), step(_step) {}
   void operator()(int i) {
-	int II = numberDone + i;
-        step.commit(II);
+    int II = numberDone + i;
+    step.commit(II);
   }
 };
 
 template <class S>
-void speculative_for(S step, int s, int e, int granularity, 
-		     bool hasState=1, int maxTries=-1) {
-  if (maxTries < 0) maxTries = 2*granularity;
-  int maxRoundSize = (e-s)/granularity+1;
-  maxRoundSize = e-s;
-  S *state;
+void speculative_for(S step, int s, int e, int granularity, bool hasState = 1,
+                     int maxTries = -1) {
+  if (maxTries < 0)
+    maxTries = 2 * granularity;
+  int maxRoundSize = (e - s) / granularity + 1;
+  maxRoundSize     = e - s;
+  S* state;
   if (hasState) {
     state = newA(S, maxRoundSize);
-    for (int i=0; i < maxRoundSize; i++) state[i] = step;
+    for (int i = 0; i < maxRoundSize; i++)
+      state[i] = step;
   }
 
-  int round = 0; 
+  int round      = 0;
   int numberDone = s; // number of iterations done
   int numberKeep = 0; // number of iterations to carry to next round
-  int failed = 0;
+  int failed     = 0;
 
   while (numberDone < e) {
-    //cout << "numberDone=" << numberDone << endl;
+    // cout << "numberDone=" << numberDone << endl;
     if (round++ > maxTries) {
-//      cerr << "speculativeLoop: too many iterations, increase maxTries parameter\n";
-//      abort();
+      //      cerr << "speculativeLoop: too many iterations, increase maxTries
+      //      parameter\n"; abort();
     }
     int size = min(maxRoundSize, e - numberDone);
 
     if (hasState) {
       abort();
     } else {
-//      parallel_for (int i =0; i < size; i++) {
+      //      parallel_for (int i =0; i < size; i++) {
       GFn2<S> gfn2(numberDone, step);
-      parallel_doall_obj(int, i, 0, size, gfn2)  {
-	int II = numberDone + i;
+      parallel_doall_obj(int, i, 0, size, gfn2) {
+        int II = numberDone + i;
         step.commit(II);
-      } parallel_doall_end
+      }
+      parallel_doall_end
     }
 
     // keep edges that failed to hook for next round
@@ -92,11 +97,11 @@ void speculative_for(S step, int s, int e, int granularity,
   }
   if (hasState)
     free(state);
-  //cout << "rounds = " << round << " failed = " << failed << "\n";
+  // cout << "rounds = " << round << " failed = " << failed << "\n";
 }
 
 struct BFSstep {
-  vertex *G;
+  vertex* G;
   vindex* Frontier;
   int* Visited;
   vindex* FrontierNext;
@@ -104,88 +109,102 @@ struct BFSstep {
   int* Marks;
   pthread_mutex_t* locks;
 
-  BFSstep(vertex* _G, vindex* _Frontier, int* _Visited, vindex* _FrontierNext, int* _Counts, int* _Marks, pthread_mutex_t* _locks):
-    G(_G), Frontier(_Frontier), Visited(_Visited), FrontierNext(_FrontierNext), Counts(_Counts), Marks(_Marks), locks(_locks) { }
+  BFSstep(vertex* _G, vindex* _Frontier, int* _Visited, vindex* _FrontierNext,
+          int* _Counts, int* _Marks, pthread_mutex_t* _locks)
+      : G(_G), Frontier(_Frontier), Visited(_Visited),
+        FrontierNext(_FrontierNext), Counts(_Counts), Marks(_Marks),
+        locks(_locks) {}
 
   bool acquire(vindex ngh, vindex v) {
     bool retval = false;
     pthread_mutex_lock(&locks[ngh]);
     if (Marks[ngh] == INT_MAX) {
       Marks[ngh] = v;
-      retval = true;
+      retval     = true;
     }
     pthread_mutex_unlock(&locks[ngh]);
     return retval;
   }
 
   bool commit(int i) {
-    int k= 0;
+    int k    = 0;
     vindex v = Frontier[i];
-    int o = Counts[i];
-    for (int j=0; j < G[v].degree; j++) {
+    int o    = Counts[i];
+    for (int j = 0; j < G[v].degree; j++) {
       vindex ngh = G[v].Neighbors[j];
       if (Visited[ngh] == -1 && acquire(ngh, v)) {
-        Visited[ngh] = 1;
-        FrontierNext[o+j] = G[v].Neighbors[k++] = ngh;
-//        Marks[ngh] = INT_MAX;
-      } else 
-        FrontierNext[o+j] = -1;
+        Visited[ngh]        = 1;
+        FrontierNext[o + j] = G[v].Neighbors[k++] = ngh;
+        //        Marks[ngh] = INT_MAX;
+      } else
+        FrontierNext[o + j] = -1;
     }
     G[v].degree = k;
     return true;
   }
 };
 
-pair<int,int> BFS(vindex start, graph GA) {
+pair<int, int> BFS(vindex start, graph GA) {
   int numRounds = Exp::getNumRounds();
-  numRounds = numRounds <= 0 ? 1 : numRounds;
+  numRounds     = numRounds <= 0 ? 1 : numRounds;
 
-  int numVertices = GA.n;
-  int numEdges = GA.m;
-  vertex *G = GA.V;
-  vindex* Frontier = newA(vindex,numEdges);
-  int* Visited = newA(vindex,numVertices);
-  int* Marks = newA(vindex,numVertices);
-  vindex* FrontierNext = newA(vindex,numEdges);
-  int* Counts = newA(int,numVertices);
+  int numVertices      = GA.n;
+  int numEdges         = GA.m;
+  vertex* G            = GA.V;
+  vindex* Frontier     = newA(vindex, numEdges);
+  int* Visited         = newA(vindex, numVertices);
+  int* Marks           = newA(vindex, numVertices);
+  vindex* FrontierNext = newA(vindex, numEdges);
+  int* Counts          = newA(int, numVertices);
 
   pthread_mutex_t* locks = new pthread_mutex_t[numVertices];
   for (int i = 0; i < numVertices; ++i)
     pthread_mutex_init(&locks[i], NULL);
 
-//  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
-  {parallel_doall(int, i, 0, numVertices) { Visited[i] = -1;} parallel_doall_end }
-  {parallel_doall(int, i, 0, numVertices) { Marks[i] = INT_MAX;} parallel_doall_end }
+  //  {parallel_for(int i = 0; i < numVertices; i++) Visited[i] = 0;}
+  {parallel_doall(int, i, 0, numVertices){Visited[i] = -1;
+}
+parallel_doall_end
+}
+{parallel_doall(int, i, 0, numVertices){Marks[i] = INT_MAX;
+}
+parallel_doall_end
+}
 
-  Frontier[0] = start;
-  int frontierSize = 1;
-  Visited[start] = 1;
+Frontier[0]      = start;
+int frontierSize = 1;
+Visited[start]   = 1;
 
-  int totalVisited = 0;
-  int round = 0;
+int totalVisited = 0;
+int round        = 0;
 
-  while (frontierSize > 0) {
-    round++;
-    totalVisited += frontierSize;
+while (frontierSize > 0) {
+  round++;
+  totalVisited += frontierSize;
 
-//    {parallel_for (int i=0; i < frontierSize; i++) 
-    {
-      parallel_doall(int, i, 0, frontierSize) {
-	Counts[i] = G[Frontier[i]].degree;
-      } parallel_doall_end
+  //    {parallel_for (int i=0; i < frontierSize; i++)
+  {
+    parallel_doall(int, i, 0, frontierSize) {
+      Counts[i] = G[Frontier[i]].degree;
     }
-    int nr = sequence::scan(Counts,Counts,frontierSize,utils::addF<int>(),0);
-
-    BFSstep bfs(G, Frontier, Visited, FrontierNext, Counts, Marks, locks);
-    speculative_for(bfs, 0, frontierSize, numRounds, 0);
-
-    // Filter out the empty slots (marked with -1)
-    frontierSize = sequence::filter(FrontierNext,Frontier,nr,nonNegF());
+    parallel_doall_end
   }
+  int nr = sequence::scan(Counts, Counts, frontierSize, utils::addF<int>(), 0);
 
-  for (int i = 0; i < numVertices; ++i)
-    pthread_mutex_destroy(&locks[i]);
+  BFSstep bfs(G, Frontier, Visited, FrontierNext, Counts, Marks, locks);
+  speculative_for(bfs, 0, frontierSize, numRounds, 0);
 
-  free(FrontierNext); free(Frontier); free(Counts); free(Visited); free(Marks);
-  return pair<int,int>(totalVisited,round);
+  // Filter out the empty slots (marked with -1)
+  frontierSize = sequence::filter(FrontierNext, Frontier, nr, nonNegF());
+}
+
+for (int i = 0; i < numVertices; ++i)
+  pthread_mutex_destroy(&locks[i]);
+
+free(FrontierNext);
+free(Frontier);
+free(Counts);
+free(Visited);
+free(Marks);
+return pair<int, int>(totalVisited, round);
 }

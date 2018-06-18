@@ -6,11 +6,11 @@ extern "C" {
 
 struct snappy_file;
 
-typedef struct snappy_file * SNAPPY_FILE;
+typedef struct snappy_file* SNAPPY_FILE;
 
-SNAPPY_FILE snopen(const char *name, const char *mode);
-size_t snwrite(SNAPPY_FILE f, void *p, size_t sz);
-size_t snread(SNAPPY_FILE f, void *p, size_t sz);
+SNAPPY_FILE snopen(const char* name, const char* mode);
+size_t snwrite(SNAPPY_FILE f, void* p, size_t sz);
+size_t snread(SNAPPY_FILE f, void* p, size_t sz);
 int sneof(SNAPPY_FILE f);
 void snclose(SNAPPY_FILE f);
 

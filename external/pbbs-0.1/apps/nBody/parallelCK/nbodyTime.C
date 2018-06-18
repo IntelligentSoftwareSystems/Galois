@@ -37,29 +37,26 @@ using namespace benchIO;
 // *************************************************************
 
 void timeNBody(point3d* pts, int n, int rounds, char* outFile) {
-  particle** p = newA(particle*,n);
+  particle** p = newA(particle*, n);
   particle* pp = newA(particle, n);
-//  {parallel_for (int i=0; i < n; i++) 
+  //  {parallel_for (int i=0; i < n; i++)
   {
-    parallel_doall(int, i, 0, n)  {
-      p[i] = new (&pp[i]) particle(pts[i],1.0);
-    } parallel_doall_end
+    parallel_doall(int, i, 0, n) { p[i] = new (&pp[i]) particle(pts[i], 1.0); }
+    parallel_doall_end
   }
-  for (int i=0; i < rounds; i++) {
+  for (int i = 0; i < rounds; i++) {
     startTime();
     nbody(p, n);
     nextTimeN();
   }
   cout << endl;
 
-  point3d* O = newA(point3d,n);
-//  parallel_for(int i=0; i < n; i++) 
-  parallel_doall(int, i, 0, n)  {
-    O[i] = point3d(0.,0.,0.) + p[i]->force;
-  } parallel_doall_end
+  point3d* O = newA(point3d, n);
+  //  parallel_for(int i=0; i < n; i++)
+  parallel_doall(int, i, 0, n) { O[i] = point3d(0., 0., 0.) + p[i]->force; }
+  parallel_doall_end
 
-  if (outFile != NULL) 
-    writePointsToFile(O,n,outFile);
+      if (outFile != NULL) writePointsToFile(O, n, outFile);
 
   free(O);
   free(p);
@@ -68,10 +65,10 @@ void timeNBody(point3d* pts, int n, int rounds, char* outFile) {
 
 int parallel_main(int argc, char* argv[]) {
   Exp::Init iii;
-  commandLine P(argc,argv,"[-o <outFile>] [-r <rounds>] <inFile>");
+  commandLine P(argc, argv, "[-o <outFile>] [-r <rounds>] <inFile>");
   char* iFile = P.getArgument(0);
   char* oFile = P.getOptionValue("-o");
-  int rounds = P.getOptionIntValue("-r",1);
+  int rounds  = P.getOptionIntValue("-r", 1);
 
   _seq<point3d> PIn = readPointsFromFile<point3d>(iFile);
   timeNBody(PIn.A, PIn.n, rounds, oFile);

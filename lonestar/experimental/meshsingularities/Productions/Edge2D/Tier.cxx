@@ -7,7 +7,4 @@
 
 #include "Tier.hxx"
 
-namespace D2Edge {
-
-
-} /* namespace D2Edge */
+namespace D2Edge {} /* namespace D2Edge */

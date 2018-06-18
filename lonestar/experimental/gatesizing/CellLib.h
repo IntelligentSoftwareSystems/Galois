@@ -25,12 +25,7 @@ enum TimingSense {
   TIMING_SENSE_UNDEFINED
 };
 
-enum PinType {
-  PIN_OUTPUT,
-  PIN_INPUT,
-  PIN_INTERNAL,
-  PIN_UNDEFINED
-};
+enum PinType { PIN_OUTPUT, PIN_INPUT, PIN_INTERNAL, PIN_UNDEFINED };
 
 struct LutTemplate {
   std::string name;
@@ -39,8 +34,8 @@ struct LutTemplate {
 };
 
 struct LUT {
-  LutTemplate *lutTemplate;
-  std::vector<std::vector<float> > index, value;
+  LutTemplate* lutTemplate;
+  std::vector<std::vector<float>> index, value;
 
   float lookup(std::vector<float>& param);
 };
@@ -49,28 +44,31 @@ struct Cell;
 
 struct CellPin {
   typedef std::pair<std::string, std::string> TSenseKey;
-  typedef std::unordered_map<TSenseKey, TimingSense, boost::hash<TSenseKey> > MapOfTimingSense;
+  typedef std::unordered_map<TSenseKey, TimingSense, boost::hash<TSenseKey>>
+      MapOfTimingSense;
 
   typedef std::pair<std::string, TimingSense> TableSetKey;
-  typedef std::unordered_map<std::string, LUT *> TableSet;
-  typedef std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey> > MapOfTableSet;
+  typedef std::unordered_map<std::string, LUT*> TableSet;
+  typedef std::unordered_map<TableSetKey, TableSet, boost::hash<TableSetKey>>
+      MapOfTableSet;
 
   std::string name;
   float riseCapacitance, fallCapacitance, maxCapacitance;
   PinType pinType;
-  Cell *cell;
+  Cell* cell;
 
-  MapOfTimingSense tSense; // timing sense
-  MapOfTableSet cellRise, cellFall; // cell delay
+  MapOfTimingSense tSense;                      // timing sense
+  MapOfTableSet cellRise, cellFall;             // cell delay
   MapOfTableSet riseTransition, fallTransition; // slew
-  MapOfTableSet risePower, fallPower; // power
+  MapOfTableSet risePower, fallPower;           // power
 };
 
 struct Cell {
   std::string name, familyName;
   float area, cellLeakagePower;
   size_t driveStrength;
-  std::unordered_map<std::string, CellPin *> outPins, inPins, internalPins, cellPins;
+  std::unordered_map<std::string, CellPin*> outPins, inPins, internalPins,
+      cellPins;
 };
 
 struct WireLoad {
@@ -84,15 +82,15 @@ struct WireLoad {
 };
 
 struct CellLib {
-  typedef std::unordered_map<std::string, Cell *> CellMap;
+  typedef std::unordered_map<std::string, Cell*> CellMap;
 
   std::string name;
   CellMap cells;
   std::unordered_map<std::string, CellMap> cellFamilies;
-  std::unordered_map<std::string, LutTemplate *> lutTemplates;
-  std::unordered_map<std::string, WireLoad *> wireLoads;
+  std::unordered_map<std::string, LutTemplate*> lutTemplates;
+  std::unordered_map<std::string, WireLoad*> wireLoads;
 
-  WireLoad *defaultWireLoad;
+  WireLoad* defaultWireLoad;
 
   CellLib();
   ~CellLib();
@@ -102,6 +100,7 @@ struct CellLib {
   void printDebug();
 };
 
-std::pair<float, std::string> extractMaxFromTableSet(CellPin::TableSet& tables, std::vector<float>& param);
+std::pair<float, std::string> extractMaxFromTableSet(CellPin::TableSet& tables,
+                                                     std::vector<float>& param);
 
 #endif // GALOIS_CELLLIB_H

@@ -23,13 +23,12 @@ bool FileReader::isDelimiter(char c) {
   return false;
 }
 
-FileReader::FileReader(std::string inName, 
-  char *delimiters, size_t numDelimiters, 
-  char *separators, size_t numSeparators)
-  : buffer(nullptr), bufferEnd(nullptr), cursor(nullptr), 
-    delimiters(delimiters), numDelimiters(numDelimiters), 
-    separators(separators), numSeparators(numSeparators)
-{ 
+FileReader::FileReader(std::string inName, char* delimiters,
+                       size_t numDelimiters, char* separators,
+                       size_t numSeparators)
+    : buffer(nullptr), bufferEnd(nullptr), cursor(nullptr),
+      delimiters(delimiters), numDelimiters(numDelimiters),
+      separators(separators), numSeparators(numSeparators) {
   std::ifstream ifs(inName);
   if (!ifs.is_open()) {
     std::cerr << "Cannot open " << inName << std::endl;
@@ -41,21 +40,17 @@ FileReader::FileReader(std::string inName,
   fileSize = ifs.tellg();
   ifs.seekg(0, std::ios::beg);
 
-  buffer = new char [fileSize + 1];
+  buffer = new char[fileSize + 1];
   ifs.read(buffer, fileSize);
   buffer[fileSize] = '\0';
-  bufferEnd = buffer + fileSize;
-  cursor = buffer;
-//  std::cout << buffer;
+  bufferEnd        = buffer + fileSize;
+  cursor           = buffer;
+  //  std::cout << buffer;
 }
 
-FileReader::~FileReader() { 
-  delete [] buffer;
-}
+FileReader::~FileReader() { delete[] buffer; }
 
-void FileReader::pushToken(std::string token) {
-  tokenStack.push_back(token);
-}
+void FileReader::pushToken(std::string token) { tokenStack.push_back(token); }
 
 std::string FileReader::nextToken() {
   std::string token;
@@ -66,18 +61,18 @@ std::string FileReader::nextToken() {
   }
 
   else {
-    for ( ; cursor < bufferEnd; ++cursor ) {
+    for (; cursor < bufferEnd; ++cursor) {
       // skip a line of comment
-      if (*cursor == '/' && *(cursor+1) == '/') {
+      if (*cursor == '/' && *(cursor + 1) == '/') {
         while (*cursor != '\n') {
           ++cursor;
         }
       }
 
       // skip a block of comments
-      if (*cursor == '/' && *(cursor+1) == '*') {
-        for (cursor = cursor+2; cursor < bufferEnd; ++cursor) {
-          if (*cursor == '*' && *(cursor+1) == '/') {
+      if (*cursor == '/' && *(cursor + 1) == '*') {
+        for (cursor = cursor + 2; cursor < bufferEnd; ++cursor) {
+          if (*cursor == '*' && *(cursor + 1) == '/') {
             cursor += 2;
             break;
           }
@@ -89,20 +84,17 @@ std::string FileReader::nextToken() {
           ++cursor;
           break;
         }
-      } 
-      else if (isDelimiter(*cursor)) {
+      } else if (isDelimiter(*cursor)) {
         if (token.empty()) {
-           token.push_back(*cursor);
-           ++cursor;
+          token.push_back(*cursor);
+          ++cursor;
         }
         break;
-      } 
-      else {
+      } else {
         token.push_back(*cursor);
       }
     } // end for cursor
-  } // end else
+  }   // end else
 
   return token;
 }
-

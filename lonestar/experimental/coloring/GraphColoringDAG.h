@@ -15,24 +15,20 @@ struct NodeDataDAG {
   unsigned priority;
   unsigned id;
 
-  NodeDataDAG (unsigned _id=0): color (0), indegree (0), priority (0), id (_id)
-  {}
-
+  NodeDataDAG(unsigned _id = 0) : color(0), indegree(0), priority(0), id(_id) {}
 };
 
-typedef galois::graphs::LC_CSR_Graph<NodeDataDAG, void>
-          ::with_numa_alloc<true>::type 
-          // ::with_no_lockable<true>::type Graph;
-          ::with_no_lockable<false>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<NodeDataDAG,
+                                     void>::with_numa_alloc<true>::type
+    // ::with_no_lockable<true>::type Graph;
+    ::with_no_lockable<false>::type Graph;
 
-typedef Graph::GraphNode GNode; 
+typedef Graph::GraphNode GNode;
 
-
-class GraphColoringDAG: public GraphColoringBase<Graph> {
+class GraphColoringDAG : public GraphColoringBase<Graph> {
 protected:
-
   struct NodeDataComparator {
-    static bool compare (const NodeDataDAG& left, const NodeDataDAG& right) {
+    static bool compare(const NodeDataDAG& left, const NodeDataDAG& right) {
       if (left.priority != right.priority) {
         return left.priority < right.priority;
       } else {
@@ -40,47 +36,47 @@ protected:
       }
     }
 
-    bool operator () (const NodeDataDAG& left, const NodeDataDAG& right) const {
-      return compare (left, right);
+    bool operator()(const NodeDataDAG& left, const NodeDataDAG& right) const {
+      return compare(left, right);
     }
   };
 
-
   template <typename W>
-  void initDAG (W& initWork) {
+  void initDAG(W& initWork) {
     NodeDataComparator cmp;
 
-    galois::do_all_choice (
-        galois::runtime::makeLocalRange (graph),
-        [&] (GNode src) {
-          auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
+    galois::do_all_choice(
+        galois::runtime::makeLocalRange(graph),
+        [&](GNode src) {
+          auto& sd = graph.getData(src, galois::MethodFlag::UNPROTECTED);
 
-          // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
+          // std::printf ("Processing node %d with priority %d\n", sd.id,
+          // sd.priority);
 
           unsigned addAmt = 0;
-          for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
-              e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
-            GNode dst = graph.getEdgeDst (e);
-            auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
+          for (Graph::edge_iterator
+                   e = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+                   e_end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+               e != e_end; ++e) {
+            GNode dst = graph.getEdgeDst(e);
+            auto& dd  = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
 
-            if (cmp (dd, sd)) { // dd < sd
+            if (cmp(dd, sd)) { // dd < sd
               ++addAmt;
             }
           }
 
           // only modify the node being processed
-          // if we modify neighbors, each node will be 
+          // if we modify neighbors, each node will be
           // processed twice.
           sd.indegree += addAmt;
 
           if (addAmt == 0) {
-            assert (sd.indegree == 0);
-            initWork.push (src);
+            assert(sd.indegree == 0);
+            initWork.push(src);
           }
         },
-        "init-dag",
-        galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
-
+        "init-dag", galois::chunk_size<DEFAULT_CHUNK_SIZE>());
   }
 
   struct ColorNodeDAG {
@@ -88,50 +84,53 @@ protected:
     GraphColoringDAG& outer;
 
     template <typename C>
-    void operator () (GNode src, C& ctx) {
+    void operator()(GNode src, C& ctx) {
 
       Graph& graph = outer.graph;
 
-      auto& sd = graph.getData (src, galois::MethodFlag::UNPROTECTED);
-      assert (sd.indegree == 0);
+      auto& sd = graph.getData(src, galois::MethodFlag::UNPROTECTED);
+      assert(sd.indegree == 0);
 
-      outer.colorNode (src);
+      outer.colorNode(src);
 
-      for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::UNPROTECTED),
-          e_end = graph.edge_end (src, galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+      for (Graph::edge_iterator
+               e     = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED),
+               e_end = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
+           e != e_end; ++e) {
 
-        GNode dst = graph.getEdgeDst (e);
-        auto& dd = graph.getData (dst, galois::MethodFlag::UNPROTECTED);
-        // std::printf ("Neighbor %d has indegree %d\n", dd.id, unsigned(dd.indegree));
+        GNode dst = graph.getEdgeDst(e);
+        auto& dd  = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
+        // std::printf ("Neighbor %d has indegree %d\n", dd.id,
+        // unsigned(dd.indegree));
         unsigned x = --(dd.indegree);
         if (x == 0) {
-          ctx.push (dst);
+          ctx.push(dst);
         }
       }
     }
   };
 
-  void colorDAG (void) {
+  void colorDAG(void) {
 
     galois::InsertBag<GNode> initWork;
 
     galois::StatTimer t_dag_init("dag initialization time: ");
 
-    t_dag_init.start ();
-    initDAG (initWork);
-    t_dag_init.stop ();
+    t_dag_init.start();
+    initDAG(initWork);
+    t_dag_init.stop();
 
     typedef galois::worklists::PerThreadChunkFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
-    std::printf ("Number of initial sources: %zd\n", 
-        std::distance (initWork.begin (), initWork.end ()));
+    std::printf("Number of initial sources: %zd\n",
+                std::distance(initWork.begin(), initWork.end()));
 
-    galois::StatTimer t_dag_color ("dag coloring time: ");
+    galois::StatTimer t_dag_color("dag coloring time: ");
 
-    t_dag_color.start ();
-    galois::for_each (initWork, ColorNodeDAG {*this}, 
-        galois::loopname ("color-DAG"), galois::wl<WL_ty> ());
-    t_dag_color.stop ();
+    t_dag_color.start();
+    galois::for_each(initWork, ColorNodeDAG{*this},
+                     galois::loopname("color-DAG"), galois::wl<WL_ty>());
+    t_dag_color.stop();
   }
 
   struct VisitNhood {
@@ -141,12 +140,14 @@ protected:
     GraphColoringDAG& outer;
 
     template <typename C>
-    void operator () (GNode src, C&) {
+    void operator()(GNode src, C&) {
       Graph& graph = outer.graph;
-      NodeData& sd = graph.getData (src, galois::MethodFlag::WRITE);
-      for (Graph::edge_iterator e = graph.edge_begin (src, galois::MethodFlag::WRITE),
-          e_end = graph.edge_end (src, galois::MethodFlag::WRITE); e != e_end; ++e) {
-        GNode dst = graph.getEdgeDst (e);
+      NodeData& sd = graph.getData(src, galois::MethodFlag::WRITE);
+      for (Graph::edge_iterator
+               e     = graph.edge_begin(src, galois::MethodFlag::WRITE),
+               e_end = graph.edge_end(src, galois::MethodFlag::WRITE);
+           e != e_end; ++e) {
+        GNode dst = graph.getEdgeDst(e);
       }
     }
   };
@@ -156,43 +157,37 @@ protected:
     GraphColoringDAG& outer;
 
     template <typename C>
-    void operator () (GNode src, C&) {
-      outer.colorNode (src);
+    void operator()(GNode src, C&) {
+      outer.colorNode(src);
     }
   };
 
-  void colorKDGparam (void) {
+  void colorKDGparam(void) {
 
     struct NodeComparator {
       Graph& graph;
 
-      bool operator () (GNode ln, GNode rn) const {
-        const auto& ldata = graph.getData (ln, galois::MethodFlag::UNPROTECTED);
-        const auto& rdata = graph.getData (rn, galois::MethodFlag::UNPROTECTED);
-        return NodeDataComparator::compare (ldata, rdata);
+      bool operator()(GNode ln, GNode rn) const {
+        const auto& ldata = graph.getData(ln, galois::MethodFlag::UNPROTECTED);
+        const auto& rdata = graph.getData(rn, galois::MethodFlag::UNPROTECTED);
+        return NodeDataComparator::compare(ldata, rdata);
       }
     };
 
-
-    galois::runtime::for_each_ordered_2p_param (
-        galois::runtime::makeLocalRange (graph),
-        NodeComparator {graph},
-        VisitNhood {*this},
-        ApplyOperator {*this},
-        "coloring-ordered-param");
+    galois::runtime::for_each_ordered_2p_param(
+        galois::runtime::makeLocalRange(graph), NodeComparator{graph},
+        VisitNhood{*this}, ApplyOperator{*this}, "coloring-ordered-param");
   }
 
-  virtual void colorGraph (void) {
-    assignPriority ();
+  virtual void colorGraph(void) {
+    assignPriority();
 
     if (useParaMeter) {
-      colorKDGparam ();
+      colorKDGparam();
     } else {
-      colorDAG ();
+      colorDAG();
     }
   }
-
 };
-
 
 #endif // GRAPH_COLORING_DETERMINISTIC_H

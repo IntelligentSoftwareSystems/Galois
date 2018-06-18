@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,20 +35,22 @@ class DistTerminationDetection : public TerminationDetection {
   };
 
   PerThreadStorage<TokenHolder> data;
-  
+
   static void globalTermLandingPad(RecvBuffer&);
   static void propTokenLandingPad(RecvBuffer&);
 
-  //send token onwards
+  // send token onwards
   void propToken(bool isBlack) {
     unsigned id = LL::getTID();
     assert(id < activeThreads);
     if (id + 1 == activeThreads && NetworkInterface::Num > 1) {
-      //remote
-      //send message to networkHost + 1
-     SendBuffer b;
-     gSerialize(b,isBlack);
-     getSystemNetworkInterface().send((NetworkInterface::ID + 1) % NetworkInterface::Num, propTokenLandingPad, b);
+      // remote
+      // send message to networkHost + 1
+      SendBuffer b;
+      gSerialize(b, isBlack);
+      getSystemNetworkInterface().send((NetworkInterface::ID + 1) %
+                                           NetworkInterface::Num,
+                                       propTokenLandingPad, b);
     } else {
       TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
       th.tokenIsBlack = isBlack;
@@ -57,7 +59,7 @@ class DistTerminationDetection : public TerminationDetection {
     }
   }
 
-  //receive remote token
+  // receive remote token
   void recvToken(bool isBlack) {
     TokenHolder& th = *data.getRemote(0);
     th.tokenIsBlack = isBlack;
@@ -81,12 +83,12 @@ public:
   DistTerminationDetection() {}
 
   virtual void initializeThread() {
-    TokenHolder& th = *data.getLocal();
-    th.hasToken = false;
-    th.tokenIsBlack = false;
+    TokenHolder& th   = *data.getLocal();
+    th.hasToken       = false;
+    th.tokenIsBlack   = false;
     th.processIsBlack = true;
-    th.lastWasWhite = true;
-    globalTerm.data = false;
+    th.lastWasWhite   = true;
+    globalTerm.data   = false;
     if (isSysMaster()) {
       th.hasToken = true;
     }
@@ -98,20 +100,21 @@ public:
     th.processIsBlack |= workHappened;
     if (th.hasToken) {
       if (isSysMaster()) {
-	bool failed = th.tokenIsBlack || th.processIsBlack;
-	th.tokenIsBlack = th.processIsBlack = false;
-	if (th.lastWasWhite && !failed) {
-	  //This was the second success
-	  propGlobalTerm();
-	  return;
-	}
-	th.lastWasWhite = !failed;
+        bool failed     = th.tokenIsBlack || th.processIsBlack;
+        th.tokenIsBlack = th.processIsBlack = false;
+        if (th.lastWasWhite && !failed) {
+          // This was the second success
+          propGlobalTerm();
+          return;
+        }
+        th.lastWasWhite = !failed;
       }
-      //Normal thread or recirc by master
-      assert (!globalTerm.data && "no token should be in progress after globalTerm");
-      bool taint = th.processIsBlack || th.tokenIsBlack;
+      // Normal thread or recirc by master
+      assert(!globalTerm.data &&
+             "no token should be in progress after globalTerm");
+      bool taint        = th.processIsBlack || th.tokenIsBlack;
       th.processIsBlack = th.tokenIsBlack = false;
-      th.hasToken = false;
+      th.hasToken                         = false;
       propToken(taint);
     }
   }
@@ -127,7 +130,7 @@ void DistTerminationDetection::globalTermLandingPad(RecvBuffer&) {
 }
 void DistTerminationDetection::propTokenLandingPad(RecvBuffer& b) {
   bool isBlack;
-  gDeserialize(b,isBlack);
+  gDeserialize(b, isBlack);
   getDistTermination().recvToken(isBlack);
 }
 

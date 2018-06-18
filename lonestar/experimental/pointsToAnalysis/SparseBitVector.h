@@ -1,7 +1,7 @@
 /**
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -35,7 +35,7 @@ namespace galois {
 
 /**
  * Sparse bit vector represented as a linked list of words.
- * 
+ *
  * Stores objects as indices in sparse bit vectors.
  * Saves space when the data to be stored is sparsely populated.
  */
@@ -53,35 +53,33 @@ struct SparseBitVector {
    */
   struct SparseBitVectorNode {
     using WORD = unsigned long;
-  
-    WORD bits; // number that is used as the bitset
-    unsigned base; // used to order the words of the vector
-    struct SparseBitVectorNode* next; // pointer to next word on linked list 
-                          // (using base as order)
-  
+
+    WORD bits;                        // number that is used as the bitset
+    unsigned base;                    // used to order the words of the vector
+    struct SparseBitVectorNode* next; // pointer to next word on linked list
+                                      // (using base as order)
+
     /**
      * Default is create a base at 0.
      */
-    SparseBitVectorNode() { 
-      SparseBitVectorNode(0);
-    }
-  
+    SparseBitVectorNode() { SparseBitVectorNode(0); }
+
     /**
      * Creates a new word.
      *
-     * @param _base base of this word, i.e. what order it should go in linked 
+     * @param _base base of this word, i.e. what order it should go in linked
      * list
      */
-    SparseBitVectorNode(unsigned _base) { 
+    SparseBitVectorNode(unsigned _base) {
       base = _base;
       bits = 0;
       next = nullptr;
     }
-  
+
     /**
      * Creates a new word with an initial bit already set.
      *
-     * @param _base base of this word, i.e. what order it should go in linked 
+     * @param _base base of this word, i.e. what order it should go in linked
      * list
      * @param _initial Offset to first bit to set in the word
      */
@@ -91,7 +89,7 @@ struct SparseBitVector {
       set(_initial);
       next = nullptr;
     }
-  
+
     /**
      * Sets the bit at the provided offset.
      *
@@ -103,7 +101,7 @@ struct SparseBitVector {
       bits |= ((WORD)1 << offset);
       return bits != beforeBits;
     }
-  
+
     /**
      * @param offset Offset into bits to check status of
      * @returns true if bit at offset is set, false otherwise
@@ -112,7 +110,7 @@ struct SparseBitVector {
       WORD mask = (WORD)1 << offset;
       return ((bits & mask) == mask);
     }
-  
+
     /**
      * Bitwise or with second's bits field on our field.
      *
@@ -125,10 +123,10 @@ struct SparseBitVector {
         bits |= second->bits;
         return (bits != oldBits);
       }
-  
+
       return 0;
     }
-  
+
     /**
      * TODO can probably use bit twiddling to get count more efficiently
      *
@@ -136,19 +134,19 @@ struct SparseBitVector {
      */
     unsigned count() const {
       unsigned numElements = 0;
-  
+
       WORD bitMask = 1;
-  
+
       for (unsigned ii = 0; ii < wordSize; ++ii) {
         if (bits & bitMask) {
           ++numElements;
         }
-  
+
         bitMask <<= 1;
       }
       return numElements;
     }
-  
+
     /**
      * Determines if second has set all of the bits that this objects has set.
      *
@@ -159,7 +157,7 @@ struct SparseBitVector {
     bool isSubsetEq(SparseBitVectorNode* second) const {
       return (bits & second->bits) == bits;
     }
-  
+
     /**
      * @returns a pointer to a copy of this word without the preservation
      * of the linked list
@@ -167,57 +165,57 @@ struct SparseBitVector {
     SparseBitVectorNode* clone() const {
       // TODO don't use new, find better way
       SparseBitVectorNode* newWord = new SparseBitVectorNode();
-  
+
       newWord->base = base;
       newWord->bits = bits;
       newWord->next = nullptr;
-  
+
       return newWord;
     }
-  
+
     /**
      * @returns a pointer to a copy of this word WITH the preservation of
      * the linked list via copies of the list starting from this word
      */
     SparseBitVectorNode* cloneAll() const {
       SparseBitVectorNode* newListBeginning = clone();
-  
-      SparseBitVectorNode* curPtr = newListBeginning;
+
+      SparseBitVectorNode* curPtr  = newListBeginning;
       SparseBitVectorNode* nextPtr = next;
-  
+
       // clone down the linked list starting from this pointer
       while (nextPtr != nullptr) {
         curPtr->next = nextPtr->clone();
-        nextPtr = nextPtr->next;
-        curPtr = curPtr->next;
+        nextPtr      = nextPtr->next;
+        curPtr       = curPtr->next;
       }
-  
+
       return newListBeginning;
     }
-  
-   /**
-    * Gets the set bits in this word and adds them to the passed in 
-    * vector.
-    *
-    * @tparam VectorTy vector type that supports push_back
-    * @param setBits Vector to add set bits to
-    * @returns Number of set bits in this word
-    */
-    template<typename VectorTy>
-    unsigned getAllSetBits(VectorTy &setbits) const {
+
+    /**
+     * Gets the set bits in this word and adds them to the passed in
+     * vector.
+     *
+     * @tparam VectorTy vector type that supports push_back
+     * @param setBits Vector to add set bits to
+     * @returns Number of set bits in this word
+     */
+    template <typename VectorTy>
+    unsigned getAllSetBits(VectorTy& setbits) const {
       // or mask used to mask set bits
-      WORD orMask = 1;
+      WORD orMask     = 1;
       unsigned numSet = 0;
-  
+
       for (unsigned curBit = 0; curBit < wordSize; ++curBit) {
         if (bits & orMask) {
           setbits.push_back(base * wordSize + curBit);
           numSet++;
         }
-  
+
         orMask <<= 1;
       }
-  
+
       return numSet;
     }
   };
@@ -235,18 +233,18 @@ struct SparseBitVector {
    * BEHAVIOR IF THE BIT VECTOR IS ALTERED DURING ITERATION IS UNDEFINED.
    * (i.e. correctness is not guaranteed)
    */
-  class SBVIterator 
-    : public boost::iterator_facade<SBVIterator, const unsigned, 
-                                    boost::forward_traversal_tag> {
+  class SBVIterator
+      : public boost::iterator_facade<SBVIterator, const unsigned,
+                                      boost::forward_traversal_tag> {
     SparseBitVectorNode* currentHead;
     unsigned currentBit;
     unsigned currentValue;
-  
+
     void advanceToNextBit(bool inclusive) {
       if (!inclusive) {
         currentBit++; // current bit doesn't count for checking
       }
-  
+
       bool found = false;
       while (!found && currentHead != nullptr) {
         while (currentBit < wordSize) {
@@ -257,59 +255,57 @@ struct SparseBitVector {
             currentBit++;
           }
         }
-  
+
         if (!found) {
           currentHead = currentHead->next;
-          currentBit = 0;
+          currentBit  = 0;
         }
       }
-  
-  
+
       if (currentHead != nullptr) {
-        currentValue = (currentHead->base * wordSize) + 
-                       currentBit;
+        currentValue = (currentHead->base * wordSize) + currentBit;
       } else {
         currentValue = -1;
       }
     }
-    
-   public:
+
+  public:
     /**
      * This is the end for an iterator.
      */
-    SBVIterator() : currentHead(nullptr), currentBit(0), currentValue(-1) { 
+    SBVIterator() : currentHead(nullptr), currentBit(0), currentValue(-1) {
       currentValue = -1;
     }
-  
-    SBVIterator(SparseBitVectorNode* firstHead) 
-        : currentHead(firstHead), currentBit(0), currentValue(-1) { 
+
+    SBVIterator(SparseBitVectorNode* firstHead)
+        : currentHead(firstHead), currentBit(0), currentValue(-1) {
       advanceToNextBit(true);
     }
-  
+
     SBVIterator(SparseBitVector* bv) : currentBit(0), currentValue(-1) {
       currentHead = bv->head;
       advanceToNextBit(true);
     }
-  
-   private:
+
+  private:
     friend class boost::iterator_core_access;
-  
+
     /**
      * Goes to next bit of bitvector.
      */
     void increment() {
       if (currentHead != nullptr) {
         advanceToNextBit(false); // false = increment currentBit
-      } // do nothing if head is nullptr (i.e. the end)
+      }                          // do nothing if head is nullptr (i.e. the end)
     }
-  
+
     /**
      * @param other Another iterator to compare against
      * @returns true if other iterator currently points to the same location
      */
     bool equal(const SBVIterator& other) const {
       if (currentHead != nullptr) {
-        if (other.currentHead == currentHead && 
+        if (other.currentHead == currentHead &&
             other.currentBit == currentBit) {
           return true;
         } else {
@@ -323,13 +319,11 @@ struct SparseBitVector {
         }
       }
     }
-  
+
     /**
      * @returns the current value that the iterator is pointing to
      */
-    const unsigned& dereference() const {
-      return currentValue;
-    }
+    const unsigned& dereference() const { return currentValue; }
   };
 
   //////////////////////////////////////////////////////////////////////////////
@@ -341,30 +335,22 @@ struct SparseBitVector {
   /**
    * Constructor; inits head to nullptr
    */
-  SparseBitVector() {
-    init();
-  }
+  SparseBitVector() { init(); }
 
   /**
    * @returns iterator to first set element of this bitvector
    */
-  SBVIterator begin() {
-    return SBVIterator(this);
-  }
+  SBVIterator begin() { return SBVIterator(this); }
 
   /**
    * @returns end iterator of this bitvector.
    */
-  SBVIterator end() {
-    return SBVIterator();
-  }
+  SBVIterator end() { return SBVIterator(); }
 
   /**
    * Initialize by setting head to nullptr
    */
-  void init() {
-    head = nullptr;
-  }
+  void init() { head = nullptr; }
 
   /**
    * Set the provided bit in the bitvector. Will create a new word if the
@@ -383,31 +369,31 @@ struct SparseBitVector {
     std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
 
     SparseBitVectorNode* curPtr = head;
-    SparseBitVectorNode* prev = nullptr;
+    SparseBitVectorNode* prev   = nullptr;
 
-    // pointers should be in sorted order 
+    // pointers should be in sorted order
     // loop through linked list to find the correct base word (if it exists)
     while (curPtr != nullptr && curPtr->base < baseWord) {
-      prev = curPtr;
+      prev   = curPtr;
       curPtr = curPtr->next;
     }
 
     // if base already exists, then set the correct offset bit
     if (curPtr != nullptr && curPtr->base == baseWord) {
       return curPtr->set(offsetIntoWord);
-    // else the base wasn't found; create and set, then rearrange linked list
-    // accordingly
+      // else the base wasn't found; create and set, then rearrange linked list
+      // accordingly
     } else {
-      SparseBitVectorNode *newWord = new SparseBitVectorNode(baseWord, 
-                                                             offsetIntoWord);
+      SparseBitVectorNode* newWord =
+          new SparseBitVectorNode(baseWord, offsetIntoWord);
 
       // this should point to prev's next, prev should point to this
       if (prev) {
         newWord->next = prev->next;
-        prev->next = newWord;
+        prev->next    = newWord;
       } else {
         if (curPtr == nullptr) {
-          // this is the first word we are adding since both prev and head are 
+          // this is the first word we are adding since both prev and head are
           // null; next is nothing
           newWord->next = nullptr;
         } else {
@@ -434,7 +420,7 @@ struct SparseBitVector {
     unsigned offsetIntoWord;
 
     std::tie(baseWord, offsetIntoWord) = getOffsets(bit);
-    SparseBitVectorNode* curPointer = head;
+    SparseBitVectorNode* curPointer    = head;
 
     while (curPointer != nullptr && curPointer->base < baseWord) {
       curPointer = curPointer->next;
@@ -457,7 +443,7 @@ struct SparseBitVector {
   unsigned unify(const SparseBitVector& second) {
     unsigned changed = 0;
 
-    SparseBitVectorNode* prev = nullptr;
+    SparseBitVectorNode* prev   = nullptr;
     SparseBitVectorNode* ptrOne = head;
     SparseBitVectorNode* ptrTwo = second.head;
 
@@ -466,12 +452,12 @@ struct SparseBitVector {
         // merged ptrTwo's word with our word, then advance both
         changed += ptrOne->unify(ptrTwo);
 
-        prev = ptrOne;
+        prev   = ptrOne;
         ptrOne = ptrOne->next;
         ptrTwo = ptrTwo->next;
       } else if (ptrOne->base < ptrTwo->base) {
         // advance our pointer until we reach "new" words
-        prev = ptrOne;
+        prev   = ptrOne;
         ptrOne = ptrOne->next;
       } else { // oneBase > twoBase
         // add ptrTwo's word that we don't have (otherwise would have been
@@ -479,11 +465,11 @@ struct SparseBitVector {
         SparseBitVectorNode* newWord = ptrTwo->clone();
         newWord->next = ptrOne; // this word comes before our current word
 
-        // if previous word exists, make it point to this new word, 
+        // if previous word exists, make it point to this new word,
         // else make this word the new head and prev pointer
         if (prev) {
           prev->next = newWord;
-          prev = newWord;
+          prev       = newWord;
         } else {
           head = prev = newWord;
         }
@@ -533,7 +519,7 @@ struct SparseBitVector {
         // ptrTwo has overtaken ptrOne, i.e. one has something (a base)
         // two doesn't
         return false;
-      } else {  // ptrOne > ptrTwo
+      } else { // ptrOne > ptrTwo
         // greater than case; advance ptrTwo to see if it eventually
         // reaches what ptrOne is currently at
         ptrTwo = ptrTwo->next;
@@ -541,11 +527,11 @@ struct SparseBitVector {
     }
 
     if (ptrOne != nullptr) {
-      // if ptrOne is not null, the loop exited because ptrTwo is nullptr, 
+      // if ptrOne is not null, the loop exited because ptrTwo is nullptr,
       // meaning this vector has more than the other vector, i.e. not a subset
       return false;
     } else {
-      // here means ptrOne == nullptr => it has sucessfully subset checked all 
+      // here means ptrOne == nullptr => it has sucessfully subset checked all
       // words that matter
       return true;
     }
@@ -553,13 +539,13 @@ struct SparseBitVector {
 
   /**
    * @param bit Bit that needs to be set
-   * @returns a pair signifying a base word and the offset into a 
+   * @returns a pair signifying a base word and the offset into a
    * baseword that corresponds to bit
    */
   std::pair<unsigned, unsigned> getOffsets(unsigned bit) const {
-    unsigned baseWord = bit / wordSize;
+    unsigned baseWord       = bit / wordSize;
     unsigned offsetIntoWord = bit % wordSize;
-      
+
     return std::pair<unsigned, unsigned>(baseWord, offsetIntoWord);
   }
 
@@ -569,7 +555,7 @@ struct SparseBitVector {
   unsigned count() const {
     unsigned nbits = 0;
 
-    for (SparseBitVectorNode *ptr = head; ptr; ptr = ptr->next) {
+    for (SparseBitVectorNode* ptr = head; ptr; ptr = ptr->next) {
       nbits += ptr->count();
     }
 
@@ -582,12 +568,13 @@ struct SparseBitVector {
    * @tparam VectorTy vector type that supports push_back
    * @returns Vector with all set bits
    */
-  template<typename VectorTy>
+  template <typename VectorTy>
   VectorTy getAllSetBits() const {
     VectorTy setBits;
 
     // loop through all words in the bitvector and get their set bits
-    for (SparseBitVectorNode* curPtr = head; curPtr != nullptr; curPtr = curPtr->next) {
+    for (SparseBitVectorNode* curPtr = head; curPtr != nullptr;
+         curPtr                      = curPtr->next) {
       curPtr->getAllSetBits(setBits);
     }
 

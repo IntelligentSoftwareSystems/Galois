@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -22,7 +22,6 @@
  *
  * Contains the implementation of BufferedGraph
  */
-
 
 #ifndef GALOIS_GRAPH_BUFGRAPH_H
 #define GALOIS_GRAPH_BUFGRAPH_H
@@ -89,7 +88,7 @@ private:
    * @param nodeStart the first node to load
    * @param numNodesToLoad number of nodes to load
    */
-  void loadOutIndex(std::ifstream& graphFile, uint64_t nodeStart, 
+  void loadOutIndex(std::ifstream& graphFile, uint64_t nodeStart,
                     uint64_t numNodesToLoad) {
     if (numNodesToLoad == 0) {
       return;
@@ -106,11 +105,10 @@ private:
     graphFile.seekg(readPosition);
 
     uint64_t numBytesToLoad = numNodesToLoad * sizeof(uint64_t);
-    uint64_t bytesRead = 0;
+    uint64_t bytesRead      = 0;
 
     while (numBytesToLoad > 0) {
-      graphFile.read(((char*)this->outIndexBuffer) + bytesRead,
-                     numBytesToLoad);
+      graphFile.read(((char*)this->outIndexBuffer) + bytesRead, numBytesToLoad);
       size_t numRead = graphFile.gcount();
       numBytesToLoad -= numRead;
       bytesRead += numRead;
@@ -130,7 +128,7 @@ private:
    * @param numGlobalNodes total number of nodes in the graph file; needed
    * to determine offset into the file
    */
-  void loadEdgeDest(std::ifstream& graphFile, uint64_t edgeStart, 
+  void loadEdgeDest(std::ifstream& graphFile, uint64_t edgeStart,
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes) {
     if (numEdgesToLoad == 0) {
       return;
@@ -149,10 +147,9 @@ private:
     graphFile.seekg(readPosition);
 
     uint64_t numBytesToLoad = numEdgesToLoad * sizeof(uint32_t);
-    uint64_t bytesRead = 0;
+    uint64_t bytesRead      = 0;
     while (numBytesToLoad > 0) {
-      graphFile.read(((char*)this->edgeDestBuffer) + bytesRead,
-                     numBytesToLoad);
+      graphFile.read(((char*)this->edgeDestBuffer) + bytesRead, numBytesToLoad);
       size_t numRead = graphFile.gcount();
       numBytesToLoad -= numRead;
       bytesRead += numRead;
@@ -175,10 +172,10 @@ private:
    * @param numGlobalEdges total number of edges in the graph file; needed
    * to determine offset into the file
    */
-  template<typename EdgeType, 
-           typename std::enable_if<!std::is_void<EdgeType>::value>::type* = 
-                                   nullptr>
-  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
+  template <
+      typename EdgeType,
+      typename std::enable_if<!std::is_void<EdgeType>::value>::type* = nullptr>
+  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart,
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
     galois::gDebug("Loading edge data");
@@ -188,7 +185,8 @@ private:
     }
 
     assert(edgeDataBuffer == nullptr);
-    edgeDataBuffer = (EdgeDataType*)malloc(sizeof(EdgeDataType) * numEdgesToLoad);
+    edgeDataBuffer =
+        (EdgeDataType*)malloc(sizeof(EdgeDataType) * numEdgesToLoad);
 
     if (edgeDataBuffer == nullptr) {
       GALOIS_DIE("Failed to allocate memory for edge data buffer.");
@@ -197,22 +195,21 @@ private:
     // position after nodes + edges
     uint64_t baseReadPosition = (4 + numGlobalNodes) * sizeof(uint64_t) +
                                 (sizeof(uint32_t) * numGlobalEdges);
-    
+
     // version 1 padding TODO make version agnostic
     if (numGlobalEdges % 2) {
       baseReadPosition += sizeof(uint32_t);
     }
 
     // jump to first byte of edge data
-    uint64_t readPosition = baseReadPosition + 
-                            (sizeof(EdgeDataType) * edgeStart);
+    uint64_t readPosition =
+        baseReadPosition + (sizeof(EdgeDataType) * edgeStart);
     graphFile.seekg(readPosition);
     uint64_t numBytesToLoad = numEdgesToLoad * sizeof(EdgeDataType);
-    uint64_t bytesRead = 0;
+    uint64_t bytesRead      = 0;
 
     while (numBytesToLoad > 0) {
-      graphFile.read(((char*)this->edgeDataBuffer) + bytesRead,
-                     numBytesToLoad);
+      graphFile.read(((char*)this->edgeDataBuffer) + bytesRead, numBytesToLoad);
       size_t numRead = graphFile.gcount();
       numBytesToLoad -= numRead;
       bytesRead += numRead;
@@ -229,10 +226,10 @@ private:
    *
    * @tparam EdgeType if EdgeType is void, this function will be used
    */
-  template<typename EdgeType, 
-           typename std::enable_if<std::is_void<EdgeType>::value>::type* = 
-                                   nullptr>
-  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart, 
+  template <
+      typename EdgeType,
+      typename std::enable_if<std::is_void<EdgeType>::value>::type* = nullptr>
+  void loadEdgeData(std::ifstream& graphFile, uint64_t edgeStart,
                     uint64_t numEdgesToLoad, uint64_t numGlobalNodes,
                     uint64_t numGlobalEdges) {
     galois::gDebug("Not loading edge data");
@@ -243,13 +240,13 @@ private:
    * Resets graph metadata to default values. Does NOT touch the buffers.
    */
   void resetGraphStatus() {
-    graphLoaded = false;
-    globalSize = 0;
+    graphLoaded    = false;
+    globalSize     = 0;
     globalEdgeSize = 0;
-    nodeOffset = 0;
-    edgeOffset = 0;
-    numLocalNodes = 0;
-    numLocalEdges = 0;
+    nodeOffset     = 0;
+    edgeOffset     = 0;
+    numLocalNodes  = 0;
+    numLocalEdges  = 0;
     resetReadCounters();
   }
 
@@ -265,22 +262,17 @@ private:
     edgeDataBuffer = nullptr;
   }
 
-
 public:
   /**
    * Class vars should be initialized by in-class initialization; all
    * left is to reset read counters.
    */
-  BufferedGraph() {
-    resetReadCounters();
-  }
+  BufferedGraph() { resetReadCounters(); }
 
   /**
    * On destruction, free allocated buffers (if necessary).
    */
-  ~BufferedGraph() noexcept {
-    freeMemory();
-  }
+  ~BufferedGraph() noexcept { freeMemory(); }
 
   // copy not allowed
   //! disabled copy constructor
@@ -295,21 +287,17 @@ public:
 
   /**
    * Gets the number of global nodes in the graph
-   * @returns the total number of nodes in the graph (not just local loaded 
+   * @returns the total number of nodes in the graph (not just local loaded
    * nodes)
    */
-  uint32_t size() const {
-    return globalSize;
-  }
+  uint32_t size() const { return globalSize; }
 
   /**
    * Gets the number of global edges in the graph
-   * @returns the total number of edges in the graph (not just local loaded 
+   * @returns the total number of edges in the graph (not just local loaded
    * edges)
    */
-  uint32_t sizeEdges() const {
-    return globalEdgeSize;
-  }
+  uint32_t sizeEdges() const { return globalEdgeSize; }
 
   /**
    * Loads given Galois CSR graph into memory.
@@ -332,7 +320,7 @@ public:
     loadOutIndex(graphFile, 0, globalSize);
     loadEdgeDest(graphFile, 0, globalEdgeSize, globalSize);
     // may or may not do something depending on EdgeDataType
-    loadEdgeData<EdgeDataType>(graphFile, 0, globalEdgeSize, globalSize, 
+    loadEdgeData<EdgeDataType>(graphFile, 0, globalEdgeSize, globalSize,
                                globalEdgeSize);
     graphLoaded = true;
 
@@ -340,7 +328,7 @@ public:
   }
 
   /**
-   * Given a node/edge range to load, loads the specified portion of the graph 
+   * Given a node/edge range to load, loads the specified portion of the graph
    * into memory buffers using read.
    *
    * @param filename name of graph to load; should be in Galois binary graph
@@ -354,16 +342,15 @@ public:
    * @param numGlobalEdges Total number of edges in the graph
    */
   void loadPartialGraph(const std::string& filename, uint64_t nodeStart,
-                        uint64_t nodeEnd, uint64_t edgeStart, 
-                        uint64_t edgeEnd, uint64_t numGlobalNodes,
-                        uint64_t numGlobalEdges) {
+                        uint64_t nodeEnd, uint64_t edgeStart, uint64_t edgeEnd,
+                        uint64_t numGlobalNodes, uint64_t numGlobalEdges) {
     if (graphLoaded) {
       GALOIS_DIE("Cannot load an buffered graph more than once.");
     }
 
     std::ifstream graphFile(filename.c_str());
 
-    globalSize = numGlobalNodes;
+    globalSize     = numGlobalNodes;
     globalEdgeSize = numGlobalEdges;
 
     assert(nodeEnd >= nodeStart);
@@ -375,7 +362,7 @@ public:
     loadEdgeDest(graphFile, edgeStart, numLocalEdges, numGlobalNodes);
 
     // may or may not do something depending on EdgeDataType
-    loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges, 
+    loadEdgeData<EdgeDataType>(graphFile, edgeStart, numLocalEdges,
                                numGlobalNodes, numGlobalEdges);
     graphLoaded = true;
 
@@ -383,7 +370,7 @@ public:
   }
 
   //! Edge iterator typedef
-  using EdgeIterator = boost::counting_iterator<uint64_t>; 
+  using EdgeIterator = boost::counting_iterator<uint64_t>;
   /**
    * Get the index to the first edge of the provided node THAT THIS GRAPH
    * HAS LOADED (not necessary the first edge of it globally).
@@ -451,7 +438,7 @@ public:
     if (numLocalEdges == 0) {
       return 0;
     }
-    assert(edgeOffset <= globalEdgeID); 
+    assert(edgeOffset <= globalEdgeID);
     assert(globalEdgeID < (edgeOffset + numLocalEdges));
 
     numBytesReadEdgeDest += sizeof(uint32_t);
@@ -466,9 +453,8 @@ public:
    * @param globalEdgeID the global edge id of the edge to get the data of
    * @returns the edge data of the requested edge id
    */
-  template<typename K = EdgeDataType, typename std::enable_if<
-    !std::is_void<K>::value>::type* = nullptr
-  >
+  template <typename K = EdgeDataType,
+            typename std::enable_if<!std::is_void<K>::value>::type* = nullptr>
   EdgeDataType edgeData(uint64_t globalEdgeID) {
     if (!graphLoaded) {
       GALOIS_DIE("Graph hasn't been loaded yet.");
@@ -481,7 +467,7 @@ public:
       return 0;
     }
 
-    assert(edgeOffset <= globalEdgeID); 
+    assert(edgeOffset <= globalEdgeID);
     assert(globalEdgeID < (edgeOffset + numLocalEdges));
 
     numBytesReadEdgeData += sizeof(EdgeDataType);
@@ -490,18 +476,15 @@ public:
     return edgeDataBuffer[localEdgeID];
   }
 
-
   /**
    * Version of above function when edge data type is void.
    */
-  template<typename K = EdgeDataType, typename std::enable_if<
-    std::is_void<K>::value>::type* = nullptr
-  >
+  template <typename K = EdgeDataType,
+            typename std::enable_if<std::is_void<K>::value>::type* = nullptr>
   unsigned edgeData(uint64_t globalEdgeID) {
     galois::gWarn("Getting edge data on graph when it doesn't exist\n");
     return 0;
   }
-
 
   /**
    * Reset reading counters.
@@ -519,8 +502,7 @@ public:
    * out indices, edge destinations, and edge data.
    */
   uint64_t getBytesRead() {
-    return numBytesReadOutIndex.reduce() +
-           numBytesReadEdgeDest.reduce() +
+    return numBytesReadOutIndex.reduce() + numBytesReadEdgeDest.reduce() +
            numBytesReadEdgeData.reduce();
   }
 
@@ -532,6 +514,6 @@ public:
     resetGraphStatus();
   }
 };
-} // end graph namespace
-} // end galois namespace
+} // namespace graphs
+} // namespace galois
 #endif

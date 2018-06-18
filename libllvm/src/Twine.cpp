@@ -24,26 +24,26 @@ std::string Twine::str() const {
   return toStringRef(Vec).str();
 }
 
-void Twine::toVector(SmallVectorImpl<char> &Out) const {
+void Twine::toVector(SmallVectorImpl<char>& Out) const {
   // raw_svector_ostream OS(Out);
   // print(OS);
 }
 
-StringRef Twine::toStringRef(SmallVectorImpl<char> &Out) const {
+StringRef Twine::toStringRef(SmallVectorImpl<char>& Out) const {
   if (isSingleStringRef())
     return getSingleStringRef();
   toVector(Out);
   return StringRef(Out.data(), Out.size());
 }
 
-StringRef Twine::toNullTerminatedStringRef(SmallVectorImpl<char> &Out) const {
+StringRef Twine::toNullTerminatedStringRef(SmallVectorImpl<char>& Out) const {
   if (isUnary()) {
     switch (getLHSKind()) {
     case CStringKind:
       // Already null terminated, yay!
       return StringRef(LHS.cString);
     case StdStringKind: {
-      const std::string *str = LHS.stdString;
+      const std::string* str = LHS.stdString;
       return StringRef(str->c_str(), str->size());
     }
     default:
@@ -56,11 +56,12 @@ StringRef Twine::toNullTerminatedStringRef(SmallVectorImpl<char> &Out) const {
   return StringRef(Out.data(), Out.size());
 }
 
-void Twine::printOneChild(std::ostream &OS, Child Ptr,
-                          NodeKind Kind) const {
+void Twine::printOneChild(std::ostream& OS, Child Ptr, NodeKind Kind) const {
   switch (Kind) {
-  case Twine::NullKind: break;
-  case Twine::EmptyKind: break;
+  case Twine::NullKind:
+    break;
+  case Twine::EmptyKind:
+    break;
   case Twine::TwineKind:
     Ptr.twine->print(OS);
     break;
@@ -100,28 +101,27 @@ void Twine::printOneChild(std::ostream &OS, Child Ptr,
   }
 }
 
-void Twine::printOneChildRepr(std::ostream &OS, Child Ptr,
+void Twine::printOneChildRepr(std::ostream& OS, Child Ptr,
                               NodeKind Kind) const {
   switch (Kind) {
   case Twine::NullKind:
-    OS << "null"; break;
+    OS << "null";
+    break;
   case Twine::EmptyKind:
-    OS << "empty"; break;
+    OS << "empty";
+    break;
   case Twine::TwineKind:
     OS << "rope:";
     Ptr.twine->printRepr(OS);
     break;
   case Twine::CStringKind:
-    OS << "cstring:\""
-       << Ptr.cString << "\"";
+    OS << "cstring:\"" << Ptr.cString << "\"";
     break;
   case Twine::StdStringKind:
-    OS << "std::string:\""
-       << Ptr.stdString << "\"";
+    OS << "std::string:\"" << Ptr.stdString << "\"";
     break;
   case Twine::StringRefKind:
-    OS << "stringref:\""
-       << Ptr.stringRef << "\"";
+    OS << "stringref:\"" << Ptr.stringRef << "\"";
     break;
   case Twine::CharKind:
     OS << "char:\"" << Ptr.character << "\"";
@@ -150,12 +150,12 @@ void Twine::printOneChildRepr(std::ostream &OS, Child Ptr,
   }
 }
 
-void Twine::print(std::ostream &OS) const {
+void Twine::print(std::ostream& OS) const {
   printOneChild(OS, LHS, getLHSKind());
   printOneChild(OS, RHS, getRHSKind());
 }
 
-void Twine::printRepr(std::ostream &OS) const {
+void Twine::printRepr(std::ostream& OS) const {
   OS << "(Twine ";
   printOneChildRepr(OS, LHS, getLHSKind());
   OS << " ";
@@ -163,10 +163,6 @@ void Twine::printRepr(std::ostream &OS) const {
   OS << ")";
 }
 
-void Twine::dump() const {
-  print(std::cerr);
-}
+void Twine::dump() const { print(std::cerr); }
 
-void Twine::dumpRepr() const {
-  printRepr(std::cerr);
-}
+void Twine::dumpRepr() const { printRepr(std::cerr); }

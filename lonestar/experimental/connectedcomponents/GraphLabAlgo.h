@@ -8,7 +8,7 @@
 
 #include <boost/mpl/if.hpp>
 
-template<typename Graph>
+template <typename Graph>
 void readInOutGraph(Graph& graph);
 
 struct GraphLabAlgo {
@@ -16,23 +16,22 @@ struct GraphLabAlgo {
     typedef size_t component_type;
     unsigned int id;
     component_type labelid;
-    
+
     component_type component() { return labelid; }
     bool isRep() { return id == labelid; }
   };
 
-  typedef galois::graphs::LC_CSR_Graph<LNode,void>
-    ::with_no_lockable<true>::type 
-    ::with_numa_alloc<true>::type InnerGraph;
+  typedef galois::graphs::LC_CSR_Graph<LNode, void>::with_no_lockable<
+      true>::type ::with_numa_alloc<true>::type InnerGraph;
   typedef galois::graphs::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
   struct Initialize {
     Graph& graph;
 
-    Initialize(Graph& g): graph(g) { }
+    Initialize(Graph& g) : graph(g) {}
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, galois::MethodFlag::UNPROTECTED);
+      LNode& data  = graph.getData(n, galois::MethodFlag::UNPROTECTED);
       data.labelid = data.id;
     }
   };
@@ -42,8 +41,8 @@ struct GraphLabAlgo {
 
     struct message_type {
       size_t value;
-      message_type(): value(std::numeric_limits<size_t>::max()) { }
-      explicit message_type(size_t v): value(v) { }
+      message_type() : value(std::numeric_limits<size_t>::max()) {}
+      explicit message_type(size_t v) : value(v) {}
       message_type& operator+=(const message_type& other) {
         value = std::min<size_t>(value, other.value);
         return *this;
@@ -58,7 +57,9 @@ struct GraphLabAlgo {
     bool perform_scatter;
 
   public:
-    Program(): received_labelid(std::numeric_limits<size_t>::max()), perform_scatter(false) { }
+    Program()
+        : received_labelid(std::numeric_limits<size_t>::max()),
+          perform_scatter(false) {}
 
     void init(Graph& graph, GNode node, const message_type& msg) {
       received_labelid = msg.value;
@@ -67,31 +68,37 @@ struct GraphLabAlgo {
     void apply(Graph& graph, GNode node, const gather_type&) {
       if (received_labelid == std::numeric_limits<size_t>::max()) {
         perform_scatter = true;
-      } else if (graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid > received_labelid) {
+      } else if (graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid >
+                 received_labelid) {
         perform_scatter = true;
-        graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid = received_labelid;
+        graph.getData(node, galois::MethodFlag::UNPROTECTED).labelid =
+            received_labelid;
       }
     }
 
-    bool needsScatter(Graph& graph, GNode node) {
-      return perform_scatter;
-    }
+    bool needsScatter(Graph& graph, GNode node) { return perform_scatter; }
 
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&,
+                typename Graph::edge_data_reference) {}
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        galois::graphsLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
+                 galois::graphsLab::Context<Graph, Program>& ctx,
+                 typename Graph::edge_data_reference) {
       LNode& data = graph.getData(node, galois::MethodFlag::UNPROTECTED);
 
-      if (node == src && graph.getData(dst, galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
+      if (node == src &&
+          graph.getData(dst, galois::MethodFlag::UNPROTECTED).labelid >
+              data.labelid) {
         ctx.push(dst, message_type(data.labelid));
-      } else if (node == dst && graph.getData(src, galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
+      } else if (node == dst &&
+                 graph.getData(src, galois::MethodFlag::UNPROTECTED).labelid >
+                     data.labelid) {
         ctx.push(src, message_type(data.labelid));
       }
     }
   };
 
-  template<typename G>
+  template <typename G>
   void readGraph(G& graph) {
     readInOutGraph(graph);
   }
@@ -99,7 +106,7 @@ struct GraphLabAlgo {
   void operator()(Graph& graph) {
     galois::do_all(graph, Initialize(graph));
 
-    galois::graphsLab::SyncEngine<Graph,Program> engine(graph, Program());
+    galois::graphsLab::SyncEngine<Graph, Program> engine(graph, Program());
     engine.execute();
   }
 };

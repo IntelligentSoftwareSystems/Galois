@@ -1,7 +1,7 @@
 /*
- * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * This file belongs to the Galois project, a C++ library for exploiting
+ * parallelism. The code is being released under the terms of XYZ License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -37,56 +37,55 @@
  *
  * @todo add the rest of the GSimpleReducible functions?
  */
-template<typename Accumulator, bool Active>
+template <typename Accumulator, bool Active>
 class ConditionalAccumulator {
   //! accumulator type
   typename std::conditional<Active, Accumulator, char>::type accumulator;
- public:
+
+public:
   //! type of the value being accumulated
   using T = typename Accumulator::AccumType;
 
   /**
    * Returns true if the conditionally accumulator is active
    */
-  bool isActive() {
-    return Active;
-  }
+  bool isActive() { return Active; }
 
   /**
    * Reset the accumulator.
    */
-  template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<A>::type* = nullptr>
   void reset() {
     accumulator.reset();
   }
 
   //! no-op
-  template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   void reset() {
     // no-op
   }
 
   //! Update the accumulator using the accumulator's update function
-  template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<A>::type* = nullptr>
   void update(T newValue) {
     accumulator.update(newValue);
   }
 
   //! no-op
-  template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   void update(T newValue) {
     // no-op
   }
 
   //! Reduce the accumulator and return the reduced value
-  template<bool A = Active, typename std::enable_if<A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<A>::type* = nullptr>
   T reduce() {
     return accumulator.reduce();
   }
 
   //! no-op
   //! @todo choose value that works better regardless of T
-  template<bool A = Active, typename std::enable_if<!A>::type* = nullptr>
+  template <bool A = Active, typename std::enable_if<!A>::type* = nullptr>
   T reduce() {
     return 0;
   }

@@ -11,20 +11,24 @@ bool didbcast = false;
 
 struct sayHi : public galois::runtime::Lockable {
   sayHi() = default;
-  sayHi(galois::runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
-  sayHi(galois::runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
+  sayHi(galois::runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) {
+    std::cout << "Hi_r " << this << "\n";
+  }
+  sayHi(galois::runtime::PerHost<sayHi> ptr) {
+    std::cout << "Hi_l " << this << "\n";
+  }
   ~sayHi() { std::cout << "Bye\n"; }
   void getInitData(SerializeBuffer& b) {}
 };
 
 void landingPad(RecvBuffer& foo) {
   int val;
-  gDeserialize(foo,val);
+  gDeserialize(foo, val);
   std::cout << "Landed on " << NetworkInterface::ID << " from " << val << "\n";
   if (!didbcast) {
     didbcast = true;
     SendBuffer buf;
-    gSerialize(buf,(int) NetworkInterface::ID);
+    gSerialize(buf, (int)NetworkInterface::ID);
     getSystemNetworkInterface().broadcast(&landingPad, buf);
   }
 }
@@ -42,8 +46,9 @@ void lp3(unsigned x, unsigned y) {
 
 int main(int argc, char** argv) {
   NetworkInterface& net = getSystemNetworkInterface();
-  
-  std::cout << "testing " << NetworkInterface::ID << " " << NetworkInterface::Num << "\n";
+
+  std::cout << "testing " << NetworkInterface::ID << " "
+            << NetworkInterface::Num << "\n";
 
   if (NetworkInterface::Num != 2) {
     std::cout << "Need two hosts, aborting\n";
@@ -54,7 +59,8 @@ int main(int argc, char** argv) {
     getSystemNetworkInterface().start();
   } else {
     net.sendAlt(1, lp3, 4U, 5U);
-    galois::runtime::PerHost<sayHi> p = galois::runtime::PerHost<sayHi>::allocate();
+    galois::runtime::PerHost<sayHi> p =
+        galois::runtime::PerHost<sayHi>::allocate();
     std::cout << p.remote(1) << "\n";
     galois::runtime::PerHost<sayHi>::deallocate(p);
 
@@ -63,8 +69,8 @@ int main(int argc, char** argv) {
     galois::Timer T;
     T.start();
     SendBuffer buf;
-    gSerialize(buf,(int) NetworkInterface::ID);
-    //net.broadcastMessage(&landingPad, buf);
+    gSerialize(buf, (int)NetworkInterface::ID);
+    // net.broadcastMessage(&landingPad, buf);
     for (unsigned int i = 0; i < 1000000; ++i) {
       net.handleReceives();
       SendBuffer buf2;
