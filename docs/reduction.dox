@@ -4,23 +4,25 @@
 
 \tableofcontents
 
-Reduction is a fundamental operation used in different graph analytics problems such as bread-first search (BFS), connected components (CC), and PageRank (PR). As such, the Galois runtime provides support for different types of reduction operations such as addition (also known as accumulation).
+@section reduction_intro Introduction
 
-@section reduction-types Types of Reduction Operations in Galois
+Reduction is a fundamental operation used in different graph analytics problems such as bread-first search (BFS), connected components (CC), and PageRank (PR). As such, the Galois runtime provides support for different types of reduction operations such as addition (also known as accumulation).
 
 Data structures that support reductions in Galois are conceptually divided into two classes: reduction of scalar types (e.g., ints and floats) or reduction of container types (e.g., STL vectors and maps). 
 
-@subsection scalar-reduction Scalar reduction
+@section scalar-reduction Scalar Reduction
 
 {@link galois::GSimpleReducible} is the base class to help reduce values of primitive types or types that are cheap to copy. For example, {@link galois::GAccumulator} is for accumulating values of types such as ints.
 
-@subsubsection scalar-define Defining a reducer
+@subsection scalar-define Defining a Reducer
 
 {@link galois::GSimpleReducible} is used to reduce mutliple values of type `T` to a single value. It is optimized for basic types or types that have low overheads while copying. {@link galois::GSimpleReducible} takes the type `T` of the values to be reduced and a functor `BinFunc` as template parameters, where the `BinFunc` conforms to:
 
+@code
     T operator()(const T& a, const T& b);
+@endcode
 
-@subsubsection scalar-reduce Reducing values
+@subsection scalar-reduce Reducing Values
 
 {@link galois::GSimpleReducible} starts with the default value of type `T`. {@link galois::GSimpleReducible::update()} updates the thread local value by applying the reduction operator to the thread local and provided value. After a parallel region, the final value can be retrieved using {@link galois::GSimpleReducible::reduce()}. Note, that {@link galois::GSimpleReducible::reduce()} can only be used outside of parallel regions (e.g., {@link galois::for_each}).
 
@@ -37,21 +39,23 @@ These specialized reducer classes implement support for different types of reduc
 - {@link galois::GReduceLogicalAND} is used to perform a `logical and` of the accumulated values. Type `T` has to meet the type requirements of `std::logical_and`.
 - {@link galois::GReduceLogicalOR} is used to perform a `logical or` of the accumulated values. Type `T` has to meet the type requirements of `std::logical_or`.
 
-@subsubsection scalar-example Example
+@subsection scalar-example Example
 
 In the following, we show an example of using reduction operations in a common graph analytics application, PageRank. The residual pull-based algorithm for PageRank uses {@link galois::GAccumulator} to keep track of whether a node with outgoing neighbors has new PageRank contribution that needs to be propagated. The PageRank computation can terminate if the reduced value across all nodes in the graph is zero (i.e., implying no more work).
 
 @snippet PageRank-pull.cpp scalarreduction
 
-@subsection reduction-containers Container reduction
+@section reduction-containers Container Reduction
 
 {@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is that `T` is expensive to copy (e.g., STL map or vector).  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated <em>in place</em>.  The `BinFunc` functor should conform to:
 
+@code
     void operator()(T& lhs, const T& rhs);
+@endcode
 
 Here the argument `lhs` is updated in place with `rhs` to reflect the output of the reduction operator.
 
-// @subsubsection specialreducers Special Reducers
+@subsection specialreducers Special Reducers
 
 The following figure shows the inheritance hierarachy of Galois classes that implement support for container reduction operations.
 
@@ -65,7 +69,7 @@ These specialized reducer classes inherit from {@link galois::GBigReducible}:
 - {@link galois::GListAccumulator} is used to splice `std::list` instances together.
 - {@link galois::GVectorPerItemReduce} and {@link galois::GMapPerItemReduce} provide element-wise reduction over vectors and maps respectively. {@link galois::GVectorPerItemReduce} reduces vectors where the reduction operator is element-wise binary operator of the type of the elements in the vector. {@link galois::GMapPerItemReduce} reduces maps, each of which is a set of key-value pairs. The reduction operator reduces the values with the same keys.
 
-@subsubsection container-example Example
+@subsection container-example Example
 
 In the following, we show a snippet using container reduction. The application first performs BFS on the input graph to determine the distance from a given source node, and then uses {@link galois::GVectorPerItemReduce} to count the number of distinct levels. Please see {@link lonestar/tutorial_examples/CountLevels.cpp} for a working example.
 
