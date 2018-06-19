@@ -11,12 +11,12 @@ The type of parallel loop needed depends on the properties of the operator being
 
 The three primary parallel loops in Galois are:
 
- - for_each
  - do_all
+ - for_each
  - on_each
 
 At a high level, {@link galois::do_all} is appropriate when a range of completely independent tasks need to be run.
-{@link galois::for_each} is appropriate in more general cases like when tasks may conflict, per iteration allocation is needed within the operator being run, or new work can be discovered as the loop runs.
+{@link galois::for_each} is appropriate in more general cases like when tasks may conflict, per-iteration allocation is needed within the operator being run, a special scheduling is required, or new work can be discovered as the loop runs.
 {@link galois::on_each} is a lower level interface for running an operation on each thread.
 
 
@@ -32,8 +32,6 @@ It is also often used in cases where a group of independent work items need to b
 
  - A range of work items
  - An operator to run on each work item
-
-Additional optional arguments may be passed to {@link galois::do_all} to enable or disable loop options.
 
 The range of work items can be specified using an instance of {@link galois::iterate}.
 It can be constructed from any of the following:
@@ -67,22 +65,31 @@ Also note that the operator passed to {@link galois::do_all} corresponds to the 
 
 The full example is available at {@link lonestar/tutorial_examples/GraphTraversalPullOperator.cpp}
 
+
+@subsection workstealing Work Stealing
+
+Work stealing is implemented hierarchically similar to galois::worklists::PerThreadChunkFIFO.
+Threads steal work within their own socket when they finish their local work, and only the socket leader can steal from outside its socket.
+The stealing amount is half of the rest work of the stolen thread.
+Below is an example of turning on work stealing for a galois::do_all loop.
+
+@snippet lonestar/tutorial_examples/Torus.cpp work stealing
+
+
 @section galois_for_each_manual galois::for_each
 
 {@link galois::for_each} is designed for cases where work items may be created dynamically or conflict detection between different threads is needed.
-It is built around parallel relaxed priority queues and is particularly useful in cases where
+It is built around parallel worklists with customizable scheduling policies, and is particularly useful in cases where
 
- - Operators that touch distinct sections of data can be executed concurrently.
+ - Operators that touch disjoint sections of data can be executed concurrently.
  - The only strict dependencies are between a given work item and the work items it creates.
 
-The relaxed priority is used to tell the runtime that the loop may run more quickly if certain work items are prioritized.
+The schedule is used to tell the runtime that the loop may run more quickly if certain work items are prioritized.
 
 {@link galois::for_each} requires the following arguments:
 
  - A starting range of work items
  - An operator to apply to each work item
-
-Additional optional arguments may be passed to {@link galois::for_each} to enable or disable loop options.
 
 The range of work items to start from is specified using an instance of {@link galois::iterate}, as was the case with {@link galois::do_all}.
 
@@ -94,12 +101,12 @@ The operator must be callable with the following arguments
 
 The work item will have the same type as the iterators given to the loop do when dereferenced, but if integers are given instead of iterators, the work item will be an integer.
 
-The reference to the {@link galois::UserContext} provides an interface that can be used within the body of the loop for creating new work items and performing conflict detection.
-This user context is accessible to the user primarily so it can provide a means for users to add new work items to the parallel relaxed priority queue.
-Although conflict detection is usually performed within the APIs of conflict aware data structures, the user context also manages the locks acquired while a given operator runs.
+The reference to the {@link galois::UserContext} provides an interface that can be used within the body of the loop for creating new work items, performing conflict detection, and hosting per-iteration allocators.
+This user context is accessible to the user primarily so it can provide a means for users to add new work items to the underlying worklist.
+Although conflict detection is usually performed within the APIs of conflict-aware data structures, the user context also manages the locks acquired while a given operator runs.
 
 The operator passed to {@link galois::for_each} is required to be cautious.
-In other words, the operator must acquire all the locks it will need in order to execute before it modifies any data.
+In other words, the operator must acquire all the locks it will need before it modifies any data.
 In cases where an operator fails to acquire a lock, it will abort immediately, freeing any per-iteration allocations and releasing any locks it has already acquired.
 In these cases, if the operator is cautious, it is guaranteed to fail without leaving the shared data structure in an inconsistent state.
 The operator is also expected to not throw exceptions.
@@ -112,8 +119,8 @@ As of this writing, C++ exceptions must not be thrown from an operator into the 
  - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
  - {@link galois::no_pushes}: Disable pushing new work via the user context.
  - {@link galois::no_conflicts}: Disable conflict detection in the Galois runtime.
- - {@link galois::wl}: Use the approximate priority supplied in this argument to prioritize work items. The default one is galois::defaultWL, which expands to galois::worklists::PerSocketChunkFIFO<32> as of this writing.
- - {@link galois::per_iter_alloc}: Use per-iteration allocator for loop iterations.
+ - {@link galois::wl}: Use the scheduling policy supplied in this argument to prioritize work items. The default one is galois::defaultWL, which expands to galois::worklists::PerSocketChunkFIFO<32> as of this writing. See @ref scheduler for details.
+ - {@link galois::per_iter_alloc}: Use per-iteration allocator for loop iterations. See @ref mem_allocator for details.
 
 The following example from the tutorial shows how to use {@link galois::for_each} with conflict detection.
 This example uses a push-style algorithm where each node adds an integer stored as edge data to the node data of its neighbors.
@@ -139,6 +146,13 @@ It requires an operator that accepts a thread id and the total number of threads
  - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
  - {@link galois::more_stats}: Collect even more detailed performance statistics as the loop runs.
  - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
+
+@section special_loops Specialized Parallel Loops
+
+Galois provides the following specialized parallel loops.
+
+  - Deterministic loop iterator: schedule active work items deterministically and produce the same answer across different platforms. See @ref galois_deterministic_iterator for details.
+  - ParaMeter loop iterator: measure the amount of parallelism during loop execution. See @ref galois_parameter_iterator for details.
 
 */
 
