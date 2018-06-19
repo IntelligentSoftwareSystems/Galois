@@ -47,7 +47,7 @@ include/galois/gdeque.h} is shown below:
 @subsection per-iter-alloc Per Iteration Allocator
 
 Per Iteration Allocator {@link galois::PerIterAllocTy} can be used when dynamic data structures are defined inside the parallel loop and live for only one iteration of the loop. This allocator can
-be used inside the functors for galois::for_each and galois::do_all. It can be used
+be used inside the operators for galois::for_each. It can be used
 with STL data structures, e.g., std::vector and std::set etc., and supports
 variable size allocations.
 
@@ -74,11 +74,10 @@ galois::for_each(
     , galois::loopname("per_iter_alloc_example")
 );
 @endcode
-</ol>
 
 Delaunay Mesh Refinement (DMR) is a good example to see how to use Per Iteration
 Allocator. The following snippet shows how to define an STL vector to use the Per Iteration
-Allocator (file {@link lonestar/delaunayrefinement/Cavity.h}):
+Allocator in Delaynay mesh refinement:
 @snippet lonestar/delaunayrefinement/Cavity.h STL vector using PerIterAllocTy
 
 @subsection Pow_2_allocator Power of 2 Allocator
