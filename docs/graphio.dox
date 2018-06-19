@@ -6,7 +6,7 @@
 
 @subsection readwrite Reading graphs
 
-Read in graphs by using galois::graphs::readGraph. The parameters for this function are the following:
+Read in graphs by using galois::graphs::readGraph, which expects the following parameters:
 <ul>
 <li> The first parameter is the graph to be read in.
 <li> The second parameter is either a file name or a galois::graphs::FileGraph representing the graph of outgoing neighbors.
@@ -17,12 +17,16 @@ The file representing the graph should be a binary representation consistent wit
 
 @snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Read a graph
 
-An alternative way to read in graphs is through galois::graphs::FileGraph. galois::graphs::FileGraph::fromFile is used to mmap a binary format of graphs into a galois::graphs::FileGraph object. Then galois::graphs::MorphGraph or galois::graphs::LC_CSR_Graph can be constructed from galois::graphs::FileGraph. Use galois::graphs::LC_CSR_Graph::constructFrom to create a galois::graphs::LC_CSR_Graph from galois::graphs::FileGraph.
+An alternative way to read in graphs is through galois::graphs::FileGraph.
+<ol>
+<li> Use galois::graphs::FileGraph::fromFile to mmap a binary format of graphs into a galois::graphs::FileGraph object.
+<li> Construct galois::graphs::MorphGraph or galois::graphs::LC_CSR_Graph from galois::graphs::FileGraph. galois::graphs::LC_CSR_Graph::constructFrom implements exactly this functionality for galois::graphs::LC_CSR_Graph.
+</ol>
 
 
 @subsection writegraph Writing graphs
 
-Use galois::graphs::FileGraph::toFile write a galois::graphs::FileGraph to a binary file. Use galois::graphs::FileGraphWriter to construct a galois::graphs::FileGraph by the following steps:
+Use galois::graphs::FileGraph::toFile to write a galois::graphs::FileGraph to a binary file. Use galois::graphs::FileGraphWriter to construct a galois::graphs::FileGraph by the following steps:
 <ol>
 <li> Set the number of nodes by calling galois::graphs::FileGraphWriter::setNumNodes.
 <li> Set the number of edges by calling galois::graphs::FileGraphWriter::setNumEdges.
@@ -43,10 +47,10 @@ The code snippet below shows an example of writing to a galois::graphs::FileGrap
 
 @subsection graphconvert Tools to convert graphs among different formats
 
-graph-convert in the directory of tools/graph-convert can be used to convert the graph files among different formats. The -help parameter will give the detailed parameters for converting and supported formats. In particular, it can convert a few ASCII-format graph files, e.g. edge list, into binary format which can be directly loaded in by galois::graphs::readGraph or galois::graphs::FileGraph::fromFile.
+Use graph-convert in the directory of tools/graph-convert to convert the graph files among different formats. Launch graph-convert with -help parameter will give the detailed parameters for converting and supported formats. In particular, graph-convert can convert a few ASCII-format graph files, e.g. edge list, into binary format which can be directly loaded in by galois::graphs::readGraph or galois::graphs::FileGraph::fromFile.
 
 @subsection graphstats Tools to get graph statistics
 
-graph-stats in the directory of tools/graph-stats can be used to get the statistics of a given graph in .gr format (Galois binary graph). Use -help command-line parameter to get the detailed parameters for reporting statistics, e.g. number of nodes and edges, out-degree/in-degree histogram, etc.
+Use graph-stats in the directory of tools/graph-stats to get the statistics of a given graph in .gr format (Galois binary graph). Launch graph-stats with -help parameter to get the detailed parameters for reporting statistics, e.g. number of nodes and edges, out-degree/in-degree histogram, etc.
 
 */
