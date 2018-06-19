@@ -3,11 +3,13 @@
 
 \tableofcontents
 
+@section target_audience Target Audience
+
 Galois is a C++ library designed to simplify parallel programming. It is especially
 focused on computations that are difficult to parallelize efficiently, such as
 loops with 
   - irregular amount of work per iteration
-  - irregular memory accesses and branching patterns.  
+  - irregular memory accesses and branching patterns
   - dependencies between iterations
   - dynamic work creation
 
@@ -15,7 +17,7 @@ A typical Galois user is a C++ programmer who understands parallelism in his/her
 algorithm and wishes to express it using high-level constructs such as parallel
 loops and concurrent data structures, without having to deal with low-level
 parallel programming details such as threads, mutexes, barriers, condition
-variables, work stealing etc. 
+variables, work stealing, etc.
 
 @section ds_and_algo Data Structures and Algorithms
 
@@ -51,7 +53,7 @@ the program with lesser number of threads, but not more.
 @section galois_as_lib Galois as a Library
 
 Galois has been implemented as a C++ library, therefore, other libraries and
-programs can use it, however, before using any Galois features, they must
+programs can use it. However, before using any Galois features, they must
 initialize galois by creating an object of type galois::SharedMemSys. Similarly,
 all Galois objects (objects of types from Galois library) must destruct before the
 galois::SharedMemSys object destructs. 
