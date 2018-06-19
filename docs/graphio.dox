@@ -4,7 +4,7 @@
 \tableofcontents
 @section graphio Graph Input and Output
 
-@subsection readwrite Reading graphs
+@subsection readwrite Reading Graphs
 
 Read in graphs by using galois::graphs::readGraph, which expects the following parameters:
 <ul>
@@ -20,7 +20,7 @@ The file representing the graph should be a binary representation consistent wit
 If you want to load a .gr (binary Galois graph) into your own graph types, then you need to read in graphs through galois::graphs::FileGraph. Specifically, use galois::graphs::FileGraph::fromFile to mmap a binary format of graphs into a galois::graphs::FileGraph object, and then construct your graph from the galois::graphs::FileGraph object. galois::graphs::LC_CSR_Graph::constructFrom implements exactly this functionality for galois::graphs::LC_CSR_Graph.
 
 
-@subsection writegraph Writing graphs
+@subsection writegraph Writing Graphs
 
 Use galois::graphs::FileGraph::toFile to write a galois::graphs::FileGraph to a binary file. Use galois::graphs::FileGraphWriter to construct a galois::graphs::FileGraph by the following steps:
 <ol>
@@ -41,11 +41,11 @@ The code snippet below shows an example of writing to a galois::graphs::FileGrap
 
 @section garph_utility Utility Tools for Graphs
 
-@subsection graphconvert Tools to convert graphs among different formats
+@subsection graphconvert Tools to Convert Graphs Among Different Formats
 
 Use graph-convert in the directory of tools/graph-convert to convert the graph files among different formats. Launch graph-convert with -help parameter will give the detailed parameters for converting and supported formats. In particular, graph-convert can convert a few ASCII-format graph files, e.g. edge list, into binary format which can be directly loaded in by galois::graphs::readGraph or galois::graphs::FileGraph::fromFile.
 
-@subsection graphstats Tools to get graph statistics
+@subsection graphstats Tools to Get Graph Statistics
 
 Use graph-stats in the directory of tools/graph-stats to get the statistics of a given graph in .gr format (Galois binary graph). Launch graph-stats with -help parameter to get the detailed parameters for reporting statistics, e.g. number of nodes and edges, out-degree/in-degree histogram, etc.
 
