@@ -99,10 +99,13 @@ void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
   else
     findBoundary(boundary, cg);
 
+  //! [Example Per-Thread-Storage Declaration]
   typedef galois::gstl::Vector<unsigned> VecTy;
   typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
   ThreadLocalData edgesThreadLocal;
+  //! [Example Per-Thread-Storage Declaration]
 
+  //! [Example Per-Thread-Storage Usage]
   // Find the partition n is most connected to
   auto pickPartitionEC = [&](GNode n, auto& cnx) -> unsigned {
     auto& edges = *edgesThreadLocal.getLocal();
@@ -118,6 +121,7 @@ void refine_BKL2(unsigned minSize, unsigned maxSize, GGraph& cg, GGraph* fg,
     return std::distance(edges.begin(),
                          std::max_element(edges.begin(), edges.end()));
   };
+  //! [Example Per-Thread-Storage Usage]
 
   // Find the smallest partition n is connected to
   auto pickPartitionMP = [&](GNode n, auto& cnx) -> unsigned {
