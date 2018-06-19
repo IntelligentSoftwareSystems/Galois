@@ -45,7 +45,7 @@ In the following, we show an example of using reduction operations in a common g
 
 @subsection reduction-containers Container reduction
 
-{@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is that `T` is expensive to copy (e.g., STL map or vector).  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated \em in place</em>.  The `BinFunc` functor should conform to:
+{@link galois::GBigReducible} is the base class in Galois to reduce a set of large or non-trivial objects of type `T` to a single object. The underlying assumption is that `T` is expensive to copy (e.g., STL map or vector).  The functor `BinFunc` takes two arguments and applies the reduction in such a way the left argument is updated <em>in place</em>.  The `BinFunc` functor should conform to:
 
     void operator()(T& lhs, const T& rhs);
 
@@ -67,7 +67,7 @@ These specialized reducer classes inherit from {@link galois::GBigReducible}:
 
 @subsubsection container-example Example
 
-In the following, we show a snippet using container reduction. The application first performs BFS on the input graph to determine the distance from a given source node, and then uses {@link galois::GVectorPerItemReduce} to count the number of distinct levels. Please see {@link CountLevels.cpp} for a working example.
+In the following, we show a snippet using container reduction. The application first performs BFS on the input graph to determine the distance from a given source node, and then uses {@link galois::GVectorPerItemReduce} to count the number of distinct levels. Please see {@link lonestar/tutorial_examples/CountLevels.cpp} for a working example.
 
 @snippet CountLevels.cpp Define GReducible
 

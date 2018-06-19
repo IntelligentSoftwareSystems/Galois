@@ -5,4 +5,5 @@
  * @example lonestar/tutorial_examples/TorusConstruction.cpp
  * @example lonestar/tutorial_examples/ConflictAwareTorus.cpp
  * @example lonestar/tutorial_examples/SSSPPushSimple.cpp
+ * @example lonestar/tutorial_examples/CountLevels.cpp
  */
