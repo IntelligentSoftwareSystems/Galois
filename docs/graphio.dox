@@ -17,11 +17,7 @@ The file representing the graph should be a binary representation consistent wit
 
 @snippet lonestar/tutorial_examples/GraphTraversalSerial.cpp Read a graph
 
-An alternative way to read in graphs is through galois::graphs::FileGraph.
-<ol>
-<li> Use galois::graphs::FileGraph::fromFile to mmap a binary format of graphs into a galois::graphs::FileGraph object.
-<li> Construct galois::graphs::MorphGraph or galois::graphs::LC_CSR_Graph from galois::graphs::FileGraph. galois::graphs::LC_CSR_Graph::constructFrom implements exactly this functionality for galois::graphs::LC_CSR_Graph.
-</ol>
+If you want to load a .gr (binary Galois graph) into your own graph types, then you need to read in graphs through galois::graphs::FileGraph. Specifically, use galois::graphs::FileGraph::fromFile to mmap a binary format of graphs into a galois::graphs::FileGraph object, and then construct your graph from the galois::graphs::FileGraph object. galois::graphs::LC_CSR_Graph::constructFrom implements exactly this functionality for galois::graphs::LC_CSR_Graph.
 
 
 @subsection writegraph Writing graphs
