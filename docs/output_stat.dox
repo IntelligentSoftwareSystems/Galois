@@ -4,7 +4,7 @@
 \tableofcontents
 
 
-For performance analysis, programmers instrument pieces of codes to collect program statistics. Galois relieves developers from this burden by (1) providing built-in instrumentation, and (2) friendly output of statistics.
+For performance analysis, programmers instrument pieces of codes to collect program statistics. Galois relieves developers from this burden by providing (1) built-in and customizable instrumentation, and (2) friendly output of statistics.
 
 @section basic_stat Basic Statistics
 
