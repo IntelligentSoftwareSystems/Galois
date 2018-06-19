@@ -85,14 +85,18 @@ int main(int argc, char** argv) {
   graph.getData(*graph.begin()) = 0;
 
   if ("dchunk16" == schedule) {
+    //! [chunk worklist]
     galois::for_each(
         galois::iterate(
             {*graph.begin()}), // initial range using initializer list
         SSSP                   // operator
         ,
-        galois::wl<PSchunk>() // options
+        galois::wl<PSchunk>() // options. PSchunk expands to 
+                              // galois::worklists::PerSocketChunkLIFO<16>, 
+                              // where 16 is chunk size
         ,
         galois::loopname("sssp_dchunk16"));
+    //! [chunk worklist]
   } else if ("obim" == schedule) {
     //! [OBIM]
     galois::for_each(

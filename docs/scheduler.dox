@@ -11,12 +11,12 @@ The schedule policies are listed as follows:
 
  - \b OrderedList
 
-    implements a std::priority_queue compatible priority queue. Elements of same
+    Implements a std::priority_queue compatible priority queue. Elements of same
     priority are processed in arbitrary order. 
 
  - \b FIFO and \b LIFO
 
-    Implements std::queue and std::stack like behaviors respectively. \n
+    Implements std::queue and std::stack like behaviors respectively.
     These implementations do not scale with the number of threads, and are often not
     suitable for parallel implementations. 
 
@@ -43,27 +43,23 @@ The schedule policies are listed as follows:
         from outside its socket. Each socket
         has a leader, which steals from other sockets when its own socket is out
         of work. 
-        We show an example of using chunked worklists from {@link lonestar/delaunayrefinement/DelaunayRefinement.cpp}
+        Below is an example of using chunked worklists from {@link lonestar/tutorial_examples/SSSPPushSimple.cpp}:
 
-    \n
+        @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp chunk worklist
 
-
- - \b OrderedByIntegerMetric\n
+ - \b OrderedByIntegerMetric
    
     Implements a priority queue based on a supplied function which maps a work
     item to an integer priority. Lower values are a higher priority. An inner
     queue may be passed to control how items within the same priority bin are stored. 
-    An example to define an OrderedByIntegerMetric scheduling in {@link lonestar/tutorial_example/SSSPPushSimple.cpp} can be seen as follows:\n
+    An example to define an OrderedByIntegerMetric scheduling in {@link lonestar/tutorial_examples/SSSPPushSimple.cpp} can be seen as follows:
     
-
-@snippet lonestar/tutorial_examples/SSSPPushSimple.cpp OBIM
+    @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp Scheduler examples
     
-The OBIM in the above example shows how to define a priority scheduling. 
-The UpdateRequestIndexer defines the priority binning function. Internally It uses a PerSocketChunkLIFO to store the items with the same priority.\n
+    The OBIM in the above example shows how to define a priority scheduling. 
+    The reqIndexer object defines the priority binning function. Internally this OBIM uses a PerSocketChunkLIFO to store the items with the same priority.
     
-OBIM works well when the algorithms performance is sensitive to scheduling, and
-the work-items can be grouped into a small number of bins, ordered by integer
-priority (typically ~1000 bins). 
+    OBIM works well when the algorithms performance is sensitive to scheduling, and the work-items can be grouped into a small number of bins, ordered by integer priority (typically ~1000 bins). 
 
 
  - \b LocalQueues
@@ -96,10 +92,10 @@ priority (typically ~1000 bins).
 
 @section workstealing Work Stealing
 
-galois::do_all devided the work items evenly to all threads. The work stealing is disabled by default. You can specify galois::steal() in galois::do_all to enable the work stealing. Work stealing is implemented hierarchically similar to PerThreadChunkFIFO.\n
-Threads steal work when they finish their local work. Normally threads steal work within their socket, but only the socket leader can steal from outside its socket. The stealing amount is half of the rest work of the stolen thread. \n
+galois::do_all devided the work items evenly to all threads. The work stealing is disabled by default. You can specify galois::steal() in galois::do_all to enable the work stealing. Work stealing is implemented hierarchically similar to PerThreadChunkFIFO.
+Threads steal work when they finish their local work. Normally threads steal work within their socket, but only the socket leader can steal from outside its socket. The stealing amount is half of the rest work of the stolen thread.
 
-Below is an example of work stealing from {@link lonestar/tutorial_examples/Torus.cpp}.
+Below is an example of turning on work stealing for a galois::do_all loop.
 @snippet lonestar/tutorial_examples/Torus.cpp work stealing
 
 */
