@@ -19,9 +19,8 @@ At a high level, {@link galois::do_all} is appropriate when a range of completel
 {@link galois::for_each} is appropriate in more general cases like when tasks may conflict, per iteration allocation is needed within the operator being run, or new work can be discovered as the loop runs.
 {@link galois::on_each} is a lower level interface for running an operation on each thread.
 
-@section parallel_loops Parallel Loops
 
-@subsection galois_do_all do_all
+@section galois_do_all_manual galois::do_all
 
 {@link galois::do_all} divides the work items evenly among the threads available.
 It supports work stealing, but does not include it by default.
@@ -68,7 +67,7 @@ Also note that the operator passed to {@link galois::do_all} corresponds to the 
 
 The full example is available at {@link lonestar/tutorial_examples/GraphTraversalPullOperator.cpp}
 
-@subsection galois_for_each for_each
+@section galois_for_each_manual galois::for_each
 
 {@link galois::for_each} is designed for cases where work items may be created dynamically or conflict detection between different threads is needed.
 It is built around parallel relaxed priority queues and is particularly useful in cases where
@@ -129,7 +128,7 @@ Note that, since no new work is created and there are no conflicts between opera
 For more details, see {@link lonestar/tutorial_examples/GraphTraversalPushOperator.cpp}.
 
 
-@subsection galois_on_each on_each
+@section galois_on_each_manual galois::on_each
 
 {@link galois::on_each} is a lower level loop construct that simply calls the given operator from each of the threads in the Galois thread pool.
 
