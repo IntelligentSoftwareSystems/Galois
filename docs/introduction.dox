@@ -1,0 +1,65 @@
+/**
+\page introduction Introduction
+
+\tableofcontents
+
+Galois is a C++ library designed to simplify parallel programming. It is especially
+focused on computations that are difficult to parallelize efficiently, such as
+loops with 
+  - irregular amount of work per iteration
+  - irregular memory accesses and branching patterns.  
+  - dependencies between iterations
+  - dynamic work creation
+
+A typical Galois user is a C++ programmer who understands parallelism in his/her
+algorithm and wishes to express it using high-level constructs such as parallel
+loops and concurrent data structures, without having to deal with low-level
+parallel programming details such as threads, mutexes, barriers, condition
+variables, work stealing etc. 
+
+@section ds_and_algo Data Structures and Algorithms
+
+Borrowing from Niklaus Wirth's aphorism "programs = algorithms + data structures",
+a "parallel-program = parallel-loop-constructs + concurrent-data-structures".
+Galois provides an implicitly parallel programming model, where the user replaces
+serial loop constructs (e.g., for and while) with parallel loop constructs, and,
+serial data structures with concurrent data structures. 
+
+Galois comes pre-packaged with a variety of concurrent data structure
+implementations, ready to use in Galois programs. This includes an extensive Graph
+API, concurrent Bags, Numa-Aware large arrays, concurrent lists, reducible types,
+as well as concurrent variants of STL data structures suitable for many use cases. 
+In addition, users can create their own data structures, as listed out in chapter
+\ref your_own_ds.
+
+@section exec_model Galois Execution Model
+
+Galois implements a serial/parallel execution model implicitly. A Galois program starts execution like a serial program with a single thread in the
+main method. Upon Galois library initialization (explained in section \ref galois_as_lib below) a thread pool is created, but all threads except
+the master thread go to sleep and the execution proceeds serially until it
+encounters a parallel loop construct. Upon encountering a parallel loop construct, Galois
+wakes up the threads in the thread pool and hands off work to them. Upon
+finishing the parallel loop, the threads meet at a barrier and all the threads
+except the main thread go back to sleep. 
+
+The number of threads in the thread pool that Galois creates is equal to the number
+of cores or hardware threads in case of hyper threading. A user may choose to run
+the program with lesser number of threads, but not more. 
+
+@image html galois_execution_model.png "Galois Execution Model"
+
+@section galois_as_lib Galois as a Library
+
+Galois has been implemented as a C++ library, therefore, other libraries and
+programs can use it, however, before using any Galois features, they must
+initialize galois by creating an object of type galois::SharedMemSys. Similarly,
+all Galois objects (objects of types from Galois library) must destruct before the
+galois::SharedMemSys object destructs. 
+
+@section rest_of Rest of the Manual
+
+The rest of this manual dives into the details of the features provided by the
+Galois library. We have arranged the chapters in progression of complexity, however a
+reader may pick individual chapters for details on a certain topic. 
+*/
+

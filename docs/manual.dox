@@ -3,17 +3,18 @@
 
 \tableofcontents
 
-- \subpage concurrent_data_structure
-- \subpage graph_io_util
-- \subpage parallel_loops
-- \subpage scheduler
-- \subpage output_stat
-- \subpage numa
-- \subpage reduction
-- \subpage mem_allocator
-- \subpage thread_local_storage 
-- \subpage your_own_ds
-- \subpage profiling
-- \subpage tuning
+-# \subpage introduction
+-# \subpage parallel_loops
+-# \subpage scheduler
+-# \subpage concurrent_data_structure
+-# \subpage reduction
+-# \subpage output_stat
+-# \subpage thread_local_storage 
+-# \subpage graph_io_util
+-# \subpage numa
+-# \subpage mem_allocator
+-# \subpage your_own_ds
+-# \subpage profiling
+-# \subpage tuning
 
 */

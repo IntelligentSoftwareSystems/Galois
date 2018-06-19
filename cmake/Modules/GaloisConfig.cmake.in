@@ -13,6 +13,6 @@ if(NOT TARGET galois AND NOT Galois_BINARY_DIR)
   include("${GALOIS_CMAKE_DIR}/GaloisTargets.cmake")
 endif()
 
-set(Galois_LIBRARIES galois)
+set(Galois_LIBRARIES galois_shmem)
 set(Galois_CXX_COMPILER "@GALOIS_CXX_COMPILER@")
 set(Galois_CXX_FLAGS "@GALOIS_FLAGS@")

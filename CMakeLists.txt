@@ -545,6 +545,7 @@ foreach(d ${defs})
 endforeach()
 install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
+  PATTERN ".git" EXCLUDE
   PATTERN ".svn" EXCLUDE)
 
 # Galois compiler definitions

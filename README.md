@@ -1,4 +1,4 @@
-Introduction
+Getting Started {#gettingStarted}
 ====================
 
 Galois is a C++ library designed to ease parallel programming, especially for
@@ -12,7 +12,7 @@ threads, locks, barriers, condition variables etc.
 
 Highlights include:
 - Parallel *for_each* loop that handles dependencies between iterations, as well as
-  *do_all* loop for simple parallelism. Both provide load balancing and excellent
+  dynamic work creation, and, a *do_all* loop for simple parallelism. Both provide load balancing and excellent
   scalability on multi-socket systems
 - A concurrent graph library designed for graph analytics algorithms as well as
   other domains such as irregular meshes. 
@@ -135,12 +135,14 @@ See online documentation at:
 Source-Tree Organization
 ========================
 
-- `lonestar` contains Lonestar applications and tutorial examples for Galois
 - `libgalois` contains the source code for shared memory Galois library, e.g., runtime, graphs, worklists etc. 
-- `libdist` contains the source code for distributed memory and heterogeneous
-  Galois library.
+- `lonestar` contains Lonestar benchmark applications and tutorial examples for Galois
+- `libdist` contains the source code for distributed memory and heterogeneous Galois library.
+- `dist_apps` contains the source code for distributed memory and heterogeneous
+  benchmark applications
 - `tools` contains various helper programs such as graph-converter to convert
   between graph file formats and graph-stats to print graph properties
+
 
 
 Installing Galois as a library
@@ -177,5 +179,5 @@ target_link_libraries(app ${Galois_LIBRARIES})
 Using basic commands (although the specific commands vary by system):
 
 ```Shell
-c++ -std=c++11 app.cpp -I${installdir}/include -L${installdir}/lib -lgalois
+c++ -std=c++14 app.cpp -I${installdir}/include -L${installdir}/lib -lgalois_shmem
 ```
