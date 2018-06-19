@@ -3,7 +3,7 @@
 
 \tableofcontents
 
-\section parallel_loop_intro Introduction
+@section parallel_loop_intro Introduction
 
 Galois includes three primary types of parallel loop constructs.
 These parallel loops provide an interface for running a given operator with various schedules.
@@ -50,25 +50,27 @@ The operator must not throw exceptions into its surrounding context.
 As of this writing, C++ exceptions can not be safely thrown from an operator into the context where it is called.
 
 If the range is a range of iterators, the work item will be a reference to whatever is obtained by dereferencing an iterator of the given type.
-If the range is a range of iterators, the work item will be an integer.
+If the range is a range of integers, the work item will be an integer.
 
 {@link galois::do_all} accepts the following optional parameters to enable/disable features:
 
  - {@link galois::steal}: Turn on work stealing.
  - {@link galois::chunk_size}: Set the unit of work stealing. Chunk size is 32 by default.
  - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
+ - {@link galois::more_stats}: Collect even more detailed performance statistics as the loop runs.
+ - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
 
 The following is an example from the tutorial of how to use {@link galois::do_all}.
 Note that, in this example, the range of work items given to {@link galois::do_all} corresponds to the outer loop range in the serial implementation.
 Also note that the operator passed to {@link galois::do_all} corresponds to the body of the loop in the serial implementation.
 
-@snippet lonestar/tutorial_examples/GraphTraversalPullOperator.cpp Graph Traversal in pull using do_all
+@snippet lonestar/tutorial_examples/GraphTraversalPullOperator.cpp Graph traversal in pull using do_all
 
 The full example is available at {@link lonestar/tutorial_examples/GraphTraversalPullOperator.cpp}
 
 @subsection galois_for_each for_each
 
-{@link galois::for_each} is designed for cases where work items may be created dynamically and conflict detection between different threads is needed.
+{@link galois::for_each} is designed for cases where work items may be created dynamically or conflict detection between different threads is needed.
 It is built around parallel relaxed priority queues and is particularly useful in cases where
 
  - Operators that touch distinct sections of data can be executed concurrently.
@@ -97,7 +99,7 @@ The reference to the {@link galois::UserContext} provides an interface that can 
 This user context is accessible to the user primarily so it can provide a means for users to add new work items to the parallel relaxed priority queue.
 Although conflict detection is usually performed within the APIs of conflict aware data structures, the user context also manages the locks acquired while a given operator runs.
 
-The operator passed to {@link galois::for_each} is also required to be cautious.
+The operator passed to {@link galois::for_each} is required to be cautious.
 In other words, the operator must acquire all the locks it will need in order to execute before it modifies any data.
 In cases where an operator fails to acquire a lock, it will abort immediately, freeing any per-iteration allocations and releasing any locks it has already acquired.
 In these cases, if the operator is cautious, it is guaranteed to fail without leaving the shared data structure in an inconsistent state.
@@ -107,9 +109,12 @@ As of this writing, C++ exceptions must not be thrown from an operator into the 
 {@link galois::for_each} also can be called with various optional arguments:
 
  - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
+ - {@link galois::more_stats}: Collect even more detailed performance statistics as the loop runs.
+ - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
  - {@link galois::no_pushes}: Disable pushing new work via the user context.
- - {@link galous::no_conflicts}: Disable conflict detection in the Galois runtime.
- - {@link galois::wl}: Use the approximate priority supplied in this argument to prioritize work items.
+ - {@link galois::no_conflicts}: Disable conflict detection in the Galois runtime.
+ - {@link galois::wl}: Use the approximate priority supplied in this argument to prioritize work items. The default one is galois::defaultWL, which expands to galois::worklists::PerSocketChunkFIFO<32> as of this writing.
+ - {@link galois::per_iter_alloc}: Use per-iteration allocator for loop iterations.
 
 The following example from the tutorial shows how to use {@link galois::for_each} with conflict detection.
 This example uses a push-style algorithm where each node adds an integer stored as edge data to the node data of its neighbors.
@@ -121,7 +126,7 @@ This shows how to do this without conflict detection:
 @snippet lonestar/tutorial_examples/GraphTraversalPushOperator.cpp For each and do all without conflict detection
 
 Note that, since no new work is created and there are no conflicts between operators, this second example could just have well been implemented using {@link galois::do_all}.
-For more details see See {@link lonestar/tutorial_examples/GraphTraversalPushOperator.cpp}.
+For more details, see {@link lonestar/tutorial_examples/GraphTraversalPushOperator.cpp}.
 
 
 @subsection galois_on_each on_each
@@ -132,8 +137,9 @@ It requires an operator that accepts a thread id and the total number of threads
 
 {@link galois::on_each} can also be called with two optional arguments:
 
- - {@link galois::loopname} Turn on the collection of performance statistics associated with the loop.
- - {@link galois::more_stats} Collect even more detailed performance statistics as the loop runs.
+ - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
+ - {@link galois::more_stats}: Collect even more detailed performance statistics as the loop runs.
+ - {@link galois::no_stats}: Turn off the collection of performance statistics even when galois::loopname is given. 
 
 */
 
