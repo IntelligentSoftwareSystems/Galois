@@ -11,6 +11,7 @@
 - \subpage numa
 - \subpage reduction
 - \subpage mem_allocator
+- \subpage thread_local_storage 
 - \subpage your_own_ds
 - \subpage profiling
 - \subpage tuning

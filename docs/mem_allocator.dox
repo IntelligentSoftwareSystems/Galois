@@ -4,7 +4,7 @@
 
 \tableofcontents
 
-@section mem_allocator Memory Allocators
+@section memAlloc Memory Allocators
 
 Memory Allocators are used by dynamic data structures whose size is either known at
 runtime or changes during execution, e.g., std::vector, std::set, etc. to manage dynamically changing memory requirements.

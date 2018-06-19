@@ -1,0 +1,67 @@
+/**
+@page thread_local_storage Per-Thread and Per-Socket Storage
+
+\tableofcontents
+
+@section per_thread Per-Thread Storage
+
+Per-Thread storage refers to the storage which is local to each thread in a parallel program. This can be very useful in certain multi-threaded scenarios, for
+example, consider a multi-threaded program which accumulates information into a global variable. To avoid a race condition, every access to this global variable
+would have to be protected by a lock (mutex). Alternatively, each thread might accumulate into a thread-local variable on thread-local storage and since each 
+thread is accessing its own local variable, there will be no race condition. Finally threads can synchronize to a final accumulation from their thread-local variable
+to a single shared global variable, which will lead to much better performance as compared the former approach of locking.
+
+C++11 standard libraries provide the keyword \a _Thread_local to define thread-local variables. The header <threads.h>, if supported, defines thread_local as a synonym for that keyword.
+Example of usage:
+@code
+#include <threads.h>
+thread_local int foo = 0;
+@endcode
+
+However, in C++ only static variables can be thread-local variables. Therefore, you can not dynamically create thread-local variables using C++ standard libraries.
+
+Dynamical thread-local allocation/de-allocation can be very useful for parallel program, therefore, Galois provides dynamic thread-local storage. The source for {@link galois::substrate::PerThreadStorage}
+shows the API for per-thread storage.
+
+An example from {@link lonestar/gmetis/Refine.cpp} is shown below:
+
+The code snippet below shows the declaration for per-thread storage:
+@snippet lonestar/gmetis/Refine.cpp Example Per-Thread-Storage Declaration
+
+The code snippet below shows the usage of per-thread storage inside an operator for \a galois::for_each:
+
+@snippet lonestar/gmetis/Refine.cpp Example Per-Thread-Storage Usage 
+
+As it can be seen above that unlike C++ \a Thread_local, galois PerThreadStorage variables can be dynamically allocated/de-allocated or resized.
+
+PerThreadStorage API also allows threads to access variables on other threads by passing the remote thread's id, for example, 
+@code
+//Thread 0 accessing edgesThreadLocal on Thread 1
+auto& edges = *edgesThreadLocal.getRemote(1);
+@endcode 
+
+@section per_socket Per-Socket Storage
+
+Similar to Per-Thread storage, Galois also provides Per-Socket ( or Per-Package) storage, which is at the level of socket (or package). Each socket can have it's own copy of a variable to
+to work on and threads in different sockets can simultaneously access the socket-local variable without any race conditions. Also, in NUMA architecture, accessing a variable on a local socket is faster than accessing a variable on a remote socket (see details at @ref numa).
+
+API for per-socket storage {@link galois::substrate::PerSocketStorage} is similar to per-thread {@link galois::substrate::PerThreadStorage}.
+
+The code snippet below shows the usage of galois PerSocketStorage variable inside \a galois::on_each:
+
+@code
+galois::substrate::PerSocketStorage<double*> socket_weights;
+
+galois::on_each([](unsigned tid, unsigned total) {
+  //Only one thread in a socket is allowed to access
+  if (galois::substrate::getThreadPool().isLeader(tid)) {
+    double* p = new double[NUM_VARIABLES];
+    *socket_weights.getLocal() = p;
+    std::fill(p, p + NUM_VARIABLES, 0);
+  }
+});
+@endcode
+
+\n
+*/
+
