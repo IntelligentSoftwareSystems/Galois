@@ -2,7 +2,9 @@
 
 @page scheduler Scheduler
 
-@section scheduler_section Scheduler 
+@tableofcontents
+
+@section scheduler_section Schedulers 
 
 The schedule policy for {@link galois::for_each} can be specified by choosing
 one of the types in {@link galois::worklists} namespace and providing the type-name
