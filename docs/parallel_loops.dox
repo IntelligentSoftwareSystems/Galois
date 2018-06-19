@@ -1,0 +1,139 @@
+/**
+\page parallel_loops Parallel Loops
+
+\tableofcontents
+
+\section parallel_loop_intro Introduction
+
+Galois includes three primary types of parallel loop constructs.
+These parallel loops provide an interface for running a given operator with various schedules.
+The type of parallel loop needed depends on the properties of the operator being run.
+
+The three primary parallel loops in Galois are:
+
+ - for_each
+ - do_all
+ - on_each
+
+At a high level, {@link galois::do_all} is appropriate when a range of completely independent tasks need to be run.
+{@link galois::for_each} is appropriate in more general cases like when tasks may conflict, per iteration allocation is needed within the operator being run, or new work can be discovered as the loop runs.
+{@link galois::on_each} is a lower level interface for running an operation on each thread.
+
+@section parallel_loops Parallel Loops
+
+@subsection galois_do_all do_all
+
+{@link galois::do_all} divides the work items evenly among the threads available.
+It supports work stealing, but does not include it by default.
+It assumes that no conflict detection is needed.
+It is often used in cases like topology-driven algorithms that iterate over the nodes in a graph.
+It is also often used in cases where a group of independent work items need to be performed.
+
+{@link galois::do_all} requires the following inputs:
+
+ - A range of work items
+ - An operator to run on each work item
+
+Additional optional arguments may be passed to {@link galois::do_all} to enable or disable loop options.
+
+The range of work items can be specified using an instance of {@link galois::iterate}.
+It can be constructed from any of the following:
+
+ - A pair of iterators (begin and end)
+ - A pair of unsigned integers for begin and end
+ - An initializer list
+ - A container that provides a forward iterator (or some more permissive type of iterator)
+
+The operator can be a lambda expression, an object with a call operator (a functor), or a function pointer.
+It must be able to be called with a single work item as its only argument.
+The operator must not throw exceptions into its surrounding context.
+As of this writing, C++ exceptions can not be safely thrown from an operator into the context where it is called.
+
+If the range is a range of iterators, the work item will be a reference to whatever is obtained by dereferencing an iterator of the given type.
+If the range is a range of iterators, the work item will be an integer.
+
+{@link galois::do_all} accepts the following optional parameters to enable/disable features:
+
+ - {@link galois::steal}: Turn on work stealing.
+ - {@link galois::chunk_size}: Set the unit of work stealing. Chunk size is 32 by default.
+ - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
+
+The following is an example from the tutorial of how to use {@link galois::do_all}.
+Note that, in this example, the range of work items given to {@link galois::do_all} corresponds to the outer loop range in the serial implementation.
+Also note that the operator passed to {@link galois::do_all} corresponds to the body of the loop in the serial implementation.
+
+@snippet lonestar/tutorial_examples/GraphTraversalPullOperator.cpp Graph Traversal in pull using do_all
+
+The full example is available at {@link lonestar/tutorial_examples/GraphTraversalPullOperator.cpp}
+
+@subsection galois_for_each for_each
+
+{@link galois::for_each} is designed for cases where work items may be created dynamically and conflict detection between different threads is needed.
+It is built around parallel relaxed priority queues and is particularly useful in cases where
+
+ - Operators that touch distinct sections of data can be executed concurrently.
+ - The only strict dependencies are between a given work item and the work items it creates.
+
+The relaxed priority is used to tell the runtime that the loop may run more quickly if certain work items are prioritized.
+
+{@link galois::for_each} requires the following arguments:
+
+ - A starting range of work items
+ - An operator to apply to each work item
+
+Additional optional arguments may be passed to {@link galois::for_each} to enable or disable loop options.
+
+The range of work items to start from is specified using an instance of {@link galois::iterate}, as was the case with {@link galois::do_all}.
+
+The operator can be a lambda expression, an object with a call operator (a functor), or a function pointer.
+The operator must be callable with the following arguments
+
+ - A work item
+ - An lvalue reference to a {@link galois::UserContext}
+
+The work item will have the same type as the iterators given to the loop do when dereferenced, but if integers are given instead of iterators, the work item will be an integer.
+
+The reference to the {@link galois::UserContext} provides an interface that can be used within the body of the loop for creating new work items and performing conflict detection.
+This user context is accessible to the user primarily so it can provide a means for users to add new work items to the parallel relaxed priority queue.
+Although conflict detection is usually performed within the APIs of conflict aware data structures, the user context also manages the locks acquired while a given operator runs.
+
+The operator passed to {@link galois::for_each} is also required to be cautious.
+In other words, the operator must acquire all the locks it will need in order to execute before it modifies any data.
+In cases where an operator fails to acquire a lock, it will abort immediately, freeing any per-iteration allocations and releasing any locks it has already acquired.
+In these cases, if the operator is cautious, it is guaranteed to fail without leaving the shared data structure in an inconsistent state.
+The operator is also expected to not throw exceptions.
+As of this writing, C++ exceptions must not be thrown from an operator into the context where it is called.
+
+{@link galois::for_each} also can be called with various optional arguments:
+
+ - {@link galois::loopname}: Turn on the collection of performance statistics associated with the loop.
+ - {@link galois::no_pushes}: Disable pushing new work via the user context.
+ - {@link galous::no_conflicts}: Disable conflict detection in the Galois runtime.
+ - {@link galois::wl}: Use the approximate priority supplied in this argument to prioritize work items.
+
+The following example from the tutorial shows how to use {@link galois::for_each} with conflict detection.
+This example uses a push-style algorithm where each node adds an integer stored as edge data to the node data of its neighbors.
+
+This shows how to do this with conflict detection enabled:
+@snippet lonestar/tutorial_examples/GraphTraversalPushOperator.cpp For each with conflict detection
+
+This shows how to do this without conflict detection:
+@snippet lonestar/tutorial_examples/GraphTraversalPushOperator.cpp For each and do all without conflict detection
+
+Note that, since no new work is created and there are no conflicts between operators, this second example could just have well been implemented using {@link galois::do_all}.
+For more details see See {@link lonestar/tutorial_examples/GraphTraversalPushOperator.cpp}.
+
+
+@subsection galois_on_each on_each
+
+{@link galois::on_each} is a lower level loop construct that simply calls the given operator from each of the threads in the Galois thread pool.
+
+It requires an operator that accepts a thread id and the total number of threads.
+
+{@link galois::on_each} can also be called with two optional arguments:
+
+ - {@link galois::loopname} Turn on the collection of performance statistics associated with the loop.
+ - {@link galois::more_stats} Collect even more detailed performance statistics as the loop runs.
+
+*/
+

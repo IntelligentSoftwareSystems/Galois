@@ -5,7 +5,7 @@
 
 - \subpage concurrent_data_structure
 - \subpage graph_io_util
-- \subpage parallel_loop
+- \subpage parallel_loops
 - \subpage scheduler
 - \subpage output_stat
 - \subpage numa
