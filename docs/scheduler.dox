@@ -4,100 +4,64 @@
 
 @tableofcontents
 
-@section scheduler_section Schedulers 
+@section wl_intro Introduction
 
-The schedule policy for {@link galois::for_each} can be specified by choosing
-one of the types in {@link galois::worklists} namespace and providing the type-name
-as an argument to {@link galois::wl} parameter of the for_each. 
-The schedule policies are listed as follows:
+Worklists are required to track work items in data-driven algorithms. A scheduling policy indicates the order by which work items are extracted from a worklist. Galois provides various scheduling policies in the namespace galois::worklists, which can be instantiated by providing one of them as the template parameter of galois::wl, an optional parameter to galois::for_each. Below we will cover Galois schedulers, starting from commonly used ones.
 
- - \b OrderedList
+@section chunked_wl Chunked Worklists
 
-    Implements a std::priority_queue compatible priority queue. Elements of same
-    priority are processed in arbitrary order. 
+Chunked worklists assign work items to threads one chunk at a time. Similarly, each thread accumulates new work in a chunk before putting it on the worklist. Chunking offers better scalability because threads can amortize the cost of their access to the shared worklist over the entire chunk. The user chooses the size of the chunk: A large chunk size means less contention on the shared worklist, but may lead to load-imbalance, while a small chunk size may increase the contention on the shared worklist.
 
- - \b FIFO and \b LIFO
+The worklist of chunks itself can be organized in different ways, and we have observed that mapping the communication patterns of threads to the hardware-topology leads to more scalable implementations: 
 
-    Implements std::queue and std::stack like behaviors respectively.
-    These implementations do not scale with the number of threads, and are often not
-    suitable for parallel implementations. 
+- galois::worklists::ChunkFIFO (or galois::worklists::ChunkLIFO) maintains a single global queue (or stack) for chunks of work items.
+- galois::worklists::PerSocketChunkFIFO (or galois::worklists::PerSocketChunkLIFO) maintains a queue (or stack) of chunks per socket (multi-core processor) in the system. A thread tries to find a chunk in its local socket before stealing from other sockets. 
+- galois::worklists::PerThreadChunkFIFO (or galois::worklists::PerThreadChunkLIFO) maintains a queue (or stack) of chunks per thread. Normally threads steal work within their socket, and only the leader of a socket can steal from other sockets when its own socket is out of work.
 
- - <b> Chunked Worklists</b>
+Below is an example of using chunked worklists from {@link lonestar/tutorial_examples/SSSPPushSimple.cpp}:
 
-    Chunked worklists assign work items to threads one chunk at a time. Similarly,
-    each thread accumulates new work in a chunk before putting it on the worklist. 
-    Chunking offers better scalability because threads can amortize the cost of their access to
-    the shared worklist over the entire chunk. The user chooses the size of the
-    chunk: A large chunk size means less contention on the shared worklist, but may
-    lead to load-imbalance, while a small chunk size may increase the contention on
-    the shared worklist. The worklist of chunks itself can be organized in
-    different ways, and we have observed that mapping the communication patterns of
-    threads to the hardware-topology leads to more scalable implementations: 
+@snippet lonestar/tutorial_examples/SSSPPushSimple.cpp chunk worklist
 
-      - \b ChunkFIFO (or ChunkLIFO) maintains a single global queue (or stack) for chunks of work items
 
-      - \b PerSocketChunkFIFO (or PerSocketChunkLIFO) maintains a queue (or stack) of chunks per each socket (multi-core
-        processor) in the system. A thread tries to find a chunk in its local
-        socket before stealing from other sockets. 
-
-      - \b PerThreadChunkFIFO (or PerThreadChunkLIFO) maintains a queue (or stack) of chunks per each thread. Normally
-        threads steal work within their socket, but not every thread can steal
-        from outside its socket. Each socket
-        has a leader, which steals from other sockets when its own socket is out
-        of work. 
-        Below is an example of using chunked worklists from {@link lonestar/tutorial_examples/SSSPPushSimple.cpp}:
-
-        @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp chunk worklist
-
- - \b OrderedByIntegerMetric
+@section obim_wl Ordered By Integer Metric (OBIM)
    
-    Implements a priority queue based on a supplied function which maps a work
-    item to an integer priority. Lower values are a higher priority. An inner
-    queue may be passed to control how items within the same priority bin are stored. 
-    An example to define an OrderedByIntegerMetric scheduling in {@link lonestar/tutorial_examples/SSSPPushSimple.cpp} can be seen as follows:
+galois::worklists::OrderedByIntergerMetric is suitable for implementing soft priorities, by which active work items can be prioritized but priority inversion will not lead to wrong answers or deadlock. OBIM expects two template parameters: 
+-# An indexer mapping work items to integers. Lower values have higher priorities.
+-# The type of worklist for each priority bin. 
+
+Below is an example of defining a galois::worklists::OrderedByIntegerMetric scheduling in {@link lonestar/tutorial_examples/SSSPPushSimple.cpp}:
     
-    @snippet lonestar/tutorial_examples/SSSPPushSimple.cpp Scheduler examples
-    
-    The OBIM in the above example shows how to define a priority scheduling. 
-    The reqIndexer object defines the priority binning function. Internally this OBIM uses a PerSocketChunkLIFO to store the items with the same priority.
-    
-    OBIM works well when the algorithms performance is sensitive to scheduling, and the work-items can be grouped into a small number of bins, ordered by integer priority (typically ~1000 bins). 
+@snippet lonestar/tutorial_examples/SSSPPushSimple.cpp Scheduler examples
 
+The reqIndexer object defines the priority binning function. Internally this OBIM uses a PerSocketChunkLIFO to store the items with the same priority. The following code snippet shows how to use OBIM with galois::for_each:
 
- - \b LocalQueues
+@snippet lonestar/tutorial_examples/SSSPPushSimple.cpp OBIM
+  
+OBIM works well when the algorithms performance is sensitive to scheduling, and the work-items can be grouped into a small number of bins, ordered by integer priority (typically ~1000 bins). For example, when a single-source shortest path problem, focusing on nodes with lower distances will converge faster if there are sufficient number of nodes to be processed in parallel.
 
-    Creates local non-shared worklists which are used for all work generated during concurrent operation and use a global worklist for all initial work. 
+@section bsp_wl BulkSynchronous
 
- - \b BulkSynchronous
+When parallel execution is organized in rounds separated by barriers, existing work items are processed in current round, while new items generated in current round will be postponed until the next round. If this is the case, galois::worklists::BulkSynchronous can be used to avoid maintaining two worklists explicitly in user code. The underlying worklist for rounds can be customized by providing template parameters to galois::worklists::BulkSynchronous.
 
-    Executes the work items in parallel rounds, where all existing items in the
-    worklist are processed in current round, while any new items generated as a
-    result of this processing are postponed till next round. The rounds are
-    separated by barriers. 
+@section lq_wl LocalQueue
 
+galois::worklists::LocalQueue creates local non-shared worklists which are used for all work generated during concurrent operation and use a global worklist for all initial work.
 
- - \b OwnerComputes
+@section onwer_wl OwnerComputes
 
-    Is similar to LocalQueues, however, the user can provide a functor to map
-    work items to threads. So a thread may generate a work item and specify another
-    thread to process it. This functor is one of the template parameters, which
-    maps each work item to the range [0:numThreads). Another
-    difference from LocalQueues is that worklists are maintained per socket. 
+galois::worklists::OwnerComputes is similar to galois::worklists::LocalQueue. The differences are listed below:
+-# The user can provide a mapper as a template parameter to galois::worklists::OwnerComputes. This mapper maps work items to threads, represented as integers in the interval of [0, numThreads). A thread may generate a work item and specify another thread to process it.
+-# The underlying worklists are maintained per socket.
 
+@section stable_iter_wl StableIterator
 
- - \b StableIterator
+galois::worklists::StableIterator can be used when loop iterates over a fixed range of items, and the operator does not generate work new items. It is different from galois::do_all in the sense that it supports speculation and allows for iterations to abort.
 
-    Similar to {@link galois::do_all}, where the loop iterates over a fixed range
-    of items, and the operator does not generate new work. The key difference from
-    {@link galois::do_all} is that this scheduling policy supports speculation and
-    allows for iterations to abort. 
+@section seq_wl Sequential Worklists
 
-@section workstealing Work Stealing
+Galois also provides sequential worklists, where push() and pop() need to acquire locks. As such, sequential schedulers are not scalable beyond a few number of threads, so we do not recommend using them with parallel loops.
 
-galois::do_all devided the work items evenly to all threads. The work stealing is disabled by default. You can specify galois::steal() in galois::do_all to enable the work stealing. Work stealing is implemented hierarchically similar to PerThreadChunkFIFO.
-Threads steal work when they finish their local work. Normally threads steal work within their socket, but only the socket leader can steal from outside its socket. The stealing amount is half of the rest work of the stolen thread.
-
-Below is an example of turning on work stealing for a galois::do_all loop.
-@snippet lonestar/tutorial_examples/Torus.cpp work stealing
+- galois::worklists::FIFO (galois::worklists::LIFO) implements std::queue (std::stack) like behavior.
+- galois::worklists::OrderedList implements a std::priority_queue compatible priority queue. Elements of same priority are processed in arbitrary order.
 
 */
