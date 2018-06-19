@@ -557,7 +557,6 @@ struct SGDBlockJumpAlgo {
   };
 
   void operator()(Graph& g, const StepFunction& sf) {
-
     galois::StatTimer preProcessTimer("PreProcessingTime");
     preProcessTimer.start();
     const size_t numUsers = g.size() - NUM_ITEM_NODES;
@@ -1420,7 +1419,6 @@ void run() {
             << " num ratings: " << g.sizeEdges() << "\n";
 
   std::unique_ptr<StepFunction> sf{newStepFunction()};
-
   std::cout << "latent vector size: " << LATENT_VECTOR_SIZE
             << " algo: " << algo.name() << " lambda: " << lambda;
 
