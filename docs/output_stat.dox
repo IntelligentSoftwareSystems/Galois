@@ -78,7 +78,7 @@ STAT, (NULL), Time, TMAX, 19<br>
 STAT, (NULL), Time, ThreadValues, 19<br>
 ...
 
-Note the lines with TOTAL_TYPE of "ThreadValues" report a sequence of numbers for threads 0 to 7 in this example. Per-thread values are reported only for stats aggregated by TSUM operation.
+Note the lines with TOTAL_TYPE of "ThreadValues" report sequences of statistics for threads 0 to 7 in this example. Per-thread values are reported only for stats aggregated by TSUM operation.
 
 </ol>
 
@@ -86,7 +86,7 @@ Note the lines with TOTAL_TYPE of "ThreadValues" report a sequence of numbers fo
 
 Monitor algorithm-specific statistics with the following steps.
 <ol>
-<li> Identify the aggregation of the desired statistics into reduction operations, e.g. sum, min, max, etc.
+<li> Identify the aggregation of the desired statistics as reduction operations, e.g. sum, min, max, etc.
 <li> Declare the reducible object for the statistics before the parallel loop of interest. See @ref reduction for reducible objects available in Galois.
 <li> Collect per-thread contribution for the statistics in the parallel loop of interest.
 <li> Reduce and report the statistics after the parallel loop of interest.
@@ -106,7 +106,7 @@ Finally, after the parallel loop for SSSP is done, report the number of bad work
 
 In the above example, the TOTAL_TYPE for BadWork is SINGLE.
 
-galois::runtime::reportStat_Single can be used if the statistic is reduced to a single value before being reported. Other reporting functions are galois::runtime::reportStat_Tmax, galois::runtime::reportStat_Tmin, galois::runtime::reportStat_Tsum, and galois::runtime::reportStat_Tavg, but they are rarely used in user code. The suffices indicate the TOTAL_TYPE for the statistics being reported. All the stat reporting functions take three parameters: name for the region, name for the statistic, and value to be aggregated/reported.
+galois::runtime::reportStat_Single can be used if the statistic is reduced to a single value before being reported. Other stat reporting functions are galois::runtime::reportStat_Tmax, galois::runtime::reportStat_Tmin, galois::runtime::reportStat_Tsum, and galois::runtime::reportStat_Tavg, but they are rarely used in user code. The suffixs of a stat reporitng function indicates the TOTAL_TYPE for the statistic being reported. All the stat reporting functions take three parameters: name for the region, name for the statistic, and the value to be aggregated/reported.
 
 Conditional reporting of a statistic can be achieved by using conditional stat reporting functions, i.e. galois::runtime::reportStatCond_Single, galois::runtime::reportStatCond_Tmax, galois::runtime::reportStatCond_Tmin, galois::runtime::reportStatCond_Tsum, and galois::runtime::reportStatCond_Tavg. The conditional stat reporting functions accept a constant expression as a template parameter, and the reporting is turned on only when the constant expression is evaluated to true. Below is an code snippet showing the use of reportStatCond_Single:
 
@@ -117,7 +117,7 @@ constexpr bool TRACE_WORK=false;
 // use this line for profiling code
 //constexpr bool TRACE_WORK=true;
 
-galois::runtime::reportStatCond_Single< TRACE_WORK >("SSSP", "BadWork", BadWork.reduce());
+galois::runtime::reportStatCond_Single< TRACE_WORK > ("SSSP", "BadWork", BadWork.reduce());
 @endcode
 
 @section stat_timer Timing Serial Code Region
