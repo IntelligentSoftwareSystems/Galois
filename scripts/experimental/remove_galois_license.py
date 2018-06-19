@@ -9,10 +9,10 @@ import textwrap
     returns: text with license removed
 """
 def commentRemover(text, filename):
-  new_license_text = """/**
+  new_license_text = """/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
- * The code is being released under the terms of XYZ License (a copy is located in
- * LICENSE.txt at the top-level directory).
+ * The code is being released under the terms of the 3-Clause BSD License (a
+ * copy is located in LICENSE.txt at the top-level directory).
  *
  * Copyright (C) 2018, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
@@ -34,10 +34,12 @@ def commentRemover(text, filename):
       return new_license_text # note: a space and not an empty string
     else:
       return s
+
   pattern = re.compile(
       #r'/\*.*?\*/',
       #r'/\*.*License.*?\*/\s+',
-      r'/\*.*License.*?.*The University of Texas at Austin.*?\*/\s+',
+      #r'/\*.*License.*?.*The University of Texas at Austin.*?\*/\s+',
+      r'/\*.*This file belongs to the Galois project.*?.*or loss or inaccuracy of data of any kind\..*?\*/\s+',
       re.DOTALL | re.MULTILINE
   )
 
