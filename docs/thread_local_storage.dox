@@ -23,8 +23,6 @@ However, in C++ only static variables can be thread-local variables. Therefore, 
 Dynamical thread-local allocation/de-allocation can be very useful for parallel program, therefore, Galois provides dynamic thread-local storage. The source for {@link galois::substrate::PerThreadStorage}
 shows the API for per-thread storage.
 
-An example from {@link lonestar/gmetis/Refine.cpp} is shown below:
-
 The code snippet below shows the declaration for per-thread storage:
 @snippet lonestar/gmetis/Refine.cpp Example Per-Thread-Storage Declaration
 
