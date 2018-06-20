@@ -504,7 +504,7 @@ public:
 };
 
 //! This is the base source of memory for all allocators.
-//! It maintains a freelist of hunks acquired from the system
+//! It maintains a freelist of chunks acquired from the system
 class SystemHeap {
 public:
   // FIXME: actually check!
