@@ -17,7 +17,7 @@ STAT, for_each_1, Commits, TSUM, 9000000<br>
 STAT, for_each_1, Pushes, TSUM, 0<br>
 STAT, for_each_1, Conflicts, TSUM, 28387<br>
 
-The first row is the header of the csv output. REGION tells you which parallel loop the statistics are related. For example, "for_each_1" is the name of the parallel loop which has an option of galois::loopname("for_each_1").
+The first row is the header of the csv output. REGION tells you which parallel loop the statistics are related. For example, "for_each_1" corresponds to the parallel loop which has an option of galois::loopname("for_each_1").
 
 CATEGORY specifies what are being reported for the parallel region. For galois::for_each loops, the following five statistics are reported:
 <ol>
