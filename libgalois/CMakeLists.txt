@@ -57,7 +57,7 @@ if(NUMA_FOUND)
   add_definitions(-DGALOIS_USE_NUMA)
   target_link_libraries(galois_shmem ${NUMA_LIBRARY})
 else()
-  message(WARNING "No NUMA Support.  Likely poor performance")
+  message(WARNING "No NUMA Support.  Likely poor performance for multi-socket systems.")
 endif()
 
 if (VTune_FOUND)
