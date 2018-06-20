@@ -25,7 +25,7 @@ Below is an example of using chunked worklists from {@link lonestar/tutorial_exa
 
 @section obim_wl Ordered By Integer Metric (OBIM)
    
-galois::worklists::OrderedByIntergerMetric is suitable for implementing soft priorities, by which active work items can be prioritized but priority inversion will not lead to wrong answers or deadlock. OBIM expects two template parameters: 
+galois::worklists::OrderedByIntegerMetric is suitable for implementing soft priorities, by which active work items can be prioritized but priority inversion will not lead to wrong answers or deadlock. OBIM expects two template parameters: 
 -# An indexer mapping work items to integers. Lower values have higher priorities.
 -# The type of worklist for each priority bin. 
 
@@ -55,11 +55,11 @@ galois::worklists::OwnerComputes is similar to galois::worklists::LocalQueue. Th
 
 @section stable_iter_wl StableIterator
 
-galois::worklists::StableIterator can be used when loop iterates over a fixed range of items, and the operator does not generate work new items. It is different from galois::do_all in the sense that it supports speculation and allows for iterations to abort.
+galois::worklists::StableIterator can be used when loop iterates over a fixed range of items, and the operator does not generate new work items. It is different from galois::do_all in the sense that it supports speculation and allows for iterations to abort.
 
 @section seq_wl Sequential Worklists
 
-Galois also provides sequential worklists, where push() and pop() need to acquire locks. As such, sequential schedulers are not scalable beyond a few number of threads, so we do not recommend using them with parallel loops.
+Galois also provides sequential worklists, where push() and pop() need to acquire locks. As such, sequential schedulers are not scalable beyond a few number of threads, so we recommend not using them with parallel loops.
 
 - galois::worklists::FIFO (galois::worklists::LIFO) implements std::queue (std::stack) like behavior.
 - galois::worklists::OrderedList implements a std::priority_queue compatible priority queue. Elements of same priority are processed in arbitrary order.
