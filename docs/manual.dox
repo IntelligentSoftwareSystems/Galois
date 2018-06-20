@@ -1,20 +1,29 @@
 /**
 \page Manual Manual 
 
-\tableofcontents
+User-level Galois Programs
+==========================
 
--# \subpage introduction
--# \subpage parallel_loops
--# \subpage scheduler
--# \subpage concurrent_data_structure
--# \subpage reduction
--# \subpage output_stat
--# \subpage thread_local_storage 
--# \subpage graph_io_util
--# \subpage numa
--# \subpage mem_allocator
--# \subpage your_own_ds
--# \subpage profiling
--# \subpage tuning
+- \subpage introduction
+- \subpage parallel_loops
+- \subpage reduction
+- \subpage scheduler
+- \subpage concurrent_data_structures
+- \subpage graph_io_util
+- \subpage output_stat
+
+Library-level Galois Constructs
+===============================
+
+- \subpage thread_local_storage 
+- \subpage numa
+- \subpage mem_allocator
+- \subpage your_own_ds
+
+Performance Tuning of Galois Programs
+=====================================
+
+- \subpage profiling
+- \subpage tuning
 
 */
