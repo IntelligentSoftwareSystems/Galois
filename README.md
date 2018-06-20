@@ -8,17 +8,17 @@ an implicitly parallel programming model, where the programmer replaces serial l
 constructs (e.g. for and while) and serial data structures in their algorithms with parallel loop
 constructs and concurrent data structures provided by Galois to express their algorithms.
 Galois is designed so that the programmer does not have to deal with low-level parallel programming constructs such as
-threads, locks, barriers, condition variables etc. 
+threads, locks, barriers, condition variables, etc. 
 
 Highlights include:
 - Parallel *for_each* loop that handles dependencies between iterations, as well as
-  dynamic work creation, and, a *do_all* loop for simple parallelism. Both provide load balancing and excellent
+  dynamic work creation, and a *do_all* loop for simple parallelism. Both provide load balancing and excellent
   scalability on multi-socket systems
 - A concurrent graph library designed for graph analytics algorithms as well as
   other domains such as irregular meshes. 
-- Scalable concurrent containers such as bag, vector, list etc. 
+- Scalable concurrent containers such as bag, vector, list, etc. 
 
-Galois is released under BSD-3-Clause license. 
+Galois is released under article BSD-3-Clause license. 
 
 
 Building Galois
@@ -31,21 +31,24 @@ Galois builds and runs on GNU/Linux (and compatible operating systems).
 
 At the minimum, Galois depends on the following software:
 
-- A modern C++ compiler compliant with C++-14 standard (GCC >= 6.1, Intel >= 17.0, LLVM >= 4.0)
+- A modern C++ compiler compliant with the C++-14 standard (GCC >= 6.1, Intel >= 17.0, LLVM >= 4.0)
 - CMake (>= 3.2.3)
 - Boost library ( >= 1.60.0, we recommend building/installing the full library)
 
 
-Here are the dependencies for optional features: 
+Here are the dependencies for the optional features: 
 
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
 - CUDA (>= 8.0) if you want to build distributed hetergeneous applications
+- Cilk 
+- Eigen
+- Doxygen for compiling documentation as webpages or latex files.
 
 
 Compiling Galois
 --------------------------
-We use cmake. Run the following commands to set up a build directory:
+We use CMake. Run the following commands to set up a build directory, e.g. `build/default`, or `build/debug`, etc.:
 
 ```Shell
 ROOT=`pwd` # Or top-level Galois source dir
@@ -64,12 +67,12 @@ Galois applications are in `lonestar` directory.  In order to build a particular
 cd lonestar/<app-dir-name>; make -j
 ```
 
-You can also build everything by running `make -j` in build directory, but that may
-take a lot of time. 
+You can also build everything by running `make -j` in the build directory, but that may
+take a lot of time and will download additional files.
 
-More esoteric systems may require a toolchain file, check ../cmake/Toolchain
+More esoteric systems may require a toolchain file; check `../cmake/Toolchain`
 if there is a file corresponding to your system. If so, use the following
-cmake command:
+CMake command:
 
 ```Shell
 cmake -C ${ROOT}/cmake/Toolchain/${platform}-tryrunresults.cmake \
@@ -100,11 +103,11 @@ or some may even generate random inputs on the fly.
 Running
 ---------
 
-All Lonestar applications take `-t` commandline option to specify the number of
+All Lonestar applications take a `-t` command-line option to specify the number of
 threads to use. All applications run a basic sanity check (often insufficient for
-correctness) on the program output, which can be turned off with `-noverify` option. 
+correctness) on the program output, which can be turned off with the `-noverify` option. 
 
-An application upon successful completion will produce some stats regarding running
+Upon successful completion, each application will produce some stats regarding running
 time of various sections, parallel loop iterations and memory usage, etc. These
 stats are in CSV format and can be redirected to a file using `-statFile` option.
 Please refer to the manual for details on stats. 
@@ -119,13 +122,13 @@ Documentation
 ====================
 
 Galois documentation is produced using doxygen, included in this repository, which includes a tutorial, a user's
-manual and API documentation for Galois library. 
+manual and API documentation for the Galois library. 
 
 Users can build doxygen documentation in the build directory using:
 
 ```Shell
 make doc
-your-fav-browser docs/index.html &
+your-fav-browser html/index.html &
 ```
 
 See online documentation at:
@@ -135,10 +138,10 @@ See online documentation at:
 Source-Tree Organization
 ========================
 
-- `libgalois` contains the source code for shared memory Galois library, e.g., runtime, graphs, worklists etc. 
-- `lonestar` contains Lonestar benchmark applications and tutorial examples for Galois
-- `libdist` contains the source code for distributed memory and heterogeneous Galois library.
-- `dist_apps` contains the source code for distributed memory and heterogeneous
+- `libgalois` contains the source code for the shared-memory Galois library, e.g., runtime, graphs, worklists, etc. 
+- `lonestar` contains the Lonestar benchmark applications and tutorial examples for Galois
+- `libdist` contains the source code for the distributed-memory and heterogeneous Galois library
+- `dist_apps` contains the source code for the distributed-memory and heterogeneous
   benchmark applications
 - `tools` contains various helper programs such as graph-converter to convert
   between graph file formats and graph-stats to print graph properties
