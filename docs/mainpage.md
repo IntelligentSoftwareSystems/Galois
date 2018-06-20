@@ -32,6 +32,6 @@ copy is located in LICENSE.txt at the top-level directory).
 
 Contributions
 =============
-Whehter or not you state this explicitly, by submitting any copyrighted
+Whether or not you state this explicitly, by submitting any copyrighted
 material to the Galois project, you agree to license the material under the
 above license and warrant that you have the legal authority to do so.
