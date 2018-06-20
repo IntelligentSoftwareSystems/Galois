@@ -15,8 +15,8 @@ User-level Galois Programs
 Library-level Galois Constructs
 ===============================
 
-- \subpage thread_local_storage 
 - \subpage numa
+- \subpage thread_local_storage
 - \subpage mem_allocator
 - \subpage your_own_ds
 

@@ -200,4 +200,6 @@ Accessing the elements is only allowed in serial. galois::InsertBag::begin and g
 
 @snippet lonestar/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
 
+<br>
+
 */
