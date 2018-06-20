@@ -77,8 +77,10 @@ VectorInt v;
 @subsection heaps_in_galois Types of Heaps in Galois
 
 The allocators in Galois are implemented in a modular fashion. An allocator can take a heap implementation as its template argument. A heap implementation defines two functions:
+
 - `void* allocate(size_t)`, and
 - `void deallocate(void*, size_t)`.
+
 Several heap implementations are just wrappers around another heap implementation to modify its interface in some way. In the following we list a few of them and show an example:
 
 - {@link galois::runtime::SystemHeap} defines the basic heap implementation used by Galois allocators, and is the source of all heap memory. It is implemented as a list of pages stored by each thread.
