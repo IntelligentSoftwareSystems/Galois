@@ -5,11 +5,7 @@ import fileinput
 import getopt
 import textwrap
 
-""" remove license from the files.
-    returns: text with license removed
-"""
-def commentRemover(text, filename):
-  new_license_text = """/*
+new_license_text = """/*
  * This file belongs to the Galois project, a C++ library for exploiting parallelism.
  * The code is being released under the terms of the 3-Clause BSD License (a
  * copy is located in LICENSE.txt at the top-level directory).
@@ -28,6 +24,10 @@ def commentRemover(text, filename):
  * Documentation, or loss or inaccuracy of data of any kind.
  */\n\n"""
 
+""" remove license from the files.
+    returns: text with license removed
+"""
+def commentRemover(text, filename):
   def replacer(match):
     s = match.group(0)
     if s.startswith('/'):
@@ -36,14 +36,22 @@ def commentRemover(text, filename):
       return s
 
   pattern = re.compile(
-      #r'/\*.*?\*/',
-      #r'/\*.*License.*?\*/\s+',
-      #r'/\*.*License.*?.*The University of Texas at Austin.*?\*/\s+',
-      r'/\*.*This file belongs to the Galois project.*?.*or loss or inaccuracy of data of any kind\..*?\*/\s+',
-      re.DOTALL | re.MULTILINE
+    #r'/\*.*?\*/',
+    #r'/\*.*License.*?\*/\s+',
+    #r'/\*.*License.*?.*The University of Texas at Austin.*?\*/\s+',
+    r'/\*.*This file belongs to the Galois project.*?.*or loss or inaccuracy of data of any kind\..*?\*/\s+',
+    re.DOTALL | re.MULTILINE
   )
 
   return re.sub(pattern, replacer, text, 1)
+
+def licenseFind(text):
+  pattern = re.compile(
+    r'/\*.*This file belongs to the Galois project.*?.*or loss or inaccuracy of data of any kind\..*?\*/\s+',
+    re.DOTALL | re.MULTILINE
+  )
+
+  return re.search(pattern, text)
 
 def main(argv):
   inputfile = ''
@@ -62,13 +70,22 @@ def main(argv):
     print 'Input file is "', inputfile
 
     filename = inputfile
+
   with open(filename, 'r+') as f:
-       uncmtFile = commentRemover(f.read(), filename)
-       #print uncmtFile
+     originalText = f.read()
+
+     found = licenseFind(originalText)
+     if found == None:
+       f.seek(0)
+       f.write(new_license_text)
+       f.write(originalText)
+     else:
+       uncmtFile = commentRemover(originalText, filename)
        f.seek(0)
        f.write(uncmtFile)
-       f.truncate()
-       #print uncmtFile
+
+     f.truncate()
+     f.close()
 
 if __name__ == "__main__":
   main(sys.argv[1:])
