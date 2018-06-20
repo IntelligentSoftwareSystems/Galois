@@ -48,15 +48,22 @@ You can further exploit the semantics of work items when designing your own per-
   <li> Extend from galois::GSimpleReducible if the work items are cheap to copy.
   <li> Extend from galois::GBigReducible if the work items are expensive to copy, e.g. containers.
   </ul>
+See @ref reduction for more details.
 <li> If the work items need to be organized with a certain structure, extend from galois::PerThreadContainer.
 <li> If the work items form a multi-set and never get removed before processed, use galois::InsertBag.
 </ol>
 
-Start from galois::substrate::PerThreadStorage if none of the above fits your needs.
+Start from galois::substrate::PerThreadStorage or galois::substrate::PerSocketStorage if none of the above fits your needs. See @ref thread_local_storage for more details.
 
 local_iterator for a per-thread data structure can be naturally defined as the iterators to thread-local containers. The global iterator should be carefully constructed from local_iterators in order to conform to the STL interface. Galois will pick up local iterators to leverage the spacial/temporal locality in work generation.
 
 See galois::InsertBag as an example data structure built with this design in mind.
+
+
+@subsection ds_and_mem_alloc Managing Memory with Custom Allocators
+
+To address the memory usage in a NUMA-aware fashion, you may need to work with custom memory allocators. As an example, the code snippet below shows parts of the implementation for galois::gdeque related to memory allocations:
+@snippet include/galois/gdeque.h Example Fixed Size Allocator
 
 
 @section conflict_aware_ds Conflict-aware Galois Data Structures
@@ -69,48 +76,39 @@ The neighbors of a 2D torus node can be inferred given the width, height and nod
 @subsection torus_conflict_awareness Conflict Awareness
 
 To make torus nodes be aware of conflicts, we can (1) use an internal struct to hold the real data, and (2) let the internal struct inherit from galois::runtime::Locakble. See the code snippet below for an example. T, given as a template parameter, is the type of actual node data.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Internal type with Lockable
 
 To store node data with locks for a torus, we instantiate a galois::LargeArray containing elements of the internal struct:
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Array of internal type
 
 To detect conflicts, we need to call galois::runtime::acquire on instances of the internal struct. All functions acquiring node ownership need to do so, so it is convenient to implement the call inside a wrapper function, as the following code snippet shows. size() returns the number of nodes in the torus. The parameter mflag is default to galois::MethodFlag::WRITE. We will see an example of optimizing out conflict detection using this parameter later.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Acquire node ownership
 
 Now we need to let all methods that need ownership of a node call the wrapper function, as the code snippet below shows. Returning reference to node data allows users to modify it in-place.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Get data
 
 
 @subsection torus_stl Container Interface
 
 Recall that galois::do_all and galois::for_each expect galois::iterate, whose parameter can be a pair of integers or a container with well-defined iterator. To make our 2D torus interoperable with Galois, we need to provide size-related functions or the iterator, given by begin() and end(), to loop through nodes. Size-related functions are easy to provide:
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp APIs for sizes
 
 Iterators can be defined as the following:
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Types for STL
 
 Users may instantiate iterators by begin() and end(), which are implemented as the following:
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Iterators
 
 
 @subsection torus_easy_cautiousness Easy Operator Cautiousness
 
 In our current example, we need to increment each node's immediate neighbors. Hence, we need APIs to get neighbors for a given node. Since we need to lock all neighbors before actual increments for operator cautiousness, it will be convenient to have a function locking all neighbors for a given node. The following code snippet shows how to achieve this.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Easy operator cautiousness
 
 
 @subsection torus_use Use the 2D Torus
 
 Now we can use our 2D torus as the following.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Use torus
 
 Upon termination, this example app will output statistics similar to the following (generated with a 2000*2000 torus and 24 threads).
@@ -127,7 +125,6 @@ STAT, for_each_torus_add_neighbors, Conflicts, TSUM, 1481<br>
 Note that all conflicts are detected successfully and reported.
 
 Conflict detection can be turned off when not required by passing galois::MethodFlag::UNPROTECTED to getData(), as shown below in the serial loop for verification.
-
 @snippet lonestar/tutorial_examples/ConflictAwareTorus.cpp Turn off conflict detection  
 
 The full example is available at {@link lonestar/tutorial_examples/ConflictAwareTorus.cpp}
