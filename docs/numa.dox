@@ -6,99 +6,74 @@
 
 @section numa-intro What is NUMA?
 
-Non-uniform memory access (NUMA) refers to the memory sytem design in which the memory access time depends on 
-the location of memory. In other words, a processor accessing a memory location that is placed locally 
-(in its socket) takes less time. If it accesses non-local memory, it incurs high overhead.
-Therefore, for the best performance on a machine with NUMA architecture, program writers must consider how memory
-is allocated among the sockets of the machine and allocate memory such that local memory accesses occur as much as possible.
+Non-uniform memory access (NUMA) refers to the memory system design in which the memory access time depends on the location of memory. In other words, a processor accessing a memory location that is placed locally (in its socket) takes less time. If it accesses non-local memory, it incurs higher overhead. Therefore, for the best performance on a machine with NUMA architecture, program writers must consider how memory is allocated among the sockets of the machine and allocate memory such that local memory accesses occur as much as possible.
 
 @section numa-types NUMA Allocation Functions in Galois
 
-Galois supports supports five kinds of NUMA allocation schemes. To illustrate them, assume that we have 
-four threads in the system and that each thread belongs to its own socket in the following figures.
+Galois supports five kinds of NUMA allocation schemes. To illustrate them, assume that we have four threads in the system and that each thread belongs to its own socket in the following figures.
 
 @subsection numa-malloc-local Local
 
-The thread that called the allocate will bind the pages to its local socket.
+The thread calling the allocate will bind the pages to its local socket.
 
 @image html numa_local.png "Example of Local Allocation: Thread 2 allocated the memory, so it is bound to Thread 2"
 
 @subsection numa-malloc-floating Floating
 
-The allocated memory will not be pre-faulted. In other words, the first thread
-to touch the memory after it's allocated will bind the page to its own socket.
+The allocated memory will not be pre-faulted. In other words, the first thread to touch the memory after it's allocated will bind the page to its own socket.
 
 @image html numa_floating.png "Example of Floating Allocation: A chunk is bound to the first thread that touches it"
 
 @subsection numa-malloc-blocked Blocked
 
-Each thread will get an even contiguous chunk of pages from the allocated 
-memory (e.g.  thread 0 gets the first contiguous chunk, thread 1 gets
-the next contiguous chunk, etc.).
+Each thread will get an even contiguous chunk of pages from the allocated memory: thread 0 gets the first contiguous chunk, thread 1 gets the next contiguous chunk, etc.
 
 @image html numa_blocked.png "Example of Blocked Allocation: Each thread gets an equal chunk"
 
 @subsection numa-malloc-interleaved Interleaved
 
 Distribute pages among threads (and as a result, NUMA sockets) in a round-robin 
-fashion (i.e. for N threads, thread 0 gets page 0, thread 1 gets page 1, ... 
-thread N gets page N, thread 0 gets page N + 1...). 
+fashion: for N threads, thread 0 gets page 0, thread 1 gets page 1, ..., thread N gets page N, thread 0 gets page (N + 1)...
 
 @image html numa_interleaved.png "Example of Interleaved Allocation: Each chunk gets assigned in round-robin manner"
 
 @subsection numa-malloc-specific Specific
 
-Specify exactly how pages are to be distributed among threads in contiguous
-chunks through an array (e.g. thread 0 may get first 5 pages, then thread 1
-the next 3, and so on).
+Specify exactly how pages are to be distributed among threads in contiguous chunks through an array (e.g. thread 0 may get first 5 pages, then thread 1 the next 3, and so on).
 
 @image html numa_specific.png "Example of Specific Allocation: Contiguous chunks assigned to each thread in user-specified manner"
 
 @section numa-large-array NUMA and Large Arrays
 
-Currently, Galois supports NUMA aware allocation for galois::LargeArray objects.
-After we construct a LargeArray object, we can specify the type of NUMA allocation  
-by calling the following appropriate function:
+Currently, Galois supports NUMA-aware allocation for galois::LargeArray objects. After we construct a LargeArray object, we can specify the type of NUMA allocation by calling the following appropriate function:
 
 @snippet LargeArray.h allocatefunctions
 
 More details can be found in LargeArray.h.
 
-Here is an example of blocked allocation of LargeArrays for storing the data 
-of nodes and edges in a graph.
+Here is an example of blocked allocation of LargeArrays for storing the data of nodes and edges in a graph.
 
 @snippet LC_CSR_Graph.h numaallocex
 
 
 @section numa-galois-graphs NUMA Allocation in Galois Graphs
-Galois also supports NUMA allocation for graph data structures. 
-Graph data structures have a template parameter called UseNumaAlloc. 
-If it is toggled, then the graph will use Blocked NUMA allocation 
-(galois::graphs::LC_Linear_Graph and 
-galois::graphs::LC_Morph_Graph will use Local allocation if toggled). 
-Otherwise, it will use Interleaved NUMA allocation.
+
+Galois also supports NUMA-aware allocation for graph data structures. Graph data structures have a template parameter called UseNumaAlloc. If it is set to true, then the graph will use Blocked NUMA allocation 
+(galois::graphs::LC_Linear_Graph and galois::graphs::LC_Morph_Graph will use Local allocation if UseNumaAlloc is true). Otherwise, it will use Interleaved NUMA allocation.
 
 The following code snippet shows the template argument for LC_CSR_Graph from LC_CSR_Graph.h:
 
 @snippet LC_CSR_Graph.h doxygennuma
 
-The NUMA allocation can also specified using the following pattern (taken from SSSP.cpp)  without using the template parameter.
+The NUMA allocation can also be specified using the following pattern (taken from SSSP.cpp) without using the template parameter UseNumaAlloc.
 
 @snippet SSSP.cpp withnumaalloc
 
-Note that if the numaMap parameter in galois::graphs::FileGraph::partFromFile, 
-if true, will toggle Interleaved NUMA allocation.
+Note that if the numaMap parameter in galois::graphs::FileGraph::partFromFile is true, then Interleaved NUMA allocation is used.
 
 @section numa-best-behavior NUMA Guidelines
 
-The best NUMA scheme for a program depends on the pattern of accesses by the
-threads in the program.
+The best NUMA scheme for a program depends on the pattern of accesses by the threads in the program.
 
-For instance, if each thread accesses only a relatively even portion of memory and 
-does not access other threads' data, then the Blocked allocation scheme will likely perform the best. 
-On the other hand, if each thread may potentially access any part of the allocated memory, 
-the Interleaved allocation scheme may perform best. If a thread that allocates memory will be the only thread
-to use it, then Local allocation can be used. Floating allocation can be used
-if the first thread that uses a chunk of memory will be the main user of the
-chunk.
+For instance, if each thread accesses only a relatively even portion of memory and does not access other threads' data, then the Blocked allocation scheme will likely perform the best. On the other hand, if each thread may potentially access any part of the allocated memory, the Interleaved allocation scheme may perform best. If a thread that allocates memory will be the only thread to use it, then Local allocation can be used. Floating allocation can be used if the first thread that uses a chunk of memory will be the main user of the chunk.
 */
