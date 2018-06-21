@@ -10,24 +10,29 @@ library('data.table')
 
 ####START: @function to parse commadline##################
 # Parses the command line to get the arguments used
-parseCmdLine <- function (logData, isSharedMemGaloisLog) {
-  cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
+parseCmdLine <- function (logData, isSharedMemGaloisLog, graphPassedAsInput) {
+  #cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
+  cmdLineRow <- subset(logData, CATEGORY == "CommandLine" & TOTAL_TYPE == "SINGLE")
 
   ## Distributed has extra column: HostID
-  if(isTRUE(isSharedMemGaloisLog))
+  if(isTRUE(isSharedMemGaloisLog)){
     cmdLine <- substring(cmdLineRow[,5], 0)
+  }
   else
     cmdLine <- substring(cmdLineRow[,6], 0)
 
   cmdLineSplit = strsplit(cmdLine, "\\s+")[[1]]
 
-  ## To check the device kind
-  pos = regexpr('-pset', cmdLineSplit)
-  deviceKind = ""
-  if(sum(pos>0) > 0){
-    deviceKind = "GPU"
-  } else {
-    deviceKind = "CPU"
+  deviceKind = "CPU"
+  if(!isTRUE(isSharedMemGaloisLog)){
+    ## To check the device kind
+    pos = regexpr('-pset', cmdLineSplit)
+    deviceKind = ""
+    if(sum(pos>0) > 0){
+      deviceKind = "GPU"
+    } else {
+      deviceKind = "CPU"
+    }
   }
 
   ## First postitional argument is always name of the executable
@@ -38,20 +43,32 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
   ## subset the threads row from the table
   numThreads <- (subset(logData, CATEGORY == "Threads"& TOTAL_TYPE != "HostValues"))$TOTAL
 
-  ## subset the input row from the table
-  inputPath <- (subset(logData, CATEGORY == "Input"& TOTAL_TYPE != "HostValues"))$TOTAL
-  inputPathSplit <- strsplit(inputPath[[1]], "/")[[1]]
-  input <- inputPathSplit[length(inputPathSplit)]
-  ### This is to remore the extension for example .gr or .sgr
-  inputsplit <- strsplit(input, "[.]")[[1]]
-  if(length(inputsplit) > 1) {
-    input <- inputsplit[1]
+  input = "noInput"
+  if(isTRUE(graphPassedAsInput)){
+    ## subset the input row from the table
+    inputPath <- (subset(logData, CATEGORY == "Input"& TOTAL_TYPE != "HostValues"))$TOTAL
+    print(inputPath)
+    if(identical(inputPath, character(0))){
+      inputPath = cmdLineSplit[3]
+      print(cmdLineSplit[3])
+      inputPathSplit <- strsplit(inputPath, "/")[[1]]
+      input <- inputPathSplit[length(inputPathSplit)]
+    }
+    else {
+      inputPathSplit <- strsplit(inputPath[[2]], "/")[[1]]
+      input <- inputPathSplit[length(inputPathSplit)]
+    }
+    ### This is to remore the extension for example .gr or .sgr
+    inputsplit <- strsplit(input, "[.]")[[1]]
+    if(length(inputsplit) > 1) {
+      input <- inputsplit[1]
+    }
   }
 
- if(isTRUE(isSharedMemGaloisLog)){
-   returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads, "deviceKind" = deviceKind)
-   return(returnList)
- }
+  if(isTRUE(isSharedMemGaloisLog)){
+    returnList <- list("benchmark" = benchmark, "input" = input, "numThreads" = numThreads, "deviceKind" = deviceKind)
+    return(returnList)
+  }
 
  ## Need more params for distributed galois logs
  numHosts <- (subset(logData, CATEGORY == "Hosts"& TOTAL_TYPE != "HostValues"))$TOTAL
@@ -74,11 +91,16 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog) {
 
 #### START: @function to values of timers for shared memory galois log ##################
 # Parses to get the timer values
-getTimersShared <- function (logData) {
- ##XXX NULL should not be a string
- totalTimeRow <- subset(logData, CATEGORY == "Time" & REGION == "(NULL)")
- totalTime <- totalTimeRow$TOTAL
- print(paste("totalTime:", totalTime))
+getTimersShared <- function (logData, benchmark) {
+  ##XXX NULL should not be a string
+  #if(benchmark == "matrixCompletion"){
+    #totalTimeRow <- subset(logData, CATEGORY == "Total Execution Time" & REGION == "(NULL)")
+  #}
+  #else {
+    totalTimeRow <- subset(logData, CATEGORY == "Time" & REGION == "(NULL)")
+  #}
+  totalTime <- totalTimeRow$TOTAL
+  print(paste("totalTime:", totalTime))
  returnList <- list("totalTime" = totalTime)
  return(returnList)
 }
@@ -585,19 +607,20 @@ getTimersFT <- function(logData) {
 }
 
 #### START: @function entry point for galois log parser ##################
-galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol, isFautlTolerant) {
+galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, isComputeMaxByMean, isComputePerIterVol, isFautlTolerant, graphPassedAsInput) {
   logData <- read.csv(input, stringsAsFactors=F,strip.white=T)
 
   printNormalStats = TRUE;
   if(isTRUE(isSharedMemGaloisLog)){
     print("Parsing commadline")
-    paramList <- parseCmdLine(logData, T)
+    paramList <- parseCmdLine(logData, T, graphPassedAsInput)
     print("Parsing timers for shared memory galois log")
-    timersList <- getTimersShared(logData)
+    benchmark = paramList[1]
+    timersList <- getTimersShared(logData, benchmark)
   }
   else{
     print("Parsing commadline")
-    paramList <- parseCmdLine(logData, F)
+    paramList <- parseCmdLine(logData, F, graphPassedAsInput)
     print("Parsing timers for distributed memory galois log")
     if(isTRUE(isComputeMaxByMean)){
       computeMaxByMean(logData, paramList, output)
@@ -638,24 +661,26 @@ galoisLogParser <- function(input, output, isSharedMemGaloisLog, isComputeRSD, i
 
 #############################################
 ##  Commandline options.
-############################################
+#######################################
 option_list = list(
-                     make_option(c("-i", "--input"), action="store", default=NA, type='character',
-                                               help="name of the input file to parse"),
-                     make_option(c("-o", "--output"), action="store", default=NA, type='character',
-                                               help="name of the output file to store output"),
-                     make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
-                                               help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]"),
-                     make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
-                                               help="To compute the RSD of per iteration compute time[default %default]"),
-                     make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
-                                               help="To compute the max by mean compute time[default %default]"),
-                     make_option(c("-p", "--perItrVolume"), action="store_true", default=FALSE,
-                                               help="To get the per iteration communication volume [default %default]"),
-                     make_option(c("-f", "--faultTolerance"), action="store_true", default=FALSE,
-                                               help="Logs are fault tolerant [default %default]")
+                   make_option(c("-i", "--input"), action="store", default=NA, type='character',
+                               help="name of the input file to parse"),
+                   make_option(c("-o", "--output"), action="store", default=NA, type='character',
+                               help="name of the output file to store output"),
+                   make_option(c("-s", "--sharedMemGaloisLog"), action="store_true", default=FALSE,
+                               help="Is it a shared memory Galois log? If -s is not used, it will be treated as a distributed Galois log [default %default]"),
+                   make_option(c("-r", "--relativeStandardDeviation"), action="store_true", default=FALSE,
+                               help="To compute the RSD of per iteration compute time[default %default]"),
+                   make_option(c("-m", "--maxByMean"), action="store_true", default=FALSE,
+                               help="To compute the max by mean compute time[default %default]"),
+                   make_option(c("-p", "--perItrVolume"), action="store_true", default=FALSE,
+                               help="To get the per iteration communication volume [default %default]"),
+                   make_option(c("-f", "--faultTolerance"), action="store_true", default=FALSE,
+                               help="Logs are fault tolerant [default %default]"),
+                   make_option(c("-g", "--graphPassedAsInput"), action="store_false", default=TRUE,
+                               help="Benchmark explicitly takes input graph as the positional argument [default %default]")
 
-                     )
+                   )
 
 opt_parser <- OptionParser(usage = "%prog [options] -i input.log -o output.csv", option_list=option_list)
 opt <- parse_args(opt_parser)
@@ -668,7 +693,8 @@ if (is.na(opt$i)){
     print("Output file name is not specified. Using name ouput.csv as default")
     opt$o <- "output.csv"
   }
-  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p, opt$f)
+  print(opt$g)
+  galoisLogParser(opt$i, opt$o, opt$s, opt$r, opt$m, opt$p, opt$f, opt$g)
 }
 
 ##################### END #####################
