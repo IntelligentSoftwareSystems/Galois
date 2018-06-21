@@ -263,10 +263,18 @@ public:
    */
   edge_iterator edge_end(GraphNode N);
 
+  /**
+   * Returns the edges of node N as a range that can be iterated through
+   * by C++ foreach.
+   */
   runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
     return internal::make_no_deref_range(edge_begin(N), edge_end(N));
   }
 
+  /**
+   * Returns the edges of node N as a range that can be iterated through
+   * by C++ foreach.
+   */
   runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N) {
     return edges(N);
   }
@@ -373,6 +381,7 @@ public:
   //  return reinterpret_cast<const EdgeTy*>(edgeData)[*it];
   //}
 
+  //! Get edge data given an edge iterator
   template <typename EdgeTy>
   EdgeTy& getEdgeData(edge_iterator it) {
     assert(edgeData);
@@ -388,18 +397,30 @@ public:
    */
   GraphNode getEdgeDst(edge_iterator it);
 
+  //! iterator over neighbors
   typedef boost::transform_iterator<Convert32, uint32_t*> neighbor_iterator;
+  //! iterator over node ids
   typedef boost::transform_iterator<Convert32, uint32_t*> node_id_iterator;
+  //! edge iterator
   typedef boost::transform_iterator<Convert64, uint64_t*> edge_id_iterator;
+  //! uint64 boost counting iterator
   typedef boost::counting_iterator<uint64_t> iterator;
 
-  // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
+  /**
+   * Gets an iterator to the first neighbor of node N
+   * 
+   * @warning only version 1 support, do not use with version 2
+   */
   neighbor_iterator neighbor_begin(GraphNode N) {
     return boost::make_transform_iterator((uint32_t*)raw_neighbor_begin(N),
                                           Convert32());
   }
 
-  // TODO ONLY VERSION 1 SUPPORT, DO NOT USE WITH VERSION 2
+  /**
+   * Gets an iterator to the end of node N's neighbors
+   * 
+   * @warning only version 1 support, do not use with version 2
+   */
   neighbor_iterator neighbor_end(GraphNode N) {
     return boost::make_transform_iterator((uint32_t*)raw_neighbor_end(N),
                                           Convert32());
@@ -433,8 +454,11 @@ public:
    */
   iterator end() const;
 
+  //! pair specifying a node range
   typedef std::pair<iterator, iterator> NodeRange;
+  //! pair specifying an edge range
   typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
+  //! pair of a NodeRange and an EdgeRange
   typedef std::pair<NodeRange, EdgeRange> GraphRange;
 
   /**
@@ -635,7 +659,6 @@ public:
  */
 class FileGraphWriter : public FileGraph {
   std::vector<uint64_t> outIdx;
-
   std::vector<uint32_t> starts;
   std::vector<uint32_t> outs;
   std::vector<uint64_t> starts64;
@@ -644,15 +667,21 @@ class FileGraphWriter : public FileGraph {
   size_t sizeofEdgeData;
   size_t numNodes;
   size_t numEdges;
-
 public:
+  //! Constructor: initializes nodes, edges, and edge data to 0
   FileGraphWriter() : sizeofEdgeData(0), numNodes(0), numEdges(0) {}
 
+  //! Set number of nodes to write to n
+  //! @param n number of nodes to set to
   void setNumNodes(size_t n) { numNodes = n; }
+  //! Set number of edges to write to n
+  //! @param n number of edges to set to
   void setNumEdges(size_t n) { numEdges = n; }
+  //! Set the size of the edge data to write to n
+  //! @param n size of edge data to write
   void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
 
-  //! Marks the transition to next phase of parsing, counting the degree of
+  //! Marks the transition to next phase of parsing: counting the degree of
   //! nodes
   void phase1() { outIdx.resize(numNodes); }
 

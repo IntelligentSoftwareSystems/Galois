@@ -48,17 +48,22 @@ static const int _MAP_ANON = MAP_ANON;
 // fail
 #endif
 
+/**
+ * Performs an mmap of all provided arguments.
+ */
 #ifdef HAVE_MMAP64
 template <typename... Args>
 void* mmap_big(Args... args) {
   return mmap64(std::forward<Args>(args)...);
 }
+//! offset type for mmap
 typedef off64_t offset_t;
 #else
 template <typename... Args>
 void* mmap_big(Args... args) {
   return mmap(std::forward<Args>(args)...);
 }
+//! offset type for mmap
 typedef off_t offset_t;
 #endif
 
