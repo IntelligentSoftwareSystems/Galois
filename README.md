@@ -183,3 +183,24 @@ Using basic commands (although the specific commands vary by system):
 ```Shell
 c++ -std=c++14 app.cpp -I${installdir}/include -L${installdir}/lib -lgalois_shmem
 ```
+
+Contact Us
+==========
+
+If you have questions not answered here or at 
+[Galois project website](http://iss.ices.utexas.edu/?p=projects/galois), please send them to 
+[Galois user mailing list](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
+You can also raise your issues at [here](https://github.com/IntelligentSoftwareSystems/Galois/issues).
+
+If you find a bug, it would help us if you sent (1) the command and program output and (2)
+a gdb backtrace, preferably with the debug build.
+
+```Shell
+mkdir debug
+cd debug
+cmake -DCMAKE_BUILD_TYPE=Debug ../..
+make VERBOSE=1
+gdb --args path/to/failing/program args
+(gdb) r
+(gdb) bt
+```
