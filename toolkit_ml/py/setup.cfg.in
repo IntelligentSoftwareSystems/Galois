@@ -1,3 +1,0 @@
-[bdist_wheel]
-python-tag = @PYTHON_TAG@
-plat-tag = @PLATFORM_TAG@
