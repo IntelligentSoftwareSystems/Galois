@@ -212,18 +212,15 @@ c++ -std=c++14 app.cpp -I${INSTALL_DIR}/include -L${INSTALL_DIR}/lib -lgalois_sh
 
 Contact Us
 ==========
-
-If you have questions not answered here or at 
-[Galois project website](http://iss.ices.utexas.edu/?p=projects/galois), please send them to 
-[Galois user mailing list](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
-You can also raise your issues at [here](https://github.com/IntelligentSoftwareSystems/Galois/issues).
+For bugs, please raise an issue here at gihub using the 'Issues' tab [https://github.com/IntelligentSoftwareSystems/Galois/issues] (https://github.com/IntelligentSoftwareSystems/Galois/issues).
+Please send questions and comments to [Galois project website[Galois user mailing list](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
 
 If you find a bug, it would help us if you sent (1) the command and program output and (2)
 a gdb backtrace, preferably with the debug build. Assuming you will build Galois in
-BUILD_DIR, while the source is in SRC_DIR
+BUILD_DIR, while the source is in SRC_DIR:
 
 ```Shell
-script Galois-errors.log
+script Galois-errors-log.txt
 mkdir -p $BUILD_DIR
 cd $BUILD_DIR
 cmake -DCMAKE_BUILD_TYPE=Debug $SRC_DIR
