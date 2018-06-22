@@ -18,7 +18,7 @@ Highlights include:
   other domains such as irregular meshes. 
 - Scalable concurrent containers such as bag, vector, list, etc. 
 
-Galois is released under article BSD-3-Clause license. 
+Galois is released under the BSD-3-Clause license. 
 
 
 Building Galois

@@ -4,7 +4,7 @@
 \tableofcontents
 
 
-@section goal_tutorial Goal of This Section
+@section goal_your_own_ds Goal of this Section
 
 We assume the readers have read @ref tutorial and understand Galois programming model and related constructs reasonably.
 
