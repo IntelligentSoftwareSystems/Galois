@@ -309,8 +309,12 @@ void FileGraph::fromFile(const std::string& filename) {
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
 
   // mmap file, then load from mem using fromMem function
+  int _MAP_BASE = MAP_PRIVATE;
+#ifdef MAP_POPULATE
+  _MAP_BASE |= MAP_POPULATE;
+#endif
   void* base = mmap_big(nullptr, buf.st_size, PROT_READ,
-                        MAP_PRIVATE | MAP_POPULATE, fd, 0);
+                        _MAP_BASE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
