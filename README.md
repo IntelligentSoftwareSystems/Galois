@@ -38,35 +38,41 @@ At the minimum, Galois depends on the following software:
 
 Here are the dependencies for the optional features: 
 
+- Linux HUGE_PAGES support. Performance will be degraded without HUGE_PAGES
+  enabled. Please see [https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)
+- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
+- PAPI (>= 5.2.0.0 ) for profiling sections of code
+- Vtune (>= 2017 ) for profiling sections of code
 - MPICH2 (>= 3.2) if you are interested in building and running distributed system
   applications in Galois
 - CUDA (>= 8.0) if you want to build distributed hetergeneous applications
-- Eigen (3.3.1 works for us) for some matrix completion variants
-- Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
+- Eigen (3.3.1 works for us) for some matrix-completion app variants
 
 
 Compiling Galois
 --------------------------
-We use CMake. Run the following commands to set up a build directory, e.g. `build/default`, or `build/debug`, etc.:
+We use CMake. Let's assume that SRC_DIR is the directory where the source code for Galois resides, and you wish to build galois in some BUILD_DIR. Run the following commands to set up a build directory:
 
 ```Shell
-ROOT=`pwd` # Or top-level Galois source dir
-mkdir -p build/default; cd build/default; cmake ${ROOT}
+SRC_DIR=`pwd` # Or top-level Galois source dir
+BUILD_DIR=<path-to-your-build-dir>
+mkdir -p $BUILD_DIR; cd $BUILD_DIR; cmake $SRC_DIR
 ```
 
-or
+By default, cmake sets up a "Release" build. You can also set up a "Debug" build,
+as follows:
 
 ```Shell
-mkdir -p build/debug; cd build/debug; cmake -DCMAKE_BUILD_TYPE=Debug ${ROOT}
+mkdir -p $BUILD_DIR; cd $BUILD_DIR; cmake -DCMAKE_BUILD_TYPE=Debug $SRC_DIR
 ```
 
 Galois applications are in `lonestar` directory.  In order to build a particular application:
 
 ```Shell
-cd lonestar/<app-dir-name>; make -j
+cd $BUILD_DIR/lonestar/<app-dir-name>; make -j
 ```
 
-You can also build everything by running `make -j` in the build directory, but that may
+You can also build everything by running `make -j` in the top-level of build directory, but that may
 take a lot of time and will download additional files.
 
 More esoteric systems may require a toolchain file; check `../cmake/Toolchain`
@@ -74,8 +80,8 @@ if there is a file corresponding to your system. If so, use the following
 CMake command:
 
 ```Shell
-cmake -C ${ROOT}/cmake/Toolchain/${platform}-tryrunresults.cmake \
-  -DCMAKE_TOOLCHAIN_FILE=${ROOT}/cmake/Toolchain/${platform}.cmake ${ROOT}
+cmake -C ${SRC_DIR}/cmake/Toolchain/${platform}-tryrunresults.cmake \
+  -DCMAKE_TOOLCHAIN_FILE=${SRC_DIR}/cmake/Toolchain/${platform}.cmake ${SRC_DIR}
 ```
 
 
@@ -89,9 +95,10 @@ Many Galois/Lonestar applications work with graphs. We store graphs in a binary 
 called *galois graph file* 
 (`.gr` file extension). Other formats such as edge-list or Matrix-Market can be
 converted to `.gr` format with `graph-convert` tool provided in galois. 
-You can run in your build directory:
+You can build graph-convert as follows:
 
 ```Shell
+cd $BUILD_DIR
 make graph-convert
 ./tools/graph-convert --help
 ```
@@ -104,7 +111,8 @@ Running
 
 All Lonestar applications take a `-t` command-line option to specify the number of
 threads to use. All applications run a basic sanity check (often insufficient for
-correctness) on the program output, which can be turned off with the `-noverify` option. 
+correctness) on the program output, which can be turned off with the `-noverify` option. You 
+can specify `-help` command-line option to print all available options. 
 
 Upon successful completion, each application will produce some stats regarding running
 time of various sections, parallel loop iterations and memory usage, etc. These
@@ -114,7 +122,7 @@ Please refer to the manual for details on stats.
 Running Distributed Galois
 ---------
 
-Please refer to README-DIST in the dist_apps directory for more details on
+Please refer to `dist_apps/README.md` for more details on
 running distributed benchmarks.
 
 Documentation
@@ -126,6 +134,7 @@ manual and API documentation for the Galois library.
 Users can build doxygen documentation in the build directory using:
 
 ```Shell
+cd $BUILD_DIR
 make doc
 your-fav-browser html/index.html &
 ```
@@ -141,7 +150,8 @@ Source-Tree Organization
 - `lonestar` contains the Lonestar benchmark applications and tutorial examples for Galois
 - `libdist` contains the source code for the distributed-memory and heterogeneous Galois library
 - `dist_apps` contains the source code for the distributed-memory and heterogeneous
-  benchmark applications
+  benchmark applications. Please refer to `dist_apps/README.md` for instructions on
+  building and running these apps. 
 - `tools` contains various helper programs such as graph-converter to convert
   between graph file formats and graph-stats to print graph properties
 
@@ -149,17 +159,18 @@ Source-Tree Organization
 
 Installing Galois as a library
 ==============================
-If you want to install Galois as a library,
+If you want to install Galois as a library. Assuming that you wish to install
+Galois under INSTALL_DIR:
 
 ```Shell
-cmake -DCMAKE_INSTALL_PREFIX=${installdir} ${ROOT}
+cmake -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} ${SRC_DIR}
 make install
 ```
 
 or, to speed up compilation,
 
 ```Shell
-cmake -DCMAKE_INSTALL_PREFIX=${installdir} -DSKIP_COMPILE_APPS=1 ${ROOT}
+cmake -DCMAKE_INSTALL_PREFIX=${INSTALL_DIR} -DSKIP_COMPILE_APPS=1 ${SRC_DIR}
 make install
 ```
 
@@ -169,7 +180,7 @@ Using Installed Galois
 If you are using CMake, put something like the following CMakeLists.txt:
 
 ```CMake
-set(CMAKE_PREFIX_PATH ${installdir}/lib/cmake/Galois ${CMAKE_PREFIX_PATH})
+set(CMAKE_PREFIX_PATH ${INSTALL_DIR}/lib/cmake/Galois ${CMAKE_PREFIX_PATH})
 find_package(Galois REQUIRED)
 include_directories(${Galois_INCLUDE_DIRS})
 set(CMAKE_CXX_COMPILER ${Galois_CXX_COMPILER})
@@ -181,7 +192,7 @@ target_link_libraries(app ${Galois_LIBRARIES})
 Using basic commands (although the specific commands vary by system):
 
 ```Shell
-c++ -std=c++14 app.cpp -I${installdir}/include -L${installdir}/lib -lgalois_shmem
+c++ -std=c++14 app.cpp -I${INSTALL_DIR}/include -L${INSTALL_DIR}/lib -lgalois_shmem
 ```
 
 Contact Us
@@ -193,14 +204,21 @@ If you have questions not answered here or at
 You can also raise your issues at [here](https://github.com/IntelligentSoftwareSystems/Galois/issues).
 
 If you find a bug, it would help us if you sent (1) the command and program output and (2)
-a gdb backtrace, preferably with the debug build.
+a gdb backtrace, preferably with the debug build. Assuming you will build Galois in
+BUILD_DIR, while the source is in SRC_DIR
 
 ```Shell
-mkdir debug
-cd debug
-cmake -DCMAKE_BUILD_TYPE=Debug ../..
+script Galois-errors.log
+mkdir -p $BUILD_DIR
+cd $BUILD_DIR
+cmake -DCMAKE_BUILD_TYPE=Debug $SRC_DIR
 make VERBOSE=1
 gdb --args path/to/failing/program args
 (gdb) r
 (gdb) bt
+(gdb) q
+exit
 ```
+
+This will generate a file Galois-errors.log, which you can send us for further
+debugging. 

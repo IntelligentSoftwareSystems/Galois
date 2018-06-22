@@ -81,8 +81,8 @@ endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE ICC_VERSION)
-  if(ICC_VERSION VERSION_LESS 13.0)
-    message(FATAL_ERROR "ICC must be 13.0 or higher; found: ${ICC_VERSION} instead")
+  if(ICC_VERSION VERSION_LESS 16.0)
+    message(FATAL_ERROR "ICC must be 16.0 or higher; found: ${ICC_VERSION} instead")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
 
@@ -105,21 +105,21 @@ endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__ -Werror")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
 endif()
 
 # check for incompatible GCC
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_LESS 4.7)
-    message(FATAL_ERROR "GCC must be 4.7 or higher")
+  if(GCC_VERSION VERSION_LESS 5.2)
+    message(FATAL_ERROR "GCC must be 5.2 or higher")
   endif()
   #new debugging optimization level
-  if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
-  endif()
+  # if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
+  # endif()
 endif()
 
 # Enable architecture-specific optimizations
@@ -155,11 +155,6 @@ add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
-find_package(OpenMP)
-if(OPENMP_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-endif()
 
 # Distributed-heterogeneous features
 if(ENABLE_HETERO_GALOIS)
@@ -217,6 +212,12 @@ if(USE_EXP)
   include_directories("libgalois/experimental/include")
   if(ENABLE_DIST_GALOIS)
     include_directories("libdist/experimental/include")
+  endif()
+
+  find_package(OpenMP)
+  if(OPENMP_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   endif()
 
   find_package(TBB)
@@ -285,7 +286,7 @@ find_package(Threads REQUIRED)
 #llvm ADT and command line parser
 #find_package(LLVM)
 
-include(CheckCilk)
+# include(CheckCilk)
 include(CheckMmap)
 
 # HugePages
