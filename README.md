@@ -213,7 +213,7 @@ c++ -std=c++14 app.cpp -I${INSTALL_DIR}/include -L${INSTALL_DIR}/lib -lgalois_sh
 Contact Us
 ==========
 For bugs, please raise an issue here at gihub using the 'Issues' tab [https://github.com/IntelligentSoftwareSystems/Galois/issues](https://github.com/IntelligentSoftwareSystems/Galois/issues).
-Please send questions and comments to Galois user mailing list: [galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu). You may subscribe at
+Please send questions and comments to Galois users mailing list: [galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu). You may subscribe at
 [https://utlists.utexas.edu/sympa/subscribe/galois-users](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
 
 If you find a bug, it would help us if you sent (1) the command and program output and (2)
