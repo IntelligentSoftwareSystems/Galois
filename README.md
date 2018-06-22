@@ -212,8 +212,9 @@ c++ -std=c++14 app.cpp -I${INSTALL_DIR}/include -L${INSTALL_DIR}/lib -lgalois_sh
 
 Contact Us
 ==========
-For bugs, please raise an issue here at gihub using the 'Issues' tab [https://github.com/IntelligentSoftwareSystems/Galois/issues] (https://github.com/IntelligentSoftwareSystems/Galois/issues).
-Please send questions and comments to [Galois project website[Galois user mailing list](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
+For bugs, please raise an issue here at gihub using the 'Issues' tab [https://github.com/IntelligentSoftwareSystems/Galois/issues](https://github.com/IntelligentSoftwareSystems/Galois/issues).
+Please send questions and comments to Galois user mailing list: [galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu). You may subscribe at
+[https://utlists.utexas.edu/sympa/subscribe/galois-users](https://utlists.utexas.edu/sympa/subscribe/galois-users). 
 
 If you find a bug, it would help us if you sent (1) the command and program output and (2)
 a gdb backtrace, preferably with the debug build. Assuming you will build Galois in
@@ -232,5 +233,4 @@ gdb --args path/to/failing/program args
 exit
 ```
 
-This will generate a file Galois-errors.log, which you can send us for further
-debugging. 
+This will generate a file Galois-errors-log.txt, which you can send to the mailing list:[galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu) for further debugging. 
