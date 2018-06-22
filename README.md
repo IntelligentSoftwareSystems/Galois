@@ -1,4 +1,4 @@
-Getting Started {#gettingStarted}
+Overview
 ====================
 
 Galois is a C++ library designed to ease parallel programming, especially for
@@ -24,10 +24,25 @@ Galois is released under the BSD-3-Clause license.
 Building Galois
 ===========================
 
+You can checkout the latest release by typing (in a terminal):
+
+```Shell
+git clone -b releaes-4.0 https://github.com/IntelligentSoftwareSystems/Galois
+```
+
+The master branch will be regularly updated, so you may try out the latest
+development code as well by checking out master branch:
+
+```Shell
+git clone https://github.com/IntelligentSoftwareSystems/Galois
+```
+
 Dependencies
 --------------
 
-Galois builds and runs on GNU/Linux (and compatible operating systems). 
+Galois builds, runs, and has been tested on GNU/Linux. Even though
+Galois builds on similar systems, such as Cygwin, we have not tested correctness or performance, so please
+beware. 
 
 At the minimum, Galois depends on the following software:
 
