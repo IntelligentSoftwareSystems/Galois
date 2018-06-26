@@ -40,8 +40,9 @@ cll::opt<bool>
                        cll::desc("Set this flag if graph is symmetric"),
                        cll::init(false));
 cll::opt<std::string> partFolder("partFolder",
-                                 cll::desc("path to partitionFolder"),
-                                 cll::init(""));
+                                 cll::desc("path to partitionFolder "
+                                           "(deprecated, do not use)"),
+                                 cll::init(""), cll::Hidden);
 cll::opt<PARTITIONING_SCHEME> partitionScheme(
     "partition", cll::desc("Type of partitioning."),
     cll::values(
