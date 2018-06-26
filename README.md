@@ -115,8 +115,8 @@ make input
 ```
 
 'make input' will download a big (~2GB) tar-ball of inputs  and extract it to
-`$BUILD_DIR/inputs/reference' directory. The tar-ball is downloaded to
-`$BUILD_DIR/inputs'
+`$BUILD_DIR/inputs/reference` directory. The tar-ball is downloaded to
+`$BUILD_DIR/inputs`
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
 called *galois graph file* 
