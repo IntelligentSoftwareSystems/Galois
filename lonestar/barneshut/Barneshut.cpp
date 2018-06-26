@@ -38,7 +38,7 @@
 
 #include "Point.h"
 
-const char* name = "Barnshut N-Body Simulator";
+const char* name = "Barnes-Hut N-Body Simulator";
 const char* desc =
     "Simulates gravitational forces in a galactic cluster using the "
     "Barnes-Hut n-body algorithm";
