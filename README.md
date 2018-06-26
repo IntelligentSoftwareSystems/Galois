@@ -48,13 +48,15 @@ At the minimum, Galois depends on the following software:
 
 - A modern C++ compiler compliant with the C++-14 standard (GCC >= 6.1, Intel >= 17.0, LLVM >= 4.0)
 - CMake (>= 3.2.3)
-- Boost library ( >= 1.60.0, we recommend building/installing the full library)
+- Boost library ( >= 1.58.0, we recommend building/installing the full library)
 
 
 Here are the dependencies for the optional features: 
 
 - Linux HUGE_PAGES support. Performance will be degraded without HUGE_PAGES
   enabled. Please see [https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)
+- libnuma support. Performance may be degraded without it. Please install
+  libnuma-dev on Debian like systems, and numactl-dev on Red Hat like systems. 
 - Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
 - PAPI (>= 5.2.0.0 ) for profiling sections of code
 - Vtune (>= 2017 ) for profiling sections of code
@@ -105,6 +107,16 @@ Running Galois Applications
 
 Inputs
 -------
+
+We provide a few sample inputs that can be downloaded by running:
+
+```Shell
+make input
+```
+
+'make input' will download a big (~2GB) tar-ball of inputs  and extract it to
+`$BUILD_DIR/inputs/reference' directory. The tar-ball is downloaded to
+`$BUILD_DIR/inputs'
 
 Many Galois/Lonestar applications work with graphs. We store graphs in a binary format
 called *galois graph file* 
@@ -233,4 +245,4 @@ gdb --args path/to/failing/program args
 exit
 ```
 
-This will generate a file Galois-errors-log.txt, which you can send to the mailing list:[galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu) for further debugging. 
+This will generate a file Galois-errors-log.txt, which you can send to the mailing list:[galois-users@utlists.utexas.edu](galois-users@utlists.utexas.edu) for further debugging or open a github issue.
