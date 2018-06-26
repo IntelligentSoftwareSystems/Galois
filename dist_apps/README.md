@@ -68,7 +68,7 @@ performance.
 If using MPI, multiple processes split across multiple hosts can be specified
 with the following:
 
-`GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=<# of processes> -hosts=<machines to run on> ./bfs_push <input graph>
+`GALOIS_DO_NOT_BIND_THREADS=1 mpirun -n=<# of processes> -hosts=<machines to run on> ./bfs_push <input graph>`
 
 The distributed applications have a few common command line flags that are
 worth noting. More details can be found by running a distributed application
