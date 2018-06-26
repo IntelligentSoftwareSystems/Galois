@@ -30,14 +30,16 @@
 // Command line args
 ////////////////////////////////////////////////////////////////////////////////
 
-cll::opt<int> numThreads("t", cll::desc("Number of threads"), cll::init(1));
-cll::opt<int> numRuns("runs", cll::desc("Number of runs"), cll::init(3));
+cll::opt<int> numThreads("t", cll::desc("Number of threads (default 1)"),
+                              cll::init(1));
+cll::opt<int> numRuns("runs", cll::desc("Number of runs (default 3)"),
+                                        cll::init(3));
 cll::opt<std::string> statFile("statFile",
-                               cll::desc("output file to print stats to "),
+                               cll::desc("optional output file to print stats to"),
                                cll::init(""));
 cll::opt<bool> verify("verify",
                       cll::desc("Verify results by outputting results "
-                                "to file"),
+                                "to file (default false)"),
                       cll::init(false));
 
 #ifdef __GALOIS_HET_CUDA__
@@ -47,8 +49,6 @@ std::string personality_str(Personality p) {
     return "CPU";
   case GPU_CUDA:
     return "GPU_CUDA";
-  case GPU_OPENCL:
-    return "GPU_OPENCL";
   }
 
   assert(false && "Invalid personality");
@@ -56,13 +56,8 @@ std::string personality_str(Personality p) {
 }
 
 int gpudevice;
-cll::opt<Personality>
-    personality("personality", cll::desc("Personality"),
-                cll::values(clEnumValN(CPU, "cpu", "Galois CPU"),
-                            clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),
-                            clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
-                            clEnumValEnd),
-                cll::init(CPU));
+Personality personality = CPU;
+
 cll::opt<unsigned> scalegpu(
     "scalegpu",
     cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally "
@@ -81,12 +76,12 @@ cll::opt<int> num_nodes(
 cll::opt<std::string> personality_set(
     "pset",
     cll::desc("String specifying personality for hosts on each physical "
-              "node. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"),
+              "node. 'c'=CPU, 'g'=GPU (default 'c')"),
     cll::init("c"));
 #endif
 
 static void PrintVersion() {
-  std::cout << "Galois Benchmark Suite v" << galois::getVersion() << " ("
+  std::cout << "D-Galois Benchmark Suite v" << galois::getVersion() << " ("
             << galois::getRevision() << ")\n";
 }
 
@@ -157,7 +152,7 @@ void DistBenchStart(int argc, char** argv, const char* app, const char* desc,
 void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
   const unsigned my_host_id = galois::runtime::getHostID();
 
-  // Parse arg string when running on multiple hosts and update/override
+  // Parse arg string when running on multiple hosts and update
   // personality with corresponding value.
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -170,10 +165,6 @@ void internal::heteroSetup(std::vector<unsigned>& scaleFactor) {
     switch (personality_set.c_str()[my_host_id % (net.Num / num_nodes)]) {
     case 'g':
       personality = GPU_CUDA;
-      break;
-    case 'o':
-      assert(0);
-      personality = GPU_OPENCL;
       break;
     case 'c':
     default:

@@ -46,12 +46,12 @@ extern cll::opt<std::string> statFile;
 extern cll::opt<bool> verify;
 
 #ifdef __GALOIS_HET_CUDA__
-enum Personality { CPU, GPU_CUDA, GPU_OPENCL };
+enum Personality { CPU, GPU_CUDA };
 
 std::string personality_str(Personality p);
 
 extern int gpudevice;
-extern cll::opt<Personality> personality;
+extern Personality personality;
 extern cll::opt<unsigned> scalegpu;
 extern cll::opt<unsigned> scalecpu;
 extern cll::opt<int> num_nodes;
@@ -105,8 +105,6 @@ marshalGPUGraph(galois::graphs::DistGraph<NodeData, EdgeData>* loadedGraph,
     MarshalGraph m;
     (*loadedGraph).getMarshalGraph(m);
     load_graph_CUDA(*cuda_ctx, m, net.Num);
-  } else if (personality == GPU_OPENCL) {
-    // galois::opencl::cl_env.init(cldevice.Value);
   }
 
   marshalTimer.stop();
