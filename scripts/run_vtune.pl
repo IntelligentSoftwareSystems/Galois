@@ -60,11 +60,9 @@ sub analysis_option(@) {
   my ($vtune, $a) = @_;
   my @candidates = (
     ["$a", "hw-events"],
-    [qw/nehalem-memory-access hw-events/],
-    [qw/nehalem-general-exploration hw-events/],
+    [qw/memory-access hw-events/],
+    [qw/memory-consumption hw-events/],
     [qw/general-exploration hw-events/],
-    [qw/knc-general-exploration hw-events/],
-    [qw/snb-general-exploration hw-events/],
     [qw/hotspots hotspots/]
   );
   foreach my $pair (@candidates) {
@@ -122,8 +120,8 @@ my $analyzeSystem = 1;
 my $startPaused = 1;
 my $help = 0;
 my $threads = 0;
-# my $analysisType = 'memory-access'; # causes vtune 2016 to hang
-my $analysisType = 'general-exploration';
+my $analysisType = 'memory-access'; # causes vtune 2016 to hang
+# my $analysisType = 'general-exploration';
 my $reportType = 'hw-events';
 my $reportTimeout = 100000;
 GetOptions(
