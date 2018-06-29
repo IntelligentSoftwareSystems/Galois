@@ -56,8 +56,6 @@ class PRBCTree {
     // reset sent flags
     sentFlag.resize(numRoundSources);
     for (unsigned i = 0; i < numRoundSources; i++) {
-      // add in infinity for all round sources
-      //distanceTree[infinity].insert(i);
       sentFlag[i] = 0;
     }
     assert(numSentSources == 0);
@@ -83,7 +81,11 @@ class PRBCTree {
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
-    size_t count = distanceTree[oldDistance].erase(index);
+    size_t count = 0;
+    // if it exists, remove it
+    if (distanceTree.find(oldDistance) != distanceTree.end()) {
+      count = distanceTree[oldDistance].erase(index);
+    }
     // if it didn't exist before, add to number of non-infinity nodes
     if (count == 0) {
       numNonInfinity++;
