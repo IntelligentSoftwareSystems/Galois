@@ -33,6 +33,18 @@ class PRBCTree {
   uint32_t numSentSources;
   //! number of non-infinity values (i.e. number of sources added already)
   uint32_t numNonInfinity;
+  //! last round number that something was sent out
+  uint32_t lastRound;
+
+  using TreeIter = 
+    typename galois::gstl::Map<uint32_t, 
+               galois::gstl::Set<uint32_t>>::const_reverse_iterator;
+  using SetIter = typename galois::gstl::Set<uint32_t>::const_reverse_iterator;
+
+  TreeIter curKey;
+  TreeIter endCurKey;
+  SetIter curSet;
+  SetIter endCurSet;
 
  public:
   /**
@@ -41,7 +53,6 @@ class PRBCTree {
    */
   void initialize(unsigned int numRoundSources) {
     distanceTree.clear();
-
     // reset sent flags
     sentFlag.resize(numRoundSources);
     for (unsigned i = 0; i < numRoundSources; i++) {
@@ -49,9 +60,13 @@ class PRBCTree {
       //distanceTree[infinity].insert(i);
       sentFlag[i] = 0;
     }
+    assert(numSentSources == 0);
     // reset number of sent sources
     numSentSources = 0;
+    // reset number of non infinity sources that exist
     numNonInfinity = 0;
+    // reset last round
+    lastRound = 0;
   }
 
   /**
@@ -69,6 +84,7 @@ class PRBCTree {
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
     size_t count = distanceTree[oldDistance].erase(index);
+    // if it didn't exist before, add to number of non-infinity nodes
     if (count == 0) {
       numNonInfinity++;
     }
@@ -94,6 +110,8 @@ class PRBCTree {
     return indexToSend;
   }
 
+  // distance + numSentSources - 1 == lastRound - curroundNumber
+  
   /**
    * Note that a particular source's message has already been sent in the data
    * structure and increment the number of sent sources.
@@ -107,8 +125,64 @@ class PRBCTree {
    * Return true if potentially more work exists to be done
    */
   bool moreWork() {
-    //galois::gPrint(distanceTree[infinity].size(), ",", numSentSources, "\n");
     return numNonInfinity > numSentSources;
+  }
+
+  /**
+   * Begin the setup for the back propagation phase by setting up the 
+   * iterators.
+   */
+  void prepForBackPhase(uint32_t lastRoundNum) {
+    lastRound = lastRoundNum;
+    curKey = distanceTree.crbegin();
+    endCurKey = distanceTree.crend();
+
+    // i.e. non-empty tree
+    if (curKey != endCurKey) {
+      curSet = curKey->second.crbegin();
+      endCurSet = curKey->second.crend();
+    }
+  }
+
+  /**
+   * Given a round number, figure out which index needs to be sent out for the
+   * back propagation phase.
+   */
+  uint32_t backGetIndexToSend(uint32_t roundNumber) {
+    uint32_t indexToReturn = infinity;
+
+    while (curKey != endCurKey) {
+      if (curSet != endCurSet) {
+        uint32_t curNumber = *curSet;
+        uint32_t distance = curKey->first;
+
+        if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
+          // this number should be sent out this round
+          indexToReturn = curNumber;
+          curSet++;
+          numSentSources--;
+          break;
+        } else {
+          // round not reached yet; get out
+          break;
+        }
+      } else {
+        // set exhausted; go onto next set
+        curKey++;
+
+        // if another set exists, set it up, else do nothing
+        if (curKey != endCurKey) {
+          curSet = curKey->second.crbegin();
+          endCurSet = curKey->second.crend();
+        }
+      }
+    }
+
+    if (curKey == endCurKey) {
+      assert(numSentSources == 0);
+    }
+
+    return indexToReturn;
   }
 };
 
