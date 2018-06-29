@@ -18,3 +18,9 @@ first map->
 distance to set of offsets: check if sent for both forward and backward
 problem: eveyr time it gets updated, you have to update this reverse map, whcih is painful
 
+
+
+backward phase:
+
+backward iterate over distances and backward over their sets, send them out as rounds match....
+
