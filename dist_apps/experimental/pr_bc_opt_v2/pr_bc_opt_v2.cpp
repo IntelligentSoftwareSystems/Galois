@@ -97,7 +97,7 @@ galois::DynamicBitSet bitset_dependency;
 using Graph = galois::graphs::DistGraph<NodeData, void>;
 using GNode = typename Graph::GraphNode;
 
-//#include "pr_bc_opt_sync.hh"
+#include "pr_bc_opt_sync.hh"
 
 /******************************************************************************/
 /* Functions for running the algorithm */
@@ -219,7 +219,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
         NodeData& cur_data = graph.getData(curNode);
 
         if (cur_data.roundIndexToSend != infinity) {
-          unsigned i                    = cur_data.roundIndexToSend;
+          unsigned i = cur_data.roundIndexToSend;
           cur_data.dTree.markSent(i);
         }
       },
@@ -301,9 +301,9 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     // you can think of this FindMessageToSync call being a part of the sync
     FindMessageToSync(graph, roundNumber, dga);
 
-    //graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast,
-    //           Bitset_minDistances>(std::string("APSP") + "_" +
-    //                                std::to_string(macroRound));
+    graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast,
+               Bitset_minDistances>(std::string("APSP") + "_" +
+                                    std::to_string(macroRound));
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
@@ -355,6 +355,10 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
       [&](GNode dst) {
         NodeData& dst_data        = graph.getData(dst);
         dst_data.roundIndexToSend = dst_data.dTree.backGetIndexToSend(roundNumber);
+
+        if (dst_data.roundIndexToSend != infinity) {
+          bitset_dependency.set(dst);
+        }
       },
       galois::loopname(
           graph.get_run_identifier("BackFindMessageToSend", macroRound)
@@ -381,9 +385,9 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
     // write destination in this case being the source in the actual graph
     // since we're using the tranpose graph
-    //graph.sync<writeDestination, readSource, DependencyReduce,
-    //           DependencyBroadcast, Bitset_dependency>(
-    //    std::string("DependencySync") + "_" + std::to_string(macroRound));
+    graph.sync<writeDestination, readSource, DependencyReduce,
+               DependencyBroadcast, Bitset_dependency>(
+        std::string("DependencySync") + "_" + std::to_string(macroRound));
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
