@@ -64,33 +64,22 @@ struct APSPReduce {
 
       // reset shortest paths if min dist changed (i.e. don't add to it)
       if (old > rDistance) {
+        node.dTree.setDistance(rIndex, old, rDistance);
         assert(rNumPaths != 0);
         node.shortestPathNumbers[rIndex] = rNumPaths;
       } else if (old == rDistance) {
-        //uint64_t oldS = node.shortestPathNumbers[rIndex];
-
         // add to short path
         node.shortestPathNumbers[rIndex] += rNumPaths;
-
-        // overflow
-        //if (oldS > node.shortestPathNumbers[rIndex]) {
-        //  galois::gDebug("Overflow detected in sync; capping at max uint64_t");
-        //  galois::gDebug(oldS, " ", rNumPaths);
-        //  node.shortestPathNumbers[rIndex] = 
-        //    std::numeric_limits<uint64_t>::max();
-        //}
       }
 
       // if received distance is smaller than current candidate for sending, send
       // it out instead (if tie breaker wins i.e. lower in position)
       if (node.roundIndexToSend == infinity || 
             (node.minDistances[rIndex] < node.minDistances[node.roundIndexToSend])) {
-          assert(!node.sentFlag[rIndex]);
           node.roundIndexToSend = rIndex;
       } else if (node.minDistances[rIndex] == 
                  node.minDistances[node.roundIndexToSend]) {
         if (rIndex < node.roundIndexToSend) {
-          assert(!node.sentFlag[rIndex]);
           node.roundIndexToSend = rIndex;
         }
       }
@@ -153,7 +142,9 @@ struct APSPBroadcast {
 
       // values from master are canonical ones for this round
       node.roundIndexToSend = rIndex;
+      uint32_t oldDistance = node.minDistances[rIndex];
       node.minDistances[rIndex] = rDistance;
+      node.dTree.setDistance(rIndex, oldDistance, rDistance);
       node.shortestPathNumbers[rIndex] = rNumPaths;
     }
   }
