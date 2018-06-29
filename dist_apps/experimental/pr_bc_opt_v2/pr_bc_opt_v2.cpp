@@ -79,13 +79,10 @@ struct NodeData {
   galois::gstl::Vector<uint32_t> minDistances;
   // actual shortest path number
   galois::gstl::Vector<ShortPathType> shortestPathNumbers;
-  // index that needs to be sent in a round
+  // index that needs to be pulled in a round
   uint32_t roundIndexToSend;
-  // round numbers saved for determining when to send out back-prop messages
-  //galois::gstl::Vector<uint32_t> savedRoundNumbers;
   // dependency values
   galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyValues;
-  // num sources that have been finalized/sent
   // final bc value
   float bc;
 
@@ -123,7 +120,6 @@ void InitializeGraph(Graph& graph) {
         cur_data.minDistances.resize(vectorSize);
         cur_data.shortestPathNumbers.resize(vectorSize);
         cur_data.roundIndexToSend = infinity;
-        //cur_data.savedRoundNumbers.resize(vectorSize);
         cur_data.dependencyValues.resize(vectorSize);
         cur_data.bc                  = 0.0;
         cur_data.dTree.initialize(numSourcesPerRound);
@@ -166,7 +162,6 @@ void InitializeIteration(Graph& graph,
             cur_data.shortestPathNumbers[i] = 0;
           }
 
-          //cur_data.savedRoundNumbers[i] = infinity;
           cur_data.dependencyValues[i]  = 0.0;
         }
       },
@@ -225,7 +220,6 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
 
         if (cur_data.roundIndexToSend != infinity) {
           unsigned i                    = cur_data.roundIndexToSend;
-          //cur_data.savedRoundNumbers[i] = roundNumber; // safe
           cur_data.dTree.markSent(i);
         }
       },
@@ -341,13 +335,6 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
       [&](GNode node) {
         NodeData& cur_data = graph.getData(node);
         cur_data.dTree.prepForBackPhase(lastRoundNumber);
-        //for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        //  if (cur_data.minDistances[i] < infinity) {
-        //    cur_data.savedRoundNumbers[i] =
-        //        lastRoundNumber - cur_data.savedRoundNumbers[i];
-        //    assert(cur_data.savedRoundNumbers[i] <= lastRoundNumber);
-        //  }
-        //}
       },
       galois::loopname(
           graph.get_run_identifier("RoundUpdate", macroRound).c_str()),
@@ -367,25 +354,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode dst) {
         NodeData& dst_data        = graph.getData(dst);
-        //dst_data.roundIndexToSend = infinity;
-
-        //for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        //  if (dst_data.savedRoundNumbers[i] == roundNumber) {
-        //    dst_data.roundIndexToSend = i;
-        //    bitset_dependency.set(dst);
-        //    break;
-        //  }
-        //}
-
-        //uint32_t k = dst_data.dTree.backGetIndexToSend(roundNumber);
-        //if (dst_data.roundIndexToSend != k) {
-        //  galois::gPrint(roundNumber, " ", dst_data.roundIndexToSend, " ", k, "\n");
-        //  exit(-1);
-        //}
-
         dst_data.roundIndexToSend = dst_data.dTree.backGetIndexToSend(roundNumber);
-        //GALOIS_ASSERT(dst_data.roundIndexToSend == 
-        //              dst_data.dTree.backGetIndexToSend(roundNumber));
       },
       galois::loopname(
           graph.get_run_identifier("BackFindMessageToSend", macroRound)
@@ -721,15 +690,11 @@ int main(int argc, char** argv) {
 
         uint64_t a      = 0;
         ShortPathType b = 0;
-        //uint64_t c      = 0;
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           if ((*hg).getData(*ii).minDistances[i] != infinity) {
             a += (*hg).getData(*ii).minDistances[i];
           }
           b += (*hg).getData(*ii).shortestPathNumbers[i];
-          //if ((*hg).getData(*ii).savedRoundNumbers[i] != infinity) {
-          //  c += (*hg).getData(*ii).savedRoundNumbers[i];
-          //}
         }
         // outputs min distance and short path numbers
         // sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
