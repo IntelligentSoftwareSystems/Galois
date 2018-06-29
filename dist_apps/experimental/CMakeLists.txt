@@ -35,8 +35,9 @@ endfunction()
 #distAppNoGPU(bc_pull)
 #distAppNoGPU(sgd_pull)
 
-distAppNoGPU(pr_bc_opt)
 distAppNoGPU(pr_bc)
+distAppNoGPU(pr_bc_opt)
+distAppNoGPU(pr_bc_opt_v2) 
 
 # inefficient version of prbc where entire vector is synchronized
 #app(pr_bc_vecsync pr_bc/gen.cpp DISTSAFE)
