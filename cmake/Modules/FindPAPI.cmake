@@ -10,9 +10,9 @@ endif()
 
 # XXX(ddn): our system papi is broken so ignore for now
 # find_path(PAPI_INCLUDE_DIRS papi.h HINTS ${PAPI_ROOT} PATH_SUFFIXES include NO_DEFAULT_PATH )
-find_path(PAPI_INCLUDE_DIRS papi.h HINTS ${PAPI_ROOT} PATH_SUFFIXES include)
+find_path(PAPI_INCLUDE_DIRS papi.h HINTS ${PAPI_ROOT} ENV TACC_PAPI_DIR PATH_SUFFIXES include)
 message(STATUS "PAPI_INCLUDE_DIRS: ${PAPI_INCLUDE_DIRS}")
-find_library(PAPI_LIBRARY NAMES papi HINTS ${PAPI_ROOT} PATH_SUFFIXES lib lib64)
+find_library(PAPI_LIBRARY NAMES papi HINTS ${PAPI_ROOT} ENV TACC_PAPI_DIR PATH_SUFFIXES lib lib64)
 message(STATUS "PAPI_LIBRARY: ${PAPI_LIBRARY}")
 find_library(PAPI_LIBRARIES NAMES rt PATH_SUFFIXES lib lib64)
 
