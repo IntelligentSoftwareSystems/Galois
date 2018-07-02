@@ -54,7 +54,7 @@ At the minimum, Galois depends on the following software:
 Here are the dependencies for the optional features: 
 
 - Linux HUGE_PAGES support (please see [www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)). Performance will most likely degrade without HUGE_PAGES
-  enabled. Galois uses 2MB huge page size and relies on the kernel-config to set aside a large amount of 2MB pages. For example, our performance testing machine (4x14 cores, 192GB RAM) is configured to support up to 65536 2MB pages:
+  enabled. Galois uses 2MB huge page size and relies on the kernel configuration to set aside a large amount of 2MB pages. For example, our performance testing machine (4x14 cores, 192GB RAM) is configured to support up to 65536 2MB pages:
   ```Shell
   cat /proc/mem_info | fgrep Huge
   AnonHugePages:    104448 kB
