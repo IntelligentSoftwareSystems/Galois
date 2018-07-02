@@ -41,7 +41,7 @@ Dependencies
 --------------
 
 Galois builds, runs, and has been tested on GNU/Linux. Even though
-Galois builds on similar systems, such as Cygwin, we have not tested correctness or performance, so please
+Galois may build on systems similar to Linux, we have not tested correctness or performance, so please
 beware. 
 
 At the minimum, Galois depends on the following software:
@@ -53,9 +53,19 @@ At the minimum, Galois depends on the following software:
 
 Here are the dependencies for the optional features: 
 
-- Linux HUGE_PAGES support. Performance will be degraded without HUGE_PAGES
-  enabled. Please see [https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)
-- libnuma support. Performance may be degraded without it. Please install
+- Linux HUGE_PAGES support (please see [www.kernel.org/doc/Documentation/vm/hugetlbpage.txt](https://www.kernel.org/doc/Documentation/vm/hugetlbpage.txt)). Performance will most likely degrade without HUGE_PAGES
+  enabled. Galois uses 2MB huge page size and relies on the kernel-config to set aside a large amount of 2MB pages. For example, our performance testing machine (4x14 cores, 192GB RAM) is configured to support up to 65536 2MB pages:
+  ```Shell
+  cat /proc/mem_info | fgrep Huge
+  AnonHugePages:    104448 kB
+  HugePages_Total:   65536
+  HugePages_Free:    65536
+  HugePages_Rsvd:        0
+  HugePages_Surp:        0
+  Hugepagesize:       2048 kB
+  ```
+   
+- libnuma support. Performance may degrade without it. Please install
   libnuma-dev on Debian like systems, and numactl-dev on Red Hat like systems. 
 - Doxygen (>= 1.8.5) for compiling documentation as webpages or latex files
 - PAPI (>= 5.2.0.0 ) for profiling sections of code
