@@ -427,8 +427,9 @@ class SSSP(SharedMemApp):
         """Adds delta argument to runs."""
         specs = self.get_default_run_specs(bmkinput, config)
 
+        # 0 is best for twitter50
         for s in specs:
-            s.set_arg("-delta=8")
+            s.set_arg("-delta=0")
         
         return specs
 
@@ -485,6 +486,9 @@ class TrianglesEdge(SharedMemApp):
 #            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
 #            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
 #            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
+
+# single benchmark run
+#BINARIES = [TrianglesNode()]
 
 BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
             ConnectedComponents(), DelaunayTriangulation(), DMR(), 

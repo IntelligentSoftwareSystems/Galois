@@ -1,17 +1,17 @@
 #v1
 barneshut nothing
-bfs twitter40
+bfs twitter50
 bc-async USA-road-d.USA
 bc-outer rmat8-2e14
 boruvka USA-road-d.USA
 boruvka-merge USA-road-d.USA
 clustering nothing
-connectedcomponents rmat25-rsymmetric
+connectedcomponents twitter40-symmetric
 delaunaytriangulation r5Mn
 delaunaytriangulation-det r5Mn
 dmr r5M
 gmetis USA-road-d.USA
-independentset rmat27-rsymmetric
+independentset twitter40-symmetric
 matrixcompletion-sync netflix
 matrixcompletion-simple netflix
 matrixcompletion-edge netflix
@@ -27,7 +27,7 @@ pagerank-push twitter40
 preflowpush r4-2e26
 pta gdb_constraints
 spanningtree r4-2e26
-sssp r4-2e26
+sssp twitter50w
 surveypropagation nothing
 triangles-node com-lj
 triangles-edge com-lj
