@@ -98,6 +98,12 @@ name = twitter50
 file = unweighted/twitter-ICWSM10-component.gr
 format = bin/galois
 
+[twitter50w]
+flags =
+name = twitter50w
+file = unweighted/withRandomWeights/twitter-ICWSM10-component_withRandomWeights.gr
+format = bin/galois
+
 [twitter50-transpose]
 flags =
 name = twitter50-transpose
