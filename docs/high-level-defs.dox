@@ -3,19 +3,20 @@
 @namespace galois
 The Galois namespace containing all Galois structures and functions.
 
+@namespace galois::DEPRECATED
+Deprecated Galois functions.
+
 @namespace galois::graphs
 Parallel data graph structures in Galois.
 
-@namespace galois::internal
-Internal implementation functions used by Galois that shouldn't be called by 
-the user.
+@namespace galois::gstl
+Standard library structures that use Galois allocators.
 
-@namespace galois::runtime
-Functions used by the Galois runtime. Use at your own risk.
+@namespace galois::runtime::DEPRECATED
+Functions used by the Galois runtime that are deprecated.
 
-@namespace galois::runtime::internal
-Internal implementation functions used by Galois that shouldn't be called by 
-the user.
+@namespace galois::runtime::ParaMeter
+Functions used by ParaMeter, which measures parallelism of loops
 
 @namespace galois::substrate
 Contains threading and machine OS support
