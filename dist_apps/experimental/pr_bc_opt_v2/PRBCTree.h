@@ -81,11 +81,14 @@ class PRBCTree {
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
+    auto setIter = distanceTree.find(oldDistance);
     size_t count = 0;
     // if it exists, remove it
-    if (distanceTree.find(oldDistance) != distanceTree.end()) {
-      count = distanceTree[oldDistance].erase(index);
+    if (setIter != distanceTree.end()) {
+      galois::gstl::Set<uint32_t>& setToChange = setIter->second;
+      count = setToChange.erase(index);
     }
+
     // if it didn't exist before, add to number of non-infinity nodes
     if (count == 0) {
       numNonInfinity++;
@@ -98,17 +101,19 @@ class PRBCTree {
    */
   uint32_t getIndexToSend(uint32_t roundNumber) {
     uint32_t distanceToCheck = roundNumber - numSentSources;
-    galois::gstl::Set<uint32_t>& setToCheck = distanceTree[distanceToCheck];
-
     uint32_t indexToSend = infinity;
 
-    for (const uint32_t index : setToCheck) {
-      if (!sentFlag[index]) {
-        indexToSend = index;
-        break;
+    auto setIter = distanceTree.find(distanceToCheck);
+    if (setIter != distanceTree.end()) {
+      galois::gstl::Set<uint32_t>& setToCheck = setIter->second;
+
+      for (const uint32_t index : setToCheck) {
+        if (!sentFlag[index]) {
+          indexToSend = index;
+          break;
+        }
       }
     }
-
     return indexToSend;
   }
 
