@@ -255,7 +255,7 @@ protected:
   }
 
   /**
-   * Given a FileGraph and an edge in it, add it to the MorphGraph.
+   * Given a FileGraph and an edge in it, add it to the LCMorphGraph.
    * Can handle edge weights.
    */
   template <bool _A1 = EdgeInfo::has_value,
@@ -277,7 +277,7 @@ protected:
   }
 
   /**
-   * Given a FileGraph and an edge in it, add it to the MorphGraph.
+   * Given a FileGraph and an edge in it, add it to the LCMorphGraph.
    * Does not handle edge weights.
    */
   template <bool _A1 = EdgeInfo::has_value,
@@ -555,7 +555,7 @@ public:
   }
 
   /**
-   * Constructs the MorphGraph nodes given a FileGraph to construct it from.
+   * Constructs the LCMorphGraph nodes given a FileGraph to construct it from.
    * Meant to be called by multiple threads.
    *
    * @param[in] graph FileGraph to construct a morph graph from
@@ -584,7 +584,7 @@ public:
   }
 
   /**
-   * Constructs the MorphGraph edges given a FileGraph to construct it from and
+   * Constructs the LCMorphGraph edges given a FileGraph to construct it from and
    * pointers to already created nodes.
    * Meant to be called by multiple threads.
    *
