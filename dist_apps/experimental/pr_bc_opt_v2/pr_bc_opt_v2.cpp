@@ -25,7 +25,6 @@ constexpr static const char* const REGION_NAME = "PR_BC";
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
-#include "PRBCTree.h"
 
 // type of short path
 using ShortPathType = double;
@@ -67,6 +66,9 @@ static cll::opt<unsigned int>
                cll::desc("DEBUG: Specify size of vector "
                          "used for node data"),
                cll::init(0), cll::Hidden);
+
+// moved here so PRBCTree has access to numSourcesPerRound
+#include "PRBCTree.h"
 
 /******************************************************************************/
 /* Graph structure declarations */
@@ -122,7 +124,7 @@ void InitializeGraph(Graph& graph) {
         cur_data.roundIndexToSend = infinity;
         cur_data.dependencyValues.resize(vectorSize);
         cur_data.bc                  = 0.0;
-        cur_data.dTree.initialize(numSourcesPerRound);
+        cur_data.dTree.initialize();
       },
       galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()),
       galois::no_stats());
@@ -145,7 +147,7 @@ void InitializeIteration(Graph& graph,
         NodeData& cur_data = graph.getData(curNode);
 
         cur_data.roundIndexToSend = infinity;
-        cur_data.dTree.initialize(numSourcesPerRound);
+        cur_data.dTree.initialize();
 
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           // min distance and short path count setup
