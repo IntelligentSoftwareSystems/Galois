@@ -326,9 +326,8 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
  * send out a message for the backward propagation of dependency values.
  *
  * @param graph Local graph to operate on
- * @param lastRoundNumber last round number in the APSP phase
  */
-void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
+void RoundUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
   graph.set_num_round(0);
 
@@ -336,7 +335,7 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode node) {
         NodeData& cur_data = graph.getData(node);
-        cur_data.dTree.prepForBackPhase(lastRoundNumber);
+        cur_data.dTree.prepForBackPhase();
       },
       galois::loopname(
           graph.get_run_identifier("RoundUpdate", macroRound).c_str()),
@@ -347,7 +346,8 @@ void RoundUpdate(Graph& graph, const uint32_t lastRoundNumber) {
  * Find the message that needs to be back propagated this round by checking
  * round number.
  */
-void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
+void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
+                           const uint32_t lastRoundNumber) {
   // has to be all nodes because even nodes without edges may have dependency
   // that needs to be sync'd
   const auto& allNodes = graph.allNodesRange();
@@ -356,7 +356,8 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber) {
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode dst) {
         NodeData& dst_data        = graph.getData(dst);
-        dst_data.roundIndexToSend = dst_data.dTree.backGetIndexToSend(roundNumber);
+        dst_data.roundIndexToSend = 
+          dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
 
         if (dst_data.roundIndexToSend != infinity) {
           bitset_dependency.set(dst);
@@ -383,7 +384,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   while (currentRound <= lastRoundNumber) {
     graph.set_num_round(currentRound);
 
-    BackFindMessageToSend(graph, currentRound);
+    BackFindMessageToSend(graph, currentRound, lastRoundNumber);
 
     // write destination in this case being the source in the actual graph
     // since we're using the tranpose graph
@@ -574,7 +575,6 @@ int main(int argc, char** argv) {
     uint64_t numNodes          = hg->globalSize();
     uint64_t totalSourcesFound = 0;
 
-    galois::DGAccumulator<unsigned> hasEdges;
     while (offset < numNodes && totalSourcesFound < totalNumSources) {
       unsigned sourcesFound = 0;
 
@@ -635,7 +635,7 @@ int main(int argc, char** argv) {
       // after that is empty round where nothing is done)
       uint32_t lastRoundNumber = APSP(*hg, dga) - 2;
 
-      RoundUpdate(*hg, lastRoundNumber);
+      RoundUpdate(*hg);
       BackProp(*hg, lastRoundNumber);
       BC(*hg, nodesToConsider);
       StatTimer_main.stop();

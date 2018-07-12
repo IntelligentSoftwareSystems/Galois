@@ -35,8 +35,6 @@ class PRBCTree {
   uint32_t numSentSources;
   //! number of non-infinity values (i.e. number of sources added already)
   uint32_t numNonInfinity;
-  //! last round number that something was sent out
-  uint32_t lastRound;
 
   //! Reverse map iterator
   using TreeIter = 
@@ -73,8 +71,6 @@ class PRBCTree {
     numSentSources = 0;
     // reset number of non infinity sources that exist
     numNonInfinity = 0;
-    // reset last round
-    lastRound = 0;
   }
 
   /**
@@ -163,8 +159,7 @@ class PRBCTree {
    * Begin the setup for the back propagation phase by setting up the 
    * iterators.
    */
-  void prepForBackPhase(uint32_t lastRoundNum) {
-    lastRound = lastRoundNum;
+  void prepForBackPhase() {
     curKey = distanceTree.crbegin();
     endCurKey = distanceTree.crend();
 
@@ -182,7 +177,8 @@ class PRBCTree {
    * Given a round number, figure out which index needs to be sent out for the
    * back propagation phase.
    */
-  uint32_t backGetIndexToSend(uint32_t roundNumber) {
+  uint32_t backGetIndexToSend(const uint32_t roundNumber, 
+                              const uint32_t lastRound) {
     uint32_t indexToReturn = infinity;
 
     while (curKey != endCurKey) {
