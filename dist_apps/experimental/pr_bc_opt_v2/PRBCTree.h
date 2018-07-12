@@ -19,6 +19,7 @@
 
 #ifndef _PRBCTREE_
 #define _PRBCTREE_
+#include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 
@@ -29,9 +30,13 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 class PRBCTree {
   using Testing = boost::container::flat_set<uint32_t, 
                     std::less<uint32_t>, galois::gstl::Pow2Alloc<uint32_t>>;
+  using Flat = boost::container::flat_map<uint32_t, Testing,
+                 std::less<uint32_t>,
+                 galois::gstl::Pow2Alloc<std::pair<uint32_t, Testing>>>;
+
   using MapBitset = galois::gstl::Vector<bool>;
   //! map to a bitset of nodes that belong in a particular distance group
-  galois::gstl::Map<uint32_t, Testing> distanceTree;
+  Flat distanceTree;
   //! marks if a message has already been sent for a source
   galois::gstl::Vector<bool> sentFlag;
   //! number of sources that have already been sent out
@@ -41,7 +46,7 @@ class PRBCTree {
 
   //! Reverse map iterator
   using TreeIter = 
-    typename galois::gstl::Map<uint32_t, Testing>::const_reverse_iterator;
+    typename Flat::const_reverse_iterator;
   //! Reverse bitset iterator
   //using SetIter = typename MapBitset::const_reverse_iterator;
   using SetIter = typename Testing::const_reverse_iterator;
