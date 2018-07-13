@@ -122,6 +122,10 @@ class PRBCTree {
     //  distanceTree[newDistance].resize(numSourcesPerRound);
     //}
     //distanceTree[newDistance][index] = 1;
+    if (oldDistance == newDistance) {
+      return;
+    }
+
     auto setIter = distanceTree.find(oldDistance);
     size_t count = 0;
     // if it exists, remove it
@@ -135,7 +139,6 @@ class PRBCTree {
       numNonInfinity++;
     }
     distanceTree[newDistance].insert(index);
-
   }
 
   /**
