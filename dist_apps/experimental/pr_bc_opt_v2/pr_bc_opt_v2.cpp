@@ -200,6 +200,7 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
       },
       galois::loopname(
           graph.get_run_identifier("FindMessageToSync", macroRound).c_str()),
+      galois::steal(),
       galois::no_stats());
 }
 
@@ -278,7 +279,8 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
       },
       galois::loopname(
           graph.get_run_identifier("SendAPSPMessages", macroRound).c_str()),
-      galois::no_stats(), galois::steal());
+      galois::steal(),
+      galois::no_stats());
 }
 
 /**
@@ -423,7 +425,8 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
         },
         galois::loopname(
             graph.get_run_identifier("BackProp", macroRound).c_str()),
-        galois::steal(), galois::no_stats());
+        galois::steal(),
+        galois::no_stats());
 
     currentRound++;
   }
