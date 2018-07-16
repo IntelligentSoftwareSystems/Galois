@@ -361,7 +361,7 @@ struct PreflowPush {
 
     galois::for_each(
         galois::iterate(initial),
-        [&, this](GNode& src, auto& ctx) {
+        [&counter, relabel_interval, this](GNode& src, auto& ctx) {
           int increment = 1;
           this->acquire(src);
           if (this->discharge(src, ctx)) {
@@ -504,9 +504,9 @@ struct PreflowPush {
   }
 
   void run() {
-
-    auto obimIndexer = [this](const GNode& n) {
-      return -this->graph.getData(n, galois::MethodFlag::UNPROTECTED).height;
+    Graph *captured_graph = &graph;
+    auto obimIndexer = [=](const GNode& n) {
+      return -captured_graph->getData(n, galois::MethodFlag::UNPROTECTED).height;
     };
 
     typedef galois::worklists::PerSocketChunkFIFO<16> Chunk;
