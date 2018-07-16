@@ -643,6 +643,18 @@ int main(int argc, char** argv) {
       BC(*hg, nodesToConsider);
       StatTimer_main.stop();
 
+      hg->set_num_round(0);
+      // report num rounds (backward rounds same as forward rounds so only need
+      // to report forward)
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::runtime::reportStat_Single(REGION_NAME
+          hg->get_run_identifier("NumRounds", macroRound),
+          lastRoundNumber + 1);
+        galois::runtime::reportStat_Tsum(REGION_NAME,
+          hg->get_run_identifier("TotalRounds"),
+          lastRoundNumber + 1);
+      }
+
       macroRound++;
     }
 
