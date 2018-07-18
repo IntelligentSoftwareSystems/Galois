@@ -42,6 +42,8 @@ class PRBCTree {
   uint32_t numSentSources;
   //! number of non-infinity values (i.e. number of sources added already)
   uint32_t numNonInfinity;
+  //! indicates if zero distance has been reached for backward iteration
+  bool zeroReached;
 
   //! reverse iterator over map
   using TreeIter = typename FlatMap::const_reverse_iterator;
@@ -69,11 +71,12 @@ class PRBCTree {
     for (unsigned i = 0; i < numSourcesPerRound; i++) {
       sentFlag[i] = 0;
     }
-    assert(numSentSources == 0);
     // reset number of sent sources
     numSentSources = 0;
     // reset number of non infinity sources that exist
     numNonInfinity = 0;
+
+    zeroReached = false;
   }
 
   /**
@@ -177,6 +180,10 @@ class PRBCTree {
         uint32_t curNumber = *curSet;
         uint32_t distance = curKey->first;
 
+        if (distance == 0) {
+          zeroReached = true;
+        }
+
         if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
           indexToReturn = curNumber;
@@ -204,7 +211,13 @@ class PRBCTree {
     }
 
     return indexToReturn;
+  }
 
+  /**
+   * Returns zeroReached variable.
+   */
+  bool isZeroReached() {
+    return zeroReached;
   }
 };
 

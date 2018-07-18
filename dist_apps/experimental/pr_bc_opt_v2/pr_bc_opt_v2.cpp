@@ -358,11 +358,22 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode dst) {
         NodeData& dst_data        = graph.getData(dst);
-        dst_data.roundIndexToSend = 
-          dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
+        dst_data.roundIndexToSend = infinity;
 
-        if (dst_data.roundIndexToSend != infinity) {
-          bitset_dependency.set(dst);
+        // if zero distances already reached, there is no point sending things
+        // out since we don't care about dependecy for sources (i.e. distance
+        // 0)
+        if (!dst_data.dTree.isZeroReached()) {
+          dst_data.roundIndexToSend = 
+            dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
+
+          if (dst_data.dTree.isZeroReached()) {
+            dst_data.roundIndexToSend = infinity;
+          }
+
+          if (dst_data.roundIndexToSend != infinity) {
+            bitset_dependency.set(dst);
+          }
         }
       },
       galois::loopname(
@@ -415,10 +426,16 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
               GNode src      = graph.getEdgeDst(inEdge);
               auto& src_data = graph.getData(src);
 
-              // determine if this source is a predecessor
-              if (myDistance == (src_data.minDistances[i] + 1)) {
-                // add to dependency of predecessor using our finalized one
-                galois::atomicAdd(src_data.dependencyValues[i], toAdd);
+              uint32_t sourceDistance = src_data.minDistances[i];
+
+              // source nodes of this batch (i.e. distance 0) can be safely 
+              // ignored
+              if (sourceDistance != 0) {
+                // determine if this source is a predecessor
+                if (myDistance == (sourceDistance + 1)) {
+                  // add to dependency of predecessor using our finalized one
+                  galois::atomicAdd(src_data.dependencyValues[i], toAdd);
+                }
               }
             }
           }
@@ -644,15 +661,17 @@ int main(int argc, char** argv) {
       StatTimer_main.stop();
 
       hg->set_num_round(0);
-      // report num rounds (backward rounds same as forward rounds so only need
-      // to report forward)
+      // report num rounds
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::runtime::reportStat_Single(REGION_NAME,
-          hg->get_run_identifier("NumRounds", macroRound),
+          hg->get_run_identifier("NumForwardRounds", macroRound),
+          lastRoundNumber + 2);
+        galois::runtime::reportStat_Single(REGION_NAME,
+          hg->get_run_identifier("NumBackwardRounds", macroRound),
           lastRoundNumber + 1);
         galois::runtime::reportStat_Tsum(REGION_NAME,
           hg->get_run_identifier("TotalRounds"),
-          lastRoundNumber + 1);
+          lastRoundNumber + lastRoundNumber + 3);
       }
 
       macroRound++;
