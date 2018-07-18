@@ -145,8 +145,7 @@ struct InitializeIteration {
       galois::do_all(
           galois::iterate(allNodes.begin(), allNodes.end()),
           InitializeIteration{infinity, current_src_node, &_graph},
-          galois::loopname("InitializeIteration"),
-          // galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()),
+          galois::loopname(_graph.get_run_identifier("InitializeIteration").c_str()),
           galois::no_stats());
   }
 
@@ -200,7 +199,7 @@ struct ForwardPass {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         ForwardPass(&_graph, _dga, roundNumber),
-        galois::loopname("ForwardPass"),
+        galois::loopname(_graph.get_run_identifier("ForwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
       );
@@ -274,7 +273,7 @@ struct MiddleSync {
       galois::do_all(
         galois::iterate(masters.begin(), masters.end()),
         MiddleSync(&_graph, _li),
-        galois::loopname("MiddleSync"),
+        galois::loopname(_graph.get_run_identifier("MiddleSync").c_str()),
         galois::no_stats()
       );
 
@@ -312,7 +311,7 @@ struct BackwardPass {
       galois::do_all(
         galois::iterate(nodesWithEdges),
         BackwardPass(&_graph, i),
-        galois::loopname("BackwardPass"),
+        galois::loopname(_graph.get_run_identifier("BackwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
       );
@@ -374,7 +373,7 @@ struct BC {
         galois::iterate(masters.begin(), masters.end()),
         BC(&_graph),
         galois::no_stats(),
-        galois::loopname("BC")
+        galois::loopname(_graph.get_run_identifier("BC").c_str())
       );
     }
   }
@@ -550,7 +549,7 @@ int main(int argc, char** argv) {
         galois::runtime::reportStat_Single(REGION_NAME,
           h_graph->get_run_identifier("NumBackRounds", i), backRounds);
         galois::runtime::reportStat_Tsum(REGION_NAME,
-          h_graph->get_run_identifier("TotalRounds"), roundNum + backRounds);
+          std::string("TotalRounds_") + std::to_string(run), roundNum + backRounds);
       }
     }
 
