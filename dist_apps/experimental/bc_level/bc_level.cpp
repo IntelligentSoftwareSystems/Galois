@@ -529,13 +529,29 @@ int main(int argc, char** argv) {
         current_src_node = i;
       }
 
-      h_graph->set_num_round(i);
-
       uint32_t roundNum = 0;
 
       StatTimer_main.start();
       BC::go(*h_graph, dga, roundNum);
       StatTimer_main.stop();
+
+      // Round reporting
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::runtime::reportStat_Single(REGION_NAME,
+          h_graph->get_run_identifier("NumRounds", i), roundNum);
+        uint32_t backRounds;
+        if (roundNum > 2) {
+          backRounds = roundNum - 2;
+        } else {
+          backRounds = 0;
+        }
+        galois::runtime::reportStat_Single(REGION_NAME,
+          h_graph->get_run_identifier("NumForwardRounds", i), roundNum);
+        galois::runtime::reportStat_Single(REGION_NAME,
+          h_graph->get_run_identifier("NumBackRounds", i), backRounds);
+        galois::runtime::reportStat_Tsum(REGION_NAME,
+          h_graph->get_run_identifier("TotalRounds"), roundNum + backRounds);
+      }
     }
 
     Sanity::go(*h_graph, dga_max, dga_min, dga_sum);
