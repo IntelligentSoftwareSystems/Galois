@@ -28,15 +28,14 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
  * easier.
  */
 class PRBCTree {
-  using Testing = boost::container::flat_set<uint32_t, 
+  using FlatSet = boost::container::flat_set<uint32_t, 
                     std::less<uint32_t>, galois::gstl::Pow2Alloc<uint32_t>>;
-  using Flat = boost::container::flat_map<uint32_t, Testing,
+  using FlatMap = boost::container::flat_map<uint32_t, FlatSet,
                  std::less<uint32_t>,
-                 galois::gstl::Pow2Alloc<std::pair<uint32_t, Testing>>>;
+                 galois::gstl::Pow2Alloc<std::pair<uint32_t, FlatSet>>>;
 
-  using MapBitset = galois::gstl::Vector<bool>;
   //! map to a bitset of nodes that belong in a particular distance group
-  Flat distanceTree;
+  FlatMap distanceTree;
   //! marks if a message has already been sent for a source
   galois::gstl::Vector<bool> sentFlag;
   //! number of sources that have already been sent out
@@ -44,24 +43,19 @@ class PRBCTree {
   //! number of non-infinity values (i.e. number of sources added already)
   uint32_t numNonInfinity;
 
-  //! Reverse map iterator
-  using TreeIter = 
-    typename Flat::const_reverse_iterator;
-  //! Reverse bitset iterator
-  //using SetIter = typename MapBitset::const_reverse_iterator;
-  using SetIter = typename Testing::const_reverse_iterator;
+  //! reverse iterator over map
+  using TreeIter = typename FlatMap::const_reverse_iterator;
+  //! reverse iterator over set
+  using SetIter = typename FlatSet::const_reverse_iterator;
 
   //! Current iterator for reverse map
   TreeIter curKey;
   //! End key for reverse map iterator
   TreeIter endCurKey;
-
-  //! Current iterator for reverse bitset
+  //! Current set iterator
   SetIter curSet;
-  //! end key for reverse bitset iterator
+  //! End of set iterator
   SetIter endCurSet;
-  //! Current index in the iterator for the bitmap
-  //unsigned curIndex;
 
  public:
   /**
@@ -87,11 +81,6 @@ class PRBCTree {
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    // create bitset if necessary
-    //if (distanceTree[newDistance].size() == 0) {
-    //  distanceTree[newDistance].resize(numSourcesPerRound);
-    //}
-    //distanceTree[newDistance][index] = 1;
     distanceTree[newDistance].insert(index);
     numNonInfinity++;
   }
@@ -101,27 +90,6 @@ class PRBCTree {
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
-    //auto setIter = distanceTree.find(oldDistance);
-    //size_t count = 0;
-    //// if it exists, remove it
-    //if (setIter != distanceTree.end()) {
-    //  MapBitset& setToChange = setIter->second;
-    //  if (setToChange[index]) {
-    //    count = 1;
-    //    setToChange[index] = 0;
-    //  }
-    //}
-
-    //// if it didn't exist before, add to number of non-infinity nodes
-    //if (count == 0) {
-    //  numNonInfinity++;
-    //}
-
-    //// create bitset if necessary
-    //if (distanceTree[newDistance].size() == 0) {
-    //  distanceTree[newDistance].resize(numSourcesPerRound);
-    //}
-    //distanceTree[newDistance][index] = 1;
     if (oldDistance == newDistance) {
       return;
     }
@@ -130,7 +98,7 @@ class PRBCTree {
     size_t count = 0;
     // if it exists, remove it
     if (setIter != distanceTree.end()) {
-      Testing& setToChange = setIter->second;
+      FlatSet& setToChange = setIter->second;
       count = setToChange.erase(index);
     }
 
@@ -145,30 +113,12 @@ class PRBCTree {
    * Get the index that needs to be sent out this round given the round number.
    */
   uint32_t getIndexToSend(uint32_t roundNumber) {
-    //uint32_t distanceToCheck = roundNumber - numSentSources;
-    //uint32_t indexToSend = infinity;
-
-    //auto setIter = distanceTree.find(distanceToCheck);
-    //if (setIter != distanceTree.end()) {
-    //  MapBitset& setToCheck = setIter->second;
-
-    //  // this iteration at worst case is as bad as prbcv1.....
-    //  for (unsigned int index = 0; index < setToCheck.size(); index++) {
-    //    if (setToCheck[index]) {
-    //      if (!sentFlag[index]) {
-    //        indexToSend = index;
-    //        break;
-    //      }
-    //    }
-    //  }
-    //}
-    //return indexToSend;
     uint32_t distanceToCheck = roundNumber - numSentSources;
     uint32_t indexToSend = infinity;
 
     auto setIter = distanceTree.find(distanceToCheck);
     if (setIter != distanceTree.end()) {
-      Testing& setToCheck = setIter->second;
+      FlatSet& setToCheck = setIter->second;
 
       for (const uint32_t index : setToCheck) {
         if (!sentFlag[index]) {
@@ -205,12 +155,6 @@ class PRBCTree {
     curKey = distanceTree.crbegin();
     endCurKey = distanceTree.crend();
 
-    //// i.e. non-empty tree
-    //if (curKey != endCurKey) {
-    //  curSet = curKey->second.crbegin();
-    //  endCurSet = curKey->second.crend();
-    //  curIndex = numSourcesPerRound;
-    //}
     if (curKey != endCurKey) {
       curSet = curKey->second.crbegin();
       endCurSet = curKey->second.crend();
@@ -226,48 +170,6 @@ class PRBCTree {
    */
   uint32_t backGetIndexToSend(const uint32_t roundNumber, 
                               const uint32_t lastRound) {
-    //uint32_t indexToReturn = infinity;
-
-    //while (curKey != endCurKey) {
-    //  // loop to non-zero element in bitset
-    //  while (!(*curSet) && curSet != endCurSet) {
-    //    curSet++;
-    //    curIndex--;
-    //  }
-
-    //  if (curSet != endCurSet) {
-    //    uint32_t curNumber = curIndex - 1;
-    //    uint32_t distance = curKey->first;
-
-    //    if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
-    //      // this number should be sent out this round
-    //      indexToReturn = curNumber;
-    //      curSet++;
-    //      numSentSources--;
-    //      curIndex--;
-    //      break;
-    //    } else {
-    //      // round not reached yet; get out
-    //      break;
-    //    }
-    //  } else {
-    //    // set exhausted; go onto next set
-    //    curKey++;
-
-    //    // if another set exists, set it up, else do nothing
-    //    if (curKey != endCurKey) {
-    //      curSet = curKey->second.crbegin();
-    //      endCurSet = curKey->second.crend();
-    //      curIndex = numSourcesPerRound;
-    //    }
-    //  }
-    //}
-
-    //if (curKey == endCurKey) {
-    //  assert(numSentSources == 0);
-    //}
-
-    //return indexToReturn;
     uint32_t indexToReturn = infinity;
 
     while (curKey != endCurKey) {
@@ -282,7 +184,7 @@ class PRBCTree {
           numSentSources--;
           break;
         } else {
-          // round not reached yet; get out
+          // round to send not reached yet; get out
           break;
         }
       } else {
