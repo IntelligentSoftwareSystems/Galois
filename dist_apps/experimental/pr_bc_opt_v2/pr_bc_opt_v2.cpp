@@ -317,7 +317,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     SendAPSPMessages(graph, dga);
 
     roundNumber++;
-  } while (dga.reduce());
+  } while (dga.reduce(graph.get_run_identifier()));
 
   return roundNumber;
 }

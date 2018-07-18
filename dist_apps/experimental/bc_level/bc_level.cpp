@@ -215,7 +215,7 @@ struct ForwardPass {
                   Bitset_num_shortest_paths>("ForwardPass");
 
       roundNumber++;
-    } while (_dga.reduce());
+    } while (_dga.reduce(_graph.get_run_identifier()));
   }
 
   void operator()(GNode src) const {
