@@ -39,6 +39,8 @@ distAppNoGPU(pr_bc)
 distAppNoGPU(pr_bc_opt)
 distAppNoGPU(pr_bc_opt_v2)
 
+distAppNoGPU(bc_level)
+
 distAppNoGPU(vector_map_micro)
 
 # inefficient version of prbc where entire vector is synchronized
