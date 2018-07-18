@@ -306,8 +306,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     FindMessageToSync(graph, roundNumber, dga);
 
     graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast,
-               Bitset_minDistances>(std::string("APSP") + "_" +
-                                    std::to_string(macroRound));
+               Bitset_minDistances>(graph.get_run_identifier("APSP", macroRound));
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
@@ -403,7 +402,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     // since we're using the tranpose graph
     graph.sync<writeDestination, readSource, DependencyReduce,
                DependencyBroadcast, Bitset_dependency>(
-        std::string("DependencySync") + "_" + std::to_string(macroRound));
+               graph.get_run_identifier("DependencySync", macroRound));
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
