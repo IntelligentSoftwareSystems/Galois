@@ -330,31 +330,6 @@ class MCM(SharedMemApp):
         
         return specs
 
-class PageRankPullResidual(SharedMemApp):
-    relativeAppPath = "pagerank/pagerank-pull-residual"
-    benchmark = "pagerank-pull-residual"
-
-    def get_run_spec(self, bmkinput, config):
-        """Adds tolerance argument"""
-        specs = self.get_default_run_specs(bmkinput, config)
-
-        for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
-        
-        return specs
-
-class PageRankPullSb(SharedMemApp):
-    relativeAppPath = "pagerank/pagerank-pull-sb"
-    benchmark = "pagerank-pull-sb"
-
-    def get_run_spec(self, bmkinput, config):
-        """Adds tolerance argument"""
-        specs = self.get_default_run_specs(bmkinput, config)
-
-        for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
-        
-        return specs
 
 class PageRankPull(SharedMemApp):
     relativeAppPath = "pagerank/pagerank-pull"
@@ -369,6 +344,20 @@ class PageRankPull(SharedMemApp):
         
         return specs
 
+class PageRankPullTopo(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-pull"
+    benchmark = "pagerank-pull-topo"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument and algorithm setting"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
+            s.set_arg("-algo=Topo") # pagerank tolerance
+        
+        return specs
+
 class PageRankPush(SharedMemApp):
     relativeAppPath = "pagerank/pagerank-push"
     benchmark = "pagerank-push"
@@ -379,6 +368,20 @@ class PageRankPush(SharedMemApp):
 
         for s in specs:
             s.set_arg("-tolerance=0.001") # pagerank tolerance
+        
+        return specs
+
+class PageRankPushSync(SharedMemApp):
+    relativeAppPath = "pagerank/pagerank-push"
+    benchmark = "pagerank-push-sync"
+
+    def get_run_spec(self, bmkinput, config):
+        """Adds tolerance argument and algo setting"""
+        specs = self.get_default_run_specs(bmkinput, config)
+
+        for s in specs:
+            s.set_arg("-tolerance=0.001") # pagerank tolerance
+            s.set_arg("-algo=Sync") # pagerank tolerance
         
         return specs
 
@@ -428,8 +431,10 @@ class SSSP(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         # 0 is best for twitter50
+        # 8 seems best for r4-2e26
         for s in specs:
-            s.set_arg("-delta=0")
+            #s.set_arg("-delta=0")
+            s.set_arg("-delta=8")
         
         return specs
 
@@ -488,7 +493,7 @@ class TrianglesEdge(SharedMemApp):
 #            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
 
 # single benchmark run
-#BINARIES = [TrianglesNode()]
+#BINARIES = [MatrixCompletionSimple()]
 
 BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
             ConnectedComponents(), DelaunayTriangulation(), DMR(), 

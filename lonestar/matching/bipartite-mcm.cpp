@@ -402,15 +402,16 @@ struct MatchingFF {
     SerialReached reached;
 
     galois::setActiveThreads(Concurrent ? numThreads : 1);
+
     galois::for_each(galois::iterate(g.A),
-                     [&, outer = this](const GraphNode& node, auto& ctx) {
+                     [&, this](const GraphNode& node, auto& ctx) {
                        if (!g.getData(node, flag).free)
                          return;
 
                        ParallelRevs parallelRevs(ctx.getPerIterAlloc());
                        ParallelReached parallelReached(ctx.getPerIterAlloc());
 
-                       outer->propagate(
+                       this->propagate(
                            g, node, ctx, RevsWrapper(revs, parallelRevs).get(),
                            ReachedWrapper(reached, parallelReached).get());
                      },
@@ -557,7 +558,7 @@ struct MatchingABMP {
     typedef OrderedByIntegerMetric<decltype(indexer), PSchunk> OBIM;
 
     galois::for_each(galois::iterate(initial),
-                     [&, outer = this](const WorkItem& item, auto& ctx) {
+                     [&, this](const WorkItem& item, auto& ctx) {
                        unsigned curLayer = item.second;
                        if (curLayer > maxLayer) {
                          // std::cout << "Reached max layer: " << curLayer <<
@@ -569,7 +570,7 @@ struct MatchingABMP {
                        //  std::cout << "Reached min size: " << size << "\n";
                        //  ctx.breakLoop();
                        //}
-                       if (!outer->propagate(g, item.first, ctx)) {
+                       if (!this->propagate(g, item.first, ctx)) {
                          //__sync_fetch_and_add(&size, -1);
                        }
                      },
@@ -880,9 +881,9 @@ struct MatchingMF {
     while (!initial.empty()) {
       galois::for_each(
           galois::iterate(initial),
-          [&, outer = this](const GraphNode& src, auto& ctx) {
+          [&, this](const GraphNode& src, auto& ctx) {
             int increment = 1;
-            if (outer->discharge(g, src, ctx, source, sink, numNodes)) {
+            if (this->discharge(g, src, ctx, source, sink, numNodes)) {
               increment += BETA;
             }
 

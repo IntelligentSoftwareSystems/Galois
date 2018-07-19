@@ -42,8 +42,6 @@
 
 namespace cll = llvm::cl;
 
-std::ios_base::failure::failure(char const*, std::error_code const&) {}
-
 static cll::opt<std::string>
     inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string>

@@ -17,6 +17,12 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/**
+ * @file MorphGraph.h
+ *
+ * Contains MorphGraph and associated helpers.
+ */
+
 #ifndef GALOIS_GRAPH_MORPHGRAPH_H
 #define GALOIS_GRAPH_MORPHGRAPH_H
 
@@ -48,7 +54,6 @@
 #include <vector>
 
 namespace galois {
-//! Parallel graph data structures.
 namespace graphs {
 
 namespace internal {
@@ -183,7 +188,7 @@ struct EdgeFactory<void, false> {
 } // namespace internal
 
 /**
- * A Graph.
+ * A graph that can have new nodes and edges added to it.
  *
  * An example of use:
  *
@@ -208,8 +213,11 @@ struct EdgeFactory<void, false> {
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
  *   Graph::GraphNode src = *ii;
  *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src);
- * ++jj) { Graph::GraphNode dst = graph.getEdgeDst(jj); int edgeData =
- * g.getEdgeData(jj); assert(edgeData == 5);
+ *        jj != ej;
+ *        ++jj) {
+ *     Graph::GraphNode dst = graph.getEdgeDst(jj);
+ *     int edgeData = g.getEdgeData(jj);
+ *     assert(edgeData == 5);
  *   }
  * }
  * \endcode
@@ -231,59 +239,80 @@ struct EdgeFactory<void, false> {
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
  * @tparam InOut true if directed graph tracks in-edges
+ * @tparam HasNoLockable if true, use no abstract locks in the graph
  * @tparam SortedNeighbors Keep neighbors sorted (for faster findEdge)
+ * @tparam FileEdgeTy type of edges on file to be read from
  */
 template <typename NodeTy, typename EdgeTy, bool Directional,
           bool InOut = false, bool HasNoLockable = false,
           bool SortedNeighbors = false, typename FileEdgeTy = EdgeTy>
 class MorphGraph : private boost::noncopyable {
 public:
-  //! If true, do not use abstract locks in graph
+  /**
+   * Struct used to define the HasNoLockable template parameter as a type
+   * in the struct.
+   */
   template <bool _has_no_lockable>
   struct with_no_lockable {
-    typedef MorphGraph<NodeTy, EdgeTy, Directional, InOut, _has_no_lockable,
-                       SortedNeighbors, FileEdgeTy>
-        type;
+    //! Type with Lockable parameter set according to struct template arg
+    using type = MorphGraph<NodeTy, EdgeTy, Directional, InOut, _has_no_lockable,
+                            SortedNeighbors, FileEdgeTy>;
   };
 
+  /**
+   * Struct used to define the type of node data in the graph.
+   */
   template <typename _node_data>
   struct with_node_data {
-    typedef MorphGraph<_node_data, EdgeTy, Directional, InOut, HasNoLockable,
-                       SortedNeighbors, FileEdgeTy>
-        type;
+    //! Type with node data parameter set according to struct template arg
+    using type = MorphGraph<_node_data, EdgeTy, Directional, InOut, HasNoLockable,
+                            SortedNeighbors, FileEdgeTy>;
   };
 
+  /**
+   * Struct used to define the type of edge data in the graph.
+   */
   template <typename _edge_data>
   struct with_edge_data {
-    typedef MorphGraph<NodeTy, _edge_data, Directional, InOut, HasNoLockable,
-                       SortedNeighbors, FileEdgeTy>
-        type;
+    //! Type with edge data parameter set according to struct template arg
+    using type = MorphGraph<NodeTy, _edge_data, Directional, InOut, HasNoLockable,
+                            SortedNeighbors, FileEdgeTy>;
   };
 
+  /**
+   * Struct used to define the type of file edge data in the graph.
+   */
   template <typename _file_edge_data>
   struct with_file_edge_data {
-    typedef MorphGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
-                       SortedNeighbors, _file_edge_data>
-        type;
+    //! Type with file edge data parameter set according to struct template arg
+    using type = MorphGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
+                            SortedNeighbors, _file_edge_data>;
   };
 
+  /**
+   * Struct used to define directionality of the graph.
+   */
   template <bool _directional>
   struct with_directional {
-    typedef MorphGraph<NodeTy, EdgeTy, _directional, InOut, HasNoLockable,
-                       SortedNeighbors, FileEdgeTy>
-        type;
+    //! Type with directional parameter set according to struct template arg
+    using type = MorphGraph<NodeTy, EdgeTy, _directional, InOut, HasNoLockable,
+                            SortedNeighbors, FileEdgeTy>;
   };
 
+  /**
+   * Struct used to define if neighbors are sorted or not in the graph.
+   */
   template <bool _sorted_neighbors>
   struct with_sorted_neighbors {
-    typedef MorphGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
-                       _sorted_neighbors, FileEdgeTy>
-        type;
+    //! Type with sort neighbor parameter set according to struct template arg
+    using type = MorphGraph<NodeTy, EdgeTy, Directional, InOut, HasNoLockable,
+                           _sorted_neighbors, FileEdgeTy>;
   };
 
-  typedef read_with_aux_first_graph_tag read_tag;
+  //! Tag that defines to graph reader how to read a graph into this class
+  using read_tag = read_with_aux_first_graph_tag;
 
-private:
+private:///////////////////////////////////////////////////////////////////////
   template <typename T>
   struct first_eq_and_valid {
     T N2;
@@ -315,36 +344,50 @@ private:
     }
   };
 
+  // forward declaration for graph node type
   class gNode;
   struct gNodeTypes
       : public internal::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
-    typedef internal::UEdgeInfoBase<gNode, EdgeTy, Directional & !InOut>
-        EdgeInfo;
+    using EdgeInfo =
+      internal::UEdgeInfoBase<gNode, EdgeTy, Directional & !InOut>;
 
     //! The storage type for edges
     // typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
     // typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
-    typedef boost::container::small_vector<
-        EdgeInfo, 3, galois::runtime::Pow_2_BlockAllocator<EdgeInfo>>
-        EdgesTy;
+    using EdgesTy =
+      boost::container::small_vector<
+        EdgeInfo, 3,
+        galois::runtime::Pow_2_BlockAllocator<EdgeInfo>
+      >;
 
-    typedef typename EdgesTy::iterator iterator;
+    using iterator = typename EdgesTy::iterator;
   };
 
   class gNode : public internal::NodeInfoBase<NodeTy, !HasNoLockable>,
                 public gNodeTypes {
+    //! friend of MorphGraph since MorphGraph contains gNodes
     friend class MorphGraph;
-    typedef internal::NodeInfoBase<NodeTy, !HasNoLockable> NodeInfo;
-    typename gNodeTypes::EdgesTy edges;
-    typedef typename gNode::iterator iterator;
-    typedef typename gNode::EdgeInfo EdgeInfo;
+    //! Storage type for node
+    using NodeInfo = internal::NodeInfoBase<NodeTy, !HasNoLockable>;
+    //! iterator over edges (taken from gNodeTypes)
+    using iterator = typename gNode::iterator;
+    //! Storage type of a single edge (taken from gNodeTypes)
+    using EdgeInfo = typename gNode::EdgeInfo;
 
+    //! edges on this node
+    typename gNodeTypes::EdgesTy edges;
+
+    //! Tracks if this node is considered as "in" the graph
     bool active;
 
+    //! Return iterator to first edge
     iterator begin() { return edges.begin(); }
+    //! Return iterator to end of edges
     iterator end() { return edges.end(); }
 
+    //! Remove the provided edge from this node
+    //! @param ii iterator to edge to remove
     void erase(iterator ii) {
       if (SortedNeighbors) {
         // For sorted case remove the element, moving following
@@ -358,21 +401,27 @@ private:
       }
     }
 
+    /**
+     * Erase an edge with a provided destination.
+     */
     void erase(gNode* N, bool inEdge = false) {
       iterator ii = find(N, inEdge);
-      if (ii != end())
-        edges.erase(ii);
+      if (ii != end()) edges.erase(ii);
     }
 
+    /**
+     * Find an edge with a particular destination node.
+     */
     iterator find(gNode* N, bool inEdge = false) {
       iterator ii, ei = edges.end();
+      // find starting point to start search
       if (SortedNeighbors) {
         assert(std::is_sorted(edges.begin(), edges.end(),
                               [=](const EdgeInfo& e1, const EdgeInfo& e2) {
                                 return e1.first() < e2.first();
                               }));
         ii =
-            std::lower_bound(edges.begin(), edges.end(), N, first_lt<gNode*>());
+          std::lower_bound(edges.begin(), edges.end(), N, first_lt<gNode*>());
       } else {
         ii = edges.begin();
       }
@@ -386,10 +435,16 @@ private:
       return ii;
     }
 
+    /**
+     * Make space for more edges stored by this node
+     */
     void resizeEdges(size_t size) {
       edges.resize(size, EdgeInfo(new gNode(), 0));
     }
 
+    /**
+     * Add a new edge to this node
+     */
     template <typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, bool inEdge, Args&&... args) {
       iterator ii;
@@ -398,12 +453,18 @@ private:
         // Insert before first neighbor that is too far.
         ii =
             std::upper_bound(edges.begin(), edges.end(), N, first_lt<gNode*>());
-      } else
+      } else {
         ii = edges.end();
+      }
+
       return edges.insert(ii,
                           EdgeInfo(N, v, inEdge, std::forward<Args>(args)...));
     }
 
+    /**
+     * Add an edge to this node; if space exists to add it in, then reuse that
+     * space.
+     */
     template <typename... Args>
     iterator createEdgeWithReuse(gNode* N, EdgeTy* v, bool inEdge,
                                  Args&&... args) {
@@ -440,11 +501,13 @@ private:
   public:
     template <typename... Args>
     gNode(Args&&... args)
-        : NodeInfo(std::forward<Args>(args)...), active(false) {}
+      : NodeInfo(std::forward<Args>(args)...), active(false) {}
   };
 
   // The graph manages the lifetimes of the data in the nodes and edges
-  typedef galois::InsertBag<gNode> NodeListTy;
+  //! Container for nodes
+  using NodeListTy = galois::InsertBag<gNode>;
+  //! nodes in this graph
   NodeListTy nodes;
 
   internal::EdgeFactory<EdgeTy, Directional && !InOut> edgesF;
@@ -475,54 +538,67 @@ private:
     gNode* operator()(gNode& data) const { return &data; }
   };
 
-public:
+public:////////////////////////////////////////////////////////////////////////
   //! Graph node handle
-  typedef gNode* GraphNode;
+  using GraphNode = gNode*;
   //! Edge data type
-  typedef EdgeTy edge_data_type;
+  using edge_data_type = EdgeTy;
   //! Edge data type of file we are loading this graph from
-  typedef FileEdgeTy file_edge_data_type;
+  using file_edge_data_type = FileEdgeTy;
   //! Node data type
-  typedef NodeTy node_data_type;
+  using node_data_type = NodeTy;
   //! (Out or Undirected) Edge iterator
-  typedef typename boost::filter_iterator<is_out_edge,
-                                          typename gNodeTypes::iterator>
-      edge_iterator;
+  using edge_iterator =
+    typename boost::filter_iterator<is_out_edge, typename gNodeTypes::iterator>;
   //! In Edge iterator
-  typedef
-      typename boost::filter_iterator<is_in_edge, typename gNodeTypes::iterator>
-          in_edge_iterator;
+  using in_edge_iterator =
+   typename boost::filter_iterator<is_in_edge, typename gNodeTypes::iterator>;
+
   //! Reference to edge data
-  typedef typename gNodeTypes::EdgeInfo::reference edge_data_reference;
+  using edge_data_reference = typename gNodeTypes::EdgeInfo::reference;
   //! Reference to node data
-  typedef typename gNodeTypes::reference node_data_reference;
+  using node_data_reference = typename gNodeTypes::reference;
   //! Node iterator
-  typedef boost::transform_iterator<
+  using iterator =
+    boost::transform_iterator<
       makeGraphNode,
-      boost::filter_iterator<is_node, typename NodeListTy::iterator>>
-      iterator;
+      boost::filter_iterator<is_node, typename NodeListTy::iterator>
+    >;
+
 #ifdef AUX_MAP
+  //! Auxiliary data for nodes that stores in neighbors in per thread storage
+  //! accessed through a map
   struct ReadGraphAuxData {
     LargeArray<GraphNode> nodes;
+    //! stores in neighbors
     galois::PerThreadMap<FileGraph::GraphNode,
                          galois::gstl::Vector<std::pair<GraphNode, EdgeTy*>>>
         inNghs;
   };
 #else
+  //! Wrapper around a graph node that provides a lock for it as well as
+  //! in-neighbor tracking
   struct AuxNode {
+    //! lock for wrapped graph node
     galois::substrate::SimpleLock lock;
+    //! single graph node wrapped by this struct
     GraphNode n;
+    //! stores in neighbors
     galois::gstl::Vector<std::pair<GraphNode, EdgeTy*>> inNghs;
   };
+  //! Padded version of AuxNode
   using AuxNodePadded = typename galois::substrate::CacheLineStorage<AuxNode>;
 
+  //! True if a node is both directional and not storing both in and out
+  //! edges
   constexpr static const bool DirectedNotInOut = (Directional && !InOut);
+  //! Large array that contains auxiliary data for each node (AuxNodes)
   using ReadGraphAuxData =
       typename std::conditional<DirectedNotInOut, LargeArray<GraphNode>,
                                 LargeArray<AuxNodePadded>>::type;
 #endif
 
-private:
+private:///////////////////////////////////////////////////////////////////////
   template <typename... Args>
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst,
                                     galois::MethodFlag mflag, Args&&... args) {
@@ -531,6 +607,7 @@ private:
     // galois::runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
+    // add edge only if it doesn't already exist
     if (ii == src->end()) {
       if (Directional && !InOut) {
         ii = src->createEdgeWithReuse(dst, 0, false,
@@ -555,6 +632,7 @@ private:
     // galois::runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->end();
+    // add edge only if it doesn't already exist
     if (ii == src->end()) {
       if (Directional && !InOut) {
         ii = src->createEdge(dst, 0, false, std::forward<Args>(args)...);
@@ -641,10 +719,13 @@ private:
     createInEdge(src, dst, e, galois::MethodFlag::UNPROTECTED);
   }
 
-public:
+public://///////////////////////////////////////////////////////////////////////
   /**
    * Creates a new node holding the indicated data. Usually you should call
    * {@link addNode()} afterwards.
+   *
+   * @param[in] args constructor arguments for node data
+   * @returns newly created graph node
    */
   template <typename... Args>
   GraphNode createNode(Args&&... args) {
@@ -664,9 +745,8 @@ public:
   }
 
   //! Gets the node data for a node.
-  node_data_reference
-  getData(const GraphNode& n,
-          galois::MethodFlag mflag = MethodFlag::WRITE) const {
+  node_data_reference getData(const GraphNode& n,
+      galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     // galois::runtime::checkWrite(mflag, false);
     n->acquire(mflag);
@@ -674,6 +754,7 @@ public:
   }
 
   //! Checks if a node is in the graph
+  //! @returns true if a node has is in the graph
   bool containsNode(const GraphNode& n,
                     galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
@@ -684,8 +765,9 @@ public:
   /**
    * Removes a node from the graph along with all its outgoing/incoming edges
    * for undirected graphs or outgoing edges for directed graphs.
+   *
+   * @todo handle edge memory
    */
-  // FIXME: handle edge memory
   void removeNode(GraphNode n, galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(n);
     // galois::runtime::checkWrite(mflag, true);
@@ -760,14 +842,16 @@ public:
       if (!edge_predicate(*ii))
         // I think we need this too, else we'll return some random iterator.
         ii = ei;
-    } else
+    } else {
       ii = ei;
+    }
     return boost::make_filter_iterator(edge_predicate, ii, ei);
   }
 
-  edge_iterator
-  findEdgeSortedByDst(GraphNode src, GraphNode dst,
-                      galois::MethodFlag mflag = MethodFlag::WRITE) {
+  //! Find/return edge between src/dst if it exists; assumes that edges
+  //! are sorted by destination
+  edge_iterator findEdgeSortedByDst(GraphNode src, GraphNode dst,
+      galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -778,16 +862,20 @@ public:
                           }));
 
     auto ei = src->end();
+
+    // jump directly to edges with destination we are looking for
     auto ii =
         std::lower_bound(src->begin(), src->end(), dst, first_lt<gNode*>());
 
     first_eq_and_valid<gNode*> checker(dst);
     ii = std::find_if(ii, ei, checker); // bug if ei set to upper_bound
+    // ignore in edges
     while (ii != ei && ii->isInEdge()) {
       ++ii;
       ii = std::find_if(ii, ei, checker);
     };
 
+    // make sure destination node is active else return end iterator
     is_out_edge edge_predicate;
     if (ii != ei) {
       dst->acquire(mflag);
@@ -798,6 +886,8 @@ public:
     return boost::make_filter_iterator(edge_predicate, ii, ei);
   }
 
+  //! Find a particular in-edge: note this function activates for the undirected
+  //! graph case, so it just calls the regular out-edge finding function
   template <bool _Undirected = !Directional>
   edge_iterator findInEdge(GraphNode src, GraphNode dst,
                            galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -807,8 +897,8 @@ public:
     return findEdge(src, dst, mflag);
   }
 
-  // Find if an incoming edge between src and dst exists for directed in-out
-  // graphs
+  //! Find if an incoming edge between src and dst exists for directed in-out
+  //! graphs
   template <bool _DirectedInOut = (Directional && InOut)>
   in_edge_iterator
   findInEdge(GraphNode src, GraphNode dst,
@@ -846,6 +936,9 @@ public:
     return *ii->second();
   }
 
+  /**
+   * Get edge data for an in-edge
+   */
   edge_data_reference
   getEdgeData(in_edge_iterator ii,
               galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
@@ -861,11 +954,13 @@ public:
     return GraphNode(ii->first());
   }
 
+  //! Returns the destination of an in-edge
   GraphNode getEdgeDst(in_edge_iterator ii) {
     assert(ii->first()->active);
     return GraphNode(ii->first());
   }
 
+  //! Sorts edge of a node by destination.
   void sortEdgesByDst(GraphNode N,
                       galois::MethodFlag mflag = MethodFlag::WRITE) {
     acquire(N, mflag);
@@ -876,13 +971,14 @@ public:
               });
   }
 
+  //! Sort all edges by destination
   void sortAllEdgesByDst(MethodFlag mflag = MethodFlag::WRITE) {
     galois::do_all(galois::iterate(*this),
                    [=](GraphNode N) { this->sortEdgesByDst(N, mflag); },
                    galois::steal());
   }
 
-  //// General Things ////
+  // General Things
 
   //! Returns an iterator to the neighbors of a node
   edge_iterator edge_begin(GraphNode N,
@@ -900,6 +996,7 @@ public:
     return boost::make_filter_iterator(is_out_edge(), N->begin(), N->end());
   }
 
+  //! Returns an iterator to the in-neighbors of a node
   template <bool _Undirected = !Directional>
   in_edge_iterator
   in_edge_begin(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -917,6 +1014,8 @@ public:
     return boost::make_filter_iterator(is_in_edge(), N->begin(), N->end());
   }
 
+  //! Returns an iterator to the in-neighbors of a node; undirected case
+  //! in which it's the same as a regular neighbor
   template <bool _Undirected = !Directional>
   edge_iterator in_edge_begin(GraphNode N,
                               galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -924,7 +1023,7 @@ public:
     return edge_begin(N, mflag);
   }
 
-  //! Returns the end of the neighbor iterator
+  //! Returns the end of the neighbor edge iterator
   edge_iterator edge_end(GraphNode N,
                          galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
@@ -934,6 +1033,7 @@ public:
     return boost::make_filter_iterator(is_out_edge(), N->end(), N->end());
   }
 
+  //! Returns the end of an in-neighbor edge iterator
   template <bool _Undirected = !Directional>
   in_edge_iterator
   in_edge_end(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -945,6 +1045,7 @@ public:
     return boost::make_filter_iterator(is_in_edge(), N->end(), N->end());
   }
 
+  //! Returns the end of an in-neighbor edge iterator, undirected case
   template <bool _Undirected = !Directional>
   edge_iterator in_edge_end(GraphNode N,
                             galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -952,12 +1053,14 @@ public:
     return edge_end(N, mflag);
   }
 
+  //! Return a range of edges that can be iterated over by C++ for-each
   runtime::iterable<NoDerefIterator<edge_iterator>>
   edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE) {
     return internal::make_no_deref_range(edge_begin(N, mflag),
                                          edge_end(N, mflag));
   }
 
+  //! Return a range of in-edges that can be iterated over by C++ for-each
   template <bool _Undirected = !Directional>
   runtime::iterable<NoDerefIterator<in_edge_iterator>>
   in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -966,6 +1069,8 @@ public:
                                          in_edge_end(N, mflag));
   }
 
+  //! Return a range of in-edges that can be iterated over by C++ for-each
+  //! Undirected case, equivalent to out-edge iteration
   template <bool _Undirected = !Directional>
   runtime::iterable<NoDerefIterator<edge_iterator>>
   in_edges(GraphNode N, galois::MethodFlag mflag = MethodFlag::WRITE,
@@ -998,8 +1103,10 @@ public:
         makeGraphNode());
   }
 
-  typedef iterator local_iterator;
+  //! local iterator over nodes
+  using local_iterator = iterator;
 
+  //! Return the beginning of local range of nodes
   local_iterator local_begin() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(is_node(), nodes.local_begin(),
@@ -1007,6 +1114,7 @@ public:
         makeGraphNode());
   }
 
+  //! Return the end of local range of nodes
   local_iterator local_end() {
     return boost::make_transform_iterator(
         boost::make_filter_iterator(is_node(), nodes.local_end(),
@@ -1023,11 +1131,27 @@ public:
   size_t sizeOfEdgeData() const { return gNode::EdgeInfo::sizeOfSecond(); }
 
 #ifdef AUX_MAP
+  /**
+   * Allocate memory for nodes given a file graph with a particular number of
+   * nodes.
+   *
+   * @param graph FileGraph with a number of nodes to allocate
+   * @param aux Data structure in which to allocate space for nodes.
+   */
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
     aux.nodes.allocateInterleaved(numNodes);
   }
 
+  /**
+   * Constructs the MorphGraph nodes given a FileGraph to construct it from.
+   * Meant to be called by multiple threads.
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in,out] aux Allocated memory to store newly created nodes
+   */
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total,
                           ReadGraphAuxData& aux) {
     auto r = graph
@@ -1040,6 +1164,16 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph edges given a FileGraph to construct it from and
+   * already created nodes.
+   * Meant to be called by multiple threads.
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in] aux Contains created nodes to create edges for
+   */
   void constructOutEdgesFrom(FileGraph& graph, unsigned tid, unsigned total,
                              ReadGraphAuxData& aux) {
     auto r = graph
@@ -1062,8 +1196,20 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph in-edges given a FileGraph to construct it from and
+   * already created nodes.
+   * Meant to be called by multiple threads.
+   * DirectedNotInOut = false version
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in] aux Contains created nodes to create edges for
+   */
   void constructInEdgesFrom(FileGraph& graph, unsigned tid, unsigned total,
                             const ReadGraphAuxData& aux) {
+    // only do it if not directioal or an inout graph
     if (!Directional || InOut) {
       auto r = graph
                    .divideByNode(sizeof(gNode),
@@ -1084,6 +1230,13 @@ public:
     }
   }
 #else
+  /**
+   * Allocate memory for nodes given a file graph with a particular number of
+   * nodes.
+   *
+   * @param graph FileGraph with a number of nodes to allocate
+   * @param aux Data structure in which to allocate space for nodes.
+   */
   void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
     size_t numNodes = graph.size();
     aux.allocateInterleaved(numNodes);
@@ -1094,6 +1247,16 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph nodes given a FileGraph to construct it from.
+   * Meant to be called by multiple threads.
+   * Version for DirectedNotInOut = false.
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in,out] aux Allocated memory to store newly created nodes
+   */
   template <bool V = DirectedNotInOut>
   std::enable_if_t<!V> constructNodesFrom(FileGraph& graph, unsigned tid,
                                           unsigned total,
@@ -1109,6 +1272,16 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph nodes given a FileGraph to construct it from.
+   * Meant to be called by multiple threads.
+   * Version for DirectedNotInOut = true.
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in,out] aux Allocated memory to store newly created nodes
+   */
   template <bool V = DirectedNotInOut>
   std::enable_if_t<V> constructNodesFrom(FileGraph& graph, unsigned tid,
                                          unsigned total,
@@ -1123,6 +1296,17 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph edges given a FileGraph to construct it from and
+   * already created nodes.
+   * Meant to be called by multiple threads.
+   * DirectedNotInOut = false version
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in] aux Contains created nodes to create edges for
+   */
   template <bool V = DirectedNotInOut>
   std::enable_if_t<!V> constructOutEdgesFrom(FileGraph& graph, unsigned tid,
                                              unsigned total,
@@ -1146,6 +1330,17 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph edges given a FileGraph to construct it from and
+   * already created nodes.
+   * Meant to be called by multiple threads.
+   * DirectedNotInOut = true version
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in] aux Contains created nodes to create edges for
+   */
   template <bool V = DirectedNotInOut>
   std::enable_if_t<V> constructOutEdgesFrom(FileGraph& graph, unsigned tid,
                                             unsigned total,
@@ -1164,6 +1359,17 @@ public:
     }
   }
 
+  /**
+   * Constructs the MorphGraph in-edges given a FileGraph to construct it from and
+   * already created nodes.
+   * Meant to be called by multiple threads.
+   * DirectedNotInOut = false version
+   *
+   * @param[in] graph FileGraph to construct a morph graph from
+   * @param[in] tid Thread id of thread calling this function
+   * @param[in] total Total number of threads in current execution
+   * @param[in] aux Contains created nodes to create edges for
+   */
   template <bool V = DirectedNotInOut>
   std::enable_if_t<!V> constructInEdgesFrom(FileGraph& graph, unsigned tid,
                                             unsigned total,
@@ -1181,6 +1387,8 @@ public:
     }
   }
 
+  //! If a directed graph and no in-edges exist (i.e. DirectedNotInOut = true),
+  //! then construct in edges should do nothing.
   template <bool V = DirectedNotInOut>
   std::enable_if_t<V> constructInEdgesFrom(FileGraph&, unsigned, unsigned,
                                            ReadGraphAuxData&) {}

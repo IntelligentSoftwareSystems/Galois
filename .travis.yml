@@ -1,0 +1,199 @@
+dist: trusty
+sudo: false
+
+language: c++
+
+# At the moment, our LCI submodule has an additional submodule within it
+# that refers to some non-public copy of googletest. To avoid failing when
+# cloning Galois, we have to turn off cloning submodules.
+git:
+  submodules: false
+
+matrix:
+  include:
+    - env:
+        - GCC_VER=5
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-5
+            - g++-5
+            - cmake
+            - boost1.67
+    - env:
+        - GCC_VER=6
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-6
+            - g++-6
+            - cmake
+            - boost1.67
+    - env:
+        - GCC_VER=7
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-7
+            - g++-7
+            - cmake
+            - boost1.67
+    - env:
+        - GCC_VER=8
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-8
+            - g++-8
+            - cmake
+            - boost1.67
+    - env:
+        - GCC_VER=8
+        - BUILD_TYPE=Debug
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - gcc-8
+            - g++-8
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=3.8
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-3.8
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-3.8
+            - gcc-5
+            - g++-5
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=3.9
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-3.9
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-3.9
+            - gcc-5
+            - g++-5
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=4.0
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-4.0
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-4.0
+            - gcc-5
+            - g++-5
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=5.0
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-5.0
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-5.0
+            - gcc-7
+            - g++-7
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=6.0
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-6.0
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-6.0
+            - gcc-8
+            - g++-8
+            - cmake
+            - boost1.67
+    - env:
+        - CLANG_VER=6.0
+        - BUILD_TYPE=Debug
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-6.0
+            - george-edison55-precise-backports
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-6.0
+            - gcc-8
+            - g++-8
+            - cmake
+            - boost1.67
+
+before_script:
+  # Depending on whether GCC_VER or CLANG_VER is set and nonempty,
+  # set CC and CXX accordingly.
+  - |
+    if [ -n "$GCC_VER" ]; then
+      export CC="gcc-$GCC_VER"
+      export CXX="g++-$GCC_VER"
+    fi
+  - |
+    if [ -n "$CLANG_VER" ]; then
+      export CC="clang-$CLANG_VER"
+      export CXX="clang++-$CLANG_VER"
+    fi
+  - |
+    # Check if BUILD_TYPE is set at all, not just whether it is empty or unset.
+    # See https://stackoverflow.com/a/13864829/1935144.
+    if [ -z ${BUILD_TYPE+x} ]; then
+      export BUILD_TYPE=Release
+    fi
+  - mkdir build
+  - pushd build
+  - cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=$BUILD_TYPE .. || exit 1
+
+script:
+  - make -j4 || exit 1
+
+notifications:
+  email: false
