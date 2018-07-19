@@ -2458,7 +2458,7 @@ private:
     Textract.stop();
 
     std::string metadata_str(syncTypeStr + "MetadataMode_" +
-                             std::to_string(data_mode) +
+                             std::to_string(data_mode) + "_" +
                              get_run_identifier(loopName));
     galois::runtime::reportStatCond_Single<MORE_DIST_STATS>(GRNAME,
                                                             metadata_str, 1);
