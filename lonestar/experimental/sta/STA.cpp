@@ -20,7 +20,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-  lib.print(std::cout);
+  lib.print();
 
   return 0;
 }
