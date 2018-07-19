@@ -21,6 +21,7 @@
 #include "galois/substrate/EnvCheck.h"
 #include "galois/gIO.h"
 
+#include <array>
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
