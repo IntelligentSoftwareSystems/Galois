@@ -128,6 +128,51 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
           make -j4
+  "openSUSE":
+    docker:
+      - image: opensuse/leap:15
+    steps:
+      - checkout
+      - run: |
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include ..
+          make -j4
+  "Fedora-gcc":
+    docker:
+      - image: fedora:28
+    steps:
+      - checkout
+      - run: |
+          yum -y install zlib-devel boost-devel make cmake gcc-c++
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "Fedora-clang":
+    docker:
+      - image: fedora:28
+    steps:
+      - checkout
+      - run: |
+          yum -y install zlib-devel boost-devel make cmake clang
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          make -j4
+  "Mageia":
+    docker:
+      - image: mageia:6
+    steps:
+      - checkout
+      - run: |
+          urpmi.addmedia --distrib --mirrorlist '$MIRRORLIST'
+          urpmi --auto gcc-c++ make cmake libboost-devel
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
  
 workflows:
   version: 2
@@ -140,3 +185,7 @@ workflows:
       - "CentOS-7-clang"
       - "Arch"
       - "Alpine"
+      - "openSUSE"
+      - "Fedora-gcc"
+      - "Fedora-clang"
+      - "Mageia"
