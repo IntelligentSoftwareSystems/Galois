@@ -4,11 +4,9 @@
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
+#include <map>
 #include <vector>
-#include <utility>
 #include <iostream>
-
-#include <boost/functional/hash.hpp>
 
 #include "Tokenizer.h"
 
@@ -17,6 +15,11 @@ struct Lut;
 struct CellLib;
 struct CellPin;
 struct Cell;
+
+enum TableType {
+  TABLE_DELAY = 0,
+  TABLE_SLEW,
+};
 
 struct CellLibParser {
   std::vector<Token> tokens;
@@ -32,7 +35,7 @@ private:
 
   // for skipping statements
   void skipAttribute();
-  void skipGroupStatement();
+  void skipGroup();
   void skip(bool isTopCall = true);
 
   // for parsing group statements
@@ -68,7 +71,7 @@ struct Lut {
 
 public:
   float lookup(std::vector<float>& param);
-  void print(std::ostream& os = std::cout);
+  void print(std::string attr, std::ostream& os = std::cout);
 };
 
 struct CellPin {
@@ -86,8 +89,18 @@ struct CellPin {
   Cell* cell;
   std::string func;
 
+  // order of keys:
+  // pin, fall/rise, delay/slew(/power in the future), unateness, when
+  using MapWhen2Lut = std::unordered_map<std::string, Lut*>;
+  using MapFromPin = std::unordered_map<CellPin*, MapWhen2Lut[2][2][2]>;
+
+  MapFromPin tables;
+
 public:
   void print(std::ostream& os = std::cout);
+  bool isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise);
+  float extract(TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
+  std::pair<float, std::string> extractMaxDelay(CellPin* inPin, bool isNeg, bool isRise);
 };
 
 struct Cell {
@@ -127,23 +140,14 @@ struct CellLib {
   float defaultInoutPinCap;
   float defaultInputPinCap;
   float defaultOutputPinCap;
+
   std::unordered_map<std::string, WireLoad*> wireLoads;
   std::unordered_map<std::string, Cell*> cells;
   std::unordered_map<std::string, LutTemplate*> lutTemplates;
 
   // set of LUTs to avoid double free
+  // lookup should be done from pins
   std::unordered_set<Lut*> luts;
-
-  using TimingArc = std::pair<CellPin*, CellPin*>;
-  using MapWhen2Lut = std::unordered_map<std::string, Lut*>;
-  using MapLut = std::unordered_map<TimingArc, MapWhen2Lut, boost::hash<TimingArc>>;
-
-  // [0]: positive unate, [1]: negative unate.
-  // non-unate will appear in both
-  MapLut riseSlew[2];
-  MapLut fallSlew[2];
-  MapLut cellRise[2];
-  MapLut cellFall[2];
 
 private:
   void clear();
@@ -152,10 +156,6 @@ private:
 public:
   void parse(std::string inName, bool toClear = false);
   void print(std::ostream& os = std::cout);
-  bool isPosUnateForFall(CellPin* outPin, CellPin* inPin);
-  bool isPosUnateForRise(CellPin* outPin, CellPin* inPin);
-  bool isNegUnateForFall(CellPin* outPin, CellPin* inPin);
-  bool isNegUnateForRise(CellPin* outPin, CellPin* inPin);
   CellLib();
   ~CellLib();
 };

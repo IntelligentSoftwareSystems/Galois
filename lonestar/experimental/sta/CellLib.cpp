@@ -1,11 +1,28 @@
+#include <cassert>
+
 #include "CellLib.h"
 
 float Lut::lookup(std::vector<float>& param) {
   return 0.0;
 }
 
-void Lut::print(std::ostream& os) {
+void Lut::print(std::string attr, std::ostream& os) {
+  os << "        " << attr << "(" << lutTemplate->name << ") {" << std::endl;
+  os << "";
+  os << "        }" << std::endl;
+}
 
+bool CellPin::isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise) {
+  return true;
+}
+
+float CellPin::extract(TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
+  return 0.0;
+}
+
+std::pair<float, std::string>
+CellPin::extractMaxDelay(CellPin* inPin, bool isNeg, bool isRise) {
+  return {0.0, ""};
 }
 
 void CellPin::print(std::ostream& os) {
@@ -14,7 +31,7 @@ void CellPin::print(std::ostream& os) {
   std::string d = (isInput && !isOutput) ? "input" :
                   (!isInput && isOutput) ? "output" :
                   (isInput && isOutput) ? "inout" : "internal";
-  os << "      direction: " << d << ";" << std:endl;
+  os << "      direction: " << d << ";" << std::endl;
 
   if (isInput) {
     os << "      capactance: " << ((riseC > fallC) ? riseC : fallC) << ";" << std::endl;
@@ -25,7 +42,74 @@ void CellPin::print(std::ostream& os) {
   if (isOutput) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
     os << "      function: \"" << func << "\";" << std::endl;
+
+    // convert tables to printing order
+    // order of keys: pin, unateness, when, delay/slew, fall/rise
+    using InnerMap = std::unordered_map<std::string, Lut*[2][2]>;
+    using OuterMap = std::unordered_map<CellPin*, InnerMap[2]>;
+    OuterMap printTables;
+    for (auto& i: tables) {
+      auto pin = i.first;
+      for (int fr = 0; fr < 2; fr++) {
+        for (int ds = 0; ds < 2; ds++) {
+          for (int pn = 0; pn < 2; pn++) {
+            for (auto& j: i.second[fr][ds][pn]) {
+              printTables[pin][pn][j.first][ds][fr] = j.second;
+            }
+          }
+        }
+      }
+    }
+
+    // print tables
+    for (auto& i: printTables) {
+      auto pin = i.first;
+      auto outMap = i.second;
+      for (int pn = 0; pn < 2; pn++) {
+        for (auto& j: outMap[pn]) {
+          auto& when = j.first;
+          std::string unateness;
+          if (0 == pn) {
+            unateness = (outMap[1].count(when)) ? "positive_unate" : "non_unate";
+          }
+          else {
+            unateness = "negative_unate";
+            if (outMap[0].count(when)) {
+              continue;
+            }
+          }
+
+          os << "      timing () {" << std::endl;
+          os << "        related_pin: \"" << pin->name << "\";" << std::endl;
+          if (!when.empty()) {
+            os << "        when: \"" << when << "\";" << std::endl;
+          }
+          os << "        timing_sense: " << unateness << ";" << std::endl;
+
+          auto& t = j.second;
+          auto lut = t[TABLE_DELAY][0];
+          if (lut) {
+            lut->print("cell_fall", os);
+          }
+          lut = t[TABLE_DELAY][1];
+          if (lut) {
+            lut->print("cell_rise", os);
+          }
+          lut = t[TABLE_SLEW][0];
+          if (lut) {
+            lut->print("fall_transition", os);
+          }
+          lut = t[TABLE_SLEW][1];
+          if (lut) {
+            lut->print("rise_transition", os);
+          }
+          os << "      }" << std::endl;
+        }
+      }
+    } // end for printTables
   } // end if (isOutput)
+
+  os << "    }" << std::endl;
 }
 
 void Cell::print(std::ostream& os) {
@@ -37,8 +121,8 @@ void Cell::print(std::ostream& os) {
 
   for (auto& i: leakagePower) {
     os << "    leakage_power () {" << std::endl;
-    os << "      when: \"" << i.first << "\"" << std::endl;
-    os << "      value: " << i.second << std::endl;
+    os << "      when: \"" << i.first << "\";" << std::endl;
+    os << "      value: " << i.second << ";" << std::endl;
     os << "    }" << std::endl;
   }
 
@@ -61,7 +145,7 @@ void LutTemplate::print(std::ostream& os) {
   os << "  lu_table_template (" << name << ") {" << std::endl;
   size_t i = 0;
   for (auto& v: var) {
-    os << "    variable_" << ++i << ": " << v << std::endl;
+    os << "    variable_" << ++i << ": " << v << ";" << std::endl;
   }
 
   i = 0;
@@ -108,7 +192,7 @@ void CellLibParser::skipAttribute() {
   }
 }
 
-void CellLibParser::skipGroupStatement() {
+void CellLibParser::skipGroup() {
   while (!isEndOfTokenStream() && "{" != *curToken) {
     ++curToken;
   }
@@ -145,7 +229,7 @@ void CellLibParser::skip(bool isTopCall) {
       if (isTopCall) {
         std::cout << "Skip group statement " << *curToken << std::endl;
       }
-      skipGroupStatement();
+      skipGroup();
       skipped = true;
       break;
     }
@@ -267,8 +351,8 @@ void CellLibParser::parseLut(Lut* lut) {
       lut->index.push_back(v);
       curToken += 2; // consume ")" and ";"
     }
-    // value ("num1[,num*]"[, \ "num1[,num*]"]);
-    else if ("value" == *curToken) {
+    // values ("num1[,num*]"[, \ "num1[,num*]"]);
+    else if ("values" == *curToken) {
       curToken += 3; // consume "value", "(" and "\""
       while (!isEndOfTokenStream() && ")" != *curToken) {
         lut->value.push_back(std::stof(*curToken));
@@ -296,46 +380,62 @@ void CellLibParser::parseTiming(CellPin* pin) {
   Token when = "";
   while (!isEndOfGroup()) {
     if ("cell_fall" == *curToken) {
+      if (!isPos && !isNeg) {
+        skip();
+        continue;
+      }
       Lut* lut = new Lut;
       lib->luts.insert(lut);
       if (isPos) {
-        lib->cellFall[0][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][0][TABLE_DELAY][0][when] = lut;
       }
       if (isNeg) {
-        lib->cellFall[1][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][0][TABLE_DELAY][1][when] = lut;
       }
       parseLut(lut);
     }
     else if ("cell_rise" == *curToken) {
+      if (!isPos && !isNeg) {
+        skip();
+        continue;
+      }
       Lut* lut = new Lut;
       lib->luts.insert(lut);
       if (isPos) {
-        lib->cellRise[0][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][1][TABLE_DELAY][0][when] = lut;
       }
       if (isNeg) {
-        lib->cellRise[1][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][1][TABLE_DELAY][1][when] = lut;
       }
       parseLut(lut);
     }
     else if ("fall_transition" == *curToken) {
+      if (!isPos && !isNeg) {
+        skip();
+        continue;
+      }
       Lut* lut = new Lut;
       lib->luts.insert(lut);
       if (isPos) {
-        lib->fallSlew[0][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][0][TABLE_SLEW][0][when] = lut;
       }
       if (isNeg) {
-        lib->fallSlew[1][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][0][TABLE_SLEW][1][when] = lut;
       }
       parseLut(lut);
     }
     else if ("rise_transition" == *curToken) {
+      if (!isPos && !isNeg) {
+        skip();
+        continue;
+      }
       Lut* lut = new Lut;
       lib->luts.insert(lut);
       if (isPos) {
-        lib->riseSlew[0][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][1][TABLE_SLEW][0][when] = lut;
       }
       if (isNeg) {
-        lib->riseSlew[1][{pin, relatedPin}][when] = lut;
+        pin->tables[relatedPin][1][TABLE_SLEW][1][when] = lut;
       }
       parseLut(lut);
     }
@@ -456,6 +556,7 @@ void CellLibParser::parseCellPin(Cell* cell) {
   pin->name = *curToken;
   pin->cell = cell;
   cell->pins[pin->name] = pin;
+  curToken += 3; // consume name, ")" and "{"
 
   while (!isEndOfGroup()) {
     if ("timing" == *curToken && pin->isOutput) {
@@ -671,22 +772,6 @@ void CellLib::print(std::ostream& os) {
   }
 
   os << "}" << std::endl;
-}
-
-bool CellLib::isPosUnateForRise(CellPin* outPin, CellPin* inPin) {
-  return !cellRise[0][{outPin, inPin}].empty();
-}
-
-bool CellLib::isPosUnateForFall(CellPin* outPin, CellPin* inPin) {
-  return !cellFall[0][{outPin, inPin}].empty();
-}
-
-bool CellLib::isNegUnateForRise(CellPin* outPin, CellPin* inPin) {
-  return !cellRise[1][{outPin, inPin}].empty();
-}
-
-bool CellLib::isNegUnateForFall(CellPin* outPin, CellPin* inPin) {
-  return !cellFall[1][{outPin, inPin}].empty();
 }
 
 void CellLib::clear() {
