@@ -40,8 +40,6 @@
 #include "galois/graphs/Details.h"
 #include "galois/Galois.h"
 
-#include "llvm/ADT/SmallVector.h"
-
 #include <boost/functional.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
@@ -353,7 +351,6 @@ private:///////////////////////////////////////////////////////////////////////
       internal::UEdgeInfoBase<gNode, EdgeTy, Directional & !InOut>;
 
     //! The storage type for edges
-    // typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
     // typedef galois::gstl::Vector<EdgeInfo> EdgesTy;
     using EdgesTy =
       boost::container::small_vector<

@@ -22,6 +22,7 @@
 #include "galois/gIO.h"
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cerrno>
 #include <cstring>
