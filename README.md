@@ -1,6 +1,9 @@
 Overview
 ====================
 
+[![CircleCI](https://circleci.com/gh/IntelligentSoftwareSystems/Galois.svg?style=svg)](https://circleci.com/gh/IntelligentSoftwareSystems/Galois)
+[![Build Status](https://travis-ci.org/IntelligentSoftwareSystems/Galois.svg?branch=master)](https://travis-ci.org/IntelligentSoftwareSystems/Galois)
+
 Galois is a C++ library designed to ease parallel programming, especially for
 applications with irregular parallelism (e.g., irregular amount of work in parallel
 sections, irregular memory accesses and branching patterns). It implements
