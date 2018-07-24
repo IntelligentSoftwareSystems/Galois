@@ -154,7 +154,7 @@ jobs:
           conda install -y -c conda-forge make cmake boost clangdev libcxx zlib
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,rpath=$HOME/miniconda/lib" ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" ..
           make -j4
   "Arch":
     docker:
@@ -227,5 +227,5 @@ workflows:
       - "openSUSE"
       - "Fedora-gcc"
       - "Fedora-clang"
-      - "Centos-6-gcc"
-      - "Centos-6-clang-libc++"
+      - "CentOS-6-gcc"
+      - "CentOS-6-clang-libc++"
