@@ -40,12 +40,11 @@ set(sources
 )
 
 add_library(galois_shmem STATIC ${sources})
-target_include_directories(galois_shmem PUBLIC 
-  ${CMAKE_SOURCE_DIR}/libllvm/include
+target_include_directories(galois_shmem PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(galois_shmem gllvm ${Boost_SERIALIZATION_LIBRARY_RELEASE})
+target_link_libraries(galois_shmem ${Boost_SERIALIZATION_LIBRARY_RELEASE})
 
 if (CMAKE_HAVE_PTHREAD_H)
    add_definitions(-DGALOIS_HAVE_PTHREAD)
@@ -66,8 +65,7 @@ if (VTune_FOUND)
 endif()
 
 add_library(galois_shmem_obj OBJECT ${sources})
-target_include_directories(galois_shmem_obj PUBLIC 
-  ${CMAKE_SOURCE_DIR}/libllvm/include
+target_include_directories(galois_shmem_obj PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 set_target_properties (galois_shmem_obj PROPERTIES 
