@@ -54,7 +54,7 @@ jobs:
       # move to something based off of centos/devtoolset-7-toolchain-centos7
       # but, since that one doesn't include sudo by default, we need
       # to use this container instead for now.
-      - image: bzohdy/centos-sudo
+      - image: vikas027/centos-ssh-sudo:7
     steps:
       - checkout
       - run: |
@@ -82,7 +82,7 @@ jobs:
     docker:
       # As with the previous Centos 7 build, until we start using our own containers,
       # we need to use an image that includes sudo. The default Centos 7 ones do not.
-      - image: bzohdy/centos-sudo
+      - image: vikas027/centos-ssh-sudo:7
     steps:
       - checkout
       - run: |
@@ -104,6 +104,57 @@ jobs:
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          make -j4
+  "CentOS-6-gcc":
+    docker:
+      # Use an image with sudo enabled so packages can be installed.
+      # Once we transition to building in our own containers we can
+      # move to something based off of centos/devtoolset-7-toolchain-centos7
+      # but, since that one doesn't include sudo by default, we need
+      # to use this container instead for now.
+      - image: vikas027/centos-ssh-sudo:6
+    steps:
+      - checkout
+      - run: |
+          sudo yum -y install centos-release-scl scl-utils zlib-devel make wget bzip2
+          sudo yum -y install devtoolset-7-toolchain
+          # For some reason using scl_source enable this way doesn't work when bash
+          # was started with -e, so temporarily disable that, then re-enable it afterward.
+          set +e
+          source scl_source enable devtoolset-7
+          set -e
+          # Use miniconda to get recent boost and cmake
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          conda install -y -c conda-forge cmake boost
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "CentOS-6-clang-libc++":
+    # Clang on CentOS 7
+    docker:
+      # As with the previous Centos 7 build, until we start using our own containers,
+      # we need to use an image that includes sudo. The default Centos 7 ones do not.
+      - image: vikas027/centos-ssh-sudo:6
+    steps:
+      - checkout
+      - run: |
+          sudo yum -y install wget bzip2-devel lzma
+          # Use miniconda to get all needed packages
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          conda install -y -c conda-forge make cmake boost clangdev libcxx zlib
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,rpath=$HOME/miniconda/lib" ..
           make -j4
   "Arch":
     docker:
@@ -189,3 +240,5 @@ workflows:
       - "Fedora-gcc"
       - "Fedora-clang"
       - "Mageia"
+      - "Centos-6-gcc"
+      - "Centos-6-clang-libc++"
