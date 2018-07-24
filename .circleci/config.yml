@@ -212,18 +212,6 @@ jobs:
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
           make -j4
-  "Mageia":
-    docker:
-      - image: mageia:6
-    steps:
-      - checkout
-      - run: |
-          urpmi.addmedia --distrib --mirrorlist '$MIRRORLIST'
-          urpmi --auto gcc-c++ make cmake libboost-devel
-          mkdir build
-          cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
-          make -j4
  
 workflows:
   version: 2
@@ -239,6 +227,5 @@ workflows:
       - "openSUSE"
       - "Fedora-gcc"
       - "Fedora-clang"
-      - "Mageia"
       - "Centos-6-gcc"
       - "Centos-6-clang-libc++"
