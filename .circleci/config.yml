@@ -206,7 +206,10 @@ jobs:
     steps:
       - checkout
       - run: |
-          yum -y -q install zlib-devel boost-devel make cmake clang
+          # Install llvm-devel, not because it is required, but because it may
+          # conflict with the llvm headers that are vendored for use when building
+          # command line programs. That configuration needs to be tested.
+          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
