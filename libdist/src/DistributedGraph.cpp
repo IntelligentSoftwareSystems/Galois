@@ -54,6 +54,8 @@ cll::opt<DataCommMode> enforce_metadata(
                 clEnumValN(onlyData, "none",
                            "Do not use any metadata (sends "
                            "non-updated values)"),
+                clEnumValN(neverOnlyData, "neverOnlyData",
+                           "Never send onlyData"),
                 clEnumValEnd),
     cll::init(noData), cll::Hidden);
 
