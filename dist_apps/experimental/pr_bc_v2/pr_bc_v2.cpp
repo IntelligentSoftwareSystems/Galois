@@ -104,7 +104,7 @@ std::vector<galois::DynamicBitSet> bitset_depAccumulator;
 using Graph = galois::graphs::DistGraph<NodeData, void>;
 using GNode = typename Graph::GraphNode;
 
-//#include "pr_bc_opt_sync.hh"
+#include "pr_bc_v2_sync.hh"
 
 /******************************************************************************/
 /* Functions for running the algorithm */
@@ -161,11 +161,7 @@ void InitializeIteration(Graph& graph,
           if (nodesToConsider[i] == graph.getGID(curNode)) {
             cur_data.minDistances[i] = 0;
             cur_data.dTree.setDistance(i, infinity, 0);
-            if (graph.isOwned(graph.L2G(curNode))) {
-              cur_data.shortestPathNumbers[i] = 1;
-            } else {
-              cur_data.shortestPathNumbers[i] = 0;
-            }
+            cur_data.shortestPathNumbers[i] = 1;
           } else {
             cur_data.minDistances[i]        = infinity;
             cur_data.shortestPathNumbers[i] = 0;
@@ -308,6 +304,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   uint32_t roundNumber = 0;
 
   do {
+    //galois::gPrint(roundNumber, "\n");
     dga.reset();
     galois::gDebug("[", galois::runtime::getSystemNetworkInterface().ID, "]",
                    " Round ", roundNumber);
@@ -319,15 +316,12 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     // send messages (if any)
     SendAPSPMessages(graph, dga);
 
-    // TODO fix sync
     // sync distance and short path count updates
-    //graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast,
-    //           Bitset_minDistances>(std::string("APSP") + "_" +
-    //                                std::to_string(macroRound));
-
+    graph.sync<writeAny, readAny, ReduceAPSP, BroadcastAPSP, BitsetAPSP>(
+      std::string("APSP") + "_" + std::to_string(macroRound)
+    );
     // short path accumulation step
     ShortPathUpdate(graph);
-
     roundNumber++;
   } while (dga.reduce(graph.get_run_identifier()));
 
@@ -700,24 +694,24 @@ int main(int argc, char** argv) {
       // after that is empty round where nothing is done)
       uint32_t lastRoundNumber = APSP(*hg, dga) - 2;
 
-      RoundUpdate(*hg);
-      BackProp(*hg, lastRoundNumber);
-      BC(*hg, nodesToConsider);
-      StatTimer_main.stop();
+      //RoundUpdate(*hg);
+      //BackProp(*hg, lastRoundNumber);
+      //BC(*hg, nodesToConsider);
+      //StatTimer_main.stop();
 
-      hg->set_num_round(0);
-      // report num rounds
-      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-        galois::runtime::reportStat_Single(REGION_NAME,
-          hg->get_run_identifier("NumForwardRounds", macroRound),
-          lastRoundNumber + 2);
-        galois::runtime::reportStat_Single(REGION_NAME,
-          hg->get_run_identifier("NumBackwardRounds", macroRound),
-          lastRoundNumber + 1);
-        galois::runtime::reportStat_Tsum(REGION_NAME,
-          hg->get_run_identifier("TotalRounds"),
-          lastRoundNumber + lastRoundNumber + 3);
-      }
+      //hg->set_num_round(0);
+      //// report num rounds
+      //if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+      //  galois::runtime::reportStat_Single(REGION_NAME,
+      //    hg->get_run_identifier("NumForwardRounds", macroRound),
+      //    lastRoundNumber + 2);
+      //  galois::runtime::reportStat_Single(REGION_NAME,
+      //    hg->get_run_identifier("NumBackwardRounds", macroRound),
+      //    lastRoundNumber + 1);
+      //  galois::runtime::reportStat_Tsum(REGION_NAME,
+      //    hg->get_run_identifier("TotalRounds"),
+      //    lastRoundNumber + lastRoundNumber + 3);
+      //}
 
       macroRound++;
     }
@@ -755,7 +749,10 @@ int main(int argc, char** argv) {
          ii != (*hg).masterNodesRange().end(); ++ii) {
       if (!outputDistPaths) {
         // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
+        //sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
+        sprintf(v_out, "%lu %lu %f\n", (*hg).getGID(*ii), 
+                                   (*hg).getData(*ii).minDistances[0],
+                                   (*hg).getData(*ii).shortestPathNumbers[0]);
       } else {
         // sprintf(v_out, "%lu ", (*hg).getGID(*ii));
         // galois::runtime::printOutput(v_out);
@@ -768,21 +765,21 @@ int main(int argc, char** argv) {
         ////sprintf(v_out, " ");
         ////galois::runtime::printOutput(v_out);
 
-        ////for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        ////  sprintf(v_out, "%lu", (*hg).getData(*ii).shortestPathNumbers[i]);
-        ////  galois::runtime::printOutput(v_out);
-        ////}
+        //for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        //  sprintf(v_out, "%lu", (*hg).getData(*ii).shortestPathNumbers[i]);
+        //  galois::runtime::printOutput(v_out);
+        //}
         // sprintf(v_out, "\n");
         // galois::runtime::printOutput(v_out);
 
-        uint64_t a      = 0;
-        ShortPathType b = 0;
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          if ((*hg).getData(*ii).minDistances[i] != infinity) {
-            a += (*hg).getData(*ii).minDistances[i];
-          }
-          b += (*hg).getData(*ii).shortestPathNumbers[i];
-        }
+        //uint64_t a      = 0;
+        //ShortPathType b = 0;
+        //for (unsigned i = 0; i < numSourcesPerRound; i++) {
+        //  if ((*hg).getData(*ii).minDistances[i] != infinity) {
+        //    a += (*hg).getData(*ii).minDistances[i];
+        //  }
+        //  b += (*hg).getData(*ii).shortestPathNumbers[i];
+        //}
         // outputs min distance and short path numbers
         // sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
         // sprintf(v_out, "%lu %lu %lu\n", (*hg).getGID(*ii), a, c);
