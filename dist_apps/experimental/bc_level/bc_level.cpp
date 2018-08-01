@@ -335,13 +335,13 @@ struct BackwardPass {
         auto& dst_data = graph->getData(dst);
 
         if (dest_to_find == dst_data.current_length.load()) {
-          float contrib = src_data.num_shortest_paths;
-          contrib /= dst_data.num_shortest_paths;
-          contrib *= (1.0 + dst_data.dependency);
+          float contrib = (1.0 + dst_data.dependency) /
+                          dst_data.num_shortest_paths;
           galois::add(src_data.dependency, contrib);
           bitset_dependency.set(src);
         }
       }
+      src_data.dependency *= src_data.num_shortest_paths;
     }
   }
 };
