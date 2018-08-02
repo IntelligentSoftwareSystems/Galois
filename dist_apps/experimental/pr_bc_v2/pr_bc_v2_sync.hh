@@ -18,18 +18,13 @@
  */
 
 ////////////////////////////////////////////////////////////////////////////////
-// MinDistances
+// Forward Phase
 ////////////////////////////////////////////////////////////////////////////////
 
-/**
- * Manually defined sync structure for reducing minDistances. Needs to be manual
- * as there is a reset operation that is contingent on changes to the minimum
- * distance.
- */
 struct ReduceAPSP {
   using ValTy = std::pair<uint32_t, ShortPathType>;
 
-  static ValTy extract(uint32_t node_id, const struct NodeData& node, 
+  static ValTy extract(uint32_t node_id, const struct NodeData& node,
                        unsigned vecIndex) {
     return ValTy(node.minDistances[vecIndex], node.pathAccumulator[vecIndex]);
   }
@@ -50,7 +45,7 @@ struct ReduceAPSP {
     bool returnVar = false;
     auto& myDistances = node.minDistances;
     uint32_t oldDist = galois::min(myDistances[vecIndex], y.first);
-    // if there's a change, reset the shortestPathsAdd var + 
+    // if there's a change, reset the shortestPathsAdd var +
     if (oldDist > myDistances[vecIndex]) {
       node.dTree.setDistance(vecIndex, oldDist, y.first);
       node.shortestPathNumbers[vecIndex] = 0;
@@ -146,28 +141,23 @@ struct BitsetAPSP {
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Shortest Path
+// Backphase
 ////////////////////////////////////////////////////////////////////////////////
 
-//GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
-//                                                        uint64_t);
-//GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint64_t);
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Dependency
-////////////////////////////////////////////////////////////////////////////////
-
-//GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
-//                                                        galois::CopyableAtomic<float>);
-//GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
-//                                              galois::CopyableAtomic<float>);
-
-
-////////////////////////////////////////////////////////////////////////////////
-// Bitsets
-////////////////////////////////////////////////////////////////////////////////
-
-//GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(minDistances);
-//GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(shortestPathToAdd);
-//GALOIS_SYNC_STRUCTURE_VECTOR_BITSET(dependencyToAdd);
+GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(depAccumulator,
+                                                        galois::CopyableAtomic<float>);
+GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(depAccumulator,
+                                              galois::CopyableAtomic<float>);
+struct BitsetDep {
+  static unsigned numBitsets() { return bitset_depAccumulator.size(); }
+  static constexpr bool is_vector_bitset() { return true; }
+  static constexpr bool is_valid() { return true; }
+  static galois::DynamicBitSet& get(unsigned i) {
+    return bitset_depAccumulator[i];
+  }
+  static void reset_range(size_t begin, size_t end) {
+    for (unsigned i = 0; i < bitset_depAccumulator.size(); i++) {
+      bitset_depAccumulator[i].reset(begin, end);
+    }
+  }
+};

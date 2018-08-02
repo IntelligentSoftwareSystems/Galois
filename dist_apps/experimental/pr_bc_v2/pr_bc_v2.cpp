@@ -281,8 +281,8 @@ void ShortPathUpdate(Graph& graph) {
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           if (cur_data.pathAccumulator[i] > 0) {
             cur_data.shortestPathNumbers[i] += cur_data.pathAccumulator[i];
+            cur_data.pathAccumulator[i] = 0;
           }
-          cur_data.pathAccumulator[i] = 0;
         }
       },
       galois::loopname(
@@ -370,7 +370,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
         // out since we don't care about dependency for sources (i.e. distance
         // 0)
         if (!dst_data.dTree.isZeroReached()) {
-          dst_data.roundIndexToSend = 
+          dst_data.roundIndexToSend =
             dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
 
           if (dst_data.dTree.isZeroReached()) {
@@ -390,18 +390,18 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @param graph Local graph to operate on
  */
 void UpdateDependency(Graph& graph) {
-  const auto& allNodes = graph.allNodesRange();
+  const auto& nodesWithEdges = graph.allNodesWithEdgesRange();
 
   galois::do_all(
-      galois::iterate(allNodes.begin(), allNodes.end()),
+      galois::iterate(nodesWithEdges.begin(), nodesWithEdges.end()),
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
 
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           if (cur_data.depAccumulator[i] > 0) {
             cur_data.dependencyValues[i] += cur_data.depAccumulator[i].load();
+            cur_data.depAccumulator[i] = 0;
           }
-          cur_data.depAccumulator[i] = 0;
         }
       },
       galois::loopname(
@@ -423,10 +423,10 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   uint32_t currentRound = 0;
 
   while (currentRound <= lastRoundNumber) {
+    //galois::gPrint("back ", currentRound, "\n");
     graph.set_num_round(currentRound);
 
     BackFindMessageToSend(graph, currentRound, lastRoundNumber);
-
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
@@ -451,7 +451,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
               uint32_t sourceDistance = src_data.minDistances[i];
 
-              // source nodes of this batch (i.e. distance 0) can be safely 
+              // source nodes of this batch (i.e. distance 0) can be safely
               // ignored
               if (sourceDistance != 0) {
                 // determine if this source is a predecessor
@@ -459,7 +459,6 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
                   // add to dependency of predecessor using our finalized one
                   galois::atomicAdd(src_data.depAccumulator[i], toAdd);
 
-                  // TODO fix this dependency bitset
                   bitset_depAccumulator[i].set(src);
                 }
               }
@@ -471,14 +470,14 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
         galois::steal(),
         galois::no_stats());
 
-    // TODO fix this sync
-    //graph.sync<writeDestination, readSource, DependencyReduce,
-    //           DependencyBroadcast, Bitset_dependency>(
-    //    std::string("DependencySync") + "_" + std::to_string(macroRound));
+    graph.sync<writeDestination, readSource,
+               Reduce_pair_wise_add_array_single_depAccumulator,
+               Broadcast_depAccumulator, BitsetDep>(
+      std::string("DependencySync") + "_" + std::to_string(macroRound)
+    );
 
     // dependency update
     UpdateDependency(graph);
-
     currentRound++;
   }
 }
@@ -694,24 +693,24 @@ int main(int argc, char** argv) {
       // after that is empty round where nothing is done)
       uint32_t lastRoundNumber = APSP(*hg, dga) - 2;
 
-      //RoundUpdate(*hg);
-      //BackProp(*hg, lastRoundNumber);
-      //BC(*hg, nodesToConsider);
-      //StatTimer_main.stop();
+      RoundUpdate(*hg);
+      BackProp(*hg, lastRoundNumber);
+      BC(*hg, nodesToConsider);
+      StatTimer_main.stop();
 
-      //hg->set_num_round(0);
-      //// report num rounds
-      //if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      //  galois::runtime::reportStat_Single(REGION_NAME,
-      //    hg->get_run_identifier("NumForwardRounds", macroRound),
-      //    lastRoundNumber + 2);
-      //  galois::runtime::reportStat_Single(REGION_NAME,
-      //    hg->get_run_identifier("NumBackwardRounds", macroRound),
-      //    lastRoundNumber + 1);
-      //  galois::runtime::reportStat_Tsum(REGION_NAME,
-      //    hg->get_run_identifier("TotalRounds"),
-      //    lastRoundNumber + lastRoundNumber + 3);
-      //}
+      hg->set_num_round(0);
+      // report num rounds
+      if (galois::runtime::getSystemNetworkInterface().ID == 0) {
+        galois::runtime::reportStat_Single(REGION_NAME,
+          hg->get_run_identifier("NumForwardRounds", macroRound),
+          lastRoundNumber + 2);
+        galois::runtime::reportStat_Single(REGION_NAME,
+          hg->get_run_identifier("NumBackwardRounds", macroRound),
+          lastRoundNumber + 1);
+        galois::runtime::reportStat_Tsum(REGION_NAME,
+          hg->get_run_identifier("TotalRounds"),
+          lastRoundNumber + lastRoundNumber + 3);
+      }
 
       macroRound++;
     }
@@ -749,10 +748,10 @@ int main(int argc, char** argv) {
          ii != (*hg).masterNodesRange().end(); ++ii) {
       if (!outputDistPaths) {
         // outputs betweenness centrality
-        //sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
-        sprintf(v_out, "%lu %lu %f\n", (*hg).getGID(*ii), 
-                                   (*hg).getData(*ii).minDistances[0],
-                                   (*hg).getData(*ii).shortestPathNumbers[0]);
+        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
+        //sprintf(v_out, "%lu %lu %f\n", (*hg).getGID(*ii),
+        //                           (*hg).getData(*ii).minDistances[0],
+        //                           (*hg).getData(*ii).shortestPathNumbers[0]);
       } else {
         // sprintf(v_out, "%lu ", (*hg).getGID(*ii));
         // galois::runtime::printOutput(v_out);
