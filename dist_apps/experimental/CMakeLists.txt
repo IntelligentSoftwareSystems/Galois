@@ -41,6 +41,7 @@ distAppNoGPU(pr_bc_opt)
 distAppNoGPU(pr_bc_opt_v2)
 
 distAppNoGPU(bc_level)
+distAppNoGPU(debug_bc_level)
 
 distAppNoGPU(vector_map_micro)
 
