@@ -35,3 +35,5 @@ distApp(sgd_pull)
 distApp(kcore_push)
 distApp(cc_push)
 distApp(pagerank_pull_topo)
+
+distApp(bc_level)

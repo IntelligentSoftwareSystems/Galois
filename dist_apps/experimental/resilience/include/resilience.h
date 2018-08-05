@@ -359,3 +359,13 @@ void crashSiteAdjust(GraphTy& _graph) {
     TimerRecoveryCrashedAdjust.stop();
   }
 }
+
+bool isCrashed() {
+  std::set<uint32_t> crashHostSet = getRandomHosts();
+  const auto& net = galois::runtime::getSystemNetworkInterface();
+  if (crashHostSet.find(net.ID) != crashHostSet.end()) {
+    return true;
+  } else {
+    return false;
+  }
+}
