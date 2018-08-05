@@ -1,0 +1,233 @@
+version: 2
+
+# TODO: These builds are currently configured to
+# install the needed dependencies in each container
+# at the start of each build. The dependencies aren't huge,
+# but that is slower and does waste some bandwidth.
+# We should eventually roll the set up for each
+# container into a separate dockerfile and push custom
+# build images to dockerhub so that setting up packages
+# during the actual CI testing is no longer necessary.
+
+jobs:
+  "Debian":
+     # As of this writing, runs on Debian 9.5
+    docker:
+      - image: gcc:8
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y libboost-all-dev cmake
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "Ubuntu-18.04":
+    docker:
+      - image: ubuntu:18.04
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y libboost-all-dev cmake gcc g++
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "Ubuntu-16.04":
+    docker:
+      - image: ubuntu:16.04
+    steps:
+      - checkout
+      - run: |
+          apt-get -q update -y
+          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "CentOS-7-gcc":
+    docker:
+      # Use an image with sudo enabled so packages can be installed.
+      # Once we transition to building in our own containers we can
+      # move to something based off of centos/devtoolset-7-toolchain-centos7
+      # but, since that one doesn't include sudo by default, we need
+      # to use this container instead for now.
+      - image: vikas027/centos-ssh-sudo:7
+    steps:
+      - checkout
+      - run: |
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
+          sudo yum -y -q install devtoolset-7-toolchain
+          # For some reason using scl_source enable this way doesn't work when bash
+          # was started with -e, so temporarily disable that, then re-enable it afterward.
+          set +e
+          source scl_source enable devtoolset-7
+          set -e
+          # Use miniconda to get recent boost and cmake
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          conda install -y -q -c conda-forge cmake boost
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "CentOS-7-clang":
+    # Clang on CentOS 7
+    docker:
+      # As with the previous Centos 7 build, until we start using our own containers,
+      # we need to use an image that includes sudo. The default Centos 7 ones do not.
+      - image: vikas027/centos-ssh-sudo:7
+    steps:
+      - checkout
+      - run: |
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
+          sudo yum -y -q install devtoolset-7-toolchain llvm-toolset-7
+          # For some reason using scl_source enable this way doesn't work when bash
+          # was started with -e, so temporarily disable that, then re-enable it afterward.
+          set +e
+          source scl_source enable llvm-toolset-7
+          set -e
+          # Use miniconda to get recent boost and cmake
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          conda install -y -q -c conda-forge cmake boost
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          make -j4
+  "CentOS-6-gcc":
+    docker:
+      # Use an image with sudo enabled so packages can be installed.
+      # Once we transition to building in our own containers we can
+      # move to something based off of centos/devtoolset-7-toolchain-centos7
+      # but, since that one doesn't include sudo by default, we need
+      # to use this container instead for now.
+      - image: vikas027/centos-ssh-sudo:6
+    steps:
+      - checkout
+      - run: |
+          sudo yum -y -q install centos-release-scl scl-utils zlib-devel make wget bzip2
+          sudo yum -y -q install devtoolset-7-toolchain
+          # For some reason using scl_source enable this way doesn't work when bash
+          # was started with -e, so temporarily disable that, then re-enable it afterward.
+          set +e
+          source scl_source enable devtoolset-7
+          set -e
+          # Use miniconda to get recent boost and cmake
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          conda install -y -q -c conda-forge cmake boost
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "CentOS-6-clang-libc++":
+    # Clang on CentOS 7
+    docker:
+      # As with the previous Centos 7 build, until we start using our own containers,
+      # we need to use an image that includes sudo. The default Centos 7 ones do not.
+      - image: vikas027/centos-ssh-sudo:6
+    steps:
+      - checkout
+      - run: |
+          # Use miniconda to get all needed packages
+          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          bash miniconda.sh -b -p $HOME/miniconda
+          rm miniconda.sh
+          export PATH=$HOME/miniconda/bin:$PATH
+          source activate
+          conda install -y -q -c conda-forge make cmake boost clangdev libcxx zlib
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" ..
+          make -j4
+  "Arch":
+    docker:
+      - image: archlinux/base
+    steps:
+      - checkout
+      - run: |
+          pacman -Syy
+          pacman -q -S --noconfirm gcc make cmake boost
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "Alpine":
+    docker:
+      - image: frolvlad/alpine-gxx
+    steps:
+      - checkout
+      - run: |
+          apk add --no-cache --no-progress make cmake boost-dev zlib-dev
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "openSUSE":
+    docker:
+      - image: opensuse/leap:15
+    steps:
+      - checkout
+      - run: |
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include ..
+          make -j4
+  "Fedora-gcc":
+    docker:
+      - image: fedora:28
+    steps:
+      - checkout
+      - run: |
+          yum -y -q install zlib-devel boost-devel make cmake gcc-c++
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          make -j4
+  "Fedora-clang":
+    docker:
+      - image: fedora:28
+    steps:
+      - checkout
+      - run: |
+          # Install llvm-devel, not because it is required, but because it may
+          # conflict with the llvm headers that are vendored for use when building
+          # command line programs. That configuration needs to be tested.
+          yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel
+          mkdir build
+          cd build
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          make -j4
+ 
+workflows:
+  version: 2
+  build:
+    jobs:
+      - "Debian"
+      - "Ubuntu-18.04"
+      - "Ubuntu-16.04"
+      - "CentOS-7-gcc"
+      - "CentOS-7-clang"
+      - "Arch"
+      - "Alpine"
+      - "openSUSE"
+      - "Fedora-gcc"
+      - "Fedora-clang"
+      - "CentOS-6-gcc"
+      - "CentOS-6-clang-libc++"

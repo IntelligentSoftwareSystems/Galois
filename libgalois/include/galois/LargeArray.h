@@ -187,9 +187,9 @@ public:
   }
 
   friend void swap(LargeArray& lhs, LargeArray& rhs) {
+    std::swap(lhs.m_realdata, rhs.m_realdata);
     std::swap(lhs.m_data, rhs.m_data);
     std::swap(lhs.m_size, rhs.m_size);
-    std::swap(lhs.allocated, rhs.allocated);
   }
 
   const_reference at(difference_type x) const { return m_data[x]; }
