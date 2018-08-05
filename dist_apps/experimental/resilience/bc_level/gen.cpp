@@ -98,7 +98,6 @@ using Graph = galois::graphs::DistGraph<NodeData, void>;
 using GNode = typename Graph::GraphNode;
 
 // bitsets for tracking updates
-galois::DynamicBitSet bitset_num_shortest_paths;
 galois::DynamicBitSet bitset_current_length;
 galois::DynamicBitSet bitset_path_accum;
 galois::DynamicBitSet bitset_dep_accum;
@@ -233,8 +232,8 @@ void PathAccum(Graph& _graph) {
 
       if (src_data.path_accum > 0 && src_data.num_shortest_paths == 0) {
         src_data.num_shortest_paths = src_data.path_accum;
-        src_data.path_accum = 0;
       }
+      src_data.path_accum = 0;
     },
     galois::loopname(_graph.get_run_identifier("ForwardPass").c_str()),
     galois::no_stats()
@@ -404,6 +403,8 @@ struct ForwardPass {
                       Broadcast_current_length, Bitset_current_length>("ForwardPass");
           _graph.sync<writeDestination, readAny, Reduce_add_path_accum,
                       Broadcast_path_accum, Bitset_path_accum>("ForwardPass");
+          PathAccum(_graph);
+
           addForward = 1;
         } else {
           addForward = toRepeat;
@@ -762,7 +763,6 @@ int main(int argc, char** argv) {
     sourceFile.close();
   }
 
-  bitset_num_shortest_paths.resize(h_graph->size());
   bitset_path_accum.resize(h_graph->size());
   bitset_current_length.resize(h_graph->size());
   bitset_dep_accum.resize(h_graph->size());
@@ -826,7 +826,6 @@ int main(int argc, char** argv) {
       (*h_graph).set_num_run(run + 1);
 
       {
-        bitset_num_shortest_paths.reset();
         bitset_path_accum.reset();
         bitset_current_length.reset();
         bitset_dep_accum.reset();
