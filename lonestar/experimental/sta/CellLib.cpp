@@ -1,28 +1,156 @@
 #include <cassert>
+#include <algorithm>
 
 #include "CellLib.h"
 
+using Bound = std::pair<size_t, size_t>;
+
+template<typename T>
+static Bound findBound(T v, std::vector<T>& array) {
+  // should be non-empty list
+  auto arraySize = array.size();
+  assert(arraySize);
+
+  if (1 == arraySize) {
+    return {0, 0};
+  }
+  else if (2 == arraySize) {
+    return {0, 1};
+  }
+  else {
+    auto upper = std::upper_bound(array.begin(), array.end(), v);
+    // all elements in array are smaller than v
+    if (upper == array.end()) {
+      return {array.size() - 2, array.size() - 1};
+    }
+    // all elements in array are smaller than v
+    else if (upper == array.begin()) {
+      return {0, 1};
+    }
+    // v sits in between a pair of elements in array
+    else {
+      auto index_u = std::distance(array.begin(), upper);
+      return {index_u - 1, index_u};
+    }
+  }
+}
+
+template<typename T>
+static T interpolate(T x0, T y0, T x1, T y1, T x) {
+  if (x1 == x0) {
+    assert(y1 == y0);
+    return y0;
+  }
+  else {
+    auto xDiff = x1 - x0;
+    auto yDiff = y1 - y0;
+    return y0 + (x - x0) * yDiff / xDiff;
+  }
+}
+
+float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, std::vector<size_t>& diff, size_t start, size_t i) {
+  auto lb = bound[i].first;
+  auto ub = bound[i].second;
+  auto start_l = start + diff[i] * lb;
+  auto start_u = start + diff[i] * ub;
+  bool isBottomMost = (i == bound.size() - 1);
+  auto y0 = (isBottomMost) ? value[start_l] : lookupInternal(param, bound, diff, start_l, i+1);
+  auto y1 = (isBottomMost) ? value[start_u] : lookupInternal(param, bound, diff, start_u, i+1);
+  return interpolate(index[i][lb], y0, index[i][ub], y1, param[i]);
+}
+
 float Lut::lookup(std::vector<float>& param) {
-  return 0.0;
+  auto paramSize = param.size();
+
+  // scalar case, return the value immediately
+  if (0 == paramSize) {
+    return value[0];
+  }
+
+  // find bounds for each dimension
+  std::vector<Bound> bound;
+  for (size_t i = 0; i < paramSize; ++i) {
+    bound.push_back(findBound(param[i], index[i]));
+  }
+
+  // find diff for each dimension
+  std::vector<size_t> diff;
+  size_t offset = 1;
+  diff.push_back(offset);
+  for (size_t i = paramSize - 1; i >= 1; --i) {
+    offset *= lutTemplate->dim[i];
+    diff.insert(diff.begin(), offset);
+  }
+
+  return lookupInternal(param, bound, diff, 0, 0);
 }
 
 void Lut::print(std::string attr, std::ostream& os) {
-  os << "        " << attr << "(" << lutTemplate->name << ") {" << std::endl;
-  os << "";
+  os << "        " << attr << " (" << lutTemplate->name << ") {" << std::endl;
+
+  for (size_t i = 0; i < index.size(); i++) {
+    os << "          index_" << (i+1) << " (\"" << index[i][0];
+    for (size_t j = 1; j < index[i].size(); j++) {
+      os << ", " << index[i][j];
+    }
+    os << "\");" << std::endl;
+  }
+
+  auto& dim = lutTemplate->dim;
+  auto numForLine = *(dim.rbegin());
+  auto numForTable = dim[0];
+  for (size_t i = 1; i < dim.size(); i++) {
+    numForTable *= dim[i];
+  }
+
+  for (size_t i = 0; i < value.size(); i++) {
+    if (0 == i) {
+      os << "          values (\"";
+    }
+    else if (0 == i % numForLine) {
+      os << "                  \"";
+    }
+
+    os << value[i];
+
+    if ((numForLine - 1) != i % numForLine) {
+      os << ", ";
+    }
+    else {
+      os << "\"";
+      if (i != numForTable - 1) {
+        os << ", \\";
+      }
+      else {
+        os << ");";
+      }
+      os << std::endl;
+    }
+  }
+
   os << "        }" << std::endl;
 }
 
 bool CellPin::isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise) {
-  return true;
+  return !tables[inPin][isRise][TABLE_DELAY][isNeg].empty();
 }
 
-float CellPin::extract(TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
-  return 0.0;
+float CellPin::extract(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
+  return tables[inPin][isRise][index][isNeg][when]->lookup(param);
 }
 
 std::pair<float, std::string>
-CellPin::extractMaxDelay(CellPin* inPin, bool isNeg, bool isRise) {
-  return {0.0, ""};
+CellPin::extractMax(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+  float ret = std::numeric_limits<float>::min();
+  std::string when;
+  for (auto& i: tables[inPin][isRise][index][isNeg]) {
+    auto tmp = i.second->lookup(param);
+    if (tmp > ret) {
+      ret = tmp;
+      when = i.first;
+    }
+  }
+  return {ret, when};
 }
 
 void CellPin::print(std::ostream& os) {
@@ -161,12 +289,51 @@ void LutTemplate::print(std::ostream& os) {
   os << "  }" << std::endl;
 }
 
-float WireLoad::wireR(size_t deg) {
-  return 0.0;
+float WireLoad::wireLength(size_t deg) {
+  auto lb = fanoutLength.lower_bound(deg);
+  // extrapolation from upper limit
+  if (lb == fanoutLength.end()) {
+    auto last = fanoutLength.rbegin();
+    return last->second + (float)(deg - last->first) * slope;
+  }
+  // exact match
+  else if (lb->first == deg) {
+    return lb->second;
+  }
+  // interpolation
+  else {
+    auto ub = fanoutLength.begin();
+    if (lb == ub) {
+      ub++;
+    }
+    else {
+      ub = lb;
+      lb--;
+    }
+    return interpolate((float)lb->first, lb->second, (float)ub->first, ub->second, (float)deg);
+  }
 }
 
-float WireLoad::wireC(size_t deg) {
-  return 0.0;
+float WireLoad::wireDelay(float loadC, size_t deg) {
+  // best-case tree
+  if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
+    return 0.0;
+  }
+  else {
+    auto wireL = wireLength(deg);
+    auto wireC = c * wireL;
+    auto wireR = r * wireL;
+
+    // balanced tree
+    if (TREE_TYPE_BALANCED == lib->wireTreeType) {
+      wireC /= (float)deg;
+      wireR /= (float)deg;
+    }
+
+    // Elmore delay for worst-case & balanced tree
+    auto delay = (wireR) * (wireC / 2 + loadC);
+    return delay;
+  }
 }
 
 void WireLoad::print(std::ostream& os) {
@@ -254,9 +421,7 @@ void CellLibParser::skip(bool isTopCall) {
 void CellLibParser::parseWireLoad() {
   // wire_load ("name") {...}
   curToken += 3; // consume "wire_load", "\"", and "("
-  WireLoad* wireLoad = new WireLoad();
-  wireLoad->name = *curToken;
-  lib->wireLoads[wireLoad->name] = wireLoad;
+  auto wireLoad = lib->addWireLoad(*curToken);
   curToken += 4; // consume name, "\"", ")", and "{"
 
   while (!isEndOfGroup()) {
@@ -284,7 +449,7 @@ void CellLibParser::parseWireLoad() {
       size_t fanout = std::stoul(*curToken);
       curToken += 2; // consume fanout and ","
       float length = std::stoul(*curToken);
-      wireLoad->fanoutLength[fanout] = length;
+      wireLoad->addFanoutLength(fanout, length);
       curToken += 3; // consume length, ")" and ";"
     }
     else {
@@ -298,9 +463,7 @@ void CellLibParser::parseWireLoad() {
 void CellLibParser::parseLutTemplate() {
   // lu_table_template (name) {...}
   curToken += 2; // consume "lu_table_tamplate" and "("
-  LutTemplate* lutTemplate = new LutTemplate;
-  lutTemplate->name = *curToken;
-  lib->lutTemplates[lutTemplate->name] = lutTemplate;
+  auto lutTemplate = lib->addLutTemplate(*curToken);
   curToken += 3; // consume name, ")", and "{"
 
   int unmatched = 0;
@@ -336,7 +499,8 @@ void CellLibParser::parseLutTemplate() {
 void CellLibParser::parseLut(Lut* lut) {
   // key_word (name) {...}
   curToken += 2; // consume key_word and "("
-  lut->lutTemplate = lib->lutTemplates[*curToken];
+  lut->lutTemplate = lib->findLutTemplate(*curToken);
+  assert(lut->lutTemplate);
   curToken += 3; // consume name, ")" and "{"
 
   while (!isEndOfGroup()) {
@@ -384,14 +548,8 @@ void CellLibParser::parseTiming(CellPin* pin) {
         skip();
         continue;
       }
-      Lut* lut = new Lut;
-      lib->luts.insert(lut);
-      if (isPos) {
-        pin->tables[relatedPin][0][TABLE_DELAY][0][when] = lut;
-      }
-      if (isNeg) {
-        pin->tables[relatedPin][0][TABLE_DELAY][1][when] = lut;
-      }
+      auto lut = lib->addLut();
+      pin->addLut(lut, TABLE_DELAY, false, relatedPin, when, isPos, isNeg);
       parseLut(lut);
     }
     else if ("cell_rise" == *curToken) {
@@ -399,14 +557,8 @@ void CellLibParser::parseTiming(CellPin* pin) {
         skip();
         continue;
       }
-      Lut* lut = new Lut;
-      lib->luts.insert(lut);
-      if (isPos) {
-        pin->tables[relatedPin][1][TABLE_DELAY][0][when] = lut;
-      }
-      if (isNeg) {
-        pin->tables[relatedPin][1][TABLE_DELAY][1][when] = lut;
-      }
+      auto lut = lib->addLut();
+      pin->addLut(lut, TABLE_DELAY, true, relatedPin, when, isPos, isNeg);
       parseLut(lut);
     }
     else if ("fall_transition" == *curToken) {
@@ -414,14 +566,8 @@ void CellLibParser::parseTiming(CellPin* pin) {
         skip();
         continue;
       }
-      Lut* lut = new Lut;
-      lib->luts.insert(lut);
-      if (isPos) {
-        pin->tables[relatedPin][0][TABLE_SLEW][0][when] = lut;
-      }
-      if (isNeg) {
-        pin->tables[relatedPin][0][TABLE_SLEW][1][when] = lut;
-      }
+      auto lut = lib->addLut();
+      pin->addLut(lut, TABLE_SLEW, false, relatedPin, when, isPos, isNeg);
       parseLut(lut);
     }
     else if ("rise_transition" == *curToken) {
@@ -429,14 +575,8 @@ void CellLibParser::parseTiming(CellPin* pin) {
         skip();
         continue;
       }
-      Lut* lut = new Lut;
-      lib->luts.insert(lut);
-      if (isPos) {
-        pin->tables[relatedPin][1][TABLE_SLEW][0][when] = lut;
-      }
-      if (isNeg) {
-        pin->tables[relatedPin][1][TABLE_SLEW][1][when] = lut;
-      }
+      auto lut = lib->addLut();
+      pin->addLut(lut, TABLE_SLEW, true, relatedPin, when, isPos, isNeg);
       parseLut(lut);
     }
     // when: "...";
@@ -448,7 +588,7 @@ void CellLibParser::parseTiming(CellPin* pin) {
     // related_pin: "name";
     else if ("related_pin" == *curToken) {
       curToken += 3; // consume "related_pin", ":" and "\""
-      relatedPin = pin->cell->inPins[*curToken];
+      relatedPin = pin->cell->findCellPin(*curToken);
       curToken += 3; // consume name, "\"" and ";"
     }
     // timing_sense: value;
@@ -545,17 +685,14 @@ void CellLibParser::parseCellLeakagePower(Cell* cell) {
     }
   }
 
-  cell->leakagePower[when] = value;
+  cell->addLeakagePower(when, value);
   curToken += 1; // consume "}"
 }
 
 void CellLibParser::parseCellPin(Cell* cell) {
   // pin (name) {...}
   curToken += 2; // consume "pin" and "{"
-  CellPin* pin = new CellPin;
-  pin->name = *curToken;
-  pin->cell = cell;
-  cell->pins[pin->name] = pin;
+  auto pin = cell->addCellPin(*curToken);
   curToken += 3; // consume name, ")" and "{"
 
   while (!isEndOfGroup()) {
@@ -566,31 +703,22 @@ void CellLibParser::parseCellPin(Cell* cell) {
     else if ("direction" == *curToken) {
       curToken += 2; // consume "direction" and ":"
       if ("input" == *curToken) {
-        pin->isInput = true;
-        pin->isOutput = false;
         pin->riseC = lib->defaultInputPinCap;
         pin->fallC = lib->defaultInputPinCap;
-        cell->inPins[pin->name] = pin;
+        cell->addInPin(pin);
       }
       else if("output" == *curToken) {
-        pin->isInput = false;
-        pin->isOutput = true;
         pin->riseC = lib->defaultOutputPinCap;
         pin->fallC = lib->defaultOutputPinCap;
-        cell->outPins[pin->name] = pin;
-     }
+        cell->addOutPin(pin);
+      }
       else if ("internal" == *curToken) {
-        pin->isInput = false;
-        pin->isOutput = false;
-        cell->internalPins[pin->name] = pin;
+        cell->addInternalPin(pin);
       }
       else if ("inout" == *curToken) {
-        pin->isInput = true;
-        pin->isOutput = true;
         pin->riseC = lib->defaultInoutPinCap;
         pin->fallC = lib->defaultInoutPinCap;
-        cell->inPins[pin->name] = pin;
-        cell->outPins[pin->name] = pin;
+        cell->addInOutPin(pin);
       }
       curToken += 2; // consume value and ";"
     }
@@ -629,9 +757,7 @@ void CellLibParser::parseCellPin(Cell* cell) {
 void CellLibParser::parseCell() {
   // cell (name) {...}
   curToken += 2; // consume "cell" and "("
-  Cell* cell = new Cell;
-  cell->name = *curToken;
-  lib->cells[cell->name] = cell;
+  auto cell = lib->addCell(*curToken);
   curToken += 3; // consume name, ")" and "{"
 
   while (!isEndOfGroup()) {
@@ -665,8 +791,33 @@ void CellLibParser::parseCell() {
   curToken += 1; // consume "}"
 }
 
-void CellLibParser::parseOperatingCondition() {
-  skip();
+void CellLibParser::parseOperatingConditions() {
+  // p[erating_conditions (name) {...}
+  curToken += 2; // consume "operating_conditions" and "("
+  lib->opCond = *curToken;
+  curToken += 3; // consume name, ")" and "{"
+
+  while(!isEndOfGroup()) {
+    // tree_type = value;
+    if ("tree_type" == *curToken) {
+      curToken += 2; // consume "tree_type" and ":"
+      if ("best_case_tree" == *curToken) {
+        lib->wireTreeType = TREE_TYPE_BEST_CASE;
+      }
+      else if ("balanced_tree" == *curToken) {
+        lib->wireTreeType = TREE_TYPE_BALANCED;
+      }
+      else if ("worst_case_tree" == *curToken) {
+        lib->wireTreeType = TREE_TYPE_WORST_CASE;
+      }
+      curToken += 2; // consume value and ";"
+    }
+    else {
+      skip();
+    }
+  }
+
+  curToken += 1; // consume "}"
 }
 
 void CellLibParser::parseCellLibrary() {
@@ -685,13 +836,13 @@ void CellLibParser::parseCellLibrary() {
     else if ("cell" == *curToken) {
       parseCell();
     }
-    else if ("operating_condition" == *curToken) {
-      parseOperatingCondition();
+    else if ("operating_conditions" == *curToken) {
+      parseOperatingConditions();
     }
     // default_wire_load: "value";
     else if ("default_wire_load" == *curToken) {
       curToken += 3; // consume "default_wire_load", ":", and "\""
-      lib->defaultWireLoad = lib->wireLoads[*curToken];
+      lib->defaultWireLoad = lib->findWireLoad(*curToken);
       curToken += 3; // consume value, "\"", and ";"
     }
     // default_inout_pin_cap: value;
@@ -758,6 +909,11 @@ void CellLib::print(std::ostream& os) {
   os << "  default_input_pin_cap: " << defaultInputPinCap << ";" << std::endl;
   os << "  default_output_pin_cap: " << defaultOutputPinCap << ";" << std::endl;
 
+  os << "  operating_conditions (" << opCond << ") {" << std::endl;
+  std::string treeTypeName[] = {"best_case_tree", "balanced_tree", "worst_case_tree"};
+  os << "    tree_type: " << treeTypeName[wireTreeType] << ";" << std::endl;
+  os << "  }" << std::endl;
+
   for (auto& i: wireLoads) {
     i.second->print(os);
   }
@@ -798,11 +954,9 @@ void CellLib::clear() {
 
 void CellLib::setup() {
   // add a LUT template for scalar case
-  LutTemplate* scalar = new LutTemplate;
-  scalar->name = "scalar";
+  auto scalar = addLutTemplate("scalar");
   scalar->var.push_back("");
   scalar->dim.push_back(1);
-  lutTemplates[scalar->name] = scalar; 
 }
 
 CellLib::CellLib() {
