@@ -41,9 +41,9 @@ int main(int argc, char *argv[]) {
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
 
-  VerilogModule topModule;
-  topModule.parse(verilogName);
-  topModule.print();
+  VerilogDesign design;
+  design.parse(verilogName);
+  design.print();
 
   return 0;
 }

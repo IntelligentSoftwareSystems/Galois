@@ -15,11 +15,11 @@ void VerilogParser::tokenizeFile(std::string inName) {
 void VerilogParser::parseModule() {
   // module name (port1 [, port*]*);
   curToken += 1; // consume "module"
-  module->name = *curToken;
+  curModule = design.addModule(*curToken);
   curToken += 2; // consume name and "("
   
   while (!isEndOfStatement()) {
-    module->addPin(getVarName());
+    curModule->addPin(getVarName());
     curToken += 1; // consume port1 and ","/")"
   }
   curToken += 1; // consume ";"
@@ -38,16 +38,16 @@ void VerilogParser::parseModule() {
       parseWires();
     }
     else {
-      parseSubModule();
+      parseGate();
     }
   }
 
   curToken += 1; // consume "endmodule"
 
   // connect wires and in/out pins
-  for (auto& i: module->pins) {
+  for (auto& i: curModule->pins) {
     auto p = i.second;
-    auto w = module->findWire(p->name);
+    auto w = curModule->findWire(p->name);
     assert(w);
     p->wire = w;
     w->addPin(p);
@@ -58,7 +58,7 @@ void VerilogParser::parseWires() {
   // wire wire1 [, wire*]*;
   while (!isEndOfStatement()) {
     curToken += 1; // consume "wire" or ","
-    module->addWire(getVarName());
+    curModule->addWire(getVarName());
   }
   curToken += 1; // consume ";"
 }
@@ -67,9 +67,9 @@ void VerilogParser::parseInPins() {
   // input pin1 [, pin*]*;
   while (!isEndOfStatement()) {
     curToken += 1; // consume "input" or ","
-    auto pin = module->findPin(getVarName());
+    auto pin = curModule->findPin(getVarName());
     assert(pin);
-    module->addInPin(pin);
+    curModule->addInPin(pin);
   }
   curToken += 1; // consume ";"
 }
@@ -78,9 +78,9 @@ void VerilogParser::parseOutPins() {
   // output pin1 [, pin*]*;
   while (!isEndOfStatement()) {
     curToken += 1; // consume "output" or ","
-    auto pin = module->findPin(getVarName());
+    auto pin = curModule->findPin(getVarName());
     assert(pin);
-    module->addOutPin(pin);
+    curModule->addOutPin(pin);
   }
   curToken += 1; // consume ";"
 }
@@ -89,11 +89,11 @@ void VerilogParser::parseAssign() {
   // assign wireName = pinName;
   curToken += 1; // consume "assign"
 
-  auto wire = module->findWire(getVarName());
+  auto wire = curModule->findWire(getVarName());
   assert(wire);
   curToken += 1; // consume "="
 
-  auto pin = module->findPin(getVarName());
+  auto pin = curModule->findPin(getVarName());
   assert(pin);
   curToken += 1; // consume ";"
   
@@ -101,19 +101,19 @@ void VerilogParser::parseAssign() {
   pin->wire = wire;
 }
 
-void VerilogParser::parseSubModule() {
+void VerilogParser::parseGate() {
   // cellType name (.port1(wire1) [.port*(wire*)]*);
   Token cellType = *curToken;
   curToken += 1; // consume cellType
   Token name = getVarName();
   curToken += 1; // consume "("
 
-  auto m = module->addSubModule(name, cellType);
+  auto g = curModule->addGate(name, cellType);
   while (!isEndOfStatement()) {
     curToken += 1; // consume "."
-    auto p = m->addPin(getVarName());
+    auto p = g->addPin(getVarName());
     curToken += 1; // consume "("
-    auto w = module->findWire(getVarName());
+    auto w = curModule->findWire(getVarName());
     assert(w);
     curToken += 2; // consume ")" and ","/")"
 
@@ -172,28 +172,43 @@ void VerilogWire::print(std::ostream& os) {
   }
 }
 
-void VerilogWire::addPin(VerilogPin* pin) {
-  pins.insert(pin);
+void VerilogGate::print(std::ostream& os) {
+  os << "  " << cellType << " " << name << "(";
+  size_t i = 1;
+  for (auto& j: pins) {
+    auto p = j.second;
+    os << "." << p->name << "(" << p->wire->name << ")";
+    if (i != pins.size()) {
+      os << ", ";
+    }
+    else {
+      os << ");";
+    }
+    i++;
+  }
+  os << std::endl;
 }
 
-void VerilogModule::setup(bool isTopModule) {
-  parentModule = this;
-
-  if (isTopModule) {
-    auto pin0 = addPin(name0);
-    auto wire0 = addWire(name0);
-    pin0->wire = wire0;
-    wire0->addPin(pin0);
-
-    auto pin1 = addPin(name1);
-    auto wire1 = addWire(name1);
-    pin1->wire = wire1;
-    wire1->addPin(pin1);
+VerilogGate::~VerilogGate() {
+  for (auto& i: pins) {
+    delete i.second;
   }
 }
 
-void VerilogModule::clear() {
-  for (auto& i: subModules) {
+VerilogModule::VerilogModule() {
+  auto pin0 = addPin(name0);
+  auto wire0 = addWire(name0);
+  pin0->wire = wire0;
+  wire0->addPin(pin0);
+
+  auto pin1 = addPin(name1);
+  auto wire1 = addWire(name1);
+  pin1->wire = wire1;
+  wire1->addPin(pin1);
+}
+
+VerilogModule::~VerilogModule() {
+  for (auto& i: gates) {
     delete i.second;
   }
 
@@ -206,28 +221,22 @@ void VerilogModule::clear() {
   }
 }
 
-void VerilogModule::parse(std::string inName, bool toClear) {
-  if (toClear) {
-    clear();
-    setup(true);
-  }
-  VerilogParser parser(this);
-  parser.parse(inName);
-}
-
 void VerilogModule::print(std::ostream& os) {
   os << "module " << name << " (" << std::endl;
 
-  size_t i = 0;
+  size_t i = 1;
+  size_t numRealPins = pins.size() - pins.count(name0) - pins.count(name1);
   for (auto& j: pins) {
     auto p = j.second; 
-    os << "    " << p->name;
-    if (i != (pins.size() - 1)) {
-      os << ",";
+    if (p->name != name0 && p->name != name1) {
+      os << "    " << p->name;
+      if (i != numRealPins) {
+        os << ",";
+      }
+      os << std::endl;
+      i++;
     }
-    os << std::endl;
-    i++;
-  };
+  }
   os << ");" << std::endl;
 
   for (auto& i: pins) {
@@ -241,79 +250,35 @@ void VerilogModule::print(std::ostream& os) {
   for (auto op: outPins) {
     auto w = op->wire;
     for (auto p: w->pins) {
-      if (p != op && (inPins.count(p) || p->name == name0 || p->name == name1)) {
+      if (p != op && pins.count(p->name)) {
         os << "  assign " << w->name << " = " << p->name << ";" << std::endl;
-        break;
       }
     }
   }
 
-  for (auto& j: subModules) {
-    auto m = j.second;
-    os << "  " << m->cellType << " " << m->name << "(";
-    i = 0;
-    for (auto& k: m->pins) {
-      auto p = k.second;
-      os << "." << p->name << "(" << p->wire->name << ")";
-      if (i != m->pins.size()) {
-        os << ", ";
-      }
-      else {
-        os << ");";
-      }
-      i++;
-    }
-    os << std::endl;
+  for (auto& i: gates) {
+    i.second->print(os);
   }
 
-  os << "endmodule";
+  os << "endmodule" << std::endl;
 }
 
-VerilogModule::VerilogModule(bool isTopModule) {
-  setup(isTopModule);
+void VerilogDesign::clear() {
+  for (auto& i: modules) {
+    delete i.second;
+  }
 }
 
-VerilogModule::~VerilogModule() {
-  clear();
+void VerilogDesign::print(std::ostream& os) {
+  for (auto& i: modules) {
+    i.second->print(os);
+  }
 }
 
-VerilogModule* VerilogModule::addSubModule(std::string name, std::string cellType) {
-  VerilogModule* m = new VerilogModule(false); // not the top-most module
-  m->name = name;
-  m->cellType = cellType;
-  m->parentModule = this;
-  subModules[name] = m;
-  return m;
-}
-
-VerilogModule* VerilogModule::findSubModule(std::string name) {
-  auto it = subModules.find(name);
-  return (it == subModules.end()) ? nullptr : it->second;
-}
-
-VerilogPin* VerilogModule::addPin(std::string name) {
-  VerilogPin* pin = new VerilogPin;
-  pin->name = name;
-  pin->module = this;
-  pin->wire = nullptr;
-  pins[name] = pin;
-  return pin;
-}
-
-VerilogPin* VerilogModule::findPin(std::string name) {
-  auto it = pins.find(name);
-  return (it == pins.end()) ? nullptr : it->second;
-}
-
-VerilogWire* VerilogModule::addWire(std::string name) {
-  VerilogWire* wire = new VerilogWire;
-  wire->name = name;
-  wire->module = this;
-  wires[name] = wire;
-  return wire;
-}
-
-VerilogWire* VerilogModule::findWire(std::string name) {
-  auto it = wires.find(name);
-  return (it == wires.end()) ? nullptr : it->second;
+void VerilogDesign::parse(std::string inName, bool toClear) {
+  if (toClear) {
+    clear();
+  }
+  VerilogParser parser(*this);
+  parser.parse(inName);
 }
