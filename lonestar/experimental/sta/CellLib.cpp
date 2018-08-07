@@ -7,7 +7,7 @@ using Bound = std::pair<size_t, size_t>;
 
 template<typename T>
 static Bound findBound(T v, std::vector<T>& array) {
-  // should be non-empty list
+  // array should be non-empty
   auto arraySize = array.size();
   assert(arraySize);
 
@@ -61,6 +61,7 @@ float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, 
 
 float Lut::lookup(std::vector<float>& param) {
   auto paramSize = param.size();
+  assert(paramSize == index.size());
 
   // scalar case, return the value immediately
   if (0 == paramSize) {
@@ -282,7 +283,7 @@ void LutTemplate::print(std::ostream& os) {
     size_t j = 1;
     os << float(j) * 0.0010f;
     while (j < d) {
-      os << "," << (float)(++j) * 0.0010f;
+      os << ", " << (float)(++j) * 0.0010f;
     }
     os << "\");" << std::endl;
   }
@@ -314,24 +315,32 @@ float WireLoad::wireLength(size_t deg) {
   }
 }
 
+float WireLoad::wireR(size_t deg) {
+  return r * wireLength(deg);
+}
+
+float WireLoad::wireC(size_t deg) {
+  return c * wireLength(deg);
+}
+
 float WireLoad::wireDelay(float loadC, size_t deg) {
   // best-case tree
   if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
     return 0.0;
   }
   else {
-    auto wireL = wireLength(deg);
-    auto wireC = c * wireL;
-    auto wireR = r * wireL;
+    auto wL = wireLength(deg);
+    auto wC = c * wL;
+    auto wR = r * wL;
 
     // balanced tree
     if (TREE_TYPE_BALANCED == lib->wireTreeType) {
-      wireC /= (float)deg;
-      wireR /= (float)deg;
+      wC /= (float)deg;
+      wR /= (float)deg;
     }
 
     // Elmore delay for worst-case & balanced tree
-    auto delay = (wireR) * (wireC / 2 + loadC);
+    auto delay = wR * (wC / 2 + loadC);
     return delay;
   }
 }
@@ -342,7 +351,7 @@ void WireLoad::print(std::ostream& os) {
   os << "    resistance: " << r << ";" << std::endl;
   os << "    slope: " << slope << ";" << std::endl;
   for (auto& i: fanoutLength) {
-    os << "    fanout_length (" << i.first << "," << i.second << ");" << std::endl;
+    os << "    fanout_length (" << i.first << ", " << i.second << ");" << std::endl;
   }
   os << "  }" << std::endl;
 }
@@ -383,9 +392,11 @@ void CellLibParser::skip(bool isTopCall) {
     // simple attributes
     // attr_key_word: value;
     if (":" == *nextToken) {
+#if 0
       if (isTopCall) {
         std::cout << "Skip attribute " << *curToken << std::endl;
       }
+#endif
       skipAttribute();
       skipped = true;
       break;
@@ -393,9 +404,11 @@ void CellLibParser::skip(bool isTopCall) {
     // group statements
     // group_key_word (...) {...}
     else if ("{" == *nextToken) {
+#if 0
       if (isTopCall) {
         std::cout << "Skip group statement " << *curToken << std::endl;
       }
+#endif
       skipGroup();
       skipped = true;
       break;
@@ -403,9 +416,11 @@ void CellLibParser::skip(bool isTopCall) {
     // complex attributes
     // attr_key_word (...);
     else if (";" == *nextToken) {
+#if 0
       if (isTopCall) {
         std::cout << "Skip attribute " << *curToken << std::endl;
       }
+#endif
       skipAttribute();
       skipped = true;
       break;
@@ -448,7 +463,7 @@ void CellLibParser::parseWireLoad() {
       curToken += 2; // consume "fanout_length" and "("
       size_t fanout = std::stoul(*curToken);
       curToken += 2; // consume fanout and ","
-      float length = std::stoul(*curToken);
+      float length = std::stof(*curToken);
       wireLoad->addFanoutLength(fanout, length);
       curToken += 3; // consume length, ")" and ";"
     }

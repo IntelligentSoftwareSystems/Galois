@@ -196,7 +196,9 @@ private:
   float wireLength(size_t deg);
 
 public:
-  float wireDelay(float loadC, size_t deg = 1);
+  float wireR(size_t deg);
+  float wireC(size_t deg);
+  float wireDelay(float loadC, size_t deg);
   void print(std::ostream& os = std::cout);
 
   void addFanoutLength(size_t fanout, float length) {
