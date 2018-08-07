@@ -1,4 +1,5 @@
 #include "CellLib.h"
+#include "Verilog.h"
 
 #include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
@@ -13,8 +14,8 @@ static const char* desc = "Static Timing Analysis";
 namespace cll = llvm::cl;
 static cll::opt<std::string>
     cellLibName("lib", cll::desc("path to .lib (cell library)"), cll::Required);
-//static cll::opt<std::string>
-//    verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
+static cll::opt<std::string>
+    verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
 static cll::opt<std::string>
     sdcName("sdc", cll::desc("path to .sdc (Synopsis design constraints)"));
 
@@ -22,8 +23,8 @@ int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  CellLib lib;
-  lib.parse(cellLibName);
+//  CellLib lib;
+//  lib.parse(cellLibName);
 //  lib.print();
 
 #if 0
@@ -40,8 +41,9 @@ int main(int argc, char *argv[]) {
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
 
-//  VerilogModule topModule;
-//  topModule.parse(verilogName);
+  VerilogModule topModule;
+  topModule.parse(verilogName);
+  topModule.print();
 
   return 0;
 }
