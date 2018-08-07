@@ -44,6 +44,9 @@ int main(int argc, char *argv[]) {
   VerilogDesign design;
   design.parse(verilogName);
   design.print();
+  design.buildHierarchy();
+  std::cout << "design is " << (design.isFlattened() ? "" : "not ") << "flattened." << std::endl;
+  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
 
   return 0;
 }

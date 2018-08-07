@@ -166,17 +166,18 @@ public:
 };
 
 struct VerilogDesign {
-public:
   std::unordered_map<std::string, VerilogModule*> modules;
   std::unordered_set<VerilogModule*> roots;
 
 private:
   void clear();
+  void clearHierarchy();
 
 public:
   void parse(std::string inName, bool toClear = false);
   void print(std::ostream& os = std::cout);
 
+  void buildHierarchy();
   bool isFlattened();
 
   ~VerilogDesign() { clear(); }

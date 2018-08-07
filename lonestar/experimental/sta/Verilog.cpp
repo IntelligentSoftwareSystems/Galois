@@ -264,9 +264,51 @@ void VerilogModule::print(std::ostream& os) {
 }
 
 void VerilogDesign::clear() {
+  clearHierarchy();
   for (auto& i: modules) {
     delete i.second;
   }
+}
+
+void VerilogDesign::clearHierarchy() {
+  for (auto& i: modules) {
+    auto m = i.second;
+    m->pred.clear();
+    m->succ.clear();
+  }
+  roots.clear();
+}
+
+void VerilogDesign::buildHierarchy() {
+  clearHierarchy();
+
+  for (auto& i: modules) {
+    auto m = i.second;
+    for (auto& j: m->gates) {
+      auto g = j.second;
+      auto used = findModule(g->cellType);
+      if (used) {
+        m->succ.insert(used);
+        used->pred.insert(m);
+      }
+    }
+  }
+
+  for (auto& i: modules) {
+    auto m = i.second;
+    if (m->pred.empty()) {
+      roots.insert(m);
+    }
+  }
+}
+
+bool VerilogDesign::isFlattened() {
+  for (auto m: roots) {
+    if (m->succ.size()) {
+      return false;
+    }
+  }
+  return true;
 }
 
 void VerilogDesign::print(std::ostream& os) {
