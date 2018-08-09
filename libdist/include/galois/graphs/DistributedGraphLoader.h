@@ -48,6 +48,7 @@ enum PARTITIONING_SCHEME {
   HIVC,                  //!< incoming hybrid vertex cut
   BOARD2D_VCUT,          //!< checkerboard cut
   CART_VCUT,             //!< cartesian vertex cut
+  CART_VCUT_IEC,         //!< cartesian vertex cut using iec
   JAGGED_CYCLIC_VCUT,    //!< cyclic jagged cut
   JAGGED_BLOCKED_VCUT,   //!< blocked jagged cut
   OVER_DECOMPOSE_2_VCUT, //!< overdecompose cvc by 2
@@ -75,6 +76,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "board2d_vcut";
   case CART_VCUT:
     return "cvc";
+  case CART_VCUT_IEC:
+    return "cvc_iec";
   case JAGGED_CYCLIC_VCUT:
     return "jcvc";
   case JAGGED_BLOCKED_VCUT:
@@ -203,6 +206,10 @@ constructTwoWayGraph(std::vector<unsigned>& scaleFactor) {
   //  return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
   //                                scaleFactor, false,
   //                               readFromFile, localGraphFileName);
+  // case CART_VCUT_IEC:
+  //  return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
+  //                                scaleFactor, true,
+  //                               readFromFile, localGraphFileName);
   // case JAGGED_CYCLIC_VCUT:
   //  return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num,
   //                                scaleFactor, false);
@@ -270,6 +277,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
     return new Graph_checkerboardCut(inputFile, partFolder, net.ID, net.Num,
                                      scaleFactor, false);
   case CART_VCUT:
+  case CART_VCUT_IEC:
     return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
                                   scaleFactor, false, readFromFile,
                                   localGraphFileName);
@@ -371,6 +379,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case CART_VCUT:
     return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
                                   scaleFactor, false, readFromFile,
+                                  localGraphFileName);
+  case CART_VCUT_IEC:
+    return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
+                                  scaleFactor, true, readFromFile,
                                   localGraphFileName);
   case JAGGED_CYCLIC_VCUT:
     return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num,
@@ -488,6 +500,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     }
 
   case CART_VCUT:
+    return new Graph_cartesianCut(inputFile, partFolder, net.ID,
+                                  net.Num, scaleFactor, true, readFromFile,
+                                  localGraphFileName);
+  case CART_VCUT_IEC:
     if (inputFileTranspose.size()) {
       return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID,
                                     net.Num, scaleFactor, false, readFromFile,

@@ -155,41 +155,81 @@ private:
                                  typename base_DistGraph::SyncType syncType,
                                  WriteLocation writeLocation,
                                  ReadLocation readLocation) {
-    if (syncType == base_DistGraph::syncReduce) {
-      switch (writeLocation) {
-      case writeSource:
-        return (gridRowID() != gridRowID(host));
-      case writeDestination:
-        return (gridColumnID() != gridColumnID(host));
-      case writeAny:
-        assert((gridRowID() == gridRowID(host)) ||
-               (gridColumnID() == gridColumnID(host)));
-        return ((gridRowID() != gridRowID(host)) &&
-                (gridColumnID() != gridColumnID(host))); // false
-      default:
-        assert(false);
+    if (base_DistGraph::transposed) {
+      if (syncType == base_DistGraph::syncReduce) {
+        switch (writeLocation) {
+        case writeSource:
+          return (gridColumnID() != gridColumnID(host));
+        case writeDestination:
+          return (gridRowID() != gridRowID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          assert(false);
+        }
+      } else { // syncBroadcast
+        switch (readLocation) {
+        case readSource:
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            galois::runtime::make_src_invalid(base_DistGraph::currentBVFlag);
+          }
+
+          return (gridColumnID() != gridColumnID(host));
+        case readDestination:
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            galois::runtime::make_dst_invalid(base_DistGraph::currentBVFlag);
+          }
+
+          return (gridRowID() != gridRowID(host));
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          assert(false);
+        }
       }
-    } else { // syncBroadcast
-      switch (readLocation) {
-      case readSource:
-        if (base_DistGraph::currentBVFlag != nullptr) {
-          galois::runtime::make_dst_invalid(base_DistGraph::currentBVFlag);
+    } else {
+      if (syncType == base_DistGraph::syncReduce) {
+        switch (writeLocation) {
+        case writeSource:
+          return (gridRowID() != gridRowID(host));
+        case writeDestination:
+          return (gridColumnID() != gridColumnID(host));
+        case writeAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          assert(false);
         }
+      } else { // syncBroadcast
+        switch (readLocation) {
+        case readSource:
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            galois::runtime::make_dst_invalid(base_DistGraph::currentBVFlag);
+          }
 
-        return (gridRowID() != gridRowID(host));
-      case readDestination:
-        if (base_DistGraph::currentBVFlag != nullptr) {
-          galois::runtime::make_src_invalid(base_DistGraph::currentBVFlag);
+          return (gridRowID() != gridRowID(host));
+        case readDestination:
+          if (base_DistGraph::currentBVFlag != nullptr) {
+            galois::runtime::make_src_invalid(base_DistGraph::currentBVFlag);
+          }
+
+          return (gridColumnID() != gridColumnID(host));
+        case readAny:
+          assert((gridRowID() == gridRowID(host)) ||
+                 (gridColumnID() == gridColumnID(host)));
+          return ((gridRowID() != gridRowID(host)) &&
+                  (gridColumnID() != gridColumnID(host))); // false
+        default:
+          assert(false);
         }
-
-        return (gridColumnID() != gridColumnID(host));
-      case readAny:
-        assert((gridRowID() == gridRowID(host)) ||
-               (gridColumnID() == gridColumnID(host)));
-        return ((gridRowID() != gridRowID(host)) &&
-                (gridColumnID() != gridColumnID(host))); // false
-      default:
-        assert(false);
       }
     }
     return false;
@@ -302,7 +342,8 @@ public:
    * @param _numHosts total number of hosts in the system
    * @param scalefactor Specifies if certain hosts should get more nodes
    * than others
-   * @param transpose Should not be set to true (not supported by cart-cut)
+   * @param transpose true if graph being read needs to have an in-memory
+   * transpose done after reading
    * @param readFromFile true if you want to read the local graph from a file
    * @param localGraphFileName the local file to read if readFromFile is set
    * to true
@@ -315,10 +356,6 @@ public:
                         bool transpose = false, bool readFromFile = false,
                         std::string localGraphFileName = "local_graph")
       : base_DistGraph(host, _numHosts) {
-    if (transpose) {
-      GALOIS_DIE("Transpose not supported for cartesian vertex-cuts");
-    }
-
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
         "GraphPartitioningTime", GRNAME);
 
@@ -424,6 +461,14 @@ public:
     // reclaim memory from buffered graphs
     for (unsigned d = 0; d < DecomposeFactor; ++d) {
       bufGraph[d].resetAndFree();
+    }
+
+    if (transpose) {
+      // consider all nodes to have outgoing edges
+      // TODO: renumber nodes so that all nodes with outgoing edges are at the beginning?
+      base_DistGraph::numNodesWithEdges = numNodes;
+      base_DistGraph::graph.transpose(GRNAME);
+      base_DistGraph::transposed = true;
     }
 
     fillMirrorNodes(base_DistGraph::mirrorNodes);
