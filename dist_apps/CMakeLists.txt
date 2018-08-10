@@ -42,6 +42,22 @@ function(distApp name)
     cuda_add_library(${name}_cuda ${name}/${name}_cuda.cu)
     target_link_libraries(${name}_cuda galois_gpu)
   endif()
+
+  app(${name}_async ${name}/${name}.cpp DISTSAFE)
+  target_link_libraries(${name}_async distbench)
+  target_include_directories(${name}_async PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  target_compile_definitions(${name}_async PRIVATE __GALOIS_HET_ASYNC__=1)
+  if(USE_BARE_MPI)
+    target_compile_definitions(${name}_async PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+  endif()
+
+  if(ENABLE_HETERO_GALOIS)
+    target_compile_definitions(${name}_async PRIVATE __GALOIS_HET_CUDA__=1)
+    target_link_libraries(${name}_async ${name}_cuda)
+
+    cuda_add_library(${name}_async_cuda ${name}/${name}_cuda.cu)
+    target_link_libraries(${name}_async_cuda galois_gpu)
+  endif()
 endfunction()
 
 function(distAppNoGPU name)

@@ -2173,7 +2173,7 @@ private:
    * @param b OUTPUT: buffer that will be sent over the network; contains data
    * based on set bits in bitset
    */
-  template <SyncType syncType, typename SyncFnTy,
+  template <SyncType syncType, typename SyncFnTy, bool async,
             typename std::enable_if<galois::runtime::is_memory_copyable<
                 typename SyncFnTy::ValTy>::value>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
@@ -2215,8 +2215,10 @@ private:
         gSerialize(b, onlyData, val_vec);
       }
     } else {
-      data_mode = noData;
-      gSerialize(b, noData);
+      if (!async) {
+        data_mode = noData;
+        gSerialize(b, noData);
+      }
     }
 
     Textract.stop();
@@ -2245,7 +2247,7 @@ private:
    * @param b OUTPUT: buffer that will be sent over the network; contains data
    * based on set bits in bitset
    */
-  template <SyncType syncType, typename SyncFnTy,
+  template <SyncType syncType, typename SyncFnTy, bool async,
             typename std::enable_if<!galois::runtime::is_memory_copyable<
                 typename SyncFnTy::ValTy>::value>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
@@ -2287,8 +2289,10 @@ private:
 
       gSerialize(b, onlyData, val_vec);
     } else {
-      data_mode = noData;
-      gSerialize(b, noData);
+      if (!async) {
+        data_mode = noData;
+        gSerialize(b, noData);
+      }
     }
 
     Textract.stop();
@@ -2348,14 +2352,16 @@ private:
    * @param b the buffer in which to serialize the message we are sending
    * to
    */
-  template <SyncType syncType, typename VecType>
+  template <bool async, SyncType syncType, typename VecType>
   void serializeMessage(std::string loopName, DataCommMode data_mode,
                         size_t bit_set_count, std::vector<size_t>& indices,
                         std::vector<unsigned int>& offsets,
                         galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
                         galois::runtime::SendBuffer& b) {
     if (data_mode == noData) {
-      gSerialize(b, data_mode);
+      if (!async) {
+        gSerialize(b, data_mode);
+      }
     } else if (data_mode == gidsData) {
       offsets.resize(bit_set_count);
       convert_lid_to_gid<syncType>(loopName, indices, offsets);
@@ -2391,7 +2397,7 @@ private:
    * based on set bits in bitset
    */
   template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async,
       typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
                    std::vector<size_t>& indices,
@@ -2448,11 +2454,13 @@ private:
 
       reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count,
                                     bit_set_comm);
-      serializeMessage<syncType>(loopName, data_mode, bit_set_count, indices,
+      serializeMessage<async, syncType>(loopName, data_mode, bit_set_count, indices,
                                  offsets, bit_set_comm, val_vec, b);
     } else {
-      data_mode = noData;
-      gSerialize(b, noData);
+      if (!async) {
+        data_mode = noData;
+        gSerialize(b, noData);
+      }
     }
 
     Textract.stop();
@@ -2485,7 +2493,7 @@ private:
    * based on set bits in bitset
    */
   template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async,
       typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void syncExtract(std::string loopName, unsigned from_id,
                    std::vector<size_t>& indices,
@@ -2542,11 +2550,13 @@ private:
 
         reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count,
                                       bit_set_comm);
-        serializeMessage<syncType>(loopName, data_mode, bit_set_count, indices,
+        serializeMessage<async, syncType>(loopName, data_mode, bit_set_count, indices,
                                    offsets, bit_set_comm, val_vec, b);
       } else {
-        // append noData for however many bitsets there are
-        gSerialize(b, noData);
+        if (!async) { // TODO: is this fine?
+          // append noData for however many bitsets there are
+          gSerialize(b, noData);
+        }
       }
     }
 
@@ -2572,17 +2582,17 @@ private:
    * @param b OUTPUT: Buffer that will hold data to send
    */
   template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async,
       typename std::enable_if<!BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void get_send_buffer(std::string loopName, unsigned x,
                        galois::runtime::SendBuffer& b) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
     if (BitsetFnTy::is_valid()) {
-      syncExtract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sharedNodes[x],
+      syncExtract<syncType, SyncFnTy, BitsetFnTy, async>(loopName, x, sharedNodes[x],
                                                   b);
     } else {
-      syncExtract<syncType, SyncFnTy>(loopName, x, sharedNodes[x], b);
+      syncExtract<syncType, SyncFnTy, async>(loopName, x, sharedNodes[x], b);
     }
 
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
@@ -2594,13 +2604,13 @@ private:
   }
 
   template <
-      SyncType syncType, typename SyncFnTy, typename BitsetFnTy,
+      SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async,
       typename std::enable_if<BitsetFnTy::is_vector_bitset()>::type* = nullptr>
   void get_send_buffer(std::string loopName, unsigned x,
                        galois::runtime::SendBuffer& b) {
     auto& sharedNodes = (syncType == syncReduce) ? mirrorNodes : masterNodes;
 
-    syncExtract<syncType, SyncFnTy, BitsetFnTy>(loopName, x, sharedNodes[x], b);
+    syncExtract<syncType, SyncFnTy, BitsetFnTy, async>(loopName, x, sharedNodes[x], b);
 
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string statSendBytes_str(syncTypeStr + "SendBytesVector_" +
@@ -2704,7 +2714,7 @@ private:
    * @param loopName used to name timers created by this sync send
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_net_send(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -2716,12 +2726,16 @@ private:
 
       galois::runtime::SendBuffer b;
 
-      get_send_buffer<syncType, SyncFnTy, BitsetFnTy>(loopName, x, b);
+      get_send_buffer<syncType, SyncFnTy, BitsetFnTy, async>(loopName, x, b);
 
-      net.sendTagged(x, galois::runtime::evilPhase, b);
+      if ((!async) || (b.size() > 0)) {
+        net.sendTagged(x, galois::runtime::evilPhase, b);
+      }
     }
-    // Will force all messages to be processed before continuing
-    net.flush();
+    if (!async) {
+      // Will force all messages to be processed before continuing
+      net.flush();
+    }
 
     if (BitsetFnTy::is_valid()) {
       reset_bitset(syncType, &BitsetFnTy::reset_range);
@@ -2741,14 +2755,14 @@ private:
    * @param loopName used to name timers for statistics
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_send(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TSendTime(
         (syncTypeStr + "Send_" + get_run_identifier(loopName)).c_str(), GRNAME);
 
     TSendTime.start();
-    sync_net_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+    sync_net_send<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
         loopName);
     TSendTime.stop();
   }
@@ -3088,25 +3102,37 @@ private:
    * @param loopName used to name timers for statistics
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_net_recv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    for (unsigned x = 0; x < numHosts; ++x) {
-      if (x == id)
-        continue;
-      if (nothingToRecv(x, syncType, writeLocation, readLocation))
-        continue;
-
+    if (async) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
       do {
         p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
 
-      syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
-                                                    loopName);
+        if (p) {
+          syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
+                                                        loopName);
+        }
+      } while (p);
+    } else {
+      for (unsigned x = 0; x < numHosts; ++x) {
+        if (x == id)
+          continue;
+        if (nothingToRecv(x, syncType, writeLocation, readLocation))
+          continue;
+
+        decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+        do {
+          p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        } while (!p);
+
+        syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
+                                                      loopName);
+      }
+      increment_evilPhase();
     }
-    increment_evilPhase();
   }
 
   /**
@@ -3122,14 +3148,14 @@ private:
    * @param loopName used to name timers for statistics
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            SyncType syncType, typename SyncFnTy, typename BitsetFnTy>
+            SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_recv(std::string loopName) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     galois::CondStatTimer<MORE_COMM_STATS> TRecvTime(
         (syncTypeStr + "Recv_" + get_run_identifier(loopName)).c_str(), GRNAME);
 
     TRecvTime.start();
-    sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy>(
+    sync_net_recv<writeLocation, readLocation, syncType, SyncFnTy, BitsetFnTy, async>(
         loopName);
     TRecvTime.stop();
   }
@@ -3295,7 +3321,7 @@ private:
    * @param loopName used to name timers for statistics
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            typename ReduceFnTy, typename BitsetFnTy>
+            typename ReduceFnTy, typename BitsetFnTy, bool async>
   inline void reduce(std::string loopName) {
     std::string timer_str("Reduce_" + get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> TsyncReduce(timer_str.c_str(),
@@ -3307,9 +3333,9 @@ private:
     case noBareMPI:
 #endif
       sync_send<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                BitsetFnTy>(loopName);
+                BitsetFnTy, async>(loopName);
       sync_recv<writeLocation, readLocation, syncReduce, ReduceFnTy,
-                BitsetFnTy>(loopName);
+                BitsetFnTy, async>(loopName);
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
       break;
     case nonBlockingBareMPI:
@@ -3339,7 +3365,7 @@ private:
    * @param loopName used to name timers for statistics
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
-            typename BroadcastFnTy, typename BitsetFnTy>
+            typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void broadcast(std::string loopName) {
     std::string timer_str("Broadcast_" + get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> TsyncBroadcast(timer_str.c_str(),
@@ -3376,13 +3402,13 @@ private:
 #endif
       if (use_bitset) {
         sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                  BitsetFnTy>(loopName);
+                  BitsetFnTy, async>(loopName);
       } else {
         sync_send<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                  galois::InvalidBitsetFnTy>(loopName);
+                  galois::InvalidBitsetFnTy, async>(loopName);
       }
       sync_recv<writeLocation, readLocation, syncBroadcast, BroadcastFnTy,
-                BitsetFnTy>(loopName);
+                BitsetFnTy, async>(loopName);
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
       break;
     case nonBlockingBareMPI:
@@ -3418,13 +3444,13 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_src_to_src(std::string loopName) {
     // do nothing for OEC
     // reduce and broadcast for IEC, CVC, UVC
     if (transposed || is_vertex_cut()) {
-      reduce<writeSource, readSource, ReduceFnTy, BitsetFnTy>(loopName);
-      broadcast<writeSource, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
+      reduce<writeSource, readSource, ReduceFnTy, BitsetFnTy, async>(loopName);
+      broadcast<writeSource, readSource, BroadcastFnTy, BitsetFnTy, async>(loopName);
     }
   }
 
@@ -3437,22 +3463,22 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_src_to_dst(std::string loopName) {
     // only broadcast for OEC
     // only reduce for IEC
     // reduce and broadcast for CVC, UVC
     if (transposed) {
-      reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
+      reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy, async>(loopName);
       if (is_vertex_cut()) {
-        broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy>(
+        broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy, async>(
             loopName);
       }
     } else {
       if (is_vertex_cut()) {
-        reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
+        reduce<writeSource, readDestination, ReduceFnTy, BitsetFnTy, async>(loopName);
       }
-      broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy>(
+      broadcast<writeSource, readDestination, BroadcastFnTy, BitsetFnTy, async>(
           loopName);
     }
   }
@@ -3466,14 +3492,14 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_src_to_any(std::string loopName) {
     // only broadcast for OEC
     // reduce and broadcast for IEC, CVC, UVC
     if (transposed || is_vertex_cut()) {
-      reduce<writeSource, readAny, ReduceFnTy, BitsetFnTy>(loopName);
+      reduce<writeSource, readAny, ReduceFnTy, BitsetFnTy, async>(loopName);
     }
-    broadcast<writeSource, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
+    broadcast<writeSource, readAny, BroadcastFnTy, BitsetFnTy, async>(loopName);
   }
 
   /**
@@ -3485,21 +3511,21 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_dst_to_src(std::string loopName) {
     // only reduce for OEC
     // only broadcast for IEC
     // reduce and broadcast for CVC, UVC
     if (transposed) {
       if (is_vertex_cut()) {
-        reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy>(loopName);
+        reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy, async>(loopName);
       }
-      broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy>(
+      broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy, async>(
           loopName);
     } else {
-      reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy>(loopName);
+      reduce<writeDestination, readSource, ReduceFnTy, BitsetFnTy, async>(loopName);
       if (is_vertex_cut()) {
-        broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy>(
+        broadcast<writeDestination, readSource, BroadcastFnTy, BitsetFnTy, async>(
             loopName);
       }
     }
@@ -3514,14 +3540,14 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_dst_to_dst(std::string loopName) {
     // do nothing for IEC
     // reduce and broadcast for OEC, CVC, UVC
     if (!transposed || is_vertex_cut()) {
-      reduce<writeDestination, readDestination, ReduceFnTy, BitsetFnTy>(
+      reduce<writeDestination, readDestination, ReduceFnTy, BitsetFnTy, async>(
           loopName);
-      broadcast<writeDestination, readDestination, BroadcastFnTy, BitsetFnTy>(
+      broadcast<writeDestination, readDestination, BroadcastFnTy, BitsetFnTy, async>(
           loopName);
     }
   }
@@ -3535,14 +3561,14 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_dst_to_any(std::string loopName) {
     // only broadcast for IEC
     // reduce and broadcast for OEC, CVC, UVC
     if (!transposed || is_vertex_cut()) {
-      reduce<writeDestination, readAny, ReduceFnTy, BitsetFnTy>(loopName);
+      reduce<writeDestination, readAny, ReduceFnTy, BitsetFnTy, async>(loopName);
     }
-    broadcast<writeDestination, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
+    broadcast<writeDestination, readAny, BroadcastFnTy, BitsetFnTy, async>(loopName);
   }
 
   /**
@@ -3554,13 +3580,13 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_any_to_src(std::string loopName) {
     // only reduce for OEC
     // reduce and broadcast for IEC, CVC, UVC
-    reduce<writeAny, readSource, ReduceFnTy, BitsetFnTy>(loopName);
+    reduce<writeAny, readSource, ReduceFnTy, BitsetFnTy, async>(loopName);
     if (transposed || is_vertex_cut()) {
-      broadcast<writeAny, readSource, BroadcastFnTy, BitsetFnTy>(loopName);
+      broadcast<writeAny, readSource, BroadcastFnTy, BitsetFnTy, async>(loopName);
     }
   }
 
@@ -3573,14 +3599,14 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_any_to_dst(std::string loopName) {
     // only reduce for IEC
     // reduce and broadcast for OEC, CVC, UVC
-    reduce<writeAny, readDestination, ReduceFnTy, BitsetFnTy>(loopName);
+    reduce<writeAny, readDestination, ReduceFnTy, BitsetFnTy, async>(loopName);
 
     if (!transposed || is_vertex_cut()) {
-      broadcast<writeAny, readDestination, BroadcastFnTy, BitsetFnTy>(loopName);
+      broadcast<writeAny, readDestination, BroadcastFnTy, BitsetFnTy, async>(loopName);
     }
   }
 
@@ -3593,11 +3619,11 @@ private:
    *
    * @param loopName used to name timers for statistics
    */
-  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy>
+  template <typename ReduceFnTy, typename BroadcastFnTy, typename BitsetFnTy, bool async>
   inline void sync_any_to_any(std::string loopName) {
     // reduce and broadcast for OEC, IEC, CVC, UVC
-    reduce<writeAny, readAny, ReduceFnTy, BitsetFnTy>(loopName);
-    broadcast<writeAny, readAny, BroadcastFnTy, BitsetFnTy>(loopName);
+    reduce<writeAny, readAny, ReduceFnTy, BitsetFnTy, async>(loopName);
+    broadcast<writeAny, readAny, BroadcastFnTy, BitsetFnTy, async>(loopName);
   }
 
 public:
@@ -3616,7 +3642,7 @@ public:
    */
   template <WriteLocation writeLocation, ReadLocation readLocation,
             typename ReduceFnTy, typename BroadcastFnTy,
-            typename BitsetFnTy = galois::InvalidBitsetFnTy>
+            typename BitsetFnTy = galois::InvalidBitsetFnTy, bool async = false>
   inline void sync(std::string loopName) {
     std::string timer_str("Sync_" + loopName + "_" + get_run_identifier());
     galois::StatTimer Tsync(timer_str.c_str(), GRNAME);
@@ -3624,31 +3650,31 @@ public:
     Tsync.start();
 
     if (partitionAgnostic) {
-      sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+      sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
     } else {
       if (writeLocation == writeSource) {
         if (readLocation == readSource) {
-          sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_src_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else if (readLocation == readDestination) {
-          sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_src_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else { // readAny
-          sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_src_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         }
       } else if (writeLocation == writeDestination) {
         if (readLocation == readSource) {
-          sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_dst_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else if (readLocation == readDestination) {
-          sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_dst_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else { // readAny
-          sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_dst_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         }
       } else { // writeAny
         if (readLocation == readSource) {
-          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_any_to_src<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else if (readLocation == readDestination) {
-          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_any_to_dst<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         } else { // readAny
-          sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy>(loopName);
+          sync_any_to_any<ReduceFnTy, BroadcastFnTy, BitsetFnTy, async>(loopName);
         }
       }
     }

@@ -164,6 +164,9 @@ public:
   //! move send buffers out to network
   virtual void flush() = 0;
 
+  //! @returns true if any receive is in progress or is pending to be dequeued
+  virtual bool anyPendingReceives() = 0;
+
   //! Get how many bytes were sent
   //! @returns num bytes sent
   virtual unsigned long reportSendBytes() const = 0;

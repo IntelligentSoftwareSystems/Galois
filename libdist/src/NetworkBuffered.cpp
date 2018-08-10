@@ -221,6 +221,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
     bool hasData(uint32_t tag) { return dataPresent == tag; }
 
+    size_t size() { return data.size(); }
+
     uint32_t getPresentTag() { return dataPresent; }
   }; // end recv buffer class
 
@@ -514,6 +516,14 @@ public:
   virtual void flush() {
     for (auto& sd : sendData)
       sd.markUrgent();
+  }
+
+  virtual bool anyPendingReceives() {
+    for (unsigned h = 0; h < recvData.size(); ++h) {
+      auto& rq = recvData[h];
+      if (rq.size() > 0) return true;
+    }
+    return netio->anyPendingReceives();
   }
 
   virtual unsigned long reportSendBytes() const { return statSendBytes; }

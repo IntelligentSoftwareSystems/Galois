@@ -216,6 +216,10 @@ public:
     sendQueue.complete();
     recvQueue.probe();
   }
+
+  virtual bool anyPendingReceives() {
+    return (!recvQueue.inflight.empty() || !recvQueue.done.empty());
+  }
 }; // end NetworkIOMPI class
 
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>

@@ -165,6 +165,10 @@ public:
     probe();
     lc_progress(mv);
   }
+
+  virtual bool anyPendingReceives() {
+    return !recv.empty();
+  }
 };
 
 /**

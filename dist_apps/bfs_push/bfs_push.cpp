@@ -26,6 +26,7 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
+#include "galois/DTerminationDetector.h"
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -167,12 +168,18 @@ struct FirstItr_BFS {
 
 struct BFS {
   Graph* graph;
-  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+#ifdef __GALOIS_HET_ASYNC__
+  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
+#else
+  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
+#endif
 
-  BFS(Graph* _graph, galois::DGAccumulator<unsigned int>& _dga)
+  DGAccumulatorTy& DGAccumulator_accum;
+
+  BFS(Graph* _graph, DGAccumulatorTy& _dga)
       : graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     FirstItr_BFS::go(_graph);
 
     unsigned _num_iterations = 1;
@@ -199,12 +206,18 @@ struct BFS {
             galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("BFS").c_str()));
       }
+#ifdef __GALOIS_HET_ASYNC__
+      _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
+                  Broadcast_dist_current, Bitset_dist_current, true>("BFS");
+#else
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("BFS");
+#endif
 
       galois::runtime::reportStat_Tsum(
           regionname, _graph.get_run_identifier("NumWorkItems"),
           (unsigned long)dga.read_local());
+
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) &&
              dga.reduce(_graph.get_run_identifier()));
@@ -337,7 +350,11 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   // accumulators for use in operators
+#ifdef __GALOIS_HET_ASYNC__
+  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+#else
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+#endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGReduceMax<uint32_t> m;
 
