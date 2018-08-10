@@ -193,6 +193,8 @@ struct ForwardPass {
     roundNumber = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
+    bool moreThanOne = galois::runtime::getSystemNetworkInterface().Num > 1;
+
     do {
       _dga.reset();
 
@@ -207,12 +209,14 @@ struct ForwardPass {
       // synchronize distances and shortest paths
       // read any because a destination node without the correct distance
       // may use a different distance (leading to incorrectness)
-      _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                  Broadcast_current_length,
-                  Bitset_current_length>("ForwardPass");
-      _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
-                  Broadcast_num_shortest_paths,
-                  Bitset_num_shortest_paths>("ForwardPass");
+      if (moreThanOne) {
+        _graph.sync<writeDestination, readAny, Reduce_min_current_length,
+                    Broadcast_current_length,
+                    Bitset_current_length>("ForwardPass");
+        _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
+                    Broadcast_num_shortest_paths,
+                    Bitset_num_shortest_paths>("ForwardPass");
+      }
 
       roundNumber++;
     } while (_dga.reduce(_graph.get_run_identifier()));
@@ -306,6 +310,7 @@ struct BackwardPass {
 
   void static go(Graph& _graph, uint32_t roundNumber) {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
+    bool moreThanOne = galois::runtime::getSystemNetworkInterface().Num > 1;
 
     for (uint32_t i = roundNumber - 1; i > 0; i--) {
       galois::do_all(
@@ -316,8 +321,10 @@ struct BackwardPass {
         galois::no_stats()
       );
 
-      _graph.sync<writeSource, readDestination, Reduce_add_dependency,
-                  Broadcast_dependency, Bitset_dependency>("BackwardPass");
+      if (moreThanOne) {
+        _graph.sync<writeSource, readDestination, Reduce_add_dependency,
+                    Broadcast_dependency, Bitset_dependency>("BackwardPass");
+      }
     }
   }
 
