@@ -168,7 +168,7 @@ void InitializeIteration(Graph& graph,
         }
       },
       galois::loopname(
-          graph.get_run_identifier("InitializeIteration", macroRound).c_str()),
+          graph.get_run_identifier("InitializeIteration").c_str()),
       galois::no_stats());
 };
 
@@ -199,7 +199,7 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
         }
       },
       galois::loopname(
-          graph.get_run_identifier("FindMessageToSync", macroRound).c_str()),
+          graph.get_run_identifier("FindMessageToSync").c_str()),
       galois::steal(),
       galois::no_stats());
 }
@@ -227,7 +227,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
         }
       },
       galois::loopname(
-          graph.get_run_identifier("ConfirmMessageToSend", macroRound).c_str()),
+          graph.get_run_identifier("ConfirmMessageToSend").c_str()),
       galois::no_stats());
 }
 
@@ -278,7 +278,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
         }
       },
       galois::loopname(
-          graph.get_run_identifier("SendAPSPMessages", macroRound).c_str()),
+          graph.get_run_identifier("SendAPSPMessages").c_str()),
       galois::steal(),
       galois::no_stats());
 }
@@ -306,8 +306,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
     FindMessageToSync(graph, roundNumber, dga);
 
     graph.sync<writeAny, readAny, APSPReduce, APSPBroadcast,
-               Bitset_minDistances>(std::string("APSP") + "_" +
-                                    std::to_string(macroRound));
+               Bitset_minDistances>(std::string("APSP"));
 
     // confirm message to send after sync potentially changes what you were
     // planning on sending
@@ -340,7 +339,7 @@ void RoundUpdate(Graph& graph) {
         cur_data.dTree.prepForBackPhase();
       },
       galois::loopname(
-          graph.get_run_identifier("RoundUpdate", macroRound).c_str()),
+          graph.get_run_identifier("RoundUpdate").c_str()),
       galois::no_stats());
 }
 
@@ -377,7 +376,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
         }
       },
       galois::loopname(
-          graph.get_run_identifier("BackFindMessageToSend", macroRound)
+          graph.get_run_identifier("BackFindMessageToSend")
               .c_str()),
       galois::no_stats());
 }
@@ -403,7 +402,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     // since we're using the tranpose graph
     graph.sync<writeDestination, readSource, DependencyReduce,
                DependencyBroadcast, Bitset_dependency>(
-        std::string("DependencySync") + "_" + std::to_string(macroRound));
+        std::string("DependencySync"));
 
     galois::do_all(
         galois::iterate(allNodesWithEdges),
@@ -441,7 +440,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
           }
         },
         galois::loopname(
-            graph.get_run_identifier("BackProp", macroRound).c_str()),
+            graph.get_run_identifier("BackProp").c_str()),
         galois::steal(),
         galois::no_stats());
 
@@ -472,7 +471,7 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
           }
         }
       },
-      galois::loopname(graph.get_run_identifier("BC", macroRound).c_str()),
+      galois::loopname(graph.get_run_identifier("BC").c_str()),
       galois::no_stats());
 };
 
@@ -664,10 +663,12 @@ int main(int argc, char** argv) {
       // report num rounds
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::runtime::reportStat_Single(REGION_NAME,
-          hg->get_run_identifier("NumForwardRounds", macroRound),
+          //hg->get_run_identifier("NumForwardRounds", macroRound),
+          hg->get_run_identifier("NumForwardRounds"),
           lastRoundNumber + 2);
         galois::runtime::reportStat_Single(REGION_NAME,
-          hg->get_run_identifier("NumBackwardRounds", macroRound),
+          //hg->get_run_identifier("NumBackwardRounds", macroRound),
+          hg->get_run_identifier("NumBackwardRounds"),
           lastRoundNumber + 1);
         galois::runtime::reportStat_Tsum(REGION_NAME,
           hg->get_run_identifier("TotalRounds"),
