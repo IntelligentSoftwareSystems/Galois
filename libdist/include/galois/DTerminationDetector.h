@@ -59,10 +59,16 @@ class DGTerminator {
 
 public:
   //! Default constructor
-  DGTerminator() : 
-    prev_snapshot(0), snapshot(1), global_snapshot(1), work_done(false)
-  {
+  DGTerminator() {
+    reinitialize();
     initiate_snapshot();
+  }
+
+  void reinitialize() {
+    prev_snapshot = 0;
+    snapshot = 1; 
+    global_snapshot = 1;
+    work_done = false;
   }
 
   /**
@@ -129,7 +135,6 @@ public:
   }
 
   void initiate_snapshot() {
-    //galois::gDebug("[", net.ID, "] taking snapshot ", snapshot, " \n");
 #ifdef GALOIS_USE_LWCI
     assert(false);
     lc_alreduce(&snapshot, &global_snapshot, sizeof(Ty),
@@ -156,11 +161,15 @@ public:
           work_done = false;
           prev_snapshot = snapshot;
           ++snapshot;
+          galois::gDebug("[", net.ID, "] work done, taking snapshot ", snapshot, " \n");
           initiate_snapshot();
         } else if (prev_snapshot != snapshot) {
           prev_snapshot = snapshot;
+          galois::gDebug("[", net.ID, "] no work done, taking snapshot ", snapshot, " \n");
           initiate_snapshot();
         } else {
+          galois::gDebug("[", net.ID, "] terminating ", snapshot, " \n");
+          reinitialize(); // for next async phase
           return true;
         }
       }
