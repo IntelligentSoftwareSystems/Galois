@@ -219,7 +219,10 @@ struct BFS {
           (unsigned long)dga.read_local());
 
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) &&
+    } while (
+#ifndef __GALOIS_HET_ASYNC__
+             (_num_iterations < maxIterations) &&
+#endif
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
