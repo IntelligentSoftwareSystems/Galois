@@ -62,6 +62,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   unsigned long statRecvNum;
   unsigned long statRecvBytes;
   unsigned long statRecvDequeued;
+  bool anyReceivedMessages;
 
   /**
    * Receive buffers for the buffered network interface
@@ -428,6 +429,7 @@ public:
 
   NetworkInterfaceBuffered() {
     ready  = 0;
+    anyReceivedMessages = false;
     worker = std::thread(&NetworkInterfaceBuffered::workerThread, this);
     while (ready != 1) {
     };
@@ -482,6 +484,7 @@ public:
               *rlg = std::move(lg);
             galois::runtime::trace("recvTagged", h, tag,
                                    galois::runtime::printVec(buf->getVec()));
+            anyReceivedMessages = true;
             return optional_t<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));
           }
@@ -519,6 +522,10 @@ public:
   }
 
   virtual bool anyPendingReceives() {
+    if (anyReceivedMessages) { // might not be acted on by the computation yet
+      anyReceivedMessages = false;
+      return true;
+    }
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
       if (rq.size() > 0) return true;
