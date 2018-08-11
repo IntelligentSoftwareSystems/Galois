@@ -928,6 +928,12 @@ private:
           bitset_reset_range(endMaster, numNodes - 1);
         }
       }
+    } else { // everything is a mirror
+      if (syncType == base_DistGraph::syncReduce) { // reset masters
+        if (numNodes > 0) {
+          bitset_reset_range(0, numNodes - 1);
+        }
+      }
     }
   }
 
