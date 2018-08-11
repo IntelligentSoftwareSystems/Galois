@@ -166,6 +166,10 @@ public:
     lc_progress(mv);
   }
 
+  virtual bool anyPendingSends() {
+    return false; // is this correct?
+  }
+
   virtual bool anyPendingReceives() {
     return !recv.empty();
   }

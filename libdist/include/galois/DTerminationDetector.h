@@ -147,8 +147,14 @@ public:
 
   bool terminate() {
     bool active = (local_mdata != 0);
+    if (active) galois::gDebug("[", net.ID, "] local work done \n");
     if (!active) {
-      active = net.anyPendingReceives();
+      active = net.anyPendingSends();
+      if (active) galois::gDebug("[", net.ID, "] pending send \n");
+      if (!active) {
+        active = net.anyPendingReceives();
+        if (active) galois::gDebug("[", net.ID, "] pending receive \n");
+      }
     }
     if (active) {
       work_done = true;

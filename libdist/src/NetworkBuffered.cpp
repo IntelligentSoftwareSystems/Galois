@@ -253,6 +253,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     unsigned long statSendOverflow;
     unsigned long statSendUrgent;
 
+    size_t size() { return messages.size(); }
+
     void markUrgent() {
       if (numBytes) {
         std::lock_guard<SimpleLock> lg(lock);
@@ -521,14 +523,29 @@ public:
       sd.markUrgent();
   }
 
+  virtual bool anyPendingSends() {
+    for (unsigned h = 0; h < sendData.size(); ++h) {
+      auto& sq = sendData[h];
+      if (sq.size() > 0)  {
+        //galois::gDebug("[", ID, "] send in buffer \n");
+        return true;
+      }
+    }
+    return netio->anyPendingSends();
+  }
+
   virtual bool anyPendingReceives() {
     if (anyReceivedMessages) { // might not be acted on by the computation yet
       anyReceivedMessages = false;
+      //galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
-      if (rq.size() > 0) return true;
+      if (rq.size() > 0)  {
+        //galois::gDebug("[", ID, "] receive in buffer \n");
+        return true;
+      }
     }
     return netio->anyPendingReceives();
   }

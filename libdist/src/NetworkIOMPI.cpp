@@ -217,6 +217,10 @@ public:
     recvQueue.probe();
   }
 
+  virtual bool anyPendingSends() {
+    return (!sendQueue.inflight.empty());
+  }
+
   virtual bool anyPendingReceives() {
     return (!recvQueue.inflight.empty() || !recvQueue.done.empty());
   }

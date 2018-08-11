@@ -102,6 +102,8 @@ public:
   virtual message dequeue() = 0;
   //! Make progress. Other functions don't have to make progress.
   virtual void progress() = 0;
+  //! @returns true if any send is in progress or is pending to be enqueued
+  virtual bool anyPendingSends() = 0;
   //! @returns true if any receive is in progress or is pending to be dequeued
   virtual bool anyPendingReceives() = 0;
 };
