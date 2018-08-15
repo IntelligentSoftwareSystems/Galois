@@ -163,9 +163,9 @@ void CellPin::print(std::ostream& os) {
   os << "      direction: " << d << ";" << std::endl;
 
   if (isInput) {
-    os << "      capactance: " << ((riseC > fallC) ? riseC : fallC) << ";" << std::endl;
-    os << "      rise_capacitance: " << riseC << ";" << std::endl;
-    os << "      fall_capacitance: " << fallC << ";" << std::endl;
+    os << "      capactance: " << ((c[1] > c[0]) ? c[1] : c[0]) << ";" << std::endl;
+    os << "      rise_capacitance: " << c[1] << ";" << std::endl;
+    os << "      fall_capacitance: " << c[0] << ";" << std::endl;
   }
 
   if (isOutput) {
@@ -718,21 +718,21 @@ void CellLibParser::parseCellPin(Cell* cell) {
     else if ("direction" == *curToken) {
       curToken += 2; // consume "direction" and ":"
       if ("input" == *curToken) {
-        pin->riseC = lib->defaultInputPinCap;
-        pin->fallC = lib->defaultInputPinCap;
+        pin->c[1] = lib->defaultInputPinCap;
+        pin->c[0] = lib->defaultInputPinCap;
         cell->addInPin(pin);
       }
       else if("output" == *curToken) {
-        pin->riseC = lib->defaultOutputPinCap;
-        pin->fallC = lib->defaultOutputPinCap;
+        pin->c[1] = lib->defaultOutputPinCap;
+        pin->c[0] = lib->defaultOutputPinCap;
         cell->addOutPin(pin);
       }
       else if ("internal" == *curToken) {
         cell->addInternalPin(pin);
       }
       else if ("inout" == *curToken) {
-        pin->riseC = lib->defaultInoutPinCap;
-        pin->fallC = lib->defaultInoutPinCap;
+        pin->c[1] = lib->defaultInoutPinCap;
+        pin->c[0] = lib->defaultInoutPinCap;
         cell->addInOutPin(pin);
       }
       curToken += 2; // consume value and ";"
@@ -740,13 +740,13 @@ void CellLibParser::parseCellPin(Cell* cell) {
     // fall_capacitance: value;
     else if ("fall_capacitance" == *curToken) {
       curToken += 2; // consume "fall_capacitance" and ":"
-      pin->fallC = std::stof(*curToken);
+      pin->c[0] = std::stof(*curToken);
       curToken += 2; // consume value and ";"
     }
     // rise_capacitance: value;
     else if ("rise_capacitance" == *curToken) {
       curToken += 2; // consume "rise_capacitance" and ":"
-      pin->riseC = std::stof(*curToken);
+      pin->c[1] = std::stof(*curToken);
       curToken += 2; // consume value and ";"
     }
     // max_capacitance: value;

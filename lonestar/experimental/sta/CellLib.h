@@ -94,8 +94,7 @@ struct CellPin {
   bool isOutput;
   bool isClock;
 
-  float riseC;
-  float fallC;
+  float c[2];
   float maxC;
   Cell* cell;
   std::string func;
