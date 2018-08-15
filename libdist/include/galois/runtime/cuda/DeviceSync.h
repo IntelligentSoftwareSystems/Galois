@@ -31,6 +31,7 @@
 #include "galois/cuda/DynamicBitset.h"
 #include "galois/cuda/Context.h"
 #include "galois/runtime/DataCommMode.h"
+#include "cub/util_allocator.cuh"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
 #define check_cuda_kernel                                                      \
@@ -391,6 +392,7 @@ void get_offsets_from_bitset(index_type bitset_size,
                              unsigned int* __restrict__ offsets,
                              DynamicBitset* __restrict__ bitset,
                              size_t* __restrict__ num_set_bits) {
+  cub::CachingDeviceAllocator  g_allocator(true);  // Caching allocator for device memory
   DynamicBitsetIterator flag_iterator(bitset);
   IdentityIterator offset_iterator;
   Shared<size_t> num_set_bits_ptr;
@@ -401,12 +403,14 @@ void get_offsets_from_bitset(index_type bitset_size,
                              offset_iterator, flag_iterator, offsets,
                              num_set_bits_ptr.gpu_wr_ptr(true), bitset_size);
   check_cuda_kernel;
-  CUDA_SAFE_CALL(cudaMalloc(&d_temp_storage, temp_storage_bytes));
+  CubDebugExit(g_allocator.DeviceAllocate(&d_temp_storage, temp_storage_bytes));
+  //CUDA_SAFE_CALL(cudaMalloc(&d_temp_storage, temp_storage_bytes));
   cub::DeviceSelect::Flagged(d_temp_storage, temp_storage_bytes,
                              offset_iterator, flag_iterator, offsets,
                              num_set_bits_ptr.gpu_wr_ptr(true), bitset_size);
   check_cuda_kernel;
-  CUDA_SAFE_CALL(cudaFree(d_temp_storage));
+  //CUDA_SAFE_CALL(cudaFree(d_temp_storage));
+  if (d_temp_storage) CubDebugExit(g_allocator.DeviceFree(d_temp_storage));
   *num_set_bits = *num_set_bits_ptr.cpu_rd_ptr();
 }
 
