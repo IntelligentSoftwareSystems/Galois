@@ -1,5 +1,6 @@
 #include "CellLib.h"
 #include "Verilog.h"
+#include "TimingEngine.h"
 
 #include "galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
@@ -23,8 +24,8 @@ int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-//  CellLib lib;
-//  lib.parse(cellLibName);
+  CellLib lib;
+  lib.parse(cellLibName);
 //  lib.print();
 
 #if 0
@@ -43,10 +44,15 @@ int main(int argc, char *argv[]) {
 
   VerilogDesign design;
   design.parse(verilogName);
-  design.print();
+//  design.print();
   design.buildHierarchy();
-  std::cout << "design is " << (design.isFlattened() ? "" : "not ") << "flattened." << std::endl;
-  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
+//  std::cout << "design is " << (design.isFlattened() ? "" : "not ") << "flattened." << std::endl;
+//  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
+
+  std::vector<CellLib*> libs;
+  libs.push_back(&lib);
+  TimingEngine engine(design, libs);
+  engine.time(*(design.roots.begin()));
 
   return 0;
 }
