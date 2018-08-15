@@ -154,11 +154,12 @@ void InitializeIteration(Graph& graph,
           if (nodesToConsider[i] == graph.getGID(curNode)) {
             cur_data.minDistances[i] = 0;
             cur_data.dTree.setDistance(i, infinity, 0);
-            if (graph.isOwned(graph.L2G(curNode))) {
-              cur_data.shortestPathNumbers[i] = 1;
-            } else {
-              cur_data.shortestPathNumbers[i] = 0;
-            }
+            cur_data.shortestPathNumbers[i] = 1;
+            //if (graph.isOwned(graph.L2G(curNode))) {
+            //  cur_data.shortestPathNumbers[i] = 1;
+            //} else {
+            //  cur_data.shortestPathNumbers[i] = 0;
+            //}
           } else {
             cur_data.minDistances[i]        = infinity;
             cur_data.shortestPathNumbers[i] = 0;
@@ -192,7 +193,9 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
 
         cur_data.roundIndexToSend = cur_data.dTree.getIndexToSend(roundNumber);
         if (cur_data.roundIndexToSend != infinity) {
-          bitset_minDistances.set(curNode);
+          if (cur_data.minDistances[cur_data.roundIndexToSend] != 0) {
+            bitset_minDistances.set(curNode);
+          }
           dga += 1;
         } else if (cur_data.dTree.moreWork()) {
           dga += 1;
