@@ -102,6 +102,7 @@ struct VerilogModule {
   std::unordered_map<std::string, VerilogPin*> pins;
   std::unordered_set<VerilogPin*> inPins;
   std::unordered_set<VerilogPin*> outPins;
+  std::unordered_map<VerilogPin*, VerilogWire*> assigns;
 
   // for dependencies among modules
   std::unordered_set<VerilogModule*> pred;
