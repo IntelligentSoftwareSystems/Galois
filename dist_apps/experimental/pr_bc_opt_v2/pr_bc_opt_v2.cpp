@@ -371,7 +371,10 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
           }
 
           if (dst_data.roundIndexToSend != infinity) {
-            bitset_dependency.set(dst);
+            // only comm if not redundant 0
+            if (dst_data.dependencyValues[dst_data.roundIndexToSend] != 0) {
+              bitset_dependency.set(dst);
+            }
           }
         }
       },
