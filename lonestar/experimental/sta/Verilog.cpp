@@ -263,6 +263,10 @@ void VerilogModule::print(std::ostream& os) {
   os << "endmodule" << std::endl;
 }
 
+bool VerilogModule::isFlattened() {
+  return succ.empty();
+}
+
 void VerilogDesign::clear() {
   clearHierarchy();
   for (auto& i: modules) {
@@ -304,7 +308,7 @@ void VerilogDesign::buildHierarchy() {
 
 bool VerilogDesign::isFlattened() {
   for (auto m: roots) {
-    if (m->succ.size()) {
+    if (!m->isFlattened()) {
       return false;
     }
   }

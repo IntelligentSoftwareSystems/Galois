@@ -163,6 +163,8 @@ public:
     auto it = wires.find(name);
     return (it == wires.end()) ? nullptr : it->second;
   }
+
+  bool isFlattened();
 };
 
 struct VerilogDesign {
