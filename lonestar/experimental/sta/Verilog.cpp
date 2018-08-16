@@ -52,6 +52,14 @@ void VerilogParser::parseModule() {
     p->wire = w;
     w->addPin(p);
   }
+
+  // fix the connection for assigns
+  for (auto& i:curModule->assigns) {
+    auto p = i.first;
+    auto w = i.second;
+    w->addPin(p);
+    p->wire = w;
+  }
 }
 
 void VerilogParser::parseWires() {
@@ -97,8 +105,7 @@ void VerilogParser::parseAssign() {
   assert(wire);
   curToken += 1; // consume ";"
   
-  wire->addPin(pin);
-  pin->wire = wire;
+  // record the assign
   curModule->assigns[pin] = wire;
 }
 

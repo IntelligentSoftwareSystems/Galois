@@ -41,7 +41,6 @@ void TimingGraph::addGate(VerilogGate* gate) {
 
       auto& data = g.getData(n, unprotected);
       data.pin = p;
-      data.isDummy = false;
       data.isRise = (bool)j;
 
       data.t.insert(data.t.begin(), libs.size(), NodeTiming());
@@ -77,14 +76,23 @@ void TimingGraph::addGate(VerilogGate* gate) {
 }
 
 void TimingGraph::addWire(VerilogWire* w) {
+  // dangling wires due to assign statements
+  if (0 == w->outDeg()) {
+    return;
+  }
+
   // scan for the source of w
   GNode src[2];
   for (auto p: w->pins) {
     for (size_t j = 0; j < 2; j++) {
       auto n = nodeMap[p][j];
       auto& data = g.getData(n, unprotected);
+      // w goes from 1'b0 or 1'b1
+      if (p->name == name0 || p->name == name1) {
+        src[j] = n;
+      }
       // w goes from primary input
-      if (data.isPrimary && !data.isOutput) {
+      else if (data.isPrimary && !data.isOutput) {
         src[j] = n;
       }
       // w goes from gate output 
@@ -95,8 +103,17 @@ void TimingGraph::addWire(VerilogWire* w) {
   }
 
   // connect w.src to other pins
-  for (auto p: w->pins) {
-    for (size_t j = 0; j < 2; j++) {
+  for (size_t j = 0; j < 2; j++) {
+    auto& srcData = g.getData(src[j], unprotected);
+    // 1'b0 rise is never connected
+    if (srcData.pin->name == name0 && 1 == j) {
+      continue;
+    }
+    // 1'b1 fall is never connected
+    if (srcData.pin->name == name1 && 0 == j) {
+      continue;
+    }
+    for (auto p: w->pins) {
       auto n = nodeMap[p][j];
       if (n != src[j]) {
         auto e = g.addMultiEdge(src[j], n, unprotected);
@@ -151,6 +168,9 @@ void TimingGraph::construct() {
     addPin(i.second);
   }
 
+  addDummySrc();
+  addDummySink(); // also marks primary output nodes
+
   for (auto& i: m.gates) {
     addGate(i.second);
   }
@@ -159,9 +179,6 @@ void TimingGraph::construct() {
   for (auto& i: m.wires) {
     addWire(i.second);
   }
-
-  addDummySrc();
-  addDummySink();
 }
 
 void TimingGraph::initialize() {
