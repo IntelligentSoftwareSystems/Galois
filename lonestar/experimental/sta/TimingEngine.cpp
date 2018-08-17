@@ -1,15 +1,14 @@
 #include "TimingEngine.h"
 
-TimingEngine::TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs)
-  : v(v), libs(libs)
+TimingEngine::TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew)
+  : v(v), libs(libs), modes(modes), isExactSlew(isExactSlew)
 {
   for (auto i: v.modules) {
     auto m = i.second;
     if (m->isFlattened()) {
-      TimingGraph* g = new TimingGraph{*m, libs};
+      TimingGraph* g = new TimingGraph(*m, libs, modes);
       modules[m] = g;
       g->construct();
-      g->print();
     }
     else {
       std::cout << "Not supported: module " << m->name << " is not flattened" << std::endl;
@@ -23,12 +22,43 @@ TimingEngine::~TimingEngine() {
   }
 }
 
+void computeArrivalTime(TimingGraph& g) {
+
+}
+
+void computeRequiredTime(TimingGraph& g) {
+
+}
+
+void updateArrivalTime(TimingGraph& g) {
+
+}
+
+void updateRequiredTime(TimingGraph& g) {
+
+}
+
+TimingGraph* TimingEngine::findTimingGraph(VerilogModule* m) {
+  auto it = modules.find(m);
+  if (modules.find(m) != modules.end()) {
+    return it->second;
+  }
+  else {
+    std::cout << "Module " << m->name << " does not exist or is not flattened." << std::endl;
+    return nullptr;
+  }
+}
+
 void TimingEngine::update(VerilogModule* m) {
 
 }
 
 void TimingEngine::time(VerilogModule* m) {
-
+  auto g = findTimingGraph(m);
+  if (g) {
+    g->initialize();
+    g->setConstraints();
+  }
 }
 
 float TimingEngine::reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
@@ -39,6 +69,6 @@ float TimingEngine::reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, si
   return 0.0;
 }
 
-void TimingEngine::reportTopKCriticalPaths(VerilogModule* m, size_t corner, size_t k) {
-
+std::vector<TimingPath> TimingEngine::reportTopKCriticalPaths(VerilogModule* m, size_t corner, size_t k) {
+  return {};
 }

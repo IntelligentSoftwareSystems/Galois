@@ -147,9 +147,17 @@ public:
     inPins.insert(pin);
   }
 
+  bool isInPin(VerilogPin* pin) {
+    return inPins.count(pin);
+  }
+
   void addOutPin(VerilogPin* pin) {
     assert(pins.count(pin));
     outPins.insert(pin);
+  }
+
+  bool isOutPin(VerilogPin* pin) {
+    return outPins.count(pin);
   }
 
   VerilogWire* addWire(std::string name) {

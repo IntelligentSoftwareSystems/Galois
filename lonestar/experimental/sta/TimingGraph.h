@@ -6,10 +6,12 @@
 
 #include "CellLib.h"
 #include "Verilog.h"
+#include "TimingMode.h"
 
 #include <iostream>
 #include <vector>
 #include <unordered_map>
+#include <atomic>
 
 struct NodeTiming {
   CellPin* pin;
@@ -20,11 +22,15 @@ struct NodeTiming {
 };
 
 struct Node {
+  std::atomic<bool> isQueued;
   bool isRise;
   bool isOutput;
   bool isPrimary;
+  bool isPowerNode;
+  bool isClock;
   bool isDummy;
-  size_t precondition;
+  size_t topoL;
+  size_t revTopoL;
   std::vector<NodeTiming> t;
   VerilogPin* pin;
 };
@@ -46,26 +52,36 @@ public:
   using GNode = Graph::GraphNode;
 
 public:
+  // external inputs
   VerilogModule& m;
-  std::vector<CellLib*> libs;
+  std::vector<CellLib*>& libs;
+  std::vector<TimingMode>& modes;
+
+  // internal graph
   Graph g;
+
+  // internal mapping
   GNode dummySrc;
   GNode dummySink;
+  GNode vdd;
+  GNode gnd;
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
 
 private:
-  void addDummySrc();
-  void addDummySink();
+  void computeTopoL();
+  void computeRevTopoL();
+  void addDummyNodes();
   void addPin(VerilogPin* p);
   void addGate(VerilogGate* g);
   void addWire(VerilogWire* w);
   std::string getNodeName(GNode n);
 
 public:
-  TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs): m(m), libs(libs) {}
+  TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes): m(m), libs(libs), modes(modes) {}
 
   void construct();
   void initialize();
+  void setConstraints();
   void print(std::ostream& os = std::cout);
 };
 

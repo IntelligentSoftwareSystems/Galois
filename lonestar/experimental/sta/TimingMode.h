@@ -1,0 +1,9 @@
+#ifndef GALOIS_EDA_TIMING_MODE_H
+#define GALOIS_EDA_TIMING_MODE_H
+
+enum TimingMode {
+  TIMING_MODE_MAX_DELAY = 0,
+  TIMING_MODE_MIN_DELAY,
+};
+
+#endif
