@@ -22,7 +22,7 @@ struct NodeTiming {
 };
 
 struct Node {
-  std::atomic<bool> isQueued;
+  bool isFinished;
   bool isRise;
   bool isOutput;
   bool isPrimary;
@@ -36,7 +36,7 @@ struct Node {
 };
 
 struct EdgeTiming {
-  WireLoad* wireLoad;
+  WireLoad* wireLoad; // nullptr for timing arcs
   float delay;
 };
 
@@ -52,10 +52,11 @@ public:
   using GNode = Graph::GraphNode;
 
 public:
-  // external inputs
+  // external inputs from TimingEngine
   VerilogModule& m;
   std::vector<CellLib*>& libs;
   std::vector<TimingMode>& modes;
+  bool isExactSlew;
 
   // internal graph
   Graph g;
@@ -68,6 +69,10 @@ public:
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
 
 private:
+  void clearFinished();
+  void setArrivalTimeAtPrimaryOutput(GNode n);
+  void setArrivalTimeAtGateOutput(GNode n);
+  void setArrivalTimeAtGateInput(GNode n);
   void computeTopoL();
   void computeRevTopoL();
   void addDummyNodes();
@@ -76,12 +81,16 @@ private:
   void addWire(VerilogWire* w);
   std::string getNodeName(GNode n);
 
+  template<typename Ctx>
+  void wrapUpArrivalTime(GNode n, Ctx& ctx);
+
 public:
-  TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes): m(m), libs(libs), modes(modes) {}
+  TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew): m(m), libs(libs), modes(modes), isExactSlew(isExactSlew) {}
 
   void construct();
   void initialize();
   void setConstraints();
+  void computeArrivalTime();
   void print(std::ostream& os = std::cout);
 };
 

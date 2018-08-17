@@ -33,10 +33,6 @@ struct TimingEngine {
   std::unordered_map<VerilogModule*, TimingGraph*> modules;
 
 private:
-  void computeArrivalTime(TimingGraph& g);
-  void computeRequiredTime(TimingGraph& g);
-  void updateArrivalTime(TimingGraph& g);
-  void updateRequiredTime(TimingGraph& g);
   TimingGraph* findTimingGraph(VerilogModule* m);
 
 public:

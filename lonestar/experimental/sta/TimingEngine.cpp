@@ -6,7 +6,7 @@ TimingEngine::TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs, std::v
   for (auto i: v.modules) {
     auto m = i.second;
     if (m->isFlattened()) {
-      TimingGraph* g = new TimingGraph(*m, libs, modes);
+      TimingGraph* g = new TimingGraph(*m, libs, modes, isExactSlew);
       modules[m] = g;
       g->construct();
     }
@@ -20,22 +20,6 @@ TimingEngine::~TimingEngine() {
   for (auto& i: modules) {
     delete i.second;
   }
-}
-
-void computeArrivalTime(TimingGraph& g) {
-
-}
-
-void computeRequiredTime(TimingGraph& g) {
-
-}
-
-void updateArrivalTime(TimingGraph& g) {
-
-}
-
-void updateRequiredTime(TimingGraph& g) {
-
 }
 
 TimingGraph* TimingEngine::findTimingGraph(VerilogModule* m) {
@@ -58,6 +42,7 @@ void TimingEngine::time(VerilogModule* m) {
   if (g) {
     g->initialize();
     g->setConstraints();
+    g->computeArrivalTime();
   }
 }
 

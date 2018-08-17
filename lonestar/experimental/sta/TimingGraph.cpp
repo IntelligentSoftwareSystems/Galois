@@ -32,6 +32,7 @@ void TimingGraph::addPin(VerilogPin* pin) {
     data.t.insert(data.t.begin(), libs.size(), NodeTiming());
     for (size_t k = 0; k < libs.size(); k++) {
       data.t[k].pin = nullptr;
+      data.t[k].slew = infinity;
       data.t[k].arrival = infinity;
       data.t[k].required = infinity;
       data.t[k].slack = infinity;
@@ -58,6 +59,7 @@ void TimingGraph::addGate(VerilogGate* gate) {
       data.t.insert(data.t.begin(), libs.size(), NodeTiming());
       for (size_t k = 0; k < libs.size(); k++) {
         data.t[k].pin = libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
+        data.t[k].slew = infinity;
         data.t[k].arrival = infinity;
         data.t[k].required = infinity;
         data.t[k].slack = infinity;
@@ -303,6 +305,7 @@ void TimingGraph::initialize() {
         else if ((data.isPrimary && !data.isOutput) || data.isPowerNode) {
           for (size_t k = 0; k < libs.size(); k++) {
             data.t[k].arrival = 0.0;
+            data.t[k].slew = 0.0;
             if (TIMING_MODE_MIN_DELAY == modes[k]) {
               data.t[k].required *= -1.0;
             }
@@ -311,6 +314,7 @@ void TimingGraph::initialize() {
         else {
           for (size_t k = 0; k < libs.size(); k++) {
             if (TIMING_MODE_MAX_DELAY == modes[k]) {
+              data.t[k].slew *= -1.0;
               data.t[k].arrival *= -1.0;
             }
             else if (TIMING_MODE_MIN_DELAY == modes[k]) {
@@ -330,6 +334,70 @@ void TimingGraph::initialize() {
 
 void TimingGraph::setConstraints() {
   // use sdc here
+}
+
+void TimingGraph::clearFinished() {
+  galois::do_all(
+      galois::iterate(g),
+      [&] (GNode n) { g.getData(n, unprotected).isFinished = false; }
+      , galois::loopname("TimingGraphClearFinished")
+      , galois::steal()
+  );
+}
+
+void TimingGraph::setArrivalTimeAtPrimaryOutput(GNode n) {
+
+}
+
+void TimingGraph::setArrivalTimeAtGateOutput(GNode n) {
+
+}
+
+void TimingGraph::setArrivalTimeAtGateInput(GNode n) {
+
+}
+
+template<typename Ctx>
+void TimingGraph::wrapUpArrivalTime(GNode n, Ctx& ctx) {
+  g.getData(n).isFinished = true;
+  for (auto e: g.edges(n)) {
+    ctx.push(g.getEdgeDst(e));
+  }
+}
+
+void TimingGraph::computeArrivalTime() {
+  clearFinished();
+
+  galois::for_each(
+    galois::iterate({dummySrc}),
+    [&] (GNode n, auto& ctx) {
+      auto& data = g.getData(n);
+      g.edges(n); // for cautiousness
+
+      // topological order
+      for (auto ie: g.in_edges(n)) {
+        auto prev = g.getEdgeDst(ie);
+        if (!g.getData(prev).isFinished) {
+          return;
+        }
+      }
+
+      if (data.isDummy || data.isPowerNode || (data.isPrimary && !data.isOutput)) {
+        ; // empty statement
+      }
+      else if (data.isPrimary && data.isOutput) {
+        setArrivalTimeAtPrimaryOutput(n);
+      }
+      else if (!data.isPrimary && data.isOutput) {
+        setArrivalTimeAtGateOutput(n);
+      }
+      else if (!data.isPrimary && !data.isOutput) {
+        setArrivalTimeAtGateInput(n);
+      }
+      wrapUpArrivalTime(n, ctx);
+    }
+    , galois::loopname("TimingGraphComputeArrivalTime")
+  );
 }
 
 std::string TimingGraph::getNodeName(GNode n) {
