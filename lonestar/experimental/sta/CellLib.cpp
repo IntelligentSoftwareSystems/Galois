@@ -142,11 +142,25 @@ float CellPin::extract(std::vector<float>& param, TableType index, CellPin* inPi
 
 std::pair<float, std::string>
 CellPin::extractMax(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
-  float ret = std::numeric_limits<float>::min();
+  float ret = -std::numeric_limits<float>::infinity();
   std::string when;
   for (auto& i: tables[inPin][isRise][index][isNeg]) {
     auto tmp = i.second->lookup(param);
     if (tmp > ret) {
+      ret = tmp;
+      when = i.first;
+    }
+  }
+  return {ret, when};
+}
+
+std::pair<float, std::string>
+CellPin::extractMin(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+  float ret = std::numeric_limits<float>::infinity();
+  std::string when;
+  for (auto& i: tables[inPin][isRise][index][isNeg]) {
+    auto tmp = i.second->lookup(param);
+    if (tmp < ret) {
       ret = tmp;
       when = i.first;
     }

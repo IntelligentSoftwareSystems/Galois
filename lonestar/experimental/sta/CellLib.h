@@ -111,6 +111,7 @@ public:
   bool isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise);
   float extract(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
   std::pair<float, std::string> extractMax(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  std::pair<float, std::string> extractMin(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
 
   void addLut(Lut* lut, TableType tType, bool isRise, CellPin* relatedPin, std::string when, bool isPos, bool isNeg) {
     if (isPos) {
