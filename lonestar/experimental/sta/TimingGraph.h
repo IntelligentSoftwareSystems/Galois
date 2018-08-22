@@ -15,6 +15,7 @@
 
 struct NodeTiming {
   CellPin* pin;
+  float driveC;
   float slew;
   float arrival;
   float required;
@@ -22,7 +23,6 @@ struct NodeTiming {
 };
 
 struct Node {
-  bool isFinished;
   bool isRise;
   bool isOutput;
   bool isPrimary;
@@ -64,15 +64,9 @@ public:
   // internal mapping
   GNode dummySrc;
   GNode dummySink;
-  GNode vdd;
-  GNode gnd;
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
 
 private:
-  void clearFinished();
-  void setArrivalTimeAtPrimaryOutput(GNode n);
-  void setArrivalTimeAtGateOutput(GNode n);
-  void setArrivalTimeAtGateInput(GNode n);
   void computeTopoL();
   void computeRevTopoL();
   void addDummyNodes();

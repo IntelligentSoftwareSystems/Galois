@@ -21,10 +21,6 @@ void TimingGraph::addPin(VerilogPin* pin) {
     data.isRise = (bool)j;
     if (pin->name == name0 || pin->name == name1) {
       data.isPowerNode = true;
-      // rising gnd and falling vdd are dummy nodes to simplify computation
-      if ((pin->name == name0 && 1 == j) || (pin->name == name1 && 0 == j)) {
-        data.isDummy = true;
-      }
     }
     else {
       data.isPrimary = true;
@@ -36,6 +32,10 @@ void TimingGraph::addPin(VerilogPin* pin) {
     data.t.insert(data.t.begin(), libs.size(), NodeTiming());
     for (size_t k = 0; k < libs.size(); k++) {
       data.t[k].pin = nullptr;
+      data.t[k].slew = infinity;
+      data.t[k].arrival = infinity;
+      data.t[k].required = infinity;
+      data.t[k].slack = infinity;
     }
   }
 }
@@ -59,6 +59,10 @@ void TimingGraph::addGate(VerilogGate* gate) {
       data.t.insert(data.t.begin(), libs.size(), NodeTiming());
       for (size_t k = 0; k < libs.size(); k++) {
         data.t[k].pin = libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
+        data.t[k].slew = infinity;
+        data.t[k].arrival = infinity;
+        data.t[k].required = infinity;
+        data.t[k].slack = infinity;
       }
 
       if (data.t[0].pin->isOutput) {
@@ -120,6 +124,15 @@ void TimingGraph::addWire(VerilogWire* w) {
 
   // connect w.src to other pins
   for (size_t j = 0; j < 2; j++) {
+    auto& srcData = g.getData(src[j], unprotected);
+    // 1'b0 rise is never connected
+    if (srcData.pin->name == name0 && 1 == j) {
+      continue;
+    }
+    // 1'b1 fall is never connected
+    if (srcData.pin->name == name1 && 0 == j) {
+      continue;
+    }
     for (auto p: w->pins) {
       auto n = nodeMap[p][j];
       if (n != src[j]) {
@@ -136,11 +149,30 @@ void TimingGraph::addWire(VerilogWire* w) {
 }
 
 void TimingGraph::addDummyNodes() {
+  galois::InsertBag<GNode> noPredNodes;
+  galois::InsertBag<GNode> noSuccNodes;
+  galois::do_all(
+      galois::iterate(g),
+      [&] (GNode n) {
+        auto numPred = std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected));
+        auto numSucc = std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
+        if (0 == numPred) { noPredNodes.push_back(n); }
+        if (0 == numSucc) { noSuccNodes.push_back(n); }
+      }
+      , galois::loopname("ScanForNeighborsOfDummyNodes")
+      , galois::steal()
+  );
+
   dummySrc = g.createNode();
   g.addNode(dummySrc, unprotected);
   auto& dSrcData = g.getData(dummySrc, unprotected);
   dSrcData.isDummy = true;
   dSrcData.pin = nullptr;
+  for (auto n: noPredNodes) {
+    auto e = g.addMultiEdge(dummySrc, n, unprotected);
+    auto& eData = g.getEdgeData(e);
+    eData.wire = nullptr;
+  }
 
   dummySink = g.createNode();
   g.addNode(dummySink, unprotected);
@@ -148,24 +180,10 @@ void TimingGraph::addDummyNodes() {
   dSinkData.isDummy = true;
   dSinkData.isOutput = true;
   dSinkData.pin = nullptr;
-
-  for (auto i: m.pins) {
-    auto p = i.second;
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto numPred = std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected));
-      if (!numPred) {
-        auto e = g.addMultiEdge(dummySrc, n, unprotected);
-        auto& eData = g.getEdgeData(e);
-        eData.wire = nullptr;
-      }
-      auto numSucc = std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
-      if (!numSucc) {
-        auto e = g.addMultiEdge(n, dummySink, unprotected);
-        auto& eData = g.getEdgeData(e);
-        eData.wire = nullptr;
-      }
-    }
+  for (auto n: noSuccNodes) {
+    auto e = g.addMultiEdge(n, dummySink, unprotected);
+    auto& eData = g.getEdgeData(e);
+    eData.wire = nullptr;
   }
 }
 
@@ -210,7 +228,7 @@ void TimingGraph::computeTopoL() {
       , galois::loopname("TimingGraphTopoLevel")
   );
 
-#if 1
+#if 0
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
@@ -252,7 +270,7 @@ void TimingGraph::computeRevTopoL() {
       , galois::loopname("TimingGraphRevTopoLevel")
   );
 
-#if 1
+#if 0
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
@@ -279,26 +297,104 @@ void TimingGraph::initialize() {
         // for computing levels
         data.topoL = std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected));
         data.revTopoL = std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
+
+        // default arrival and required time for each timing corner
+        if (data.isDummy) {
+          return;
+        }
+        else if ((data.isPrimary && !data.isOutput) || data.isPowerNode) {
+          for (size_t k = 0; k < libs.size(); k++) {
+            data.t[k].arrival = 0.0;
+            data.t[k].slew = 0.0;
+            if (TIMING_MODE_MIN_DELAY == modes[k]) {
+              data.t[k].required *= -1.0;
+            }
+          }
+        }
+        else {
+          for (size_t k = 0; k < libs.size(); k++) {
+            if (TIMING_MODE_MAX_DELAY == modes[k]) {
+              data.t[k].slew *= -1.0;
+              data.t[k].arrival *= -1.0;
+            }
+            else if (TIMING_MODE_MIN_DELAY == modes[k]) {
+              data.t[k].required *= -1.0;
+            }
+          }
+        }
       }
       , galois::loopname("TimingGraphInitialize")
       , galois::steal()
   );
 
-  print();
+//  print();
   computeTopoL();
   computeRevTopoL();
-  std::cout << "Levelization done.\n" << std::endl;
-  print();
 }
 
 void TimingGraph::setConstraints() {
   // use sdc here
 }
 
+void TimingGraph::clearFinished() {
+  galois::do_all(
+      galois::iterate(g),
+      [&] (GNode n) { g.getData(n, unprotected).isFinished = false; }
+      , galois::loopname("TimingGraphClearFinished")
+      , galois::steal()
+  );
+}
+
+void TimingGraph::setArrivalTimeAtPrimaryOutput(GNode n) {
+
+}
+
+void TimingGraph::setArrivalTimeAtGateOutput(GNode n) {
+
+}
+
+void TimingGraph::setArrivalTimeAtGateInput(GNode n) {
+
+}
+
+template<typename Ctx>
+void TimingGraph::wrapUpArrivalTime(GNode n, Ctx& ctx) {
+  g.getData(n).isFinished = true;
+  for (auto e: g.edges(n)) {
+    ctx.push(g.getEdgeDst(e));
+  }
+}
+
 void TimingGraph::computeArrivalTime() {
+  clearFinished();
+
   galois::for_each(
     galois::iterate({dummySrc}),
     [&] (GNode n, auto& ctx) {
+      auto& data = g.getData(n);
+      g.edges(n); // for cautiousness
+
+      // topological order
+      for (auto ie: g.in_edges(n)) {
+        auto prev = g.getEdgeDst(ie);
+        if (!g.getData(prev).isFinished) {
+          return;
+        }
+      }
+
+      if (data.isDummy || data.isPowerNode || (data.isPrimary && !data.isOutput)) {
+        ; // empty statement
+      }
+      else if (data.isPrimary && data.isOutput) {
+        setArrivalTimeAtPrimaryOutput(n);
+      }
+      else if (!data.isPrimary && data.isOutput) {
+        setArrivalTimeAtGateOutput(n);
+      }
+      else if (!data.isPrimary && !data.isOutput) {
+        setArrivalTimeAtGateInput(n);
+      }
+      wrapUpArrivalTime(n, ctx);
     }
     , galois::loopname("TimingGraphComputeArrivalTime")
   );
@@ -308,19 +404,19 @@ std::string TimingGraph::getNodeName(GNode n) {
   auto& data = g.getData(n, unprotected);
 
   std::string nName;
-  if (data.isPowerNode) {
-    nName = "Power ";
-    nName += data.pin->name;
-    nName += ", ";
-    nName += (data.isRise) ? "rise" : "fall";
-  }
-  else if (data.isDummy) {
+  if (data.isDummy) {
     if (data.isOutput) {
       nName = "Dummy output";
     }
     else {
       nName = "Dummy input";
     }
+  }
+  else if (data.isPowerNode) {
+    nName = "Power ";
+    nName += data.pin->name;
+    nName += ", ";
+    nName += (data.isRise) ? "rise" : "fall";
   }
   else if (data.isPrimary) {
     if (data.isOutput) {
