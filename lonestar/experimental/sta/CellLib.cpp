@@ -354,7 +354,12 @@ float WireLoad::wireDelay(float loadC, size_t deg) {
     }
 
     // Elmore delay for worst-case & balanced tree
-    auto delay = wR * (wC / 2 + loadC);
+    // Ref: J. Bhasker, R. Chadha. STA for nanometer designs: a practical approach
+    //      Springer, 2009.
+//      auto delay = wR * (wC / 2 + loadC);
+
+    // delay formula used by Cadence genus
+    auto delay = wR * (wC + loadC);
     return delay;
   }
 }
