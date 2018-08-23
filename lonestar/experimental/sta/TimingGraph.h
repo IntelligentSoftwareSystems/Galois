@@ -31,8 +31,55 @@ struct Node {
   bool isDummy;
   size_t topoL;
   size_t revTopoL;
+  std::atomic<bool> isQueued;
   std::vector<NodeTiming> t;
   VerilogPin* pin;
+
+public:
+  bool isPrimaryInput() {
+    return (!isDummy && !isPowerNode && isPrimary && !isOutput);
+  }
+
+  bool isPrimaryOutput() {
+    return (!isDummy && !isPowerNode && isPrimary && isOutput);
+  }
+
+  bool isGateInput() {
+    return (!isDummy && !isPowerNode && !isPrimary && !isOutput);
+  }
+
+  bool isGateOutput() {
+    return (!isDummy && !isPowerNode && !isPrimary && isOutput);
+  }
+
+  bool isRealPowerNode() {
+    return (isPowerNode && !isDummy);
+  }
+
+  bool isRealDummy() {
+    return (isDummy && !isPowerNode);
+  }
+
+  bool isSequentialInput() {
+    return false;
+  }
+
+  bool isSequentialOutput() {
+    return false;
+  }
+
+  bool isPseudoPrimaryInput() {
+    return (isPrimaryInput() || isSequentialOutput());
+  }
+
+  bool isPseudoPrimaryOutput() {
+    return (isPrimaryOutput() || isSequentialInput());
+  }
+
+  // TODO: add clock pins of all modules/gates
+  bool isTimingSource() {
+    return (isPseudoPrimaryInput() || isRealPowerNode());
+  }
 };
 
 struct EdgeTiming {
@@ -67,6 +114,10 @@ public:
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
 
 private:
+  void computeDriveC(GNode n);
+  void computeArrivalByWire(GNode n, Graph::in_edge_iterator ie);
+  void computeExtremeSlew(GNode n, Graph::in_edge_iterator ie, size_t k);
+  void computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k);
   void computeTopoL();
   void computeRevTopoL();
   void addDummyNodes();
