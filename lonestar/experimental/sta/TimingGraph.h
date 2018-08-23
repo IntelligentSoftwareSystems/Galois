@@ -31,7 +31,7 @@ struct Node {
   bool isDummy;
   size_t topoL;
   size_t revTopoL;
-  std::atomic<bool> isQueued;
+  std::atomic<bool> flag;
   std::vector<NodeTiming> t;
   VerilogPin* pin;
 
@@ -118,6 +118,7 @@ private:
   void computeArrivalByWire(GNode n, Graph::in_edge_iterator ie);
   void computeExtremeSlew(GNode n, Graph::in_edge_iterator ie, size_t k);
   void computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k);
+  void initFlag(bool value);
   void computeTopoL();
   void computeRevTopoL();
   void addDummyNodes();

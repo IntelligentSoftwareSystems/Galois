@@ -206,28 +206,49 @@ void TimingGraph::construct() {
   addDummyNodes();
 }
 
+void TimingGraph::initFlag(bool value) {
+  galois::do_all(
+      galois::iterate(g),
+      [&] (GNode n) {
+        g.getData(n).flag.store(value);
+      }
+      , galois::loopname("TimingGraphInitFlag")
+      , galois::steal()
+  );
+}
+
 void TimingGraph::computeTopoL() {
+  // data.flag indicates "to be done" if true in this function
+  initFlag(true);
+
   galois::for_each(
       galois::iterate({dummySrc}),
       [&] (GNode n, auto& ctx) {
-        // lock outgoing neighbors for cautiousness
-        g.edges(n);
-
-        auto& myTopoL = g.getData(n).topoL;
-        for (auto ie: g.in_edges(n, unprotected)) {
-          auto prev = g.getEdgeDst(ie);
-          auto prevTopoL = g.getData(prev).topoL;
-          if (myTopoL <= prevTopoL) { myTopoL = prevTopoL + 1; }
+        auto& data = g.getData(n);
+        if (!data.flag.load()) {
+          return; // this node is already done
         }
 
+        size_t myTopoL = 0;
+        for (auto ie: g.in_edges(n)) {
+          auto pred = g.getEdgeDst(ie);
+          auto& predData = g.getData(pred);
+          if (predData.flag.load()) {
+            return; // this predecessor is to be done
+          }
+          else if (myTopoL <= predData.topoL) {
+            myTopoL = predData.topoL + 1;
+          }
+        }
+
+        data.topoL = myTopoL;
+        data.flag.store(false); // done computing topoL
         for (auto e: g.edges(n)) {
-          auto succ = g.getEdgeDst(e);
-          auto& succTopoL = g.getData(succ).topoL;
-          succTopoL -= 1;
-          if (0 == succTopoL) { ctx.push(succ); }
+          ctx.push(g.getEdgeDst(e));
         }
       }
-      , galois::loopname("TimingGraphTopoLevel")
+      , galois::loopname("TimingGraphComputeTopoL")
+      , galois::no_conflicts()
   );
 
 #if 0
@@ -249,27 +270,37 @@ void TimingGraph::computeTopoL() {
 }
 
 void TimingGraph::computeRevTopoL() {
+  // data.flag indicates "to be done" if true in this function
+  initFlag(true);
+
   galois::for_each(
       galois::iterate({dummySink}),
       [&] (GNode n, auto& ctx) {
-        // lock incoming neighbors for cautiousness
-        g.in_edges(n);
-
-        auto& myRevTopoL = g.getData(n).revTopoL;
-        for (auto e: g.edges(n, unprotected)) {
-          auto succ = g.getEdgeDst(e);
-          auto succRevTopoL = g.getData(succ).revTopoL;
-          if (myRevTopoL <= succRevTopoL) { myRevTopoL = succRevTopoL + 1; }
+        auto& data = g.getData(n);
+        if (!data.flag.load()) {
+          return; // this node is already done
         }
 
+        size_t myRevTopoL = 0;
+        for (auto e: g.edges(n)) {
+          auto succ = g.getEdgeDst(e);
+          auto& succData = g.getData(succ);
+          if (succData.flag.load()) {
+            return; // this successor is to be done
+          }
+          else if (myRevTopoL <= succData.revTopoL) {
+            myRevTopoL = succData.revTopoL + 1;
+          }
+        }
+
+        data.revTopoL = myRevTopoL;
+        data.flag.store(false); // done computing revTopoL
         for (auto ie: g.in_edges(n)) {
-          auto prev = g.getEdgeDst(ie);
-          auto& prevRevTopoL = g.getData(prev).revTopoL;
-          prevRevTopoL--;
-          if (0 == prevRevTopoL) { ctx.push(prev); }
+          ctx.push(g.getEdgeDst(ie));
         }
       }
-      , galois::loopname("TimingGraphRevTopoLevel")
+      , galois::loopname("TimingGraphComputeRevTopoL")
+      , galois::no_conflicts()
   );
 
 #if 0
@@ -296,11 +327,6 @@ void TimingGraph::initialize() {
       [&] (GNode n) {
         auto& data = g.getData(n, unprotected);
 
-        // for computing levels
-        data.topoL = std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected));
-        data.revTopoL = std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
-
-        // for timing computation
         for (size_t k = 0; k < libs.size(); k++) {
           if (TIMING_MODE_MAX_DELAY == modes[k]) {
             data.t[k].slew = 0.0;
@@ -344,7 +370,7 @@ void TimingGraph::computeDriveC(GNode n) {
 
     for (size_t k = 0; k < libs.size(); k++) {
       if (e == g.edge_begin(n)) {
-        data.t[k].driveC += eData.t[k].wireLoad->wireC(wOutDeg);
+        data.t[k].driveC = eData.t[k].wireLoad->wireC(wOutDeg);
       }
       data.t[k].driveC += succData.t[k].driveC;
     }
@@ -438,7 +464,9 @@ void TimingGraph::computeArrivalTime() {
   };
 
   using LIFO = galois::worklists::PerThreadChunkLIFO<>;
-  using OBIM = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>;
+  using OBIM
+      = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
+        ::template with_barrier<true>::type;
 
   galois::for_each(
     galois::iterate({dummySrc}),
@@ -469,20 +497,20 @@ void TimingGraph::computeArrivalTime() {
         }
       }
 
+      data.flag.store(false);
+
       // schedule outgoing neighbors
       for (auto e: g.edges(n)) {
         auto succ = g.getEdgeDst(e);
         auto& succData = g.getData(succ);
         if (!succData.isDummy) {
-          auto& succInQueue = succData.isQueued;
+          auto& succInQueue = succData.flag;
           bool succQueued = false;
           if (succInQueue.compare_exchange_weak(succQueued, true)) {
             ctx.push(succ);
           }
         }
       }
-
-      data.isQueued.store(false);
     }
     , galois::loopname("TimingGraphComputeArrivalTime")
     , galois::no_conflicts()
