@@ -213,6 +213,7 @@ struct CellLib {
   float defaultInoutPinCap;
   float defaultInputPinCap;
   float defaultOutputPinCap;
+  float defaultMaxSlew;
   WireTreeType wireTreeType;
 
   std::unordered_map<std::string, WireLoad*> wireLoads;

@@ -897,6 +897,12 @@ void CellLibParser::parseCellLibrary() {
       lib->defaultOutputPinCap = std::stof(*curToken);
       curToken += 2; // consume value and ";"
     }
+    // default_max_transition: value;
+    else if ("default_max_transition" == *curToken) {
+      curToken += 2; // consume "default_max_transition" and ":"
+      lib->defaultMaxSlew = std::stof(*curToken);
+      curToken += 2; // consume value and ";"
+    }
     else {
       skip();
     }
@@ -942,6 +948,7 @@ void CellLib::print(std::ostream& os) {
   os << "  default_inout_pin_cap: " << defaultInoutPinCap << ";" << std::endl;
   os << "  default_input_pin_cap: " << defaultInputPinCap << ";" << std::endl;
   os << "  default_output_pin_cap: " << defaultOutputPinCap << ";" << std::endl;
+  os << "  default_max_transition: " << defaultMaxSlew << ";" << std::endl;
 
   os << "  operating_conditions (" << opCond << ") {" << std::endl;
   std::string treeTypeName[] = {"best_case_tree", "balanced_tree", "worst_case_tree"};

@@ -303,15 +303,16 @@ void TimingGraph::initialize() {
         // for timing computation
         for (size_t k = 0; k < libs.size(); k++) {
           if (TIMING_MODE_MAX_DELAY == modes[k]) {
-            data.t[k].required = infinity;
+            data.t[k].slew = 0.0;
             data.t[k].arrival = (data.isTimingSource()) ? 0.0 : -infinity;
+            data.t[k].required = infinity;
           }
           else {
-            data.t[k].required = -infinity;
+            data.t[k].slew = (data.isTimingSource()) ? 0.0 : libs[k]->defaultMaxSlew;
             data.t[k].arrival = (data.isTimingSource()) ? 0.0 : infinity;
+            data.t[k].required = -infinity;
           }
 
-          data.t[k].slew = data.t[k].arrival;
           data.t[k].slack = infinity;
           data.t[k].driveC = (data.isGateInput()) ? data.t[k].pin->c[data.isRise] : 0.0;
         }
