@@ -33,6 +33,7 @@ enum ConvertMode {
   gr2sgr,
   gr2cgr,
   gr2rgr,
+  tgr2lux,
   nodemap2binary
 };
 
@@ -62,6 +63,7 @@ static cll::opt<ConvertMode> convertMode(
                           "Convert binary gr to binary gr without self-loops "
                           "or multi-edges; edge data will be ignored"),
                 clEnumVal(gr2rgr, "Convert binary gr to randomized binary gr"),
+                clEnumVal(tgr2lux, "Convert transpose graph to Lux CSC"),
                 clEnumVal(nodemap2binary, "Convert node map into binary form"),
                 clEnumValEnd),
     cll::Required);
@@ -469,6 +471,45 @@ struct Gr2RGr : public Conversion {
   }
 };
 
+struct Tgr2Lux : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& inputFile, const std::string& outputFile) {
+    GALOIS_ASSERT(!(outputFile.empty()), "tgr2lux needs an output file");
+
+    auto& net       = galois::runtime::getSystemNetworkInterface();
+    uint32_t hostID = net.ID;
+
+    uint64_t totalNumNodes;
+    uint64_t totalNumEdges;
+    std::tie(totalNumNodes, totalNumEdges) =
+        readV1GrHeader(inputFile, std::is_void<EdgeTy>::value);
+
+    // get "read" assignment of nodes (i.e. nodes this host is responsible for)
+    Uint64Pair nodesToRead;
+    Uint64Pair edgesToRead;
+    std::tie(nodesToRead, edgesToRead) = getNodesToReadFromGr(inputFile);
+    printf("[%u] Reads nodes %lu to %lu\n", hostID, nodesToRead.first,
+           nodesToRead.second);
+    printf("[%u] Reads edges %lu to %lu (count %lu)\n", hostID,
+           edgesToRead.first, edgesToRead.second,
+           edgesToRead.second - edgesToRead.first);
+
+    // read edges of assigned nodes using MPI_Graph, load into the same format
+    // used by edgelist2gr; key is to do it TRANSPOSED
+    std::vector<uint32_t> localEdges =
+        loadEdgesFromBufferedGraph<EdgeTy>(
+            inputFile, nodesToRead, edgesToRead, totalNumNodes, totalNumEdges);
+    // sanity check
+    uint64_t totalEdgeCount = accumulateValue(getNumEdges<EdgeTy>(localEdges));
+    GALOIS_ASSERT(totalEdgeCount == totalNumEdges,
+                  "edges from metadata doesn't match edges in memory");
+    assignAndWriteEdgesLux<EdgeTy>(localEdges, totalNumNodes, totalNumEdges,
+                                   outputFile);
+
+    galois::runtime::getHostBarrier().wait();
+  }
+};
+
 /**
  * Take a line separated list of numbers and convert it into a binary format.
  */
@@ -564,6 +605,9 @@ int main(int argc, char** argv) {
     break;
   case gr2rgr:
     convert<Gr2RGr>();
+    break;
+  case tgr2lux:
+    convert<Tgr2Lux>();
     break;
   case nodemap2binary:
     convert<Nodemap2Binary>();

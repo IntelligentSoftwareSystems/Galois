@@ -841,6 +841,79 @@ void writeToGr(const std::string& outputFile, uint64_t totalNumNodes,
   MPICheck(MPI_File_close(&newGR));
 }
 
+void writeToLux(const std::string& outputFile, uint64_t totalNumNodes,
+                uint64_t totalNumEdges, uint64_t localNumNodes,
+                uint64_t localNodeBegin, uint64_t globalEdgeOffset,
+                std::vector<std::vector<uint32_t>>& localSrcToDest,
+                std::vector<std::vector<uint32_t>>& localSrcToData) {
+  uint64_t hostID = galois::runtime::getSystemNetworkInterface().ID;
+
+  printf("[%lu] Beginning write to file\n", hostID);
+  MPI_File newGR;
+  MPICheck(MPI_File_open(MPI_COMM_WORLD, outputFile.c_str(),
+                         MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL,
+                         &newGR));
+
+  // Lux header
+  if (hostID == 0) {
+    // cast down the node data
+    uint32_t castDown = totalNumNodes;
+    MPICheck(MPI_File_write_at(newGR, 0, &castDown, 1, MPI_UINT32_T,
+             MPI_STATUS_IGNORE));
+    MPICheck(MPI_File_write_at(newGR, sizeof(uint32_t), &totalNumEdges, 1,
+                               MPI_UINT64_T, MPI_STATUS_IGNORE));
+  }
+
+  if (localNumNodes > 0) {
+    // prepare edge prefix sum for file writing
+    std::vector<uint64_t> edgePrefixSum(localNumNodes);
+    edgePrefixSum[0] = localSrcToDest[0].size();
+    for (unsigned i = 1; i < localNumNodes; i++) {
+      edgePrefixSum[i] = (edgePrefixSum[i - 1] + localSrcToDest[i].size());
+    }
+
+    // account for edge offset
+    for (unsigned i = 0; i < localNumNodes; i++) {
+      edgePrefixSum[i] = edgePrefixSum[i] + globalEdgeOffset;
+    }
+
+    // begin file writing
+    // Lux header differs from Galois header
+    uint64_t headerSize      = sizeof(uint32_t) + sizeof(uint64_t);
+    uint64_t nodeIndexOffset = headerSize + (localNodeBegin * sizeof(uint64_t));
+
+    printf("[%lu] Write node index data\n", hostID);
+    writeNodeIndexData(newGR, localNumNodes, nodeIndexOffset, edgePrefixSum);
+    freeVector(edgePrefixSum);
+
+    uint64_t edgeDestOffset = headerSize + (totalNumNodes * sizeof(uint64_t)) +
+                              globalEdgeOffset * sizeof(uint32_t);
+    printf("[%lu] Write edge dest data\n", hostID);
+    std::vector<uint32_t> destVector = flattenVectors(localSrcToDest);
+    freeVector(localSrcToDest);
+    writeEdgeDestData(newGR, edgeDestOffset, destVector);
+
+    // edge data writing if necessary
+    if (!localSrcToData.empty()) {
+      uint64_t byteOffsetToEdgeData = sizeof(uint32_t) + sizeof(uint64_t) +
+                                      (totalNumNodes * sizeof(uint64_t)) +
+                                      (totalNumEdges * sizeof(uint32_t));
+      byteOffsetToEdgeData += globalEdgeOffset * sizeof(uint32_t);
+      // NO PADDING
+      uint64_t edgeDataOffset = byteOffsetToEdgeData;
+
+      printf("[%lu] Write edge data data\n", hostID);
+      std::vector<uint32_t> dataVector = flattenVectors(localSrcToData);
+      freeVector(localSrcToData);
+      writeEdgeDataData(newGR, edgeDataOffset, dataVector);
+    }
+
+    printf("[%lu] Write to file done\n", hostID);
+  }
+
+  MPICheck(MPI_File_close(&newGR));
+}
+
 std::vector<uint32_t> generateRandomNumbers(uint64_t count, uint64_t seed,
                                             uint64_t lower, uint64_t upper) {
   std::minstd_rand0 rGenerator;
