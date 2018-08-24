@@ -1,9 +1,11 @@
 #include "TimingGraph.h"
 #include "galois/Bag.h"
+#include "galois/Reduction.h"
 
 #include <unordered_set>
 #include <string>
 #include <iostream>
+#include <map>
 
 static auto unprotected = galois::MethodFlag::UNPROTECTED;
 static std::string name0 = "1\'b0";
@@ -251,11 +253,13 @@ void TimingGraph::computeTopoL() {
       , galois::no_conflicts()
   );
 
-#if 0
+#if 1
+  std::map<size_t, size_t> numInEachTopoL;
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
         auto myTopoL = g.getData(n, unprotected).topoL;
+        numInEachTopoL[myTopoL] += 1;
         for (auto e: g.edges(n, unprotected)) {
           auto succ = g.getEdgeDst(e);
           auto succTopoL = g.getData(succ, unprotected).topoL;
@@ -266,6 +270,10 @@ void TimingGraph::computeTopoL() {
         }
       }
   );
+
+  for (auto& i: numInEachTopoL) {
+    std::cout << "Level " << i.first << ": " << i.second << " nodes" << std::endl;
+  }
 #endif
 }
 
@@ -303,7 +311,7 @@ void TimingGraph::computeRevTopoL() {
       , galois::no_conflicts()
   );
 
-#if 0
+#if 1
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
@@ -468,10 +476,18 @@ void TimingGraph::computeArrivalTime() {
       = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
         ::template with_barrier<true>::type;
 
+  size_t numLevels = g.getData(dummySink, unprotected).topoL + 1;
+  std::vector<galois::GAccumulator<size_t>*> enqueued, executed;
+  for (size_t i = 0; i < numLevels; i++) {
+    enqueued.push_back(new galois::GAccumulator<size_t>);
+    executed.push_back(new galois::GAccumulator<size_t>);
+  }
+
   galois::for_each(
     galois::iterate({dummySrc}),
     [&] (GNode n, auto& ctx) {
       auto& data = g.getData(n);
+      *(executed[data.topoL]) += 1;
 
       if (data.isGateInput() || data.isPseudoPrimaryOutput()) {
         // should have one incoming neighbor only
@@ -503,10 +519,11 @@ void TimingGraph::computeArrivalTime() {
       for (auto e: g.edges(n)) {
         auto succ = g.getEdgeDst(e);
         auto& succData = g.getData(succ);
-        if (!succData.isDummy) {
+        if ((1 == succData.topoL - data.topoL) && !succData.isDummy) {
           auto& succInQueue = succData.flag;
           bool succQueued = false;
-          if (succInQueue.compare_exchange_weak(succQueued, true)) {
+          if (succInQueue.compare_exchange_strong(succQueued, true)) {
+            *(enqueued[succData.topoL]) += 1;
             ctx.push(succ);
           }
         }
@@ -516,6 +533,12 @@ void TimingGraph::computeArrivalTime() {
     , galois::no_conflicts()
     , galois::wl<OBIM>(topoLIndexer)
   );
+
+  for (size_t i = 0; i < numLevels; i++) {
+    std::cout << "Level " << i << ": " << enqueued[i]->reduce() << " enqueued, " << executed[i]->reduce() << " executed." << std::endl;
+    delete enqueued[i];
+    delete executed[i];
+  }
 
   print();
 }
@@ -568,6 +591,8 @@ std::string TimingGraph::getNodeName(GNode n) {
 
 void TimingGraph::print(std::ostream& os) {
   os << "Timing graph for module " << m.name << std::endl;
+
+  g.sortAllEdgesByDst();
 
   for (auto n: g) {
     os << "  " << getNodeName(n) << std::endl;
