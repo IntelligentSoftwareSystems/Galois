@@ -50,8 +50,10 @@ int main(int argc, char *argv[]) {
 //  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
 
   std::vector<CellLib*> libs;
-  libs.insert(libs.begin(), 2, &lib);
-  std::vector<TimingMode> modes = {TIMING_MODE_MAX_DELAY, TIMING_MODE_MIN_DELAY};
+  libs.insert(libs.begin(), 1, &lib);
+//  libs.insert(libs.begin(), 2, &lib);
+//  std::vector<TimingMode> modes = {TIMING_MODE_MAX_DELAY, TIMING_MODE_MIN_DELAY};
+  std::vector<TimingMode> modes = {TIMING_MODE_MAX_DELAY};
   TimingEngine engine(design, libs, modes);
   engine.time(*(design.roots.begin()));
 
