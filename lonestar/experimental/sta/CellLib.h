@@ -61,9 +61,10 @@ public:
 };
 
 struct LutTemplate {
-  std::string name;
+  std::vector<size_t> shape;
+  std::vector<size_t> stride;
   std::vector<std::string> var;
-  std::vector<size_t> dim;
+  std::string name;
   CellLib* lib;
 
 public:
@@ -77,7 +78,7 @@ struct Lut {
   std::vector<float> value;
 
 private:
-  float lookupInternal(std::vector<float>& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& diff, size_t start, size_t i);
+  float lookupInternal(std::vector<float>& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
   float lookup(std::vector<float>& param);

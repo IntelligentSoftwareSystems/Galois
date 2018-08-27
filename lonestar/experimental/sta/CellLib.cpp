@@ -48,15 +48,15 @@ static T interpolate(T x0, T y0, T x1, T y1, T x) {
   }
 }
 
-float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, std::vector<size_t>& diff, size_t start, size_t i) {
-  auto lb = bound[i].first;
-  auto ub = bound[i].second;
-  auto start_l = start + diff[i] * lb;
-  auto start_u = start + diff[i] * ub;
-  bool isBottomMost = (i == bound.size() - 1);
-  auto y0 = (isBottomMost) ? value[start_l] : lookupInternal(param, bound, diff, start_l, i+1);
-  auto y1 = (isBottomMost) ? value[start_u] : lookupInternal(param, bound, diff, start_u, i+1);
-  return interpolate(index[i][lb], y0, index[i][ub], y1, param[i]);
+float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
+  auto lb = bound[lv].first;
+  auto ub = bound[lv].second;
+  auto start_l = start + stride[lv] * lb;
+  auto start_u = start + stride[lv] * ub;
+  bool isBottomMost = (lv == bound.size() - 1);
+  auto y0 = (isBottomMost) ? value[start_l] : lookupInternal(param, bound, stride, start_l, lv+1);
+  auto y1 = (isBottomMost) ? value[start_u] : lookupInternal(param, bound, stride, start_u, lv+1);
+  return interpolate(index[lv][lb], y0, index[lv][ub], y1, param[lv]);
 }
 
 float Lut::lookup(std::vector<float>& param) {
@@ -74,16 +74,7 @@ float Lut::lookup(std::vector<float>& param) {
     bound.push_back(findBound(param[i], index[i]));
   }
 
-  // find diff for each dimension
-  std::vector<size_t> diff;
-  size_t offset = 1;
-  diff.push_back(offset);
-  for (size_t i = paramSize - 1; i >= 1; --i) {
-    offset *= lutTemplate->dim[i];
-    diff.insert(diff.begin(), offset);
-  }
-
-  return lookupInternal(param, bound, diff, 0, 0);
+  return lookupInternal(param, bound, lutTemplate->stride, 0, 0);
 }
 
 void Lut::print(std::string attr, std::ostream& os) {
@@ -97,12 +88,8 @@ void Lut::print(std::string attr, std::ostream& os) {
     os << "\");" << std::endl;
   }
 
-  auto& dim = lutTemplate->dim;
-  auto numForLine = *(dim.rbegin());
-  auto numForTable = dim[0];
-  for (size_t i = 1; i < dim.size(); i++) {
-    numForTable *= dim[i];
-  }
+  auto numForLine = *(lutTemplate->shape.rbegin());
+  auto numForTable = value.size();
 
   for (size_t i = 0; i < value.size(); i++) {
     if (0 == i) {
@@ -292,7 +279,7 @@ void LutTemplate::print(std::ostream& os) {
   }
 
   i = 0;
-  for (auto& d: dim) {
+  for (auto& d: shape) {
     os << "    index_" << ++i << " (\"";
     size_t j = 1;
     os << float(j) * 0.0010f;
@@ -517,7 +504,7 @@ void CellLibParser::parseLutTemplate() {
         curToken += 2; // consume "," and num*
         num++;
       }
-      lutTemplate->dim.push_back(num);
+      lutTemplate->shape.push_back(num);
       curToken += 3; // consume "\"", ")" and ";"
       unmatched--;
     }
@@ -525,7 +512,15 @@ void CellLibParser::parseLutTemplate() {
       skip();
     }
   }
-  
+
+  // find stride for each dimension
+  auto& shape = lutTemplate->shape;
+  auto& stride = lutTemplate->stride;
+  stride.insert(stride.begin(), shape.size(), 1);
+  for (size_t i = shape.size() - 1; i >= 1; --i) {
+    stride[i-1] = stride[i] * shape[i];
+  }
+
   assert(!unmatched);
   curToken += 1; // consume "}"
 }
@@ -997,7 +992,8 @@ void CellLib::setup() {
   // add a LUT template for scalar case
   auto scalar = addLutTemplate("scalar");
   scalar->var.push_back("");
-  scalar->dim.push_back(1);
+  scalar->shape.push_back(1);
+  scalar->stride.push_back(1);
 }
 
 CellLib::CellLib() {
