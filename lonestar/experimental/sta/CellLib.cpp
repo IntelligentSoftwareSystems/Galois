@@ -970,22 +970,27 @@ void CellLib::clear() {
   for (auto& i: wireLoads) {
     delete i.second;
   }
+  wireLoads.clear();
 
   for (auto& i: cells) {
     auto c = i.second;
     for (auto& j: c->pins) {
       delete j.second;
     }
+    c->pins.clear();
     delete c;
   }
+  cells.clear();
 
   for (auto& i: lutTemplates) {
     delete i.second;
   }
+  lutTemplates.clear();
 
   for (auto& i: luts) {
     delete i;
   }
+  luts.clear();
 }
 
 void CellLib::setup() {

@@ -277,6 +277,7 @@ void VerilogDesign::clear() {
   for (auto& i: modules) {
     delete i.second;
   }
+  modules.clear();
 }
 
 void VerilogDesign::clearHierarchy() {
