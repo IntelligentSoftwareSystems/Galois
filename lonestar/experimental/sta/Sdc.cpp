@@ -148,7 +148,7 @@ void SDCParser::parseDrivingCell() {
   while (!isEndOfCommand()) {
     if ("-lib_cell" == *curToken) {
       curToken += 1; // consume "-lib_cell"
-      cell = sdc.lib.findCell(getVarName());
+      cell = curLib->findCell(getVarName());
     }
     else if ("-pin" == *curToken) {
       curToken += 1; // consume "-pin"
@@ -284,7 +284,12 @@ Token SDCParser::getVarName() {
 
 void SDCParser::parse(std::string inName) {
   tokenizeFile(inName);
+  defaultLib = *(sdc.libs.begin());
+  std::cout << defaultLib->name << " is used" << std::endl;
+
   while (!isEndOfTokenStream()) {
+    curLib = defaultLib;
+
     if ("create_clock" == *curToken) {
       parseClock();
     }

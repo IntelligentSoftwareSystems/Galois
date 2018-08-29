@@ -45,6 +45,8 @@ struct SDCParser {
   SDC& sdc;
   std::vector<Token> tokens;
   std::vector<Token>::iterator curToken;
+  CellLib* defaultLib;
+  CellLib* curLib;
 
 private:
   // for token stream
@@ -64,6 +66,7 @@ private:
 
 public:
   SDCParser(SDC& sdc): sdc(sdc) {}
+
   void parse(std::string inName);
 };
 
@@ -72,7 +75,7 @@ private:
   void clear();
 
 public:
-  CellLib& lib;
+  std::vector<CellLib*>& libs;
   VerilogModule& m;
 
   // boundary conditions
@@ -106,7 +109,7 @@ public:
     return mapPin2DrivingCells.at(pin);
   }
 
-  SDC(CellLib& lib, VerilogModule& m): lib(lib), m(m) {
+  SDC(std::vector<CellLib*>& libs, VerilogModule& m): libs(libs), m(m) {
     maxDelayPI2PO = std::numeric_limits<float>::infinity();
     maxDelayPI2RI = std::numeric_limits<float>::infinity();
     maxDelayRO2RI = std::numeric_limits<float>::infinity();
