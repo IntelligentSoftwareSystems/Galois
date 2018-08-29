@@ -119,7 +119,6 @@ private:
   // arrival time computation
   void computeDriveC(GNode n);
   void computeArrivalByWire(GNode n, Graph::in_edge_iterator ie);
-  void computeExtremeSlew(GNode n, Graph::in_edge_iterator ie, size_t k);
   void computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k);
 
   // initialization

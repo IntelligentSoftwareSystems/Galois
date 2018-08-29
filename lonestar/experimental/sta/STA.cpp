@@ -1,5 +1,6 @@
 #include "CellLib.h"
 #include "Verilog.h"
+#include "Sdc.h"
 #include "TimingEngine.h"
 
 #include "galois/Galois.h"
@@ -26,7 +27,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-//  lib.print();
+  lib.print();
 
 #if 0
   auto wireLoad = lib.defaultWireLoad;
@@ -48,14 +49,28 @@ int main(int argc, char *argv[]) {
   design.buildHierarchy();
 //  std::cout << "design is " << (design.isFlattened() ? "" : "not ") << "flattened." << std::endl;
 //  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
+  if (!design.isFlattened() || (design.roots.size() > 1)) {
+    std::cout << "Abort: Not supporting multiple/hierarchical modules for now." << std::endl;
+    return 0;
+  }
 
   std::vector<CellLib*> libs;
   libs.insert(libs.begin(), 1, &lib);
 //  libs.insert(libs.begin(), 2, &lib);
+
+  auto m = *(design.roots.begin());
+
+  SDC sdc(libs, *m);
+  sdc.parse(sdcName);
+//  sdc.print();
+
+#if 1
 //  std::vector<TimingMode> modes = {TIMING_MODE_MAX_DELAY, TIMING_MODE_MIN_DELAY};
   std::vector<TimingMode> modes = {TIMING_MODE_MAX_DELAY};
   TimingEngine engine(design, libs, modes);
-  engine.time(*(design.roots.begin()));
+  engine.constrain(m, sdc);
+  engine.time(m);
+#endif
 
   return 0;
 }

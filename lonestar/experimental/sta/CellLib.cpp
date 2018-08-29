@@ -288,6 +288,21 @@ void LutTemplate::print(std::ostream& os) {
     }
     os << "\");" << std::endl;
   }
+#if 0
+  os << "    shape:";
+  i = 0;
+  for (auto& v: shape) {
+    os << " " << v;
+  }
+  os << std::endl;
+
+  os << "    stride:";
+  i = 0;
+  for (auto& v: stride) {
+    os << " " << v;
+  }
+  os << std::endl;
+#endif
   os << "  }" << std::endl;
 }
 
