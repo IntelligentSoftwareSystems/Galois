@@ -37,11 +37,17 @@ void TimingEngine::update(VerilogModule* m) {
 
 }
 
-void TimingEngine::time(VerilogModule* m) {
+void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
   auto g = findTimingGraph(m);
   if (g) {
     g->initialize();
-    g->setConstraints();
+    g->setConstraints(sdc);
+  }
+}
+
+void TimingEngine::time(VerilogModule* m) {
+  auto g = findTimingGraph(m);
+  if (g) {
     g->computeArrivalTime();
   }
 }

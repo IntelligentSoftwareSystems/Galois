@@ -3,6 +3,7 @@
 
 #include "CellLib.h"
 #include "Verilog.h"
+#include "Sdc.h"
 #include "TimingGraph.h"
 #include "TimingMode.h"
 
@@ -40,6 +41,7 @@ public:
   ~TimingEngine();
 
   void update(VerilogModule* m); // for incremental timing analysis
+  void constrain(VerilogModule* m, SDC& sdc);  // add constraints to the module
   void time(VerilogModule* m);  // timing analysis from scratch
 
   float reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);

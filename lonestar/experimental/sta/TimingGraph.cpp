@@ -211,9 +211,7 @@ void TimingGraph::construct() {
 void TimingGraph::initFlag(bool value) {
   galois::do_all(
       galois::iterate(g),
-      [&] (GNode n) {
-        g.getData(n).flag.store(value);
-      }
+      [&] (GNode n) { g.getData(n).flag.store(value); }
       , galois::loopname("TimingGraphInitFlag")
       , galois::steal()
   );
@@ -335,6 +333,13 @@ void TimingGraph::initialize() {
       [&] (GNode n) {
         auto& data = g.getData(n, unprotected);
 
+        // remove driving cells. to be re-established by sdc
+        if (data.isDrivingCell) {
+          g.removeNode(n);
+          return;
+        }
+
+        // for timing computation
         for (size_t k = 0; k < libs.size(); k++) {
           if (TIMING_MODE_MAX_DELAY == modes[k]) {
             data.t[k].slew = 0.0;
@@ -349,20 +354,24 @@ void TimingGraph::initialize() {
 
           data.t[k].slack = infinity;
           data.t[k].driveC = (data.isGateInput()) ? data.t[k].pin->c[data.isRise] : 0.0;
+
+          // get rid of any driving cell info
+          if (data.isPrimaryInput()) {
+            data.t[k].pin = nullptr;
+          }
         }
       }
       , galois::loopname("TimingGraphInitialize")
       , galois::steal()
   );
 
-//  print();
   computeTopoL();
   computeRevTopoL();
 //  std::cout << "Levelization done.\n" << std::endl;
 //  print();
 }
 
-void TimingGraph::setConstraints() {
+void TimingGraph::setConstraints(SDC& sdc) {
   // use sdc here
 }
 
@@ -405,10 +414,16 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
 void TimingGraph::computeExtremeSlew(GNode n, Graph::in_edge_iterator ie, size_t k) {
   auto& data = g.getData(n);
   auto outPin = data.t[k].pin;
+  if (!outPin) {
+    return;
+  }
 
   auto pred = g.getEdgeDst(ie);
   auto& predData = g.getData(pred);
   auto inPin = predData.t[k].pin;
+  if (predData.isRealDummy()) {
+    return;
+  }
 
   bool isNeg = (data.isRise != predData.isRise);
   std::vector<float> param = {predData.t[k].slew, data.t[k].driveC};
@@ -474,7 +489,9 @@ void TimingGraph::computeArrivalTime() {
   using LIFO = galois::worklists::PerThreadChunkLIFO<>;
   using OBIM
       = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
-        ::template with_barrier<true>::type;
+        ::template with_barrier<true>::type
+//        ::template with_monotonic<true>::type
+        ;
 
   size_t numLevels = g.getData(dummySink, unprotected).topoL + 1;
   std::vector<galois::GAccumulator<size_t>*> enqueued, executed;
@@ -497,12 +514,14 @@ void TimingGraph::computeArrivalTime() {
       }
       else if (data.isPseudoPrimaryInput()) {
         computeDriveC(n);
-        // compute slew if driving cell exists
+        for (auto ie: g.in_edges(n)) {
+          for (size_t k = 0; k < libs.size(); k++) {
+            computeExtremeSlew(n, ie, k);
+          }
+        }
       }
       else if (data.isGateOutput()) {
         computeDriveC(n);
-
-        // compute arrival time & slew
         for (auto ie: g.in_edges(n)) {
           for (size_t k = 0; k < libs.size(); k++) {
             computeArrivalByTimingArc(n, ie, k);
@@ -535,12 +554,16 @@ void TimingGraph::computeArrivalTime() {
   );
 
   for (size_t i = 0; i < numLevels; i++) {
-    std::cout << "Level " << i << ": " << enqueued[i]->reduce() << " enqueued, " << executed[i]->reduce() << " executed." << std::endl;
+    auto q = enqueued[i]->reduce();
+    auto x = executed[i]->reduce();
+    if (q != x) {
+      std::cout << "Level " << i << ": " << q << " enqueued, " << x << " executed." << std::endl;
+    }
     delete enqueued[i];
     delete executed[i];
   }
 
-  print();
+//  print();
 }
 
 std::string TimingGraph::getNodeName(GNode n) {

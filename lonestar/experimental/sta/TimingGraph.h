@@ -6,6 +6,7 @@
 
 #include "CellLib.h"
 #include "Verilog.h"
+#include "Sdc.h"
 #include "TimingMode.h"
 
 #include <iostream>
@@ -29,6 +30,7 @@ struct Node {
   bool isPowerNode;
   bool isClock;
   bool isDummy;
+  bool isDrivingCell;
   size_t topoL;
   size_t revTopoL;
   std::atomic<bool> flag;
@@ -114,28 +116,32 @@ public:
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
 
 private:
+  // arrival time computation
   void computeDriveC(GNode n);
   void computeArrivalByWire(GNode n, Graph::in_edge_iterator ie);
   void computeExtremeSlew(GNode n, Graph::in_edge_iterator ie, size_t k);
   void computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k);
+
+  // initialization
   void initFlag(bool value);
   void computeTopoL();
   void computeRevTopoL();
+
+  // graph construction
   void addDummyNodes();
   void addPin(VerilogPin* p);
   void addGate(VerilogGate* g);
   void addWire(VerilogWire* w);
-  std::string getNodeName(GNode n);
 
-  template<typename Ctx>
-  void wrapUpArrivalTime(GNode n, Ctx& ctx);
+  // debug printing
+  std::string getNodeName(GNode n);
 
 public:
   TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew): m(m), libs(libs), modes(modes), isExactSlew(isExactSlew) {}
 
   void construct();
   void initialize();
-  void setConstraints();
+  void setConstraints(SDC& sdc);
   void computeArrivalTime();
   void print(std::ostream& os = std::cout);
 };
