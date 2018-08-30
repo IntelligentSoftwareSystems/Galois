@@ -143,7 +143,7 @@ public:
   }
 
   void addInPin(VerilogPin* pin) {
-    assert(pins.count(pin));
+    assert(pins.count(pin->name));
     inPins.insert(pin);
   }
 
@@ -152,7 +152,7 @@ public:
   }
 
   void addOutPin(VerilogPin* pin) {
-    assert(pins.count(pin));
+    assert(pins.count(pin->name));
     outPins.insert(pin);
   }
 
