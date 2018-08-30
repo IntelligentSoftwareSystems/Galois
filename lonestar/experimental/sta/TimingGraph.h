@@ -16,7 +16,8 @@
 
 struct NodeTiming {
   CellPin* pin;
-  float driveC;
+  float pinC;
+  float wireC;
   float slew;
   float arrival;
   float required;

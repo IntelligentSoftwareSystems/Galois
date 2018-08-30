@@ -353,7 +353,8 @@ void TimingGraph::initialize() {
           }
 
           data.t[k].slack = infinity;
-          data.t[k].driveC = (data.isGateInput()) ? data.t[k].pin->c[data.isRise] : 0.0;
+          data.t[k].pinC = (data.isGateInput()) ? data.t[k].pin->c[data.isRise] : 0.0;
+          data.t[k].wireC = 0.0;
 
           // get rid of any driving cell info
           if (data.isPrimaryInput()) {
@@ -393,7 +394,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
       auto n = nodeMap[p][j];
       auto& data = g.getData(n, unprotected);
       for (size_t k = 0; k < libs.size(); k++) {
-        data.t[k].driveC = load;
+        data.t[k].pinC = load;
       }
     }
   }
@@ -437,7 +438,8 @@ void TimingGraph::setConstraints(SDC& sdc) {
         data.t[k].slew = dCell->slew[j];
         data.t[k].arrival = 0.0;
         data.t[k].slack = infinity;
-        data.t[k].driveC = 0.0;
+        data.t[k].pinC = 0.0;
+        data.t[k].wireC = 0.0;
 
         if (TIMING_MODE_MAX_DELAY == modes[k]) {
           data.t[k].required = infinity;
@@ -488,9 +490,9 @@ void TimingGraph::computeDriveC(GNode n) {
 
     for (size_t k = 0; k < libs.size(); k++) {
       if (e == g.edge_begin(n)) {
-        data.t[k].driveC = eData.t[k].wireLoad->wireC(wOutDeg);
+        data.t[k].wireC = eData.t[k].wireLoad->wireC(wOutDeg);
       }
-      data.t[k].driveC += succData.t[k].driveC;
+      data.t[k].pinC += succData.t[k].pinC;
     }
   }
 }
@@ -505,7 +507,7 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
   auto wOutDeg = ieData.wire->outDeg();
 
   for (size_t k = 0; k < libs.size(); k++) {
-    auto delay = ieData.t[k].wireLoad->wireDelay(data.t[k].driveC, wOutDeg);
+    auto delay = ieData.t[k].wireLoad->wireDelay(data.t[k].pinC, wOutDeg);
     ieData.t[k].delay = delay;
     data.t[k].arrival = predData.t[k].arrival + delay;
     data.t[k].slew = predData.t[k].slew;
@@ -527,7 +529,7 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   }
 
   bool isNeg = (data.isRise != predData.isRise);
-  std::vector<float> param = {predData.t[k].slew, data.t[k].driveC};
+  std::vector<float> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
 
   auto& ieData = g.getEdgeData(ie);
 
@@ -714,7 +716,8 @@ void TimingGraph::print(std::ostream& os) {
       os << "    corner " << k;
       os << ": arrival = " << data.t[k].arrival;
       os << ", slew = " << data.t[k].slew;
-      os << ", driveC = " << data.t[k].driveC;
+      os << ", pinC = " << data.t[k].pinC;
+      os << ", wireC = " << data.t[k].wireC;
       os << std::endl;
     }
 
