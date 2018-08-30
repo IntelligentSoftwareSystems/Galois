@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-  lib.print();
+//  lib.print();
 
 #if 0
   auto wireLoad = lib.defaultWireLoad;

@@ -704,12 +704,31 @@ void TimingGraph::print(std::ostream& os) {
     os << "  " << getNodeName(n) << std::endl;
     auto& data = g.getData(n, unprotected);
     os << "    topoL = " << data.topoL << ", revTopoL = " << data.revTopoL << std::endl;
+    os << "    outDeg = " << std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
+    os << ", inDeg = " << std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected)) << std::endl;
     for (size_t k = 0; k < libs.size(); k++) {
       os << "    corner " << k;
       os << ": arrival = " << data.t[k].arrival;
       os << ", slew = " << data.t[k].slew;
       os << ", driveC = " << data.t[k].driveC;
       os << std::endl;
+    }
+
+    for (auto ie: g.in_edges(n)) {
+      auto w = g.getEdgeData(ie).wire;
+      if (w) {
+        os << "    Wire " << w->name;
+      }
+      else {
+        os << "    Timing arc";
+      }
+      os << " from " << getNodeName(g.getEdgeDst(ie)) << std::endl;
+
+      for (size_t k = 0; k < libs.size(); k++) {
+        os << "    corner " << k;
+        os << ": delay = " << g.getEdgeData(ie).t[k].delay;
+        os << std::endl;
+      }
     }
 
     for (auto e: g.edges(n)) {
@@ -728,22 +747,5 @@ void TimingGraph::print(std::ostream& os) {
         os << std::endl;
       }
     }
-
-    for (auto ie: g.in_edges(n)) {
-      auto w = g.getEdgeData(ie).wire;
-      if (w) {
-        os << "    Wire " << w->name;
-      }
-      else {
-        os << "    Timing arc";
-      }
-      os << " from " << getNodeName(g.getEdgeDst(ie)) << std::endl;
-
-      for (size_t k = 0; k < libs.size(); k++) {
-        os << "    corner " << k;
-        os << ": delay = " << g.getEdgeData(ie).t[k].delay;
-        os << std::endl;
-      }
-    } 
   } // end for n
 }
