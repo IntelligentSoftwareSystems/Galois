@@ -157,11 +157,11 @@ jobs:
           make -j4
   "Arch":
     docker:
-      - image: archlinux/base
+      - image: base/archlinux
     steps:
       - checkout
       - run: |
-          pacman -Syy
+          pacman -Sy
           pacman -q -S --noconfirm gcc make cmake boost
           mkdir build
           cd build

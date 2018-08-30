@@ -17,12 +17,11 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-5
             - g++-5
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - GCC_VER=6
@@ -30,12 +29,11 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-6
             - g++-6
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - GCC_VER=7
@@ -43,12 +41,11 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-7
             - g++-7
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - GCC_VER=8
@@ -56,12 +53,11 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-8
             - g++-8
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - GCC_VER=8
@@ -70,12 +66,11 @@ matrix:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - gcc-8
             - g++-8
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=3.8
@@ -84,13 +79,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-3.8
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-3.8
             - gcc-5
             - g++-5
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=3.9
@@ -99,13 +93,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-3.9
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-3.9
             - gcc-5
             - g++-5
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=4.0
@@ -114,13 +107,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-4.0
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-4.0
             - gcc-5
             - g++-5
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=5.0
@@ -129,13 +121,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-5.0
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-5.0
             - gcc-7
             - g++-7
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=6.0
@@ -144,13 +135,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-6.0
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-6.0
             - gcc-8
             - g++-8
-            - cmake
+            - cmake3
             - boost1.67
     - env:
         - CLANG_VER=6.0
@@ -160,13 +150,12 @@ matrix:
           sources:
             - ubuntu-toolchain-r-test
             - llvm-toolchain-trusty-6.0
-            - george-edison55-precise-backports
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
             - clang-6.0
             - gcc-8
             - g++-8
-            - cmake
+            - cmake3
             - boost1.67
 
 before_script:
