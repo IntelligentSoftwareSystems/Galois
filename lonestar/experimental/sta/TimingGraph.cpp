@@ -701,8 +701,12 @@ void TimingGraph::print(std::ostream& os) {
   g.sortAllEdgesByDst();
 
   for (auto n: g) {
-    os << "  " << getNodeName(n) << std::endl;
     auto& data = g.getData(n, unprotected);
+    if (data.isDrivingCell) {
+      continue;
+    }
+
+    os << "  " << getNodeName(n) << std::endl;
     os << "    topoL = " << data.topoL << ", revTopoL = " << data.revTopoL << std::endl;
     os << "    outDeg = " << std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
     os << ", inDeg = " << std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected)) << std::endl;
