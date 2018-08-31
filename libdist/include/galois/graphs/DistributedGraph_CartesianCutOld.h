@@ -18,12 +18,13 @@
  */
 
 /**
- * @file DistributedGraph_CartesianCut.h
+ * @file DistributedGraph_CartesianCutOld.h
  *
- * Implements the cartesian cut partitioning scheme for DistGraph.
+ * Implements the cartesian cut partitioning scheme for DistGraph; old
+ * version of the code.
  */
-#ifndef _GALOIS_DIST_HGRAPHCC_H
-#define _GALOIS_DIST_HGRAPHCC_H
+#ifndef _GALOIS_DIST_HGRAPHCC_OLD_H
+#define _GALOIS_DIST_HGRAPHCC_OLD_H
 
 #include "galois/graphs/DistributedGraph.h"
 
@@ -44,8 +45,8 @@ namespace graphs {
  */
 template <typename NodeTy, typename EdgeTy, bool columnBlocked = false,
           bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
-class DistGraphCartesianCut : public DistGraph<NodeTy, EdgeTy> {
-  constexpr static const char* const GRNAME = "dGraph_cartesianCut";
+class DistGraphCartesianCutOld : public DistGraph<NodeTy, EdgeTy> {
+  constexpr static const char* const GRNAME = "dGraph_cartesianCutOld";
   //! Vector of Uint64 Vectors
   using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
 
@@ -350,7 +351,7 @@ public:
    *
    * @todo get rid of string argument (2nd one)
    */
-  DistGraphCartesianCut(const std::string& filename, const std::string&,
+  DistGraphCartesianCutOld(const std::string& filename, const std::string&,
                         unsigned host, unsigned _numHosts,
                         std::vector<unsigned>& scalefactor,
                         bool transpose = false, bool readFromFile = false,
