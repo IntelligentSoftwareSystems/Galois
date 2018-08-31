@@ -36,14 +36,11 @@ namespace graphs {
  *
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
- * @tparam columnBlocked If true, turns on checkboard partitioning
  * @tparam moreColumnHosts If true, swaps the number of rows and columns
- * @tparam DecomposeFactor Specifies how much further to decompose a cartesian
  * block into. For example, if 2, then each block is decomposed into 2 more
  * columns and 2 more rows from normal
  */
-template <typename NodeTy, typename EdgeTy, bool columnBlocked = false,
-          bool moreColumnHosts = false, unsigned DecomposeFactor = 1>
+template <typename NodeTy, typename EdgeTy, bool moreColumnHosts = false>
 class DistGraphCartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
   //! Vector of Uint64 Vectors
@@ -56,17 +53,10 @@ public:
 private:
   unsigned numRowHosts;
   unsigned numColumnHosts;
-  unsigned numVirtualHosts;
-
-  //! Nodes without outgoing edges that are stored with nodes having outgoing
-  //! edges (to preserve original ordering locality).
-  //! Only used with checkerboard partitioning, i.e. columnBlocked = true
-  uint32_t dummyOutgoingNodes;
 
   //! Factorize numHosts into rows and columns such that difference between
   //! factors is minimized
   void factorizeHosts() {
-    numVirtualHosts = base_DistGraph::numHosts * DecomposeFactor;
     numColumnHosts  = sqrt(base_DistGraph::numHosts);
 
     while ((base_DistGraph::numHosts % numColumnHosts) != 0)
@@ -79,11 +69,9 @@ private:
       std::swap(numRowHosts, numColumnHosts);
     }
 
-    numRowHosts = numRowHosts * DecomposeFactor;
     if (base_DistGraph::id == 0) {
       galois::gPrint("Cartesian grid: ", numRowHosts, " x ", numColumnHosts,
                      "\n");
-      galois::gPrint("Decomposition factor: ", DecomposeFactor, "\n");
     }
   }
 
@@ -113,11 +101,7 @@ private:
 
   //! Find the column host ID of a particular block
   unsigned getColumnHostIDOfBlock(uint32_t blockID) const {
-    if (columnBlocked) {
-      return (blockID / numRowHosts); // blocked, contiguous
-    } else {
-      return (blockID % numColumnHosts); // round-robin, non-contiguous
-    }
+    return (blockID % numColumnHosts); // round-robin, non-contiguous
   }
 
   //! Find the column host ID of a particular node
@@ -250,7 +234,7 @@ public:
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     // for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
-    for (auto h = 0U; h < numVirtualHosts; ++h) {
+    for (auto h = 0U; h < base_DistGraph::numHosts; ++h) {
       uint64_t start, end;
       std::tie(start, end) = base_DistGraph::gid2host[h];
       if (gid >= start && gid < end) {
@@ -264,13 +248,9 @@ public:
   //! @copydoc DistGraphEdgeCut::isOwned
   bool isOwned(uint64_t gid) const {
     uint64_t start, end;
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      std::tie(start, end) =
-          base_DistGraph::gid2host[base_DistGraph::id +
-                                   d * base_DistGraph::numHosts];
-      if (gid >= start && gid < end)
-        return true;
-    }
+    std::tie(start, end) = base_DistGraph::gid2host[base_DistGraph::id];
+
+    if (gid >= start && gid < end) return true;
     return false;
   }
 
@@ -303,12 +283,8 @@ public:
                             : base_DistGraph::masterNodes;
 
     if (sharedNodes[host].size() > 0) {
-      if (columnBlocked) { // does not match processor grid
-        return false;
-      } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation,
-                                         readLocation);
-      }
+      return isNotCommunicationPartner(host, syncType, writeLocation,
+                                       readLocation);
     }
 
     return true;
@@ -323,12 +299,8 @@ public:
                             : base_DistGraph::mirrorNodes;
 
     if (sharedNodes[host].size() > 0) {
-      if (columnBlocked) { // does not match processor grid
-        return false;
-      } else {
-        return isNotCommunicationPartner(host, syncType, writeLocation,
-                                         readLocation);
-      }
+      return isNotCommunicationPartner(host, syncType, writeLocation,
+                                       readLocation);
     }
 
     return true;
@@ -380,41 +352,30 @@ public:
 
     factorizeHosts();
 
-    base_DistGraph::computeMasters(g, scalefactor, false, DecomposeFactor);
+    base_DistGraph::computeMasters(g, scalefactor, false);
 
     // at this point gid2Host has pairs for how to split nodes among
     // hosts; pair has begin and end
-    std::vector<uint64_t> nodeBegin(DecomposeFactor);
-    std::vector<uint64_t> nodeEnd(DecomposeFactor);
-    std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeBegin(
-        DecomposeFactor);
-    std::vector<typename galois::graphs::OfflineGraph::edge_iterator> edgeEnd(
-        DecomposeFactor);
+    uint64_t nodeBegin;
+    uint64_t nodeEnd;
+    typename galois::graphs::OfflineGraph::edge_iterator edgeBegin;
+    typename galois::graphs::OfflineGraph::edge_iterator edgeEnd;
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      nodeBegin[d] = base_DistGraph::gid2host[base_DistGraph::id +
-                                              d * base_DistGraph::numHosts]
-                         .first;
-      nodeEnd[d] = base_DistGraph::gid2host[base_DistGraph::id +
-                                            d * base_DistGraph::numHosts]
-                       .second;
-      edgeBegin[d] = g.edge_begin(nodeBegin[d]);
-      edgeEnd[d]   = g.edge_begin(nodeEnd[d]);
-    }
+    nodeBegin = base_DistGraph::gid2host[base_DistGraph::id].first;
+    nodeEnd   = base_DistGraph::gid2host[base_DistGraph::id].second;
+    edgeBegin = g.edge_begin(nodeBegin);
+    edgeEnd   = g.edge_begin(nodeEnd);
 
     galois::Timer inspectionTimer;
 
     inspectionTimer.start();
 
     // graph that loads assigned region into memory
-    std::vector<galois::graphs::BufferedGraph<EdgeTy>> bufGraph(
-        DecomposeFactor);
+    galois::graphs::BufferedGraph<EdgeTy> bufGraph;
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      bufGraph[d].loadPartialGraph(
-          filename, nodeBegin[d], nodeEnd[d], *edgeBegin[d], *edgeEnd[d],
-          base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges);
-    }
+    bufGraph.loadPartialGraph(
+        filename, nodeBegin, nodeEnd, *edgeBegin, *edgeEnd,
+        base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges);
 
     std::vector<uint64_t> prefixSumOfEdges;
 
@@ -452,16 +413,8 @@ public:
     // second pass of the graph file
     loadEdges(base_DistGraph::graph, bufGraph);
 
-    if (columnBlocked) {
-      // like an unconstrained vertex-cut; all nodes because it is not optimized
-      // to know which nodes may have edges
-      base_DistGraph::numNodesWithEdges = numNodes;
-    }
-
     // reclaim memory from buffered graphs
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      bufGraph[d].resetAndFree();
-    }
+    bufGraph.resetAndFree();
 
     if (transpose) {
       // consider all nodes to have outgoing edges
@@ -498,26 +451,18 @@ private:
    * prepare metadata required to constructing the graph and sending off
    * edges this host reads that do not belong to this host.
    */
-  void
-  loadStatistics(std::vector<galois::graphs::BufferedGraph<EdgeTy>>& bufGraph,
-                 std::vector<uint64_t>& prefixSumOfEdges,
-                 galois::Timer& inspectionTimer) {
-    base_DistGraph::numOwned = 0;
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      base_DistGraph::numOwned +=
-          base_DistGraph::gid2host[base_DistGraph::id +
-                                   d * base_DistGraph::numHosts]
-              .second -
-          base_DistGraph::gid2host[base_DistGraph::id +
-                                   d * base_DistGraph::numHosts]
-              .first;
-    }
+  void loadStatistics(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                      std::vector<uint64_t>& prefixSumOfEdges,
+                      galois::Timer& inspectionTimer) {
+    base_DistGraph::numOwned =
+      base_DistGraph::gid2host[base_DistGraph::id].second -
+      base_DistGraph::gid2host[base_DistGraph::id].first;
 
     std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
 
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t columnBlockSize = 0;
-      for (auto b = 0U; b < numVirtualHosts; ++b) {
+      for (auto b = 0U; b < base_DistGraph::numHosts; ++b) {
         if (getColumnHostIDOfBlock(b) == i) {
           uint64_t start, end;
           std::tie(start, end) = base_DistGraph::gid2host[b];
@@ -527,59 +472,40 @@ private:
       hasIncomingEdge[i].resize(columnBlockSize);
     }
 
-    std::vector<VectorOfVector64> numOutgoingEdges(DecomposeFactor);
+    VectorOfVector64 numOutgoingEdges;
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      numOutgoingEdges[d].resize(numColumnHosts);
-      for (unsigned i = 0; i < numColumnHosts; ++i) {
-        numOutgoingEdges[d][i].assign(
-            (base_DistGraph::gid2host[base_DistGraph::id +
-                                      d * base_DistGraph::numHosts]
-                 .second -
-             base_DistGraph::gid2host[base_DistGraph::id +
-                                      d * base_DistGraph::numHosts]
-                 .first),
-            0);
-      }
+    numOutgoingEdges.resize(numColumnHosts);
+    for (unsigned i = 0; i < numColumnHosts; ++i) {
+      numOutgoingEdges[i].assign(
+          (base_DistGraph::gid2host[base_DistGraph::id].second -
+           base_DistGraph::gid2host[base_DistGraph::id].first),
+          0);
     }
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      bufGraph[d].resetReadCounters();
+    bufGraph.resetReadCounters();
+    uint64_t rowOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
-      uint64_t rowOffset =
-          base_DistGraph::gid2host[base_DistGraph::id +
-                                   d * base_DistGraph::numHosts]
-              .first;
-
-      galois::do_all(
-          galois::iterate(base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .first,
-                          base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .second),
-          [&](auto src) {
-            auto ii = bufGraph[d].edgeBegin(src);
-            auto ee = bufGraph[d].edgeEnd(src);
-            for (; ii < ee; ++ii) {
-              auto dst = bufGraph[d].edgeDestination(*ii);
-              auto h   = this->getColumnHostID(dst);
-              hasIncomingEdge[h].set(this->getColumnIndex(dst));
-              numOutgoingEdges[d][h][src - rowOffset]++;
-            }
-          },
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto src) {
+          auto ii = bufGraph.edgeBegin(src);
+          auto ee = bufGraph.edgeEnd(src);
+          for (; ii < ee; ++ii) {
+            auto dst = bufGraph.edgeDestination(*ii);
+            auto h   = this->getColumnHostID(dst);
+            hasIncomingEdge[h].set(this->getColumnIndex(dst));
+            numOutgoingEdges[h][src - rowOffset]++;
+          }
+        },
 #if MORE_DIST_STATS
-          galois::loopname("EdgeInspection"),
+        galois::loopname("EdgeInspection"),
 #endif
-          galois::no_stats());
-    }
+        galois::no_stats());
 
     inspectionTimer.stop();
 
-    uint64_t allBytesRead = 0;
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      allBytesRead += bufGraph[d].getBytesRead();
-    }
+    uint64_t allBytesRead = bufGraph.getBytesRead();
 
     galois::gPrint(
         "[", base_DistGraph::id,
@@ -593,9 +519,7 @@ private:
       if (h == base_DistGraph::id)
         continue;
       galois::runtime::SendBuffer b;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gSerialize(b, numOutgoingEdges[d][i]);
-      }
+      galois::runtime::gSerialize(b, numOutgoingEdges[i]);
       galois::runtime::gSerialize(b, hasIncomingEdge[i]);
       net.sendTagged(h, galois::runtime::evilPhase, b);
     }
@@ -608,9 +532,7 @@ private:
       } while (!p);
       unsigned h = (p->first % numColumnHosts);
       auto& b    = p->second;
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        galois::runtime::gDeserialize(b, numOutgoingEdges[d][h]);
-      }
+      galois::runtime::gDeserialize(b, numOutgoingEdges[h]);
       galois::runtime::gDeserialize(b, hasIncomingEdge[h]);
     }
     base_DistGraph::increment_evilPhase();
@@ -621,70 +543,56 @@ private:
 
     auto max_nodes = hasIncomingEdge[0].size();
     for (unsigned i = 0; i < numColumnHosts; ++i) {
-      for (unsigned d = 0; d < DecomposeFactor; ++d) {
-        max_nodes += numOutgoingEdges[d][i].size();
-      }
+      max_nodes += numOutgoingEdges[i].size();
     }
     localToGlobalVector.reserve(max_nodes);
     globalToLocalMap.reserve(max_nodes);
     prefixSumOfEdges.reserve(max_nodes);
 
-    dummyOutgoingNodes = 0;
     numNodes           = 0;
     numEdges           = 0;
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      // unsigned leaderHostID = gridRowID(base_DistGraph::id +
-      // d*base_DistGraph::numHosts) * numColumnHosts;
-      unsigned hostID = (base_DistGraph::id + d * base_DistGraph::numHosts);
-      uint64_t src    = base_DistGraph::gid2host[hostID].first;
-      unsigned i      = gridColumnID();
-      for (uint32_t j = 0; j < numOutgoingEdges[d][i].size(); ++j) {
-        numEdges += numOutgoingEdges[d][i][j];
-        localToGlobalVector.push_back(src);
-        assert(globalToLocalMap.find(src) == globalToLocalMap.end());
-        globalToLocalMap[src] = numNodes++;
-        prefixSumOfEdges.push_back(numEdges);
-        ++src;
-      }
+    unsigned hostID = (base_DistGraph::id);
+    uint64_t src    = base_DistGraph::gid2host[hostID].first;
+    unsigned i      = gridColumnID();
+    for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
+      numEdges += numOutgoingEdges[i][j];
+      localToGlobalVector.push_back(src);
+      assert(globalToLocalMap.find(src) == globalToLocalMap.end());
+      globalToLocalMap[src] = numNodes++;
+      prefixSumOfEdges.push_back(numEdges);
+      ++src;
     }
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      unsigned leaderHostID =
-          gridRowID(base_DistGraph::id + d * base_DistGraph::numHosts) *
-          numColumnHosts;
-      for (unsigned i = 0; i < numColumnHosts; ++i) {
-        unsigned hostID = leaderHostID + i;
-        if (virtual2RealHost(hostID) == base_DistGraph::id)
-          continue;
-        uint64_t src = base_DistGraph::gid2host[hostID].first;
-        for (uint32_t j = 0; j < numOutgoingEdges[d][i].size(); ++j) {
-          bool createNode = false;
-          if (numOutgoingEdges[d][i][j] > 0) {
-            createNode = true;
-            numEdges += numOutgoingEdges[d][i][j];
-          } else if ((gridColumnID(base_DistGraph::id +
-                                   i * base_DistGraph::numHosts) ==
-                      getColumnHostID(src)) &&
-                     hasIncomingEdge[0].test(getColumnIndex(src))) {
-            if (columnBlocked) {
-              ++dummyOutgoingNodes;
-            } else {
-              galois::gWarn(
-                  "Partitioning of vertices resulted in some inconsistency");
-              assert(false); // should be owned
-            }
-            createNode = true;
-          }
-
-          if (createNode) {
-            localToGlobalVector.push_back(src);
-            assert(globalToLocalMap.find(src) == globalToLocalMap.end());
-            globalToLocalMap[src] = numNodes++;
-            prefixSumOfEdges.push_back(numEdges);
-          }
-          ++src;
+    unsigned leaderHostID =
+        gridRowID(base_DistGraph::id) *
+        numColumnHosts;
+    for (unsigned i = 0; i < numColumnHosts; ++i) {
+      unsigned hostID = leaderHostID + i;
+      if (virtual2RealHost(hostID) == base_DistGraph::id)
+        continue;
+      uint64_t src = base_DistGraph::gid2host[hostID].first;
+      for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
+        bool createNode = false;
+        if (numOutgoingEdges[i][j] > 0) {
+          createNode = true;
+          numEdges += numOutgoingEdges[i][j];
+        } else if ((gridColumnID(base_DistGraph::id +
+                                 i * base_DistGraph::numHosts) ==
+                    getColumnHostID(src)) &&
+                   hasIncomingEdge[0].test(getColumnIndex(src))) {
+          galois::gWarn(
+              "Partitioning of vertices resulted in some inconsistency");
+          assert(false); // should be owned
         }
+
+        if (createNode) {
+          localToGlobalVector.push_back(src);
+          assert(globalToLocalMap.find(src) == globalToLocalMap.end());
+          globalToLocalMap[src] = numNodes++;
+          prefixSumOfEdges.push_back(numEdges);
+        }
+        ++src;
       }
     }
 
@@ -693,29 +601,10 @@ private:
     for (unsigned i = 0; i < numRowHosts; ++i) {
       // unsigned hostID;
       unsigned hostID_virtual;
-      if (columnBlocked) {
-        hostID_virtual = (gridColumnID() * numRowHosts) + i;
-      } else {
-        hostID_virtual = (i * numColumnHosts) + gridColumnID();
-        // hostID_virtual = (i * numColumnHosts) +
-        // gridColumnID(base_DistGraph::id + d*base_DistGraph::numHosts);
-      }
+      hostID_virtual = (i * numColumnHosts) + gridColumnID();
+
       if (virtual2RealHost(hostID_virtual) == (base_DistGraph::id))
         continue;
-      if (columnBlocked) {
-        bool skip = false;
-        for (unsigned d = 0; d < DecomposeFactor; ++d) {
-          unsigned leaderHostID =
-              gridRowID(base_DistGraph::id + d * base_DistGraph::numHosts) *
-              numColumnHosts;
-          if ((hostID_virtual >= leaderHostID) &&
-              (hostID_virtual < (leaderHostID + numColumnHosts))) {
-            skip = true;
-          }
-        }
-        if (skip)
-          continue;
-      }
 
       uint64_t dst     = base_DistGraph::gid2host[hostID_virtual].first;
       uint64_t dst_end = base_DistGraph::gid2host[hostID_virtual].second;
@@ -734,7 +623,7 @@ private:
   //! by other hosts that belong to us and construct them as well.
   template <typename GraphTy>
   void loadEdges(GraphTy& graph,
-                 std::vector<galois::graphs::BufferedGraph<EdgeTy>>& bufGraph) {
+                 galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
     if (base_DistGraph::id == 0) {
       if (std::is_void<typename GraphTy::edge_data_type>::value) {
         galois::gPrint("Loading void edge-data while creating edges\n");
@@ -745,12 +634,10 @@ private:
 
     galois::Timer timer;
     timer.start();
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      bufGraph[d].resetReadCounters();
-    }
+    bufGraph.resetReadCounters();
 
     std::atomic<uint32_t> numNodesWithEdges;
-    numNodesWithEdges = base_DistGraph::numOwned + dummyOutgoingNodes;
+    numNodesWithEdges = base_DistGraph::numOwned;
     loadEdgesFromFile(graph, bufGraph, numNodesWithEdges);
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       receiveEdges(graph, numNodesWithEdges);
@@ -758,13 +645,11 @@ private:
     base_DistGraph::increment_evilPhase();
 
     timer.stop();
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      galois::gPrint(
-          "[", base_DistGraph::id,
-          "] Edge loading time: ", timer.get_usec() / 1000000.0f,
-          " seconds to read ", bufGraph[d].getBytesRead(), " bytes (",
-          bufGraph[d].getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
-    }
+    galois::gPrint(
+        "[", base_DistGraph::id,
+        "] Edge loading time: ", timer.get_usec() / 1000000.0f,
+        " seconds to read ", bufGraph.getBytesRead(), " bytes (",
+        bufGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
   }
 
   //! Read in our assigned edges, constructing them if they belong to this host
@@ -780,91 +665,84 @@ private:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // XXX h_offset not correct
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      // h_offset is virual hostID for DecomposeFactor > 1.
-      unsigned h_offset = gridRowID() * numColumnHosts;
-      galois::substrate::PerThreadStorage<VectorOfVector64> gdst_vecs(
-          numColumnHosts);
-      typedef std::vector<std::vector<typename GraphTy::edge_data_type>>
-          DataVecVecTy;
-      galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(
-          numColumnHosts);
-      typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
-      galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
+    unsigned h_offset = gridRowID() * numColumnHosts;
+    galois::substrate::PerThreadStorage<VectorOfVector64> gdst_vecs(
+        numColumnHosts);
+    typedef std::vector<std::vector<typename GraphTy::edge_data_type>>
+        DataVecVecTy;
+    galois::substrate::PerThreadStorage<DataVecVecTy> gdata_vecs(
+        numColumnHosts);
+    typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+    galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-      const unsigned& id =
-          base_DistGraph::id; // manually copy it because it is protected
-      galois::do_all(
-          galois::iterate(base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .first,
-                          base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .second),
-          [&](auto n) {
-            auto& gdst_vec  = *gdst_vecs.getLocal();
-            auto& gdata_vec = *gdata_vecs.getLocal();
-            uint32_t lsrc   = 0;
-            uint64_t cur    = 0;
-            if (this->isLocal(n)) {
-              lsrc = this->G2L(n);
-              cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-            }
-            auto ii = bufGraph[d].edgeBegin(n);
-            auto ee = bufGraph[d].edgeEnd(n);
-            for (unsigned i = 0; i < numColumnHosts; ++i) {
-              gdst_vec[i].clear();
-              gdata_vec[i].clear();
-              gdst_vec[i].reserve(std::distance(ii, ee));
-              gdata_vec[i].reserve(std::distance(ii, ee));
-            }
-            for (; ii < ee; ++ii) {
-              uint64_t gdst = bufGraph[d].edgeDestination(*ii);
-              auto gdata    = bufGraph[d].edgeData(*ii);
-              int i         = this->getColumnHostID(gdst);
-              if ((h_offset + i) == (id)) {
-                assert(this->isLocal(n));
-                uint32_t ldst = this->G2L(gdst);
-                graph.constructEdge(cur++, ldst, gdata);
-              } else {
-                gdst_vec[i].push_back(gdst);
-                gdata_vec[i].push_back(gdata);
-              }
-            }
-            for (unsigned i = 0; i < numColumnHosts; ++i) {
-              if (gdst_vec[i].size() > 0) {
-                auto& b = (*sb.getLocal())[i];
-                galois::runtime::gSerialize(b, n);
-                galois::runtime::gSerialize(b, gdst_vec[i]);
-                galois::runtime::gSerialize(b, gdata_vec[i]);
-                if (b.size() > edgePartitionSendBufSize) {
-                  net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-                  b.getVec().clear();
-                }
-              }
-            }
-            if (this->isLocal(n)) {
-              assert(cur == (*graph.edge_end(lsrc)));
-            }
-
-            // TODO don't have to receive every iteration
-            auto buffer =
-                net.recieveTagged(galois::runtime::evilPhase, nullptr);
-            this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
-          },
-#if MORE_DIST_STATS
-          galois::loopname("EdgeLoading"),
-#endif
-          galois::no_stats());
-
-      for (unsigned t = 0; t < sb.size(); ++t) {
-        auto& sbr = *sb.getRemote(t);
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          auto& b = sbr[i];
-          if (b.size() > 0) {
-            net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-            b.getVec().clear();
+    const unsigned& id =
+        base_DistGraph::id; // manually copy it because it is protected
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          auto& gdst_vec  = *gdst_vecs.getLocal();
+          auto& gdata_vec = *gdata_vecs.getLocal();
+          uint32_t lsrc   = 0;
+          uint64_t cur    = 0;
+          if (this->isLocal(n)) {
+            lsrc = this->G2L(n);
+            cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
+          auto ii = bufGraph.edgeBegin(n);
+          auto ee = bufGraph.edgeEnd(n);
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            gdst_vec[i].clear();
+            gdata_vec[i].clear();
+            gdst_vec[i].reserve(std::distance(ii, ee));
+            gdata_vec[i].reserve(std::distance(ii, ee));
+          }
+          for (; ii < ee; ++ii) {
+            uint64_t gdst = bufGraph.edgeDestination(*ii);
+            auto gdata    = bufGraph.edgeData(*ii);
+            int i         = this->getColumnHostID(gdst);
+            if ((h_offset + i) == (id)) {
+              assert(this->isLocal(n));
+              uint32_t ldst = this->G2L(gdst);
+              graph.constructEdge(cur++, ldst, gdata);
+            } else {
+              gdst_vec[i].push_back(gdst);
+              gdata_vec[i].push_back(gdata);
+            }
+          }
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            if (gdst_vec[i].size() > 0) {
+              auto& b = (*sb.getLocal())[i];
+              galois::runtime::gSerialize(b, n);
+              galois::runtime::gSerialize(b, gdst_vec[i]);
+              galois::runtime::gSerialize(b, gdata_vec[i]);
+              if (b.size() > edgePartitionSendBufSize) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
+            }
+          }
+          if (this->isLocal(n)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+
+          // TODO don't have to receive every iteration
+          auto buffer =
+              net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+#endif
+        galois::no_stats());
+
+    for (unsigned t = 0; t < sb.size(); ++t) {
+      auto& sbr = *sb.getRemote(t);
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        auto& b = sbr[i];
+        if (b.size() > 0) {
+          net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+          b.getVec().clear();
         }
       }
     }
@@ -879,86 +757,79 @@ private:
                 typename GraphTy::edge_data_type>::value>::type* = nullptr>
   void loadEdgesFromFile(
       GraphTy& graph,
-      std::vector<galois::graphs::BufferedGraph<EdgeTy>>& bufGraph,
+      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       std::atomic<uint32_t>& numNodesWithEdges) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      // h_offset is virual hostID for DecomposeFactor > 1.
-      unsigned h_offset = gridRowID() * numColumnHosts;
-      galois::substrate::PerThreadStorage<VectorOfVector64> gdst_vecs(
-          numColumnHosts);
-      typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
-      galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
+    unsigned h_offset = gridRowID() * numColumnHosts;
+    galois::substrate::PerThreadStorage<VectorOfVector64> gdst_vecs(
+        numColumnHosts);
+    typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
+    galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
-      const unsigned& id =
-          base_DistGraph::id; // manually copy it because it is protected
-      galois::do_all(
-          galois::iterate(base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .first,
-                          base_DistGraph::gid2host[base_DistGraph::id +
-                                                   d * base_DistGraph::numHosts]
-                              .second),
-          [&](auto n) {
-            auto& gdst_vec = *gdst_vecs.getLocal();
-            uint32_t lsrc  = 0;
-            uint64_t cur   = 0;
-            if (this->isLocal(n)) {
-              lsrc = this->G2L(n);
-              cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-            }
-            auto ii = bufGraph[d].edgeBegin(n);
-            auto ee = bufGraph[d].edgeEnd(n);
-            for (unsigned i = 0; i < numColumnHosts; ++i) {
-              gdst_vec[i].clear();
-              gdst_vec[i].reserve(std::distance(ii, ee));
-            }
-            for (; ii < ee; ++ii) {
-              uint64_t gdst = bufGraph[d].edgeDestination(*ii);
-              int i         = this->getColumnHostID(gdst);
-              if ((h_offset + i) == (id)) {
-                assert(this->isLocal(n));
-                uint32_t ldst = this->G2L(gdst);
-                graph.constructEdge(cur++, ldst);
-              } else {
-                gdst_vec[i].push_back(gdst);
-              }
-            }
-            for (unsigned i = 0; i < numColumnHosts; ++i) {
-              if (gdst_vec[i].size() > 0) {
-                auto& b = (*sb.getLocal())[i];
-                galois::runtime::gSerialize(b, n);
-                galois::runtime::gSerialize(b, gdst_vec[i]);
-                // unsigned h_offset_real = virtual2RealHost(h_offset);
-                if (b.size() > edgePartitionSendBufSize) {
-                  net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-                  b.getVec().clear();
-                }
-              }
-            }
-            if (this->isLocal(n)) {
-              assert(cur == (*graph.edge_end(lsrc)));
-            }
-
-            // TODO don't have to receive every iteration
-            auto buffer =
-                net.recieveTagged(galois::runtime::evilPhase, nullptr);
-            this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
-          },
-#if MORE_DIST_STATS
-          galois::loopname("EdgeLoading"),
-#endif
-          galois::no_stats());
-
-      for (unsigned t = 0; t < sb.size(); ++t) {
-        auto& sbr = *sb.getRemote(t);
-        for (unsigned i = 0; i < numColumnHosts; ++i) {
-          auto& b = sbr[i];
-          if (b.size() > 0) {
-            net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
-            b.getVec().clear();
+    const unsigned& id =
+        base_DistGraph::id; // manually copy it because it is protected
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          auto& gdst_vec = *gdst_vecs.getLocal();
+          uint32_t lsrc  = 0;
+          uint64_t cur   = 0;
+          if (this->isLocal(n)) {
+            lsrc = this->G2L(n);
+            cur  = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           }
+          auto ii = bufGraph.edgeBegin(n);
+          auto ee = bufGraph.edgeEnd(n);
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            gdst_vec[i].clear();
+            gdst_vec[i].reserve(std::distance(ii, ee));
+          }
+          for (; ii < ee; ++ii) {
+            uint64_t gdst = bufGraph.edgeDestination(*ii);
+            int i         = this->getColumnHostID(gdst);
+            if ((h_offset + i) == (id)) {
+              assert(this->isLocal(n));
+              uint32_t ldst = this->G2L(gdst);
+              graph.constructEdge(cur++, ldst);
+            } else {
+              gdst_vec[i].push_back(gdst);
+            }
+          }
+          for (unsigned i = 0; i < numColumnHosts; ++i) {
+            if (gdst_vec[i].size() > 0) {
+              auto& b = (*sb.getLocal())[i];
+              galois::runtime::gSerialize(b, n);
+              galois::runtime::gSerialize(b, gdst_vec[i]);
+              // unsigned h_offset_real = virtual2RealHost(h_offset);
+              if (b.size() > edgePartitionSendBufSize) {
+                net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+              }
+            }
+          }
+          if (this->isLocal(n)) {
+            assert(cur == (*graph.edge_end(lsrc)));
+          }
+
+          // TODO don't have to receive every iteration
+          auto buffer =
+              net.recieveTagged(galois::runtime::evilPhase, nullptr);
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+#endif
+        galois::no_stats());
+
+    for (unsigned t = 0; t < sb.size(); ++t) {
+      auto& sbr = *sb.getRemote(t);
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        auto& b = sbr[i];
+        if (b.size() > 0) {
+          net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+          b.getVec().clear();
         }
       }
     }
@@ -1057,63 +928,42 @@ private:
    */
   void fillMirrorNodes(std::vector<std::vector<size_t>>& mirrorNodes) {
     // mirrors for outgoing edges
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      for (unsigned i = 0; i < numColumnHosts; ++i) {
-        // unsigned hostID = (gridRowID() * numColumnHosts) + i;
-        unsigned hostID_virtual =
-            (gridRowID(base_DistGraph::id + d * base_DistGraph::numHosts) *
-             numColumnHosts) +
-            i;
-        if (hostID_virtual ==
-            (base_DistGraph::id + d * base_DistGraph::numHosts))
-          continue;
-        uint64_t src         = base_DistGraph::gid2host[hostID_virtual].first;
-        uint64_t src_end     = base_DistGraph::gid2host[hostID_virtual].second;
-        unsigned hostID_real = virtual2RealHost(hostID_virtual);
-        mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
-                                         src_end - src);
-        for (; src < src_end; ++src) {
-          if (globalToLocalMap.find(src) != globalToLocalMap.end()) {
-            mirrorNodes[hostID_real].push_back(src);
-          }
+    for (unsigned i = 0; i < numColumnHosts; ++i) {
+      // unsigned hostID = (gridRowID() * numColumnHosts) + i;
+      unsigned hostID_virtual =
+          (gridRowID(base_DistGraph::id) *
+           numColumnHosts) +
+          i;
+
+      if (hostID_virtual == base_DistGraph::id) continue;
+
+      uint64_t src         = base_DistGraph::gid2host[hostID_virtual].first;
+      uint64_t src_end     = base_DistGraph::gid2host[hostID_virtual].second;
+      unsigned hostID_real = virtual2RealHost(hostID_virtual);
+      mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
+                                       src_end - src);
+      for (; src < src_end; ++src) {
+        if (globalToLocalMap.find(src) != globalToLocalMap.end()) {
+          mirrorNodes[hostID_real].push_back(src);
         }
       }
     }
 
     // mirrors for incoming edges
-    for (unsigned d = 0; d < DecomposeFactor; ++d) {
-      unsigned leaderHostID =
-          gridRowID(base_DistGraph::id + d * base_DistGraph::numHosts) *
-          numColumnHosts;
-      for (unsigned i = 0; i < numRowHosts; ++i) {
-        unsigned hostID_virtual;
-        if (columnBlocked) {
-          hostID_virtual =
-              (gridColumnID(base_DistGraph::id + d * base_DistGraph::numHosts) *
-               numRowHosts) +
-              i;
-        } else {
-          hostID_virtual =
-              (i * numColumnHosts) +
-              gridColumnID(base_DistGraph::id + d * base_DistGraph::numHosts);
-        }
-        if (hostID_virtual ==
-            (base_DistGraph::id + d * base_DistGraph::numHosts))
-          continue;
-        if (columnBlocked) {
-          if ((hostID_virtual >= leaderHostID) &&
-              (hostID_virtual < (leaderHostID + numColumnHosts)))
-            continue;
-        }
-        uint64_t dst         = base_DistGraph::gid2host[hostID_virtual].first;
-        uint64_t dst_end     = base_DistGraph::gid2host[hostID_virtual].second;
-        unsigned hostID_real = virtual2RealHost(hostID_virtual);
-        mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
-                                         dst_end - dst);
-        for (; dst < dst_end; ++dst) {
-          if (globalToLocalMap.find(dst) != globalToLocalMap.end()) {
-            mirrorNodes[hostID_real].push_back(dst);
-          }
+    for (unsigned i = 0; i < numRowHosts; ++i) {
+      unsigned hostID_virtual;
+      hostID_virtual = (i * numColumnHosts) + gridColumnID(base_DistGraph::id);
+
+      if (hostID_virtual == base_DistGraph::id) continue;
+
+      uint64_t dst         = base_DistGraph::gid2host[hostID_virtual].first;
+      uint64_t dst_end     = base_DistGraph::gid2host[hostID_virtual].second;
+      unsigned hostID_real = virtual2RealHost(hostID_virtual);
+      mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
+                                       dst_end - dst);
+      for (; dst < dst_end; ++dst) {
+        if (globalToLocalMap.find(dst) != globalToLocalMap.end()) {
+          mirrorNodes[hostID_real].push_back(dst);
         }
       }
     }
