@@ -40,12 +40,12 @@ std::string getFileName(std::string path);
 
 int main(int argc, char* argv[]) {
 
-  galois::SharedMemSys
-      G; // shared-memory system object initializes global variables for galois
+	// shared-memory system object initializes global variables for galois
+  galois::SharedMemSys G;
 
   if (argc < 3) {
     std::cout << "Mandatory arguments: <nThreads> <AigInputFile>" << std::endl;
-    std::cout << "Optional arguments: -v (verrbose)" << std::endl;
+    std::cout << "Optional arguments: -v (verbose)" << std::endl;
     exit(1);
   }
 
@@ -90,6 +90,17 @@ int main(int argc, char* argv[]) {
   // kcut( aig, fileName, nThreads, verbose );
 
   // rdCut( aig, fileName, nThreads, verbose );
+  
+ 	// TEST WRITE AIG //
+  //std::cout << "Writing final AIG file..." << std::endl;
+  //AigWriter aigWriter(fileName + "_rewritten.aig");
+  //aigWriter.writeAig(aig);
+
+	//AigWriter aigWriter(fileName + "_rewritten.aag");
+  //aigWriter.writeAag(aig);
+
+  // TEST WRITE DOT //
+  //aig.writeDot( fileName + "_rewritten.dot", aig.toDot() );
 
   return 0;
 }
@@ -132,7 +143,8 @@ void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
   // RWMan
   algorithm::RewriteManager rwtMan(aig, cutMan, npnMan, pcgMan, triesNGraphs,
                                    useZeros, updateLevel);
-  algorithm::runRewriteOperator(rwtMan);
+ 
+	algorithm::runRewriteOperator(rwtMan);
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   long double rewriteTime = duration_cast<microseconds>(t2 - t1).count();
@@ -154,6 +166,8 @@ void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
   std::cout << "Writing final AIG file..." << std::endl;
   AigWriter aigWriter(fileName + "_rewritten.aig");
   aigWriter.writeAig(aig);
+	//AigWriter aigWriter(fileName + "_rewritten.aag");
+  //aigWriter.writeAag(aig);
 
   // WRITE DOT //
   // aig.writeDot( fileName + "_rewritten.dot", aig.toDot() );
@@ -191,7 +205,7 @@ void kcut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose) {
 
   if (verbose >= 1) {
     std::cout << "################ Results ################## " << std::endl;
-    // cutMan.printAllCuts();
+    //cutMan.printAllCuts();
     // cutMan.printRuntimes();
     cutMan.printCutStatistics();
     std::cout << "Size: " << aig.getNumAnds() << std::endl;

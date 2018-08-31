@@ -168,12 +168,15 @@ std::string AigParser::parseString(std::string delimChar) {
 
 void AigParser::resize() {
   inputs.resize(i);
-  inputNames.resize(i);
   latches.resize(l);
-  latchNames.resize(l);
   outputs.resize(o);
-  outputNames.resize(o);
   ands.resize(a);
+ 	
+	// The symbols may be empty
+ 	// inputNames.resize(i);
+ 	// latchNames.resize(l);
+  // outputNames.resize(o);
+  
   int nNodes = m + o + 1;
   aig.getNodes().resize(nNodes);
   aig.getNodesTravId().resize(nNodes);
@@ -311,6 +314,9 @@ void AigParser::parseSymbolTable() {
       if (n >= i)
         throw semantic_error(currLine, currChar,
                              "Input number greater than number of inputs");
+			if (inputNames.empty()) {
+				inputNames.resize(i);
+			}
       inputNames[n] = parseString("\n");
       break;
     case 'l':
@@ -318,6 +324,9 @@ void AigParser::parseSymbolTable() {
       if (n >= l)
         throw semantic_error(currLine, currChar,
                              "Latch number greater than number of latches");
+			if (latchNames.empty()) {
+				latchNames.resize(l);
+			}
       latchNames[n] = parseString("\n");
       break;
     case 'o':
@@ -325,6 +334,9 @@ void AigParser::parseSymbolTable() {
       if (n >= o)
         throw semantic_error(currLine, currChar,
                              "Output number greater than number of outputs");
+			if (outputNames.empty()) {
+				outputNames.resize(o);
+			}
       outputNames[n] = parseString("\n");
       break;
     case 'c':
@@ -474,6 +486,7 @@ void AigParser::connectLatches() {
     int rhs                      = std::get<1>(latches[in]);
     aig::GNode inputNode         = aig.getNodes()[rhs / 2];
     aig::NodeData& inputNodeData = aigGraph.getData(inputNode);
+		inputNodeData.nFanout += 1;
 
     aigGraph.getEdgeData(aigGraph.addEdge(inputNode, latchNode)) = !(rhs % 2);
     latchNodeData.level = 1 + inputNodeData.level;
@@ -527,6 +540,7 @@ void AigParser::connectAnds() {
 
     aigGraph.getEdgeData(aigGraph.addMultiEdge(
         lhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = !(B % 2);
+
     aigGraph.getEdgeData(aigGraph.addMultiEdge(
         rhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = !(C % 2);
 
@@ -567,9 +581,11 @@ void AigParser::connectAndsWithFanoutMap() {
 
     aigGraph.getEdgeData(aigGraph.addMultiEdge(
         lhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = lhsPol;
-    aigGraph.getEdgeData(aigGraph.addMultiEdge(
+   
+		aigGraph.getEdgeData(aigGraph.addMultiEdge(
         rhsNode, andNode, galois::MethodFlag::UNPROTECTED)) = rhsPol;
-    aig.insertNodeInFanoutMap(andNode, lhsNode, rhsNode, lhsPol, rhsPol);
+   
+		aig.insertNodeInFanoutMap(andNode, lhsNode, rhsNode, lhsPol, rhsPol);
 
     andData.level = 1 + std::max(lhsData.level, rhsData.level);
     this->levelHistogram[andData.level] += 1;

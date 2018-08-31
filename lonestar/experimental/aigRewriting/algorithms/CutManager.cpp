@@ -628,14 +628,14 @@ void CutManager::printCutStatistics() {
 
   long int nSatuRed = nSatu.reduce();
 
-  std::cout << std::endl << "#### Cut Statistics ####" << std::endl;
+
+  std::cout << std::endl << "############## Cut Statistics #############" << std::endl;
   std::cout << "nCuts: " << nCutsRed << std::endl;
   std::cout << "nTriv: " << nTrivRed << std::endl;
   std::cout << "nFilt: " << nFiltRed << std::endl;
   std::cout << "nSatu: " << nSatuRed << std::endl;
-  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes)
-            << std::endl;
-  std::cout << "#################################" << std::endl;
+  std::cout << "nCutPerNode: " << (((double)nCutsRed) / this->nNodes) << std::endl;
+  std::cout << "###########################################" << std::endl;
 }
 
 void CutManager::printRuntimes() {
@@ -680,8 +680,7 @@ PerThreadAuxTruth& CutManager::getPerThreadAuxTruth() {
 
 Cut** CutManager::getNodeCuts() { return this->nodeCuts; }
 
-// ############################################ BEGIN OPERATOR
-// ########################################## //
+// ######################## BEGIN OPERATOR ######################## //
 struct KCutOperator {
 
   CutManager& cutMan;
@@ -716,6 +715,8 @@ struct KCutOperator {
       CutList* cutList   = cutMan.getPerThreadCutList().getLocal();
       AuxTruth* auxTruth = cutMan.getPerThreadAuxTruth().getLocal();
 
+			//ctx.cautiousPoint();
+
       cutMan.computeCuts(cutPool, cutList, auxTruth, nodeData.id, lhsData.id,
                          rhsData.id, lhsPolarity, rhsPolarity);
 
@@ -735,6 +736,8 @@ struct KCutOperator {
         // node's locks.
         for (auto outEdge : aigGraph.out_edges(node)) {
         }
+
+				//ctx.cautiousPoint();
 
         // Set the trivial cut
         nodeData.counter      = 3;
@@ -780,37 +783,15 @@ void runKCutOperator(CutManager& cutMan) {
 
   // Galois Parallel Foreach
   galois::for_each(galois::iterate(workList.begin(), workList.end()),
-                   KCutOperator(cutMan), galois::wl<DC_BAG>(),
+                   KCutOperator(cutMan),
+									 galois::wl<DC_BAG>(),
                    galois::loopname("KCutOperator"));
 
-  /*
-      for ( auto pi : aig.getInputNodes() ) {
-          aig::NodeData & piData = aigGraph.getData( pi,
-     galois::MethodFlag::UNPROTECTED ); CutPool * cutPool =
-     cutMan.getPerThreadCutPool().getRemote( 0 ); Cut * trivialCut =
-     cutPool->getMemory(); trivialCut->leaves[0] = piData.id;
-          trivialCut->nLeaves++;
-          trivialCut->sig = ( 1U << (piData.id % 31) );
-          if ( cutMan.getCompTruthFlag() ) {
-              unsigned * cutTruth = cutMan.readTruth( trivialCut );
-              for ( int i = 0; i < cutMan.getNWords(); i++ ) {
-                  cutTruth[i] = 0xAAAAAAAA;
-              }
-          }
 
-          cutMan.getNodeCuts()[ piData.id ] = trivialCut;
-
-          for ( auto edge : aigGraph.out_edges( pi ) ) {
-              aig::GNode nextNode = aigGraph.getEdgeDst( edge );
-              aig::NodeData & nextNodeData = aigGraph.getData( nextNode,
-     galois::MethodFlag::WRITE ); nextNodeData.counter += 1; if (
-     nextNodeData.counter == 2 ) { workList.push( nextNode );
-              }
-          }
-      }
-  */
+	//galois::wl<galois::worklists::Deterministic<>>(),
+	//galois::wl<DC_BAG>(),
+	
 }
-// ############################################ END OPERATOR
-// ############################################# //
+// ######################## END OPERATOR ######################## //
 
 } /* namespace algorithm */

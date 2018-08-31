@@ -316,6 +316,7 @@ void Aig::resetAndPIsIds() {
   for (GNode pi : this->inputNodes) {
     NodeData& piData = this->graph.getData(pi, galois::MethodFlag::WRITE);
     piData.id        = currentId++;
+    this->nodes[piData.id] = pi;
   }
 
   while (!stack.empty()) {
@@ -348,6 +349,7 @@ void Aig::resetAndPOsIds() {
   for (GNode po : this->outputNodes) {
     NodeData& poData = this->graph.getData(po, galois::MethodFlag::WRITE);
     poData.id        = currentId++;
+    this->nodes[poData.id] = po;
   }
 
   // std::cout << std::endl << "All AND node IDs were reseted!" << std::endl;
@@ -365,6 +367,14 @@ void Aig::resetAllIds() {
     NodeData& piData = this->graph.getData(pi, galois::MethodFlag::WRITE);
     piData.id        = currentId++;
     piData.level     = 0;
+    this->nodes[piData.id] = pi;
+  } 
+
+	for (GNode latch : this->latchNodes) {
+    NodeData& latchData = this->graph.getData(latch, galois::MethodFlag::WRITE);
+    latchData.id        = currentId++;
+    latchData.level     = 0; // FIXME
+    this->nodes[latchData.id] = latch;
   }
 
   while (!stack.empty()) {
@@ -394,6 +404,7 @@ void Aig::resetAllIds() {
     NodeData inData = this->graph.getData(inNode, galois::MethodFlag::READ);
 
     poData.level = inData.level;
+    this->nodes[poData.id] = po;
   }
 
   // std::cout << std::endl << "All AND node IDs were reseted!" << std::endl;
@@ -417,6 +428,21 @@ void Aig::computeTopologicalSortForAll(std::stack<GNode>& stack) {
 
     stack.push(pi);
   }
+
+	for (GNode latch : this->latchNodes) {
+    for (auto outEdge : this->graph.out_edges(latch)) {
+
+      GNode node         = this->graph.getEdgeDst(outEdge);
+      NodeData& nodeData = this->graph.getData(node, galois::MethodFlag::READ);
+
+      if (!visited[nodeData.id]) {
+        topologicalSortAll(node, visited, stack);
+      }
+    }
+
+    stack.push(latch);
+  }
+
 }
 
 void Aig::topologicalSortAll(GNode node, std::vector<bool>& visited,
@@ -446,6 +472,18 @@ void Aig::computeTopologicalSortForAnds(std::stack<GNode>& stack) {
 
   for (GNode pi : this->inputNodes) {
     for (auto outEdge : this->graph.out_edges(pi)) {
+
+      GNode node         = this->graph.getEdgeDst(outEdge);
+      NodeData& nodeData = this->graph.getData(node, galois::MethodFlag::READ);
+
+      if ((!visited[nodeData.id]) && (nodeData.type == NodeType::AND)) {
+        topologicalSortAnds(node, visited, stack);
+      }
+    }
+  }
+
+	for (GNode latch : this->latchNodes) {
+    for (auto outEdge : this->graph.out_edges(latch)) {
 
       GNode node         = this->graph.getEdgeDst(outEdge);
       NodeData& nodeData = this->graph.getData(node, galois::MethodFlag::READ);
@@ -487,12 +525,19 @@ void Aig::resetAllNodeCounters() {
 
 std::string Aig::toDot() {
 
-  // Preprocess PI and PO names
+  // Preprocess PI, LATCH and PO names
   std::unordered_map<int, std::string> piNames;
   for (int i = 0; i < this->inputNodes.size(); i++) {
     aig::NodeData& nodeData =
         graph.getData(this->inputNodes[i], galois::MethodFlag::READ);
     piNames.insert(std::make_pair(nodeData.id, this->inputNames[i]));
+  }
+
+ 	std::unordered_map<int, std::string> latchNames;
+  for (int i = 0; i < this->latchNodes.size(); i++) {
+    aig::NodeData& nodeData =
+        graph.getData(this->latchNodes[i], galois::MethodFlag::READ);
+    latchNames.insert(std::make_pair(nodeData.id, this->latchNames[i]));
   }
 
   std::unordered_map<int, std::string> poNames;
@@ -502,7 +547,7 @@ std::string Aig::toDot() {
     poNames.insert(std::make_pair(nodeData.id, this->outputNames[i]));
   }
 
-  std::stringstream dot, inputs, outputs, ands, edges;
+  std::stringstream dot, inputs, latches, outputs, ands, edges;
 
   for (auto node : this->graph) {
 
@@ -519,21 +564,29 @@ std::string Aig::toDot() {
       if (nodeData.type == NodeType::PI) {
         nodeName = piNames[nodeData.id];
       } else {
-        if (nodeData.type == NodeType::PO) {
-          nodeName = poNames[nodeData.id];
-        } else {
-          nodeName = std::to_string(nodeData.id);
-        }
+				if (nodeData.type == NodeType::LATCH) {
+        	nodeName = latchNames[nodeData.id];
+				} else {
+       		if (nodeData.type == NodeType::PO) {
+          	nodeName = poNames[nodeData.id];
+        	} else {
+          	nodeName = std::to_string(nodeData.id);
+        	}
+				}
       }
 
       if (dstData.type == NodeType::PI) {
         dstName = piNames[dstData.id];
       } else {
-        if (dstData.type == NodeType::PO) {
-          dstName = poNames[dstData.id];
-        } else {
-          dstName = std::to_string(dstData.id);
-        }
+				if (dstData.type == NodeType::LATCH) {
+        	dstName = latchNames[dstData.id];
+				} else {
+        	if (dstData.type == NodeType::PO) {
+          	dstName = poNames[dstData.id];
+        	} else {
+          	dstName = std::to_string(dstData.id);
+        	}
+				}
       }
 
       edges << "\"" << dstName << "\" -> \"" << nodeName << "\"";
@@ -548,6 +601,14 @@ std::string Aig::toDot() {
     if (nodeData.type == NodeType::PI) {
       inputs << "\"" << piNames[nodeData.id] << "\"";
       inputs << " [shape=circle, height=1, width=1, penwidth=5 style=filled, "
+                "fillcolor=\"#ff8080\", fontsize=20]"
+             << std::endl;
+      continue;
+    }
+
+		if (nodeData.type == NodeType::LATCH) {
+      latches << "\"" << latchNames[nodeData.id] << "\"";
+      latches << " [shape=square, height=1, width=1, penwidth=5 style=filled, "
                 "fillcolor=\"#ff8080\", fontsize=20]"
              << std::endl;
       continue;
@@ -573,6 +634,7 @@ std::string Aig::toDot() {
   dot << "ranksep=1.5;" << std::endl;
   dot << "nodesep=1.5;" << std::endl;
   dot << inputs.str();
+  dot << latches.str();
   dot << ands.str();
   dot << outputs.str();
   dot << edges.str();
@@ -580,6 +642,11 @@ std::string Aig::toDot() {
   for (GNode node : this->inputNodes) {
     aig::NodeData& nodeData = graph.getData(node, galois::MethodFlag::READ);
     dot << " \"" << piNames[nodeData.id] << "\"";
+  }
+
+  for (GNode node : this->latchNodes) {
+    aig::NodeData& nodeData = graph.getData(node, galois::MethodFlag::READ);
+    dot << " \"" << latchNames[nodeData.id] << "\"";
   }
   dot << " }" << std::endl;
 
