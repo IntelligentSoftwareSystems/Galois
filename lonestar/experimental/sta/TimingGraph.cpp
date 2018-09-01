@@ -530,12 +530,19 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
 
   bool isNeg = (data.isRise != predData.isRise);
   std::vector<float> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
+  std::vector<float> paramNoC = {predData.t[k].slew, 0.0};
 
   auto& ieData = g.getEdgeData(ie);
 
   if (TIMING_MODE_MAX_DELAY == modes[k]) {
     auto delayResult = outPin->extractMax(param, TABLE_DELAY, inPin, isNeg, data.isRise);
     auto delay = delayResult.first;
+    if (predData.isDrivingCell) {
+      // offset for the primary inputs =
+      //     delay for the driving cell with the load
+      //   - delay for the driving cell without the load (Genus)
+      delay -= outPin->extractMax(paramNoC, TABLE_DELAY, inPin, isNeg, data.isRise).first;
+    }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival < predData.t[k].arrival + delay) {
@@ -554,6 +561,12 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   else {
     auto delayResult = outPin->extractMin(param, TABLE_DELAY, inPin, isNeg, data.isRise);
     auto delay = delayResult.first;
+    if (predData.isDrivingCell) {
+      // offset for the primary inputs =
+      //     delay for the driving cell with the load
+      //   - delay for the driving cell without the load (Genus)
+      delay -= outPin->extractMin(paramNoC, TABLE_DELAY, inPin, isNeg, data.isRise).first;
+    }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival > predData.t[k].arrival + delay) {
