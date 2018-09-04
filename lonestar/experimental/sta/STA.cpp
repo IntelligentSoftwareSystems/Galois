@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
   auto invX1 = lib.findCell("INV_X1");
   auto outPin = invX1->findCellPin("ZN");
   auto inPin = invX1->findCellPin("A");
-  std::vector<float> v = {0.0, 4.0};
+  std::vector<MyFloat> v = {0.0, 4.0};
   auto res = outPin->extractMax(v, TABLE_DELAY, inPin, true, true);
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif

@@ -5,7 +5,7 @@
 #include "Verilog.h"
 #include "Sdc.h"
 #include "TimingGraph.h"
-#include "TimingMode.h"
+#include "TimingDefinition.h"
 
 #include <vector>
 #include <unordered_map>
@@ -13,9 +13,9 @@
 struct TimingPathNode {
   VerilogPin* pin;
   bool isRise;
-  float arrival;
-  float required;
-  float slack;
+  MyFloat arrival;
+  MyFloat required;
+  MyFloat slack;
 };
 
 using TimingPath = std::vector<TimingPathNode>;
@@ -44,8 +44,8 @@ public:
   void constrain(VerilogModule* m, SDC& sdc);  // add constraints to the module
   void time(VerilogModule* m);  // timing analysis from scratch
 
-  float reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
-  float reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
+  MyFloat reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
+  MyFloat reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
   std::vector<TimingPath> reportTopKCriticalPaths(VerilogModule* m, size_t corner, size_t k = 1);
 };
 

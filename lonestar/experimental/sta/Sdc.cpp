@@ -76,7 +76,7 @@ void SDCParser::parseClock() {
     // -period value
     if ("-period" == *curToken) {
       curToken += 1; // consume "-period"
-      clk->period = std::stof(*curToken);
+      clk->period = getMyFloat(*curToken);
       curToken += 1; // consume value
     }
     // -name name
@@ -108,7 +108,7 @@ void SDCParser::parseClock() {
   auto& wv = clk->waveform;
   if (wv.empty()) {
     wv.push_back({0.0, true});
-    wv.push_back({(clk->period / (float)2.0), false});
+    wv.push_back({(clk->period / (MyFloat)2.0), false});
   }
   else {
     std::sort(wv.begin(), wv.end(),
@@ -163,12 +163,12 @@ void SDCParser::parseDrivingCell() {
     }
     else if ("-input_transition_fall" == *curToken) {
       curToken += 1; // consume "-input_transition_fall"
-      dCell->slew[0] = std::stof(*curToken);
+      dCell->slew[0] = getMyFloat(*curToken);
       curToken += 1; // consume value
     }
     else if ("-input_transition_rise" == *curToken) {
       curToken += 1; // consume "-input_transition_rise"
-      dCell->slew[1] = std::stof(*curToken);
+      dCell->slew[1] = getMyFloat(*curToken);
       curToken += 1; // consume value
     }
     // skip trailing "\\"
@@ -194,12 +194,12 @@ void SDCParser::parseLoad() {
   // set_load -pin_load value [port_list]
   curToken += 1; // consume "set_load"
 
-  float value = 0.0;
+  MyFloat value = 0.0;
   PinSet ports;
   while (!isEndOfCommand()) {
     if ("-pin_load" == *curToken) {
       curToken += 1; // consume "-pin_load"
-      value = std::stof(*curToken);
+      value = getMyFloat(*curToken);
       curToken += 1; // consume value
     }
     else if ("[" == *curToken) {
@@ -224,7 +224,7 @@ void SDCParser::parseMaxDelay() {
   // set_max_delay value -from [port_list] -to [port_list]
   curToken += 1; // consume "set_max_delay"
 
-  float value = std::stof(*curToken);
+  MyFloat value = getMyFloat(*curToken);
   curToken += 1; // consume value
 
   PinSet fromPins, toPins;

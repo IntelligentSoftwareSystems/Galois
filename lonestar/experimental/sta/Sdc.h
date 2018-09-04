@@ -1,6 +1,7 @@
 #ifndef GALOIS_EDA_SDC_H
 #define GALOIS_EDA_SDC_H
 
+#include "TimingDefinition.h"
 #include "Tokenizer.h"
 #include "CellLib.h"
 #include "Verilog.h"
@@ -17,14 +18,14 @@ struct SDC;
 struct SDCDrivingCell {
   CellPin* toCellPin;
   CellPin* fromCellPin;
-  float slew[2];
+  MyFloat slew[2];
 
 public:
   void print(std::ostream& os);
 };
 
 struct SDCClockEdge {
-  float t;
+  MyFloat t;
   bool isRise;
 
 public:
@@ -32,7 +33,7 @@ public:
 };
 
 struct SDCClock {
-  float period;
+  MyFloat period;
   std::vector<SDCClockEdge> waveform;
   VerilogPin* src;
   std::string name;
@@ -81,13 +82,13 @@ public:
   // boundary conditions
   std::unordered_map<VerilogPin*, SDCDrivingCell*> mapPin2DrivingCells;
   std::unordered_set<SDCDrivingCell*> drivingCells;
-  std::unordered_map<VerilogPin*, float> pinLoads;
+  std::unordered_map<VerilogPin*, MyFloat> pinLoads;
 
   // usual delay constraints
-  float maxDelayPI2PO;
-  float maxDelayPI2RI;
-  float maxDelayRO2RI;
-  float maxDelayRO2PO;
+  MyFloat maxDelayPI2PO;
+  MyFloat maxDelayPI2RI;
+  MyFloat maxDelayRO2RI;
+  MyFloat maxDelayRO2PO;
 
   std::unordered_map<std::string, SDCClock*> clocks;
 
@@ -110,10 +111,10 @@ public:
   }
 
   SDC(std::vector<CellLib*>& libs, VerilogModule& m): libs(libs), m(m) {
-    maxDelayPI2PO = std::numeric_limits<float>::infinity();
-    maxDelayPI2RI = std::numeric_limits<float>::infinity();
-    maxDelayRO2RI = std::numeric_limits<float>::infinity();
-    maxDelayRO2PO = std::numeric_limits<float>::infinity();
+    maxDelayPI2PO = std::numeric_limits<MyFloat>::infinity();
+    maxDelayPI2RI = std::numeric_limits<MyFloat>::infinity();
+    maxDelayRO2RI = std::numeric_limits<MyFloat>::infinity();
+    maxDelayRO2PO = std::numeric_limits<MyFloat>::infinity();
   }
 
   ~SDC() { clear(); }

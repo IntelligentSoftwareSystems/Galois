@@ -7,7 +7,7 @@
 #include "CellLib.h"
 #include "Verilog.h"
 #include "Sdc.h"
-#include "TimingMode.h"
+#include "TimingDefinition.h"
 
 #include <iostream>
 #include <vector>
@@ -16,12 +16,12 @@
 
 struct NodeTiming {
   CellPin* pin;
-  float pinC;
-  float wireC;
-  float slew;
-  float arrival;
-  float required;
-  float slack;
+  MyFloat pinC;
+  MyFloat wireC;
+  MyFloat slew;
+  MyFloat arrival;
+  MyFloat required;
+  MyFloat slack;
 };
 
 struct Node {
@@ -87,7 +87,7 @@ public:
 
 struct EdgeTiming {
   WireLoad* wireLoad; // nullptr for timing arcs
-  float delay;
+  MyFloat delay;
 };
 
 struct Edge {

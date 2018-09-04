@@ -48,7 +48,7 @@ static T interpolate(T x0, T y0, T x1, T y1, T x) {
   }
 }
 
-float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
+MyFloat Lut::lookupInternal(std::vector<MyFloat>& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
   auto lb = bound[lv].first;
   auto ub = bound[lv].second;
   auto start_l = start + stride[lv] * lb;
@@ -59,7 +59,7 @@ float Lut::lookupInternal(std::vector<float>& param, std::vector<Bound>& bound, 
   return interpolate(index[lv][lb], y0, index[lv][ub], y1, param[lv]);
 }
 
-float Lut::lookup(std::vector<float>& param) {
+MyFloat Lut::lookup(std::vector<MyFloat>& param) {
   auto paramSize = param.size();
   assert(paramSize == index.size());
 
@@ -123,13 +123,13 @@ bool CellPin::isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise) {
   return !tables[inPin][isRise][TABLE_DELAY][isNeg].empty();
 }
 
-float CellPin::extract(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
+MyFloat CellPin::extract(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
   return tables[inPin][isRise][index][isNeg][when]->lookup(param);
 }
 
-std::pair<float, std::string>
-CellPin::extractMax(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
-  float ret = -std::numeric_limits<float>::infinity();
+std::pair<MyFloat, std::string>
+CellPin::extractMax(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+  MyFloat ret = -std::numeric_limits<MyFloat>::infinity();
   std::string when;
   for (auto& i: tables[inPin][isRise][index][isNeg]) {
     auto tmp = i.second->lookup(param);
@@ -141,9 +141,9 @@ CellPin::extractMax(std::vector<float>& param, TableType index, CellPin* inPin, 
   return {ret, when};
 }
 
-std::pair<float, std::string>
-CellPin::extractMin(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
-  float ret = std::numeric_limits<float>::infinity();
+std::pair<MyFloat, std::string>
+CellPin::extractMin(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+  MyFloat ret = std::numeric_limits<MyFloat>::infinity();
   std::string when;
   for (auto& i: tables[inPin][isRise][index][isNeg]) {
     auto tmp = i.second->lookup(param);
@@ -282,9 +282,9 @@ void LutTemplate::print(std::ostream& os) {
   for (auto& d: shape) {
     os << "    index_" << ++i << " (\"";
     size_t j = 1;
-    os << float(j) * 0.0010f;
+    os << MyFloat(j) * 0.0010f;
     while (j < d) {
-      os << ", " << (float)(++j) * 0.0010f;
+      os << ", " << (MyFloat)(++j) * 0.0010f;
     }
     os << "\");" << std::endl;
   }
@@ -306,12 +306,12 @@ void LutTemplate::print(std::ostream& os) {
   os << "  }" << std::endl;
 }
 
-float WireLoad::wireLength(size_t deg) {
+MyFloat WireLoad::wireLength(size_t deg) {
   auto lb = fanoutLength.lower_bound(deg);
   // extrapolation from upper limit
   if (lb == fanoutLength.end()) {
     auto last = fanoutLength.rbegin();
-    return last->second + (float)(deg - last->first) * slope;
+    return last->second + (MyFloat)(deg - last->first) * slope;
   }
   // exact match
   else if (lb->first == deg) {
@@ -327,19 +327,19 @@ float WireLoad::wireLength(size_t deg) {
       ub = lb;
       lb--;
     }
-    return interpolate((float)lb->first, lb->second, (float)ub->first, ub->second, (float)deg);
+    return interpolate((MyFloat)lb->first, lb->second, (MyFloat)ub->first, ub->second, (MyFloat)deg);
   }
 }
 
-float WireLoad::wireR(size_t deg) {
+MyFloat WireLoad::wireR(size_t deg) {
   return r * wireLength(deg);
 }
 
-float WireLoad::wireC(size_t deg) {
+MyFloat WireLoad::wireC(size_t deg) {
   return c * wireLength(deg);
 }
 
-float WireLoad::wireDelay(float loadC, size_t deg) {
+MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
   // best-case tree
   if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
     return 0.0;
@@ -351,8 +351,8 @@ float WireLoad::wireDelay(float loadC, size_t deg) {
 
     // balanced tree
     if (TREE_TYPE_BALANCED == lib->wireTreeType) {
-      wC /= (float)deg;
-      wR /= (float)deg;
+      wC /= (MyFloat)deg;
+      wR /= (MyFloat)deg;
     }
 
     // Elmore delay for worst-case & balanced tree
@@ -464,19 +464,19 @@ void CellLibParser::parseWireLoad() {
     // capacitance: value;
     if ("capacitance" == *curToken) {
       curToken += 2; // consume "capacitance" and ":"
-      wireLoad->c = std::stof(*curToken);
+      wireLoad->c = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // resisance: value;
     else if ("resistance" == *curToken) {
       curToken += 2; // consume "resistance" and ":"
-      wireLoad->r = std::stof(*curToken);
+      wireLoad->r = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // slope: value;
     else if ("slope" == *curToken) {
       curToken += 2; // consume "slope" and ":"
-      wireLoad->slope = std::stof(*curToken);
+      wireLoad->slope = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // fanout_length(fanout, length);
@@ -484,7 +484,7 @@ void CellLibParser::parseWireLoad() {
       curToken += 2; // consume "fanout_length" and "("
       size_t fanout = std::stoul(*curToken);
       curToken += 2; // consume fanout and ","
-      float length = std::stof(*curToken);
+      MyFloat length = getMyFloat(*curToken);
       wireLoad->addFanoutLength(fanout, length);
       curToken += 3; // consume length, ")" and ";"
     }
@@ -551,9 +551,9 @@ void CellLibParser::parseLut(Lut* lut) {
     // index_* ("num1[,num*]");
     if ("index_1" == *curToken || "index_2" == *curToken || "index_3" == *curToken) {
       curToken += 3; // consume "index_*", "(" and "\""
-      std::vector<float> v;
+      std::vector<MyFloat> v;
       while (!isEndOfTokenStream() && ")" != *curToken) {
-        v.push_back(std::stof(*curToken));
+        v.push_back(getMyFloat(*curToken));
         curToken += 2; // consume num*, and "," in between or "\"" at the end
       }
       lut->index.push_back(v);
@@ -563,7 +563,7 @@ void CellLibParser::parseLut(Lut* lut) {
     else if ("values" == *curToken) {
       curToken += 3; // consume "value", "(" and "\""
       while (!isEndOfTokenStream() && ")" != *curToken) {
-        lut->value.push_back(std::stof(*curToken));
+        lut->value.push_back(getMyFloat(*curToken));
         curToken += 2;
         if ("," == *curToken) {
           curToken += 3; // consume ",", "\\" and "\""
@@ -709,7 +709,7 @@ void CellLibParser::parseCellLeakagePower(Cell* cell) {
   // leakege_power () {...}
   curToken += 4; // consume "leakage_power", "(", ")" and "{"
 
-  float value = 0.0;
+  MyFloat value = 0.0;
   std::string when = "";
   while (!isEndOfGroup()) {
     // when: "...";
@@ -721,7 +721,7 @@ void CellLibParser::parseCellLeakagePower(Cell* cell) {
     // value: v;
     else if ("value" == *curToken) {
       curToken += 2; // consume "value" and ":"
-      value = std::stof(*curToken);
+      value = getMyFloat(*curToken);
       curToken += 2; // consume v and ";"
     }
     else {
@@ -769,19 +769,19 @@ void CellLibParser::parseCellPin(Cell* cell) {
     // fall_capacitance: value;
     else if ("fall_capacitance" == *curToken) {
       curToken += 2; // consume "fall_capacitance" and ":"
-      pin->c[0] = std::stof(*curToken);
+      pin->c[0] = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // rise_capacitance: value;
     else if ("rise_capacitance" == *curToken) {
       curToken += 2; // consume "rise_capacitance" and ":"
-      pin->c[1] = std::stof(*curToken);
+      pin->c[1] = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // max_capacitance: value;
     else if ("max_capacitance" == *curToken) {
       curToken += 2; // consume "max_capacitance" and ":"
-      pin->maxC = std::stof(*curToken);
+      pin->maxC = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // function: "...";
@@ -819,12 +819,12 @@ void CellLibParser::parseCell() {
     }
     else if ("area" == *curToken) {
       curToken += 2; // consume "area" and ":"
-      cell->area = std::stof(*curToken);
+      cell->area = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     else if ("cell_leakage_power" == *curToken) {
       curToken += 2; // consume "cell_leakage_power" and ":"
-      cell->cellLeakagePower = std::stof(*curToken);
+      cell->cellLeakagePower = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     else {
@@ -892,25 +892,25 @@ void CellLibParser::parseCellLibrary() {
     // default_inout_pin_cap: value;
     else if ("default_inout_pin_cap" == *curToken) {
       curToken += 2; // consume "default_inout_pin_cap" and ":"
-      lib->defaultInoutPinCap = std::stof(*curToken);
+      lib->defaultInoutPinCap = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // default_input_pin_cap: value;
     else if ("default_input_pin_cap" == *curToken) {
       curToken += 2; // consume "default_input_pin_cap" and ":"
-      lib->defaultInputPinCap = std::stof(*curToken);
+      lib->defaultInputPinCap = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // default_output_pin_cap: value;
     else if ("default_output_pin_cap" == *curToken) {
       curToken += 2; // consume "default_output_pin_cap" and ":"
-      lib->defaultOutputPinCap = std::stof(*curToken);
+      lib->defaultOutputPinCap = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // default_max_transition: value;
     else if ("default_max_transition" == *curToken) {
       curToken += 2; // consume "default_max_transition" and ":"
-      lib->defaultMaxSlew = std::stof(*curToken);
+      lib->defaultMaxSlew = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     else {

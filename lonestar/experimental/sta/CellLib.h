@@ -8,6 +8,7 @@
 #include <vector>
 #include <iostream>
 
+#include "TimingDefinition.h"
 #include "Tokenizer.h"
 
 // forward declaration
@@ -74,14 +75,14 @@ public:
 struct Lut {
   LutTemplate* lutTemplate;
 
-  std::vector<std::vector<float>> index;
-  std::vector<float> value;
+  std::vector<std::vector<MyFloat>> index;
+  std::vector<MyFloat> value;
 
 private:
-  float lookupInternal(std::vector<float>& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
+  MyFloat lookupInternal(std::vector<MyFloat>& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
-  float lookup(std::vector<float>& param);
+  MyFloat lookup(std::vector<MyFloat>& param);
   void print(std::string attr, std::ostream& os = std::cout);
 };
 
@@ -95,8 +96,8 @@ struct CellPin {
   bool isOutput;
   bool isClock;
 
-  float c[2];
-  float maxC;
+  MyFloat c[2];
+  MyFloat maxC;
   Cell* cell;
   std::string func;
 
@@ -110,9 +111,9 @@ struct CellPin {
 public:
   void print(std::ostream& os = std::cout);
   bool isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise);
-  float extract(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
-  std::pair<float, std::string> extractMax(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
-  std::pair<float, std::string> extractMin(std::vector<float>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  MyFloat extract(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
+  std::pair<MyFloat, std::string> extractMax(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  std::pair<MyFloat, std::string> extractMin(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
 
   void addLut(Lut* lut, TableType tType, bool isRise, CellPin* relatedPin, std::string when, bool isPos, bool isNeg) {
     if (isPos) {
@@ -127,9 +128,9 @@ public:
 struct Cell {
   std::string name;
   size_t driveStrength;
-  float area;
-  float cellLeakagePower;
-  std::unordered_map<std::string, float> leakagePower;
+  MyFloat area;
+  MyFloat cellLeakagePower;
+  std::unordered_map<std::string, MyFloat> leakagePower;
   CellLib* lib;
 
   using MapCellPin = std::unordered_map<std::string, CellPin*>;
@@ -180,29 +181,29 @@ public:
     return (it == pins.end()) ? nullptr : it->second;
   }
 
-  void addLeakagePower(std::string when, float value) {
+  void addLeakagePower(std::string when, MyFloat value) {
     leakagePower[when] = value;
   }
 };
 
 struct WireLoad {
   std::string name;
-  float c;
-  float r;
-  float slope;
-  std::map<size_t, float> fanoutLength;
+  MyFloat c;
+  MyFloat r;
+  MyFloat slope;
+  std::map<size_t, MyFloat> fanoutLength;
   CellLib* lib;
 
 private:
-  float wireLength(size_t deg);
+  MyFloat wireLength(size_t deg);
 
 public:
-  float wireR(size_t deg);
-  float wireC(size_t deg);
-  float wireDelay(float loadC, size_t deg);
+  MyFloat wireR(size_t deg);
+  MyFloat wireC(size_t deg);
+  MyFloat wireDelay(MyFloat loadC, size_t deg);
   void print(std::ostream& os = std::cout);
 
-  void addFanoutLength(size_t fanout, float length) {
+  void addFanoutLength(size_t fanout, MyFloat length) {
     fanoutLength[fanout] = length;
   }
 };
@@ -211,10 +212,10 @@ struct CellLib {
   std::string name;
   std::string opCond;
   WireLoad* defaultWireLoad;
-  float defaultInoutPinCap;
-  float defaultInputPinCap;
-  float defaultOutputPinCap;
-  float defaultMaxSlew;
+  MyFloat defaultInoutPinCap;
+  MyFloat defaultInputPinCap;
+  MyFloat defaultOutputPinCap;
+  MyFloat defaultMaxSlew;
   WireTreeType wireTreeType;
 
   std::unordered_map<std::string, WireLoad*> wireLoads;

@@ -52,11 +52,11 @@ void TimingEngine::time(VerilogModule* m) {
   }
 }
 
-float TimingEngine::reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
+MyFloat TimingEngine::reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
   return 0.0;
 }
 
-float TimingEngine::reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
+MyFloat TimingEngine::reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
   return 0.0;
 }
 

@@ -10,7 +10,7 @@
 static auto unprotected = galois::MethodFlag::UNPROTECTED;
 static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
-static float infinity = std::numeric_limits<float>::infinity();
+static MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
 
 void TimingGraph::addPin(VerilogPin* pin) {
   for (size_t j = 0; j < 2; j++) {
@@ -529,8 +529,8 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   }
 
   bool isNeg = (data.isRise != predData.isRise);
-  std::vector<float> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
-  std::vector<float> paramNoC = {predData.t[k].slew, 0.0};
+  std::vector<MyFloat> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
+  std::vector<MyFloat> paramNoC = {predData.t[k].slew, 0.0};
 
   auto& ieData = g.getEdgeData(ie);
 
