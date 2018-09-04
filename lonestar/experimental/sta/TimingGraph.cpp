@@ -507,7 +507,14 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
   auto wOutDeg = ieData.wire->outDeg();
 
   for (size_t k = 0; k < libs.size(); k++) {
-    auto delay = ieData.t[k].wireLoad->wireDelay(data.t[k].pinC, wOutDeg);
+    MyFloat loadC = 0.0;
+    if (TREE_TYPE_BALANCED == libs[k]->wireTreeType) {
+      loadC = data.t[k].pinC;
+    }
+    else if (TREE_TYPE_WORST_CASE == libs[k]->wireTreeType) {
+      loadC = predData.t[k].pinC;
+    }
+    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, wOutDeg);
     ieData.t[k].delay = delay;
     data.t[k].arrival = predData.t[k].arrival + delay;
     data.t[k].slew = predData.t[k].slew;

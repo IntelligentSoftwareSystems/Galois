@@ -362,6 +362,7 @@ MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
 
     // delay formula used by Cadence genus
     auto delay = wR * (wC + loadC);
+
     return delay;
   }
 }
