@@ -138,7 +138,7 @@ public:
 #ifdef GALOIS_USE_LWCI
     assert(false);
     lc_alreduce(&snapshot, &global_snapshot, sizeof(Ty),
-                &galois::runtime::internal::ompi_op_max<Ty>, &snapshot_request);
+                &galois::runtime::internal::ompi_op_max<Ty>);
 #else
     MPI_Iallreduce(&snapshot, &global_snapshot, 1, MPI::UNSIGNED_LONG, MPI_MAX,
                   MPI_COMM_WORLD, &snapshot_request);
@@ -160,7 +160,9 @@ public:
       work_done = true;
     } else {
       int snapshot_ended = 0;
+#ifndef GALOIS_USE_LWCI
       MPI_Test(&snapshot_request, &snapshot_ended, MPI_STATUS_IGNORE);
+#endif
       if (snapshot_ended != 0) {
         snapshot = global_snapshot;
         if (work_done) {
