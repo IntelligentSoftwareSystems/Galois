@@ -53,6 +53,7 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(BOARD2D_VCUT, "2dvc", "2d Checkerboard Vertex-Cut"),
         clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
         clEnumValN(CART_VCUT_IEC, "cvc-iec", "Cartesian Vertex-Cut of iec"),
+        clEnumValN(CART_VCUT_OLD, "cvc-old", "Cartesian Vertex-Cut oec, old impl"),
         clEnumValN(JAGGED_CYCLIC_VCUT, "jcvc", "Jagged Cyclic Vertex-Cut"),
         clEnumValN(JAGGED_BLOCKED_VCUT, "jbvc", "Jagged Blocked Vertex-Cut"),
         clEnumValN(OVER_DECOMPOSE_2_VCUT, "od2vc",

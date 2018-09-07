@@ -50,6 +50,7 @@ enum PARTITIONING_SCHEME {
   BOARD2D_VCUT,          //!< checkerboard cut
   CART_VCUT,             //!< cartesian vertex cut
   CART_VCUT_IEC,         //!< cartesian vertex cut using iec
+  CART_VCUT_OLD,             //!< cartesian vertex cut
   JAGGED_CYCLIC_VCUT,    //!< cyclic jagged cut
   JAGGED_BLOCKED_VCUT,   //!< blocked jagged cut
   OVER_DECOMPOSE_2_VCUT, //!< overdecompose cvc by 2
@@ -79,6 +80,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "cvc";
   case CART_VCUT_IEC:
     return "cvc_iec";
+  case CART_VCUT_OLD:
+    return "cvc_old";
   case JAGGED_CYCLIC_VCUT:
     return "jcvc";
   case JAGGED_BLOCKED_VCUT:
@@ -253,6 +256,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   typedef DistGraphEdgeCut<NodeData, EdgeData> Graph_edgeCut;
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData> Graph_cartesianCut;
+  typedef DistGraphCartesianCutOld<NodeData, EdgeData> Graph_cartesianCutOld;
   typedef DistGraphCartesianCutOld<NodeData, EdgeData, true> Graph_checkerboardCut;
   typedef DistGraphJaggedCut<NodeData, EdgeData> Graph_jaggedCut;
   typedef DistGraphJaggedCut<NodeData, EdgeData, true> Graph_jaggedBlockedCut;
@@ -282,6 +286,10 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
     return new Graph_cartesianCut(inputFile, partFolder, net.ID, net.Num,
                                   scaleFactor, false, readFromFile,
                                   localGraphFileName);
+  case CART_VCUT_OLD:
+    return new Graph_cartesianCutOld(inputFile, partFolder, net.ID, net.Num,
+                                     scaleFactor, false, readFromFile,
+                                     localGraphFileName);
   case JAGGED_CYCLIC_VCUT:
     return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num,
                                scaleFactor, false);
@@ -325,6 +333,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData>
       Graph_cartesianCut; // assumes push-style
+  typedef DistGraphCartesianCutOld<NodeData, EdgeData>
+      Graph_cartesianCutOld;
   typedef DistGraphCartesianCutOld<NodeData, EdgeData, true>
       Graph_checkerboardCut; // assumes push-style
   typedef DistGraphJaggedCut<NodeData, EdgeData>
@@ -385,6 +395,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
                                   scaleFactor, true, readFromFile,
                                   localGraphFileName);
+  case CART_VCUT_OLD:
+    return new Graph_cartesianCutOld(inputFile, partFolder, net.ID, net.Num,
+                                     scaleFactor, false, readFromFile,
+                                     localGraphFileName);
   case JAGGED_CYCLIC_VCUT:
     return new Graph_jaggedCut(inputFile, partFolder, net.ID, net.Num,
                                scaleFactor, false);
@@ -428,6 +442,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   typedef DistGraphHybridCut<NodeData, EdgeData> Graph_vertexCut;
   typedef DistGraphCartesianCut<NodeData, EdgeData, true>
       Graph_cartesianCut; // assumes pull-style
+  typedef DistGraphCartesianCutOld<NodeData, EdgeData, false, true>
+      Graph_cartesianCutOld;
   typedef DistGraphCartesianCutOld<NodeData, EdgeData, true,
                                 true>
       Graph_checkerboardCut; // assumes pull-style
@@ -512,6 +528,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       GALOIS_DIE("Error: (cvc) iterate over in-edges without transpose graph");
       break;
     }
+  case CART_VCUT_OLD:
+    return new Graph_cartesianCutOld(inputFile, partFolder, net.ID,
+                                     net.Num, scaleFactor, true, readFromFile,
+                                     localGraphFileName);
   case JAGGED_CYCLIC_VCUT:
     if (inputFileTranspose.size()) {
       return new Graph_jaggedCut(inputFileTranspose, partFolder, net.ID,
