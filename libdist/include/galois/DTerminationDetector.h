@@ -147,13 +147,13 @@ public:
 
   bool terminate() {
     bool active = (local_mdata != 0);
-    if (active) galois::gDebug("[", net.ID, "] local work done \n");
+    //if (active) galois::gDebug("[", net.ID, "] local work done \n");
     if (!active) {
       active = net.anyPendingSends();
-      if (active) galois::gDebug("[", net.ID, "] pending send \n");
+      //if (active) galois::gDebug("[", net.ID, "] pending send \n");
       if (!active) {
         active = net.anyPendingReceives();
-        if (active) galois::gDebug("[", net.ID, "] pending receive \n");
+        //if (active) galois::gDebug("[", net.ID, "] pending receive \n");
       }
     }
     if (active) {
@@ -207,7 +207,7 @@ public:
     bool halt = terminate();
     global_mdata = !halt;
     if (halt) {
-      ++galois::runtime::evilPhase;
+      galois::runtime::evilPhase += 2; // one for reduce and one for broadcast
       if (galois::runtime::evilPhase >=
           std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
         galois::runtime::evilPhase = 1;

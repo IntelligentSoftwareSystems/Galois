@@ -2729,7 +2729,9 @@ private:
       get_send_buffer<syncType, SyncFnTy, BitsetFnTy, async>(loopName, x, b);
 
       if ((!async) || (b.size() > 0)) {
-        net.sendTagged(x, galois::runtime::evilPhase, b);
+        size_t syncTypePhase = 0;
+        if (async && (syncType == syncBroadcast)) syncTypePhase = 1;
+        net.sendTagged(x, galois::runtime::evilPhase + syncTypePhase, b);
       }
     }
     if (!async) {
@@ -3107,9 +3109,11 @@ private:
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     if (async) {
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      size_t syncTypePhase = 0;
+      if (syncType == syncBroadcast) syncTypePhase = 1;
+      decltype(net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr);
 
         if (p) {
           syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
