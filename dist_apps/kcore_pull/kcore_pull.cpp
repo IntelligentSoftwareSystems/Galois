@@ -27,6 +27,9 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
+#ifdef __GALOIS_HET_ASYNC__
+#include "galois/DTerminationDetector.h"
+#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -165,13 +168,19 @@ struct InitializeGraph {
 struct LiveUpdate {
   cll::opt<uint32_t>& local_k_core_num;
   Graph* graph;
-  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+#ifdef __GALOIS_HET_ASYNC__
+  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
+#else
+  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
+#endif
+
+  DGAccumulatorTy& DGAccumulator_accum;
 
   LiveUpdate(cll::opt<uint32_t>& _kcore, Graph* _graph,
-             galois::DGAccumulator<unsigned int>& _dga)
+             DGAccumulatorTy& _dga)
       : local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     const auto& allNodes = _graph.allNodesRange();
     dga.reset();
 
@@ -235,9 +244,15 @@ struct LiveUpdate {
 struct KCore {
   Graph* graph;
 
+#ifdef __GALOIS_HET_ASYNC__
+  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
+#else
+  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
+#endif
+
   KCore(Graph* _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned iterations = 0;
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -259,14 +274,22 @@ struct KCore {
             galois::steal(),
             galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 
+#ifdef __GALOIS_HET_ASYNC__
+      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+                  Bitset_trim, true>("KCore");
+#else
       _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
                   Bitset_trim>("KCore");
+#endif
 
       // update live/deadness
       LiveUpdate::go(_graph, dga);
 
       iterations++;
-    } while ((iterations < maxIterations) &&
+    } while (
+#ifndef __GALOIS_HET_ASYNC__
+             (iterations < maxIterations) &&
+#endif
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -380,7 +403,11 @@ int main(int argc, char** argv) {
   InitializeGraph::go((*h_graph));
   galois::runtime::getHostBarrier().wait();
 
+#ifdef __GALOIS_HET_ASYNC__
+  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+#else
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+#endif
   galois::DGAccumulator<uint64_t> dga;
 
   for (auto run = 0; run < numRuns; ++run) {

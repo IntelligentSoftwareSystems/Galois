@@ -27,6 +27,9 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
+#ifdef __GALOIS_HET_ASYNC__
+#include "galois/DTerminationDetector.h"
+#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -201,13 +204,19 @@ struct KCoreStep1 {
   cll::opt<uint32_t>& local_k_core_num;
   Graph* graph;
 
-  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+#ifdef __GALOIS_HET_ASYNC__
+  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
+#else
+  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
+#endif
+
+  DGAccumulatorTy& DGAccumulator_accum;
 
   KCoreStep1(cll::opt<uint32_t>& _kcore, Graph* _graph,
-             galois::DGAccumulator<unsigned int>& _dga)
+             DGAccumulatorTy& _dga)
       : local_k_core_num(_kcore), graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned iterations = 0;
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -236,14 +245,22 @@ struct KCoreStep1 {
       // source=destination; not a readAny because any will grab non
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
+#ifdef __GALOIS_HET_ASYNC__
+      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+                  Bitset_trim, true>("KCore");
+#else
       _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
                   Bitset_trim>("KCore");
+#endif
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);
 
       iterations++;
-    } while ((iterations < maxIterations) &&
+    } while (
+#ifndef __GALOIS_HET_ASYNC__
+             (iterations < maxIterations) &&
+#endif
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -360,7 +377,11 @@ int main(int argc, char** argv) {
   InitializeGraph1::go((*h_graph));
   galois::runtime::getHostBarrier().wait();
 
+#ifdef __GALOIS_HET_ASYNC__
+  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+#else
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+#endif
   galois::DGAccumulator<uint64_t> dga;
 
   for (auto run = 0; run < numRuns; ++run) {

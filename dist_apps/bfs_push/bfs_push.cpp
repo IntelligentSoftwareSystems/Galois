@@ -26,7 +26,9 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
+#ifdef __GALOIS_HET_ASYNC__
 #include "galois/DTerminationDetector.h"
+#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__

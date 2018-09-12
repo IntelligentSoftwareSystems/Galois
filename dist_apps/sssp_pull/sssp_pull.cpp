@@ -23,6 +23,9 @@
 #include "galois/gstl.h"
 #include "DistBenchStart.h"
 #include "galois/DReducible.h"
+#ifdef __GALOIS_HET_ASYNC__
+#include "galois/DTerminationDetector.h"
+#endif
 #include "galois/runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
@@ -104,12 +107,18 @@ struct InitializeGraph {
 
 struct SSSP {
   Graph* graph;
-  galois::DGAccumulator<unsigned int>& DGAccumulator_accum;
+#ifdef __GALOIS_HET_ASYNC__
+  using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
+#else
+  using DGAccumulatorTy = galois::DGAccumulator<unsigned int>;
+#endif
 
-  SSSP(Graph* _graph, galois::DGAccumulator<unsigned int>& _dga)
+  DGAccumulatorTy& DGAccumulator_accum;
+
+  SSSP(Graph* _graph, DGAccumulatorTy& _dga)
       : graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     unsigned _num_iterations   = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
@@ -134,15 +143,23 @@ struct SSSP {
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()));
       }
 
+#ifdef __GALOIS_HET_ASYNC__
+      _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
+                  Broadcast_dist_current, Bitset_dist_current, true>("SSSP");
+#else
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
                   Broadcast_dist_current, Bitset_dist_current>("SSSP");
+#endif
 
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
           (unsigned long)dga.read_local());
 
       ++_num_iterations;
-    } while ((_num_iterations < maxIterations) &&
+    } while (
+#ifndef __GALOIS_HET_ASYNC__
+             (_num_iterations < maxIterations) &&
+#endif
              dga.reduce(_graph.get_run_identifier()));
 
     if (galois::runtime::getSystemNetworkInterface().ID == 0) {
@@ -277,7 +294,11 @@ int main(int argc, char** argv) {
   galois::runtime::getHostBarrier().wait();
 
   // accumulators for use in operators
+#ifdef __GALOIS_HET_ASYNC__
+  galois::DGTerminator<unsigned int> DGAccumulator_accum;
+#else
   galois::DGAccumulator<unsigned int> DGAccumulator_accum;
+#endif
   galois::DGAccumulator<uint64_t> DGAccumulator_sum;
   galois::DGAccumulator<uint64_t> dg_avge;
   galois::DGReduceMax<uint32_t> m;
