@@ -26,6 +26,8 @@
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
+#include "galois/gIO.h"
+#include <atomic>
 
 /**
  * MPI implementation of network IO. ASSUMES THAT MPI IS INITIALIZED
@@ -86,8 +88,11 @@ private:
 
     galois::runtime::MemUsageTracker& memUsageTracker;
 
-    sendQueueTy(galois::runtime::MemUsageTracker& tracker)
-        : memUsageTracker(tracker) {}
+    std::atomic<size_t>& inflightSends;
+
+    sendQueueTy(galois::runtime::MemUsageTracker& tracker,
+        std::atomic<size_t>& sends)
+        : memUsageTracker(tracker), inflightSends(sends) {}
 
     void complete() {
       while (!inflight.empty()) {
@@ -99,6 +104,7 @@ private:
         if (flag) {
           memUsageTracker.decrementMemUsage(f.data.size());
           inflight.pop_front();
+          --inflightSends;
         } else
           break;
       }
@@ -124,8 +130,11 @@ private:
 
     galois::runtime::MemUsageTracker& memUsageTracker;
 
-    recvQueueTy(galois::runtime::MemUsageTracker& tracker)
-        : memUsageTracker(tracker) {}
+    std::atomic<size_t>& inflightRecvs;
+
+    recvQueueTy(galois::runtime::MemUsageTracker& tracker,
+        std::atomic<size_t>& recvs)
+        : memUsageTracker(tracker), inflightRecvs(recvs) {}
 
     // FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
@@ -136,6 +145,7 @@ private:
                           &status);
       handleError(rv);
       if (flag) {
+        ++inflightRecvs;
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
@@ -181,9 +191,11 @@ public:
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */
-  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID,
-               uint32_t& NUM)
-      : NetworkIO(tracker), sendQueue(tracker), recvQueue(tracker) {
+  NetworkIOMPI(galois::runtime::MemUsageTracker& tracker, 
+      std::atomic<size_t>& sends, std::atomic<size_t>& recvs, 
+      uint32_t& ID, uint32_t& NUM)
+      : NetworkIO(tracker, sends, recvs),
+        sendQueue(tracker, inflightSends), recvQueue(tracker, inflightRecvs) {
     auto p = getIDAndHostNum();
     ID     = p.first;
     NUM    = p.second;
@@ -216,20 +228,12 @@ public:
     sendQueue.complete();
     recvQueue.probe();
   }
-
-  virtual bool anyPendingSends() {
-    return (!sendQueue.inflight.empty());
-  }
-
-  virtual bool anyPendingReceives() {
-    return (!recvQueue.inflight.empty() || !recvQueue.done.empty());
-  }
 }; // end NetworkIOMPI class
 
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>
-galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker) {
+galois::runtime::makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs) {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{
-      new NetworkIOMPI(tracker, ID, NUM)};
+      new NetworkIOMPI(tracker, sends, recvs, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }

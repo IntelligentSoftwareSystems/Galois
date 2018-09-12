@@ -66,6 +66,10 @@ protected:
   //! memory usage tracker
   MemUsageTracker& memUsageTracker;
 
+  //! Number of inflight sends and receives
+  std::atomic<size_t>& inflightSends;
+  std::atomic<size_t>& inflightRecvs;
+
 public:
   /**
    * Message structure for sending data across the network.
@@ -90,7 +94,8 @@ public:
 
   //! The default constructor takes a memory usage tracker and saves it
   //! @param tracker reference to a memory usage tracker used by the system
-  NetworkIO(MemUsageTracker& tracker) : memUsageTracker(tracker) {}
+  NetworkIO(MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs)
+    : memUsageTracker(tracker), inflightSends(sends), inflightRecvs(recvs) {}
 
   //! Default destructor does nothing.
   virtual ~NetworkIO();
@@ -102,10 +107,6 @@ public:
   virtual message dequeue() = 0;
   //! Make progress. Other functions don't have to make progress.
   virtual void progress() = 0;
-  //! @returns true if any send is in progress or is pending to be enqueued
-  virtual bool anyPendingSends() = 0;
-  //! @returns true if any receive is in progress or is pending to be dequeued
-  virtual bool anyPendingReceives() = 0;
 };
 
 /**
@@ -115,7 +116,7 @@ public:
  * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
-makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
+makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
 #ifdef GALOIS_USE_LWCI
 /**
  * Creates/returns a network IO layer that uses LWCI to do communication.
@@ -124,7 +125,7 @@ makeNetworkIOMPI(galois::runtime::MemUsageTracker& tracker);
  * total number of hosts in the system
  */
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t>
-makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker);
+makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs);
 #endif
 
 } // namespace runtime

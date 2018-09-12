@@ -365,7 +365,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 // Initialize LWCI or MPI depending on what was defined in CMake
 #ifdef GALOIS_USE_LWCI
     // Initialize LWCI
-    std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker);
+    std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker, inflightSends, inflightRecvs);
     if (ID == 0)
       fprintf(stderr, "**Using LWCI Communication layer**\n");
 #else
@@ -384,7 +384,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
-    std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker);
+    std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker, inflightSends, inflightRecvs);
 #endif
 
     assert(ID == (unsigned)rank);
@@ -430,6 +430,8 @@ public:
   using NetworkInterface::Num;
 
   NetworkInterfaceBuffered() {
+    inflightSends = 0;
+    inflightRecvs = 0;
     ready  = 0;
     anyReceivedMessages = false;
     worker = std::thread(&NetworkInterfaceBuffered::workerThread, this);
@@ -460,6 +462,7 @@ public:
   std::unique_ptr<galois::runtime::NetworkIO> netio;
 
   virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) {
+    ++inflightSends;
     statSendNum += 1;
     statSendBytes += buf.size();
     galois::runtime::trace("sendTagged", dest, tag,
@@ -486,6 +489,7 @@ public:
               *rlg = std::move(lg);
             galois::runtime::trace("recvTagged", h, tag,
                                    galois::runtime::printVec(buf->getVec()));
+            --inflightRecvs;
             anyReceivedMessages = true;
             return optional_t<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));
@@ -524,14 +528,7 @@ public:
   }
 
   virtual bool anyPendingSends() {
-    for (unsigned h = 0; h < sendData.size(); ++h) {
-      auto& sq = sendData[h];
-      if (sq.size() > 0)  {
-        //galois::gDebug("[", ID, "] send in buffer \n");
-        return true;
-      }
-    }
-    return netio->anyPendingSends();
+    return (inflightSends > 0);
   }
 
   virtual bool anyPendingReceives() {
@@ -540,14 +537,7 @@ public:
       //galois::gDebug("[", ID, "] receive out of buffer \n");
       return true;
     }
-    for (unsigned h = 0; h < recvData.size(); ++h) {
-      auto& rq = recvData[h];
-      if (rq.size() > 0)  {
-        //galois::gDebug("[", ID, "] receive in buffer \n");
-        return true;
-      }
-    }
-    return netio->anyPendingReceives();
+    return (inflightRecvs > 0);
   }
 
   virtual unsigned long reportSendBytes() const { return statSendBytes; }

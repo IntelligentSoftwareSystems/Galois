@@ -90,6 +90,10 @@ protected:
   //! Memory usage tracker
   MemUsageTracker memUsageTracker;
 
+  //! Number of inflight sends and receives
+  std::atomic<size_t> inflightSends;
+  std::atomic<size_t> inflightRecvs;
+
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
 public:
   //! Wrapper that calls into increment mem usage on the memory usage tracker

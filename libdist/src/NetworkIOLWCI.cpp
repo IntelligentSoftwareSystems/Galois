@@ -98,9 +98,10 @@ public:
    * @param [out] ID this machine's host id
    * @param [out] NUM total number of hosts in the system
    */
-  NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, uint32_t& ID,
-                uint32_t& NUM)
-      : NetworkIO(tracker) {
+  NetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, 
+      std::atomic<size_t>& sends, std::atomic<size_t>& recvs, 
+      uint32_t& ID, uint32_t& NUM)
+      : NetworkIO(tracker, sends, recvs) {
     auto p = initMPI();
     ID     = p.first;
     NUM    = p.second;
@@ -123,6 +124,7 @@ public:
     if (lc_post(&f->ctx, (void*)f)) {
       delete f;
     }
+    --inflightSends;
   }
 
   void probe() {
@@ -132,6 +134,7 @@ public:
     lc_qtag tag;
     if (lc_recv_queue(mv, &size, (int*)&m.rank, (lc_qtag*)&tag, 0, alloc_cb, &m,
                       LC_SYNC_NULL, &m.ctx)) {
+      ++inflightRecvs;
       m.tag = tag;
       memUsageTracker.incrementMemUsage(size);
     } else {
@@ -165,14 +168,6 @@ public:
     probe();
     lc_progress(mv);
   }
-
-  virtual bool anyPendingSends() {
-    return false; // is this correct?
-  }
-
-  virtual bool anyPendingReceives() {
-    return !recv.empty();
-  }
 };
 
 /**
@@ -182,10 +177,10 @@ public:
  * the caller in the network layer + total number of hosts in the system.
  */
 std::tuple<std::unique_ptr<galois::runtime::NetworkIO>, uint32_t, uint32_t>
-galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker) {
+galois::runtime::makeNetworkIOLWCI(galois::runtime::MemUsageTracker& tracker, std::atomic<size_t>& sends, std::atomic<size_t>& recvs) {
   uint32_t ID, NUM;
   std::unique_ptr<galois::runtime::NetworkIO> n{
-      new NetworkIOLWCI(tracker, ID, NUM)};
+      new NetworkIOLWCI(tracker, sends, recvs, ID, NUM)};
   return std::make_tuple(std::move(n), ID, NUM);
 }
 
