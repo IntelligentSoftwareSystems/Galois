@@ -26,8 +26,6 @@
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
-#include "galois/gIO.h"
-#include <atomic>
 
 /**
  * MPI implementation of network IO. ASSUMES THAT MPI IS INITIALIZED

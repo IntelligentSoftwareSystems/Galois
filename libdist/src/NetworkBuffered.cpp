@@ -111,10 +111,11 @@ class NetworkInterfaceBuffered : public NetworkInterface {
      * Return a (moved) vector if the len bytes requested are the last len
      * bytes of the front of the buffer queue
      */
-    optional_t<std::vector<uint8_t>> popVec(uint32_t len) {
+    optional_t<std::vector<uint8_t>> popVec(uint32_t len, std::atomic<size_t>& inflightRecvs) {
       if (data[0].data.size() == frontOffset + len) {
         std::vector<uint8_t> retval(std::move(data[0].data));
         data.pop_front();
+        --inflightRecvs;
         frontOffset = 0;
         if (data.size()) {
           dataPresent = data.front().tag;
@@ -127,11 +128,12 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
     }
 
-    void erase(size_t n) {
+    void erase(size_t n, std::atomic<size_t>& inflightRecvs) {
       frontOffset += n;
       while (frontOffset && frontOffset >= data.front().data.size()) {
         frontOffset -= data.front().data.size();
         data.pop_front();
+        --inflightRecvs;
       }
       if (data.size()) {
         dataPresent = data.front().tag;
@@ -154,7 +156,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
   public:
-    optional_t<RecvBuffer> popMsg(uint32_t tag) {
+    optional_t<RecvBuffer> popMsg(uint32_t tag, std::atomic<size_t>& inflightRecvs) {
       std::lock_guard<SimpleLock> lg(qlock);
 #ifndef NO_AGG
       uint32_t len = getLenFromFront(tag);
@@ -163,10 +165,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         return optional_t<RecvBuffer>();
       if (!sizeAtLeast(sizeof(uint32_t) + len, tag))
         return optional_t<RecvBuffer>();
-      erase(4);
+      erase(4, inflightRecvs);
 
       // Try just using the buffer
-      if (auto r = popVec(len)) {
+      if (auto r = popVec(len, inflightRecvs)) {
         auto start = r->size() - len;
         //        std::cerr << "FP " << r->size() << " " << len << " " << start
         //        << "\n";
@@ -176,7 +178,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       RecvBuffer buf(len);
       // FIXME: This is slows things down 25%
       copyOut((char*)buf.linearData(), len);
-      erase(len);
+      erase(len, inflightRecvs);
       // std::cerr << "p " << tag << " " << len << "\n";
       return optional_t<RecvBuffer>(std::move(buf));
 #else
@@ -186,6 +188,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       std::vector<uint8_t> vec(std::move(data.front().data));
 
       data.pop_front();
+      --inflightRecvs;
       if (!data.empty()) {
         dataPresent = data.front().tag;
       } else {
@@ -480,7 +483,7 @@ public:
         if (recvLock[h].try_lock()) {
           std::unique_lock<galois::substrate::SimpleLock> lg(recvLock[h],
                                                              std::adopt_lock);
-          auto buf = rq.popMsg(tag);
+          auto buf = rq.popMsg(tag, inflightRecvs);
           if (buf) {
             ++statRecvNum;
             statRecvBytes += buf->size();
@@ -489,7 +492,6 @@ public:
               *rlg = std::move(lg);
             galois::runtime::trace("recvTagged", h, tag,
                                    galois::runtime::printVec(buf->getVec()));
-            --inflightRecvs;
             anyReceivedMessages = true;
             return optional_t<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));
