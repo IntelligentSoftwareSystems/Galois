@@ -247,10 +247,10 @@ struct PageRank {
             galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
 #ifdef __GALOIS_HET_ASYNC__
-      _graph.sync<writeSource, readDestination, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual, true>("PageRank");
 #else
-      _graph.sync<writeSource, readDestination, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
                   Bitset_residual>("PageRank");
 #endif
 

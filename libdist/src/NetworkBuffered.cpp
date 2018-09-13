@@ -472,7 +472,6 @@ public:
     statSendBytes += buf.size();
     galois::runtime::trace("sendTagged", dest, tag,
                            galois::runtime::printVec(buf.getVec()));
-    galois::gDebug("[", ID, "] sendTagged ", dest, " ", tag);
     auto& sd = sendData[dest];
     sd.add(tag, buf.getVec());
   }
@@ -495,7 +494,6 @@ public:
               *rlg = std::move(lg);
             galois::runtime::trace("recvTagged", h, tag,
                                    galois::runtime::printVec(buf->getVec()));
-            galois::gDebug("[", ID, "] recvTagged ", h, " ", tag);
             anyReceivedMessages = true;
             return optional_t<std::pair<uint32_t, RecvBuffer>>(
                 std::make_pair(h, std::move(*buf)));

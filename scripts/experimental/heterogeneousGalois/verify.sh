@@ -8,12 +8,12 @@ execdirname="."
 execname=$1
 EXEC=${execdirname}/${execname}
 
-inputdirname=/net/ohm/export/iss/dist-inputs
+inputdirname=/net/ohm/export/cdgc/dist-inputs
 #inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/net/ohm/export/iss/dist-outputs
+outputdirname=/net/ohm/export/cdgc/dist-outputs
 #outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
@@ -79,7 +79,7 @@ INPUT=${inputdirname}/${inputname}.${extension}
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/Galois
 fi
-checker=${ABELIAN_GALOIS_ROOT}/scripts/result_checker.py
+checker=${ABELIAN_GALOIS_ROOT}/dist_exp/scripts/result_checker.py
 #checker=./result_checker.py
 
 hostname=`hostname`
@@ -98,7 +98,7 @@ pass=0
 fail=0
 failed_cases=""
 #for partition in 1 2 3 4 5 6 7 8 9 10; do
-for partition in 1 7 8; do
+for partition in 1 2 3 5 6 7 8; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
@@ -121,8 +121,6 @@ for partition in 1 7 8; do
     CUTTYPE+=" -partition=od2vc"
   elif [ $partition -eq 10 ]; then
     CUTTYPE+=" -partition=od4vc"
-  elif [ $partition -eq 11 ]; then
-    CUTTYPE+=" -partition=cvc-iec"
   fi
 
   for task in $SET; do
@@ -169,8 +167,6 @@ for partition in 1 7 8; do
         failed_cases+="over-decompose 2 cvc $1 devices with $3 threads; "
       elif [ $partition -eq 10 ]; then
         failed_cases+="over-decompose 4 cvc $1 devices with $3 threads; "
-      elif [ $partition -eq 11 ]; then
-        failed_cases+="cartesian vertex-cut (with incoming edge-cut) $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1

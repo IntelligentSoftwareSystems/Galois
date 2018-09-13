@@ -28,9 +28,9 @@ fi
 if [[ ($execname == *"bc"*) ]]; then
   FLAGS+=" -singleSource"
 fi
-#if [[ ($execname == *"pagerank"*) ]]; then
-#  FLAGS+=" -maxIterations=100"
-#fi
+if [[ ($execname == *"pagerank"*) ]]; then
+  FLAGS+=" -maxIterations=100"
+fi
 
 source_file=${inputdirname}/source
 if [[ $execname == *"cc"* || $execname == *"kcore"* ]]; then
@@ -65,7 +65,6 @@ SET="g,1,2 gg,2,2 c,1,16 gc,2,14 cg,2,14 ggc,3,12 cgg,3,12 gcg,3,12"
 SET="c,1,48 g,1,2 gg,2,2 ggg,3,2 gggg,4,2 ggggg,5,2 gggggg,6,2"
 # assumes 4 GPU devices available
 SET="c,1,28 g,1,28 gg,2,14 ggg,3,7 gggg,4,7"
-SET="gggg,4,7"
 
 for task in $SET; do
   IFS=",";
