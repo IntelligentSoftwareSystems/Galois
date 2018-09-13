@@ -295,7 +295,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 #endif
     }
 
-    std::pair<uint32_t, std::vector<uint8_t>> assemble() {
+    std::pair<uint32_t, std::vector<uint8_t>> assemble(std::atomic<size_t>& inflightSends) {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
         return std::make_pair(~0, std::vector<uint8_t>());
@@ -338,7 +338,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           --urgent;
         lg.lock();
         messages.pop_front();
+        --inflightSends;
       } while (vec.size() < len + num);
+      ++inflightSends;
       numBytes -= len;
 #else
       uint32_t tag = messages.front().tag;
@@ -404,7 +406,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         if (sd.ready()) {
           NetworkIO::message msg;
           msg.host                    = i;
-          std::tie(msg.tag, msg.data) = sd.assemble();
+          std::tie(msg.tag, msg.data) = sd.assemble(inflightSends);
           galois::runtime::trace("BufferedSending", msg.host, msg.tag,
                                  galois::runtime::printVec(msg.data));
           ++statSendEnqueued;
