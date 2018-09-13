@@ -26,6 +26,7 @@
 #include "galois/runtime/NetworkIO.h"
 #include "galois/runtime/Tracer.h"
 #include "galois/substrate/SimpleLock.h"
+#include "galois/gIO.h"
 
 /**
  * MPI implementation of network IO. ASSUMES THAT MPI IS INITIALIZED
@@ -113,6 +114,7 @@ private:
       auto& f = inflight.back();
       galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(),
                              galois::runtime::printVec(f.data));
+      galois::gDebug("[", getID(), "] MPI ISEND ", f.host, " ", f.tag, " ", f.data.size());
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
                          MPI_COMM_WORLD, &f.req);
       handleError(rv);
@@ -159,6 +161,7 @@ private:
           handleError(rv);
           galois::runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG,
                                  m.data.size());
+          galois::gDebug("[", getID(), "] MPI IRECV ", status.MPI_SOURCE, " ", status.MPI_TAG, " ", m.data.size());
 #ifdef __GALOIS_BARE_MPI_COMMUNICATION__
         }
 #endif
