@@ -222,6 +222,9 @@ struct PageRank {
       _graph.set_num_round(_num_iterations);
       PageRank_delta::go(_graph);
       dga.reset();
+      // reset residual on mirrors
+      _graph.reset_mirrorField<Reduce_add_residual>();
+
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("PageRank_" + (_graph.get_run_identifier()));
