@@ -113,8 +113,13 @@ private:
       auto& f = inflight.back();
       galois::runtime::trace("MPI SEND", f.host, f.tag, f.data.size(),
                              galois::runtime::printVec(f.data));
+#ifdef __GALOIS_HET_ASYNC__
+      int rv = MPI_Issend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
+                         MPI_COMM_WORLD, &f.req);
+#else
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag,
                          MPI_COMM_WORLD, &f.req);
+#endif
       handleError(rv);
     }
   };
