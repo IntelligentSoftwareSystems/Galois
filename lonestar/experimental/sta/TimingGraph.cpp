@@ -596,6 +596,7 @@ void TimingGraph::computeArrivalTime() {
     return g.getData(n, unprotected).topoL;
   };
 
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
   using LIFO = galois::worklists::PerThreadChunkLIFO<>;
   using OBIM
       = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
@@ -638,12 +639,14 @@ void TimingGraph::computeArrivalTime() {
       for (auto e: g.edges(n)) {
         auto succ = g.getEdgeDst(e);
         auto& succData = g.getData(succ);
-        if ((1 == succData.topoL - data.topoL) && !succData.isDummy) {
+        if (/*(1 == succData.topoL - data.topoL) &&*/ !succData.isDummy) {
           auto& succInQueue = succData.flag;
-          bool succQueued = false;
-          if (succInQueue.compare_exchange_strong(succQueued, true)) {
-            *(enqueued[succData.topoL]) += 1;
-            ctx.push(succ);
+          if (!succInQueue) {
+            bool succQueued = false;
+            if (succInQueue.compare_exchange_strong(succQueued, true)) {
+              *(enqueued[succData.topoL]) += 1;
+              ctx.push(succ);
+            }
           }
         }
       }
@@ -653,15 +656,20 @@ void TimingGraph::computeArrivalTime() {
     , galois::wl<OBIM>(topoLIndexer)
   );
 
+  size_t totalEnqueued = 0;
+  size_t totalExecuted = 0;
   for (size_t i = 0; i < numLevels; i++) {
     auto q = enqueued[i]->reduce();
     auto x = executed[i]->reduce();
+    totalEnqueued += q;
+    totalExecuted += x;
     if (q != x) {
       std::cout << "Level " << i << ": " << q << " enqueued, " << x << " executed." << std::endl;
     }
     delete enqueued[i];
     delete executed[i];
   }
+  std::cout << totalEnqueued << " enqueued, " << totalExecuted << " executed." << std::endl;
 
   std::cout << "ComputeArrivalTime done." << std::endl;
   print();
