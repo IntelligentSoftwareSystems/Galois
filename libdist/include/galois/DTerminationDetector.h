@@ -151,18 +151,20 @@ public:
     if (!active) {
       active = net.anyPendingSends();
       //if (active) galois::gDebug("[", net.ID, "] pending send \n");
-      if (!active) {
-        active = net.anyPendingReceives();
-        //if (active) galois::gDebug("[", net.ID, "] pending receive \n");
-      }
+    }
+    int snapshot_ended = 0;
+    if (!active) {
+#ifndef GALOIS_USE_LWCI
+      MPI_Test(&snapshot_request, &snapshot_ended, MPI_STATUS_IGNORE);
+#endif
+    }
+    if (!active) { // check pending receives after checking snapshot
+      active = net.anyPendingReceives();
+      //if (active) galois::gDebug("[", net.ID, "] pending receive \n");
     }
     if (active) {
       work_done = true;
     } else {
-      int snapshot_ended = 0;
-#ifndef GALOIS_USE_LWCI
-      MPI_Test(&snapshot_request, &snapshot_ended, MPI_STATUS_IGNORE);
-#endif
       if (snapshot_ended != 0) {
         snapshot = global_snapshot;
         if (work_done) {
