@@ -44,7 +44,7 @@ template <typename NodeTy, typename EdgeTy, bool moreColumnHosts = false>
 class DistGraphCartesianCut : public DistGraph<NodeTy, EdgeTy> {
   constexpr static const char* const GRNAME = "dGraph_cartesianCut";
   //! Vector of Uint64 Vectors
-  using VectorOfVector64 = std::vector<std::vector<uint64_t>>;
+  using VectorOfVector64 = galois::gstl::Vector<galois::gstl::Vector<uint64_t>>;
 
 public:
   //! @copydoc DistGraphEdgeCut::base_DistGraph
@@ -758,6 +758,14 @@ private:
     typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
+    // reserve space for send buffers
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        auto& b = (*sb.getLocal())[i];
+        b.reserve(edgePartitionSendBufSize * 1.25);
+      }
+    });
+
     const unsigned& id =
         base_DistGraph::id; // manually copy it because it is protected
     galois::do_all(
@@ -784,7 +792,7 @@ private:
             uint64_t gdst = bufGraph.edgeDestination(*ii);
             auto gdata    = bufGraph.edgeData(*ii);
             int i         = this->getColumnOfNode(gdst);
-            if ((h_offset + i) == (id)) {
+            if ((h_offset + i) == id) {
               assert(this->isLocal(n));
               uint32_t ldst = this->G2L(gdst);
               graph.constructEdge(cur++, ldst, gdata);
@@ -802,6 +810,7 @@ private:
               if (b.size() > edgePartitionSendBufSize) {
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
                 b.getVec().clear();
+                b.getVec().reserve(edgePartitionSendBufSize * 1.25);
               }
             }
           }
@@ -850,6 +859,14 @@ private:
     typedef std::vector<galois::runtime::SendBuffer> SendBufferVecTy;
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
+    // reserve space for send buffers
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      for (unsigned i = 0; i < numColumnHosts; ++i) {
+        auto& b = (*sb.getLocal())[i];
+        b.reserve(edgePartitionSendBufSize * 1.25);
+      }
+    });
+
     const unsigned& id =
         base_DistGraph::id; // manually copy it because it is protected
     galois::do_all(
@@ -885,11 +902,12 @@ private:
               auto& b = (*sb.getLocal())[i];
               galois::runtime::gSerialize(b, n);
               galois::runtime::gSerialize(b, gdst_vec[i]);
-              // unsigned h_offset_real = virtual2RealHost(h_offset);
               if (b.size() > edgePartitionSendBufSize) {
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
                 b.getVec().clear();
+                b.getVec().reserve(edgePartitionSendBufSize * 1.25);
               }
+
             }
           }
           if (this->isLocal(n)) {
