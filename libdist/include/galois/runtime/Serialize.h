@@ -108,7 +108,7 @@ public:
   //! Returns a pointer to the data stored in this serialize buffer
   const uint8_t* linearData() const { return bufdata.data(); }
   //! Returns vector of data stored in this serialize buffer
-  std::vector<uint8_t>& getVec() { return bufdata; }
+  vTy& getVec() { return bufdata; }
 
   //! Returns an iterator to the beginning of the data in this serialize buffer
   vTy::const_iterator begin() const { return bufdata.cbegin(); }
