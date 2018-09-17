@@ -131,7 +131,7 @@ struct FirstItr_BFS {
     _graph.set_num_round(0);
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      std::string impl_str(_graph.get_run_identifier("BFS_"));
+      std::string impl_str(_graph.get_run_identifier("BFS"));
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), regionname);
       StatTimer_cuda.start();
       FirstItr_BFS_cuda(__begin, __end, cuda_ctx);
