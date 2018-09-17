@@ -2599,7 +2599,7 @@ private:
     std::string statSendBytes_str(syncTypeStr + "SendBytes_" +
                                   get_run_identifier(loopName));
 
-    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(
+    galois::runtime::reportStat_Tsum(
         GRNAME, statSendBytes_str, b.size());
   }
 
@@ -2616,7 +2616,7 @@ private:
     std::string statSendBytes_str(syncTypeStr + "SendBytesVector_" +
                                   get_run_identifier(loopName));
 
-    galois::runtime::reportStatCond_Tsum<MORE_COMM_STATS>(
+    galois::runtime::reportStat_Tsum(
         GRNAME, statSendBytes_str, b.size());
   }
 
