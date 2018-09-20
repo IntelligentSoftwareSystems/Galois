@@ -1364,6 +1364,7 @@ private:
           (syncType == syncReduce) ? "Reduce" : "Broadcast";
       std::string doall_str(syncTypeStr + "Bitset_" + loopName);
 
+      bitset_comm.reset();
       // determine which local nodes in the indices array need to be
       // sychronized
       galois::do_all(galois::iterate(0ul, indices.size()),
