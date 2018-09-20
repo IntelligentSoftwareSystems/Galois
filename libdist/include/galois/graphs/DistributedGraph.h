@@ -2717,7 +2717,11 @@ private:
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_net_send(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string statNumMessages_str(syncTypeStr + "NumMessages_" +
+                                  get_run_identifier(loopName));
 
+    size_t numMessages = 0;
     for (unsigned h = 1; h < numHosts; ++h) {
       unsigned x = (id + h) % numHosts;
 
@@ -2732,6 +2736,7 @@ private:
         size_t syncTypePhase = 0;
         if (async && (syncType == syncBroadcast)) syncTypePhase = 1;
         net.sendTagged(x, galois::runtime::evilPhase + syncTypePhase, b);
+        ++numMessages;
       }
     }
     if (!async) {
@@ -2742,6 +2747,9 @@ private:
     if (BitsetFnTy::is_valid()) {
       reset_bitset(syncType, &BitsetFnTy::reset_range);
     }
+
+    galois::runtime::reportStat_Tsum(
+        GRNAME, statNumMessages_str, numMessages);
   }
 
   /**
