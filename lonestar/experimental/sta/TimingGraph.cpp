@@ -80,8 +80,8 @@ void TimingGraph::addGate(VerilogGate* gate) {
     for (auto in: inNodes) {
       auto& iData = g.getData(in, unprotected);
       auto ip = iData.t[0].pin;
-      auto isNegUnate = (oData.isRise != iData.isRise);
-      if (op->isUnateAtEdge(ip, isNegUnate, oData.isRise)) {
+      auto isNeg = (oData.isRise != iData.isRise);
+      if (op->isEdgeDefined(ip, isNeg, oData.isRise)) {
         auto e = g.addMultiEdge(in, on, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -462,7 +462,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
         iData.revTopoL = oData.revTopoL + 1;
         bool isNeg = (oData.isRise != iData.isRise);
 
-        if (dCell->toCellPin->isUnateAtEdge(dCell->fromCellPin, isNeg, oData.isRise)) {
+        if (dCell->toCellPin->isEdgeDefined(dCell->fromCellPin, isNeg, oData.isRise)) {
           auto e = g.addMultiEdge(in, on, unprotected);
           auto& eData = g.getEdgeData(e);
           eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -536,8 +536,16 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   }
 
   bool isNeg = (data.isRise != predData.isRise);
-  std::vector<MyFloat> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
-  std::vector<MyFloat> paramNoC = {predData.t[k].slew, 0.0};
+
+  Parameter param = {
+    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
+  };
+
+  Parameter paramNoC = {
+    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, 0.0}
+  };
 
   auto& ieData = g.getEdgeData(ie);
 
