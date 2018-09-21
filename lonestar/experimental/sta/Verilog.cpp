@@ -268,19 +268,19 @@ void VerilogModule::print(std::ostream& os) {
   os << "endmodule" << std::endl;
 }
 
-bool VerilogModule::isFlattened() {
-  return succ.empty();
+bool VerilogModule::isHierarchical() {
+  return !succ.empty();
 }
 
 void VerilogDesign::clear() {
-  clearHierarchy();
+  clearDependency();
   for (auto& i: modules) {
     delete i.second;
   }
   modules.clear();
 }
 
-void VerilogDesign::clearHierarchy() {
+void VerilogDesign::clearDependency() {
   for (auto& i: modules) {
     auto m = i.second;
     m->pred.clear();
@@ -289,8 +289,8 @@ void VerilogDesign::clearHierarchy() {
   roots.clear();
 }
 
-void VerilogDesign::buildHierarchy() {
-  clearHierarchy();
+void VerilogDesign::buildDependency() {
+  clearDependency();
 
   for (auto& i: modules) {
     auto m = i.second;
@@ -312,13 +312,13 @@ void VerilogDesign::buildHierarchy() {
   }
 }
 
-bool VerilogDesign::isFlattened() {
+bool VerilogDesign::isHierarchical() {
   for (auto m: roots) {
-    if (!m->isFlattened()) {
-      return false;
+    if (m->isHierarchical()) {
+      return true;
     }
   }
-  return true;
+  return false;
 }
 
 void VerilogDesign::print(std::ostream& os) {

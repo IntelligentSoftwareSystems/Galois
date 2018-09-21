@@ -49,17 +49,18 @@ int main(int argc, char *argv[]) {
   VerilogDesign design;
   design.parse(verilogName);
 //  design.print();
-  design.buildHierarchy();
-//  std::cout << "design is " << (design.isFlattened() ? "" : "not ") << "flattened." << std::endl;
+  design.buildDependency();
+//  std::cout << "design is " << (design.isHierarchical() ? "" : "not ") << "hierarchical." << std::endl;
 //  std::cout << "design has " << design.roots.size() << " top-level module(s)." << std::endl;
-  if (!design.isFlattened() || (design.roots.size() > 1)) {
+  if (design.isHierarchical() || (design.roots.size() > 1)) {
     std::cout << "Abort: Not supporting multiple/hierarchical modules for now." << std::endl;
     return 0;
   }
 
-  TimingEngine engine(design);
+  TimingEngine engine;
   engine.addCellLib(&lib, TIMING_MODE_MAX_DELAY);
 //  engine.addCellLib(&lib, TIMING_MODE_MIN_DELAY);
+  engine.readDesign(&design);
 
   auto m = *(design.roots.begin());
 
