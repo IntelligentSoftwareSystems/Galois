@@ -27,6 +27,7 @@
 #define _GALOIS_DYNAMIC_BIT_SET_
 
 #include "galois/AtomicWrapper.h"
+#include "galois/PODResizeableArray.h"
 #include <boost/mpl/has_xxx.hpp>
 #include <climits> // CHAR_BIT
 #include <vector>
@@ -37,7 +38,7 @@ namespace galois {
  * Concurrent dynamically allocated bitset
  **/
 class DynamicBitSet {
-  std::vector<galois::CopyableAtomic<uint64_t>> bitvec;
+  galois::PODResizeableArray<galois::CopyableAtomic<uint64_t>> bitvec;
   size_t num_bits;
   static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
 
@@ -51,7 +52,7 @@ public:
    * @returns constant reference vector of copyable atomics that represents
    * the bitset
    */
-  const std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() const {
+  const auto& get_vec() const {
     return bitvec;
   }
 
@@ -61,7 +62,7 @@ public:
    * @returns reference to vector of copyable atomics that represents the
    * bitset
    */
-  std::vector<galois::CopyableAtomic<uint64_t>>& get_vec() { return bitvec; }
+  auto& get_vec() { return bitvec; }
 
   /**
    * Resizes the bitset.
@@ -75,6 +76,16 @@ public:
   }
 
   /**
+   * Reserves capacity for the bitset.
+   *
+   * @param n Size to reserve the capacity of the bitset to 
+   */
+  void reserve(uint64_t n) {
+    assert(bits_uint64 == 64); // compatibility with other devices
+    bitvec.reserve((n + bits_uint64 - 1) / bits_uint64);
+  }
+
+  /**
    * Gets the size of the bitset
    * @returns The number of bits held by the bitset
    */
@@ -84,7 +95,7 @@ public:
    * Gets the space taken by the bitset
    * @returns the space in bytes taken by this bitset
    */
-  size_t alloc_size() const { return bitvec.size() * sizeof(uint64_t); }
+  //size_t alloc_size() const { return bitvec.size() * sizeof(uint64_t); }
 
   /**
    * Unset every bit in the bitset.

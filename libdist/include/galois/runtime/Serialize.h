@@ -41,6 +41,7 @@
 #include <galois/gdeque.h>
 #include <galois/DynamicBitset.h>
 #include <galois/AtomicWrapper.h>
+#include <galois/PODResizeableArray.h>
 #include "galois/CopyableTuple.h"
 #include "galois/Bag.h"
 
@@ -335,6 +336,17 @@ inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
 }
 
 /**
+ * Returns the size needed to store the elements a PODResizeableArray in a serialize
+ * buffer.
+ *
+ * @returns size needed to store a PODResizeableArray into a serialize buffer
+ */
+template <typename T>
+inline size_t gSizedObj(const galois::PODResizeableArray<T>& data) {
+  return gSizedSeq(data);
+}
+
+/**
  * Returns the size needed to store the elements a deque into a serialize
  * buffer.
  *
@@ -569,6 +581,19 @@ inline void gSerializeObj(SerializeBuffer& buf,
     gSerializeLinearSeq(buf, data);
   else
     gSerializeSeq(buf, data);
+}
+
+/**
+ * Serialize a PODResizeableArray into a buffer, choosing to do a memcopy or
+ * to serialize each element individually depending on data.
+ *
+ * @param [in,out] buf Serialize buffer to serialize into
+ * @param [in] data PODResizeableArray to serialize
+ */
+template <typename T>
+inline void gSerializeObj(SerializeBuffer& buf,
+                          const galois::PODResizeableArray<T>& data) {
+  gSerializeLinearSeq(buf, data);
 }
 
 /**
@@ -915,6 +940,17 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
     gDeserializeLinearSeq(buf, data);
   else
     gDeserializeSeq(buf, data);
+}
+
+/**
+ * Deserialize into a PODResizeableArray
+ *
+ * @param buf [in,out] Buffer to deserialize from
+ * @param data [in,out] PODResizeableArray to deserialize into
+ */
+template <typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, galois::PODResizeableArray<T>& data) {
+  gDeserializeLinearSeq(buf, data);
 }
 
 /**
