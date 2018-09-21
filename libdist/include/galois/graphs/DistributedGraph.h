@@ -1580,7 +1580,7 @@ private:
                       const std::vector<unsigned int>& offsets,
                       std::vector<typename FnTy::ValTy>& val_vec,
                       unsigned vecIndex, size_t start = 0) {
-    val_vec.resize(size); // resive val vec for this vecIndex
+    val_vec.resize(size); // resize val vec for this vecIndex
 
     if (parallelize) {
       std::string syncTypeStr =
@@ -2359,24 +2359,39 @@ private:
                         std::vector<unsigned int>& offsets,
                         galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
                         galois::runtime::SendBuffer& b) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
+                                  get_run_identifier(loopName));
+    galois::CondStatTimer<MORE_COMM_STATS> Tserialize(serialize_timer_str.c_str(),
+                                                    GRNAME);
     if (data_mode == noData) {
       if (!async) {
+        Tserialize.start();
         gSerialize(b, data_mode);
+        Tserialize.stop();
       }
     } else if (data_mode == gidsData) {
       offsets.resize(bit_set_count);
       convert_lid_to_gid<syncType>(loopName, indices, offsets);
       val_vec.resize(bit_set_count);
+      Tserialize.start();
       gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+      Tserialize.stop();
     } else if (data_mode == offsetsData) {
       offsets.resize(bit_set_count);
       val_vec.resize(bit_set_count);
+      Tserialize.start();
       gSerialize(b, data_mode, bit_set_count, offsets, val_vec);
+      Tserialize.stop();
     } else if (data_mode == bitsetData) {
       val_vec.resize(bit_set_count);
+      Tserialize.start();
       gSerialize(b, data_mode, bit_set_count, bit_set_comm, val_vec);
+      Tserialize.stop();
     } else { // onlyData
+      Tserialize.start();
       gSerialize(b, data_mode, val_vec);
+      Tserialize.stop();
     }
   }
 
@@ -2413,6 +2428,10 @@ private:
                                   get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textract(extract_timer_str.c_str(),
                                                     GRNAME);
+    std::string extract_alloc_timer_str(syncTypeStr + "ExtractAlloc_" +
+                                        get_run_identifier(loopName));
+    galois::CondStatTimer<MORE_COMM_STATS> Textractalloc(
+        extract_alloc_timer_str.c_str(), GRNAME);
     std::string extract_batch_timer_str(syncTypeStr + "ExtractBatch_" +
                                         get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Textractbatch(
@@ -2423,9 +2442,11 @@ private:
     Textract.start();
 
     if (num > 0) {
+      Textractalloc.start();
       bit_set_comm.resize(num);
       offsets.resize(num);
       val_vec.resize(num);
+      Textractalloc.stop();
       size_t bit_set_count = 0;
 
       Textractbatch.start();
