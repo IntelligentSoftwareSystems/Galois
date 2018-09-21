@@ -12,7 +12,7 @@ library('data.table')
 # Parses the command line to get the arguments used
 parseCmdLine <- function (logData, isSharedMemGaloisLog, graphPassedAsInput) {
   #cmdLineRow <- subset(logData, CATEGORY == "CommandLine"& TOTAL_TYPE != "HostValues")
-  cmdLineRow <- subset(logData, CATEGORY == "CommandLine" & TOTAL_TYPE == "SINGLE")
+  cmdLineRow <- subset(logData, CATEGORY == "CommandLine" & STAT_TYPE == "PARAM")
 
   ## Distributed has extra column: HostID
   if(isTRUE(isSharedMemGaloisLog)){
@@ -41,16 +41,16 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog, graphPassedAsInput) {
   benchmark <- exePathSplit[length(exePathSplit)]
 
   ## subset the threads row from the table
-  numThreads <- (subset(logData, CATEGORY == "Threads"& TOTAL_TYPE != "HostValues"))$TOTAL
+  numThreads <- (subset(logData, CATEGORY == "Threads" & TOTAL_TYPE != "HostValues"))$TOTAL
 
   input = "noInput"
   if(isTRUE(graphPassedAsInput)){
     ## subset the input row from the table
-    inputPath <- (subset(logData, CATEGORY == "Input"& TOTAL_TYPE != "HostValues"))$TOTAL
+    inputPath <- (subset(logData, CATEGORY == "Input" & STAT_TYPE == "PARAM"))$TOTAL
     print(inputPath)
-    if(identical(inputPath, character(0))){
-      inputPath = cmdLineSplit[3]
-      print(cmdLineSplit[3])
+    if(!identical(inputPath, character(0))){
+      #inputPath = cmdLineSplit[3]
+      #print(cmdLineSplit[3])
       inputPathSplit <- strsplit(inputPath, "/")[[1]]
       input <- inputPathSplit[length(inputPathSplit)]
     }
@@ -77,7 +77,7 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog, graphPassedAsInput) {
 
  runID <- (subset(logData, CATEGORY == "Run_UUID"& TOTAL_TYPE != "HostValues"))$TOTAL
 
- numIterations <- (subset(logData, CATEGORY == "NUM_ITERATIONS_0"& TOTAL_TYPE != "HostValues"))$TOTAL
+ numIterations <- (subset(logData, CATEGORY == "NumIterations_0"& TOTAL_TYPE != "HostValues"))$TOTAL
  #If numIterations is not printed in the log files
  if(identical(numIterations, character(0))){
    numIterations <- 0
@@ -92,13 +92,7 @@ parseCmdLine <- function (logData, isSharedMemGaloisLog, graphPassedAsInput) {
 #### START: @function to values of timers for shared memory galois log ##################
 # Parses to get the timer values
 getTimersShared <- function (logData, benchmark) {
-  ##XXX NULL should not be a string
-  #if(benchmark == "matrixCompletion"){
-    #totalTimeRow <- subset(logData, CATEGORY == "Total Execution Time" & REGION == "(NULL)")
-  #}
-  #else {
-    totalTimeRow <- subset(logData, CATEGORY == "Time" & REGION == "(NULL)")
-  #}
+  totalTimeRow <- subset(logData, CATEGORY == "Time" & REGION == "(NULL)")
   totalTime <- totalTimeRow$TOTAL
   print(paste("totalTime:", totalTime))
  returnList <- list("totalTime" = totalTime)
@@ -111,17 +105,17 @@ getTimersShared <- function (logData, benchmark) {
 getTimersDistributed <- function (logData) {
 
  ## Total time including the graph construction and initialization
- totalTime <- (subset(logData, CATEGORY == "TIMER_TOTAL" & TOTAL_TYPE != "HostValues")$TOTAL)
+ totalTime <- (subset(logData, CATEGORY == "TimerTotal" & TOTAL_TYPE != "HostValues")$TOTAL)
  print(paste("totalTime:", totalTime))
 
  ## Taking mean of all the runs
- totalTimeExecMean <- mean(as.numeric(subset(logData, grepl("TIMER_[0-9]+", CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL))
+ totalTimeExecMean <- round(mean(as.numeric(subset(logData, grepl("Timer_[0-9]+", CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)), digits = 2)
  print(paste("totalTimeExecMean:", totalTimeExecMean))
 
  ## To get the name of benchmark to be used with other queries to get right timers.
- ### It assumes that there will always with TIMER_0 with REGION name as benchmark
+ ### It assumes that there will always with Timer_0 with REGION name as benchmark
  ### name used with other queries.
- benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+ benchmarkRegionName <- subset(logData, CATEGORY == "Timer_0" & TOTAL_TYPE != "HostValues")$REGION
  print(paste("benchmark:", benchmarkRegionName))
 
  ## Number of runs
@@ -153,20 +147,24 @@ getTimersDistributed <- function (logData) {
      }
    }
    computeTimeMean <- (mean(computeTimePerIter))
+
+   if(computeTimeMean == 0){
+     computeTimeMean <- round(mean(as.numeric(subset(logData, grepl(paste("^", benchmarkRegionName, "_[0-9]+", sep=""), REGION) & TOTAL_TYPE != "HostValues")$TOTAL)), digits = 2)
+   }
  }
  print(paste("computeTimeMean:", computeTimeMean))
 
  ##Total sync time.
  syncTimePerIter <- numeric(numRuns)
+ syncTimeMean <- 0
  if(benchmarkRegionName == "BC"){
    regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
    for(i in 1:(numRuns)) {
-     j = i - 1 #Vectors are 1 indexed in r
      for(region in regions){
-       syncTimeRows <- subset(logData, grepl(paste("SYNC_", region, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
-       if(!is.null(syncTimeRows)){
+       syncTimeRows <- subset(logData, grepl(paste("Sync_", region, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+       if(!identical(syncTimeRows, character(0))){
          #print(region)
-         syncTimePerIter[i] <- syncTimePerIter[i] + sum(as.numeric(syncTimeRows))
+         syncTimeMean <- syncTimeMean + round(mean(as.numeric(syncTimeRows)), digits = 2)
        }
      }
    }
@@ -174,26 +172,32 @@ getTimersDistributed <- function (logData) {
  else{
    for(i in 1:(numRuns)) {
      j = i - 1 #Vectors are 1 indexed in r
-     syncTimeRows <- subset(logData, grepl(paste("SYNC_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
-     if(!is.null(syncTimeRows)){
+     syncTimeRows <- subset(logData, grepl(paste("Sync_", benchmarkRegionName, "_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+     if(!identical(syncTimeRows, character(0))){
        syncTimePerIter[i] <- sum(as.numeric(syncTimeRows))
      }
    }
+   syncTimeMean <- (mean(syncTimePerIter))
+   if(syncTimeMean == 0) {
+     syncTimeMean <- round(mean(as.numeric(subset(logData, grepl(paste("Sync_", benchmarkRegionName, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)), digits = 2)
+   }
  }
- syncTimeMean <- (mean(syncTimePerIter))
  print(paste("syncTimeMean", syncTimeMean))
 
 
  ## Mean time spent in the implicit barrier: DGReducible
- barrierTimePerIter <- numeric()
+ barrierTimePerIter <- numeric(numRuns)
  for(i in 1:(numRuns)) {
   j = i - 1 #Vectors are 1 indexed in r
-  barrierTimeRows <- subset(logData, REGION =="DGReducible" & grepl(paste( "REDUCE_DGACCUM_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
-  if(!is.null(barrierTimeRows)){
+  barrierTimeRows <- subset(logData, REGION =="DGReducible" & grepl(paste( "ReduceDGAccum_", j, "_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL
+  if(!identical(barrierTimeRows, character(0))){
     barrierTimePerIter[i] <- sum(as.numeric(barrierTimeRows))
   }
  }
  barrierTimeMean <- (mean(barrierTimePerIter))
+ if(barrierTimeMean == 0) {
+  barrierTimeMean <- round(mean(as.numeric(subset(logData, REGION =="DGReducible" & grepl(paste( "ReduceDGAccum_[0-9]*", sep=""), CATEGORY) & TOTAL_TYPE != "HostValues")$TOTAL)), digits = 2)
+ }
  print(paste("barrierTimeMean:", barrierTimeMean))
 
  ## Total bytes sent in reduce and broadcast phase in run 0.
@@ -202,24 +206,23 @@ getTimersDistributed <- function (logData) {
  if(benchmarkRegionName == "BC"){
    regions <- c("SSSP", "InitializeIteration", "PredAndSucc", "NumShortestPathsChanges", "NumShortestPaths", "PropagationFlagUpdate", "DependencyPropChanges", "DependencyPropagation", "BC")
    for(region in regions){
-     sendBytesRegion <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", region, "_0_[0-9]+", sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL))
+     sendBytesRegion <- sum(as.numeric(subset(logData, grepl(paste("[Reduce|Broadcast]SendBytes_", region, "_0", sep=""), CATEGORY) & TOTAL_TYPE == "HSUM")$TOTAL))
      print(paste(region, " : ", sendBytesRegion))
      syncBytes <- syncBytes + sendBytesRegion 
      print(syncBytes)
    }
  }
  else {
-   #syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE != "HostValues")$TOTAL))
-   syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[REDUCE|BROADCAST]_SEND_BYTES_", benchmarkRegionName, "_0_[0-9]+", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
+   syncBytes <- sum(as.numeric(subset(logData, grepl(paste("[Reduce|Broadcast]SendBytes_", benchmarkRegionName, "_0", sep=""), CATEGORY)& TOTAL_TYPE == "HSUM")$TOTAL))
  }
  print(paste("syncBytes:", syncBytes))
 
  ##Graph construction time
- graphConstructTime <- subset(logData, CATEGORY == "TIME_GRAPH_CONSTRUCT" & TOTAL_TYPE != "HostValues")$TOTAL
+ graphConstructTime <- subset(logData, CATEGORY == "GraphConstructTime" & TOTAL_TYPE != "HostValues")$TOTAL
  print(paste("graphConstructTime:", graphConstructTime))
 
  ## Replication factor
- replicationFactor <- subset(logData, CATEGORY == "REPLICATION_FACTOR_0_0" & TOTAL_TYPE != "HostValues")$TOTAL
+ replicationFactor <- subset(logData, CATEGORY == "ReplicationFactor" & TOTAL_TYPE != "HostValues")$TOTAL
  print(paste("replicationFactor:", replicationFactor))
  #if(is.null(replicationFactor)){
 if(identical(replicationFactor, character(0))){
@@ -227,8 +230,8 @@ if(identical(replicationFactor, character(0))){
  }
 
  ## Communication memory usage: Max and Min.
- communicationMemUsageMax = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MAX" & TOTAL_TYPE == "HMAX")$TOTAL)
- communicationMemUsageMin = as.numeric(subset(logData, CATEGORY == "COMMUNICATION_MEM_USAGE_MIN" & TOTAL_TYPE == "HMIN")$TOTAL)
+ communicationMemUsageMax = as.numeric(subset(logData, CATEGORY == "CommunicationMemUsageMax" & TOTAL_TYPE == "HMAX")$TOTAL)
+ communicationMemUsageMin = as.numeric(subset(logData, CATEGORY == "CommunicationMemUsageMin" & TOTAL_TYPE == "HMIN")$TOTAL)
 
  if(identical(communicationMemUsageMax, numeric(0)) || identical(communicationMemUsageMin, numeric(0))){
    communicationMemUsageMax = 0
@@ -248,7 +251,7 @@ computePerIterVolume <- function (logData, paramList, output) {
   numIter = as.numeric(paramList["iterations"])
   print(numIter)
 
-  benchmarkRegionName <- subset(logData, CATEGORY == "TIMER_0" & TOTAL_TYPE != "HostValues")$REGION
+  benchmarkRegionName <- subset(logData, CATEGORY == "Timer_0" & TOTAL_TYPE != "HostValues")$REGION
   print(paste("benchmark:", benchmarkRegionName))
 
   ## Number of runs

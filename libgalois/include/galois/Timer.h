@@ -150,7 +150,7 @@ template <bool enabled>
 class ThreadTimer : private boost::noncopyable {
   timespec m_start;
   timespec m_stop;
-  int64_t m_nsec;
+  uint64_t m_nsec;
 
 public:
   ThreadTimer() : m_nsec(0){};
@@ -160,14 +160,14 @@ public:
   void stop(void) {
     clock_gettime(CLOCK_THREAD_CPUTIME_ID, &m_stop);
     m_nsec += (m_stop.tv_nsec - m_start.tv_nsec);
-    m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
+    m_nsec += ((m_stop.tv_sec - m_start.tv_sec) * 1000000000);
   }
 
-  int64_t get_nsec(void) const { return m_nsec; }
+  uint64_t get_nsec(void) const { return m_nsec; }
 
-  int64_t get_sec(void) const { return (m_nsec >> 30); }
+  uint64_t get_sec(void) const { return (m_nsec / 1000000000); }
 
-  int64_t get_msec(void) const { return (m_nsec >> 20); }
+  uint64_t get_msec(void) const { return (m_nsec / 1000000); }
 };
 
 template <>
@@ -175,9 +175,9 @@ class ThreadTimer<false> {
 public:
   void start(void) const {}
   void stop(void) const {}
-  int64_t get_nsec(void) const { return 0; }
-  int64_t get_sec(void) const { return 0; }
-  int64_t get_msec(void) const { return 0; }
+  uint64_t get_nsec(void) const { return 0; }
+  uint64_t get_sec(void) const { return 0; }
+  uint64_t get_msec(void) const { return 0; }
 };
 
 template <bool enabled>
@@ -190,37 +190,23 @@ protected:
   substrate::PerThreadStorage<ThreadTimer<enabled>> timers;
 
   void reportTimes(void) {
-
-    int64_t minTime = std::numeric_limits<int64_t>::max();
+    uint64_t minTime = std::numeric_limits<uint64_t>::max();
 
     for (unsigned i = 0; i < timers.size(); ++i) {
-
       auto ns = timers.getRemote(i)->get_nsec();
-
       minTime = std::min(minTime, ns);
     }
 
-    std::string timeCat = category + std::string("-per-thread-times(ns)");
-    std::string lagCat  = category + std::string("-per-thread-lag(ns)");
-
-    galois::substrate::getThreadPool(galois::getActiveThreads(), [&](void) {
-      auto ns  = timers.getLocal()->get_nsec();
+    std::string timeCat = category + std::string("-per-thread-times (ms)");
+    std::string lagCat  = category + std::string("-per-thread-lag (ms)");
+    on_each([&] (auto a, auto b) {
+      auto ns = timers.getLocal()->get_nsec();
       auto lag = ns - minTime;
       assert(lag > 0 && "negative time lag from min is impossible");
 
-      galois::runtime::reportStat_Tmax(region, timeCat.c_str(), ns);
-      galois::runtime::reportStat_Tmax(region, lagCat.c_str(), lag);
+      galois::runtime::reportStat_Tmax(region, timeCat.c_str(), ns / 1000000);
+      galois::runtime::reportStat_Tmax(region, lagCat.c_str(), lag / 1000000);
     });
-
-    // for (unsigned i = 0; i < timers.size(); ++i) {
-    //
-    // auto ns = timers.getRemote(i)->get_nsec();
-    // auto lag = ns - minTime;
-    // assert(lag > 0 && "negative time lag from min is impossible");
-    //
-    // galois::runtime::reportStat(region, lagCat.c_str(), lag, i);
-    // galois::runtime::reportStat(region, timeCat.c_str(), ns, i);
-    // }
   }
 
 public:
