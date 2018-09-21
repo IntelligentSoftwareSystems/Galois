@@ -218,6 +218,9 @@ private:
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
 
+  galois::DynamicBitSet syncBitset;
+  galois::PODResizeableArray<unsigned int> syncOffsets;
+
 protected:
   //! Prints graph statistics.
   void printStatistics() {
@@ -2191,7 +2194,7 @@ private:
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec; // sometimes wasteful
-    static galois::PODResizeableArray<unsigned int> offsets;
+    galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
                                   get_run_identifier(loopName));
@@ -2430,9 +2433,9 @@ private:
                    std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
-    static galois::DynamicBitSet bit_set_comm;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
-    static galois::PODResizeableArray<unsigned int> offsets;
+    galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "Extract_" +
@@ -2535,9 +2538,9 @@ private:
                    std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
-    static galois::DynamicBitSet bit_set_comm;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
-    static galois::PODResizeableArray<unsigned int> offsets;
+    galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string extract_timer_str(syncTypeStr + "ExtractVector_" +
@@ -2899,9 +2902,9 @@ private:
     galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(
         set_batch_timer_str.c_str(), GRNAME);
 
-    static galois::DynamicBitSet bit_set_comm;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
-    static galois::PODResizeableArray<unsigned int> offsets;
+    galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
     uint32_t num      = sharedNodes[from_id].size();
@@ -3004,9 +3007,9 @@ private:
                               get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
 
-    static galois::DynamicBitSet bit_set_comm;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
-    static galois::PODResizeableArray<unsigned int> offsets;
+    galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
     auto& sharedNodes = (syncType == syncReduce) ? masterNodes : mirrorNodes;
     uint32_t num      = sharedNodes[from_id].size();
