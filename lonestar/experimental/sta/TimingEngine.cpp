@@ -1,7 +1,7 @@
 #include "TimingEngine.h"
 
-TimingEngine::TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew)
-  : v(v), libs(libs), modes(modes), isExactSlew(isExactSlew)
+TimingEngine::TimingEngine(VerilogDesign& v, bool isExactSlew)
+  : v(v), isExactSlew(isExactSlew)
 {
   for (auto i: v.modules) {
     auto m = i.second;

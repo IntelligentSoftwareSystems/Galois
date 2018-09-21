@@ -22,9 +22,8 @@ using TimingPath = std::vector<TimingPathNode>;
 
 struct TimingEngine {
   VerilogDesign& v;
-  std::vector<CellLib*>& libs;
-  std::vector<TimingMode>& modes;
-  // sdc files
+  std::vector<CellLib*> libs;
+  std::vector<TimingMode> modes;
 
   // slew merging
   //   by best/worst slew if false (default)
@@ -37,8 +36,13 @@ private:
   TimingGraph* findTimingGraph(VerilogModule* m);
 
 public:
-  TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew = false);
+  TimingEngine(VerilogDesign& v, bool isExactSlew = false);
   ~TimingEngine();
+
+  void addCellLib(CellLib* lib, TimingMode mode) {
+    libs.push_back(lib);
+    modes.push_back(mode);
+  }
 
   void update(VerilogModule* m); // for incremental timing analysis
   void constrain(VerilogModule* m, SDC& sdc);  // add constraints to the module
