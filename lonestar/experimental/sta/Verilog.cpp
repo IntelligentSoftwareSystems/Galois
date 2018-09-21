@@ -57,16 +57,12 @@ void VerilogParser::parseModule() {
     auto p = i.second;
     auto w = curModule->findWire(p->name);
     assert(w);
-    p->wire = w;
     w->addPin(p);
-  }
 
-  // fix the connection for assigns
-  for (auto& i:curModule->assigns) {
-    auto p = i.first;
-    auto w = i.second;
-    w->addPin(p);
-    p->wire = w;
+    // no assign statement for this pin
+    if (!(p->wire)) {
+      p->wire = w;
+    }
   }
 }
 
@@ -113,8 +109,8 @@ void VerilogParser::parseAssign() {
   assert(wire);
   curToken += 1; // consume ";"
   
-  // record the assign
-  curModule->assigns[pin] = wire;
+  pin->wire = wire;
+  wire->addPin(pin);
 }
 
 void VerilogParser::parseGate() {
@@ -263,10 +259,12 @@ void VerilogModule::print(std::ostream& os) {
     i.second->print(os);
   }
 
-  for (auto& i: assigns) {
-    auto p = i.first;
-    auto w = i.second;
-    os << "  assign " << p->name << " = " << w->name << ";" << std::endl;
+  for (auto& i: outPins) {
+    auto& pinName = i->name;
+    auto& wireName = i->wire->name;
+    if (pinName != wireName) {
+      os << "  assign " << pinName << " = " << wireName << ";" << std::endl;
+    }
   }
 
   for (auto& i: gates) {
