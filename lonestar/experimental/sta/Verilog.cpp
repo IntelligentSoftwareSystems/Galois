@@ -3,6 +3,14 @@
 static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
 
+static bool isNameForVdd(std::string name) {
+  return (name == name0 || name == "1\'h0");
+}
+
+static bool isNameForGnd(std::string name) {
+  return (name == name1 || name == "1\'h1");
+}
+
 void VerilogParser::tokenizeFile(std::string inName) {
   std::vector<char> delimiters = {'(', ')', ',', ';', '\\', '[', ']', '=', '.'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
@@ -175,7 +183,7 @@ void VerilogPin::print(std::ostream& os) {
 
 void VerilogWire::print(std::ostream& os) {
   // do not print wires for constants
-  if (name != name0 && name != name1) {
+  if (!isNameForGnd(name) && !isNameForVdd(name)) {
     os << "  wire " << name << ";" << std::endl;
   }
 }
@@ -270,6 +278,13 @@ void VerilogModule::print(std::ostream& os) {
 
 bool VerilogModule::isHierarchical() {
   return !succ.empty();
+}
+
+VerilogWire* VerilogModule::findWire(std::string name) {
+  name = isNameForGnd(name) ? name0 :
+         isNameForVdd(name) ? name1 : name;
+  auto it = wires.find(name);
+  return (it == wires.end()) ? nullptr : it->second;
 }
 
 void VerilogDesign::clear() {

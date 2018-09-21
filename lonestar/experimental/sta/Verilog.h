@@ -168,11 +168,7 @@ public:
     return wire;
   }
 
-  VerilogWire* findWire(std::string name) {
-    auto it = wires.find(name);
-    return (it == wires.end()) ? nullptr : it->second;
-  }
-
+  VerilogWire* findWire(std::string name);
   bool isHierarchical();
 };
 
