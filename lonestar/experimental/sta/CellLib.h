@@ -10,6 +10,8 @@
 
 #include "TimingDefinition.h"
 #include "Tokenizer.h"
+#include "WireLoad.h"
+#include "Verilog.h"
 
 // forward declaration
 struct Lut;
@@ -198,8 +200,7 @@ public:
   }
 };
 
-struct WireLoad {
-  std::string name;
+struct PreLayoutWireLoad: public WireLoad {
   MyFloat c;
   MyFloat r;
   MyFloat slope;
@@ -210,9 +211,8 @@ private:
   MyFloat wireLength(size_t deg);
 
 public:
-  MyFloat wireR(size_t deg);
-  MyFloat wireC(size_t deg);
-  MyFloat wireDelay(MyFloat loadC, size_t deg);
+  MyFloat wireC(VerilogWire* wire);
+  MyFloat wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin);
   void print(std::ostream& os = std::cout);
 
   void addFanoutLength(size_t fanout, MyFloat length) {
@@ -223,14 +223,14 @@ public:
 struct CellLib {
   std::string name;
   std::string opCond;
-  WireLoad* defaultWireLoad;
+  PreLayoutWireLoad* defaultWireLoad;
   MyFloat defaultInoutPinCap;
   MyFloat defaultInputPinCap;
   MyFloat defaultOutputPinCap;
   MyFloat defaultMaxSlew;
   WireTreeType wireTreeType;
 
-  std::unordered_map<std::string, WireLoad*> wireLoads;
+  std::unordered_map<std::string, PreLayoutWireLoad*> wireLoads;
   std::unordered_map<std::string, Cell*> cells;
   std::unordered_map<std::string, LutTemplate*> lutTemplates;
 
@@ -261,15 +261,15 @@ public:
     return (it == cells.end()) ? nullptr : it->second;
   }
 
-  WireLoad* addWireLoad(std::string name) {
-    WireLoad* wireLoad = new WireLoad;
+  PreLayoutWireLoad* addWireLoad(std::string name) {
+    PreLayoutWireLoad* wireLoad = new PreLayoutWireLoad;
     wireLoad->name = name;
     wireLoad->lib = this;
     wireLoads[name] = wireLoad;
     return wireLoad;
   }
 
-  WireLoad* findWireLoad(std::string name) {
+  PreLayoutWireLoad* findWireLoad(std::string name) {
     auto it = wireLoads.find(name);
     return (it == wireLoads.end()) ? nullptr : it->second;
   }

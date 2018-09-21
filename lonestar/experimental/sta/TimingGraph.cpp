@@ -483,14 +483,13 @@ void TimingGraph::computeDriveC(GNode n) {
 
   for (auto e: g.edges(n)) {
     auto& eData = g.getEdgeData(e);
-    auto wOutDeg = eData.wire->outDeg();
 
     auto succ = g.getEdgeDst(e);
     auto& succData = g.getData(succ);
 
     for (size_t k = 0; k < libs.size(); k++) {
       if (e == g.edge_begin(n)) {
-        data.t[k].wireC = eData.t[k].wireLoad->wireC(wOutDeg);
+        data.t[k].wireC = eData.t[k].wireLoad->wireC(eData.wire);
       }
       data.t[k].pinC += succData.t[k].pinC;
     }
@@ -504,7 +503,6 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
   auto& predData = g.getData(pred);
 
   auto& ieData = g.getEdgeData(ie);
-  auto wOutDeg = ieData.wire->outDeg();
 
   for (size_t k = 0; k < libs.size(); k++) {
     MyFloat loadC = 0.0;
@@ -514,7 +512,7 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
     else if (TREE_TYPE_WORST_CASE == libs[k]->wireTreeType) {
       loadC = predData.t[k].pinC;
     }
-    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, wOutDeg);
+    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, ieData.wire, data.pin);
     ieData.t[k].delay = delay;
     data.t[k].arrival = predData.t[k].arrival + delay;
     data.t[k].slew = predData.t[k].slew;

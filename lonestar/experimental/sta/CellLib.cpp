@@ -313,7 +313,7 @@ void LutTemplate::print(std::ostream& os) {
   os << "  }" << std::endl;
 }
 
-MyFloat WireLoad::wireLength(size_t deg) {
+MyFloat PreLayoutWireLoad::wireLength(size_t deg) {
   auto lb = fanoutLength.lower_bound(deg);
   // extrapolation from upper limit
   if (lb == fanoutLength.end()) {
@@ -338,20 +338,17 @@ MyFloat WireLoad::wireLength(size_t deg) {
   }
 }
 
-MyFloat WireLoad::wireR(size_t deg) {
-  return r * wireLength(deg);
+MyFloat PreLayoutWireLoad::wireC(VerilogWire* wire) {
+  return c * wireLength(wire->outDeg());
 }
 
-MyFloat WireLoad::wireC(size_t deg) {
-  return c * wireLength(deg);
-}
-
-MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
+MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin) {
   // best-case tree
   if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
     return 0.0;
   }
   else {
+    auto deg = wire->outDeg();
     auto wL = wireLength(deg);
     auto wC = c * wL;
     auto wR = r * wL;
@@ -374,7 +371,7 @@ MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
   }
 }
 
-void WireLoad::print(std::ostream& os) {
+void PreLayoutWireLoad::print(std::ostream& os) {
   os << "  wire_load (\"" << name << "\") {" << std::endl;
   os << "    capacitance: " << c << ";" << std::endl;
   os << "    resistance: " << r << ";" << std::endl;
