@@ -197,8 +197,8 @@ protected:
       minTime = std::min(minTime, ns);
     }
 
-    std::string timeCat = category + std::string("-per-thread-times (ms)");
-    std::string lagCat  = category + std::string("-per-thread-lag (ms)");
+    std::string timeCat = category + std::string("PerThreadTimes");
+    std::string lagCat  = category + std::string("PerThreadLag");
     on_each([&] (auto a, auto b) {
       auto ns = timers.getLocal()->get_nsec();
       auto lag = ns - minTime;
