@@ -727,14 +727,13 @@ private:
     galois::PerThreadTimer<PHASE_BREAKDOWN> recvComputeTimer2(
       GRNAME, "EdgeRecvProcessNonoverlap");
 
-    loadTimer.start();
-
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_DistGraph::numOwned;
 
 #if PHASE_BREAKDOWN
     galois::runtime::getHostBarrier().wait();
 #endif
+    loadTimer.start();
 
     // read and send edges
     edgeSendsTimer.start();
