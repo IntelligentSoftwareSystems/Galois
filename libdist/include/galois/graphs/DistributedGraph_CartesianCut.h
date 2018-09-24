@@ -25,6 +25,8 @@
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 
+#define PHASE_BREAKDOWN 0
+
 #include "galois/graphs/DistributedGraph.h"
 
 namespace galois {
@@ -383,7 +385,7 @@ public:
           galois::iterate((uint32_t)0, numNodes),
           [&](auto n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
 #if MORE_DIST_STATS
-          galois::loopname("EdgeLoading"),
+          galois::loopname("ConstructionEndEdgeFix"),
 #endif
           galois::no_stats());
     }
@@ -711,28 +713,42 @@ private:
 
     bufGraph.resetReadCounters();
 
-    galois::Timer timer;
-    timer.start();
+    galois::StatTimer loadTimer("EdgeLoading", GRNAME);
+    galois::CondStatTimer<PHASE_BREAKDOWN> edgeSendsTimer(
+      "EdgeLoadingSends", GRNAME);
+    galois::CondStatTimer<PHASE_BREAKDOWN> edgeRecvsTimer(
+      "EdgeLoadingReceives", GRNAME);
+
+    loadTimer.start();
 
     std::atomic<uint32_t> numNodesWithEdges;
     numNodesWithEdges = base_DistGraph::numOwned;
 
+#if PHASE_BREAKDOWN
+    galois::runtime::getHostBarrier().wait();
+#endif
+
     // read and send edges
+    edgeSendsTimer.start();
     loadEdgesFromFile(graph, bufGraph, numNodesWithEdges);
+    edgeSendsTimer.stop();
+
+    edgeRecvsTimer.start();
     // receive all edges
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       receiveEdges(graph, numNodesWithEdges);
     });
+    edgeRecvsTimer.stop();
 
     base_DistGraph::increment_evilPhase();
 
-    timer.stop();
+    loadTimer.stop();
 
     galois::gPrint(
         "[", base_DistGraph::id,
-        "] Edge loading time: ", timer.get_usec() / 1000000.0f,
+        "] Edge loading time: ", loadTimer.get_usec() / 1000000.0f,
         " seconds to read ", bufGraph.getBytesRead(), " bytes (",
-        bufGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
+        bufGraph.getBytesRead() / (float)loadTimer.get_usec(), " MBPS)\n");
   }
 
   //! Read in our assigned edges, constructing them if they belong to this host
@@ -745,6 +761,13 @@ private:
       GraphTy& graph,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       std::atomic<uint32_t>& numNodesWithEdges) {
+    galois::CondStatTimer<PHASE_BREAKDOWN> clearReserveTimer(
+      GRNAME, "EdgeSendClearReserveTime"
+    );
+    galois::CondStatTimer<PHASE_BREAKDOWN> sendTaggedTimer(
+      GRNAME, "EdgeSendComm"
+    );
+
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // XXX h_offset not correct
@@ -759,15 +782,29 @@ private:
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
     // reserve space for send buffers
+    clearReserveTimer.start();
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = (*sb.getLocal())[i];
         b.reserve(edgePartitionSendBufSize * 1.25);
       }
     });
+    clearReserveTimer.stop();
+
+    // thread timers for detailed breakdown of this loop
+    galois::PerThreadTimer<PHASE_BREAKDOWN> edgeSendSerializeTimerT(
+      GRNAME, "EdgeSendSerialize"
+    );
+    galois::PerThreadTimer<PHASE_BREAKDOWN> edgeSendCommTimerT(
+      GRNAME, "EdgeSendComm"
+    );
+    galois::PerThreadTimer<PHASE_BREAKDOWN> clearReserveTimerT(
+      GRNAME, "EdgeSendClearReserveTime"
+    );
 
     const unsigned& id =
         base_DistGraph::id; // manually copy it because it is protected
+
     galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                         base_DistGraph::gid2host[base_DistGraph::id].second),
@@ -804,16 +841,25 @@ private:
           for (unsigned i = 0; i < numColumnHosts; ++i) {
             if (gdst_vec[i].size() > 0) {
               auto& b = (*sb.getLocal())[i];
+              edgeSendSerializeTimerT.start();
               galois::runtime::gSerialize(b, n);
               galois::runtime::gSerialize(b, gdst_vec[i]);
               galois::runtime::gSerialize(b, gdata_vec[i]);
+              edgeSendSerializeTimerT.stop();
+
               if (b.size() > edgePartitionSendBufSize) {
+                edgeSendCommTimerT.start();
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                edgeSendCommTimerT.stop();
+
+                clearReserveTimerT.start();
                 b.getVec().clear();
                 b.getVec().reserve(edgePartitionSendBufSize * 1.25);
+                clearReserveTimerT.stop();
               }
             }
           }
+
           if (this->isLocal(n)) {
             assert(cur == (*graph.edge_end(lsrc)));
           }
@@ -824,17 +870,23 @@ private:
           this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
 #if MORE_DIST_STATS
-        galois::loopname("EdgeLoading"),
+        galois::loopname("EdgeLoadingSendsLoop"),
 #endif
         galois::no_stats());
 
+    // flush out all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
       auto& sbr = *sb.getRemote(t);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = sbr[i];
         if (b.size() > 0) {
+          sendTaggedTimer.start();
           net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+          sendTaggedTimer.stop();
+
+          clearReserveTimer.start();
           b.getVec().clear();
+          clearReserveTimer.stop();
         }
       }
     }
@@ -851,6 +903,13 @@ private:
       GraphTy& graph,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       std::atomic<uint32_t>& numNodesWithEdges) {
+    galois::CondStatTimer<PHASE_BREAKDOWN> clearReserveTimer(
+      GRNAME, "EdgeSendClearReserveTime"
+    );
+    galois::CondStatTimer<PHASE_BREAKDOWN> sendTaggedTimer(
+      GRNAME, "EdgeSendComm"
+    );
+
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     unsigned h_offset = gridRowID() * numColumnHosts;
@@ -860,15 +919,29 @@ private:
     galois::substrate::PerThreadStorage<SendBufferVecTy> sb(numColumnHosts);
 
     // reserve space for send buffers
+    clearReserveTimer.start();
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = (*sb.getLocal())[i];
         b.reserve(edgePartitionSendBufSize * 1.25);
       }
     });
+    clearReserveTimer.stop();
 
     const unsigned& id =
         base_DistGraph::id; // manually copy it because it is protected
+
+    // thread timers for detailed breakdown of this loop
+    galois::PerThreadTimer<PHASE_BREAKDOWN> edgeSendSerializeTimerT(
+      GRNAME, "EdgeSendSerialize"
+    );
+    galois::PerThreadTimer<PHASE_BREAKDOWN> edgeSendCommTimerT(
+      GRNAME, "EdgeSendComm"
+    );
+    galois::PerThreadTimer<PHASE_BREAKDOWN> clearReserveTimerT(
+      GRNAME, "EdgeSendClearReserveTime"
+    );
+
     galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                         base_DistGraph::gid2host[base_DistGraph::id].second),
@@ -900,12 +973,21 @@ private:
           for (unsigned i = 0; i < numColumnHosts; ++i) {
             if (gdst_vec[i].size() > 0) {
               auto& b = (*sb.getLocal())[i];
+
+              edgeSendSerializeTimerT.start();
               galois::runtime::gSerialize(b, n);
               galois::runtime::gSerialize(b, gdst_vec[i]);
+              edgeSendSerializeTimerT.stop();
+
               if (b.size() > edgePartitionSendBufSize) {
+                edgeSendCommTimerT.start();
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+                edgeSendCommTimerT.stop();
+
+                clearReserveTimerT.start();
                 b.getVec().clear();
                 b.getVec().reserve(edgePartitionSendBufSize * 1.25);
+                clearReserveTimerT.stop();
               }
 
             }
@@ -920,17 +1002,23 @@ private:
           this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
         },
 #if MORE_DIST_STATS
-        galois::loopname("EdgeLoading"),
+        galois::loopname("EdgeLoadingSendsLoop"),
 #endif
         galois::no_stats());
 
+    // flush out all buffers
     for (unsigned t = 0; t < sb.size(); ++t) {
       auto& sbr = *sb.getRemote(t);
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = sbr[i];
         if (b.size() > 0) {
+          sendTaggedTimer.start();
           net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
+          sendTaggedTimer.stop();
+
+          clearReserveTimer.start();
           b.getVec().clear();
+          clearReserveTimer.stop();
         }
       }
     }
