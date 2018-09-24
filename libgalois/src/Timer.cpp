@@ -45,6 +45,7 @@ void TimeAccumulator::stop() {
 }
 
 unsigned long TimeAccumulator::get() const { return acc / 1000; }
+unsigned long TimeAccumulator::get_usec() const { return acc; }
 
 TimeAccumulator& TimeAccumulator::operator+=(const TimeAccumulator& rhs) {
   acc += rhs.acc;

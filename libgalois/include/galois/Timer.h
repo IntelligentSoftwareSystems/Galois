@@ -63,6 +63,7 @@ public:
   //! adds the current timed interval to the total
   void stop();
   unsigned long get() const;
+  unsigned long get_usec() const;
   TimeAccumulator& operator+=(const TimeAccumulator& rhs);
   TimeAccumulator& operator+=(const Timer& rhs);
 };
@@ -115,6 +116,10 @@ public:
     valid = false;
     TimeAccumulator::stop();
   }
+
+  unsigned long get_usec() const {
+    return TimeAccumulator::get_usec();
+  }
 };
 
 template <bool Enable>
@@ -133,6 +138,7 @@ public:
 
   void start(void) const {}
   void stop(void) const {}
+  unsigned long get_usec(void) const { return 0; }
 };
 
 template <typename F>
