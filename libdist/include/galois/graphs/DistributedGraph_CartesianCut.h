@@ -713,7 +713,7 @@ private:
 
     bufGraph.resetReadCounters();
 
-    galois::StatTimer loadTimer("EdgeLoading", GRNAME);
+    galois::StatTimer loadTimer("EdgeLoadingAll", GRNAME);
     galois::CondStatTimer<PHASE_BREAKDOWN> edgeSendsTimer(
       "EdgeLoadingSends", GRNAME);
     galois::CondStatTimer<PHASE_BREAKDOWN> edgeRecvsTimer(
@@ -814,6 +814,13 @@ private:
       GRNAME, "EdgeSendClearReserveTime"
     );
 
+    galois::GAccumulator<uint64_t> messagesSent;
+    galois::GAccumulator<uint64_t> bytesSent;
+    galois::GReduceMax<uint64_t> maxBytesSent;
+    messagesSent.reset();
+    bytesSent.reset();
+    maxBytesSent.reset();
+
     const unsigned& id =
         base_DistGraph::id; // manually copy it because it is protected
 
@@ -860,6 +867,10 @@ private:
               edgeSendSerializeTimerT.stop();
 
               if (b.size() > edgePartitionSendBufSize) {
+                messagesSent += 1;
+                bytesSent.update(b.size());
+                maxBytesSent.update(b.size());
+
                 edgeSendCommTimerT.start();
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
                 edgeSendCommTimerT.stop();
@@ -895,6 +906,10 @@ private:
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = sbr[i];
         if (b.size() > 0) {
+          messagesSent += 1;
+          bytesSent.update(b.size());
+          maxBytesSent.update(b.size());
+
           sendTaggedTimer.start();
           net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
           sendTaggedTimer.stop();
@@ -906,6 +921,17 @@ private:
       }
     }
     net.flush();
+
+    // TODO make conditional?
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("EdgeLoadingMessagesSent"), messagesSent.reduce()
+    );
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("EdgeLoadingBytesSent"), bytesSent.reduce()
+    );
+    galois::runtime::reportStat_Tmax(
+      GRNAME, std::string("EdgeLoadingMaxBytesSent"), maxBytesSent.reduce()
+    );
   }
 
   //! Read in our assigned edges, constructing them if they belong to this host
@@ -946,9 +972,6 @@ private:
     });
     clearReserveTimer.stop();
 
-    const unsigned& id =
-        base_DistGraph::id; // manually copy it because it is protected
-
     // thread timers for detailed breakdown of this loop
     galois::PerThreadTimer<PHASE_BREAKDOWN> edgeSendSerializeTimerT(
       GRNAME, "EdgeSendSerialize"
@@ -959,6 +982,16 @@ private:
     galois::PerThreadTimer<PHASE_BREAKDOWN> clearReserveTimerT(
       GRNAME, "EdgeSendClearReserveTime"
     );
+
+    galois::GAccumulator<uint64_t> messagesSent;
+    galois::GAccumulator<uint64_t> bytesSent;
+    galois::GReduceMax<uint64_t> maxBytesSent;
+    messagesSent.reset();
+    bytesSent.reset();
+    maxBytesSent.reset();
+
+    const unsigned& id =
+        base_DistGraph::id; // manually copy it because it is protected
 
     galois::do_all(
         galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
@@ -998,6 +1031,10 @@ private:
               edgeSendSerializeTimerT.stop();
 
               if (b.size() > edgePartitionSendBufSize) {
+                messagesSent += 1;
+                bytesSent.update(b.size());
+                maxBytesSent.update(b.size());
+
                 edgeSendCommTimerT.start();
                 net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
                 edgeSendCommTimerT.stop();
@@ -1033,6 +1070,10 @@ private:
       for (unsigned i = 0; i < numColumnHosts; ++i) {
         auto& b = sbr[i];
         if (b.size() > 0) {
+          messagesSent += 1;
+          bytesSent.update(b.size());
+          maxBytesSent.update(b.size());
+
           sendTaggedTimer.start();
           net.sendTagged(h_offset + i, galois::runtime::evilPhase, b);
           sendTaggedTimer.stop();
@@ -1044,6 +1085,17 @@ private:
       }
     }
     net.flush();
+
+    // TODO make conditional?
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("EdgeLoadingMessagesSent"), messagesSent.reduce()
+    );
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("EdgeLoadingBytesSent"), bytesSent.reduce()
+    );
+    galois::runtime::reportStat_Tmax(
+      GRNAME, std::string("EdgeLoadingMaxBytesSent"), maxBytesSent.reduce()
+    );
   }
 
   //! Optional type
@@ -1261,6 +1313,10 @@ public:
   }
 };
 
+// declaration so other places can access (e.g. stats)
+template <typename NodeTy, typename EdgeTy, bool moreColumnHosts>
+constexpr const char* const
+    galois::graphs::DistGraphCartesianCut<NodeTy, EdgeTy, moreColumnHosts>::GRNAME;
 } // end namespace graphs
 } // end namespace galois
 #endif
