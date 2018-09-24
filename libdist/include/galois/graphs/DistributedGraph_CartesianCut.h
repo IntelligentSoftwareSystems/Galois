@@ -718,6 +718,14 @@ private:
       "EdgeLoadingSends", GRNAME);
     galois::CondStatTimer<PHASE_BREAKDOWN> edgeRecvsTimer(
       "EdgeLoadingReceives", GRNAME);
+    galois::PerThreadTimer<PHASE_BREAKDOWN> recvTagTimer1(
+      GRNAME, "EdgeRecvTaggedOverlap");
+    galois::PerThreadTimer<PHASE_BREAKDOWN> recvComputeTimer1(
+      GRNAME, "EdgeRecvProcessOverlap");
+    galois::PerThreadTimer<PHASE_BREAKDOWN> recvTagTimer2(
+      GRNAME, "EdgeRecvTaggedNonoverlap");
+    galois::PerThreadTimer<PHASE_BREAKDOWN> recvComputeTimer2(
+      GRNAME, "EdgeRecvProcessNonoverlap");
 
     loadTimer.start();
 
@@ -730,13 +738,14 @@ private:
 
     // read and send edges
     edgeSendsTimer.start();
-    loadEdgesFromFile(graph, bufGraph, numNodesWithEdges);
+    loadEdgesFromFile(graph, bufGraph, numNodesWithEdges, recvTagTimer1,
+                      recvComputeTimer1);
     edgeSendsTimer.stop();
 
     edgeRecvsTimer.start();
     // receive all edges
     galois::on_each([&](unsigned tid, unsigned nthreads) {
-      receiveEdges(graph, numNodesWithEdges);
+      receiveEdges(graph, numNodesWithEdges, recvTagTimer2, recvComputeTimer2);
     });
     edgeRecvsTimer.stop();
 
@@ -760,7 +769,10 @@ private:
   void loadEdgesFromFile(
       GraphTy& graph,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      std::atomic<uint32_t>& numNodesWithEdges) {
+      std::atomic<uint32_t>& numNodesWithEdges,
+      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvTagTimer,
+      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer
+  ) {
     galois::CondStatTimer<PHASE_BREAKDOWN> clearReserveTimer(
       GRNAME, "EdgeSendClearReserveTime"
     );
@@ -865,9 +877,12 @@ private:
           }
 
           // TODO don't have to receive every iteration
+          recvTagTimer.start();
           auto buffer =
               net.recieveTagged(galois::runtime::evilPhase, nullptr);
-          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
+          recvTagTimer.stop();
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges,
+                                          recvComputeTimer);
         },
 #if MORE_DIST_STATS
         galois::loopname("EdgeLoadingSendsLoop"),
@@ -902,7 +917,10 @@ private:
   void loadEdgesFromFile(
       GraphTy& graph,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      std::atomic<uint32_t>& numNodesWithEdges) {
+      std::atomic<uint32_t>& numNodesWithEdges,
+      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvTagTimer,
+      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer
+  ) {
     galois::CondStatTimer<PHASE_BREAKDOWN> clearReserveTimer(
       GRNAME, "EdgeSendClearReserveTime"
     );
@@ -997,9 +1015,12 @@ private:
           }
 
           // TODO don't have to receive every iteration
+          recvTagTimer.start();
           auto buffer =
               net.recieveTagged(galois::runtime::evilPhase, nullptr);
-          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges);
+          recvTagTimer.stop();
+          this->processReceivedEdgeBuffer(buffer, graph, numNodesWithEdges,
+                                          recvComputeTimer);
         },
 #if MORE_DIST_STATS
         galois::loopname("EdgeLoadingSendsLoop"),
@@ -1037,10 +1058,12 @@ private:
   template <typename GraphTy>
   void processReceivedEdgeBuffer(
       optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
-      GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
+      GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges,
+      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer) {
     if (buffer) {
       auto& rb = buffer->second;
 
+      recvComputeTimer.start();
       while (rb.r_size() > 0) {
         uint64_t n;
         std::vector<uint64_t> gdst_vec;
@@ -1054,6 +1077,7 @@ private:
         deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
         ++numNodesWithEdges;
       }
+      recvComputeTimer.stop();
     }
   }
 
@@ -1062,14 +1086,20 @@ private:
    * that were responsible for reading them.
    */
   template <typename GraphTy>
-  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges) {
+  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges,
+                    galois::PerThreadTimer<PHASE_BREAKDOWN>& recvTagTimer,
+                    galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer
+  ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     // receive edges for all mirror nodes
     while (numNodesWithEdges < base_DistGraph::numNodesWithEdges) {
       decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      recvTagTimer.start();
       p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      processReceivedEdgeBuffer(p, graph, numNodesWithEdges);
+      recvTagTimer.stop();
+
+      processReceivedEdgeBuffer(p, graph, numNodesWithEdges, recvComputeTimer);
     }
   }
 
