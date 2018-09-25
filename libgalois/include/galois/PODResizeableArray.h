@@ -126,6 +126,11 @@ public:
 
   pointer data() { return data_; }
   const_pointer data() const { return data_; }
+
+  void push_back(const _Tp& value) {
+    resize(size_ + 1);
+    data_[size_ - 1] = value;
+  }
 };
 
 } // namespace galois
