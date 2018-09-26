@@ -1200,40 +1200,34 @@ private:
     // mirrors for outgoing edges
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       // unsigned hostID = (gridRowID() * numColumnHosts) + i;
-      unsigned hostID_virtual =
-          (gridRowID(base_DistGraph::id) *
-           numColumnHosts) +
-          i;
+      unsigned hostToExamine =
+        (gridRowID(base_DistGraph::id) * numColumnHosts) + i;
+      if (hostToExamine == base_DistGraph::id) continue;
 
-      if (hostID_virtual == base_DistGraph::id) continue;
-
-      uint64_t src         = base_DistGraph::gid2host[hostID_virtual].first;
-      uint64_t src_end     = base_DistGraph::gid2host[hostID_virtual].second;
-      unsigned hostID_real = hostID_virtual;
-      mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
-                                       src_end - src);
+      uint64_t src         = base_DistGraph::gid2host[hostToExamine].first;
+      uint64_t src_end     = base_DistGraph::gid2host[hostToExamine].second;
+      mirrorNodes[hostToExamine].reserve(mirrorNodes[hostToExamine].size() +
+                                         src_end - src);
       for (; src < src_end; ++src) {
         if (globalToLocalMap.find(src) != globalToLocalMap.end()) {
-          mirrorNodes[hostID_real].push_back(src);
+          mirrorNodes[hostToExamine].push_back(src);
         }
       }
     }
 
     // mirrors for incoming edges
     for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID_virtual;
-      hostID_virtual = (i * numColumnHosts) + gridColumnID(base_DistGraph::id);
+      unsigned hostToExamine;
+      hostToExamine = (i * numColumnHosts) + gridColumnID(base_DistGraph::id);
+      if (hostToExamine == base_DistGraph::id) continue;
 
-      if (hostID_virtual == base_DistGraph::id) continue;
-
-      uint64_t dst         = base_DistGraph::gid2host[hostID_virtual].first;
-      uint64_t dst_end     = base_DistGraph::gid2host[hostID_virtual].second;
-      unsigned hostID_real = hostID_virtual;
-      mirrorNodes[hostID_real].reserve(mirrorNodes[hostID_real].size() +
-                                       dst_end - dst);
+      uint64_t dst         = base_DistGraph::gid2host[hostToExamine].first;
+      uint64_t dst_end     = base_DistGraph::gid2host[hostToExamine].second;
+      mirrorNodes[hostToExamine].reserve(mirrorNodes[hostToExamine].size() +
+                                         dst_end - dst);
       for (; dst < dst_end; ++dst) {
         if (globalToLocalMap.find(dst) != globalToLocalMap.end()) {
-          mirrorNodes[hostID_real].push_back(dst);
+          mirrorNodes[hostToExamine].push_back(dst);
         }
       }
     }
