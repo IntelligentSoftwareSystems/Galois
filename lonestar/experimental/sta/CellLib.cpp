@@ -278,11 +278,20 @@ void Cell::print(std::ostream& os) {
   os << "  }" << std::endl;
 }
 
+static std::unordered_map<VariableType, std::string> mapVarType2Name = {
+  {VARIABLE_INPUT_TRANSITION_TIME,        "input_transition_time"},
+  {VARIABLE_CONSTRAINED_PIN_TRANSITION,   "constrained_pin_transition"},
+  {VARIABLE_RELATED_PIN_TRANSITION,       "related_pin_transition"},
+  {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, "total_output_net_capacitance"},
+  {VARIABLE_INPUT_NET_TRANSITION,         "input_net_transition"},
+  {VARIABLE_TIME,                         "time"}
+};
+
 void LutTemplate::print(std::ostream& os) {
   os << "  lu_table_template (" << name << ") {" << std::endl;
   size_t i = 0;
   for (auto& v: var) {
-    os << "    variable_" << ++i << ": " << v << ";" << std::endl;
+    os << "    variable_" << ++i << ": " << mapVarType2Name.at(v) << ";" << std::endl;
   }
 
   i = 0;

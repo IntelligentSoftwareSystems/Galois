@@ -30,10 +30,33 @@ int main(int argc, char *argv[]) {
 //  lib.print();
 
 #if 0
+  VerilogWire* wire = new VerilogWire;
+  std::vector<VerilogPin*> pins;
+  for (size_t i = 0; i < 12; ++i) {
+    pins.push_back(new VerilogPin);
+  }
+
   auto wireLoad = lib.defaultWireLoad;
-  std::cout << "default wire delay (drive c=0.0, deg=2) = " << wireLoad->wireDelay(0.0, 2) << std::endl;
-  std::cout << "default wire delay (drive c=0.0, deg=10) = " << wireLoad->wireDelay(0.0, 10) << std::endl;
-  std::cout << "default wire delay (drive c=0.0, deg=12) = " << wireLoad->wireDelay(0.0, 12) << std::endl;
+
+  for (size_t i = 0; i < 2; ++i) {
+    wire->addPin(pins[i]);
+  }
+  std::cout << "default wire delay (drive c=0.0, deg=2) = " << wireLoad->wireDelay(0.0, wire, nullptr) << std::endl;
+
+  for (size_t i = 2; i < 10; ++i) {
+    wire->addPin(pins[i]);
+  }
+  std::cout << "default wire delay (drive c=0.0, deg=10) = " << wireLoad->wireDelay(0.0, wire, nullptr) << std::endl;
+
+  for (size_t i = 10; i < 12; ++i) {
+    wire->addPin(pins[i]);
+  }
+  std::cout << "default wire delay (drive c=0.0, deg=12) = " << wireLoad->wireDelay(0.0, wire, nullptr) << std::endl;
+
+  for (auto& p: pins) {
+    delete p;
+  }
+  delete wire;
 
   auto invX1 = lib.findCell("INV_X1");
   auto outPin = invX1->findCellPin("ZN");
