@@ -25,7 +25,7 @@
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 
-#define PHASE_BREAKDOWN 0
+#define PHASE_BREAKDOWN 1
 
 #include "galois/graphs/DistributedGraph.h"
 
@@ -357,20 +357,26 @@ public:
     edgeEnd   = g.edge_begin(nodeEnd);
 
     galois::Timer inspectionTimer;
+    galois::CondStatTimer<PHASE_BREAKDOWN> loadStatTimer("LoadStats", GRNAME);
+    galois::CondStatTimer<PHASE_BREAKDOWN> loadGraphTimer("LoadPartialGraph", GRNAME);
 
     inspectionTimer.start();
 
     // graph that loads assigned region into memory
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
 
+    loadGraphTimer.start();
     bufGraph.loadPartialGraph(
         filename, nodeBegin, nodeEnd, *edgeBegin, *edgeEnd,
         base_DistGraph::numGlobalNodes, base_DistGraph::numGlobalEdges);
+    loadGraphTimer.stop();
 
     std::vector<uint64_t> prefixSumOfEdges;
 
+    loadStatTimer.start();
     // first pass of the graph file
     loadStatistics(bufGraph, prefixSumOfEdges, inspectionTimer);
+    loadStatTimer.stop();
 
     // allocate memory for our underlying graph representation
     base_DistGraph::graph.allocateFrom(numNodes, numEdges);
@@ -665,12 +671,14 @@ private:
     inOutMetadataInitialization(hasIncomingEdge, numOutgoingEdges);
 
     // EDGE INSPECTION AND SENDING OF METADATA TO OTHERS
-
+    galois::CondStatTimer<PHASE_BREAKDOWN> p1CommTimer("P1Comm", GRNAME);
     // edge inspection for metadata
     edgeInspection(bufGraph, hasIncomingEdge, numOutgoingEdges,
                    inspectionTimer);
+    p1CommTimer.start();
     // send out data to other hosts in same column
     communicateColumnMetadata(hasIncomingEdge, numOutgoingEdges);
+    p1CommTimer.stop();
 
     // SPACE ALLOCATION
 
@@ -687,15 +695,25 @@ private:
     numEdges           = 0;
 
     // NODE METADATA CREATION
-
+    galois::CondStatTimer<PHASE_BREAKDOWN> cLocalTimer("CreateLocalTimer", GRNAME);
+    galois::CondStatTimer<PHASE_BREAKDOWN> cOutTimer("CreateOutgoingTimer", GRNAME);
+    galois::CondStatTimer<PHASE_BREAKDOWN> cInTimer("CreateInTimer", GRNAME);
     // master nodes
+    cLocalTimer.start();
     createLocalNodes(numOutgoingEdges, prefixSumOfEdges);
+    cLocalTimer.stop();
+
     // nodes along the row
+    cOutTimer.start();
     createOutgoingNodes(hasIncomingEdge, numOutgoingEdges, prefixSumOfEdges);
+    cOutTimer.stop();
+
     // numNodes should now have counted master nodes as well as nodes with edges
     base_DistGraph::numNodesWithEdges = numNodes;
+    cInTimer.start();
     // nodes along the column
     createIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
+    cInTimer.stop();
   }
 
   //! Load our assigned edges and construct them in-memory. Receive edges read
