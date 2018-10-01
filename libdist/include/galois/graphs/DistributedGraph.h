@@ -2850,6 +2850,13 @@ private:
                        galois::PODResizeableArray<unsigned int>& offsets,
                        galois::DynamicBitSet& bit_set_comm, size_t& buf_start,
                        size_t& retval, VecType& val_vec) {
+    std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
+    std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
+                                  get_run_identifier(loopName));
+    galois::CondStatTimer<MORE_COMM_STATS> Tdeserialize(serialize_timer_str.c_str(),
+                                                    GRNAME);
+    Tdeserialize.start();
+
     // get other metadata associated with message if mode isn't OnlyData
     if (data_mode != onlyData) {
       galois::runtime::gDeserialize(buf, bit_set_count);
@@ -2871,6 +2878,8 @@ private:
 
     // get data itself
     galois::runtime::gDeserialize(buf, val_vec);
+
+    Tdeserialize.stop();
   }
 
   /**
