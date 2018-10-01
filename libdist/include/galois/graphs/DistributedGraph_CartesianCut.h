@@ -25,7 +25,7 @@
 #ifndef _GALOIS_DIST_HGRAPHCC_H
 #define _GALOIS_DIST_HGRAPHCC_H
 
-#define PHASE_BREAKDOWN 1
+#define PHASE_BREAKDOWN 0
 
 #include "galois/graphs/DistributedGraph.h"
 
@@ -507,6 +507,7 @@ private:
 #if MORE_DIST_STATS
         galois::loopname("EdgeInspection"),
 #endif
+        galois::steal(),
         galois::no_stats());
 
     inspectionTimer.stop();
