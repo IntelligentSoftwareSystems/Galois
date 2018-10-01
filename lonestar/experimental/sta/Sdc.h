@@ -5,6 +5,7 @@
 #include "Tokenizer.h"
 #include "CellLib.h"
 #include "Verilog.h"
+#include "Clock.h"
 
 #include <vector>
 #include <unordered_map>
@@ -19,24 +20,6 @@ struct SDCDrivingCell {
   CellPin* toCellPin;
   CellPin* fromCellPin;
   MyFloat slew[2];
-
-public:
-  void print(std::ostream& os);
-};
-
-struct SDCClockEdge {
-  MyFloat t;
-  bool isRise;
-
-public:
-  void print(std::ostream& os);
-};
-
-struct SDCClock {
-  MyFloat period;
-  std::vector<SDCClockEdge> waveform;
-  VerilogPin* src;
-  std::string name;
 
 public:
   void print(std::ostream& os);
@@ -84,6 +67,7 @@ public:
   std::unordered_map<VerilogPin*, SDCDrivingCell*> mapPin2DrivingCells;
   std::unordered_set<SDCDrivingCell*> drivingCells;
   std::unordered_map<VerilogPin*, MyFloat> pinLoads;
+  std::unordered_map<VerilogPin*, MyFloat> wireLoads;
 
   // usual delay constraints
   MyFloat maxDelayPI2PO;
@@ -91,7 +75,7 @@ public:
   MyFloat maxDelayRO2RI;
   MyFloat maxDelayRO2PO;
 
-  std::unordered_map<std::string, SDCClock*> clocks;
+  std::unordered_map<std::string, Clock*> clocks;
 
 public:
   void parse(std::string inName, bool toClear = false);
@@ -123,6 +107,18 @@ public:
   }
 
   ~SDC() { clear(); }
+};
+
+struct SdcSetInputTransition {
+
+};
+
+struct SdcSetInputDelay {
+
+};
+
+struct SdcSetOutputDelay {
+
 };
 
 #endif // GALOIS_EDA_SDC_H
