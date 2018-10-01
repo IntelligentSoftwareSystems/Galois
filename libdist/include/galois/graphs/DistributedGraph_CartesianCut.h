@@ -571,11 +571,12 @@ private:
                         std::vector<uint64_t>& prefixSumOfEdges) {
     unsigned hostID = base_DistGraph::id;
     uint64_t src    = base_DistGraph::gid2host[hostID].first;
-    unsigned i      = gridColumnID();
+    unsigned myColumn      = gridColumnID();
+
     // process the nodes/edges that were read locally before looking at
     // received data from other hosts
-    for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
-      numEdges += numOutgoingEdges[i][j];
+    for (uint32_t j = 0; j < numOutgoingEdges[myColumn].size(); ++j) {
+      numEdges += numOutgoingEdges[myColumn][j];
       localToGlobalVector.push_back(src);
       assert(globalToLocalMap.find(src) == globalToLocalMap.end());
       globalToLocalMap[src] = numNodes++;
@@ -597,21 +598,23 @@ private:
     // loop through data from all hosts associated with this row (ignore
     // self because already handled) and count edges, create nodes, and
     // keep a running prefix sum
-    for (unsigned i = 0; i < numColumnHosts; ++i) {
-      unsigned hostID = leaderHostID + i;
+    for (unsigned curColumnHost = 0;
+         curColumnHost < numColumnHosts;
+         ++curColumnHost) {
+      unsigned hostID = leaderHostID + curColumnHost;
       if (hostID == base_DistGraph::id) continue;
       uint64_t src = base_DistGraph::gid2host[hostID].first;
 
-      for (uint32_t j = 0; j < numOutgoingEdges[i].size(); ++j) {
+      for (uint32_t j = 0; j < numOutgoingEdges[curColumnHost].size(); ++j) {
         // only consider nodes with outgoing edges
-        if (numOutgoingEdges[i][j] > 0) {
-          numEdges += numOutgoingEdges[i][j];
+        if (numOutgoingEdges[curColumnHost][j] > 0) {
+          numEdges += numOutgoingEdges[curColumnHost][j];
           localToGlobalVector.push_back(src);
           assert(globalToLocalMap.find(src) == globalToLocalMap.end());
           globalToLocalMap[src] = numNodes++;
           prefixSumOfEdges.push_back(numEdges);
         } else if ((gridColumnID(base_DistGraph::id +
-                                 i * base_DistGraph::numHosts) ==
+                                 curColumnHost * base_DistGraph::numHosts) ==
                     getColumnOfNode(src)) &&
                    hasIncomingEdge[0].test(getColumnIndexOfNode(src))) {
           galois::gWarn(
@@ -632,8 +635,8 @@ private:
     std::vector<uint64_t>& prefixSumOfEdges
   ) {
     // check hosts in different rows but on same column
-    for (unsigned i = 0; i < numRowHosts; ++i) {
-      unsigned hostID = (i * numColumnHosts) + gridColumnID();
+    for (unsigned curRowHost = 0; curRowHost < numRowHosts; ++curRowHost) {
+      unsigned hostID = (curRowHost * numColumnHosts) + gridColumnID();
       if (hostID == base_DistGraph::id) continue;
 
       // disjoint set of nodes from nodes on this host
