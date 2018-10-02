@@ -273,6 +273,7 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, co
 
   const unsigned __kernel_tb_size = __tb_BFS;
   __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage work_items_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -291,6 +292,7 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, co
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   DGAccumulator_accum.thread_entry();
+  work_items.thread_entry();
   // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -504,6 +506,7 @@ __global__ void BFS(CSRGraph graph, unsigned int __begin, unsigned int __end, co
   }
   // FP: "119 -> 120;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
+  work_items.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(work_items_ts);
   // FP: "120 -> 121;
 }
 __global__ void BFSSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGReduceMax<uint32_t> DGMax)
@@ -610,6 +613,7 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccum
   dim3 blocks;
   dim3 threads;
   HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _work_items;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
@@ -622,8 +626,6 @@ void BFS_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccum
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  HGAccumulator<unsigned int> _work_items;
-  kernel_sizing(blocks, threads);
   Shared<unsigned int> work_itemsval  = Shared<unsigned int>(1);
   *(work_itemsval.cpu_wr_ptr()) = 0;
   _work_items.rv = work_itemsval.gpu_wr_ptr();
