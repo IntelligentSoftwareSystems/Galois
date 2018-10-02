@@ -143,7 +143,10 @@ void InitializeGraph_nodesWithEdges_cuda(const uint32_t& local_infinity,
                                          unsigned long long local_src_node,
                                          struct CUDA_Context* ctx);
 void SSSP_cuda(unsigned int __begin, unsigned int __end,
-               unsigned int& DGAccumulator_accum, struct CUDA_Context* ctx);
+               unsigned int& DGAccumulator_accum, 
+               unsigned int& work_items,
+               const uint32_t local_priority,
+               struct CUDA_Context* ctx);
 void SSSPSanityCheck_cuda(unsigned int __begin, unsigned int __end,
                           uint64_t& DGAccumulator_sum, uint32_t& DGMax,
                           const uint32_t& local_infinity,
@@ -160,8 +163,14 @@ void SSSPSanityCheck_nodesWithEdges_cuda(uint64_t& DGAccumulator_sum,
                                          const uint32_t& local_infinity,
                                          struct CUDA_Context* ctx);
 void SSSP_allNodes_cuda(unsigned int& DGAccumulator_accum,
+                        unsigned int& work_items,
+                        const uint32_t local_priority,
                         struct CUDA_Context* ctx);
 void SSSP_masterNodes_cuda(unsigned int& DGAccumulator_accum,
+                           unsigned int& work_items,
+                           const uint32_t local_priority,
                            struct CUDA_Context* ctx);
 void SSSP_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
+                              unsigned int& work_items,
+                              const uint32_t local_priority,
                               struct CUDA_Context* ctx);

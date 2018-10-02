@@ -266,7 +266,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int
   }
   // FP: "113 -> 114;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t local_priority, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum, HGAccumulator<unsigned int> work_items)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -305,8 +305,16 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, u
     {
       if (p_dist_old[src] > p_dist_current[src])
       {
-        p_dist_old[src] = p_dist_current[src];
         DGAccumulator_accum.reduce( 1);
+        if (local_priority > p_dist_current[src])
+        {
+          p_dist_old[src] = p_dist_current[src];
+          work_items.reduce( 1);
+        }
+        else
+        {
+          pop = false;
+        }
       }
       else
       {
@@ -597,7 +605,7 @@ void FirstItr_SSSP_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   FirstItr_SSSP_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
@@ -614,29 +622,35 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccu
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  HGAccumulator<unsigned int> _work_items;
+  kernel_sizing(blocks, threads);
+  Shared<unsigned int> work_itemsval  = Shared<unsigned int>(1);
+  *(work_itemsval.cpu_wr_ptr()) = 0;
+  _work_items.rv = work_itemsval.gpu_wr_ptr();
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, local_priority, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum, _work_items);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
   DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
   // FP: "11 -> 12;
+  work_items = *(work_itemsval.cpu_rd_ptr());
 }
-void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, work_items, local_priority, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_masterNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_masterNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, work_items, local_priority, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void SSSP_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, work_items, local_priority, ctx);
   // FP: "2 -> 3;
 }
 void SSSPSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)

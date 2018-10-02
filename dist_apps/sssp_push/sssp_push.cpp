@@ -49,6 +49,11 @@ static cll::opt<unsigned long long>
     src_node("startNode", // not uint64_t due to a bug in llvm cl
              cll::desc("ID of the source node"), cll::init(0));
 
+static cll::opt<uint32_t>
+    delta("delta",
+             cll::desc("Shift value for the delta step (default value INF)"), 
+             cll::init(std::numeric_limits<uint32_t>::max()));
+
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
@@ -165,6 +170,7 @@ struct FirstItr_SSSP {
 };
 
 struct SSSP {
+  uint32_t local_priority;
   Graph* graph;
 #ifdef __GALOIS_HET_ASYNC__
   using DGAccumulatorTy = galois::DGTerminator<unsigned int>;
@@ -173,9 +179,12 @@ struct SSSP {
 #endif
 
   DGAccumulatorTy& DGAccumulator_accum;
+  galois::GAccumulator<uint32_t>& work_items;
 
-  SSSP(Graph* _graph, DGAccumulatorTy& _dga)
-      : graph(_graph), DGAccumulator_accum(_dga) {}
+  SSSP(uint32_t _local_priority, Graph* _graph, 
+      DGAccumulatorTy& _dga, galois::GAccumulator<uint32_t>& _work_items)
+      : local_priority(_local_priority), graph(_graph), 
+      DGAccumulator_accum(_dga), work_items(_work_items) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga) {
     using namespace galois::worklists;
@@ -186,23 +195,33 @@ struct SSSP {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
+    assert(delta > 0);
+    uint32_t priority = 0;
+    galois::GAccumulator<uint32_t> work_items;
+
     do {
+
+      if (work_items.reduce() == 0) priority += delta;
+
       _graph.set_num_round(_num_iterations);
       dga.reset();
+      work_items.reset();
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
         std::string impl_str("SSSP_" + (_graph.get_run_identifier()));
         galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
         StatTimer_cuda.start();
         unsigned int __retval = 0;
-        SSSP_nodesWithEdges_cuda(__retval, cuda_ctx);
+        unsigned int __retval2 = 0;
+        SSSP_nodesWithEdges_cuda(__retval, __retval2, priority, cuda_ctx);
         dga += __retval;
+        work_items += __retval2;
         StatTimer_cuda.stop();
       } else if (personality == CPU)
 #endif
       {
         galois::do_all(
-            galois::iterate(nodesWithEdges), SSSP{&_graph, dga},
+            galois::iterate(nodesWithEdges), SSSP{priority, &_graph, dga, work_items},
             galois::no_stats(),
             galois::loopname(_graph.get_run_identifier("SSSP").c_str()),
             galois::steal());
@@ -218,7 +237,7 @@ struct SSSP {
 
       galois::runtime::reportStat_Tsum(
           "SSSP", "NumWorkItems_" + (_graph.get_run_identifier()),
-          (unsigned long)dga.read_local());
+          (unsigned long)work_items.reduce());
       ++_num_iterations;
     } while (
 #ifndef __GALOIS_HET_ASYNC__
@@ -237,17 +256,21 @@ struct SSSP {
     NodeData& snode = graph->getData(src);
 
     if (snode.dist_old > snode.dist_current) {
-      snode.dist_old = snode.dist_current;
-
       DGAccumulator_accum += 1;
 
-      for (auto jj : graph->edges(src)) {
-        GNode dst         = graph->getEdgeDst(jj);
-        auto& dnode       = graph->getData(dst);
-        uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
-        uint32_t old_dist = galois::atomicMin(dnode.dist_current, new_dist);
-        if (old_dist > new_dist)
-          bitset_dist_current.set(dst);
+      if (local_priority > snode.dist_current) {
+        snode.dist_old = snode.dist_current;
+
+        work_items += 1;
+
+        for (auto jj : graph->edges(src)) {
+          GNode dst         = graph->getEdgeDst(jj);
+          auto& dnode       = graph->getData(dst);
+          uint32_t new_dist = graph->getEdgeData(jj) + snode.dist_current;
+          uint32_t old_dist = galois::atomicMin(dnode.dist_current, new_dist);
+          if (old_dist > new_dist)
+            bitset_dist_current.set(dst);
+        }
       }
     }
   }
