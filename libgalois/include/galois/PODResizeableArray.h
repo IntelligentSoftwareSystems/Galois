@@ -126,8 +126,9 @@ public:
 
   void reserve(size_t n) {
     if (n > capacity_) {
-      data_ = static_cast<_Tp*>(realloc(data_, n * sizeof(_Tp)));
-      capacity_ = n;
+      if (capacity_ == 0) capacity_ = 1;
+      while (capacity_ < n) capacity_ <<= 1;
+      data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
     }
   }
 
@@ -169,7 +170,6 @@ public:
   const_pointer data() const { return data_; }
 
   void push_back(const _Tp& value) {
-    if (size_ == capacity_) reserve(2 * size_);
     resize(size_ + 1);
     data_[size_ - 1] = value;
   }
