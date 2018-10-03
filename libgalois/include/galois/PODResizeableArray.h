@@ -55,9 +55,49 @@ public:
 
   PODResizeableArray() : data_(NULL), capacity_(0), size_(0) {}
 
-  PODResizeableArray(size_t n) { resize(n); }
+  template <class InputIterator>
+  PODResizeableArray(InputIterator first, InputIterator last) 
+    : data_(NULL), capacity_(0), size_(0) 
+  {
+    size_t to_add = last - first;
+    resize(to_add);
+    std::copy_n(first, to_add, begin());
+  }
 
-  ~PODResizeableArray() { free(data_); }
+  PODResizeableArray(size_t n) 
+    : data_(NULL), capacity_(0), size_(0) 
+  { 
+    resize(n); 
+  }
+
+  //! disabled (shallow) copy constructor
+  PODResizeableArray(const PODResizeableArray&) = delete;
+
+  //! move constructor
+  PODResizeableArray(PODResizeableArray&& v)
+    : data_(v.data_), capacity_(v.capacity_), size_(v.size_) 
+  {
+    v.data_ = NULL;
+    v.capacity_ = 0;
+    v.size_ = 0;
+  }
+
+  //! disabled (shallow) copy assignment operator
+  PODResizeableArray& operator=(const PODResizeableArray&) = delete;
+
+  //! move assignment operator
+  PODResizeableArray& operator=(PODResizeableArray&& v) {
+    if (data_ != NULL) free(data_);
+    data_ = v.data_;
+    capacity_ = v.capacity_;
+    size_ = v.size_;
+    v.data_ = NULL;
+    v.capacity_ = 0;
+    v.size_ = 0;
+    return *this;
+  }
+
+  ~PODResizeableArray() { if (data_ != NULL) free(data_); }
 
   // iterators:
   iterator begin() { return iterator(&data_[0]); }
@@ -132,6 +172,21 @@ public:
     if (size_ == capacity_) reserve(2 * size_);
     resize(size_ + 1);
     data_[size_ - 1] = value;
+  }
+
+  template <class InputIterator>
+  void insert(iterator position, InputIterator first, InputIterator last) {
+    assert(position == end());
+    size_t old_size = size_;
+    size_t to_add = last - first;
+    resize(old_size + to_add);
+    std::copy_n(first, to_add, begin() + old_size);
+  }
+
+  void swap(PODResizeableArray& v) {
+    std::swap(data_, v.data_);
+    std::swap(size_, v.size_);
+    std::swap(capacity_, v.capacity_);
   }
 };
 

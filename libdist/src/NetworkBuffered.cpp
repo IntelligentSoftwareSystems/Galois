@@ -64,6 +64,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   unsigned long statRecvDequeued;
   bool anyReceivedMessages;
 
+  //using vTy = std::vector<uint8_t>;
+  using vTy = galois::PODResizeableArray<uint8_t>;
+
   /**
    * Receive buffers for the buffered network interface
    */
@@ -111,9 +114,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
      * Return a (moved) vector if the len bytes requested are the last len
      * bytes of the front of the buffer queue
      */
-    optional_t<std::vector<uint8_t>> popVec(uint32_t len, std::atomic<size_t>& inflightRecvs) {
+    optional_t<vTy> popVec(uint32_t len, std::atomic<size_t>& inflightRecvs) {
       if (data[0].data.size() == frontOffset + len) {
-        std::vector<uint8_t> retval(std::move(data[0].data));
+        vTy retval(std::move(data[0].data));
         data.pop_front();
         --inflightRecvs;
         frontOffset = 0;
@@ -122,9 +125,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         } else {
           dataPresent = ~0;
         }
-        return optional_t<std::vector<uint8_t>>(std::move(retval));
+        return optional_t<vTy>(std::move(retval));
       } else {
-        return optional_t<std::vector<uint8_t>>();
+        return optional_t<vTy>();
       }
     }
 
@@ -185,7 +188,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       if (data.empty() || data.front().tag != tag)
         return optional_t<RecvBuffer>();
 
-      std::vector<uint8_t> vec(std::move(data.front().data));
+      vTy vec(std::move(data.front().data));
 
       data.pop_front();
       --inflightRecvs;
@@ -239,8 +242,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   class sendBuffer {
     struct msg {
       uint32_t tag;
-      std::vector<uint8_t> data;
-      msg(uint32_t t, std::vector<uint8_t>& _data)
+      vTy data;
+      msg(uint32_t t, vTy& _data)
           : tag(t), data(std::move(_data)) {}
     };
 
@@ -295,10 +298,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 #endif
     }
 
-    std::pair<uint32_t, std::vector<uint8_t>> assemble(std::atomic<size_t>& inflightSends) {
+    std::pair<uint32_t, vTy> assemble(std::atomic<size_t>& inflightSends) {
       std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
-        return std::make_pair(~0, std::vector<uint8_t>());
+        return std::make_pair(~0, vTy());
 #ifndef NO_AGG
       // compute message size
       uint32_t len = 0;
@@ -320,7 +323,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       }
       lg.unlock();
       // construct message
-      std::vector<uint8_t> vec;
+      vTy vec;
       vec.reserve(len + num);
       // go out of our way to avoid locking out senders when making messages
       lg.lock();
@@ -344,13 +347,13 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       numBytes -= len;
 #else
       uint32_t tag = messages.front().tag;
-      std::vector<uint8_t> vec(std::move(messages.front().data));
+      vTy vec(std::move(messages.front().data));
       messages.pop_front();
 #endif
       return std::make_pair(tag, std::move(vec));
     }
 
-    void add(uint32_t tag, std::vector<uint8_t>& b) {
+    void add(uint32_t tag, vTy& b) {
       std::lock_guard<SimpleLock> lg(lock);
       if (messages.empty()) {
         std::lock_guard<SimpleLock> lg(timelock);

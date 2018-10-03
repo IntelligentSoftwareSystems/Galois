@@ -68,11 +68,11 @@ private:
   struct mpiMessage {
     uint32_t host;
     uint32_t tag;
-    std::vector<uint8_t> data;
+    vTy data;
     MPI_Request req;
     // mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req)
     // {}
-    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data)
+    mpiMessage(uint32_t host, uint32_t tag, vTy&& data)
         : host(host), tag(tag), data(std::move(data)) {}
     mpiMessage(uint32_t host, uint32_t tag, size_t len)
         : host(host), tag(tag), data(len) {}
@@ -221,7 +221,7 @@ public:
       recvQueue.done.pop_front();
       return msg;
     }
-    return message{~0U, 0, std::vector<uint8_t>()};
+    return message{~0U, 0, vTy()};
   }
 
   /**
