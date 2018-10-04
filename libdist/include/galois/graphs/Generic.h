@@ -58,6 +58,7 @@ public:
 
   uint32_t numNodes;
   uint64_t numEdges;
+  uint32_t nodesToReceive;
 
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
@@ -157,49 +158,45 @@ public:
 
     base_DistGraph::printStatistics();
 
+    //galois::runtime::getHostBarrier().wait();
 
-    galois::runtime::getHostBarrier().wait();
-    exit(0);
+    loadEdges(base_DistGraph::graph, bufGraph);
 
-    //loadEdges(base_DistGraph::graph, bufGraph, numEdges_distribute);
-
-    //bufGraph.resetAndFree();
+    bufGraph.resetAndFree();
 
     ///*******************************************/
 
     //galois::runtime::getHostBarrier().wait();
 
-    //if (transpose && (numNodes > 0)) {
-    //  base_DistGraph::graph.transpose();
-    //  base_DistGraph::transposed = true;
-    //}
+    if (transpose && (numNodes > 0)) {
+      base_DistGraph::graph.transpose();
+      base_DistGraph::transposed = true;
+    }
 
-    //galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
-    //                                                      GRNAME);
+    galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
+                                                          GRNAME);
 
-    //Tthread_ranges.start();
-    //base_DistGraph::determineThreadRanges();
-    //Tthread_ranges.stop();
+    Tthread_ranges.start();
+    base_DistGraph::determineThreadRanges();
+    Tthread_ranges.stop();
 
-    //base_DistGraph::determineThreadRangesMaster();
-    //base_DistGraph::determineThreadRangesWithEdges();
-    //base_DistGraph::initializeSpecificRanges();
+    base_DistGraph::determineThreadRangesMaster();
+    base_DistGraph::determineThreadRangesWithEdges();
+    base_DistGraph::initializeSpecificRanges();
 
-    //base_DistGraph::edgesEqualMasters(); // edges should be masters
+    Tgraph_construct.stop();
 
-    //Tgraph_construct.stop();
+    /*****************************************
+     * Communication PreProcessing:
+     * Exchange mirrors and master nodes among
+     * hosts
+     ****************************************/
+    galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
+        "GraphCommSetupTime", GRNAME);
 
-    ///*****************************************
-    // * Communication PreProcessing:
-    // * Exchange mirrors and master nodes among
-    // * hosts
-    // ****************************************/
-    //galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
-    //    "GraphCommSetupTime", GRNAME);
-
-    //Tgraph_construct_comm.start();
-    //base_DistGraph::setup_communication();
-    //Tgraph_construct_comm.stop();
+    Tgraph_construct_comm.start();
+    base_DistGraph::setup_communication();
+    Tgraph_construct_comm.stop();
   }
 
 
@@ -443,6 +440,7 @@ public:
   ) {
     numNodes = 0;
     numEdges = 0;
+    nodesToReceive = 0;
 
     galois::gstl::Vector<uint64_t> prefixSumOfEdges;
     // reserve overestimation of nodes
@@ -463,6 +461,7 @@ public:
     finalizeInspection(prefixSumOfEdges);
     galois::gPrint(base_DistGraph::id, " after finalize\n");
 
+    galois::gPrint(base_DistGraph::id, " receive this many: ", nodesToReceive, "\n");
     return prefixSumOfEdges;
   }
 
@@ -475,6 +474,9 @@ public:
     galois::gstl::Vector<uint64_t>& prefixSumOfEdges
   ) {
     uint32_t myHID = base_DistGraph::id;
+
+    galois::GAccumulator<uint32_t> toReceive;
+    toReceive.reset();
 
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
       uint32_t activeThreads = galois::getActiveThreads();
@@ -521,6 +523,7 @@ public:
       prefixSumOfEdges.resize(numNodes + newMasterNodes);
       localToGlobalVector.resize(numNodes + newMasterNodes);
 
+
       if (newMasterNodes > 0) {
         // do actual work, second on_each
         galois::on_each(
@@ -548,6 +551,9 @@ public:
                                               // handled later
                   prefixSumOfEdges[startingNodeIndex + threadStartLocation +
                                    handledNodes] = myEdges;
+                  if (myEdges > 0 && h != myHID) {
+                    toReceive += 1;
+                  }
                 } else {
                   prefixSumOfEdges[startingNodeIndex + threadStartLocation +
                                    handledNodes] = 0;
@@ -564,6 +570,7 @@ public:
       }
     }
 
+    nodesToReceive += toReceive.reduce();
     // masters have been handled
     base_DistGraph::numOwned = numNodes;
   }
@@ -576,6 +583,11 @@ public:
     std::vector<std::vector<uint64_t>>& numOutgoingEdges,
     galois::gstl::Vector<uint64_t>& prefixSumOfEdges
   ) {
+    uint32_t myHID = base_DistGraph::id;
+
+    galois::GAccumulator<uint32_t> toReceive;
+    toReceive.reset();
+
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
       size_t hostSize = numOutgoingEdges[h].size();
       // if i got no outgoing info from this host, safely continue to next one
@@ -622,6 +634,7 @@ public:
       uint64_t startNode = base_DistGraph::gid2host[h].first;
       uint32_t startingNodeIndex = numNodes;
 
+
       if (newOutgoingNodes > 0) {
         // do actual work, second on_each
         galois::on_each(
@@ -647,6 +660,10 @@ public:
                 localToGlobalVector[startingNodeIndex + threadStartLocation +
                                     handledNodes] = startNode + i;
                 handledNodes++;
+
+                if (myEdges > 0 && h != myHID) {
+                  toReceive += 1;
+                }
               }
             }
           }
@@ -656,6 +673,8 @@ public:
       // don't need anymore after this point; get memory back
       numOutgoingEdges[h].clear();
     }
+
+    nodesToReceive += toReceive.reduce();
     base_DistGraph::numNodesWithEdges = numNodes;
   }
 
@@ -787,7 +806,7 @@ public:
 ////////////////////////////////////////////////////////////////////////////////
 
   /**
-   * TODO make parallel
+   * TODO make parallel?
    */
   void fillMirrors() {
     base_DistGraph::mirrorNodes.reserve(numNodes - base_DistGraph::numOwned);
@@ -800,154 +819,152 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-//  template <typename GraphTy>
-//  void loadEdges(GraphTy& graph,
-//                 galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-//                 uint64_t numEdges_distribute) {
-//    if (base_DistGraph::id == 0) {
-//      if (std::is_void<typename GraphTy::edge_data_type>::value) {
-//        fprintf(stderr, "Loading void edge-data while creating edges.\n");
-//      } else {
-//        fprintf(stderr, "Loading edge-data while creating edges.\n");
-//      }
-//    }
-//
-//    bufGraph.resetReadCounters();
-//
-//    galois::StatTimer loadEdgeTimer("EdgeLoading");
-//    loadEdgeTimer.start();
-//
-//    sendEdges(graph, bufGraph);
-//    std::atomic<uint32_t> nodesToReceive;
-//    edgesToReceive.store(numNodesWithEdges - base_DistGraph::numOwned);
-//    galois::on_each([&](unsigned tid, unsigned nthreads) {
-//      receive_edges(graph, edgesToReceive);
-//    });
-//    base_DistGraph::increment_evilPhase();
-//
-//    loadEdgeTimer.stop();
-//
-//    galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ",
-//                   loadEdgeTimer.get_usec() / 1000000.0f,
-//                   " seconds to read ", bufGraph.getBytesRead(), " bytes (",
-//                   bufGraph.getBytesRead() / (float)loadEdgeTimer.get_usec(),
-//                   " MBPS)\n");
-//  }
-//
-//  // Edge type is not void. (i.e. edge data exists)
-//  template <typename GraphTy,
-//            typename std::enable_if<!std::is_void<
-//                typename GraphTy::edge_data_type>::value>::type* = nullptr>
-//  void sendEdges(GraphTy& graph,
-//                 galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
-//    using DstVecType = std::vector<std::vector<uint64_t>>;
-//    using DataVecType =
-//        std::vector<std::vector<typename GraphTy::edge_data_type>>;
-//    using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>;
-//
-//    galois::substrate::PerThreadStorage<DstVecType> gdst_vecs(
-//        base_DistGraph::numHosts);
-//    galois::substrate::PerThreadStorage<DataVecType> gdata_vecs(
-//        base_DistGraph::numHosts);
-//    galois::substrate::PerThreadStorage<SendBufferVecTy> sendBuffers(
-//        base_DistGraph::numHosts);
-//
-//    auto& net             = galois::runtime::getSystemNetworkInterface();
-//    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
-//    const unsigned& id       = this->base_DistGraph::id;
-//    const unsigned& numHosts = this->base_DistGraph::numHosts;
-//
-//    // Go over assigned nodes and distribute edges.
-//    galois::do_all(
-//        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
-//                        base_DistGraph::gid2host[base_DistGraph::id].second),
-//        [&](auto src) {
-//          uint64_t curEdge    = 0;
-//          if (this->isLocal(src)) {
-//            lsrc = this->G2L(src);
-//            curEdge = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-//          }
-//
-//          auto ee     = bufGraph.edgeBegin(src);
-//          auto ee_end = bufGraph.edgeEnd(src);
-//          uint64_t numEdges = std::distance(ee, ee_end);
-//          auto& gdst_vec  = *gdst_vecs.getLocal();
-//          auto& gdata_vec = *gdata_vecs.getLocal();
-//
-//          for (unsigned i = 0; i < numHosts; ++i) {
-//            gdst_vec[i].clear();
-//            gdata_vec[i].clear();
-//            gdst_vec[i].reserve(numEdges);
-//            gdata_vec[i].reserve(numEdges);
-//          }
-//
-//          for (; ee != ee_end; ++ee) {
-//            uint32_t gdst = bufGraph.edgeDestination(*ee);
-//            auto gdata    = bufGraph.edgeData(*ee);
-//
-//            uint32_t hostBelongs =
-//              graphPartitioner->getEdge(src, gdst, numEdges).first;
-//            if (hostBelongs == id) {
-//              // edge belongs here, construct on self
-//              assert(this->isLocal(src));
-//              uint32_t ldst = this->G2L(dst)
-//              graph.constructEdge(curEdge++, ldst, gdata);
-//            } else {
-//              // add to host vector to send out later
-//              gdst_vec[hostBelongs].push_back(gdst);
-//              gdata_vec[hostBelongs].push_back(gdata);
-//            }
-//          }
-//
-//          // make sure all edges accounted for if local
-//          if (this->isLocal(n)) {
-//            assert(cur == (*graph.edge_end(lsrc)));
-//          }
-//
-//          // send
-//          for (uint32_t h = 0; h < numHosts; ++h) {
-//            if (h == id) continue;
-//
-//            if (gdst_vec[i].size() > 0) {
-//              auto& b = (*sendBuffers.getLocal())[h];
-//              galois::runtime::gSerialize(b, src);
-//              galois::runtime::gSerialize(b, gdst_vec[h]);
-//              galois::runtime::gSerialize(b, gdata_vec[h]);
-//
-//              if (b.size() > edgePartitionSendBufSize) {
-//                net.sendTagged(h, galois::runtime::evilPhase, b);
-//                b.getVec().clear();
-//                b.getVec().reserve(edgePartitionSendBufSize * 1.25);
-//              }
-//            }
-//          }
-//
-//          // TODO overlap receives here
-//        },
-//#if MORE_DIST_STATS
-//        galois::loopname("EdgeLoading"),
-//#endif
-//        galois::steal(),
-//        galois::no_stats());
-//
-//    // flush buffers
-//    for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
-//      auto& sbr = *sendBuffers.getRemote(threadNum);
-//      for (unsigned h = 0; h < this->base_DistGraph::numHosts; ++h) {
-//        if (h == this->base_DistGraph::id) continue;
-//        auto& sendBuffer = sbr[h];
-//        if (sendBuffer.size() > 0) {
-//          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
-//          sendBuffer.getVec().clear();
-//        }
-//      }
-//    }
-//
-//    net.flush();
-//
-//
-//    // TODO stats
-//  }
+  template <typename GraphTy>
+  void loadEdges(GraphTy& graph,
+                 galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
+    if (base_DistGraph::id == 0) {
+      if (std::is_void<typename GraphTy::edge_data_type>::value) {
+        fprintf(stderr, "Loading void edge-data while creating edges.\n");
+      } else {
+        fprintf(stderr, "Loading edge-data while creating edges.\n");
+      }
+    }
+
+    bufGraph.resetReadCounters();
+    std::atomic<uint32_t> receivedNodes;
+    receivedNodes.store(0);
+    galois::StatTimer loadEdgeTimer("EdgeLoading");
+    loadEdgeTimer.start();
+
+    sendEdges(graph, bufGraph, receivedNodes);
+    galois::on_each([&](unsigned tid, unsigned nthreads) {
+      receiveEdges(graph, receivedNodes);
+    });
+    base_DistGraph::increment_evilPhase();
+
+    loadEdgeTimer.stop();
+
+    galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ",
+                   loadEdgeTimer.get_usec() / 1000000.0f,
+                   " seconds to read ", bufGraph.getBytesRead(), " bytes (",
+                   bufGraph.getBytesRead() / (float)loadEdgeTimer.get_usec(),
+                   " MBPS)\n");
+  }
+
+  // Edge type is not void. (i.e. edge data exists)
+  template <typename GraphTy,
+            typename std::enable_if<!std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void sendEdges(GraphTy& graph,
+                 galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                 std::atomic<uint32_t>& receivedNodes) {
+    using DstVecType = std::vector<std::vector<uint64_t>>;
+    using DataVecType =
+        std::vector<std::vector<typename GraphTy::edge_data_type>>;
+    using SendBufferVecTy = std::vector<galois::runtime::SendBuffer>;
+
+    galois::substrate::PerThreadStorage<DstVecType> gdst_vecs(
+        base_DistGraph::numHosts);
+    galois::substrate::PerThreadStorage<DataVecType> gdata_vecs(
+        base_DistGraph::numHosts);
+    galois::substrate::PerThreadStorage<SendBufferVecTy> sendBuffers(
+        base_DistGraph::numHosts);
+
+    auto& net             = galois::runtime::getSystemNetworkInterface();
+    const unsigned& id       = this->base_DistGraph::id;
+    const unsigned& numHosts = this->base_DistGraph::numHosts;
+
+    // Go over assigned nodes and distribute edges.
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto src) {
+          uint32_t lsrc       = 0;
+          uint64_t curEdge    = 0;
+          if (this->isLocal(src)) {
+            lsrc = this->G2L(src);
+            curEdge = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          }
+
+          auto ee     = bufGraph.edgeBegin(src);
+          auto ee_end = bufGraph.edgeEnd(src);
+          uint64_t numEdges = std::distance(ee, ee_end);
+          auto& gdst_vec  = *gdst_vecs.getLocal();
+          auto& gdata_vec = *gdata_vecs.getLocal();
+
+          for (unsigned i = 0; i < numHosts; ++i) {
+            gdst_vec[i].clear();
+            gdata_vec[i].clear();
+            gdst_vec[i].reserve(numEdges);
+            gdata_vec[i].reserve(numEdges);
+          }
+
+          for (; ee != ee_end; ++ee) {
+            uint32_t gdst = bufGraph.edgeDestination(*ee);
+            auto gdata    = bufGraph.edgeData(*ee);
+
+            uint32_t hostBelongs =
+              graphPartitioner->getEdge(src, gdst, numEdges).first;
+            if (hostBelongs == id) {
+              // edge belongs here, construct on self
+              assert(this->isLocal(src));
+              uint32_t ldst = this->G2L(gdst);
+              graph.constructEdge(curEdge++, ldst, gdata);
+            } else {
+              // add to host vector to send out later
+              gdst_vec[hostBelongs].push_back(gdst);
+              gdata_vec[hostBelongs].push_back(gdata);
+            }
+          }
+
+          // make sure all edges accounted for if local
+          if (this->isLocal(src)) {
+            assert(curEdge == (*graph.edge_end(lsrc)));
+          }
+
+          // send
+          for (uint32_t h = 0; h < numHosts; ++h) {
+            if (h == id) continue;
+
+            if (gdst_vec[h].size() > 0) {
+              auto& b = (*sendBuffers.getLocal())[h];
+              galois::runtime::gSerialize(b, src);
+              galois::runtime::gSerialize(b, gdst_vec[h]);
+              galois::runtime::gSerialize(b, gdata_vec[h]);
+
+              if (b.size() > edgePartitionSendBufSize) {
+                net.sendTagged(h, galois::runtime::evilPhase, b);
+                b.getVec().clear();
+                b.getVec().reserve(edgePartitionSendBufSize * 1.25);
+              }
+            }
+          }
+
+          // TODO overlap receives here
+        },
+#if MORE_DIST_STATS
+        galois::loopname("EdgeLoading"),
+#endif
+        galois::steal(),
+        galois::no_stats());
+
+    // flush buffers
+    for (unsigned threadNum = 0; threadNum < sendBuffers.size(); ++threadNum) {
+      auto& sbr = *sendBuffers.getRemote(threadNum);
+      for (unsigned h = 0; h < this->base_DistGraph::numHosts; ++h) {
+        if (h == this->base_DistGraph::id) continue;
+        auto& sendBuffer = sbr[h];
+        if (sendBuffer.size() > 0) {
+          net.sendTagged(h, galois::runtime::evilPhase, sendBuffer);
+          sendBuffer.getVec().clear();
+        }
+      }
+    }
+
+    net.flush();
+
+    // TODO stats
+  }
 
 //  // Edge type is void, i.e. no edge data
 //  template <typename GraphTy,
@@ -1045,93 +1062,84 @@ public:
 //    net.flush();
 //  }
 
-//  //! Optional type
-//  //! @tparam T type that the variable may possibly take
-//  template <typename T>
-//#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
-//  using optional_t = std::experimental::optional<T>;
-//#else
-//  using optional_t = boost::optional<T>;
-//#endif
-//  //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
-//  template <typename GraphTy>
-//  void processReceivedEdgeBuffer(
-//      optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
-//      GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges,
-//      galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer) {
-//    if (buffer) {
-//      auto& rb = buffer->second;
-//
-//      recvComputeTimer.start();
-//      while (rb.r_size() > 0) {
-//        uint64_t n;
-//        std::vector<uint64_t> gdst_vec;
-//        galois::runtime::gDeserialize(rb, n);
-//        galois::runtime::gDeserialize(rb, gdst_vec);
-//        assert(isLocal(n));
-//        uint32_t lsrc = G2L(n);
-//        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
-//        uint64_t cur_end = *graph.edge_end(lsrc);
-//        assert((cur_end - cur) == gdst_vec.size());
-//        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
-//        ++numNodesWithEdges;
-//      }
-//      recvComputeTimer.stop();
-//    }
-//  }
-//
-//  /**
-//   * Receive the edge dest/data assigned to this host from other hosts
-//   * that were responsible for reading them.
-//   */
-//  template <typename GraphTy>
-//  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& numNodesWithEdges,
-//                    galois::PerThreadTimer<PHASE_BREAKDOWN>& recvTagTimer,
-//                    galois::PerThreadTimer<PHASE_BREAKDOWN>& recvComputeTimer
-//  ) {
-//    auto& net = galois::runtime::getSystemNetworkInterface();
-//
-//    // receive edges for all mirror nodes
-//    while (numNodesWithEdges < base_DistGraph::numNodesWithEdges) {
-//      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-//      recvTagTimer.start();
-//      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-//      recvTagTimer.stop();
-//
-//      processReceivedEdgeBuffer(p, graph, numNodesWithEdges, recvComputeTimer);
-//    }
-//  }
-//
-//  template <typename GraphTy,
-//            typename std::enable_if<!std::is_void<
-//                typename GraphTy::edge_data_type>::value>::type* = nullptr>
-//  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
-//                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
-//                        uint64_t& cur_end) {
-//    std::vector<typename GraphTy::edge_data_type> gdata_vec;
-//    galois::runtime::gDeserialize(b, gdata_vec);
-//    uint64_t i = 0;
-//    while (cur < cur_end) {
-//      auto gdata    = gdata_vec[i];
-//      uint64_t gdst = gdst_vec[i++];
-//      uint32_t ldst = G2L(gdst);
-//      graph.constructEdge(cur++, ldst, gdata);
-//    }
-//  }
-//
-//  template <typename GraphTy,
-//            typename std::enable_if<std::is_void<
-//                typename GraphTy::edge_data_type>::value>::type* = nullptr>
-//  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
-//                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
-//                        uint64_t& cur_end) {
-//    uint64_t i = 0;
-//    while (cur < cur_end) {
-//      uint64_t gdst = gdst_vec[i++];
-//      uint32_t ldst = G2L(gdst);
-//      graph.constructEdge(cur++, ldst);
-//    }
-//  }
+  //! Optional type
+  //! @tparam T type that the variable may possibly take
+  template <typename T>
+#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
+  using optional_t = std::experimental::optional<T>;
+#else
+  using optional_t = boost::optional<T>;
+#endif
+  //! @copydoc DistGraphHybridCut::processReceivedEdgeBuffer
+  template <typename GraphTy>
+  void processReceivedEdgeBuffer(
+      optional_t<std::pair<uint32_t, galois::runtime::RecvBuffer>>& buffer,
+      GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
+    if (buffer) {
+      auto& rb = buffer->second;
+      while (rb.r_size() > 0) {
+        uint64_t n;
+        std::vector<uint64_t> gdst_vec;
+        galois::runtime::gDeserialize(rb, n);
+        galois::runtime::gDeserialize(rb, gdst_vec);
+        assert(isLocal(n));
+        uint32_t lsrc = G2L(n);
+        uint64_t cur = *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+        uint64_t cur_end = *graph.edge_end(lsrc);
+        assert((cur_end - cur) == gdst_vec.size());
+        deserializeEdges(graph, rb, gdst_vec, cur, cur_end);
+        ++receivedNodes;
+        //galois::gPrint("curent received nodes ", receivedNodes.load(), "\n");
+      }
+    }
+  }
+
+  /**
+   * Receive the edge dest/data assigned to this host from other hosts
+   * that were responsible for reading them.
+   */
+  template <typename GraphTy>
+  void receiveEdges(GraphTy& graph, std::atomic<uint32_t>& receivedNodes) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    // receive edges for all mirror nodes
+    while (receivedNodes < nodesToReceive) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      processReceivedEdgeBuffer(p, graph, receivedNodes);
+    }
+  }
+
+  template <typename GraphTy,
+            typename std::enable_if<!std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
+                        uint64_t& cur_end) {
+    std::vector<typename GraphTy::edge_data_type> gdata_vec;
+    galois::runtime::gDeserialize(b, gdata_vec);
+    uint64_t i = 0;
+    while (cur < cur_end) {
+      auto gdata    = gdata_vec[i];
+      uint64_t gdst = gdst_vec[i++];
+      uint32_t ldst = G2L(gdst);
+      graph.constructEdge(cur++, ldst, gdata);
+    }
+  }
+
+  template <typename GraphTy,
+            typename std::enable_if<std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void deserializeEdges(GraphTy& graph, galois::runtime::RecvBuffer& b,
+                        std::vector<uint64_t>& gdst_vec, uint64_t& cur,
+                        uint64_t& cur_end) {
+    uint64_t i = 0;
+    while (cur < cur_end) {
+      uint64_t gdst = gdst_vec[i++];
+      uint32_t ldst = G2L(gdst);
+      graph.constructEdge(cur++, ldst);
+    }
+  }
 
   /**
    * Reset bitset
@@ -1146,7 +1154,9 @@ public:
       } else {
         assert(syncType == base_DistGraph::syncReduce);
         // mirrors occur after masters
-        bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
+        if (base_DistGraph::numOwned < numNodes) {
+          bitset_reset_range(base_DistGraph::numOwned, numNodes - 1);
+        }
       }
     } else { // all things are mirrors
       // only need to reset if reduce
