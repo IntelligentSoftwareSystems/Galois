@@ -140,6 +140,15 @@ public:
    */
   uint64_t count();
 
+  /**
+   * Returns a vector containing the set bits in this bitset in order
+   * from left to right.
+   * Do NOT call in a parallel region as it uses galois::on_each.
+   *
+   * @returns vector with offsets into set bits
+   */
+  std::vector<uint32_t> getOffsets();
+
   //! this is defined to
   using tt_is_copyable = int;
 };

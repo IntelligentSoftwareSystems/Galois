@@ -151,4 +151,64 @@ uint64_t DynamicBitSet::count() {
   return ret.reduce();
 }
 
+std::vector<uint32_t> DynamicBitSet::getOffsets() {
+  uint32_t activeThreads = galois::getActiveThreads();
+  std::vector<unsigned int> tPrefixBitCounts(activeThreads);
+
+  // count how many bits are set on each thread
+  galois::on_each(
+    [&] (unsigned tid, unsigned nthreads) {
+      size_t start;
+      size_t end;
+      std::tie(start, end) = galois::block_range((size_t)0, this->size(), tid,
+                                                 nthreads);
+
+      unsigned int count = 0;
+      for (unsigned int i = start; i < end; ++i) {
+        if (this->test(i)) ++count;
+      }
+
+      tPrefixBitCounts[tid] = count;
+  });
+
+  // calculate prefix sum of bits per thread
+  for (unsigned int i = 1; i < activeThreads; ++i) {
+    tPrefixBitCounts[i] += tPrefixBitCounts[i - 1];
+  }
+
+  // total num of set bits
+  uint64_t bitsetCount = tPrefixBitCounts[activeThreads - 1];
+  std::vector<uint32_t> offsets;
+
+  // calculate the indices of the set bits and save them to the offset
+  // vector
+  if (bitsetCount > 0) {
+    offsets.resize(bitsetCount);
+    galois::on_each(
+      [&] (unsigned tid, unsigned nthreads) {
+        size_t start;
+        size_t end;
+        std::tie(start, end) = galois::block_range((size_t)0, this->size(), tid,
+                                                   nthreads);
+        unsigned int count = 0;
+        unsigned int tPrefixBitCount;
+        if (tid == 0) {
+          tPrefixBitCount = 0;
+        } else {
+          tPrefixBitCount = tPrefixBitCounts[tid - 1];
+        }
+
+        for (unsigned int i = start; i < end; ++i) {
+          if (this->test(i)) {
+            offsets[tPrefixBitCount + count] = i;
+            ++count;
+          }
+        }
+      }
+    );
+  }
+
+  return offsets;
+}
+
 } // namespace galois
