@@ -464,6 +464,7 @@ private:
       }
       // resize bitset representing column to correct number of vertices
       hasIncomingEdge[i].resize(columnBlockSize);
+      hasIncomingEdge[i].reset();
     }
 
     // create vectors specifying how many outgoing edges will be sent out
@@ -500,12 +501,13 @@ private:
           for (; ii < ee; ++ii) {
             auto dst = bufGraph.edgeDestination(*ii);
             auto c   = this->getColumnOfNode(dst);
+
             hasIncomingEdge[c].set(this->getColumnIndexOfNode(dst));
             numOutgoingEdges[c][src - rowOffset]++;
           }
         },
 #if MORE_DIST_STATS
-        galois::loopname("EdgeInspection"),
+        galois::loopname("AssignEdges"),
 #endif
         galois::steal(),
         galois::no_stats());
@@ -533,15 +535,25 @@ private:
     // from this column, send data to hosts in same row as this one
     // for hosts r1..rk on some row, host r1 gets column 1, host r2 gets
     // column 2, etc.
+
+    galois::GAccumulator<uint64_t> bytesSent;
+    bytesSent.reset();
+
     for (unsigned col = 0; col < numColumnHosts; ++col) {
       unsigned h = (gridRowID() * numColumnHosts) + col;
       if (h == base_DistGraph::id) continue;
       galois::runtime::SendBuffer buf;
       galois::runtime::gSerialize(buf, numOutgoingEdges[col]);
       galois::runtime::gSerialize(buf, hasIncomingEdge[col]);
+      bytesSent.update(buf.size());
       net.sendTagged(h, galois::runtime::evilPhase, buf);
     }
     net.flush();
+
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("EdgeInspectionBytesSent"), bytesSent.reduce()
+    );
+
 
     // receive from other columns in this row: get info on nodes that this
     // host will receive (note it overwrites old info; that info has already
@@ -567,15 +579,15 @@ private:
   /**
    * Create metadata of all master nodes on this host.
    */
-  void createLocalNodes(VectorOfVector64& numOutgoingEdges,
+  void inspectLocalNodes(VectorOfVector64& numOutgoingEdges,
                         std::vector<uint64_t>& prefixSumOfEdges) {
     galois::gDebug("Creating local node mapping");
-    unsigned hostID = base_DistGraph::id;
-    uint64_t src    = base_DistGraph::gid2host[hostID].first;
-    unsigned myColumn      = gridColumnID();
+    unsigned hostID      = base_DistGraph::id;
+    uint64_t startSrc    = base_DistGraph::gid2host[hostID].first;
+    unsigned myColumn    = gridColumnID();
     uint32_t myNodeCount = numOutgoingEdges[myColumn].size();
 
-    // resize vectors to appropriate size
+    // resize vectors to appropriate size; assumes they are currently empty
     prefixSumOfEdges.resize(myNodeCount);
     localToGlobalVector.resize(myNodeCount);
 
@@ -584,38 +596,21 @@ private:
       galois::iterate(0u, myNodeCount),
       [&] (uint32_t node) {
         uint64_t myEdges = numOutgoingEdges[myColumn][node];
-        localToGlobalVector[node] = src + node;
+        localToGlobalVector[node] = startSrc + node;
         prefixSumOfEdges[node] = myEdges;
       },
-      galois::loopname("LocalNodesLoop"),
+      galois::loopname("InspectLocalNodesLoop"),
       galois::no_stats()
     );
 
     numNodes += myNodeCount;
-
-    //// calculate prefix sum
-    //for (uint32_t i = 1; i < myNodeCount; ++i) {
-    //  prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
-    //}
-    //numEdges += prefixSumOfEdges[myNodeCount - 1];
-
-    // process the nodes/edges that were read locally before looking at
-    // received data from other hosts
-    //for (uint32_t j = 0; j < numOutgoingEdges[myColumn].size(); ++j) {
-    //  numEdges += numOutgoingEdges[myColumn][j];
-    //  localToGlobalVector.push_back(src);
-    //  assert(globalToLocalMap.find(src) == globalToLocalMap.end());
-    //  globalToLocalMap[src] = numNodes++;
-    //  prefixSumOfEdges.push_back(numEdges);
-    //  ++src;
-    //}
   }
 
 
   /**
    * Create metadata of the source nodes of edges that we are responsible for.
    */
-  void createOutgoingNodes(std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+  void inspectOutgoingNodes(std::vector<galois::DynamicBitSet>& hasIncomingEdge,
                            VectorOfVector64& numOutgoingEdges,
                            std::vector<uint64_t>& prefixSumOfEdges) {
     galois::gDebug("Creating outgoing node mapping");
@@ -625,16 +620,14 @@ private:
     // loop through data from all hosts associated with this row (ignore
     // self because already handled) and count edges, create nodes, and
     // keep a running prefix sum
-    for (unsigned curColumnHost = 0;
-         curColumnHost < numColumnHosts;
-         ++curColumnHost) {
-      unsigned hostID = leaderHostID + curColumnHost;
+    for (unsigned curColumn = 0; curColumn < numColumnHosts; ++curColumn) {
+      unsigned hostID = leaderHostID + curColumn;
       if (hostID == base_DistGraph::id) continue;
       uint64_t src = base_DistGraph::gid2host[hostID].first;
 
       uint32_t activeThreads = galois::getActiveThreads();
       std::vector<uint64_t> threadPrefixSums(activeThreads);
-      size_t columnSize = numOutgoingEdges[curColumnHost].size();
+      size_t columnSize = numOutgoingEdges[curColumn].size();
 
       // for each thread, figure out how many items it will work with
       galois::on_each(
@@ -645,7 +638,7 @@ private:
                                              columnSize, tid, nthreads);
           uint64_t count = 0;
           for (size_t i = beginNode; i < endNode; i++) {
-            if (numOutgoingEdges[curColumnHost][i] > 0) {
+            if (numOutgoingEdges[curColumn][i] > 0) {
               count++;
             }
           }
@@ -685,12 +678,13 @@ private:
           uint32_t handledNodes = 0;
 
           for (size_t i = beginNode; i < endNode; i++) {
-            uint64_t myEdges = numOutgoingEdges[curColumnHost][i];
+            uint64_t myEdges = numOutgoingEdges[curColumn][i];
             if (myEdges > 0) {
               prefixSumOfEdges[startingNodeIndex + threadStartLocation +
                                handledNodes] = myEdges;
               localToGlobalVector[startingNodeIndex + threadStartLocation +
                                   handledNodes] = src + i;
+
               handledNodes++;
             }
           }
@@ -698,32 +692,13 @@ private:
       );
 
       numNodes += newOutgoingNodes;
-      //for (uint32_t j = 0; j < numOutgoingEdges[curColumnHost].size(); ++j) {
-      //  // only consider nodes with outgoing edges
-      //  if (numOutgoingEdges[curColumnHost][j] > 0) {
-      //    numEdges += numOutgoingEdges[curColumnHost][j];
-      //    localToGlobalVector.push_back(src);
-      //    assert(globalToLocalMap.find(src) == globalToLocalMap.end());
-      //    globalToLocalMap[src] = numNodes++;
-      //    prefixSumOfEdges.push_back(numEdges);
-      //  } else if ((gridColumnID(base_DistGraph::id +
-      //                           curColumnHost * base_DistGraph::numHosts) ==
-      //              getColumnOfNode(src)) &&
-      //             hasIncomingEdge[0].test(getColumnIndexOfNode(src))) {
-      //    galois::gWarn(
-      //        "Partitioning of vertices resulted in some inconsistency");
-      //    GALOIS_ASSERT(false); // should be owned
-      //  }
-      //
-      //  ++src;
-      //}
     }
   }
 
   /**
    * Create metadata for endpoints of edges that we are responsible for.
    */
-  void createIncomingNodes(
+  void inspectIncomingNodes(
     std::vector<galois::DynamicBitSet>& hasIncomingEdge,
     std::vector<uint64_t>& prefixSumOfEdges
   ) {
@@ -797,16 +772,6 @@ private:
       );
 
       numNodes += newIncomingNodes;
-      // create destination mirrors for outgoing edges that point to nodes
-      // we do not own on nodes in same COLUMN
-      //for (; dst < dst_end; ++dst) {
-      //  if (hasIncomingEdge[0].test(getColumnIndexOfNode(dst))) {
-      //    localToGlobalVector.push_back(dst);
-      //    assert(globalToLocalMap.find(dst) == globalToLocalMap.end());
-      //    globalToLocalMap[dst] = numNodes++;
-      //    prefixSumOfEdges.push_back(numEdges);
-      //  }
-      //}
     }
   }
 
@@ -827,32 +792,11 @@ private:
     // first iteration lifted out of loop to fuse global/local loop and prefix
     // sum loop together
     globalToLocalMap[localToGlobalVector[0]] = 0;
-
-    if (galois::getActiveThreads() > 1) {
-      // split into 2 threads to at least get some speedup
-      galois::on_each(
-        [&] (unsigned tid, unsigned nthreads) {
-          if (tid == 0) {
-            for (unsigned i = 1; i < numNodes; i++) {
-              // finalize prefix sum
-              prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
-            }
-          } else if (tid == 1) {
-            for (unsigned i = 1; i < numNodes; i++) {
-              // global to local map construction
-              globalToLocalMap[localToGlobalVector[i]] = i;
-            }
-          }
-        }
-      );
-    } else {
-      // do all on one thread
-      for (unsigned i = 1; i < numNodes; i++) {
-        // finalize prefix sum
-        prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
-        // global to local map construction
-        globalToLocalMap[localToGlobalVector[i]] = i;
-      }
+    for (unsigned i = 1; i < numNodes; i++) {
+      // finalize prefix sum
+      prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
+      // global to local map construction
+      globalToLocalMap[localToGlobalVector[i]] = i;
     }
     numEdges = prefixSumOfEdges.back();
   }
@@ -886,6 +830,8 @@ private:
     p1CommTimer.stop();
 
     // SPACE ALLOCATION
+    galois::StatTimer mapTimer("NodeMapping", GRNAME);
+    mapTimer.start();
 
     // reserve space for maximum amount of nodes possible
     auto max_nodes = hasIncomingEdge[0].size();
@@ -905,24 +851,26 @@ private:
     galois::CondStatTimer<PHASE_BREAKDOWN> finalizeTimer("FinalizeTimer", GRNAME);
     // master nodes
     cLocalTimer.start();
-    createLocalNodes(numOutgoingEdges, prefixSumOfEdges);
+    inspectLocalNodes(numOutgoingEdges, prefixSumOfEdges);
     cLocalTimer.stop();
 
     // nodes along the row
     cOutTimer.start();
-    createOutgoingNodes(hasIncomingEdge, numOutgoingEdges, prefixSumOfEdges);
+    inspectOutgoingNodes(hasIncomingEdge, numOutgoingEdges, prefixSumOfEdges);
     cOutTimer.stop();
 
     // numNodes should now have counted master nodes as well as nodes with edges
     base_DistGraph::numNodesWithEdges = numNodes;
     cInTimer.start();
     // nodes along the column
-    createIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
+    inspectIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
     cInTimer.stop();
 
     finalizeTimer.start();
     finalizeNodeMapping(prefixSumOfEdges);
     finalizeTimer.stop();
+
+    mapTimer.stop();
   }
 
   //! Load our assigned edges and construct them in-memory. Receive edges read
@@ -940,7 +888,7 @@ private:
 
     bufGraph.resetReadCounters();
 
-    galois::StatTimer loadTimer("EdgeLoadingAll", GRNAME);
+    galois::StatTimer loadTimer("EdgeLoading", GRNAME);
     galois::CondStatTimer<PHASE_BREAKDOWN> edgeSendsTimer(
       "EdgeLoadingSends", GRNAME);
     galois::CondStatTimer<PHASE_BREAKDOWN> edgeRecvsTimer(
@@ -1074,6 +1022,7 @@ private:
             uint64_t gdst = bufGraph.edgeDestination(*ii);
             auto gdata    = bufGraph.edgeData(*ii);
             int i         = this->getColumnOfNode(gdst);
+
             if ((h_offset + i) == id) {
               assert(this->isLocal(n));
               uint32_t ldst = this->G2L(gdst);
@@ -1238,6 +1187,7 @@ private:
           }
           for (; ii < ee; ++ii) {
             uint64_t gdst = bufGraph.edgeDestination(*ii);
+
             int i         = this->getColumnOfNode(gdst);
             if ((h_offset + i) == (id)) {
               assert(this->isLocal(n));
@@ -1490,7 +1440,7 @@ public:
         }
       }
     } else { // everything is a mirror
-      if (syncType == base_DistGraph::syncReduce) { // reset masters
+      if (syncType == base_DistGraph::syncReduce) {
         if (numNodes > 0) {
           bitset_reset_range(0, numNodes - 1);
         }
