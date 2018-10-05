@@ -51,9 +51,7 @@ public:
 
   //! store the ownerIDs sorted according to the global IDs
   std::vector<size_t> OwnerVec;
-  std::vector<std::pair<uint32_t, uint32_t>> hostNodes;
 
-  std::vector<size_t> GlobalVec_ordered; //!< global ids sorted vector
   // To send edges to different hosts: #Src #Dst
   std::vector<std::vector<uint64_t>> assigned_edges_perhost;
   std::vector<uint64_t> recv_assigned_edges;
@@ -66,11 +64,9 @@ public:
   //! LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
   //! vector that stored custom vertex ID map
-  std::vector<int32_t> vertexIDMap;
+  std::vector<int32_t> vertexIDMap; // TODO why is this a int32
 
-  uint64_t globalOffset;
   uint32_t numNodes;
-  bool isBipartite;
   uint64_t numEdges;
 
   //! @todo this is broken
@@ -124,14 +120,6 @@ public:
     return true;
   }
 
-  std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
-    return std::make_pair<uint32_t, uint32_t>(~0, ~0);
-  }
-
-  std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
-    return std::make_pair<uint64_t, uint64_t>(~0, ~0);
-  }
-
   /**
    * Constructor for Vertex Cut
    */
@@ -139,8 +127,7 @@ public:
                          const std::string& partitionFolder, unsigned host,
                          unsigned _numHosts, std::vector<unsigned>& scalefactor,
                          const std::string& vertexIDMap_filename,
-                         bool transpose = false, uint32_t VCutThreshold = 100,
-                         bool bipartite = false)
+                         bool transpose = false)
       : base_DistGraph(host, _numHosts) {
     if (!scalefactor.empty()) {
       if (base_DistGraph::id == 0) {
@@ -165,11 +152,10 @@ public:
     Tgraph_construct.start();
 
     galois::graphs::OfflineGraph g(filename);
-    isBipartite = bipartite;
 
     base_DistGraph::numGlobalNodes = g.size();
     base_DistGraph::numGlobalEdges = g.sizeEdges();
-    base_DistGraph::computeMasters(g, scalefactor, isBipartite);
+    base_DistGraph::computeMasters(g, scalefactor);
 
     // Read the vertexIDMap_filename for masters.
     auto startLoc = base_DistGraph::gid2host[base_DistGraph::id].first;
@@ -997,12 +983,6 @@ public:
       graph.constructEdge(cur++, ldst);
     }
   }
-
-  /**
-   * @returns the total number of nodes; master + slaves created on the local
-   * host.
-   */
-  uint64_t get_local_total_nodes() const { return (base_DistGraph::numOwned); }
 
   void reset_bitset(typename base_DistGraph::SyncType syncType,
                     void (*bitset_reset_range)(size_t, size_t)) const {
