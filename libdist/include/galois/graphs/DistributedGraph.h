@@ -1713,8 +1713,8 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
   inline bool extract_batch_wrapper(unsigned x,
-                                    galois::PODResizeableArray<typename FnTy::ValTy>& v) {
-    return FnTy::extract_reset_batch(x, v.data());
+                                    galois::runtime::SendBuffer& b) {
+    return FnTy::extract_reset_batch(x, b.getVec().data());
   }
 
   /**
@@ -1731,8 +1731,8 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline bool extract_batch_wrapper(unsigned x,
-                                    galois::PODResizeableArray<typename FnTy::ValTy>& v) {
-    return FnTy::extract_batch(x, v.data());
+                                    galois::runtime::SendBuffer& b) {
+    return FnTy::extract_batch(x, b.getVec().data());
   }
 
   /**
@@ -1755,12 +1755,11 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  inline bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet& b,
-                                    galois::PODResizeableArray<unsigned int>& o,
-                                    galois::PODResizeableArray<typename FnTy::ValTy>& v,
+  inline bool extract_batch_wrapper(unsigned x,
+                                    galois::runtime::SendBuffer& b,
                                     size_t& s, DataCommMode& data_mode) {
-    return FnTy::extract_reset_batch(x, (uint64_t*)b.get_vec().data(), o.data(),
-                                     v.data(), &s, &data_mode);
+    return FnTy::extract_reset_batch(x,
+                                     b.getVec().data(), &s, &data_mode);
   }
 
   /**
@@ -1782,12 +1781,11 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool extract_batch_wrapper(unsigned x, galois::DynamicBitSet& b,
-                                    galois::PODResizeableArray<unsigned int>& o,
-                                    galois::PODResizeableArray<typename FnTy::ValTy>& v,
+  inline bool extract_batch_wrapper(unsigned x,
+                                    galois::runtime::SendBuffer& b,
                                     size_t& s, DataCommMode& data_mode) const {
-    return FnTy::extract_batch(x, (uint64_t*)b.get_vec().data(), o.data(),
-                               v.data(), &s, &data_mode);
+    return FnTy::extract_batch(x,
+                               b.getVec().data(), &s, &data_mode);
   }
 
   /**
@@ -2045,9 +2043,8 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x,
-                                galois::PODResizeableArray<typename FnTy::ValTy>& v) {
-    return FnTy::reduce_batch(x, v.data());
+  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b) {
+    return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset());
   }
 
   /**
@@ -2063,9 +2060,8 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x,
-                                galois::PODResizeableArray<typename FnTy::ValTy>& v) {
-    return FnTy::setVal_batch(x, v.data());
+  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b) {
+    return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset());
   }
 
   /**
@@ -2086,12 +2082,9 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x, galois::DynamicBitSet& b,
-                                galois::PODResizeableArray<unsigned int>& o,
-                                galois::PODResizeableArray<typename FnTy::ValTy>& v, size_t& s,
+  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b,
                                 DataCommMode& data_mode) {
-    return FnTy::reduce_batch(x, (uint64_t*)b.get_vec().data(), o.data(),
-                              v.data(), s, data_mode);
+    return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset(), data_mode);
   }
 
   /**
@@ -2112,12 +2105,9 @@ private:
    */
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x, galois::DynamicBitSet& b,
-                                galois::PODResizeableArray<unsigned int>& o,
-                                galois::PODResizeableArray<typename FnTy::ValTy>& v, size_t& s,
+  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b,
                                 DataCommMode& data_mode) {
-    return FnTy::setVal_batch(x, (uint64_t*)b.get_vec().data(), o.data(),
-                              v.data(), s, data_mode);
+    return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(), data_mode);
   }
 
   /**
@@ -2211,24 +2201,33 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      val_vec.reserve(maxSharedSize);
-      val_vec.resize(num);
+      // NOTE: this allocation is insufficient for enforce_data_mode
+      // so, this will crash when enforce_data_mode is used for GPUs
+      b.reserve(sizeof(DataCommMode)
+          + sizeof(size_t)
+          + (num * sizeof(typename SyncFnTy::ValTy)));
 
       Textractbatch.start();
       bool batch_succeeded =
-          extract_batch_wrapper<SyncFnTy, syncType>(from_id, val_vec);
+          extract_batch_wrapper<SyncFnTy, syncType>(from_id, b);
       Textractbatch.stop();
 
       if (!batch_succeeded) {
+        b.resize(0);
+        val_vec.reserve(maxSharedSize);
+        val_vec.resize(num);
         gSerialize(b, onlyData);
         auto lseq = gSerializeLazySeq(
             b, num, (galois::PODResizeableArray<typename SyncFnTy::ValTy>*)nullptr);
         extract_subset<SyncFnTy, decltype(lseq), syncType, true, true>(
             loopName, indices, num, offsets, b, lseq);
       } else {
-        gSerialize(b, onlyData, val_vec);
+        b.resize(sizeof(DataCommMode)
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
       }
     } else {
+      b.resize(0);
       if (!async) {
         data_mode = noData;
         gSerialize(b, noData);
@@ -2287,23 +2286,34 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      val_vec.reserve(maxSharedSize);
-      val_vec.resize(num);
+      // NOTE: this allocation is insufficient for enforce_data_mode
+      // so, this will crash when enforce_data_mode is used for GPUs
+      b.reserve(sizeof(DataCommMode)
+          + sizeof(size_t)
+          + (num * sizeof(typename SyncFnTy::ValTy)));
 
       Textractbatch.start();
       bool batch_succeeded =
-          extract_batch_wrapper<SyncFnTy, syncType>(from_id, val_vec);
+          extract_batch_wrapper<SyncFnTy, syncType>(from_id, b);
       Textractbatch.stop();
 
       if (!batch_succeeded) {
+        b.resize(0);
+        val_vec.reserve(maxSharedSize);
+        val_vec.resize(num);
         // get everything (note I pass in "indices" as offsets as it won't
         // even get used anyways)
         extract_subset<SyncFnTy, syncType, true, true>(loopName, indices, num,
                                                        dummyVector, val_vec);
+        gSerialize(b, onlyData, val_vec);
+      } else {
+        b.resize(sizeof(DataCommMode)
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
       }
 
-      gSerialize(b, onlyData, val_vec);
     } else {
+      b.resize(0);
       if (!async) {
         data_mode = noData;
         gSerialize(b, noData);
@@ -2456,24 +2466,32 @@ private:
     Textract.start();
 
     if (num > 0) {
-      Textractalloc.start();
-      bit_set_comm.reserve(maxSharedSize);
-      offsets.reserve(maxSharedSize);
-      val_vec.reserve(maxSharedSize);
-      bit_set_comm.resize(num);
-      offsets.resize(num);
-      val_vec.resize(num);
-      Textractalloc.stop();
       size_t bit_set_count = 0;
+      Textractalloc.start();
+      // NOTE: this allocation is insufficient for enforce_data_mode
+      // so, this will crash when enforce_data_mode is used for GPUs
+      b.reserve(sizeof(DataCommMode)
+          + sizeof(size_t)
+          + (num * sizeof(typename SyncFnTy::ValTy)));
+      Textractalloc.stop();
 
       Textractbatch.start();
       bool batch_succeeded = extract_batch_wrapper<SyncFnTy, syncType>(
-          from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
+          from_id, b, bit_set_count, data_mode);
       Textractbatch.stop();
 
       // GPUs have a batch function they can use; CPUs do not; therefore,
       // CPUS always enter this if block
       if (!batch_succeeded) {
+        Textractalloc.start();
+        b.resize(0);
+        bit_set_comm.reserve(maxSharedSize);
+        offsets.reserve(maxSharedSize);
+        val_vec.reserve(maxSharedSize);
+        bit_set_comm.resize(num);
+        offsets.resize(num);
+        val_vec.resize(num);
+        Textractalloc.stop();
         const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
         get_bitset_and_offsets<SyncFnTy, syncType>(
@@ -2489,13 +2507,49 @@ private:
           extract_subset<SyncFnTy, syncType, false, true>(
               loopName, indices, bit_set_count, offsets, val_vec);
         }
+        serializeMessage<async, syncType>(loopName, data_mode, bit_set_count, indices,
+                                   offsets, bit_set_comm, val_vec, b);
+      } else {
+        if (data_mode == noData) {
+          b.resize(0);
+          if (!async) {
+            gSerialize(b, data_mode);
+          }
+        } else if (data_mode == gidsData) {
+          b.resize(sizeof(DataCommMode)
+              + sizeof(bit_set_count)
+              + sizeof(size_t)
+              + (bit_set_count * sizeof(unsigned int))
+              + sizeof(size_t)
+              + (bit_set_count * sizeof(typename SyncFnTy::ValTy)));
+        } else if (data_mode == offsetsData) {
+          b.resize(sizeof(DataCommMode)
+              + sizeof(bit_set_count)
+              + sizeof(size_t)
+              + (bit_set_count * sizeof(unsigned int))
+              + sizeof(size_t)
+              + (bit_set_count * sizeof(typename SyncFnTy::ValTy)));
+        } else if (data_mode == bitsetData) {
+          size_t bitset_alloc_size =
+              ((num + 63) / 64) * sizeof(uint64_t);
+          b.resize(sizeof(DataCommMode)
+              + sizeof(bit_set_count)
+              + sizeof(size_t) // bitset size
+              + sizeof(size_t) // bitset vector size
+              + bitset_alloc_size
+              + sizeof(size_t)
+              + (bit_set_count * sizeof(typename SyncFnTy::ValTy)));
+        } else { // onlyData
+          b.resize(sizeof(DataCommMode)
+              + sizeof(size_t)
+              + (num * sizeof(typename SyncFnTy::ValTy)));
+        }
       }
 
       reportRedundantSize<SyncFnTy>(loopName, syncTypeStr, num, bit_set_count,
                                     bit_set_comm);
-      serializeMessage<async, syncType>(loopName, data_mode, bit_set_count, indices,
-                                 offsets, bit_set_comm, val_vec, b);
     } else {
+      b.resize(0);
       if (!async) {
         data_mode = noData;
         gSerialize(b, noData);
@@ -2758,6 +2812,9 @@ private:
   template <WriteLocation writeLocation, ReadLocation readLocation,
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_net_send(std::string loopName) {
+    static galois::runtime::SendBuffer b; // although a static variable, allocation not reused
+                                          // due to std::move in net.sendTagged()
+
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string statNumMessages_str(syncTypeStr + "NumMessages_" +
@@ -2769,8 +2826,6 @@ private:
 
       if (nothingToSend(x, syncType, writeLocation, readLocation))
         continue;
-
-      galois::runtime::SendBuffer b;
 
       get_send_buffer<syncType, SyncFnTy, BitsetFnTy, async>(loopName, x, b);
 
@@ -2844,7 +2899,7 @@ private:
    * @param val_vec The data proper will be deserialized into this vector
    */
   template <SyncType syncType, typename VecType>
-  void deserializeData(std::string loopName, DataCommMode data_mode,
+  void deserializeMessage(std::string loopName, DataCommMode data_mode,
                        uint32_t num, galois::runtime::RecvBuffer& buf,
                        size_t& bit_set_count,
                        galois::PODResizeableArray<unsigned int>& offsets,
@@ -2927,27 +2982,27 @@ private:
       galois::runtime::gDeserialize(buf, data_mode);
 
       if (data_mode != noData) {
-        size_t bit_set_count = num;
-        size_t buf_start     = 0;
-        
-        bit_set_comm.reserve(maxSharedSize);
-        offsets.reserve(maxSharedSize);
-        val_vec.reserve(maxSharedSize);
-
-        // deserialize the rest of the data in the buffer depending on the data
-        // mode; arguments passed in here are mostly output vars
-        deserializeData<syncType>(loopName, data_mode, num, buf, bit_set_count,
-                                  offsets, bit_set_comm, buf_start, retval,
-                                  val_vec);
-
         // GPU update call
         Tsetbatch.start();
         bool batch_succeeded = set_batch_wrapper<SyncFnTy, syncType>(
-            from_id, bit_set_comm, offsets, val_vec, bit_set_count, data_mode);
+            from_id, buf, data_mode);
         Tsetbatch.stop();
 
         // cpu always enters this block
         if (!batch_succeeded) {
+          size_t bit_set_count = num;
+          size_t buf_start     = 0;
+          
+          // deserialize the rest of the data in the buffer depending on the data
+          // mode; arguments passed in here are mostly output vars
+          deserializeMessage<syncType>(loopName, data_mode, num, buf, bit_set_count,
+                                    offsets, bit_set_comm, buf_start, retval,
+                                    val_vec);
+
+          bit_set_comm.reserve(maxSharedSize);
+          offsets.reserve(maxSharedSize);
+          val_vec.reserve(maxSharedSize);
+
           galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
           if (data_mode == bitsetData) {
@@ -3038,7 +3093,7 @@ private:
 
           // deserialize the rest of the data in the buffer depending on the
           // data mode; arguments passed in here are mostly output vars
-          deserializeData<syncType>(loopName, data_mode, num, buf,
+          deserializeMessage<syncType>(loopName, data_mode, num, buf,
                                     bit_set_count, offsets, bit_set_comm,
                                     buf_start, retval, val_vec);
 

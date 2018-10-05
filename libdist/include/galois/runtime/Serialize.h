@@ -100,6 +100,10 @@ public:
     return retval;
   }
 
+  void resize(size_t bytes) {
+    bufdata.resize(bytes);
+  }
+
   /**
    * Reserve more space in the serialize buffer.
    *
