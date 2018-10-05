@@ -32,6 +32,8 @@
 namespace galois {
 
 void DynamicBitSet::reset(size_t begin, size_t end) {
+  if (num_bits == 0) return;
+
   assert(begin <= (num_bits - 1));
   assert(end <= (num_bits - 1));
 
