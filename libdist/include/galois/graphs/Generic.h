@@ -345,16 +345,16 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         [&](auto src) {
           auto ee        = bufGraph.edgeBegin(src);
           auto ee_end    = bufGraph.edgeEnd(src);
-          uint64_t numEdges = std::distance(ee, ee_end);
+          uint64_t numEdgesL = std::distance(ee, ee_end);
 
           for (; ee != ee_end; ee++) {
             uint32_t dst = bufGraph.edgeDestination(*ee);
             uint32_t hostBelongs = -1;
-            hostBelongs = graphPartitioner->getEdgeOwner(src, dst, numEdges);
+            hostBelongs = graphPartitioner->getEdgeOwner(src, dst, numEdgesL);
 
             numOutgoingEdges[hostBelongs][src - globalOffset] += 1;
             hostHasOutgoing.set(hostBelongs);
-            bool hostIsMasterOfDest = 
+            bool hostIsMasterOfDest =
               (hostBelongs == graphPartitioner->getMaster(dst));
 
             // this means a mirror must be created for destination node on
@@ -373,7 +373,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                   hasIncomingEdge[hostBelongs].reset();
                   bitsetStatus = 2;
                 }
-              } 
+              }
               // until initialized, loop
               while (indicatorVars[hostBelongs] != 2);
               hasIncomingEdge[hostBelongs].set(dst);
@@ -420,10 +420,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // only send if non-zeros exist
       if (hostHasOutgoing.test(h)) {
         galois::runtime::gSerialize(b, 1); // token saying data exists
-        galois::gPrint("data\n");
-        auto before = b.size();
         galois::runtime::gSerialize(b, numOutgoingEdges[h]);
-        galois::gPrint("[", base_DistGraph::id, "] bytes sent to ", h, " is ", b.size() - before, "\n");
       } else {
         galois::runtime::gSerialize(b, 0); // token saying no data exists
       }
@@ -433,14 +430,12 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       auto& curBitset = hasIncomingEdge[h];
       uint64_t bitsetSize = curBitset.size(); // num bits
       uint64_t onlyOffsetsSize = curBitset.count() * 32;
-      galois::gPrint("b size ", bitsetSize, " offset ", onlyOffsetsSize, "\n");
       if (bitsetSize == 0) {
         // there was nothing there to send in first place
         galois::runtime::gSerialize(b, 0);
       } else if (onlyOffsetsSize <= bitsetSize) {
         // send only offsets
         std::vector<uint32_t> offsets = curBitset.getOffsets();
-        galois::gPrint("only offsets\n");
         galois::runtime::gSerialize(b, 2); // 2 = only offsets
         galois::runtime::gSerialize(b, offsets);
       } else {
@@ -973,15 +968,15 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         auto ee     = bufGraph.edgeBegin(src);
         auto ee_end = bufGraph.edgeEnd(src);
-        uint64_t numEdges = std::distance(ee, ee_end);
+        uint64_t numEdgesL = std::distance(ee, ee_end);
         auto& gdst_vec  = *gdst_vecs.getLocal();
         auto& gdata_vec = *gdata_vecs.getLocal();
 
         for (unsigned i = 0; i < numHosts; ++i) {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
-          gdst_vec[i].reserve(numEdges);
-          gdata_vec[i].reserve(numEdges);
+          gdst_vec[i].reserve(numEdgesL);
+          gdata_vec[i].reserve(numEdgesL);
         }
 
         for (; ee != ee_end; ++ee) {
@@ -989,7 +984,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           auto gdata    = bufGraph.edgeData(*ee);
 
           uint32_t hostBelongs =
-            graphPartitioner->getEdgeOwner(src, gdst, numEdges);
+            graphPartitioner->getEdgeOwner(src, gdst, numEdgesL);
           if (hostBelongs == id) {
             // edge belongs here, construct on self
             assert(this->isLocal(src));

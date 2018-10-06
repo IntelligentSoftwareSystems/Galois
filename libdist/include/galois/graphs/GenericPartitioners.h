@@ -71,7 +71,6 @@ class GenericCVC {
     }
     assert(false);
     return _numHosts;
-    //return gid % 2; // 0 or 1
   }
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
@@ -226,7 +225,6 @@ class GenericCVCColumnFlip {
     }
     assert(false);
     return _numHosts;
-    //return gid % 2; // 0 or 1
   }
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
@@ -313,7 +311,57 @@ class GenericCVCColumnFlip {
   }
 };
 
+class GenericHVC {
+  std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
+  uint32_t _hostID;
+  uint32_t _numHosts;
+  uint32_t _vCutThreshold;
+ public:
+  GenericHVC(uint32_t hostID, uint32_t numHosts) {
+    _hostID = hostID;
+    _numHosts = numHosts;
+    _vCutThreshold = 1000; // can be changed, but default seems to be 1000
+  }
 
+  void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
+    _gid2host = gid2host;
+  }
 
+  uint32_t getMaster(uint32_t gid) const {
+    for (auto h = 0U; h < _numHosts; ++h) {
+      uint64_t start, end;
+      std::tie(start, end) = _gid2host[h];
+      if (gid >= start && gid < end) {
+        return h;
+      }
+    }
+    assert(false);
+    return _numHosts;
+  }
 
+  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+    if (numEdges > _vCutThreshold) {
+      return getMaster(dst);
+    } else {
+      return getMaster(src);
+    }
+  }
+
+  // TODO I should be able to make this runtime detectable
+  bool isVertexCut() const {
+    return true;
+  }
+
+  constexpr static bool isCartCut() {
+    return false;
+  }
+
+  // not used by this
+  bool isNotCommunicationPartner(unsigned host, unsigned syncType,
+                                 WriteLocation writeLocation,
+                                 ReadLocation readLocation,
+                                 bool transposed) {
+    return false;
+  }
+};
 #endif
