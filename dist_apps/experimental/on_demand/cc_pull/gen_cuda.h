@@ -69,7 +69,7 @@ void batch_get_reset_node_comp_current_cuda(
 void batch_set_mirror_node_comp_current_cuda(
     struct CUDA_Context* ctx, unsigned from_id,
     unsigned long long int* bitset_comm, unsigned int* offsets,
-    unsigned long long* v, size_t v_size, DataCommMode data_mode);
+    unsigned long long* v, DataCommMode data_mode);
 void batch_set_node_comp_current_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id,
                                       unsigned long long int* bitset_comm,

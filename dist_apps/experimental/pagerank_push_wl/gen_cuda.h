@@ -38,39 +38,32 @@ void set_node_nout_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
 void add_node_nout_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
 bool min_node_nout_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
 void batch_get_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                              uint32_t* v);
+                              uint32_t v);
 void batch_get_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               unsigned long long int* bitset_comm,
-                              unsigned int* offsets, uint32_t* v,
                               size_t* v_size, DataCommMode* data_mode);
 void batch_get_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                                     uint32_t* v);
+                                     uint32_t v);
 void batch_get_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                      unsigned long long int* bitset_comm,
-                                     unsigned int* offsets, uint32_t* v,
                                      size_t* v_size, DataCommMode* data_mode);
 void batch_get_reset_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                                    uint32_t* v, uint32_t i);
+                                    uint8_t* v, uint32_t i);
 void batch_get_reset_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                     unsigned long long int* bitset_comm,
-                                    unsigned int* offsets, uint32_t* v,
                                     size_t* v_size, DataCommMode* data_mode,
                                     uint32_t i);
 void batch_set_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                      unsigned long long int* bitset_comm,
-                                     unsigned int* offsets, uint32_t* v,
-                                     size_t v_size, DataCommMode data_mode);
+                                     DataCommMode data_mode);
 void batch_set_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               unsigned long long int* bitset_comm,
-                              unsigned int* offsets, uint32_t* v, size_t v_size,
                               DataCommMode data_mode);
 void batch_add_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               unsigned long long int* bitset_comm,
-                              unsigned int* offsets, uint32_t* v, size_t v_size,
                               DataCommMode data_mode);
 void batch_min_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               unsigned long long int* bitset_comm,
-                              unsigned int* offsets, uint32_t* v, size_t v_size,
                               DataCommMode data_mode);
 
 void get_bitset_residual_cuda(struct CUDA_Context* ctx,
@@ -79,90 +72,76 @@ void bitset_residual_reset_cuda(struct CUDA_Context* ctx);
 void bitset_residual_reset_cuda(struct CUDA_Context* ctx, size_t begin,
                                 size_t end);
 float get_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID);
-void set_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
-void add_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
-bool min_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
+void set_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
+void add_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
+bool min_node_residual_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
 void batch_get_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                                  float* v);
+                                  uint32_t v);
 void batch_get_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   unsigned long long int* bitset_comm,
-                                  unsigned int* offsets, float* v,
                                   size_t* v_size, DataCommMode* data_mode);
 void batch_get_mirror_node_residual_cuda(struct CUDA_Context* ctx,
-                                         unsigned from_id, float* v);
+                                         unsigned from_id, uint8_t* v);
 void batch_get_mirror_node_residual_cuda(struct CUDA_Context* ctx,
                                          unsigned from_id,
                                          unsigned long long int* bitset_comm,
-                                         unsigned int* offsets, float* v,
                                          size_t* v_size,
                                          DataCommMode* data_mode);
 void batch_get_reset_node_residual_cuda(struct CUDA_Context* ctx,
-                                        unsigned from_id, float* v, float i);
+                                        unsigned from_id, uint8_t* v, float i);
 void batch_get_reset_node_residual_cuda(struct CUDA_Context* ctx,
                                         unsigned from_id,
                                         unsigned long long int* bitset_comm,
-                                        unsigned int* offsets, float* v,
                                         size_t* v_size, DataCommMode* data_mode,
                                         float i);
 void batch_set_mirror_node_residual_cuda(struct CUDA_Context* ctx,
                                          unsigned from_id,
                                          unsigned long long int* bitset_comm,
-                                         unsigned int* offsets, float* v,
-                                         size_t v_size, DataCommMode data_mode);
+                                         DataCommMode data_mode);
 void batch_set_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   unsigned long long int* bitset_comm,
-                                  unsigned int* offsets, float* v,
-                                  size_t v_size, DataCommMode data_mode);
+                                  DataCommMode data_mode);
 void batch_add_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   unsigned long long int* bitset_comm,
-                                  unsigned int* offsets, float* v,
-                                  size_t v_size, DataCommMode data_mode);
+                                  DataCommMode data_mode);
 void batch_min_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   unsigned long long int* bitset_comm,
-                                  unsigned int* offsets, float* v,
-                                  size_t v_size, DataCommMode data_mode);
+                                  DataCommMode data_mode);
 
 void bitset_value_clear_cuda(struct CUDA_Context* ctx);
 float get_node_value_cuda(struct CUDA_Context* ctx, unsigned LID);
-void set_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
-void add_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
-bool min_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, float v);
+void set_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
+void add_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
+bool min_node_value_cuda(struct CUDA_Context* ctx, unsigned LID, uint32_t v);
 void batch_get_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                               float* v);
+                               uint32_t v);
 void batch_get_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                unsigned long long int* bitset_comm,
-                               unsigned int* offsets, float* v, size_t* v_size,
                                DataCommMode* data_mode);
 void batch_get_mirror_node_value_cuda(struct CUDA_Context* ctx,
-                                      unsigned from_id, float* v);
+                                      unsigned from_id, uint8_t* v);
 void batch_get_mirror_node_value_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id,
                                       unsigned long long int* bitset_comm,
-                                      unsigned int* offsets, float* v,
                                       size_t* v_size, DataCommMode* data_mode);
 void batch_get_reset_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
-                                     float* v, float i);
+                                     uint8_t* v, float i);
 void batch_get_reset_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                      unsigned long long int* bitset_comm,
-                                     unsigned int* offsets, float* v,
                                      size_t* v_size, DataCommMode* data_mode,
                                      float i);
 void batch_set_mirror_node_value_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id,
                                       unsigned long long int* bitset_comm,
-                                      unsigned int* offsets, float* v,
-                                      size_t v_size, DataCommMode data_mode);
+                                      DataCommMode data_mode);
 void batch_set_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                unsigned long long int* bitset_comm,
-                               unsigned int* offsets, float* v, size_t v_size,
                                DataCommMode data_mode);
 void batch_add_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                unsigned long long int* bitset_comm,
-                               unsigned int* offsets, float* v, size_t v_size,
                                DataCommMode data_mode);
 void batch_min_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                unsigned long long int* bitset_comm,
-                               unsigned int* offsets, float* v, size_t v_size,
                                DataCommMode data_mode);
 
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end,
