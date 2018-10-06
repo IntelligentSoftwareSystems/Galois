@@ -225,6 +225,11 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // Finalization
 
+    // TODO this is a hack; fix it somehow
+    if (graphPartitioner->isVertexCut() && !graphPartitioner->isCartCut()) {
+      base_DistGraph::numNodesWithEdges = numNodes;
+    }
+
     if (transpose && (numNodes > 0)) {
       // consider all nodes to have outgoing edges (TODO better way to do this?)
       // for now it's fine I guess
@@ -232,6 +237,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::graph.transpose(GRNAME);
       base_DistGraph::transposed = true;
     }
+
 
     galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
                                                           GRNAME);
@@ -1328,6 +1334,30 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   bool is_vertex_cut() const {
     return graphPartitioner->isVertexCut();
   }
+
+  //virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
+  //                                      const unsigned int version = 0) const {
+  //  // unsigned ints
+  //  ar << numNodes;
+
+  //  // partition specific
+  //  graphPartitioner->serializePartition(ar);
+
+  //  // maps and vectors
+  //  ar << localToGlobalVector;
+  //  ar << globalToLocalMap;
+  //}
+
+  //virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
+  //                                        const unsigned int version = 0) {
+  //  // unsigned ints
+  //  ar >> numNodes;
+  //  ar >> numRowHosts;
+  //  ar >> numColumnHosts;
+  //  // maps and vectors
+  //  ar >> localToGlobalVector;
+  //  ar >> globalToLocalMap;
+  //}
 };
 
 // make GRNAME visible to public
