@@ -38,6 +38,8 @@
 #include "ittnotify.h"
 #endif
 
+using vTy = galois::PODResizeableArray<uint8_t>;
+
 // forward declaration
 class NetworkIOLWCI;
 //! Pointer to LCI channel
