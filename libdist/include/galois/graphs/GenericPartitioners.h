@@ -155,6 +155,17 @@ class GenericCVC {
     }
     return false;
   }
+
+  void serializePartition(boost::archive::binary_oarchive& ar) {
+    ar << numRowHosts;
+    ar << numColumnHosts;
+  }
+
+  void deserializePartition(boost::archive::binary_iarchive& ar) {
+    ar >> numRowHosts;
+    ar >> numColumnHosts;
+  }
+
 };
 
 // same as above, except columns are flipped (changes behavior of vertex cut
@@ -309,6 +320,16 @@ class GenericCVCColumnFlip {
     }
     return false;
   }
+
+  void serializePartition(boost::archive::binary_oarchive& ar) {
+    ar << numRowHosts;
+    ar << numColumnHosts;
+  }
+
+  void deserializePartition(boost::archive::binary_iarchive& ar) {
+    ar >> numRowHosts;
+    ar >> numColumnHosts;
+  }
 };
 
 class GenericHVC {
@@ -363,5 +384,14 @@ class GenericHVC {
                                  bool transposed) {
     return false;
   }
+
+  void serializePartition(boost::archive::binary_oarchive& ar) {
+    return;
+  }
+
+  void deserializePartition(boost::archive::binary_iarchive& ar) {
+    return;
+  }
+
 };
 #endif

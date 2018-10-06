@@ -52,7 +52,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   using base_DistGraph = DistGraph<NodeTy, EdgeTy>;
 
   //! GID = localToGlobalVector[LID]
-  galois::gstl::Vector<uint64_t> localToGlobalVector;
+  std::vector<uint64_t> localToGlobalVector;
   //! LID = globalToLocalMap[GID]
   std::unordered_map<uint64_t, uint32_t> globalToLocalMap;
 
@@ -142,12 +142,23 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * Constructor
    */
   DistGraphGeneric(const std::string& filename, unsigned host,
-                   unsigned _numHosts, bool transpose = false)
+                   unsigned _numHosts, bool transpose = false,
+                   bool readFromFile = false,
+                   std::string localGraphFileName = "local_graph")
       : base_DistGraph(host, _numHosts) {
     galois::runtime::reportParam("dGraph", "GenericPartitioner", "0");
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct(
         "GraphPartitioningTime", GRNAME);
     Tgraph_construct.start();
+
+    if (readFromFile) {
+      galois::gPrint("[", base_DistGraph::id,
+                     "] Reading local graph from file ",
+                     localGraphFileName, "\n");
+      base_DistGraph::read_local_graph_from_file(localGraphFileName);
+      Tgraph_construct.stop();
+      return;
+    }
 
     galois::graphs::OfflineGraph g(filename);
     base_DistGraph::numGlobalNodes = g.size();
@@ -1335,29 +1346,34 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     return graphPartitioner->isVertexCut();
   }
 
-  //virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
-  //                                      const unsigned int version = 0) const {
-  //  // unsigned ints
-  //  ar << numNodes;
+  virtual void boostSerializeLocalGraph(boost::archive::binary_oarchive& ar,
+                                        const unsigned int version = 0) const {
+    // unsigned ints
+    ar << numNodes;
 
-  //  // partition specific
-  //  graphPartitioner->serializePartition(ar);
+    // partition specific
+    graphPartitioner->serializePartition(ar);
 
-  //  // maps and vectors
-  //  ar << localToGlobalVector;
-  //  ar << globalToLocalMap;
-  //}
+    // maps and vectors
+    ar << localToGlobalVector;
+    ar << globalToLocalMap;
+  }
 
-  //virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
-  //                                        const unsigned int version = 0) {
-  //  // unsigned ints
-  //  ar >> numNodes;
-  //  ar >> numRowHosts;
-  //  ar >> numColumnHosts;
-  //  // maps and vectors
-  //  ar >> localToGlobalVector;
-  //  ar >> globalToLocalMap;
-  //}
+  virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
+                                          const unsigned int version = 0) {
+    graphPartitioner = new Partitioner(base_DistGraph::id, base_DistGraph::numHosts);
+    graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
+
+    // unsigned ints
+    ar >> numNodes;
+
+    // partition specific
+    graphPartitioner->deserializePartition(ar);
+
+    // maps and vectors
+    ar >> localToGlobalVector;
+    ar >> globalToLocalMap;
+  }
 };
 
 // make GRNAME visible to public
