@@ -1049,7 +1049,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         this->processReceivedEdgeBuffer(buffer, graph, receivedNodes);
       },
       #if MORE_DIST_STATS
-      galois::loopname("EdgeLoading"),
+      galois::loopname("EdgeLoadingLoop"),
       #endif
       galois::steal(),
       galois::no_stats()
