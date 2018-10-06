@@ -223,7 +223,7 @@ public:
     galois::DynamicBitSet ghosts;
     ghosts.resize(g.size());
 
-    galois::Timer timer;
+    galois::StatTimer timer("EdgeInspection", GRNAME);
     timer.start();
 
     galois::graphs::BufferedGraph<EdgeTy> bGraph;
@@ -252,7 +252,7 @@ public:
                          std::distance(edgeOffset, ee);
                    },
 #if MORE_DIST_STATS
-                   galois::loopname("EdgeInspection"),
+                   galois::loopname("EdgeInspectionLoop"),
 #endif
                    galois::no_stats());
     timer.stop();
@@ -323,7 +323,7 @@ public:
         galois::iterate((uint32_t)0, numNodes),
         [&](auto n) { base_graph.fixEndEdge(n, prefixSumOfEdges[n]); },
 #if MORE_DIST_STATS
-        galois::loopname("EdgeLoading"),
+        galois::loopname("FixEndEdgeLoop"),
 #endif
         galois::no_stats());
 
@@ -412,7 +412,7 @@ private:
       galois::gPrint("Loading edge-data while creating edges\n");
     }
 
-    galois::Timer timer;
+    galois::StatTimer timer("EdgeLoading", GRNAME);
     timer.start();
     bGraph.resetReadCounters();
 
@@ -434,7 +434,7 @@ private:
           assert(cur == (*graph.edge_end(lsrc)));
         },
 #if MORE_DIST_STATS
-        galois::loopname("EdgeLoading"),
+        galois::loopname("EdgeLoadingLoop"),
 #endif
         galois::no_stats());
 
