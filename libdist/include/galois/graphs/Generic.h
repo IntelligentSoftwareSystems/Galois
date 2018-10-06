@@ -186,13 +186,16 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<galois::DynamicBitSet>
       hasIncomingEdge(base_DistGraph::numHosts);
 
+    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
     galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
     inspectionTimer.start();
 
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
+    graphReadTimer.start();
     bufGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin,
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
+    graphReadTimer.stop();
     bufGraph.resetReadCounters();
 
     // assign edges to other nodes
