@@ -118,7 +118,7 @@ public:
   DistGraphHybridCut(const std::string& filename, const std::string&,
                      unsigned host, unsigned _numHosts,
                      std::vector<unsigned>& scalefactor, bool transpose = false,
-                     uint32_t VCutThreshold = 100, bool bipartite = false,
+                     uint32_t VCutThreshold = 1000, bool bipartite = false,
                      bool readFromFile              = false,
                      std::string localGraphFileName = "local_graph")
       : base_DistGraph(host, _numHosts) {
