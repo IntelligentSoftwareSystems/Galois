@@ -317,7 +317,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
     return new Graph_customEdgeCut(inputFile, partFolder, net.ID, net.Num,
                                    scaleFactor, vertexIDMapFileName, false);
   case GCVC:
-    return new GenericCVC(inputFile, net.ID, net.Num, false);
+    return new GenericCVC(inputFile, net.ID, net.Num, false,
+                          readFromFile, localGraphFileName);
   case GHIVC:
     return new GenericHVC(inputFile, net.ID, net.Num, false);
 
@@ -433,7 +434,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new Graph_customEdgeCut(inputFile, partFolder, net.ID, net.Num,
                                    scaleFactor, vertexIDMapFileName, false);
   case GCVC:
-    return new GenericCVC(inputFile, net.ID, net.Num, false);
+    return new GenericCVC(inputFile, net.ID, net.Num, false, readFromFile,
+                          localGraphFileName);
   case GHIVC:
     if (inputFileTranspose.size()) {
       return new GenericHVC(inputFileTranspose, net.ID, net.Num, true);
@@ -612,7 +614,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case GCVC:
     // read regular partition and then flip it
-    return new GenericCVC(inputFile, net.ID, net.Num, true);
+    return new GenericCVC(inputFile, net.ID, net.Num, true, readFromFile,
+                          localGraphFileName);
 
   case GHIVC:
     if (inputFileTranspose.size()) {
