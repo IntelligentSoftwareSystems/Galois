@@ -58,7 +58,8 @@ enum PARTITIONING_SCHEME {
   OVER_DECOMPOSE_2_VCUT, //!< overdecompose cvc by 2
   OVER_DECOMPOSE_4_VCUT, //!< overdecompose cvc by 4
   CEC,                    //!< custom edge cut
-  GCVC                    //!< generic cvc
+  GCVC,                    //!< generic cvc
+  GHIVC                    //!< generic hivc
 };
 
 /**
@@ -97,6 +98,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "cec";
   case GCVC:
     return "gcvc";
+  case GHIVC:
+    return "ghivc";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -271,6 +274,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
       Graph_cartesianCut_overDecomposeBy4;
   typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
+  using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -314,6 +318,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
                                    scaleFactor, vertexIDMapFileName, false);
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false);
+  case GHIVC:
+    return new GenericHVC(inputFile, net.ID, net.Num, false);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -356,6 +362,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   typedef DistGraphCartesianCutOld<NodeData, EdgeData, false, false, 4>
       Graph_cartesianCut_overDecomposeBy4;
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
+  using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -427,6 +434,14 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
                                    scaleFactor, vertexIDMapFileName, false);
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false);
+  case GHIVC:
+    if (inputFileTranspose.size()) {
+      return new GenericHVC(inputFileTranspose, net.ID, net.Num, true);
+    } else {
+      GALOIS_DIE("Error: attempting generic incoming hybrid cut without "
+                 "transpose graph");
+      break;
+    }
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -473,6 +488,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       Graph_cartesianCut_overDecomposeBy4; // assumes pull-style
   typedef DistGraphCustomEdgeCut<NodeData, EdgeData> Graph_customEdgeCut;
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
+  using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -593,9 +609,19 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
           "Error: (cec) iterate over in-edges without transpose graph");
       break;
     }
+
   case GCVC:
     // read regular partition and then flip it
     return new GenericCVC(inputFile, net.ID, net.Num, true);
+
+  case GHIVC:
+    if (inputFileTranspose.size()) {
+      return new GenericHVC(inputFileTranspose, net.ID, net.Num, false);
+    } else {
+      GALOIS_DIE("Error: attempting generic incoming hybrid cut without "
+                 "transpose graph");
+      break;
+    }
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");

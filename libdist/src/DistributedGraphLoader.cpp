@@ -62,6 +62,7 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
                    "Over decomposed by 4 cartesian Vertex-Cut"),
         clEnumValN(CEC, "cec", "Custom edge cut from vertexID mapping"),
         clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
+        clEnumValN(GHIVC, "ghivc", "HIVC using generic interface"),
         clEnumValEnd),
     cll::init(OEC));
 cll::opt<unsigned int>
