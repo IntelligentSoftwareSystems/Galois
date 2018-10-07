@@ -180,11 +180,15 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // signifies how many outgoing edges a particular host should expect from
     // this host
-    std::vector<std::vector<uint64_t>>
-      numOutgoingEdges(base_DistGraph::numHosts);
+    std::vector<std::vector<uint64_t>> numOutgoingEdges;
     // signifies if a host should create a node because it has an incoming edge
-    std::vector<galois::DynamicBitSet>
-      hasIncomingEdge(base_DistGraph::numHosts);
+    std::vector<galois::DynamicBitSet> hasIncomingEdge;
+
+    // only need to use for things that need communication
+    if (!graphPartitioner->noCommunication()) {
+      numOutgoingEdges.resize(base_DistGraph::numHosts);
+      hasIncomingEdge.resize(base_DistGraph::numHosts);
+    }
 
     galois::StatTimer graphReadTimer("GraphReading", GRNAME);
     galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
@@ -198,17 +202,25 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     graphReadTimer.stop();
     bufGraph.resetReadCounters();
 
+    galois::gstl::Vector<uint64_t> prefixSumOfEdges;
+
     // assign edges to other nodes
-    edgeInspection(bufGraph, numOutgoingEdges, hasIncomingEdge,
-                   inspectionTimer);
-    galois::DynamicBitSet& finalIncoming = hasIncomingEdge[base_DistGraph::id];
+    if (!graphPartitioner->noCommunication()) {
+      edgeInspection(bufGraph, numOutgoingEdges, hasIncomingEdge,
+                     inspectionTimer);
+      galois::DynamicBitSet& finalIncoming = hasIncomingEdge[base_DistGraph::id];
 
-    galois::StatTimer mapTimer("NodeMapping", GRNAME);
-    mapTimer.start();
-    galois::gstl::Vector<uint64_t> prefixSumOfEdges =
-      nodeMapping(numOutgoingEdges, finalIncoming);
-    mapTimer.stop();
-
+      galois::StatTimer mapTimer("NodeMapping", GRNAME);
+      mapTimer.start();
+      nodeMapping(numOutgoingEdges, finalIncoming, prefixSumOfEdges);
+      mapTimer.stop();
+    } else {
+      base_DistGraph::numOwned = nodeEnd - nodeBegin;
+      uint64_t edgeOffset = *bufGraph.edgeBegin(nodeBegin);
+      // edge prefix sum, no comm required
+      edgeCutInspection(bufGraph, inspectionTimer, edgeOffset,
+                        prefixSumOfEdges);
+    }
 
     // Graph construction related calls
 
@@ -231,10 +243,13 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     base_DistGraph::printStatistics();
 
-
     // Edge loading
-
-    loadEdges(base_DistGraph::graph, bufGraph);
+    if (!graphPartitioner->noCommunication()) {
+      loadEdges(base_DistGraph::graph, bufGraph);
+    } else {
+      // Edge cut construction
+      edgeCutLoad(base_DistGraph::graph, bufGraph);
+    }
     bufGraph.resetAndFree();
 
     // Finalization
@@ -251,7 +266,6 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::graph.transpose(GRNAME);
       base_DistGraph::transposed = true;
     }
-
 
     galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
                                                           GRNAME);
@@ -282,6 +296,234 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
  private:
+  void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                         galois::StatTimer& inspectionTimer,
+                         uint64_t edgeOffset,
+                         galois::gstl::Vector<uint64_t>& prefixSumOfEdges) {
+    galois::DynamicBitSet incomingMirrors;
+    incomingMirrors.resize(base_DistGraph::numGlobalNodes);
+    incomingMirrors.reset();
+    uint32_t myID = base_DistGraph::id;
+    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    // already set before this is called
+    localToGlobalVector.resize(base_DistGraph::numOwned);
+    prefixSumOfEdges.resize(base_DistGraph::numOwned);
+
+    galois::do_all(
+      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                      base_DistGraph::gid2host[base_DistGraph::id].second),
+      [&] (auto n) {
+        auto ii = bufGraph.edgeBegin(n);
+        auto ee = bufGraph.edgeEnd(n);
+        for (; ii < ee; ++ii) {
+          uint32_t dst = bufGraph.edgeDestination(*ii);
+          if (graphPartitioner->getMaster(dst) != myID) {
+            incomingMirrors.set(dst);
+          }
+        }
+        prefixSumOfEdges[n - globalOffset] = (*ee) - edgeOffset;
+        localToGlobalVector[n - globalOffset] = n;
+      },
+      #if MORE_DIST_STATS
+      galois::loopname("EdgeInspectionLoop"),
+      #endif
+      galois::no_stats()
+    );
+    inspectionTimer.stop();
+
+    uint64_t allBytesRead = bufGraph.getBytesRead();
+    galois::gPrint(
+        "[", base_DistGraph::id,
+        "] Edge inspection time: ", inspectionTimer.get_usec() / 1000000.0f,
+        " seconds to read ", allBytesRead, " bytes (",
+        allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
+
+
+    // get incoming mirrors ready for creation
+    uint32_t additionalMirrorCount = incomingMirrors.count();
+    localToGlobalVector.resize(localToGlobalVector.size() +
+                               additionalMirrorCount);
+    if (base_DistGraph::numOwned > 0) {
+      // fill prefix sum with last number (incomings have no edges)
+      prefixSumOfEdges.resize(prefixSumOfEdges.size() + additionalMirrorCount,
+                              prefixSumOfEdges.back());
+    } else {
+      prefixSumOfEdges.resize(additionalMirrorCount);
+    }
+
+    if (additionalMirrorCount > 0) {
+      // TODO move this part below into separate function
+      uint32_t totalNumNodes = base_DistGraph::numGlobalNodes;
+      uint32_t activeThreads = galois::getActiveThreads();
+      std::vector<uint64_t> threadPrefixSums(activeThreads);
+      galois::on_each(
+        [&](unsigned tid, unsigned nthreads) {
+          size_t beginNode;
+          size_t endNode;
+          std::tie(beginNode, endNode) = galois::block_range(0u,
+                                           totalNumNodes, tid, nthreads);
+          uint64_t count = 0;
+          for (size_t i = beginNode; i < endNode; i++) {
+            if (incomingMirrors.test(i)) ++count;
+          }
+          threadPrefixSums[tid] = count;
+        }
+      );
+      // get prefix sums
+      for (unsigned int i = 1; i < threadPrefixSums.size(); i++) {
+        threadPrefixSums[i] += threadPrefixSums[i - 1];
+      }
+
+      assert(threadPrefixSums.back() == additionalMirrorCount);
+
+      uint32_t startingNodeIndex = base_DistGraph::numOwned;
+      // do actual work, second on_each
+      galois::on_each(
+        [&] (unsigned tid, unsigned nthreads) {
+          size_t beginNode;
+          size_t endNode;
+          std::tie(beginNode, endNode) = galois::block_range(0u,
+                                           totalNumNodes, tid, nthreads);
+          // start location to start adding things into prefix sums/vectors
+          uint32_t threadStartLocation = 0;
+          if (tid != 0) {
+            threadStartLocation = threadPrefixSums[tid - 1];
+          }
+          uint32_t handledNodes = 0;
+          for (size_t i = beginNode; i < endNode; i++) {
+            if (incomingMirrors.test(i)) {
+              localToGlobalVector[startingNodeIndex + threadStartLocation +
+                                  handledNodes] = i;
+              handledNodes++;
+            }
+          }
+        }
+      );
+    }
+
+    numNodes = base_DistGraph::numOwned + additionalMirrorCount;
+    if (prefixSumOfEdges.size() != 0) {
+      numEdges = prefixSumOfEdges.back();
+    } else {
+      numEdges = 0;
+    }
+    assert(localToGlobalVector.size() == numNodes);
+    assert(prefixSumOfEdges.size() == numNodes);
+
+    // g2l mapping
+    globalToLocalMap.reserve(numNodes);
+    for (unsigned i = 0; i < numNodes; i++) {
+      // global to local map construction
+      globalToLocalMap[localToGlobalVector[i]] = i;
+    }
+    assert(globalToLocalMap.size() == numNodes);
+
+    base_DistGraph::numNodesWithEdges = base_DistGraph::numOwned;
+  }
+
+  /**
+   * Given a loaded graph, construct the edges in the DistGraph graph.
+   * Variant that constructs edge data as well.
+   *
+   * @tparam GraphTy type of graph to construct
+   *
+   * @param [in,out] graph Graph to construct edges in
+   * @param bGraph Buffered graph that has edges to write into graph in memory
+   */
+  template <typename GraphTy,
+            typename std::enable_if<!std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void edgeCutLoad(GraphTy& graph,
+                 galois::graphs::BufferedGraph<EdgeTy>& bGraph) {
+    if (base_DistGraph::id == 0) {
+      galois::gPrint("Loading edge-data while creating edges\n");
+    }
+
+    bGraph.resetReadCounters();
+    galois::StatTimer timer("EdgeLoading", GRNAME);
+    timer.start();
+
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          auto ii       = bGraph.edgeBegin(n);
+          auto ee       = bGraph.edgeEnd(n);
+          uint32_t lsrc = this->G2L(n);
+          uint64_t cur =
+              *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          for (; ii < ee; ++ii) {
+            auto gdst           = bGraph.edgeDestination(*ii);
+            decltype(gdst) ldst = this->G2L(gdst);
+            auto gdata          = bGraph.edgeData(*ii);
+            graph.constructEdge(cur++, ldst, gdata);
+          }
+          assert(cur == (*graph.edge_end(lsrc)));
+        },
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoadingLoop"),
+        #endif
+        galois::no_stats());
+
+    timer.stop();
+    galois::gPrint("[", base_DistGraph::id,
+                   "] Edge loading time: ", timer.get_usec() / 1000000.0f,
+                   " seconds to read ", bGraph.getBytesRead(), " bytes (",
+                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
+  }
+
+  /**
+   * Given a loaded graph, construct the edges in the DistGraph graph.
+   * No edge data.
+   *
+   * @tparam GraphTy type of graph to construct
+   *
+   * @param [in,out] graph Graph to construct edges in
+   * @param bGraph Buffered graph that has edges to write into graph in memory
+   */
+  template <typename GraphTy,
+            typename std::enable_if<std::is_void<
+                typename GraphTy::edge_data_type>::value>::type* = nullptr>
+  void edgeCutLoad(GraphTy& graph,
+                   galois::graphs::BufferedGraph<EdgeTy>& bGraph) {
+    if (base_DistGraph::id == 0) {
+      galois::gPrint("Loading edge-data while creating edges\n");
+    }
+
+    bGraph.resetReadCounters();
+    galois::StatTimer timer("EdgeLoading", GRNAME);
+    timer.start();
+
+    galois::do_all(
+        galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                        base_DistGraph::gid2host[base_DistGraph::id].second),
+        [&](auto n) {
+          auto ii       = bGraph.edgeBegin(n);
+          auto ee       = bGraph.edgeEnd(n);
+          uint32_t lsrc = this->G2L(n);
+          uint64_t cur =
+              *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
+          for (; ii < ee; ++ii) {
+            auto gdst           = bGraph.edgeDestination(*ii);
+            decltype(gdst) ldst = this->G2L(gdst);
+            graph.constructEdge(cur++, ldst);
+          }
+          assert(cur == (*graph.edge_end(lsrc)));
+        },
+        #if MORE_DIST_STATS
+        galois::loopname("EdgeLoadingLoop"),
+        #endif
+        galois::no_stats());
+
+    timer.stop();
+    galois::gPrint("[", base_DistGraph::id,
+                   "] Edge loading time: ", timer.get_usec() / 1000000.0f,
+                   " seconds to read ", bGraph.getBytesRead(), " bytes (",
+                   bGraph.getBytesRead() / (float)timer.get_usec(), " MBPS)\n");
+  }
+
+
   /**
    * Assign edges to hosts (but don't actually send), and send this information
    * out to all hosts
@@ -542,13 +784,13 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   galois::gstl::Vector<uint64_t> nodeMapping(
     std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-    galois::DynamicBitSet& hasIncomingEdge
+    galois::DynamicBitSet& hasIncomingEdge,
+    galois::gstl::Vector<uint64_t>& prefixSumOfEdges
   ) {
     numNodes = 0;
     numEdges = 0;
     nodesToReceive = 0;
 
-    galois::gstl::Vector<uint64_t> prefixSumOfEdges;
     // reserve overestimation of nodes
     prefixSumOfEdges.reserve(base_DistGraph::numGlobalNodes /
                              base_DistGraph::numHosts * 1.15);
