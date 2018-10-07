@@ -63,6 +63,7 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(CEC, "cec", "Custom edge cut from vertexID mapping"),
         clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
         clEnumValN(GHIVC, "ghivc", "HIVC using generic interface"),
+        clEnumValN(GOEC, "goec", "oec generic interface"),
         clEnumValEnd),
     cll::init(OEC));
 cll::opt<unsigned int>
