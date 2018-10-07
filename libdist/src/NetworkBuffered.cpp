@@ -371,12 +371,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
   void workerThread() {
 // Initialize LWCI or MPI depending on what was defined in CMake
-#ifdef GALOIS_USE_LWCI
-    // Initialize LWCI
-    std::tie(netio, ID, Num) = makeNetworkIOLWCI(memUsageTracker, inflightSends, inflightRecvs);
-    if (ID == 0)
-      fprintf(stderr, "**Using LWCI Communication layer**\n");
-#else
     initializeMPI();
     int rank;
     int hostSize;
@@ -393,7 +387,6 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
     galois::gDebug("[", NetworkInterface::ID, "] MPI initialized");
     std::tie(netio, ID, Num) = makeNetworkIOMPI(memUsageTracker, inflightSends, inflightRecvs);
-#endif
 
     assert(ID == (unsigned)rank);
     assert(Num == (unsigned)hostSize);
@@ -469,8 +462,9 @@ public:
 
   std::unique_ptr<galois::runtime::NetworkIO> netio;
 
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) {
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf, int phase) {
     ++inflightSends;
+    tag += phase;
     statSendNum += 1;
     statSendBytes += buf.size();
     galois::runtime::trace("sendTagged", dest, tag,
@@ -481,7 +475,8 @@ public:
 
   virtual optional_t<std::pair<uint32_t, RecvBuffer>>
   recieveTagged(uint32_t tag,
-                std::unique_lock<galois::substrate::SimpleLock>* rlg) {
+                std::unique_lock<galois::substrate::SimpleLock>* rlg, int phase) {
+    tag += phase;
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
       if (rq.hasData(tag)) {

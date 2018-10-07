@@ -27,7 +27,9 @@
 #pragma once
 #ifdef GALOIS_USE_LWCI
 #include "lc.h"
-extern lch* mv;
+
+extern lc_ep lc_col_ep;
+extern lc_ep lc_p2p_ep[3];
 
 namespace galois {
 namespace runtime {

@@ -139,7 +139,7 @@ public:
   //! tag (tag) and some data (buf)
   //! on the receiver, buf will be returned on a receiveTagged(tag)
   //! buf is invalidated by this operation
-  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) = 0;
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf, int type = 0) = 0;
 
   //! Send a message to all hosts.  A message is simply a
   //! landing pad (recv) and some data (buf)
@@ -163,7 +163,7 @@ public:
 
   //! Receive a tagged message
   virtual optional_t<std::pair<uint32_t, RecvBuffer>>
-  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg) = 0;
+  recieveTagged(uint32_t tag, std::unique_lock<substrate::SimpleLock>* rlg, int type = 0) = 0;
 
   //! move send buffers out to network
   virtual void flush() = 0;
@@ -215,6 +215,9 @@ uint32_t getHostID();
 
 //! Returns a BufferedNetwork interface
 NetworkInterface& makeNetworkBuffered();
+
+//! Returns a LCINetwork interface
+NetworkInterface& makeNetworkLCI();
 
 //! Returns a host barrier, which is a regular MPI-Like Barrier for all hosts.
 //! @warning Should not be called within a parallel region; assumes only one
