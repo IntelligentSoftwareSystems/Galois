@@ -170,7 +170,7 @@ if(ENABLE_DIST_GALOIS)
     add_definitions(-DGALOIS_USE_LWCI)
     set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
     set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-    set(LWCI_LIBRARY "${LWCI_ROOT}/liblwci.a")
+    set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
     add_custom_command(
       OUTPUT ${LWCI_LIBRARY}
       COMMAND make -C ${LWCI_ROOT}
