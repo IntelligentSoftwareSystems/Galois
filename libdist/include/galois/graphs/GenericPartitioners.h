@@ -4,6 +4,61 @@
 #include "DistributedGraph.h"
 #include <utility>
 
+class NoCommunication {
+  std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
+  uint32_t _numHosts;
+
+ public:
+  NoCommunication(uint32_t, uint32_t numHosts) {
+    _numHosts = numHosts;
+  }
+
+  void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
+    _gid2host = gid2host;
+  }
+
+  uint32_t getMaster(uint32_t gid) const {
+    for (auto h = 0U; h < _numHosts; ++h) {
+      uint64_t start, end;
+      std::tie(start, end) = _gid2host[h];
+      if (gid >= start && gid < end) {
+        return h;
+      }
+    }
+    assert(false);
+    return _numHosts;
+  }
+
+  uint32_t getEdgeOwner(uint32_t src, uint32_t, uint64_t) const {
+    return getMaster(src);
+  }
+
+  bool isVertexCut() const {
+    return false;
+  }
+
+  bool isCartCut() {
+    return false;
+  }
+
+  bool isNotCommunicationPartner(unsigned, unsigned, WriteLocation,
+                                 ReadLocation, bool) {
+    return false;
+  }
+
+  void serializePartition(boost::archive::binary_oarchive&) {
+    return;
+  }
+
+  void deserializePartition(boost::archive::binary_iarchive&) {
+    return;
+  }
+
+  bool noCommunication() {
+    return true;
+  }
+};
+
 class GenericCVC {
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
   uint32_t _hostID;
@@ -166,6 +221,9 @@ class GenericCVC {
     ar >> numColumnHosts;
   }
 
+  bool noCommunication() {
+    return false;
+  }
 };
 
 // same as above, except columns are flipped (changes behavior of vertex cut
@@ -330,6 +388,10 @@ class GenericCVCColumnFlip {
     ar >> numRowHosts;
     ar >> numColumnHosts;
   }
+
+  bool noCommunication() {
+    return false;
+  }
 };
 
 class GenericHVC {
@@ -393,5 +455,8 @@ class GenericHVC {
     return;
   }
 
+  bool noCommunication() {
+    return false;
+  }
 };
 #endif
