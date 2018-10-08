@@ -213,6 +213,8 @@ class PRBCTree {
   uint32_t numBackSources;
   // DEBUG: number of sources that returned by getIndexToSend
   uint32_t numGetSources;
+  // DEBUG: number of unvisited indexes for current node
+  uint32_t numUnvisited;
 
 
 public:
@@ -348,7 +350,10 @@ public:
       assert(curSet.getIndicator() == curSet.npos);
 
       curSet.setIndicator(curSet.find_last());
-      // galois::gDebug("count: ", curSet.count(), ", curInd: ", curSet.getIndicator(), ", last: ", curSet.find_last());
+      // DEBUG
+      numUnvisited = curSet.count();
+      if (curSet.getIndicator() != curSet.find_last())
+        galois::gDebug("count: ", numUnvisited, ", curInd: ", curSet.getIndicator(), ", last: ", curSet.find_last());
       assert(curSet.getIndicator() != infinity);
       assert(curSet.find_next(curSet.getIndicator()) == curSet.npos);
       if (curSet.getIndicator() == curSet.npos)
@@ -372,6 +377,10 @@ public:
       assert(curSet.size() == numSourcesPerRound);
       auto curInd = curSet.getIndicator();
 
+      if (numUnvisited != 0 && curInd == curSet.npos) {
+        galois::gDebug("Unv/Cnt: ", numUnvisited, "/", curSet.count(), ", curInd: ", curSet.getIndicator(), ", f/l: ", curSet.find_first(), "/", curSet.find_last());
+        assert(curInd == curSet.npos);
+      }
       if (curInd != curSet.npos) {
         assert(curInd < numSourcesPerRound);
         uint32_t distance = curKey->first;
@@ -383,11 +392,13 @@ public:
         if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
           indexToReturn = curInd;
-          assert(curInd != infinity);
+          assert(curInd < numSourcesPerRound);
           curSet.prev_indicator();
           numSentSources--;
           // this line should occur when successfully visited
-          galois::gDebug("backGetIndexToSend: numSentSources = ", numSentSources);
+          galois::gDebug("backGetIndexToSend: indexToReturn = ", indexToReturn, ", numSentSources = ", numSentSources);
+          // DEBUG
+          numUnvisited--;
           break;
         } else {
           // round to send not reached yet; get out
@@ -395,39 +406,51 @@ public:
         }
       } else {
         // DEBUG
+        assert(numUnvisited == 0);
         numBackSources += curSet.count();
         if (numSentSources + numBackSources != numNonInfinity) // should have been equal
           galois::gDebug("Sent + Back = ", numSentSources, " + ", numBackSources,
                           " = ", numSentSources + numBackSources, " -> ", numNonInfinity);
 
         // set exhausted; go onto next set
-        curKey++;
+        do {
+          curKey++;
+          if (curKey != endCurKey) {
+            BitSet& nextSet = curKey->second;
+            if (nextSet.any()) break;
+          }
+        } while (curKey != endCurKey);
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
-          curSet = curKey->second;
-          assert(curSet.size() == numSourcesPerRound);
-          curSet.setIndicator(curSet.find_last());
-          if (curSet.any()) {
-            galois::gDebug("count: ", curSet.count(), ", curInd: ", curSet.getIndicator(), ", last: ", curSet.find_last());
-            assert(curSet.getIndicator() < infinity);
+          BitSet& nextSet = curKey->second;
+          assert(nextSet.size() == numSourcesPerRound);
+          nextSet.setIndicator(nextSet.find_last());
+          // DEBUG
+          numUnvisited = nextSet.count();
+          if (nextSet.getIndicator() != nextSet.find_last())
+            galois::gDebug("count: ", numUnvisited, ", curInd: ", nextSet.getIndicator(), ", last: ", nextSet.find_last());
+          if (nextSet.any()) {
+            assert(nextSet.getIndicator() == nextSet.find_last());
+            assert(nextSet.getIndicator() < infinity);
           }
 
-          assert(curSet.find_next(curSet.getIndicator()) == curSet.npos);
-          if (curSet.getIndicator() < infinity)
-            assert(curSet.count() != 0);
+          assert(nextSet.find_next(nextSet.getIndicator()) == nextSet.npos);
+          if (nextSet.getIndicator() < infinity)
+            assert(numUnvisited != 0);
           else
-            assert(curSet.count() == 0);
+            assert(numUnvisited == 0);
         }
         else {
           // galois::gDebug("Node finished");
+          assert(numUnvisited == 0);
         }
       }
     }
 
     if (curKey == endCurKey) {
       if (numSentSources != 0)
-        galois::gDebug("Assertion: numSentSources = ", numSentSources);
+        galois::gDebug("Assertion: numSentSources = ", numSentSources, " (MapSize = ", distanceTree.size(), ")");
       assert(numSentSources == 0);
     }
 
