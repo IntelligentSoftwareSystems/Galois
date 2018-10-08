@@ -60,6 +60,15 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   uint64_t numEdges;
   uint32_t nodesToReceive;
 
+  /**
+   * Free memory of a vector by swapping an empty vector with it
+   */
+  template<typename V>
+  void freeVector(V& vectorToKill) {
+    V dummyVector;
+    vectorToKill.swap(dummyVector);
+  }
+
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
     return graphPartitioner->getMaster(gid);
@@ -214,6 +223,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       mapTimer.start();
       nodeMapping(numOutgoingEdges, finalIncoming, prefixSumOfEdges);
       mapTimer.stop();
+
+      finalIncoming.resize(0);
     } else {
       base_DistGraph::numOwned = nodeEnd - nodeBegin;
       uint64_t edgeOffset = *bufGraph.edgeBegin(nodeBegin);
@@ -221,6 +232,13 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       edgeCutInspection(bufGraph, inspectionTimer, edgeOffset,
                         prefixSumOfEdges);
     }
+
+    // get memory back from inspection metadata
+    numOutgoingEdges.clear();
+    hasIncomingEdge.clear();
+    // doubly make sure the data is cleared
+    freeVector(numOutgoingEdges); // should no longer use this variable
+    freeVector(hasIncomingEdge); // should no longer use this variable
 
     // Graph construction related calls
 
@@ -239,7 +257,12 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 #endif
       galois::no_stats()
     );
+    // get memory from prefix sum back
+    prefixSumOfEdges.clear();
+    freeVector(prefixSumOfEdges); // should no longer use this variable
+
     fillMirrors();
+
 
     base_DistGraph::printStatistics();
 
@@ -249,8 +272,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     } else {
       // Edge cut construction
       edgeCutLoad(base_DistGraph::graph, bufGraph);
+      bufGraph.resetAndFree();
     }
-    bufGraph.resetAndFree();
 
     // Finalization
 
@@ -279,6 +302,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::initializeSpecificRanges();
 
     Tgraph_construct.stop();
+    galois::gPrint("[", base_DistGraph::id, "] Graph construction complete.\n");
 
     galois::CondStatTimer<MORE_DIST_STATS> Tgraph_construct_comm(
         "GraphCommSetupTime", GRNAME);
@@ -718,6 +742,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::runtime::reportStat_Tsum(
       GRNAME, std::string("EdgeInspectionBytesSent"), bytesSent.reduce()
     );
+
+    galois::gPrint("[", base_DistGraph::id, "] Insepection sends complete.\n");
   }
 
   /**
@@ -776,6 +802,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         GALOIS_DIE("invalid recv inspection data metadata mode");
       }
     }
+
+    galois::gPrint("[", base_DistGraph::id, "] Insepection receives complete.\n");
   }
 
   /**
@@ -806,6 +834,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gDebug("[", base_DistGraph::id, "] To receive this many nodes: ",
                    nodesToReceive);
 
+    galois::gPrint("[", base_DistGraph::id, "] Insepection mapping complete.\n");
     return prefixSumOfEdges;
   }
 
@@ -1171,6 +1200,10 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // sends data
     sendEdges(graph, bufGraph, receivedNodes);
+    uint64_t bufBytesRead = bufGraph.getBytesRead();
+    // get data from graph back (don't need it after sending things out)
+    bufGraph.resetAndFree();
+
     // receives data
     galois::on_each([&](unsigned tid, unsigned nthreads) {
       receiveEdges(graph, receivedNodes);
@@ -1181,8 +1214,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     galois::gPrint("[", base_DistGraph::id, "] Edge loading time: ",
                    loadEdgeTimer.get_usec() / 1000000.0f,
-                   " seconds to read ", bufGraph.getBytesRead(), " bytes (",
-                   bufGraph.getBytesRead() / (float)loadEdgeTimer.get_usec(),
+                   " seconds to read ", bufBytesRead, " bytes (",
+                   bufBytesRead / (float)loadEdgeTimer.get_usec(),
                    " MBPS)\n");
   }
 
