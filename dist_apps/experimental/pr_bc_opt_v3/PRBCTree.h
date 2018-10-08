@@ -69,7 +69,6 @@ class PRBCTree {
          * The maximum value of size_type.
          */
         this->indicator = this->npos;
-        // galois::gDebug("npos = ", this->npos, ", infinity = ", infinity);
       }
 
       /**
@@ -83,7 +82,6 @@ class PRBCTree {
        */
       void set_indicator(size_type index) {
         this->set(index);
-
         if (index < indicator)
           this->indicator = index;
       }
@@ -105,9 +103,6 @@ class PRBCTree {
        */
       size_type find_prev(size_type pos) const {
 
-          // DEBUG
-          auto old = pos;
-
           // Return npos if no bit is set or to scan
           if (!(this->any()) || pos == 0)
               return this->npos;
@@ -115,8 +110,6 @@ class PRBCTree {
           // Normalize pos in case of npos
           pos = (pos >= this->size()? this->size() : pos);
           --pos; // Find from the previous bit
-          if (this->size() > numSourcesPerRound)
-            galois::gDebug("Strange size: ", this->size(), "!!!");
 
           // Integerize into blocks
           std::vector<Block> blocks = this->integerize();
@@ -126,35 +119,26 @@ class PRBCTree {
 
           
           // Scan within current Block
-          // galois::gDebug("Stone 0: ", pos, "@", curBlock, "/", curOffset);
           while (curOffset >= 0) {
               if (this->test(pos)){
-                  // DEBUG
-                  assert(this->find_next(pos) >= old);
                   return pos;}
               if (curOffset == 0)
                   break;
               pos--;
               curOffset--;
           }
-          // galois::gDebug("Stone 1: ", pos, "@", curBlock, "/", curOffset);
           if (pos == 0)
               return this->npos;
-          assert(pos == (this->bits_per_block) * curBlock); // curOffset is 0
 
           // Jump over zero blocks
           for (pos--, curBlock--, curOffset = this->bits_per_block - 1;
                   blocks[curBlock] == 0 && curBlock > 0;
                   curBlock--, pos -= this->bits_per_block);
-          // galois::gDebug("Stone 2: ", pos, "@", curBlock, "/", curOffset);
-          assert(pos == (this->bits_per_block) * curBlock + curOffset);
 
           // Scan the last block (if non-zero)
           if (blocks[curBlock]) {
               while (curOffset >= 0) {
                   if (this->test(pos)){
-                      // DEBUG
-                      assert(this->find_next(pos) >= old);
                       return pos;}
                   pos--;
                   curOffset--;
@@ -208,15 +192,6 @@ class PRBCTree {
   //! End key for reverse map iterator
   TreeIter endCurKey;
 
-
-  // DEBUG: number of sources that have been send back
-  uint32_t numBackSources;
-  // DEBUG: number of sources that returned by getIndexToSend
-  uint32_t numGetSources;
-  // DEBUG: number of unvisited indexes for current node
-  uint32_t numUnvisited;
-
-
 public:
   /**
    * Reset the map, initialize all distances to infinity, and reset the "sent"
@@ -230,12 +205,6 @@ public:
     numNonInfinity = 0;
     // reset the flag for backward phase
     zeroReached = false;
-
-    // DEBUG
-    numGetSources = 0;
-    // DEBUG
-    numBackSources = 0;
-
   }
 
   /**
@@ -243,10 +212,8 @@ public:
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    galois::gDebug("setDistance: index = ", index, ", newDistance = ", newDistance);
     distanceTree[newDistance].set_indicator(index);
     numNonInfinity++;
-    galois::gDebug("List count: ", numNonInfinity);
   }
 
   /**
@@ -277,13 +244,11 @@ public:
         }
       }
     }
+
     // if it didn't exist before, add to number of non-infinity nodes
     if (oldDistance == infinity) {
       numNonInfinity++;
       // galois::gDebug("numNonInfinity: ", numNonInfinity);
-    }
-    else {
-      galois::gDebug("setDistance: index = ", index, ", oldDistance = ", oldDistance, ", newDistance = ", newDistance);
     }
     distanceTree[newDistance].set_indicator(index); // Set & Update
   }
@@ -292,30 +257,19 @@ public:
    * Get the index that needs to be sent out this round given the round number.
    */
   uint32_t getIndexToSend(uint32_t roundNumber) {
-    // galois::gDebug("getIndexToSend: roundNumber = ", roundNumber);
     uint32_t distanceToCheck = roundNumber - numSentSources;
-    // galois::gDebug("getIndexToSend: distanceToCheck = ", distanceToCheck);
     uint32_t indexToSend = infinity;
 
     auto setIter = distanceTree.find(distanceToCheck);
     if (setIter != distanceTree.end()) {
-      // galois::gDebug("getIndexToSend: setIter successfully found distanceToCheck");
       BitSet& setToCheck = setIter->second;
 
       auto index = setToCheck.getIndicator();
-      // galois::gDebug("getIndexToSend: current indicator = ", index);
       if (index != setToCheck.npos) {
           indexToSend = index;
-          assert(index < numSourcesPerRound);
-
           setToCheck.next_indicator();
-          // galois::gDebug("getIndexToSend: next indicator = ", setToCheck.getIndicator());
-
-          // DEBUG
-          numGetSources++;
         }
       }
-    // galois::gDebug("getIndexToSend: indexToSend = ", indexToSend);
     return indexToSend;
   }
 
@@ -339,27 +293,9 @@ public:
     curKey = distanceTree.rbegin();
     endCurKey = distanceTree.rend();
 
-    assert(numSentSources == numNonInfinity);
-
-    // DEBUG: to make sure all gotten nodes are marked sent
-    assert(numSentSources == numGetSources);
-
     if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
-      assert(curSet.size() == numSourcesPerRound);
-      assert(curSet.getIndicator() == curSet.npos);
-
       curSet.setIndicator(curSet.find_last());
-      // DEBUG
-      numUnvisited = curSet.count();
-      if (curSet.getIndicator() != curSet.find_last())
-        galois::gDebug("count: ", numUnvisited, ", curInd: ", curSet.getIndicator(), ", last: ", curSet.find_last());
-      assert(curSet.getIndicator() != infinity);
-      assert(curSet.find_next(curSet.getIndicator()) == curSet.npos);
-      if (curSet.getIndicator() == curSet.npos)
-        assert(curSet.count() == 0);
-      else
-        assert(curSet.count() != 0);
     }
 
   }
@@ -374,15 +310,8 @@ public:
 
     while (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
-      assert(curSet.size() == numSourcesPerRound);
       auto curInd = curSet.getIndicator();
-
-      if (numUnvisited != 0 && curInd == curSet.npos) {
-        galois::gDebug("Unv/Cnt: ", numUnvisited, "/", curSet.count(), ", curInd: ", curSet.getIndicator(), ", f/l: ", curSet.find_first(), "/", curSet.find_last());
-        assert(curInd == curSet.npos);
-      }
       if (curInd != curSet.npos) {
-        assert(curInd < numSourcesPerRound);
         uint32_t distance = curKey->first;
 
         if (distance == 0) {
@@ -392,65 +321,28 @@ public:
         if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
           indexToReturn = curInd;
-          assert(curInd < numSourcesPerRound);
           curSet.prev_indicator();
           numSentSources--;
-          // this line should occur when successfully visited
-          galois::gDebug("backGetIndexToSend: indexToReturn = ", indexToReturn, ", numSentSources = ", numSentSources);
-          // DEBUG
-          numUnvisited--;
           break;
         } else {
           // round to send not reached yet; get out
           break;
         }
       } else {
-        // DEBUG
-        assert(numUnvisited == 0);
-        numBackSources += curSet.count();
-        if (numSentSources + numBackSources != numNonInfinity) // should have been equal
-          galois::gDebug("Sent + Back = ", numSentSources, " + ", numBackSources,
-                          " = ", numSentSources + numBackSources, " -> ", numNonInfinity);
-
         // set exhausted; go onto next set
-        do {
-          curKey++;
-          if (curKey != endCurKey) {
-            BitSet& nextSet = curKey->second;
-            if (nextSet.any()) break;
-          }
-        } while (curKey != endCurKey);
+        for (curKey++; curKey != endCurKey; curKey++) {
+          if (curKey->second.any()) break;
+        }
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
           BitSet& nextSet = curKey->second;
-          assert(nextSet.size() == numSourcesPerRound);
           nextSet.setIndicator(nextSet.find_last());
-          // DEBUG
-          numUnvisited = nextSet.count();
-          if (nextSet.getIndicator() != nextSet.find_last())
-            galois::gDebug("count: ", numUnvisited, ", curInd: ", nextSet.getIndicator(), ", last: ", nextSet.find_last());
-          if (nextSet.any()) {
-            assert(nextSet.getIndicator() == nextSet.find_last());
-            assert(nextSet.getIndicator() < infinity);
-          }
-
-          assert(nextSet.find_next(nextSet.getIndicator()) == nextSet.npos);
-          if (nextSet.getIndicator() < infinity)
-            assert(numUnvisited != 0);
-          else
-            assert(numUnvisited == 0);
-        }
-        else {
-          // galois::gDebug("Node finished");
-          assert(numUnvisited == 0);
         }
       }
     }
 
     if (curKey == endCurKey) {
-      if (numSentSources != 0)
-        galois::gDebug("Assertion: numSentSources = ", numSentSources, " (MapSize = ", distanceTree.size(), ")");
       assert(numSentSources == 0);
     }
 
