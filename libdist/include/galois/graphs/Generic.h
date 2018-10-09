@@ -89,6 +89,16 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     return globalToLocalMap.at(gid);
   }
 
+  uint32_t G2LEdgeCut(uint64_t gid, uint32_t globalOffset) const {
+    assert(isLocal(gid));
+    // optimized for edge cuts
+    if (gid >= globalOffset && gid < globalOffset + base_DistGraph::numOwned)
+      return gid - globalOffset;
+
+    return globalToLocalMap.at(gid);
+  }
+
+
   virtual uint64_t L2G(uint32_t lid) const {
     return localToGlobalVector[lid];
   }
@@ -464,6 +474,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::gPrint("Loading edge-data while creating edges\n");
     }
 
+    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
     bGraph.resetReadCounters();
     galois::StatTimer timer("EdgeLoading", GRNAME);
     timer.start();
@@ -474,12 +485,12 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         [&](auto n) {
           auto ii       = bGraph.edgeBegin(n);
           auto ee       = bGraph.edgeEnd(n);
-          uint32_t lsrc = this->G2L(n);
+          uint32_t lsrc = this->G2LEdgeCut(n, globalOffset);
           uint64_t cur =
               *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           for (; ii < ee; ++ii) {
             auto gdst           = bGraph.edgeDestination(*ii);
-            decltype(gdst) ldst = this->G2L(gdst);
+            decltype(gdst) ldst = this->G2LEdgeCut(gdst, globalOffset);
             auto gdata          = bGraph.edgeData(*ii);
             graph.constructEdge(cur++, ldst, gdata);
           }
@@ -515,6 +526,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::gPrint("Loading edge-data while creating edges\n");
     }
 
+    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
     bGraph.resetReadCounters();
     galois::StatTimer timer("EdgeLoading", GRNAME);
     timer.start();
@@ -525,12 +537,12 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         [&](auto n) {
           auto ii       = bGraph.edgeBegin(n);
           auto ee       = bGraph.edgeEnd(n);
-          uint32_t lsrc = this->G2L(n);
+          uint32_t lsrc = this->G2LEdgeCut(n, globalOffset);
           uint64_t cur =
               *graph.edge_begin(lsrc, galois::MethodFlag::UNPROTECTED);
           for (; ii < ee; ++ii) {
             auto gdst           = bGraph.edgeDestination(*ii);
-            decltype(gdst) ldst = this->G2L(gdst);
+            decltype(gdst) ldst = this->G2LEdgeCut(gdst, globalOffset);
             graph.constructEdge(cur++, ldst);
           }
           assert(cur == (*graph.edge_end(lsrc)));
