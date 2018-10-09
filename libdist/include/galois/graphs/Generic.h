@@ -362,6 +362,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       #if MORE_DIST_STATS
       galois::loopname("EdgeInspectionLoop"),
       #endif
+      galois::steal(),
       galois::no_stats()
     );
     inspectionTimer.stop();
@@ -499,6 +500,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         #if MORE_DIST_STATS
         galois::loopname("EdgeLoadingLoop"),
         #endif
+        galois::steal(),
         galois::no_stats());
 
     timer.stop();
@@ -550,6 +552,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         #if MORE_DIST_STATS
         galois::loopname("EdgeLoadingLoop"),
         #endif
+        galois::steal(),
         galois::no_stats());
 
     timer.stop();
