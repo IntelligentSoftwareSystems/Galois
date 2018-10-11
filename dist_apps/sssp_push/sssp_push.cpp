@@ -51,8 +51,8 @@ static cll::opt<unsigned long long>
 
 static cll::opt<uint32_t>
     delta("delta",
-             cll::desc("Shift value for the delta step (default value INF)"), 
-             cll::init(std::numeric_limits<uint32_t>::max()));
+             cll::desc("Shift value for the delta step (default value 0)"),
+             cll::init(0));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -195,8 +195,9 @@ struct SSSP {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    assert(delta > 0);
-    uint32_t priority = 0;
+    uint32_t priority;
+    if (delta == 0) priority = std::numeric_limits<uint32_t>::max();
+    else priority = 0;
     galois::GAccumulator<uint32_t> work_items;
 
     do {
