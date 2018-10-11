@@ -48,7 +48,8 @@ static inline void AND(word* result, word* lhs, word* rhs, int nWords);
 static inline void NAND(word* result, word* lhs, word* rhs, int nWords);
 static inline void OR(word* result, word* lhs, word* rhs, int nWords);
 static inline void XOR(word* result, word* lhs, word* rhs, int nWords);
-static int wordNum(int nVars);
+static inline int countOnes(unsigned uWord);
+static inline int wordNum(int nVars);
 static void truthStretch(word* result, word* input, int inVars, int nVars,
                          unsigned phase);
 static void swapAdjacentVars(word* result, word* input, int nVars, int iVar);
@@ -95,6 +96,17 @@ void XOR(word* result, word* lhs, word* rhs, int nWords) {
   }
 }
 
+int countOnes(unsigned uWord) {
+
+    uWord = (uWord & 0x55555555) + ((uWord>>1) & 0x55555555);
+    uWord = (uWord & 0x33333333) + ((uWord>>2) & 0x33333333);
+    uWord = (uWord & 0x0F0F0F0F) + ((uWord>>4) & 0x0F0F0F0F);
+    uWord = (uWord & 0x00FF00FF) + ((uWord>>8) & 0x00FF00FF);
+    return  (uWord & 0x0000FFFF) + (uWord>>16);
+}
+
+int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
+
 void truthStretch(word* result, word* input, int inVars, int nVars,
                   unsigned phase) {
 
@@ -125,8 +137,6 @@ void truthStretch(word* result, word* input, int inVars, int nVars,
     copy(result, input, nWords);
   }
 }
-
-int wordNum(int nVars) { return nVars <= 5 ? 1 : 1 << (nVars - 5); }
 
 void swapAdjacentVars(word* result, word* input, int nVars, int iVar) {
 
