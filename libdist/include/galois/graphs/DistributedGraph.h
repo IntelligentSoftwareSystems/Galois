@@ -3225,6 +3225,10 @@ private:
             SyncType syncType, typename SyncFnTy, typename BitsetFnTy, bool async>
   void sync_net_recv(std::string loopName) {
     auto& net = galois::runtime::getSystemNetworkInterface();
+    std::string wait_timer_str("Wait_" +
+                                  get_run_identifier(loopName));
+    galois::CondStatTimer<MORE_COMM_STATS> Twait(wait_timer_str.c_str(),
+                                                    GRNAME);
 
     if (async) {
       size_t syncTypePhase = 0;
@@ -3245,10 +3249,12 @@ private:
         if (nothingToRecv(x, syncType, writeLocation, readLocation))
           continue;
 
+        Twait.start();
         decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
         do {
           p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
         } while (!p);
+        Twait.stop();
 
         syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
                                                       loopName);
