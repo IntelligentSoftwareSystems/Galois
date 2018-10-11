@@ -103,8 +103,8 @@ public:
   ~StatTimer() {
     if (valid)
       stop();
-    if (TimeAccumulator::get()) // only report non-zero stat
-      galois::runtime::reportStat_Tmax(region, name, TimeAccumulator::get());
+    if (TimeAccumulator::get_usec()) // only report non-zero stat
+      galois::runtime::reportStat_Tmax(region, name, TimeAccumulator::get_usec());
   }
 
   void start() {
