@@ -246,11 +246,9 @@ struct BFS {
 #endif
              dga.reduce(_graph.get_run_identifier()));
 
-    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Single(
-          regionname, "NumIterations_" + std::to_string(_graph.get_run_num()),
-          (unsigned long)_num_iterations);
-    }
+    galois::runtime::reportStat_Tmax(
+        regionname, "NumIterations_" + std::to_string(_graph.get_run_num()),
+        (unsigned long)_num_iterations);
   }
 
   void operator()(GNode src) const {

@@ -265,11 +265,9 @@ struct PageRank {
 #endif
              dga.reduce(_graph.get_run_identifier()));
 
-    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Single(
-          REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
-          (unsigned long)_num_iterations);
-    }
+    galois::runtime::reportStat_Tmax(
+        REGION_NAME, "NumIterations_" + std::to_string(_graph.get_run_num()),
+        (unsigned long)_num_iterations);
   }
 
   // Pull deltas from neighbor nodes, then add to self-residual
