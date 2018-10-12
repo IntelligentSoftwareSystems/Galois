@@ -32,7 +32,8 @@ class PRBCTree {
   template <typename Block, typename Allocator>
   class bitset_with_index_indicator : public boost::dynamic_bitset<Block, Allocator> {
       // To match the type of npos (unsighed long by default)
-      typedef typename std::remove_const<decltype(boost::dynamic_bitset<Block, Allocator>::npos)>::type size_type;
+      // typedef typename std::remove_const<decltype(boost::dynamic_bitset<Block, Allocator>::npos)>::type size_type;
+      typedef std::size_t size_type;
 
       //! indicate the index of bit to process
       size_type indicator;
@@ -40,8 +41,8 @@ class PRBCTree {
       /**
        * To convert the bitset into block chain (vector of block-type).
        */
-      std::vector<Block> integerize() const {
-          std::vector<Block> blocks;
+      std::vector<galois::CopyableAtomic<Block>> integerize() const {
+          std::vector<galois::CopyableAtomic<Block>> blocks;
           /**
            * template <typename Block, typename Alloc, typename BlockOutputIterator>
            * void to_block_range(const dynamic_bitset<Block, Alloc>& b, BlockOutputIterator result)
@@ -68,22 +69,44 @@ class PRBCTree {
          *
          * The maximum value of size_type.
          */
-        this->indicator = this->npos;
+        indicator = this->npos;
       }
 
       /**
        * Accessors (get/set) for indicator.
        */
-      size_type getIndicator() const {return this->indicator;}
-      void setIndicator(size_type index) {this->indicator = index;}
+      size_type getIndicator() const { return indicator; }
+      void setIndicator(size_type index) { indicator = index; }
       
       /**
        * Set a bit with the side-effect updating indicator to the first.
        */
       void set_indicator(size_type index) {
-        this->set(index);
-        if (index < indicator)
-          this->indicator = index;
+          this->set(index);
+          if (index < indicator)
+            indicator = index;
+      }
+
+      void test_set_indicator(size_type index, bool val=true) {
+          /**
+           * bool boost::dynamic_bitset::test_set(size_type n, bool val = true)
+           * 
+           * Precondition: n < size().
+           * 
+           * Effects: Sets bit n if val is true, and clears bit n if val is false. 
+           * 
+           * Returns: true if the previous state of bit n was set and false if bit n is 0.
+           */
+          if (this->test_set(index, val))
+              if (index == indicator)
+                  next_indicator();
+      }
+
+      /**
+       * Return true if indicator is npos
+       */
+      bool nposInd() {
+          return indicator == this->npos;
       }
 
       /**
@@ -104,45 +127,44 @@ class PRBCTree {
       size_type find_prev(size_type pos) const {
 
           // Return npos if no bit is set or to scan
-          if (!(this->any()) || pos == 0)
+          if (pos == 0 || this->size() == 0)
               return this->npos;
 
           // Normalize pos in case of npos
           pos = (pos >= this->size()? this->size() : pos);
           --pos; // Find from the previous bit
-
           // Integerize into blocks
-          std::vector<Block> blocks = this->integerize();
+          std::vector<galois::CopyableAtomic<Block>> m_bits = integerize();
 
           auto curBlock = pos < this->bits_per_block? 0 : pos / this->bits_per_block;
           auto curOffset = pos < this->bits_per_block? pos : pos % this->bits_per_block;
 
-          
           // Scan within current Block
-          while (curOffset >= 0) {
-              if (this->test(pos)){
-                  return pos;}
-              if (curOffset == 0)
-                  break;
-              pos--;
-              curOffset--;
+          auto curSeg = m_bits[curBlock] & ((2 << curOffset) - 1);
+          if (curSeg) {
+              pos -= curOffset;
+              if (curSeg == 1)
+                  return pos;
+              return pos + boost::integer_log2<size_type>(curSeg);
           }
-          if (pos == 0)
-              return this->npos;
+          else {
+              pos -= curOffset;
+              if (pos == 0)
+                  return this->npos;
+          }
 
           // Jump over zero blocks
-          for (pos--, curBlock--, curOffset = this->bits_per_block - 1;
-                  blocks[curBlock] == 0 && curBlock > 0;
+          for (curBlock--, curOffset = this->bits_per_block - 1;
+                  m_bits[curBlock] == 0 && curBlock > 0;
                   curBlock--, pos -= this->bits_per_block);
 
           // Scan the last block (if non-zero)
-          if (blocks[curBlock]) {
-              while (curOffset >= 0) {
-                  if (this->test(pos)){
-                      return pos;}
-                  pos--;
-                  curOffset--;
-              }
+          if (m_bits[curBlock]) {
+              pos -= this->bits_per_block;
+              auto curSeg = m_bits[curBlock] & ((2 << curOffset) - 1);
+              if (curSeg == 1)
+                  return pos;
+              return pos + boost::integer_log2<size_type>(curSeg);
           }
           return this->npos;
       }
@@ -151,23 +173,27 @@ class PRBCTree {
        * Similar to find_first().
        */
       size_type find_last() const {
-          return this->find_prev(this->size());
+          return find_prev(this->size());
       }
 
       /**
        * To move indicator to the next set bit.
        */
-      void next_indicator() {
-          this->indicator = 
-            this->indicator == this->npos? 
-            this->find_first() : this->find_next(this->indicator);
+      size_type next_indicator() {
+          size_type old = indicator;
+          indicator = 
+            indicator == this->npos? 
+            this->find_first() : this->find_next(indicator);
+          return old;
       }
 
       /**
-       * To move indicator to the previous set bit.
+       * To move indicator to the previous set bit, and return the old value.
        */
-      void prev_indicator() {
-          this->indicator = this->find_prev(this->indicator);
+      size_type prev_indicator() {
+          size_type old = indicator;
+          indicator = this->find_prev(indicator);
+          return old;
       }
   };
 
@@ -229,27 +255,14 @@ public:
     // if it exists, remove it
     if (setIter != distanceTree.end()) {
       BitSet& setToChange = setIter->second;
-      /**
-       * bool boost::dynamic_bitset::test_set(size_type n, bool val = true)
-       * 
-       * Precondition: n < this->size().
-       * 
-       * Effects: Sets bit n if val is true, and clears bit n if val is false. 
-       * 
-       * Returns: true if the previous state of bit n was set and false if bit n is 0.
-       */
-      if (setToChange.test_set(index, false)) {
-        if (index == setToChange.getIndicator()){
-          setToChange.next_indicator();
-        }
-      }
+      setToChange.test_set_indicator(index, false); // Test, set, update
     }
 
     // if it didn't exist before, add to number of non-infinity nodes
     if (oldDistance == infinity) {
       numNonInfinity++;
-      // galois::gDebug("numNonInfinity: ", numNonInfinity);
     }
+
     distanceTree[newDistance].set_indicator(index); // Set & Update
   }
 
@@ -263,7 +276,6 @@ public:
     auto setIter = distanceTree.find(distanceToCheck);
     if (setIter != distanceTree.end()) {
       BitSet& setToCheck = setIter->second;
-
       auto index = setToCheck.getIndicator();
       if (index != setToCheck.npos) {
           indexToSend = index;
@@ -295,7 +307,7 @@ public:
 
     if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
-      curSet.setIndicator(curSet.find_last());
+      curSet.prev_indicator();
     }
 
   }
@@ -309,19 +321,17 @@ public:
     uint32_t indexToReturn = infinity;
 
     while (curKey != endCurKey) {
+      uint32_t distance = curKey->first;
+      if (distance == 0) {
+        zeroReached = true;
+        return indexToReturn;
+      }
+
       BitSet& curSet = curKey->second;
-      auto curInd = curSet.getIndicator();
-      if (curInd != curSet.npos) {
-        uint32_t distance = curKey->first;
-
-        if (distance == 0) {
-          zeroReached = true;
-        }
-
+      if (!curSet.nposInd()) {
         if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
-          indexToReturn = curInd;
-          curSet.prev_indicator();
+          indexToReturn = curSet.prev_indicator();
           numSentSources--;
           break;
         } else {
@@ -330,14 +340,12 @@ public:
         }
       } else {
         // set exhausted; go onto next set
-        for (curKey++; curKey != endCurKey; curKey++) {
-          if (curKey->second.any()) break;
-        }
+        for (curKey++; curKey != endCurKey && curKey->second.none(); curKey++);
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
           BitSet& nextSet = curKey->second;
-          nextSet.setIndicator(nextSet.find_last());
+          nextSet.prev_indicator();
         }
       }
     }

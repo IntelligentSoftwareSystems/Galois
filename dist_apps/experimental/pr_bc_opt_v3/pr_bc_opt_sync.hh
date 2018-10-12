@@ -26,24 +26,21 @@ struct APSPReduce {
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
     uint32_t indexToGet = node.roundIndexToSend;
+    uint32_t minDist;
+    ShortPathType shortestPN;
 
-    uint32_t a;
-    uint32_t b;
-    ShortPathType c;
-
-    a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      b = node.minDistances[indexToGet];
-      c = node.shortestPathNumbers[indexToGet];
+      minDist = node.minDistances[indexToGet];
+      shortestPN = node.shortestPathNumbers[indexToGet];
       node.shortestPathNumbers[indexToGet] = 0;
     } else {
       // no-op
-      b = infinity;
-      c = 0;
+      minDist = infinity;
+      shortestPN = 0;
     }
 
-    return ValTy(a, b, c);
+    return ValTy(indexToGet, minDist, shortestPN);
   }
 
   static bool extract_reset_batch(unsigned, unsigned long int*,
@@ -109,24 +106,21 @@ struct APSPBroadcast {
 
   static ValTy extract(uint32_t node_id, const struct NodeData & node) {
     uint32_t indexToGet = node.roundIndexToSend;
+    uint32_t minDist;
+    ShortPathType shortestPN;
 
-    uint32_t a;
-    uint32_t b;
-    ShortPathType c;
-
-    a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      b = node.minDistances[indexToGet];
-      c = node.shortestPathNumbers[indexToGet];
-      assert(c != 0); // should not send out 0 for # paths
+      minDist = node.minDistances[indexToGet];
+      shortestPN = node.shortestPathNumbers[indexToGet];
+      assert(shortestPN != 0); // should not send out 0 for # paths
     } else {
       // no-op
-      b = infinity;
-      c = 0;
+      minDist = infinity;
+      shortestPN = 0;
     }
 
-    return ValTy(a, b, c);
+    return ValTy(indexToGet, minDist, shortestPN);
   }
 
   static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
@@ -242,5 +236,5 @@ struct DependencyBroadcast {
 // Bitsets
 ////////////////////////////////////////////////////////////////////////////////
 
-GALOIS_SYNC_STRUCTURE_BITSET(minDistances);
-GALOIS_SYNC_STRUCTURE_BITSET(dependency);
+GALOIS_SYNC_STRUCTURE_BITSET(minDistances); // struct Bitset_minDistances
+GALOIS_SYNC_STRUCTURE_BITSET(dependency); // struct Bitset_dependency

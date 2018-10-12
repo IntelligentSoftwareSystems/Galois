@@ -73,7 +73,6 @@ public:
     assert(bits_uint64 == 64); // compatibility with other devices
     num_bits = n;
     bitvec.resize((n + bits_uint64 - 1) / bits_uint64);
-    reset();
   }
 
   /**
