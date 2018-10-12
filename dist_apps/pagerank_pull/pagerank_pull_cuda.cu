@@ -251,10 +251,12 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
 
   const unsigned __kernel_tb_size = TB_SIZE;
   __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage work_items_ts;
   index_type src_end;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   DGAccumulator_accum.thread_entry();
+  work_items.thread_entry();
   // FP: "3 -> 4;
   src_end = __end;
   for (index_type src = __begin + tid; src < src_end; src += nthreads)
@@ -282,6 +284,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
   // FP: "17 -> 18;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   // FP: "18 -> 19;
+  work_items.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(work_items_ts);
 }
 __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual)
 {

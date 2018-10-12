@@ -186,11 +186,8 @@ struct PageRank_delta {
         graph(_graph), DGAccumulator_accum(_dga), work_items(_work_items) {}
 
   void static go(Graph& _graph, DGAccumulatorTy& dga,
-      galois::GAccumulator<uint32_t>& work_items, float priority) {
+      galois::GAccumulator<uint32_t>& work_items, float& priority) {
     const auto& allNodes = _graph.allNodesRange();
-
-    if (work_items.reduce() == 0) priority -= delta;
-    else if (work_items.reduce() > (maxRatio * _graph.size())) priority += delta;
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -249,11 +246,16 @@ struct PageRank {
 
     // unsigned int reduced = 0;
 
-    float priority = 0;
+    float priority = delta;
     if (maxRatio > 1) maxRatio = 1;
     galois::GAccumulator<uint32_t> work_items;
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    uint32_t prev_work_items = 0;
 
     do {
+      if (prev_work_items == 0) priority -= delta;
+      else if (prev_work_items > (maxRatio * _graph.size())) priority += delta;
+
       _graph.set_num_round(_num_iterations);
       dga.reset();
       work_items.reset();
@@ -283,9 +285,10 @@ struct PageRank {
                   Bitset_residual>("PageRank");
 #endif
 
+      prev_work_items = work_items.reduce();
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
-          (unsigned long)work_items.reduce());
+          (unsigned long)prev_work_items);
 
       ++_num_iterations;
     } while (
