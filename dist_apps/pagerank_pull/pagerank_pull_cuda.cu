@@ -244,7 +244,7 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   }
   // FP: "97 -> 98;
 }
-__global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned int __end, const float  local_alpha, float local_tolerance, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned int __end, const float local_priority, const float  local_alpha, float local_tolerance, float * p_delta, uint32_t * p_nout, float * p_residual, float * p_value, HGAccumulator<unsigned int> DGAccumulator_accum, HGAccumulator<unsigned int> work_items)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -265,13 +265,17 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
       p_delta[src] = 0;
       if (p_residual[src] > local_tolerance)
       {
-        p_value[src] += p_residual[src];
-        if (p_nout[src] > 0)
+        DGAccumulator_accum.reduce( 1);
+        if (p_residual[src] > local_priority)
         {
-          p_delta[src] = p_residual[src] * (1 - local_alpha) / p_nout[src];
-          DGAccumulator_accum.reduce( 1);
+          p_value[src] += p_residual[src];
+          work_items.reduce( 1);
+          if (p_nout[src] > 0)
+          {
+            p_delta[src] = p_residual[src] * (1 - local_alpha) / p_nout[src];
+          }
+          p_residual[src] = 0;
         }
-        p_residual[src] = 0;
       }
     }
   }
@@ -621,11 +625,12 @@ void InitializeGraph_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
+void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, unsigned int & work_items, const float local_priority, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
   HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _work_items;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
@@ -638,29 +643,33 @@ void PageRank_delta_cuda(unsigned int  __begin, unsigned int  __end, unsigned in
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  PageRank_delta <<<blocks, threads>>>(ctx->gg, __begin, __end, local_alpha, local_tolerance, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _DGAccumulator_accum);
+  Shared<unsigned int> work_itemsval  = Shared<unsigned int>(1);
+  *(work_itemsval.cpu_wr_ptr()) = 0;
+  _work_items.rv = work_itemsval.gpu_wr_ptr();
+  PageRank_delta <<<blocks, threads>>>(ctx->gg, __begin, __end, local_priority, local_alpha, local_tolerance, ctx->delta.data.gpu_wr_ptr(), ctx->nout.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), ctx->value.data.gpu_wr_ptr(), _DGAccumulator_accum, _work_items);
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
   DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
   // FP: "11 -> 12;
+  work_items = *(work_itemsval.cpu_rd_ptr());
 }
-void PageRank_delta_allNodes_cuda(unsigned int & DGAccumulator_accum, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
+void PageRank_delta_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const float local_priority, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_delta_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, local_alpha, local_tolerance, ctx);
+  PageRank_delta_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, work_items, local_priority, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_delta_masterNodes_cuda(unsigned int & DGAccumulator_accum, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
+void PageRank_delta_masterNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const float local_priority, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_delta_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, local_alpha, local_tolerance, ctx);
+  PageRank_delta_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, work_items, local_priority, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
-void PageRank_delta_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
+void PageRank_delta_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const float local_priority, const float & local_alpha, float local_tolerance, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  PageRank_delta_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, local_alpha, local_tolerance, ctx);
+  PageRank_delta_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, work_items, local_priority, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
 void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
