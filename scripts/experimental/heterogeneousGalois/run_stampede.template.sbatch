@@ -125,11 +125,11 @@ if [[ ($execname == *"partition"*) ]]; then
   #FLAGS+=" -saveLocalGraph "
 fi
 
-if [[ -n "$SAVE_GRAPH" ]]
+if [[ -n "$SAVE_GRAPH" ]]; then
   FLAGS+=" -saveLocalGraph "
 fi
 
-if [[ -n "$LOAD_GRAPH" ]]
+if [[ -n "$LOAD_GRAPH" ]]; then
   FLAGS+=" -readFromFile "
 fi
 
