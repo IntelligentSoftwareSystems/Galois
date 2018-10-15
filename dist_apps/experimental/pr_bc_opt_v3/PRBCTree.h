@@ -60,6 +60,10 @@ class PRBCTree {
           boost::to_block_range(*this, std::back_inserter(blocks));
           return blocks;
       }
+
+      size_type reverse(size_type i) {
+          return i < this->size()? this->size() - 1 - i : this->npos;
+      }
   public:
       /* Constructor */
       bitset_with_index_indicator(uint32_t n = numSourcesPerRound) : boost::dynamic_bitset<Block, Allocator>(n) {
@@ -82,7 +86,7 @@ class PRBCTree {
        * Set a bit with the side-effect updating indicator to the first.
        */
       void set_indicator(size_type index) {
-          this->set(index);
+          this->set(reverse(index));
           if (index < indicator)
             indicator = index;
       }
@@ -97,9 +101,9 @@ class PRBCTree {
            * 
            * Returns: true if the previous state of bit n was set and false if bit n is 0.
            */
-          if (this->test_set(index, val))
+          if (this->test_set(reverse(index), val))
               if (index == indicator)
-                  next_indicator();
+                  forward_indicator();
       }
 
       /**
@@ -179,20 +183,20 @@ class PRBCTree {
       /**
        * To move indicator to the next set bit.
        */
-      size_type next_indicator() {
+      size_type backward_indicator() {
           size_type old = indicator;
           indicator = 
-            indicator == this->npos? 
-            this->find_first() : this->find_next(indicator);
+            reverse(indicator == this->npos? 
+            this->find_first() : this->find_next(reverse(indicator)));
           return old;
       }
 
       /**
        * To move indicator to the previous set bit, and return the old value.
        */
-      size_type prev_indicator() {
+      size_type forward_indicator() {
           size_type old = indicator;
-          indicator = this->find_prev(indicator);
+          indicator = reverse(this->find_prev(reverse(indicator)));
           return old;
       }
   };
@@ -279,7 +283,7 @@ public:
       auto index = setToCheck.getIndicator();
       if (index != setToCheck.npos) {
           indexToSend = index;
-          setToCheck.next_indicator();
+          setToCheck.forward_indicator();
         }
       }
     return indexToSend;
@@ -307,7 +311,7 @@ public:
 
     if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
-      curSet.prev_indicator();
+      curSet.backward_indicator();
     }
 
   }
@@ -331,7 +335,7 @@ public:
       if (!curSet.nposInd()) {
         if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
-          indexToReturn = curSet.prev_indicator();
+          indexToReturn = curSet.backward_indicator();
           numSentSources--;
           break;
         } else {
@@ -345,7 +349,7 @@ public:
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
           BitSet& nextSet = curKey->second;
-          nextSet.prev_indicator();
+          nextSet.backward_indicator();
         }
       }
     }
