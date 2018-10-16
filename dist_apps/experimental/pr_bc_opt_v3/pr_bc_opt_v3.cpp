@@ -392,9 +392,7 @@ void InitializeGraph(Graph& graph) {
         cur_data.minDistances.resize(vectorSize);
         cur_data.shortestPathNumbers.resize(vectorSize);
         cur_data.dependencyValues.resize(vectorSize);
-        cur_data.roundIndexToSend = infinity;
         cur_data.bc = 0.0;
-        cur_data.dTree.initialize();
       },
       galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()),
       galois::no_stats()); // Only stats the runtime by loopname
@@ -415,6 +413,8 @@ void InitializeIteration(Graph& graph,
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
+        cur_data.roundIndexToSend = infinity;
+        cur_data.dTree.initialize();
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           // min distance and short path count setup
           cur_data.dependencyValues[i]  = 0.0;

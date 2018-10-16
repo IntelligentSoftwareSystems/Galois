@@ -38,11 +38,17 @@ class PRBCTree {
       //! indicate the index of bit to process
       size_type indicator;
 
+      //! vector which is not directly accessable by boost definition
+      std::vector<galois::CopyableAtomic<Block>> m_bits;
+
+      //! reverse method flag (default false)
+      bool reverse_mode;
+
       /**
-       * To convert the bitset into block chain (vector of block-type).
+       * To update the vector.
        */
-      std::vector<galois::CopyableAtomic<Block>> integerize() const {
-          std::vector<galois::CopyableAtomic<Block>> blocks;
+      void update_vector() {
+          if (!m_bits.empty()) m_bits.clear();
           /**
            * template <typename Block, typename Alloc, typename BlockOutputIterator>
            * void to_block_range(const dynamic_bitset<Block, Alloc>& b, BlockOutputIterator result)
@@ -57,8 +63,7 @@ class PRBCTree {
            * The type BlockOutputIterator must be a model of Output Iterator and its value_type must be the same type as Block.
            * Further, the size of the output range must be greater or equal b.num_blocks().
            */
-          boost::to_block_range(*this, std::back_inserter(blocks));
-          return blocks;
+          boost::to_block_range(*this, std::back_inserter(m_bits));
       }
 
       size_type reverse(size_type i) {
@@ -74,6 +79,7 @@ class PRBCTree {
          * The maximum value of size_type.
          */
         indicator = this->npos;
+        reverse_mode = false;
       }
 
       /**
@@ -86,9 +92,16 @@ class PRBCTree {
        * Set a bit with the side-effect updating indicator to the first.
        */
       void set_indicator(size_type index) {
-          this->set(reverse(index));
-          if (index < indicator)
-            indicator = index;
+          if (reverse_mode) {
+              this->set(reverse(index));
+              if (index < indicator)
+                indicator = reverse(index);
+          }
+          else {
+              this->set(index);
+              if (index < indicator)
+                  indicator = index;
+          }
       }
 
       void test_set_indicator(size_type index, bool val=true) {
@@ -101,9 +114,16 @@ class PRBCTree {
            * 
            * Returns: true if the previous state of bit n was set and false if bit n is 0.
            */
-          if (this->test_set(reverse(index), val))
+          if (reverse_mode) {
+            if (this->test_set(reverse(index), val))
+                if (reverse(index) == indicator)
+                    forward_indicator();
+          }
+          else {
+            if (this->test_set(index, val))
               if (index == indicator)
                   forward_indicator();
+          }
       }
 
       /**
@@ -128,20 +148,20 @@ class PRBCTree {
       /**
        * Similar to find_next().
        */
-      size_type find_prev(size_type pos) const {
+      size_type find_prev(size_type pos) {
 
-          // Return npos if no bit is set or to scan
-          if (pos == 0 || this->size() == 0)
+          // Return npos if no bit set
+          if (pos == 0)
               return this->npos;
 
           // Normalize pos in case of npos
           pos = (pos >= this->size()? this->size() : pos);
           --pos; // Find from the previous bit
-          // Integerize into blocks
-          std::vector<galois::CopyableAtomic<Block>> m_bits = integerize();
 
           auto curBlock = pos < this->bits_per_block? 0 : pos / this->bits_per_block;
           auto curOffset = pos < this->bits_per_block? pos : pos % this->bits_per_block;
+
+          if(reverse_mode) update_vector();
 
           // Scan within current Block
           auto curSeg = m_bits[curBlock] & ((2 << curOffset) - 1);
@@ -165,10 +185,9 @@ class PRBCTree {
           // Scan the last block (if non-zero)
           if (m_bits[curBlock]) {
               pos -= this->bits_per_block;
-              auto curSeg = m_bits[curBlock] & ((2 << curOffset) - 1);
-              if (curSeg == 1)
+              if (m_bits[curBlock] == 1)
                   return pos;
-              return pos + boost::integer_log2<size_type>(curSeg);
+              return pos + boost::integer_log2<size_type>(m_bits[curBlock]);
           }
           return this->npos;
       }
@@ -176,7 +195,7 @@ class PRBCTree {
       /**
        * Similar to find_first().
        */
-      size_type find_last() const {
+      size_type find_last(size_type last_block) {
           return find_prev(this->size());
       }
 
@@ -184,10 +203,17 @@ class PRBCTree {
        * To move indicator to the next set bit.
        */
       size_type backward_indicator() {
+          if (this->size() == 0)
+              return this->npos;
           size_type old = indicator;
-          indicator = 
-            reverse(indicator == this->npos? 
-            this->find_first() : this->find_next(reverse(indicator)));
+          if (reverse_mode)
+              indicator = 
+                reverse(indicator == this->npos? 
+                this->find_first() : this->find_next(reverse(indicator)));
+          else {
+              if (indicator == this->npos) update_vector();
+              indicator = this->find_prev(indicator);
+          }
           return old;
       }
 
@@ -195,8 +221,17 @@ class PRBCTree {
        * To move indicator to the previous set bit, and return the old value.
        */
       size_type forward_indicator() {
+          if (this->size() == 0)
+              return this->npos;
           size_type old = indicator;
-          indicator = reverse(this->find_prev(reverse(indicator)));
+          if (reverse_mode) {
+              if (indicator == this->npos) update_vector();
+              indicator = reverse(this->find_prev(reverse(indicator)));
+          }
+          else
+              indicator = 
+                indicator == this->npos? 
+                this->find_first() : this->find_next(indicator);
           return old;
       }
   };
@@ -357,7 +392,7 @@ public:
     if (curKey == endCurKey) {
       assert(numSentSources == 0);
     }
-
+    
     return indexToReturn;
   }
 
