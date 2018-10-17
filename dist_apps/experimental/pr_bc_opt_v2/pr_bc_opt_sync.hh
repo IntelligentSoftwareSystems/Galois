@@ -46,11 +46,10 @@ struct APSPReduce {
     return ValTy(a, b, c);
   }
 
-  static bool extract_reset_batch(unsigned, unsigned long int*,
-                                  unsigned int*, ValTy*, size_t*,
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, 
                                   DataCommMode*) { return false; }
 
-  static bool extract_reset_batch(unsigned, ValTy*) { return false; }
+  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
     uint32_t rIndex = y.first;
@@ -93,8 +92,7 @@ struct APSPReduce {
     return false;
   }
 
-  static bool reduce_batch(unsigned, unsigned long int*, unsigned int *,
-                           ValTy*, size_t, DataCommMode) { return false; }
+  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
   static void reset(uint32_t node_id, struct NodeData &node) { 
@@ -129,10 +127,10 @@ struct APSPBroadcast {
     return ValTy(a, b, c);
   }
 
-  static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
+  static bool extract_batch(unsigned, uint8_t*, size_t*,
                             DataCommMode*) { return false; }
 
-  static bool extract_batch(unsigned, ValTy*) { return false; }
+  static bool extract_batch(unsigned, uint8_t*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;
@@ -149,8 +147,7 @@ struct APSPBroadcast {
     }
   }
 
-  static bool setVal_batch(unsigned, uint64_t*, unsigned int*, ValTy*,
-                           size_t, DataCommMode) { return false; }
+  static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -170,11 +167,10 @@ struct DependencyReduce {
     return ValTy(indexToGet, thing);
   }
 
-  static bool extract_reset_batch(unsigned, unsigned long int*,
-                                  unsigned int*, ValTy*, size_t*,
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, 
                                   DataCommMode*) { return false; }
 
-  static bool extract_reset_batch(unsigned, ValTy*) { return false; }
+  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
 
   static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
     uint32_t rIndex = y.first;
@@ -193,8 +189,7 @@ struct DependencyReduce {
     return false;
   }
 
-  static bool reduce_batch(unsigned, unsigned long int*, unsigned int *,
-                           ValTy*, size_t, DataCommMode) { return false; }
+  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
   static void reset(uint32_t node_id, struct NodeData &node) { 
@@ -220,10 +215,10 @@ struct DependencyBroadcast {
     return ValTy(indexToGet, thing);
   }
 
-  static bool extract_batch(unsigned, uint64_t*, unsigned int*, ValTy*, size_t*,
+  static bool extract_batch(unsigned, uint8_t*, size_t*,
                             DataCommMode*) { return false; }
 
-  static bool extract_batch(unsigned, ValTy*) { return false; }
+  static bool extract_batch(unsigned, uint8_t*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;
@@ -234,8 +229,7 @@ struct DependencyBroadcast {
     }
   }
 
-  static bool setVal_batch(unsigned, uint64_t*, unsigned int*, ValTy*,
-                           size_t, DataCommMode) { return false; }
+  static bool setVal_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
