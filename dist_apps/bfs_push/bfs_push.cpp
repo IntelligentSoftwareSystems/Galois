@@ -55,8 +55,8 @@ static cll::opt<unsigned long long>
 
 static cll::opt<uint32_t>
     delta("delta",
-             cll::desc("Shift value for the delta step (default value INF)"), 
-             cll::init(std::numeric_limits<uint32_t>::max()));
+             cll::desc("Shift value for the delta step (default value 0)"),
+             cll::init(0));
 
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
@@ -197,8 +197,9 @@ struct BFS {
 
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
-    assert(delta > 0);
-    uint32_t priority = 0;
+    uint32_t priority;
+    if (delta == 0) priority = std::numeric_limits<uint32_t>::max();
+    else priority = 0;
     galois::GAccumulator<uint32_t> work_items;
 
     do {
@@ -246,11 +247,9 @@ struct BFS {
 #endif
              dga.reduce(_graph.get_run_identifier()));
 
-    if (galois::runtime::getSystemNetworkInterface().ID == 0) {
-      galois::runtime::reportStat_Single(
-          regionname, "NumIterations_" + std::to_string(_graph.get_run_num()),
-          (unsigned long)_num_iterations);
-    }
+    galois::runtime::reportStat_Tmax(
+        regionname, "NumIterations_" + std::to_string(_graph.get_run_num()),
+        (unsigned long)_num_iterations);
   }
 
   void operator()(GNode src) const {

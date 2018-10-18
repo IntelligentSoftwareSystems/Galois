@@ -55,9 +55,49 @@ public:
 
   PODResizeableArray() : data_(NULL), capacity_(0), size_(0) {}
 
-  PODResizeableArray(size_t n) { resize(n); }
+  template <class InputIterator>
+  PODResizeableArray(InputIterator first, InputIterator last) 
+    : data_(NULL), capacity_(0), size_(0) 
+  {
+    size_t to_add = last - first;
+    resize(to_add);
+    std::copy_n(first, to_add, begin());
+  }
 
-  ~PODResizeableArray() { free(data_); }
+  PODResizeableArray(size_t n) 
+    : data_(NULL), capacity_(0), size_(0) 
+  { 
+    resize(n); 
+  }
+
+  //! disabled (shallow) copy constructor
+  PODResizeableArray(const PODResizeableArray&) = delete;
+
+  //! move constructor
+  PODResizeableArray(PODResizeableArray&& v)
+    : data_(v.data_), capacity_(v.capacity_), size_(v.size_) 
+  {
+    v.data_ = NULL;
+    v.capacity_ = 0;
+    v.size_ = 0;
+  }
+
+  //! disabled (shallow) copy assignment operator
+  PODResizeableArray& operator=(const PODResizeableArray&) = delete;
+
+  //! move assignment operator
+  PODResizeableArray& operator=(PODResizeableArray&& v) {
+    if (data_ != NULL) free(data_);
+    data_ = v.data_;
+    capacity_ = v.capacity_;
+    size_ = v.size_;
+    v.data_ = NULL;
+    v.capacity_ = 0;
+    v.size_ = 0;
+    return *this;
+  }
+
+  ~PODResizeableArray() { if (data_ != NULL) free(data_); }
 
   // iterators:
   iterator begin() { return iterator(&data_[0]); }
@@ -86,7 +126,9 @@ public:
 
   void reserve(size_t n) {
     if (n > capacity_) {
-      data_ = static_cast<_Tp*>(realloc(data_, n * sizeof(_Tp)));
+      if (capacity_ == 0) capacity_ = 1;
+      while (capacity_ < n) capacity_ <<= 1;
+      data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
     }
   }
 
@@ -130,6 +172,21 @@ public:
   void push_back(const _Tp& value) {
     resize(size_ + 1);
     data_[size_ - 1] = value;
+  }
+
+  template <class InputIterator>
+  void insert(iterator position, InputIterator first, InputIterator last) {
+    assert(position == end());
+    size_t old_size = size_;
+    size_t to_add = last - first;
+    resize(old_size + to_add);
+    std::copy_n(first, to_add, begin() + old_size);
+  }
+
+  void swap(PODResizeableArray& v) {
+    std::swap(data_, v.data_);
+    std::swap(size_, v.size_);
+    std::swap(capacity_, v.capacity_);
   }
 };
 

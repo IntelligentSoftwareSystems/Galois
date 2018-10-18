@@ -170,11 +170,11 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s, \
+        batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, y, s, \
                                                 data_mode, (ValTy)0);          \
         return true;                                                           \
       }                                                                        \
@@ -182,7 +182,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, y,          \
                                                 (ValTy)0);                     \
@@ -213,10 +213,10 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_add_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_add_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -241,13 +241,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -260,8 +260,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -288,11 +288,11 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s, \
+        batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, y, s, \
                                                 data_mode, (ValTy)0);          \
         return true;                                                           \
       }                                                                        \
@@ -300,7 +300,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_reset_node_##fieldname##_cuda(cuda_ctx, from_id, y,          \
                                                 (ValTy)0);                     \
@@ -331,10 +331,10 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_add_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_add_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -359,13 +359,13 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -378,8 +378,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -409,11 +409,11 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -421,7 +421,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -444,10 +444,10 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -467,13 +467,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -486,8 +486,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -512,11 +512,11 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -524,7 +524,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -547,10 +547,10 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -570,13 +570,13 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -589,8 +589,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -618,11 +618,11 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -630,7 +630,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -649,10 +649,10 @@ public:
       { return y < galois::min(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_min_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_min_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -672,13 +672,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -688,8 +688,8 @@ public:
       { return y < galois::min(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -717,11 +717,11 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -729,7 +729,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -748,10 +748,10 @@ public:
       { return y > galois::max(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_max_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_max_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -771,13 +771,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -787,8 +787,8 @@ public:
       { return y > galois::max(node.fieldname, y); }                           \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -813,11 +813,11 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -825,7 +825,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -844,10 +844,10 @@ public:
       { return y < galois::min(fieldname[node_id], y); }                       \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_min_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_min_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -867,13 +867,13 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -883,8 +883,8 @@ public:
       { return y < galois::min(fieldname[node_id], y); }                       \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -909,11 +909,11 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
+        batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
                                                  s, data_mode);                \
         return true;                                                           \
       }                                                                        \
@@ -921,7 +921,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       if (personality == GPU_CUDA) {                                           \
         batch_get_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y);        \
         return true;                                                           \
@@ -944,10 +944,10 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_set_node_##fieldname##_cuda(cuda_ctx, from_id, y,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -969,13 +969,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -988,8 +988,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -1011,13 +1011,13 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, uint64_t* b,             \
-                                    unsigned int* o, ValTy* y, size_t* s,      \
+    static bool extract_reset_batch(unsigned from_id,             \
+                                    uint8_t* y, size_t* s,      \
                                     DataCommMode* data_mode) {                 \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned from_id, ValTy* y) {              \
+    static bool extract_reset_batch(unsigned from_id, uint8_t* y) {              \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -1030,8 +1030,8 @@ public:
       }                                                                        \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool reduce_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -1054,13 +1054,13 @@ public:
       return node.fieldname[vecIndex];                                         \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned, unsigned long long int*,         \
-                                    unsigned int*, ValTy*, size_t*,            \
+    static bool extract_reset_batch(unsigned,        \
+                                    uint8_t*, size_t*,            \
                                     DataCommMode*) {                           \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_reset_batch(unsigned, ValTy*) { return false; }        \
+    static bool extract_reset_batch(unsigned, uint8_t*) { return false; }        \
                                                                                \
     static bool reset_batch(size_t begin, size_t end) { return false; }        \
                                                                                \
@@ -1070,8 +1070,8 @@ public:
       return true;                                                             \
     }                                                                          \
                                                                                \
-    static bool reduce_batch(unsigned, unsigned long long int*, unsigned int*, \
-                             ValTy*, size_t, DataCommMode) {                   \
+    static bool reduce_batch(unsigned, \
+                             uint8_t*, size_t, DataCommMode) {                   \
       return false;                                                            \
     }                                                                          \
                                                                                \
@@ -1101,10 +1101,10 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint64_t* b, unsigned int* o,  \
-                              ValTy* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned from_id,  \
+                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, y, s,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -1112,7 +1112,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, ValTy* y) {                    \
+    static bool extract_batch(unsigned from_id, uint8_t* y) {                    \
       if (personality == GPU_CUDA) {                                           \
         batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, y);               \
         return true;                                                           \
@@ -1128,11 +1128,11 @@ public:
         node.fieldname = y;                                                    \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
-                                                 s, data_mode);                \
+        batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
+                                                 data_mode);                \
         return true;                                                           \
       }                                                                        \
       assert(personality == CPU);                                              \
@@ -1148,19 +1148,19 @@ public:
       return node.fieldname;                                                   \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint64_t* b, unsigned int* o,  \
-                              ValTy* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned from_id,  \
+                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, ValTy* y) { return false; }    \
+    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }    \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       node.fieldname = y;                                                      \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
   }
@@ -1187,12 +1187,12 @@ public:
       return node.fieldname[0];                                                \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned, unsigned long int*, unsigned int*,     \
-                              ValTy*, size_t*, DataCommMode*) {                \
+    static bool extract_batch(unsigned,     \
+                              uint8_t*, size_t*, DataCommMode*) {                \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned, ValTy*) { return false; }              \
+    static bool extract_batch(unsigned, uint8_t*) { return false; }              \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y,       \
                        unsigned vecIndex) {                                    \
@@ -1203,8 +1203,8 @@ public:
       GALOIS_DIE("Execution shouldn't get here; needs index arg\n");           \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned, unsigned long int*, unsigned int*,      \
-                             ValTy*, size_t, DataCommMode) {                   \
+    static bool setVal_batch(unsigned      \
+                             uint8_t*, DataCommMode) {                   \
       return false;                                                            \
     }                                                                          \
   }
@@ -1226,10 +1226,10 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint64_t* b, unsigned int* o,  \
-                              ValTy* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned from_id,  \
+                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
       if (personality == GPU_CUDA) {                                           \
-        batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y, s,       \
+        batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, y, s,       \
                                           data_mode);                          \
         return true;                                                           \
       }                                                                        \
@@ -1237,7 +1237,7 @@ public:
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, ValTy* y) {                    \
+    static bool extract_batch(unsigned from_id, uint8_t* y) {                    \
       if (personality == GPU_CUDA) {                                           \
         batch_get_node_##fieldname##_cuda(cuda_ctx, from_id, y);               \
         return true;                                                           \
@@ -1253,11 +1253,11 @@ public:
         fieldname[node_id] = y;                                                \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       if (personality == GPU_CUDA) {                                           \
-        batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, b, o, y,   \
-                                                 s, data_mode);                \
+        batch_set_mirror_node_##fieldname##_cuda(cuda_ctx, from_id, y,   \
+                                                 data_mode);                \
         return true;                                                           \
       }                                                                        \
       assert(personality == CPU);                                              \
@@ -1273,19 +1273,19 @@ public:
       return fieldname[node_id];                                               \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, uint64_t* b, unsigned int* o,  \
-                              ValTy* y, size_t* s, DataCommMode* data_mode) {  \
+    static bool extract_batch(unsigned from_id,  \
+                              uint8_t* y, size_t* s, DataCommMode* data_mode) {  \
       return false;                                                            \
     }                                                                          \
                                                                                \
-    static bool extract_batch(unsigned from_id, ValTy* y) { return false; }    \
+    static bool extract_batch(unsigned from_id, uint8_t* y) { return false; }    \
                                                                                \
     static void setVal(uint32_t node_id, struct NodeData& node, ValTy y) {     \
       fieldname[node_id] = y;                                                  \
     }                                                                          \
                                                                                \
-    static bool setVal_batch(unsigned from_id, uint64_t* b, unsigned int* o,   \
-                             ValTy* y, size_t s, DataCommMode data_mode) {     \
+    static bool setVal_batch(unsigned from_id,   \
+                             uint8_t* y, DataCommMode data_mode) {     \
       return false;                                                            \
     }                                                                          \
   }

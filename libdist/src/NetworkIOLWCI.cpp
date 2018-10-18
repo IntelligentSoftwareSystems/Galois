@@ -38,6 +38,8 @@
 #include "ittnotify.h"
 #endif
 
+using vTy = galois::PODResizeableArray<uint8_t>;
+
 // forward declaration
 class NetworkIOLWCI;
 //! Pointer to LCI channel
@@ -50,11 +52,11 @@ struct mpiMessage {
   lc_ctx ctx;
   uint32_t rank;
   uint32_t tag;
-  std::vector<uint8_t> buf;
+  vTy buf;
 
   mpiMessage() {}
 
-  mpiMessage(uint32_t r, uint32_t t, std::vector<uint8_t>& b)
+  mpiMessage(uint32_t r, uint32_t t, vTy& b)
       : rank(r), tag(t), buf(std::move(b)){};
 };
 
@@ -161,7 +163,7 @@ public:
         lc_progress(mv);
       }
     }
-    return message{~0U, 0, std::vector<uint8_t>()};
+    return message{~0U, 0, vTy()};
   }
 
   virtual void progress() {

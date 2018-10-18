@@ -58,7 +58,8 @@ class SerializeBuffer {
   friend DeSerializeBuffer;
 
   //! type of data buffer
-  using vTy = std::vector<uint8_t>;
+  //using vTy = std::vector<uint8_t>;
+  using vTy = galois::PODResizeableArray<uint8_t>;
   //! the actual data stored in this buffer
   vTy bufdata;
 
@@ -97,6 +98,10 @@ public:
     size_t retval = bufdata.size();
     bufdata.resize(retval + bytes);
     return retval;
+  }
+
+  void resize(size_t bytes) {
+    bufdata.resize(bytes);
   }
 
   /**
@@ -144,8 +149,11 @@ public:
 class DeSerializeBuffer {
   //! Access to serialize buffer
   friend SerializeBuffer;
+  //! type of data buffer
+  //using vTy = std::vector<uint8_t>;
+  using vTy = galois::PODResizeableArray<uint8_t>;
   //! the actual data stored in this buffer
-  std::vector<uint8_t> bufdata;
+  vTy bufdata;
   int offset;
 
 public:
@@ -156,12 +164,12 @@ public:
   //! Move constructor
   //! @param v vector to act as deserialize buffer
   //! @param start offset to start saving data into
-  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0)
+  DeSerializeBuffer(vTy&& v, uint32_t start = 0)
       : bufdata(std::move(v)), offset(start) {}
 
   //! Constructor that takes an existing vector to use as the deserialize
   //! buffer
-  explicit DeSerializeBuffer(std::vector<uint8_t>& data) {
+  explicit DeSerializeBuffer(vTy& data) {
     bufdata.swap(data);
     offset = 0;
   }
@@ -235,7 +243,7 @@ public:
 
   //! Get the underlying vector storing the data of the deserialize
   //! buffer
-  std::vector<uint8_t>& getVec() { return bufdata; }
+  vTy& getVec() { return bufdata; }
 
   //! Get a pointer to the underlying data of the deserialize buffer
   void* linearData() { return &bufdata[0]; }

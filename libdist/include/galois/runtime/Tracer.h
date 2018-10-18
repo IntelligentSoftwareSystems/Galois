@@ -26,6 +26,7 @@
 #define GALOIS_RUNTIME_TRACER_H
 
 #include "galois/substrate/EnvCheck.h"
+#include "galois/PODResizeableArray.h"
 
 #include <sstream>
 #include <functional>
@@ -77,12 +78,12 @@ static inline void traceFormatImpl(std::ostringstream& os, const char* format,
 /**
  * Class to print a vector.
  */
-template <typename T, typename A>
+template <typename T>
 class vecPrinter {
-  const std::vector<T, A>& v;
+  const galois::PODResizeableArray<T>& v;
 
 public:
-  vecPrinter(const std::vector<T, A>& _v) : v(_v) {}
+  vecPrinter(const galois::PODResizeableArray<T>& _v) : v(_v) {}
   void print(std::ostream& os) const {
     os << "< " << v.size() << " : ";
     for (auto& i : v)
@@ -95,7 +96,7 @@ public:
  * Operator to print a vector given a vecPrinter object
  */
 template <typename T, typename A>
-std::ostream& operator<<(std::ostream& os, const vecPrinter<T, A>& vp) {
+std::ostream& operator<<(std::ostream& os, const vecPrinter<T>& vp) {
   vp.print(os);
   return os;
 }
@@ -119,9 +120,9 @@ extern bool initTrace;
  * Given a vector, returns a vector printer object that is able
  * to print the vector out onto an output stream.
  */
-template <typename T, typename A>
-internal::vecPrinter<T, A> printVec(const std::vector<T, A>& v) {
-  return internal::vecPrinter<T, A>(v);
+template <typename T>
+internal::vecPrinter<T> printVec(const galois::PODResizeableArray<T>& v) {
+  return internal::vecPrinter<T>(v);
 };
 
 /**
