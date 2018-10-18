@@ -20,7 +20,9 @@
 #ifndef _PRBCTREE_
 #define _PRBCTREE_
 #include <boost/container/flat_map.hpp>
-#include <boost/dynamic_bitset.hpp>
+// #include "bitset_with_indicator.hh"
+#include "galois/DynamicBitset.h"
+
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
 
 /**
@@ -29,214 +31,8 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
  */
 class PRBCTree {
 
-  template <typename Block, typename Allocator>
-  class bitset_with_index_indicator : public boost::dynamic_bitset<Block, Allocator> {
-      // To match the type of npos (unsighed long by default)
-      // typedef typename std::remove_const<decltype(boost::dynamic_bitset<Block, Allocator>::npos)>::type size_type;
-      typedef std::size_t size_type;
-
-      //! indicate the index of bit to process
-      size_type indicator;
-
-      //! vector which is not directly accessable by boost definition
-      std::vector<galois::CopyableAtomic<Block>> m_bits;
-
-      //! reverse method flag (default false)
-      bool reverse_mode;
-
-      /**
-       * To update the vector.
-       */
-      void update_vector() {
-          if (!m_bits.empty()) m_bits.clear();
-          /**
-           * template <typename Block, typename Alloc, typename BlockOutputIterator>
-           * void to_block_range(const dynamic_bitset<Block, Alloc>& b, BlockOutputIterator result)
-           *
-           * Effects:
-           * Writes the bits of the bitset into the iterator result a block at a time.
-           * The first block written represents the bits in the position range [0,bits_per_block) in the bitset,
-           * the second block written the bits in the range [bits_per_block,2*bits_per_block), and so on.
-           * For each block bval written, the bit (bval >> i) & 1 corresponds to the bit at position (b * bits_per_block + i) in the bitset.
-           * 
-           * Requires:
-           * The type BlockOutputIterator must be a model of Output Iterator and its value_type must be the same type as Block.
-           * Further, the size of the output range must be greater or equal b.num_blocks().
-           */
-          boost::to_block_range(*this, std::back_inserter(m_bits));
-      }
-
-      size_type reverse(size_type i) {
-          return i < this->size()? this->size() - 1 - i : this->npos;
-      }
-  public:
-      /* Constructor */
-      bitset_with_index_indicator(uint32_t n = numSourcesPerRound) : boost::dynamic_bitset<Block, Allocator>(n) {
-        this->reset();
-        /**
-         * dynamic_bitset::npos
-         *
-         * The maximum value of size_type.
-         */
-        indicator = this->npos;
-        reverse_mode = false;
-      }
-
-      /**
-       * Accessors (get/set) for indicator.
-       */
-      size_type getIndicator() const { return indicator; }
-      void setIndicator(size_type index) { indicator = index; }
-      
-      /**
-       * Set a bit with the side-effect updating indicator to the first.
-       */
-      void set_indicator(size_type index) {
-          if (reverse_mode) {
-              this->set(reverse(index));
-              if (index < indicator)
-                indicator = reverse(index);
-          }
-          else {
-              this->set(index);
-              if (index < indicator)
-                  indicator = index;
-          }
-      }
-
-      void test_set_indicator(size_type index, bool val=true) {
-          /**
-           * bool boost::dynamic_bitset::test_set(size_type n, bool val = true)
-           * 
-           * Precondition: n < size().
-           * 
-           * Effects: Sets bit n if val is true, and clears bit n if val is false. 
-           * 
-           * Returns: true if the previous state of bit n was set and false if bit n is 0.
-           */
-          if (reverse_mode) {
-            if (this->test_set(reverse(index), val))
-                if (reverse(index) == indicator)
-                    forward_indicator();
-          }
-          else {
-            if (this->test_set(index, val))
-              if (index == indicator)
-                  forward_indicator();
-          }
-      }
-
-      /**
-       * Return true if indicator is npos
-       */
-      bool nposInd() {
-          return indicator == this->npos;
-      }
-
-      /**
-       * size_type boost::dynamic_bitset::find_first() const;
-       *
-       * Returns: the lowest index i such as bit i is set, or npos if *this has no on bits.
-       */
-
-      /**
-       * size_type boost::dynamic_bitset::find_next(size_type pos) const;
-       *
-       * Returns: the lowest index i greater than pos such as bit i is set, or npos if no such index exists.
-       */
-
-      /**
-       * Similar to find_next().
-       */
-      size_type find_prev(size_type pos) {
-
-          // Return npos if no bit set
-          if (pos == 0)
-              return this->npos;
-
-          // Normalize pos in case of npos
-          pos = (pos >= this->size()? this->size() : pos);
-          --pos; // Find from the previous bit
-
-          auto curBlock = pos < this->bits_per_block? 0 : pos / this->bits_per_block;
-          auto curOffset = pos < this->bits_per_block? pos : pos % this->bits_per_block;
-
-          if(reverse_mode) update_vector();
-
-          // Scan within current Block
-          auto curSeg = m_bits[curBlock] & ((2 << curOffset) - 1);
-          if (curSeg) {
-              pos -= curOffset;
-              if (curSeg == 1)
-                  return pos;
-              return pos + boost::integer_log2<size_type>(curSeg);
-          }
-          else {
-              pos -= curOffset;
-              if (pos == 0)
-                  return this->npos;
-          }
-
-          // Jump over zero blocks
-          for (curBlock--, curOffset = this->bits_per_block - 1;
-                  m_bits[curBlock] == 0 && curBlock > 0;
-                  curBlock--, pos -= this->bits_per_block);
-
-          // Scan the last block (if non-zero)
-          if (m_bits[curBlock]) {
-              pos -= this->bits_per_block;
-              if (m_bits[curBlock] == 1)
-                  return pos;
-              return pos + boost::integer_log2<size_type>(m_bits[curBlock]);
-          }
-          return this->npos;
-      }
-
-      /**
-       * Similar to find_first().
-       */
-      size_type find_last(size_type last_block) {
-          return find_prev(this->size());
-      }
-
-      /**
-       * To move indicator to the next set bit.
-       */
-      size_type backward_indicator() {
-          if (this->size() == 0)
-              return this->npos;
-          size_type old = indicator;
-          if (reverse_mode)
-              indicator = 
-                reverse(indicator == this->npos? 
-                this->find_first() : this->find_next(reverse(indicator)));
-          else {
-              if (indicator == this->npos) update_vector();
-              indicator = this->find_prev(indicator);
-          }
-          return old;
-      }
-
-      /**
-       * To move indicator to the previous set bit, and return the old value.
-       */
-      size_type forward_indicator() {
-          if (this->size() == 0)
-              return this->npos;
-          size_type old = indicator;
-          if (reverse_mode) {
-              if (indicator == this->npos) update_vector();
-              indicator = reverse(this->find_prev(reverse(indicator)));
-          }
-          else
-              indicator = 
-                indicator == this->npos? 
-                this->find_first() : this->find_next(indicator);
-          return old;
-      }
-  };
-
-  using BitSet = bitset_with_index_indicator<uint32_t, galois::gstl::Pow2Alloc<uint32_t>>;
+  // using BitSet = bitset_with_indicator<uint32_t>;
+  using BitSet = galois::DynamicBitSet;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
                                               galois::gstl::Pow2Alloc<std::pair<uint32_t, BitSet>>>;
@@ -277,7 +73,11 @@ public:
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
+    if (distanceTree[newDistance].size() != numSourcesPerRound) {
+      distanceTree[newDistance].resize(numSourcesPerRound);
+    }
     distanceTree[newDistance].set_indicator(index);
+
     numNonInfinity++;
   }
 
@@ -302,7 +102,11 @@ public:
       numNonInfinity++;
     }
 
-    distanceTree[newDistance].set_indicator(index); // Set & Update
+    if (distanceTree[newDistance].size() != numSourcesPerRound) {
+      distanceTree[newDistance].resize(numSourcesPerRound);
+    }
+    distanceTree[newDistance].set_indicator(index);
+
   }
 
   /**
@@ -392,7 +196,7 @@ public:
     if (curKey == endCurKey) {
       assert(numSentSources == 0);
     }
-    
+
     return indexToReturn;
   }
 

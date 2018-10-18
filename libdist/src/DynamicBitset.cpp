@@ -116,7 +116,7 @@ void DynamicBitSet::set(size_t index) {
   }
 }
 
-#if 0
+#if 0 || defined(_PR_BC_OPT_V3_)
 void DynamicBitSet::reset(size_t index) {
   size_t bit_index = index/bits_uint64;
   uint64_t bit_offset = 1;

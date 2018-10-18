@@ -33,6 +33,10 @@
 #include <vector>
 #include <assert.h>
 
+#ifdef _PR_BC_OPT_V3_
+#include <boost/random/detail/integer_log2.hpp>
+#endif
+
 namespace galois {
 /**
  * Concurrent dynamically allocated bitset
@@ -42,9 +46,25 @@ class DynamicBitSet {
   size_t num_bits;
   static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
 
+#ifdef _PR_BC_OPT_V3_
+  //! indicate the index of bit to process
+  size_t indicator;
+  //! reverse order to set
+  // bool reverse_mode;
+
+  // Member functions
+  size_t block_index(size_t pos) const { return pos < bits_uint64? 0 : pos / bits_uint64; }
+  size_t bit_index(size_t pos) const { return pos < bits_uint64? pos : pos % bits_uint64; }
+  uint64_t bit_mask(size_t pos) const { return uint64_t(1) << bit_index(pos); }
+#endif
+
 public:
   //! Constructor which initializes to an empty bitset.
-  DynamicBitSet() : num_bits(0) {}
+  DynamicBitSet() : num_bits(0) {
+  #ifdef _PR_BC_OPT_V3_
+    indicator = npos;
+  #endif
+  }
 
   /**
    * Returns the underlying bitset representation to the user
@@ -127,7 +147,7 @@ public:
    */
   void set(size_t index);
 
-#if 0
+#if 0 || defined(_PR_BC_OPT_V3_)
     void reset(size_t index);
 #endif
 
@@ -152,6 +172,174 @@ public:
 
   //! this is defined to
   using tt_is_copyable = int;
+
+#ifdef _PR_BC_OPT_V3_
+  //! not found
+  static const size_t npos = std::numeric_limits<size_t>::max();
+
+  // Accessors
+  size_t getIndicator() const { return indicator; }
+  void setIndicator(size_t index) { indicator = index; }
+
+  /**
+   * Test and then set
+   *
+   * @returns test result before set
+   */
+  bool test_set(size_t pos, bool val=true) {
+    bool const ret = test(pos);
+    if (ret != val) {
+      uint64_t old_val = bitvec[block_index(pos)];
+      if (val) {
+        while (!bitvec[block_index(pos)].compare_exchange_weak(
+          old_val, (old_val | bit_mask(pos)), 
+          std::memory_order_relaxed));
+      }
+      else {
+        while (!bitvec[block_index(pos)].compare_exchange_weak(
+          old_val, (old_val & ~bit_mask(pos)), 
+          std::memory_order_relaxed));
+      }
+    }
+    return ret;
+  }
+
+  bool none() {
+    for (size_t i = 0; i < bitvec.size(); ++i)
+      if (bitvec[i])
+        return false;
+    return true;
+  }
+    
+  /**
+   * Set a bit with the side-effect updating indicator to the first.
+   */
+  void set_indicator(size_t pos) {
+    // if (reverse_mode)
+    //   set(reverse(pos));
+    // else
+      set(pos);
+    if (pos < indicator) {
+      indicator = pos;
+    }
+  }
+
+  void test_set_indicator(size_t pos, bool val=true) {
+    // if (reverse_mode) {
+    //   if (test_set(reverse(pos), val)) {
+    //     if (pos == indicator) {
+    //       forward_indicator();
+    //     }
+    //   }
+    // }
+    // else {
+      if (test_set(pos, val)) {
+        if (pos == indicator) {
+          forward_indicator();
+        }
+      }
+    // }
+  }
+
+  /**
+   * Return true if indicator is npos
+   */
+  bool nposInd() {
+    return indicator == npos;
+  }
+
+  size_t right_most_bit(uint64_t w) const {
+    // assert(w >= 1);
+    return boost::integer_log2<uint64_t>(w & -w);
+  }
+
+  size_t left_most_bit(uint64_t w) const {
+      return boost::integer_log2<uint64_t>(w);
+  }
+
+size_t find_from_block(size_t first, bool fore=true) const {
+  size_t i;
+  if (fore) {
+    for (i = first; i < bitvec.size() && bitvec[i] == 0; i++);
+    if (i >= bitvec.size())
+        return npos;
+    return i * bits_uint64 + right_most_bit(bitvec[i]);
+  }
+  else {
+    for (i = first; i > 0 && bitvec[i] == 0; i--);
+    if (i <= 0 && bitvec[i] == 0)
+      return npos;
+    return i * bits_uint64 + left_most_bit(bitvec[i]);
+  }
+}
+
+/**
+ * Returns: the lowest index i such as bit i is set, or npos if *this has no on bits.
+ */
+size_t find_first() const {
+  return find_from_block(0);
+}
+
+size_t find_last() const {
+  return find_from_block(bitvec.size() - 1, false);
+}
+
+/**
+ * Returns: the lowest index i greater than pos such as bit i is set, or npos if no such index exists.
+ */
+size_t find_next(size_t pos) const {
+  if (pos == npos) {
+    return find_first();
+  }
+  if (++pos >= size() || size() == 0) {
+    return npos;
+  }
+  size_t curBlock = block_index(pos);
+  uint64_t res = bitvec[curBlock] >> bit_index(pos);
+  return res?
+    pos + right_most_bit(res) : find_from_block(++curBlock);
+}
+
+size_t find_prev(size_t pos) const{
+  if (pos >= size()) {
+    return find_last();
+  }
+  // Return npos if no bit set
+  if (pos-- == 0 || size() == 0) {
+    return npos;
+  }
+  size_t curBlock = block_index(pos);
+  uint64_t res = bitvec[curBlock] & ((uint64_t(2) << bit_index(pos)) - 1);
+  return res?
+    curBlock * bits_uint64 + left_most_bit(res) : 
+    (curBlock?
+      find_from_block(--curBlock, false) : npos);
+}
+
+/**
+ * To move indicator to the previous set bit, and return the old value.
+ */
+size_t forward_indicator() {
+  size_t old = indicator;
+  // if (reverse_mode)
+  //   indicator = reverse(find_prev(reverse(indicator)));
+  // else
+    indicator = find_next(indicator);
+  return old;
+}
+
+/**
+ * To move indicator to the next set bit.
+ */
+size_t backward_indicator() {
+  size_t old = indicator;
+  // if (reverse_mode)
+  //   indicator = reverse(find_next(reverse(indicator)));
+  // else
+    indicator = find_prev(indicator);
+  return old;
+}
+#endif
 };
 
 //! An empty bitset object; used mainly by InvalidBitsetFnTy

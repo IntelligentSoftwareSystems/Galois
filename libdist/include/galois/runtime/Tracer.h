@@ -48,7 +48,7 @@ static inline void traceImpl(std::ostringstream& os) { os << "\n"; }
 template <typename T, typename... Args>
 static inline void traceImpl(std::ostringstream& os, T&& value,
                              Args&&... args) {
-  os << value << " ";
+  // os << value << " ";
   traceImpl(os, std::forward<Args>(args)...);
 }
 

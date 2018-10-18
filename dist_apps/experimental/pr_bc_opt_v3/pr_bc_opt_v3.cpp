@@ -16,6 +16,12 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
+
+// Definition for special addition to DynamicBitset.h
+#ifndef _PR_BC_OPT_V3_
+#define _PR_BC_OPT_V3_
+#endif
+
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
@@ -56,7 +62,6 @@ static cll::opt<unsigned int> vectorSize("vectorSize",
                                 cll::desc("DEBUG: Specify size of vector "
                                                         "used for node data"),
                                 cll::init(0), cll::Hidden);
-
 // moved here so PRBCTree has access to numSourcesPerRound
 #include "PRBCTree.h"
 
