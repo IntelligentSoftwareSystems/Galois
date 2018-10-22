@@ -150,6 +150,9 @@ public:
 
     if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
+      #ifdef FLIP_MODE
+        curSet.flip();
+      #endif
       curSet.backward_indicator();
     }
 
@@ -188,6 +191,9 @@ public:
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
           BitSet& nextSet = curKey->second;
+          #ifdef FLIP_MODE
+            nextSet.flip();
+          #endif
           nextSet.backward_indicator();
         }
       }

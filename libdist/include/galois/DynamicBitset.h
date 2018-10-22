@@ -34,7 +34,15 @@
 #include <assert.h>
 
 #ifdef _PR_BC_OPT_V3_
+
 #include <boost/random/detail/integer_log2.hpp>
+
+/**
+ * Optimized mode: enable ONLY ONE of them at most
+ */
+// #define REVERSE_MODE
+#define FLIP_MODE
+
 #endif
 
 namespace galois {
@@ -49,13 +57,36 @@ class DynamicBitSet {
 #ifdef _PR_BC_OPT_V3_
   //! indicate the index of bit to process
   size_t indicator;
-  //! reverse order to set
-  // bool reverse_mode;
 
   // Member functions
   size_t block_index(size_t pos) const { return pos < bits_uint64? 0 : pos / bits_uint64; }
   size_t bit_index(size_t pos) const { return pos < bits_uint64? pos : pos % bits_uint64; }
   uint64_t bit_mask(size_t pos) const { return uint64_t(1) << bit_index(pos); }
+
+  #if defined(REVERSE_MODE) || defined(FLIP_MODE)
+    size_t reverse(size_t pos) {
+      return pos == npos? npos : num_bits - pos - 1;
+    }
+  #endif
+
+  #ifdef FLIP_MODE
+    void flip_recursive(size_t pos) {
+      size_t next = find_next(pos);
+      if (next != npos)
+        flip_recursive(next);
+      // do the flip for pos
+      uint64_t block = block_index(pos), mask = bit_mask(pos);
+      uint64_t rBlock = block_index(reverse(pos)), rMask = bit_mask(reverse(pos));
+      // flip if asymmetrical
+      if (!(bitvec[rBlock] & rMask)) {
+        bitvec[block].fetch_and(~mask);
+        size_t r_old = bitvec[rBlock];
+        while (!bitvec[rBlock].compare_exchange_weak(
+          r_old, r_old | rMask, std::memory_order_relaxed));
+      }
+    }
+  #endif
+
 #endif
 
 public:
@@ -177,6 +208,14 @@ public:
   //! not found
   static const size_t npos = std::numeric_limits<size_t>::max();
 
+  #ifdef FLIP_MODE
+    void flip() {
+      size_t first = find_first();
+      if (first != npos)
+        flip_recursive(first);
+    }
+  #endif
+
   // Accessors
   size_t getIndicator() const { return indicator; }
   void setIndicator(size_t index) { indicator = index; }
@@ -215,30 +254,30 @@ public:
    * Set a bit with the side-effect updating indicator to the first.
    */
   void set_indicator(size_t pos) {
-    // if (reverse_mode)
-    //   set(reverse(pos));
-    // else
+    #ifdef REVERSE_MODE
+      set(reverse(pos));
+    #else
       set(pos);
+    #endif
     if (pos < indicator) {
       indicator = pos;
     }
   }
 
   void test_set_indicator(size_t pos, bool val=true) {
-    // if (reverse_mode) {
-    //   if (test_set(reverse(pos), val)) {
-    //     if (pos == indicator) {
-    //       forward_indicator();
-    //     }
-    //   }
-    // }
-    // else {
+    #ifdef REVERSE_MODE
+      if (test_set(reverse(pos), val)) {
+        if (pos == indicator) {
+          forward_indicator();
+        }
+      }
+    #else
       if (test_set(pos, val)) {
         if (pos == indicator) {
           forward_indicator();
         }
       }
-    // }
+    #endif
   }
 
   /**
@@ -321,10 +360,11 @@ size_t find_prev(size_t pos) const{
  */
 size_t forward_indicator() {
   size_t old = indicator;
-  // if (reverse_mode)
-  //   indicator = reverse(find_prev(reverse(indicator)));
-  // else
+  #ifdef REVERSE_MODE
+    indicator = reverse(find_prev(reverse(indicator)));
+  #else
     indicator = find_next(indicator);
+  #endif
   return old;
 }
 
@@ -333,11 +373,17 @@ size_t forward_indicator() {
  */
 size_t backward_indicator() {
   size_t old = indicator;
-  // if (reverse_mode)
-  //   indicator = reverse(find_next(reverse(indicator)));
-  // else
+  #ifdef FLIP_MODE
+    indicator = nposInd()? find_first() : find_next(indicator);
+    return reverse(old);
+  #else
+    #ifdef REVERSE_MODE
+    indicator = reverse(find_next(reverse(indicator)));
+    #else
     indicator = find_prev(indicator);
-  return old;
+    #endif
+    return old;
+  #endif
 }
 #endif
 };
