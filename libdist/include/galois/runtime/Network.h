@@ -193,6 +193,12 @@ extern uint32_t evilPhase;
 //! Get the network interface
 //! @returns network interface
 NetworkInterface& getSystemNetworkInterface();
+
+namespace internal {
+  //! Deletes the system network interface (if it exists).
+  void destroySystemNetworkInterface();
+}
+
 //! Gets this host's ID
 //! @returns ID of this host
 uint32_t getHostID();
