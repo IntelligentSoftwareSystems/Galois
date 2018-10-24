@@ -86,9 +86,9 @@ public:
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
-    if (oldDistance == newDistance) {
-      return;
-    }
+    // if (oldDistance == newDistance) {
+    //   return;
+    // }
 
     auto setIter = distanceTree.find(oldDistance);
     // if it exists, remove it
@@ -121,10 +121,10 @@ public:
       BitSet& setToCheck = setIter->second;
       auto index = setToCheck.getIndicator();
       if (index != setToCheck.npos) {
-          indexToSend = index;
-          setToCheck.forward_indicator();
-        }
+        indexToSend = index;
+        setToCheck.forward_indicator();
       }
+    }
     return indexToSend;
   }
 
@@ -168,22 +168,22 @@ public:
 
     while (curKey != endCurKey) {
       uint32_t distance = curKey->first;
+      if ((distance + numSentSources - 1) != (lastRound - roundNumber)){
+        // round to send not reached yet; get out
+        return infinity;
+      }
+
       if (distance == 0) {
         zeroReached = true;
-        return indexToReturn;
+        return infinity;
       }
 
       BitSet& curSet = curKey->second;
       if (!curSet.nposInd()) {
-        if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
           // this number should be sent out this round
           indexToReturn = curSet.backward_indicator();
           numSentSources--;
           break;
-        } else {
-          // round to send not reached yet; get out
-          break;
-        }
       } else {
         // set exhausted; go onto next set
         for (curKey++; curKey != endCurKey && curKey->second.none(); curKey++);
