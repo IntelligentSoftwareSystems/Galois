@@ -21,13 +21,17 @@
 #ifndef _PR_BC_OPT_V3_
 #define _PR_BC_OPT_V3_
 #endif
-
-#include "galois/DistGalois.h"
-#include "galois/DReducible.h"
-#include "galois/runtime/Tracer.h"
-#include "DistBenchStart.h"
+constexpr static const char* const REGION_NAME = "PR_BC";
 
 #include <iostream>
+
+#include "galois/DistGalois.h"
+#include "DistBenchStart.h"
+#include "galois/DReducible.h"
+#include "galois/runtime/Tracer.h"
+
+// type of short path
+using ShortPathType = double;
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -35,38 +39,40 @@
 namespace cll = llvm::cl;
 
 static cll::opt<std::string> sourcesToUse("sourcesToUse",
-                                cll::desc("Sources to use in BC"),
-                                cll::init(""));
-static cll::opt<unsigned int> numSourcesPerRound("numRoundSources",
-                                cll::desc("Number of sources to use for APSP"),
-                                cll::init(1));
-static cll::opt<unsigned int> totalNumSources("numOfSources",
-                                cll::desc("Total number of sources to do BC"),
-                                cll::init(0));
+                                          cll::desc("Sources to use in BC"),
+                                          cll::init(""));
+static cll::opt<unsigned int>
+    numSourcesPerRound("numRoundSources",
+                       cll::desc("Number of sources to use for APSP"),
+                       cll::init(1));
+static cll::opt<unsigned int>
+    totalNumSources("numOfSources",
+                    cll::desc("Total number of sources to do BC"),
+                    cll::init(0));
 static cll::opt<bool> useSingleSource("singleSource",
-                                cll::desc("Use a single source."),
-                                cll::init(false));
-static cll::opt<unsigned long long> startNode("startNode", 
-                                cll::desc("Single source start node."),
-                                cll::init(0));
-static cll::opt<unsigned int> vIndex("index",
-                                cll::desc("DEBUG: Index to print for "
-                                                          "dist/short paths"),
-                                cll::init(0), cll::Hidden);
+                                      cll::desc("Use a single source."),
+                                      cll::init(false));
+static cll::opt<unsigned long long>
+    startNode("startNode", cll::desc("Single source start node."),
+              cll::init(0));
+static cll::opt<unsigned int>
+    vIndex("index",
+           cll::desc("DEBUG: Index to print for dist/short "
+                     "paths"),
+           cll::init(0), cll::Hidden);
 // debug vars
 static cll::opt<bool> outputDistPaths("outputDistPaths",
-                                cll::desc("DEBUG: Output min distance"
+                                      cll::desc("DEBUG: Output min distance"
                                                 "/short path counts instead"),
-                                cll::init(false), cll::Hidden);
-static cll::opt<unsigned int> vectorSize("vectorSize",
-                                cll::desc("DEBUG: Specify size of vector "
-                                                        "used for node data"),
-                                cll::init(0), cll::Hidden);
+                                      cll::init(false), cll::Hidden);
+static cll::opt<unsigned int>
+    vectorSize("vectorSize",
+               cll::desc("DEBUG: Specify size of vector "
+                         "used for node data"),
+               cll::init(0), cll::Hidden);
+
 // moved here so PRBCTree has access to numSourcesPerRound
 #include "PRBCTree.h"
-
-// type of short path
-using ShortPathType = double;
 
 /******************************************************************************/
 /* Graph structure declarations */
@@ -76,43 +82,33 @@ using ShortPathType = double;
 // need to be changed for very large graphs
 struct NodeData {
   // current min distances for each source
-  galois::gstl::Vector<uint32_t>                      minDistances;
+  galois::gstl::Vector<uint32_t> minDistances;
   // actual shortest path number
-  galois::gstl::Vector<ShortPathType>                 shortestPathNumbers;
+  galois::gstl::Vector<ShortPathType> shortestPathNumbers;
+  // index that needs to be pulled in a round
+  uint32_t roundIndexToSend;
   // dependency values
   galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyValues;
-  // distance map
-  PRBCTree dTree;  
   // final bc value
   float bc;
 
-  // index that needs to be pulled in a round
-  uint32_t roundIndexToSend;
+  PRBCTree dTree;
 };
-
-using Graph = galois::graphs::DistGraph<NodeData, void>;
-using GNode = typename Graph::GraphNode;
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a
 // particular field
 galois::DynamicBitSet bitset_minDistances;
 galois::DynamicBitSet bitset_dependency;
 
-// moved here for access to ShortPathType, NodeData, DynamicBitSets
+using Graph = galois::graphs::DistGraph<NodeData, void>;
+using GNode = typename Graph::GraphNode;
+
 #include "pr_bc_opt_sync.hh"
-
-
-constexpr static const char* const REGION_NAME = "PR_BC";
-constexpr static const char* const name = "Pontecorvi-Ramachandran Betweeness "
-                                          "Centrality";
-constexpr static const char* const desc = "Pontecorvi-Ramachandran Betweeness "
-                                          "Centrality on Distributed Galois.";
-constexpr static const char* const url = 0;
-uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 
 /******************************************************************************/
 /* Functions for running the algorithm */
 /******************************************************************************/
+uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 
 /**
  * Graph initialization. Initialize all of the node data fields.
