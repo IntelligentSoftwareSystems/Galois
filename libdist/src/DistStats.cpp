@@ -45,6 +45,9 @@ inline static DistStatManager* dsm(void) {
 
 DistStatManager::DistStatManager(const std::string& outfile)
     : StatManager(outfile) {}
+DistStatManager::~DistStatManager() {
+  galois::runtime::internal::destroySystemNetworkInterface();
+}
 
 class galois::runtime::StatRecvHelper {
 
