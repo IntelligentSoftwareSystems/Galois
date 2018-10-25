@@ -266,6 +266,7 @@ virtual void printStats(std::ostream& out);
 public:
 //! Dist stat manager constructor
 DistStatManager(const std::string& outfile = "");
+~DistStatManager();
 
 /**
  * Adds a statistic to the statistics manager.
