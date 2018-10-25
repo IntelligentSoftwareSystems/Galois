@@ -91,14 +91,16 @@ public:
     // }
 
     auto setIter = distanceTree.find(oldDistance);
+    bool found = 0;
+
     // if it exists, remove it
     if (setIter != distanceTree.end()) {
       BitSet& setToChange = setIter->second;
-      setToChange.test_set_indicator(index, false); // Test, set, update
+      found = setToChange.test_set_indicator(index, false); // Test, set, update
     }
 
     // if it didn't exist before, add to number of non-infinity nodes
-    if (oldDistance == infinity) {
+    if (found == 0) {
       numNonInfinity++;
     }
 
