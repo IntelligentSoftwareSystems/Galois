@@ -202,47 +202,47 @@ class DistStatManager : public galois::runtime::StatManager {
     using Base = internal::BasicStatMap<HostStat<T>>;
 
 #if __GNUC__ < 5
-    static const char* htotalName(const StatTotal::Type& type){
+    static const char* htotalName(const StatTotal::Type& type) {
 #else
     static constexpr const char* htotalName(const StatTotal::Type& type) {
 #endif
-        switch (type) {
-          case StatTotal::SINGLE : return "HOST_0";
-  case StatTotal::TSUM:
-    return "HSUM";
-  case StatTotal::TAVG:
-    return "HAVG";
-  case StatTotal::TMIN:
-    return "HMIN";
-  case StatTotal::TMAX:
-    return "HMAX";
-  default:
-    std::abort();
-    return nullptr;
-  }
-}
+      switch (type) {
+        case StatTotal::SINGLE : return "HOST_0";
+        case StatTotal::TSUM:
+          return "HSUM";
+        case StatTotal::TAVG:
+          return "HAVG";
+        case StatTotal::TMIN:
+          return "HMIN";
+        case StatTotal::TMAX:
+          return "HMAX";
+        default:
+          std::abort();
+          return nullptr;
+      }
+    }
 
     void print(std::ostream& out) const {
-  for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
-    out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID()
-        << SEP;
-    out << Base::region(i) << SEP << Base::category(i) << SEP;
+      for (auto i = Base::cbegin(), end_i = Base::cend(); i != end_i; ++i) {
+        out << StatManager::statKind<T>() << SEP << galois::runtime::getHostID()
+            << SEP;
+        out << Base::region(i) << SEP << Base::category(i) << SEP;
 
-    const HostStat<T>& hs = Base::stat(i);
+        const HostStat<T>& hs = Base::stat(i);
 
-    out << htotalName(hs.totalTy()) << SEP << hs.total();
-    out << std::endl;
+        out << htotalName(hs.totalTy()) << SEP << hs.total();
+        out << std::endl;
 
-    if (DistStatManager::printingHostVals()) {
-      hs.printHostVals(out, Base::region(i), Base::category(i));
+        if (DistStatManager::printingHostVals()) {
+          hs.printHostVals(out, Base::region(i), Base::category(i));
+        }
+
+        if (StatManager::printingThreadVals()) {
+          hs.printThreadVals(out, Base::region(i), Base::category(i));
+        }
+      }
     }
-
-    if (StatManager::printingThreadVals()) {
-      hs.printThreadVals(out, Base::region(i), Base::category(i));
-    }
-  }
-}
-}; // namespace runtime
+  }; // struct dist stat combiner
 
 DistStatCombiner<int64_t> intDistStats;
 DistStatCombiner<double> fpDistStats;
@@ -272,6 +272,7 @@ virtual void printStats(std::ostream& out);
 public:
 //! Dist stat manager constructor
 DistStatManager(const std::string& outfile = "");
+~DistStatManager();
 
 /**
  * Adds a statistic to the statistics manager.

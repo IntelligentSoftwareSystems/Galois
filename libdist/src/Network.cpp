@@ -121,3 +121,9 @@ void NetworkInterface::handleReceives() {
 NetworkInterface& galois::runtime::getSystemNetworkInterface() {
   return makeNetworkBuffered();
 }
+
+void galois::runtime::internal::destroySystemNetworkInterface() {
+  // get net interface, then delete it
+  NetworkInterface& netInterface = makeNetworkBuffered();
+  delete &netInterface;
+}
