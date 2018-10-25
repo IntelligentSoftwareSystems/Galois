@@ -21,6 +21,7 @@
 #include "writers/AigWriter.h"
 #include "subjectgraph/aig/Aig.h"
 #include "algorithms/CutManager.h"
+#include "algorithms/PriorityCutManager.h"
 #include "algorithms/NPNManager.h"
 #include "algorithms/RewriteManager.h"
 #include "algorithms/PreCompGraphManager.h"
@@ -35,6 +36,7 @@ using namespace std::chrono;
 void aigRewriting(aig::Aig& aig, std::string& fileName, int nThreads,
                   int verbose);
 void kcut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose);
+void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose);
 void rdCut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose);
 std::string getFileName(std::string path);
 
@@ -75,8 +77,7 @@ int main(int argc, char* argv[]) {
     std::cout << "|L|: " << aigParser.getL() << std::endl;
     std::cout << "|O|: " << aigParser.getO() << std::endl;
     std::cout << "|A|: " << aigParser.getA() << std::endl;
-    std::cout << "|E|: " << aigParser.getE() << " (outgoing edges)"
-              << std::endl;
+    std::cout << "|E|: " << aigParser.getE() << " (outgoing edges)" << std::endl;
   }
 
   // std::vector< int > levelHistogram = aigParser.getLevelHistogram();
@@ -85,9 +86,13 @@ int main(int argc, char* argv[]) {
   //	std::cout << i++ << ": " << value << std::endl;
   //}
 
-  aigRewriting(aig, fileName, nThreads, verbose);
+  // aigRewriting(aig, fileName, nThreads, verbose);
 
-  // kcut( aig, fileName, nThreads, verbose );
+  //kcut( aig, fileName, nThreads, verbose );
+
+	//aig.resetAllNodeCounters();
+  
+	prioritycut( aig, fileName, nThreads, verbose );
 
   // rdCut( aig, fileName, nThreads, verbose );
   
@@ -193,6 +198,47 @@ void kcut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose) {
 
   algorithm::CutManager cutMan(aig, K, C, numThreads, compTruth);
   algorithm::runKCutOperator(cutMan);
+
+  high_resolution_clock::time_point t2 = high_resolution_clock::now();
+  kcutTime = duration_cast<microseconds>(t2 - t1).count();
+
+  if (verbose == 0) {
+    std::cout << fileName << ";" << K << ";" << C << ";" << compTruth << ";"
+              << aig.getNumAnds() << ";" << aig.getDepth() << ";" << numThreads
+              << ";" << kcutTime << std::endl;
+  }
+
+  if (verbose >= 1) {
+    std::cout << "################ Results ################## " << std::endl;
+    //cutMan.printAllCuts();
+    // cutMan.printRuntimes();
+    cutMan.printCutStatistics();
+    std::cout << "Size: " << aig.getNumAnds() << std::endl;
+    std::cout << "Depth: " << aig.getDepth() << std::endl;
+    std::cout << "Runtime (us): " << kcutTime << std::endl;
+  }
+}
+
+void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose) {
+
+  int numThreads = galois::setActiveThreads(nThreads);
+
+  int K = 6, C = 20;
+  bool compTruth = false;
+
+  if (verbose == 1) {
+    std::cout << "############# Configurations ############## " << std::endl;
+    std::cout << "K: " << K << std::endl;
+    std::cout << "C: " << C << std::endl;
+    std::cout << "CompTruth: " << (compTruth ? "yes" : "no") << std::endl;
+    std::cout << "nThreads: " << numThreads << std::endl;
+  }
+
+  long double kcutTime                 = 0;
+  high_resolution_clock::time_point t1 = high_resolution_clock::now();
+
+  algorithm::PriCutManager cutMan(aig, K, C, numThreads, compTruth);
+  algorithm::runKPriCutOperator(cutMan);
 
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   kcutTime = duration_cast<microseconds>(t2 - t1).count();
