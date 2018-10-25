@@ -264,19 +264,25 @@ public:
     }
   }
 
-  void test_set_indicator(size_t pos, bool val=true) {
+  bool test_set_indicator(size_t pos, bool val=true) {
     #ifdef REVERSE_MODE
       if (test_set(reverse(pos), val)) {
         if (pos == indicator) {
           forward_indicator();
         }
+        return true;
       }
+      else
+        return false;
     #else
       if (test_set(pos, val)) {
         if (pos == indicator) {
           forward_indicator();
         }
+        return true;
       }
+      else
+        return false;
     #endif
   }
 
