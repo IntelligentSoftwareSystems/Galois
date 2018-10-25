@@ -51,7 +51,6 @@ bool StatManager::printingThreadVals(void) {
 void StatManager::print(void) {
   if (m_outfile == "") {
     printStats(std::cout);
-
   } else {
     std::ofstream outf(m_outfile.c_str());
     if (outf.good()) {
