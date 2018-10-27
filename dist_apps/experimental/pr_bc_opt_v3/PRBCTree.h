@@ -86,21 +86,20 @@ public:
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
-    // if (oldDistance == newDistance) {
-    //   return;
-    // }
+    if (oldDistance == newDistance) {
+      return;
+    }
 
     auto setIter = distanceTree.find(oldDistance);
-    bool found = 0;
-
+    bool existed = false;
     // if it exists, remove it
     if (setIter != distanceTree.end()) {
       BitSet& setToChange = setIter->second;
-      found = setToChange.test_set_indicator(index, false); // Test, set, update
+      existed = setToChange.test_set_indicator(index, false); // Test, set, update
     }
 
     // if it didn't exist before, add to number of non-infinity nodes
-    if (found == 0) {
+    if (!existed) {
       numNonInfinity++;
     }
 
@@ -124,7 +123,6 @@ public:
       auto index = setToCheck.getIndicator();
       if (index != setToCheck.npos) {
         indexToSend = index;
-        setToCheck.forward_indicator();
       }
     }
     return indexToSend;
@@ -135,7 +133,13 @@ public:
    * Note that a particular source's message has already been sent in the data
    * structure and increment the number of sent sources.
    */
-  void markSent(uint32_t index) { numSentSources++; }
+  void markSent(uint32_t roundNumber) {
+    uint32_t distanceToCheck = roundNumber - numSentSources;
+    BitSet& setToCheck = distanceTree[distanceToCheck];
+    setToCheck.forward_indicator();
+
+    numSentSources++;
+  }
 
   /**
    * Return true if potentially more work exists to be done
