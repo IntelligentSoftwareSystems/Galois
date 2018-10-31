@@ -21,7 +21,7 @@
 #define _PRBCTREE_
 #include <boost/container/flat_map.hpp>
 // #include "bitset_with_indicator.hh"
-#include "galois/DynamicBitset.h"
+#include "pr_bc_bitset.hh"
 
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
 
@@ -32,7 +32,7 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
 class PRBCTree {
 
   // using BitSet = bitset_with_indicator<uint32_t>;
-  using BitSet = galois::DynamicBitSet;
+  using BitSet = PRBCBitSet;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
                                               galois::gstl::Pow2Alloc<std::pair<uint32_t, BitSet>>>;
