@@ -40,7 +40,7 @@
 /**
  * Optimized mode: enable ONLY ONE of them at most
  */
-#define REVERSE_MODE
+// #define REVERSE_MODE
 // #define FLIP_MODE
 
 #endif
