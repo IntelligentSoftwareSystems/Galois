@@ -20,4 +20,13 @@ public:
   virtual ~WireLoad() {}
 };
 
+// used for ideal wire. do not instantiate this class in user code.
+struct IdealWireLoad: public WireLoad {
+  MyFloat wireC(VerilogWire*) { return 0.0; }
+  MyFloat wireDelay(MyFloat, VerilogWire*, VerilogPin*) { return 0.0; }
+  void print(std::ostream& os = std::cout) { }
+};
+
+extern WireLoad* idealWireLoad;
+
 #endif // GALOIS_EDA_WIRELOAD_H
