@@ -72,10 +72,13 @@ public:
   void parse(std::string inName);
 };
 
+using VecOfMyFloat = std::vector<MyFloat>;
+
 struct LutTemplate {
   std::vector<size_t> shape;
   std::vector<size_t> stride;
   std::vector<VariableType> var;
+  std::vector<VecOfMyFloat> index;
   std::string name;
   CellLib* lib;
 
@@ -84,7 +87,6 @@ public:
 };
 
 using Parameter = std::unordered_map<VariableType, MyFloat>;
-using VecOfMyFloat = std::vector<MyFloat>;
 
 struct Lut {
   LutTemplate* lutTemplate;

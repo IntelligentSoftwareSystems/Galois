@@ -309,12 +309,13 @@ void LutTemplate::print(std::ostream& os) {
   }
 
   i = 0;
-  for (auto& d: shape) {
+  for (auto& idx: index) {
     os << "    index_" << ++i << " (\"";
-    size_t j = 1;
-    os << MyFloat(j) * 0.0010f;
-    while (j < d) {
-      os << ", " << (MyFloat)(++j) * 0.0010f;
+    for (size_t j = 0; j < idx.size(); j++) {
+      os << idx[j];
+      if (j < idx.size() - 1) {
+        os << ", ";
+      }
     }
     os << "\");" << std::endl;
   }
@@ -550,13 +551,17 @@ void CellLibParser::parseLutTemplate() {
     }
     // index_* ("num1[,num*]");
     else if ("index_1" == *curToken || "index_2" == *curToken || "index_3" == *curToken) {
-      curToken += 4; // consume "index_*", "(", "\"" and num1
-      size_t num = 1;
+      curToken += 3; // consume "index_*", "(", "\""
+      VecOfMyFloat oneIndex;
+      oneIndex.push_back(getMyFloat(*curToken));
+      curToken += 1; // consume value
       while ("," == *curToken) {
-        curToken += 2; // consume "," and num*
-        num++;
+        curToken += 1; // consume ","
+        oneIndex.push_back(getMyFloat(*curToken));
+        curToken += 1; // consume value
       }
-      lutTemplate->shape.push_back(num);
+      lutTemplate->shape.push_back(oneIndex.size());
+      lutTemplate->index.push_back(oneIndex);
       curToken += 3; // consume "\"", ")" and ";"
       unmatched--;
     }
@@ -613,6 +618,10 @@ void CellLibParser::parseLut(Lut* lut) {
     }
   }
 
+  // use index from the template when not specified
+  if (0 == lut->index.size()) {
+    lut->index = lut->lutTemplate->index;
+  }
   curToken += 1; // consume "}"
 }
 
