@@ -27,9 +27,48 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-//  lib.print();
+  lib.print();
 
 #if 0
+  auto and2X1 = lib.findCell("AND2_X1");
+  auto pinZN = and2X1->findCellPin("ZN");
+  auto pinA1 = and2X1->findCellPin("A1");
+  auto pinA2 = and2X1->findCellPin("A2");
+  std::cout << "AND2_X1: (A1-f, ZN-f) is " << pinZN->isEdgeDefined(pinA1, false, false) << std::endl;
+  std::cout << "AND2_X1: (A1-r, ZN-r) is " << pinZN->isEdgeDefined(pinA1, false, true) << std::endl;
+  std::cout << "AND2_X1: (A1-r, ZN-f) is " << pinZN->isEdgeDefined(pinA1, true, false) << std::endl;
+  std::cout << "AND2_X1: (A1-f, ZN-r) is " << pinZN->isEdgeDefined(pinA1, true, true) << std::endl;
+  std::cout << "AND2_X1: (A2-f, ZN-f) is " << pinZN->isEdgeDefined(pinA2, false, false) << std::endl;
+  std::cout << "AND2_X1: (A2-r, ZN-r) is " << pinZN->isEdgeDefined(pinA2, false, true) << std::endl;
+  std::cout << "AND2_X1: (A2-r, ZN-f) is " << pinZN->isEdgeDefined(pinA2, true, false) << std::endl;
+  std::cout << "AND2_X1: (A2-f, ZN-r) is " << pinZN->isEdgeDefined(pinA2, true, true) << std::endl;
+
+  auto nand2X1 = lib.findCell("NAND2_X1");
+  pinZN = nand2X1->findCellPin("ZN");
+  pinA1 = nand2X1->findCellPin("A1");
+  pinA2 = nand2X1->findCellPin("A2");
+  std::cout << "NAND2_X1: (A1-f, ZN-f) is " << pinZN->isEdgeDefined(pinA1, false, false) << std::endl;
+  std::cout << "NAND2_X1: (A1-r, ZN-r) is " << pinZN->isEdgeDefined(pinA1, false, true) << std::endl;
+  std::cout << "NAND2_X1: (A1-r, ZN-f) is " << pinZN->isEdgeDefined(pinA1, true, false) << std::endl;
+  std::cout << "NAND2_X1: (A1-f, ZN-r) is " << pinZN->isEdgeDefined(pinA1, true, true) << std::endl;
+  std::cout << "NAND2_X1: (A2-f, ZN-f) is " << pinZN->isEdgeDefined(pinA2, false, false) << std::endl;
+  std::cout << "NAND2_X1: (A2-r, ZN-r) is " << pinZN->isEdgeDefined(pinA2, false, true) << std::endl;
+  std::cout << "NAND2_X1: (A2-r, ZN-f) is " << pinZN->isEdgeDefined(pinA2, true, false) << std::endl;
+  std::cout << "NAND2_X1: (A2-f, ZN-r) is " << pinZN->isEdgeDefined(pinA2, true, true) << std::endl;
+
+  auto xor2X1 = lib.findCell("XOR2_X1");
+  auto pinZ = xor2X1->findCellPin("Z");
+  auto pinA = xor2X1->findCellPin("A");
+  auto pinB = xor2X1->findCellPin("B");
+  std::cout << "XOR2_X1: (A-f, Z-f) is " << pinZ->isEdgeDefined(pinA, false, false) << std::endl;
+  std::cout << "XOR2_X1: (A-r, Z-r) is " << pinZ->isEdgeDefined(pinA, false, true) << std::endl;
+  std::cout << "XOR2_X1: (A-r, Z-f) is " << pinZ->isEdgeDefined(pinA, true, false) << std::endl;
+  std::cout << "XOR2_X1: (A-f, Z-r) is " << pinZ->isEdgeDefined(pinA, true, true) << std::endl;
+  std::cout << "XOR2_X1: (B-f, Z-f) is " << pinZ->isEdgeDefined(pinB, false, false) << std::endl;
+  std::cout << "XOR2_X1: (B-r, Z-r) is " << pinZ->isEdgeDefined(pinB, false, true) << std::endl;
+  std::cout << "XOR2_X1: (B-r, Z-f) is " << pinZ->isEdgeDefined(pinB, true, false) << std::endl;
+  std::cout << "XOR2_X1: (B-f, Z-r) is " << pinZ->isEdgeDefined(pinB, true, true) << std::endl;
+
   VerilogWire* wire = new VerilogWire;
   std::vector<VerilogPin*> pins;
   for (size_t i = 0; i < 12; ++i) {
@@ -68,7 +107,7 @@ int main(int argc, char *argv[]) {
   auto res = outPin->extractMax(param, TABLE_DELAY, inPin, true, true);
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
-
+/*
   VerilogDesign design;
   design.parse(verilogName);
 //  design.print();
@@ -93,6 +132,6 @@ int main(int argc, char *argv[]) {
 
   engine.constrain(m, sdc);
   engine.time(m);
-
+*/
   return 0;
 }
