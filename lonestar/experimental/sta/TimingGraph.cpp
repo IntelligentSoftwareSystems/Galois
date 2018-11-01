@@ -627,14 +627,14 @@ void TimingGraph::computeArrivalTime() {
       if (data.isGateInput() || data.isPseudoPrimaryOutput()) {
         // should have one incoming neighbor only
         for (auto ie: g.in_edges(n)) {
-          computeArrivalByWire(n, ie);
+          this->computeArrivalByWire(n, ie);
         }
       }
       else if (data.isGateOutput() || data.isPseudoPrimaryInput()) {
-        computeDriveC(n);
+        this->computeDriveC(n);
         for (auto ie: g.in_edges(n)) {
           for (size_t k = 0; k < libs.size(); k++) {
-            computeArrivalByTimingArc(n, ie, k);
+            this->computeArrivalByTimingArc(n, ie, k);
           }
         }
       }
