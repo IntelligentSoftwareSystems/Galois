@@ -178,7 +178,15 @@ void CellPin::print(std::ostream& os) {
 
   if (isOutput) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
-    os << "      function: \"" << func << "\";" << std::endl;
+    if (func.size()) {
+      os << "      function: \"" << func << "\";" << std::endl;
+    }
+    if (func_up.size()) {
+      os << "      function_up: \"" << func_up << "\";" << std::endl;
+    }
+    if (func_down.size()) {
+      os << "      function_down: \"" << func_down << "\";" << std::endl;
+    }
   }
 
   // convert tables to printing order
@@ -817,6 +825,16 @@ void CellLibParser::parseCellPin(Cell* cell) {
     else if ("function" == *curToken) {
       curToken += 2; // consume "function" and ":"
       pin->func = getBooleanExpression();
+      curToken += 1; // consume ";"
+    }
+    else if ("function_up" == *curToken) {
+      curToken += 2; // consume "function_up" and ":"
+      pin->func_up = getBooleanExpression();
+      curToken += 1; // consume ";"
+    }
+    else if ("function_down" == *curToken) {
+      curToken += 2; // consume "function_down" and ":"
+      pin->func_down = getBooleanExpression();
       curToken += 1; // consume ";"
     }
     else {

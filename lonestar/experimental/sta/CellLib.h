@@ -114,6 +114,8 @@ struct CellPin {
   MyFloat maxC;
   Cell* cell;
   std::string func;
+  std::string func_up;
+  std::string func_down;
 
   // order of keys:
   // pin, fall/rise, delay/slew(/power in the future), unateness, when
