@@ -20,7 +20,6 @@
 #ifndef _PRBCTREE_
 #define _PRBCTREE_
 #include <boost/container/flat_map.hpp>
-// #include "bitset_with_indicator.hh"
 #include "pr_bc_bitset.hh"
 
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
@@ -73,9 +72,7 @@ public:
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    if (distanceTree[newDistance].size() != numSourcesPerRound) {
-      distanceTree[newDistance].resize(numSourcesPerRound);
-    }
+    // asset(distanceTree[newDistance].size() == numSourcesPerRound);
     distanceTree[newDistance].set_indicator(index);
 
     numNonInfinity++;
@@ -103,9 +100,7 @@ public:
       numNonInfinity++;
     }
 
-    if (distanceTree[newDistance].size() != numSourcesPerRound) {
-      distanceTree[newDistance].resize(numSourcesPerRound);
-    }
+    // asset(distanceTree[newDistance].size() == numSourcesPerRound);
     distanceTree[newDistance].set_indicator(index);
 
   }

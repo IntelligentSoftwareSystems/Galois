@@ -17,11 +17,6 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-// Definition for special addition to DynamicBitset.h
-#ifndef _PR_BC_OPT_V3_
-#define _PR_BC_OPT_V3_
-#endif
-
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
@@ -305,7 +300,7 @@ int main(int argc, char** argv) {
       galois::runtime::getHostBarrier().wait();
 
       (*hg).set_num_run(run + 1); // Manually set run number
-      (*hg).set_num_round(0); // Unnecessary, will be done the next run /***/
+      (*hg).set_num_round(0); // Manually set round number
 
       macroRound         = 0;
 

@@ -34,7 +34,7 @@ namespace galois {
  * of plain-old-datatype (POD) elements.
  * There is no initialization or destruction of elements.
  */
-template <typename _Tp>
+template <typename _Tp, typename _Alloc = std::allocator<_Tp>>
 class PODResizeableArray {
   _Tp* data_;
   size_t capacity_;
@@ -42,6 +42,7 @@ class PODResizeableArray {
 
 public:
   typedef _Tp value_type;
+  typedef _Alloc allocator_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef value_type& reference;

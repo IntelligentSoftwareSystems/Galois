@@ -38,6 +38,7 @@ namespace galois {
  * Concurrent dynamically allocated bitset
  **/
 class DynamicBitSet {
+protected:
   galois::PODResizeableArray<galois::CopyableAtomic<uint64_t>> bitvec;
   size_t num_bits;
   static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
