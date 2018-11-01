@@ -179,72 +179,78 @@ void CellPin::print(std::ostream& os) {
   if (isOutput) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
     os << "      function: \"" << func << "\";" << std::endl;
+  }
 
-    // convert tables to printing order
-    // order of keys: pin, unateness, when, delay/slew, fall/rise
-    using InnerMap = std::unordered_map<std::string, Lut*[2][2]>;
-    using OuterMap = std::unordered_map<CellPin*, InnerMap[2]>;
-    OuterMap printTables;
-    for (auto& i: tables) {
-      auto pin = i.first;
-      for (int fr = 0; fr < 2; fr++) {
-        for (int ds = 0; ds < 2; ds++) {
-          for (int pn = 0; pn < 2; pn++) {
-            for (auto& j: i.second[fr][ds][pn]) {
-              printTables[pin][pn][j.first][ds][fr] = j.second;
-            }
+  // convert tables to printing order
+  // order of keys: pin, unateness, when, delay/slew, fall/rise
+  using InnerMap = std::unordered_map<std::string, Lut*[2][2]>;
+  using OuterMap = std::unordered_map<CellPin*, InnerMap[2]>;
+  OuterMap printTables;
+  for (auto& i: tables) {
+    auto pin = i.first;
+    for (int fr = 0; fr < 2; fr++) {
+      for (int ds = 0; ds < 2; ds++) {
+        for (int pn = 0; pn < 2; pn++) {
+          for (auto& j: i.second[fr][ds][pn]) {
+            printTables[pin][pn][j.first][ds][fr] = j.second;
           }
         }
       }
     }
+  }
 
-    // print tables
-    for (auto& i: printTables) {
-      auto pin = i.first;
-      auto outMap = i.second;
-      for (int pn = 0; pn < 2; pn++) {
-        for (auto& j: outMap[pn]) {
-          auto& when = j.first;
-          std::string unateness;
-          if (0 == pn) {
-            unateness = (outMap[1].count(when)) ? "positive_unate" : "non_unate";
-          }
-          else {
-            unateness = "negative_unate";
-            if (outMap[0].count(when)) {
-              continue;
-            }
-          }
+  auto isArcNonUnate =
+      [&] (auto& m, std::string when) {
+        if (!m[0].count(when)) return false;
+        if (!m[1].count(when)) return false;
+        return (m[0][when][TABLE_DELAY][0] == m[1][when][TABLE_DELAY][0]);
+      };
 
-          os << "      timing () {" << std::endl;
-          os << "        related_pin: \"" << pin->name << "\";" << std::endl;
-          if (!when.empty()) {
-            os << "        when: \"" << when << "\";" << std::endl;
-          }
-          os << "        timing_sense: " << unateness << ";" << std::endl;
-
-          auto& t = j.second;
-          auto lut = t[TABLE_DELAY][0];
-          if (lut) {
-            lut->print("cell_fall", os);
-          }
-          lut = t[TABLE_DELAY][1];
-          if (lut) {
-            lut->print("cell_rise", os);
-          }
-          lut = t[TABLE_SLEW][0];
-          if (lut) {
-            lut->print("fall_transition", os);
-          }
-          lut = t[TABLE_SLEW][1];
-          if (lut) {
-            lut->print("rise_transition", os);
-          }
-          os << "      }" << std::endl;
+  // print tables
+  for (auto& i: printTables) {
+    auto pin = i.first;
+    auto& outMap = i.second;
+    for (int pn = 0; pn < 2; pn++) {
+      for (auto& j: outMap[pn]) {
+        auto& when = j.first;
+        std::string unateness;
+        if (0 == pn) {
+          unateness = (isArcNonUnate(outMap, when)) ? "non_unate" : "positive_unate";
         }
+        else {
+          unateness = "negative_unate";
+          if (isArcNonUnate(outMap, when)) {
+            continue;
+          }
+        }
+        os << "      timing () {" << std::endl;
+        os << "        related_pin: \"" << pin->name << "\";" << std::endl;
+        if (!when.empty()) {
+          os << "        when: \"" << when << "\";" << std::endl;
+        }
+        os << "        timing_sense: " << unateness << ";" << std::endl;
+
+        auto& t = j.second;
+        auto lut = t[TABLE_DELAY][0];
+        if (lut) {
+          lut->print("cell_fall", os);
+        }
+        lut = t[TABLE_DELAY][1];
+        if (lut) {
+          lut->print("cell_rise", os);
+        }
+        lut = t[TABLE_SLEW][0];
+        if (lut) {
+          lut->print("fall_transition", os);
+        }
+        lut = t[TABLE_SLEW][1];
+        if (lut) {
+          lut->print("rise_transition", os);
+        }
+        os << "      }" << std::endl;
       }
-    } // end for printTables
-  } // end if (isOutput)
+    }
+  } // end for printTables
 
   os << "    }" << std::endl;
 }
@@ -991,7 +997,9 @@ void CellLib::print(std::ostream& os) {
   for (auto& i: wireLoads) {
     i.second->print(os);
   }
-  os << "  default_wire_load: \"" << defaultWireLoad->name << "\";" << std::endl;
+  if (defaultWireLoad) {
+    os << "  default_wire_load: \"" << defaultWireLoad->name << "\";" << std::endl;
+  }
 
   for (auto& i: lutTemplates) {
     i.second->print(os);
