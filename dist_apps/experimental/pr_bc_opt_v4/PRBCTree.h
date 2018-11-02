@@ -31,7 +31,6 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
  */
 class PRBCTree {
 
-  // using BitSet = bitset_with_indicator<uint32_t>;
   using BitSet = PRBCBitSet;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
@@ -50,10 +49,17 @@ class PRBCTree {
 
   //! reverse iterator over map
   using TreeIter = typename FlatMap::reverse_iterator;
+    //! reverse iterator over set
+  using SetIter = typename BitSet::reverse_iterator;
+
   //! Current iterator for reverse map
   TreeIter curKey;
   //! End key for reverse map iterator
   TreeIter endCurKey;
+  //! Current set iterator
+  SetIter curSet;
+  //! End of set iterator
+  SetIter endCurSet;
 
 public:
   /**
@@ -80,9 +86,7 @@ public:
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    if (distanceTree[newDistance].size() != numSourcesPerRound) {
-      distanceTree[newDistance].resize(numSourcesPerRound);
-    }
+    // assert(distanceTree[newDistance].size() == numSourcesPerRound)
     distanceTree[newDistance].set(index);
 
     numNonInfinity++;
@@ -110,9 +114,7 @@ public:
       numNonInfinity++;
     }
 
-    if (distanceTree[newDistance].size() != numSourcesPerRound) {
-      distanceTree[newDistance].resize(numSourcesPerRound);
-    }
+    // assert(distanceTree[newDistance].size() == numSourcesPerRound)
     distanceTree[newDistance].set(index);
 
   }
@@ -164,11 +166,11 @@ public:
     endCurKey = distanceTree.rend();
 
     if (curKey != endCurKey) {
-      BitSet& curSet = curKey->second;
       #ifdef FLIP_MODE
-        curSet.flip();
+        curKey->second.flip();
       #endif
-      curSet.backward_indicator();
+      curSet = curKey->second.rbegin();
+      endCurSet = curKey->second.rend();
     }
 
   }
@@ -193,10 +195,9 @@ public:
         return infinity;
       }
 
-      BitSet& curSet = curKey->second;
-      if (!curSet.nposInd()) {
+      if (curSet != endCurSet) {
           // this number should be sent out this round
-          indexToReturn = curSet.backward_indicator();
+          indexToReturn = curKey->second.backward_iterate(curSet);
           numSentSources--;
           break;
       } else {
@@ -205,11 +206,11 @@ public:
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
-          BitSet& nextSet = curKey->second;
           #ifdef FLIP_MODE
-            nextSet.flip();
+            curKey->second.flip();
           #endif
-          nextSet.backward_indicator();
+          curSet = curKey->second.rbegin();
+          endCurSet = curKey->second.rend();
         }
       }
     }
