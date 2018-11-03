@@ -182,7 +182,7 @@ void SDCParser::parseDrivingCell() {
   }
 
   if (nullptr == dCell->fromCellPin) {
-    dCell->fromCellPin = cell->inPins.begin()->second;
+    dCell->fromCellPin = *(cell->inPins.begin());
   }
 
   for (auto& i: ports) {
