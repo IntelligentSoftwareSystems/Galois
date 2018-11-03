@@ -63,11 +63,12 @@ void TimingGraph::addGate(VerilogGate* gate) {
         data.t[k].pin = libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
       }
 
-      if (data.t[0].pin->isOutput) {
+      auto dir = data.t[0].pin->pinDir();
+      if (OUTPUT == dir || INOUT == dir) {
         data.isOutput = true;
         outNodes.insert(n);
       }
-      if (data.t[0].pin->isInput) {
+      if (INPUT == dir || INOUT == dir) {
         inNodes.insert(n);
       }
     }
@@ -80,8 +81,7 @@ void TimingGraph::addGate(VerilogGate* gate) {
     for (auto in: inNodes) {
       auto& iData = g.getData(in, unprotected);
       auto ip = iData.t[0].pin;
-      auto isNeg = (oData.isRise != iData.isRise);
-      if (op->isEdgeDefined(ip, isNeg, oData.isRise)) {
+      if (op->isEdgeDefined(ip, iData.isRise, oData.isRise)) {
         auto e = g.addMultiEdge(in, on, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -460,9 +460,8 @@ void TimingGraph::setConstraints(SDC& sdc) {
         auto& iData = g.getData(in, unprotected);
         iData.topoL = 0;
         iData.revTopoL = oData.revTopoL + 1;
-        bool isNeg = (oData.isRise != iData.isRise);
 
-        if (dCell->toCellPin->isEdgeDefined(dCell->fromCellPin, isNeg, oData.isRise)) {
+        if (dCell->toCellPin->isEdgeDefined(dCell->fromCellPin, iData.isRise, oData.isRise)) {
           auto e = g.addMultiEdge(in, on, unprotected);
           auto& eData = g.getEdgeData(e);
           eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -506,10 +505,10 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
 
   for (size_t k = 0; k < libs.size(); k++) {
     MyFloat loadC = 0.0;
-    if (TREE_TYPE_BALANCED == libs[k]->wireTreeType) {
+    if (BALANCED_TREE == libs[k]->wireTreeType) {
       loadC = data.t[k].pinC;
     }
-    else if (TREE_TYPE_WORST_CASE == libs[k]->wireTreeType) {
+    else if (WORST_CASE_TREE == libs[k]->wireTreeType) {
       loadC = predData.t[k].pinC;
     }
     auto delay = ieData.t[k].wireLoad->wireDelay(loadC, ieData.wire, data.pin);
@@ -533,63 +532,61 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
     return; // invalid timing arc
   }
 
-  bool isNeg = (data.isRise != predData.isRise);
-
   Parameter param = {
-    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
-    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
+    {INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
   };
 
   Parameter paramNoC = {
-    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
-    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, 0.0}
+    {INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {TOTAL_OUTPUT_NET_CAPACITANCE, 0.0}
   };
 
   auto& ieData = g.getEdgeData(ie);
 
   if (TIMING_MODE_MAX_DELAY == modes[k]) {
-    auto delayResult = outPin->extractMax(param, TABLE_DELAY, inPin, isNeg, data.isRise);
+    auto delayResult = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise);
     auto delay = delayResult.first;
     if (predData.isDrivingCell) {
       // offset for the primary inputs =
       //     delay for the driving cell with the load
       //   - delay for the driving cell without the load (Genus)
-      delay -= outPin->extractMax(paramNoC, TABLE_DELAY, inPin, isNeg, data.isRise).first;
+      delay -= outPin->extractMax(paramNoC, DELAY, inPin, predData.isRise, data.isRise).first;
     }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival < predData.t[k].arrival + delay) {
       data.t[k].arrival = predData.t[k].arrival + delay;
       if (isExactSlew) {
-        data.t[k].slew = outPin->extract(param, TABLE_SLEW, inPin, isNeg, data.isRise, when);
+        data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
       }
     }
     if (!isExactSlew) {
-      auto slew = outPin->extractMax(param, TABLE_SLEW, inPin, isNeg, data.isRise).first;
+      auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise).first;
       if (data.t[k].slew < slew) {
         data.t[k].slew = slew;
       }
     }
   }
   else {
-    auto delayResult = outPin->extractMin(param, TABLE_DELAY, inPin, isNeg, data.isRise);
+    auto delayResult = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise);
     auto delay = delayResult.first;
     if (predData.isDrivingCell) {
       // offset for the primary inputs =
       //     delay for the driving cell with the load
       //   - delay for the driving cell without the load (Genus)
-      delay -= outPin->extractMin(paramNoC, TABLE_DELAY, inPin, isNeg, data.isRise).first;
+      delay -= outPin->extractMin(paramNoC, DELAY, inPin, predData.isRise, data.isRise).first;
     }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival > predData.t[k].arrival + delay) {
       data.t[k].arrival = predData.t[k].arrival + delay;
       if (isExactSlew) {
-        data.t[k].slew = outPin->extract(param, TABLE_SLEW, inPin, isNeg, data.isRise, when);
+        data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
       }
     }
     if (!isExactSlew) {
-      auto slew = outPin->extractMin(param, TABLE_SLEW, inPin, isNeg, data.isRise).first;
+      auto slew = outPin->extractMin(param, SLEW, inPin, predData.isRise, data.isRise).first;
       if (data.t[k].slew > slew) {
         data.t[k].slew = slew;
       }
