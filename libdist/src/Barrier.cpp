@@ -50,9 +50,6 @@ public:
   //! control-flow barrier across distributed hosts
   //! acts as a distributed-memory fence as well (flushes send and receives)
   virtual void wait() {
-#ifdef GALOIS_USE_LWCI
-    lc_barrier(lc_col_ep);
-#else
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     for (unsigned h = 0; h < net.Num; ++h) {
@@ -81,7 +78,6 @@ public:
         std::numeric_limits<int16_t>::max()) { // limit defined by MPI or LCI
       galois::runtime::evilPhase = 1;
     }
-#endif
   }
 };
 

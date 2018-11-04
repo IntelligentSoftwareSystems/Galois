@@ -162,7 +162,7 @@ public:
     statSendBytes += buf.size();
 
     auto* msg = new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
-    int count = 0;
+    // int count = 0;
 
 #ifndef __GALOIS_HET_ASYNC__
     while (lc_send(msg->buf.data(), msg->buf.size(), dest, tag, lc_p2p_ep[phase], free_req, msg) != LC_OK)
@@ -171,8 +171,8 @@ public:
 #endif
     {
       sched_yield();
-      if (count == 10000)
-        printf("[%d] Warning possible lock out on SEND %d\n", ID, tag);
+      // if (count == 10000)
+      //  printf("[%d] Warning possible lock out on SEND %d\n", ID, tag);
     }
   }
 
@@ -191,14 +191,14 @@ public:
   recieveTagged(uint32_t tag,
                 std::unique_lock<galois::substrate::SimpleLock>* rlg, int phase) {
     if (tag == 0) phase = 2;
-    static int count = 0;
+    // static int count = 0;
 
     pendingReq* req;
     int bin = ((tag % 3) * 3) + phase;
     if (!bufferedRecv[bin].pop(req)) {
-      if (count ++ == 10000) {
-        printf("[%d] WARNING possible lock out on RECV %d\n", ID, tag);
-      }
+      // if (count ++ == 10000) {
+      //  printf("[%d] WARNING possible lock out on RECV %d\n", ID, tag);
+      // }
       return optional_t<std::pair<uint32_t, RecvBuffer>>();
     }
     
@@ -217,9 +217,9 @@ public:
   }
 
   virtual bool anyPendingSends() {
-    static int count = 0;
-    if (count++ == 10000) 
-      printf("[%d] WARNING possible lock out terminate %d %d\n", ID, inflightSends.load(), inflightRecvs.load());
+    // static int count = 0;
+    // if (count++ == 10000) 
+    // printf("[%d] WARNING possible lock out terminate %d %d\n", ID, inflightSends.load(), inflightRecvs.load());
     return (inflightSends > 0);
   }
 
