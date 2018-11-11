@@ -318,7 +318,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
 
   items2.swap(items);
     std::cout << "Start phase 2\n";
-    for(auto phase = 0; phase < 3; ++phase){
+    for(auto phase = 0; phase < 5; ++phase){
        galois::do_all(
             galois::iterate(items2),
             [&](const SubGraphTuple& sg) {
