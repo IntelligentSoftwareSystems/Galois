@@ -37,8 +37,8 @@
 #include <iostream>
 #include <fstream>
 
-const char* name = "Triangles";
-const char* desc = "Counts the triangles in a graph";
+const char* name = "k-motif";
+const char* desc = "Counts the k-motifs in a graph";
 const char* url  = 0;
 
 enum Algo {
@@ -251,8 +251,19 @@ void nodeIteratingAlgoPre(Graph& graph) {
 }
 
 template <typename VecTy, typename ElemTy>
-bool isNotInTuple(const VecTy& vec, const ElemTy& elem){
+bool vertexNotInTuple(const VecTy& vec, const ElemTy& elem){
   return (std::find(vec.begin(), vec.end(), elem) == vec.end());
+}
+
+template <typename VecTy, typename ElemTy>
+bool edgeNotInTuple(const VecTy& vec, const ElemTy& elem, const uint32_t& st_info_elem){
+  auto it = std::find(vec.begin(), vec.end(), elem); 
+  if (it == vec.end()) {
+    return true;
+  } else {
+    auto index = std::distance(vec.begin(), it);
+    return !(st_info_elem == index);
+  }
 }
 
 typedef galois::gstl::Vector<GNode> VecGNodeTy;
@@ -311,23 +322,9 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
               }
             },
             galois::chunk_size<512>(), galois::steal(),
-            galois::loopname("nodeIteratingAlgoPre"));
-
-#if 0
-  std::cout << "items1" << "\n";
-  for(auto ii = items.begin(); ii != items.end(); ++ii){
-    for(auto i :  (*ii).vertices){
-      std::cout << i << "--";
-    }
-    std::cout << "\n";
-  }
-#endif
+            galois::loopname("nodeIteratingAlgoWithStruct"));
 
     std::cout << "Start phase 2\n";
-    //for(auto phase = 0; phase < 1; ++phase){
-      //Swap the bags
-      //items_active.swap(items);
-      //items.clear();
       galois::do_all(
       //galois::for_each(
             galois::iterate(items_active),
@@ -351,7 +348,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                   first, last, GreaterThanOrEqual<Graph>(graph, max_elem));
               for (; bb != last; ++bb) {
                 GNode dst = graph.getEdgeDst(bb);
-                if (isNotInTuple(sg.vertices, dst)){
+                if (edgeNotInTuple(sg.vertices, dst, sg.st_info[sg.key])){
                   auto verts = sg.vertices;
                   auto st_info = sg.st_info;
                   verts.push_back(dst);
@@ -368,9 +365,9 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
               }
             },
             galois::chunk_size<512>(), galois::steal(), galois::no_conflicts(),
-            galois::loopname("nodeIteratingAlgoPre"));
+            galois::loopname("nodeIteratingAlgoWithStruct"));
 
-
+#if 0
     std::cout << "items2" << "\n";
   for(auto ii = items_final.begin(); ii != items_final.end(); ++ii){
     std::cout << "key : " << (*ii).key << "\n";
@@ -379,9 +376,8 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
     }
     std::cout << "\n";
   }
-    //items2.swap(items3);
-    //items3.clear();
-    //}//for look end
+#endif
+  std::cout << "Num " << k << "-motif: " << std::distance(items_final.begin(), items_final.end()) << "\n";
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
