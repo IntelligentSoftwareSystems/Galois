@@ -53,6 +53,11 @@ static cll::opt<Algo> algo(
     cll::values(clEnumValN(Algo::nodeiteratorpre, "nodeiteratorpre", "Node Iterator (default)"),
                 clEnumValEnd),
     cll::init(Algo::nodeiteratorpre));
+static cll::opt<unsigned int>
+    k("k",
+        cll::desc("max number of vertices in k-motif(default value 0)"),
+        cll::init(0));
+
 
 struct NodeData{
   uint64_t ea;
@@ -250,23 +255,24 @@ bool isNotInTuple(const VecTy& vec, const ElemTy& elem){
   return (std::find(vec.begin(), vec.end(), elem) == vec.end());
 }
 
-typedef galois::gstl::Vector<GNode> VecTy;
+typedef galois::gstl::Vector<GNode> VecGNodeTy;
+typedef galois::gstl::Vector<uint32_t> VecUnsignedTy;
 void nodeIteratingAlgoWithStruct(Graph& graph) {
 
   struct SubGraphTuple {
-    VecTy vertices;
+    VecGNodeTy vertices;
     uint32_t key;
-    //TODO: Add struct info
-    SubGraphTuple(const VecTy& v1, const uint32_t& k1) : vertices(v1), key(k1) {} 
+    VecUnsignedTy st_info;
+    SubGraphTuple(const VecTy& v1, const uint32_t& k1, const VecUnsignedTy& s1) : vertices(v1), key(k1), st_info(s1) {}
   };
   galois::InsertBag<SubGraphTuple> items;
-  galois::InsertBag<SubGraphTuple> items2;
+  galois::InsertBag<SubGraphTuple> items_active;
   galois::InsertBag<SubGraphTuple> items3;
+  galois::InsertBag<SubGraphTuple> items_final;
   galois::GAccumulator<size_t> numTriangles;
 
-  galois::do_all(galois::iterate(graph),//galois::iterate(graph.begin() + i, graph.begin() + i + delta ),
-                 [&](GNode n) {
-
+  galois::do_all(galois::iterate(graph),
+                [&](GNode n) {
                 // Partition neighbors
                 // [first, ea) [n] [bb, last)
                 auto& ndata = graph.getData(n);
@@ -300,14 +306,14 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
 
               for (; bb != last; ++bb) {
                 GNode B = graph.getEdgeDst(bb);
-                items.push(SubGraphTuple(VecTy{n,B}, 0));
-                items.push(SubGraphTuple(VecTy{n,B}, 1));
+                items_active.push(SubGraphTuple(VecTy{n,B}, 0, VecUnsignedTy{0,1}));
+                items_active.push(SubGraphTuple(VecTy{n,B}, 1, VecUnsignedTy{0,1}));
               }
             },
             galois::chunk_size<512>(), galois::steal(),
             galois::loopname("nodeIteratingAlgoPre"));
 
-
+#if 0
   std::cout << "items1" << "\n";
   for(auto ii = items.begin(); ii != items.end(); ++ii){
     for(auto i :  (*ii).vertices){
@@ -315,21 +321,24 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
     }
     std::cout << "\n";
   }
+#endif
 
-  items2.swap(items);
     std::cout << "Start phase 2\n";
-    for(auto phase = 0; phase < 5; ++phase){
-       galois::do_all(
-            galois::iterate(items2),
+    //for(auto phase = 0; phase < 1; ++phase){
+      //Swap the bags
+      //items_active.swap(items);
+      //items.clear();
+      galois::do_all(
+      //galois::for_each(
+            galois::iterate(items_active),
             [&](const SubGraphTuple& sg) {
+            //[&](const SubGraphTuple& sg, auto& cnx) {
               auto n = sg.vertices[sg.key];
               auto& ndata = graph.getData(n);
               Graph::edge_iterator first =
                   graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
               Graph::edge_iterator last =
                   graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-              //Graph::edge_iterator ea = first + ndata.ea; // std::advance(first, ndata.ea);
-              //Graph::edge_iterator bb = first + ndata.bb; //std::advance(first, ndata.bb);
 
               auto first_elem = sg.vertices[0];
               auto max_elem = first_elem;
@@ -342,31 +351,37 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                   first, last, GreaterThanOrEqual<Graph>(graph, max_elem));
               for (; bb != last; ++bb) {
                 GNode dst = graph.getEdgeDst(bb);
-                if(isNotInTuple(sg.vertices, dst)){
+                if (isNotInTuple(sg.vertices, dst)){
                   auto verts = sg.vertices;
+                  auto st_info = sg.st_info;
                   verts.push_back(dst);
-                  for(auto i = 0; i < verts.size(); ++i){
-                    items3.push(SubGraphTuple(verts, i));
+                  st_info.push_back(sg.key);
+                  if (verts.size() == k) {
+                    items_final.push(SubGraphTuple(verts, sg.key, st_info));
+                  }
+                  else {
+                    for (auto i = 0; i < verts.size(); ++i) {
+                      items_active.push(SubGraphTuple(verts, i, st_info));
+                    }
                   }
                 }
               }
             },
-            galois::chunk_size<512>(), galois::steal(),
+            galois::chunk_size<512>(), galois::steal(), galois::no_conflicts(),
             galois::loopname("nodeIteratingAlgoPre"));
 
 
     std::cout << "items2" << "\n";
-
-  for(auto ii = items3.begin(); ii != items3.end(); ++ii){
+  for(auto ii = items_final.begin(); ii != items_final.end(); ++ii){
     std::cout << "key : " << (*ii).key << "\n";
     for(auto i :  (*ii).vertices){
       std::cout << i << "--";
     }
     std::cout << "\n";
   }
-    items2.swap(items3);
-    items3.clear();
-    }
+    //items2.swap(items3);
+    //items3.clear();
+    //}//for look end
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
