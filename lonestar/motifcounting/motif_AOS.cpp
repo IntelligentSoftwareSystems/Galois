@@ -261,6 +261,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
   };
   galois::InsertBag<SubGraphTuple> items;
   galois::InsertBag<SubGraphTuple> items2;
+  galois::InsertBag<SubGraphTuple> items3;
   galois::GAccumulator<size_t> numTriangles;
 
   galois::do_all(galois::iterate(graph),//galois::iterate(graph.begin() + i, graph.begin() + i + delta ),
@@ -306,9 +307,20 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
             galois::chunk_size<512>(), galois::steal(),
             galois::loopname("nodeIteratingAlgoPre"));
 
+
+  std::cout << "items1" << "\n";
+  for(auto ii = items.begin(); ii != items.end(); ++ii){
+    for(auto i :  (*ii).vertices){
+      std::cout << i << "--";
+    }
+    std::cout << "\n";
+  }
+
+  items2.swap(items);
     std::cout << "Start phase 2\n";
+    for(auto phase = 0; phase < 3; ++phase){
        galois::do_all(
-            galois::iterate(items),
+            galois::iterate(items2),
             [&](const SubGraphTuple& sg) {
               auto n = sg.vertices[sg.key];
               auto& ndata = graph.getData(n);
@@ -334,7 +346,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                   auto verts = sg.vertices;
                   verts.push_back(dst);
                   for(auto i = 0; i < verts.size(); ++i){
-                    items2.push(SubGraphTuple(verts, i));
+                    items3.push(SubGraphTuple(verts, i));
                   }
                 }
               }
@@ -343,13 +355,18 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
             galois::loopname("nodeIteratingAlgoPre"));
 
 
+    std::cout << "items2" << "\n";
 
-  for(auto ii = items2.begin(); ii != items2.end(); ++ii){
+  for(auto ii = items3.begin(); ii != items3.end(); ++ii){
+    std::cout << "key : " << (*ii).key << "\n";
     for(auto i :  (*ii).vertices){
       std::cout << i << "--";
     }
     std::cout << "\n";
   }
+    items2.swap(items3);
+    items3.clear();
+    }
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
