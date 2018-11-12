@@ -65,7 +65,8 @@ struct NodeData{
 };
 
 
-typedef galois::graphs::LC_CSR_Graph<NodeData, void>::with_numa_alloc<
+//typedef galois::graphs::LC_CSR_Graph<NodeData, void>::with_numa_alloc<
+typedef galois::graphs::LC_CSR_Graph<uint8_t, void>::with_numa_alloc<
 true>::type ::with_no_lockable<true>::type Graph;
 // typedef galois::graphs::LC_CSR_Graph<uint32_t,void> Graph;
 // typedef galois::graphs::LC_Linear_Graph<uint32_t,void> Graph;
@@ -86,6 +87,29 @@ Iterator lowerBound(Iterator first, Iterator last, Compare comp) {
     half = count / 2;
     std::advance(it, half);
     if (comp(it)) {
+      first = ++it;
+      count -= half + 1;
+    } else {
+      count = half;
+    }
+  }
+  return first;
+}
+
+/**
+ * Like std::upper_bound but doesn't dereference iterators. Returns the first
+ * element for which comp is not true.
+ */
+template <typename Iterator, typename Compare>
+Iterator upperBound(Iterator first, Iterator last, Compare comp) {
+  Iterator it;
+  typename std::iterator_traits<Iterator>::difference_type count, half;
+  count = std::distance(first, last);
+  while (count > 0) {
+    it   = first;
+    half = count / 2;
+    std::advance(it, half);
+    if (!comp(it)) {
       first = ++it;
       count -= half + 1;
     } else {
@@ -138,6 +162,19 @@ struct GreaterThanOrEqual {
 };
 
 template <typename G>
+struct GreaterThan{
+  G& g;
+  typename G::GraphNode n;
+  GreaterThan(G& g, typename G::GraphNode n) : g(g), n(n) {}
+  bool operator()(typename G::edge_iterator it) {
+    return (n > g.getEdgeDst(it));
+  }
+};
+
+
+
+
+template <typename G>
 struct DegreeLess : public std::binary_function<typename G::GraphNode,
                                                 typename G::GraphNode, bool> {
   typedef typename G::GraphNode N;
@@ -185,6 +222,7 @@ struct IdLess {
  * Thomas Schank. Algorithmic Aspects of Triangle-Based Network Analysis. PhD
  * Thesis. Universitat Karlsruhe. 2007.
  */
+#if 0
 typedef galois::gstl::Vector<GNode> VecTy;
 void nodeIteratingAlgoPre(Graph& graph) {
 
@@ -249,12 +287,17 @@ void nodeIteratingAlgoPre(Graph& graph) {
 
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
+#endif
 
 template <typename VecTy, typename ElemTy>
 bool vertexNotInTuple(const VecTy& vec, const ElemTy& elem){
   return (std::find(vec.begin(), vec.end(), elem) == vec.end());
 }
 
+template <typename VecTy>
+size_t uniqueInTuple(const VecTy& vec){
+  return (std::set<GNode>(vec.begin(), vec.end()).size());
+}
 template <typename VecTy, typename ElemTy>
 bool edgeNotInTuple(const VecTy& vec, const ElemTy& elem, const uint32_t& st_info_elem){
   auto it = std::find(vec.begin(), vec.end(), elem); 
@@ -274,7 +317,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
     VecGNodeTy vertices;
     uint32_t key;
     VecUnsignedTy st_info;
-    SubGraphTuple(const VecTy& v1, const uint32_t& k1, const VecUnsignedTy& s1) : vertices(v1), key(k1), st_info(s1) {}
+    SubGraphTuple(const VecGNodeTy& v1, const uint32_t& k1, const VecUnsignedTy& s1) : vertices(v1), key(k1), st_info(s1) {}
   };
   galois::InsertBag<SubGraphTuple> items;
   galois::InsertBag<SubGraphTuple> items_active;
@@ -282,6 +325,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
   galois::InsertBag<SubGraphTuple> items_final;
   galois::GAccumulator<size_t> numTriangles;
 
+#if 0
   galois::do_all(galois::iterate(graph),
                 [&](GNode n) {
                 // Partition neighbors
@@ -301,9 +345,9 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
 
                  },
                  galois::loopname("Initialize"));
-
     //std::cout << "numItems: " << numItems.reduce() << "\n";
     std::cout << "Done Initializing\n";
+#endif
        galois::do_all(
             galois::iterate(graph),
             [&](const GNode& n) {
@@ -312,17 +356,30 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                   graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
               Graph::edge_iterator last =
                   graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-              Graph::edge_iterator ea = first + ndata.ea; // std::advance(first, ndata.ea);
-              Graph::edge_iterator bb = first + ndata.bb; //std::advance(first, ndata.bb);
+              //Graph::edge_iterator ea = first + ndata.ea; // std::advance(first, ndata.ea);
+              //Graph::edge_iterator bb = first + ndata.bb; //std::advance(first, ndata.bb);
+
+              Graph::edge_iterator ea =
+                  lowerBound(first, last, LessThan<Graph>(graph, n));
+              Graph::edge_iterator bb =
+                  lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
               for (; bb != last; ++bb) {
                 GNode B = graph.getEdgeDst(bb);
-                items_active.push(SubGraphTuple(VecTy{n,B}, 0, VecUnsignedTy{0,1}));
-                items_active.push(SubGraphTuple(VecTy{n,B}, 1, VecUnsignedTy{0,1}));
+                items_active.push(SubGraphTuple(VecGNodeTy{n,B}, 0, VecUnsignedTy{1,0}));
+                items_active.push(SubGraphTuple(VecGNodeTy{n,B}, 1, VecUnsignedTy{1,0}));
               }
             },
             galois::chunk_size<512>(), galois::steal(),
             galois::loopname("nodeIteratingAlgoWithStruct"));
+
+
+
+       //Optimization
+       //1. exclude tuples that cannot be expanded: Early pruning
+
+
+
 
     std::cout << "Start phase 2\n";
       galois::do_all(
@@ -331,7 +388,7 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
             [&](const SubGraphTuple& sg) {
             //[&](const SubGraphTuple& sg, auto& cnx) {
               auto n = sg.vertices[sg.key];
-              auto& ndata = graph.getData(n);
+              //auto& ndata = graph.getData(n);
               Graph::edge_iterator first =
                   graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
               Graph::edge_iterator last =
@@ -339,7 +396,13 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
 
               auto first_elem = sg.vertices[0];
               auto max_elem = first_elem;
-              auto max_elem_after_n  = std::max_element(sg.vertices.begin() + sg.key + 1, sg.vertices.end());
+              //If n is duplicated, find the first instance of n else it will find n:
+              //n is gauranteed to be present in the tuple
+              auto first_instance_of_n_it = std::find(sg.vertices.begin(), sg.vertices.end(), n);
+              //If no duplicates are present than first_instance_of_n == sg.key
+              auto first_instance_of_n  = std::distance(sg.vertices.begin(), first_instance_of_n_it); 
+
+              auto max_elem_after_n  = std::max_element(sg.vertices.begin() + first_instance_of_n + 1, sg.vertices.end());
               if(max_elem_after_n != sg.vertices.end()){
                 max_elem = std::max(*max_elem_after_n, max_elem);
               }
@@ -348,13 +411,49 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                   first, last, GreaterThanOrEqual<Graph>(graph, max_elem));
               for (; bb != last; ++bb) {
                 GNode dst = graph.getEdgeDst(bb);
+                //Do not add duplicate edges
                 if (edgeNotInTuple(sg.vertices, dst, sg.st_info[sg.key])){
                   auto verts = sg.vertices;
                   auto st_info = sg.st_info;
                   verts.push_back(dst);
                   st_info.push_back(sg.key);
+                  //TODO: Should have k unique elements
                   if (verts.size() == k) {
                     items_final.push(SubGraphTuple(verts, sg.key, st_info));
+                    //Find close structures using same rules of canonicality
+                    for (auto j = 1; j < verts.size(); ++j) {
+
+                      auto n_local = verts[j];
+                      auto first_elem = verts[0];
+                      auto max_elem = first_elem;
+                      //If n is duplicated, find the first instance of n else it will find n:
+                      //n is gauranteed to be present in the tuple
+                      auto first_instance_of_n_it = std::find(verts.begin(), verts.end(), n_local);
+                      //If no duplicates are present than first_instance_of_n == sg.key
+                      auto first_instance_of_n  = std::distance(verts.begin(), first_instance_of_n_it); 
+
+                      auto max_elem_after_n  = std::max_element(verts.begin() + first_instance_of_n + 1, verts.end());
+                      if(max_elem_after_n != sg.vertices.end()){
+                        max_elem = std::max(*max_elem_after_n, max_elem);
+                      }
+
+                      Graph::edge_iterator first_local =
+                        graph.edge_begin(n_local, galois::MethodFlag::UNPROTECTED);
+                      Graph::edge_iterator last_local =
+                        graph.edge_end(n_local, galois::MethodFlag::UNPROTECTED);
+                      Graph::edge_iterator bb = lowerBound(
+                          first_local, last_local, GreaterThanOrEqual<Graph>(graph, max_elem));
+                      for (; bb != last_local; ++bb) {
+                        GNode dst = graph.getEdgeDst(bb);
+                        if(vertexNotInTuple(verts, dst))
+                          continue;
+                        if (edgeNotInTuple(verts, dst, st_info[j])) {
+                          verts.push_back(dst);
+                          st_info.push_back(j);
+                          items_final.push(SubGraphTuple(verts, j, st_info));
+                        }
+                      }
+                    }
                   }
                   else {
                     for (auto i = 0; i < verts.size(); ++i) {
@@ -367,16 +466,18 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
             galois::chunk_size<512>(), galois::steal(), galois::no_conflicts(),
             galois::loopname("nodeIteratingAlgoWithStruct"));
 
-#if 0
     std::cout << "items2" << "\n";
   for(auto ii = items_final.begin(); ii != items_final.end(); ++ii){
     std::cout << "key : " << (*ii).key << "\n";
     for(auto i :  (*ii).vertices){
       std::cout << i << "--";
     }
+    std::cout <<"\n";
+    for(auto i :  (*ii).st_info){
+      std::cout << i << "--";
+    }
     std::cout << "\n";
   }
-#endif
   std::cout << "Num " << k << "-motif: " << std::distance(items_final.begin(), items_final.end()) << "\n";
   std::cout << "NumTriangles: " << numTriangles.reduce() << "\n";
 }
