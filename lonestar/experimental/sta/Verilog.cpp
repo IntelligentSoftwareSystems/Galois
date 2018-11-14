@@ -3,6 +3,14 @@
 static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
 
+static bool isNameForVdd(std::string name) {
+  return (name == name0 || name == "1\'h0");
+}
+
+static bool isNameForGnd(std::string name) {
+  return (name == name1 || name == "1\'h1");
+}
+
 void VerilogParser::tokenizeFile(std::string inName) {
   std::vector<char> delimiters = {'(', ')', ',', ';', '\\', '[', ']', '=', '.'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
@@ -49,16 +57,12 @@ void VerilogParser::parseModule() {
     auto p = i.second;
     auto w = curModule->findWire(p->name);
     assert(w);
-    p->wire = w;
     w->addPin(p);
-  }
 
-  // fix the connection for assigns
-  for (auto& i:curModule->assigns) {
-    auto p = i.first;
-    auto w = i.second;
-    w->addPin(p);
-    p->wire = w;
+    // no assign statement for this pin
+    if (!(p->wire)) {
+      p->wire = w;
+    }
   }
 }
 
@@ -105,8 +109,8 @@ void VerilogParser::parseAssign() {
   assert(wire);
   curToken += 1; // consume ";"
   
-  // record the assign
-  curModule->assigns[pin] = wire;
+  pin->wire = wire;
+  wire->addPin(pin);
 }
 
 void VerilogParser::parseGate() {
@@ -175,7 +179,7 @@ void VerilogPin::print(std::ostream& os) {
 
 void VerilogWire::print(std::ostream& os) {
   // do not print wires for constants
-  if (name != name0 && name != name1) {
+  if (!isNameForGnd(name) && !isNameForVdd(name)) {
     os << "  wire " << name << ";" << std::endl;
   }
 }
@@ -255,10 +259,12 @@ void VerilogModule::print(std::ostream& os) {
     i.second->print(os);
   }
 
-  for (auto& i: assigns) {
-    auto p = i.first;
-    auto w = i.second;
-    os << "  assign " << p->name << " = " << w->name << ";" << std::endl;
+  for (auto& i: outPins) {
+    auto& pinName = i->name;
+    auto& wireName = i->wire->name;
+    if (pinName != wireName) {
+      os << "  assign " << pinName << " = " << wireName << ";" << std::endl;
+    }
   }
 
   for (auto& i: gates) {
@@ -268,19 +274,26 @@ void VerilogModule::print(std::ostream& os) {
   os << "endmodule" << std::endl;
 }
 
-bool VerilogModule::isFlattened() {
-  return succ.empty();
+bool VerilogModule::isHierarchical() {
+  return !succ.empty();
+}
+
+VerilogWire* VerilogModule::findWire(std::string name) {
+  name = isNameForGnd(name) ? name0 :
+         isNameForVdd(name) ? name1 : name;
+  auto it = wires.find(name);
+  return (it == wires.end()) ? nullptr : it->second;
 }
 
 void VerilogDesign::clear() {
-  clearHierarchy();
+  clearDependency();
   for (auto& i: modules) {
     delete i.second;
   }
   modules.clear();
 }
 
-void VerilogDesign::clearHierarchy() {
+void VerilogDesign::clearDependency() {
   for (auto& i: modules) {
     auto m = i.second;
     m->pred.clear();
@@ -289,8 +302,8 @@ void VerilogDesign::clearHierarchy() {
   roots.clear();
 }
 
-void VerilogDesign::buildHierarchy() {
-  clearHierarchy();
+void VerilogDesign::buildDependency() {
+  clearDependency();
 
   for (auto& i: modules) {
     auto m = i.second;
@@ -312,13 +325,13 @@ void VerilogDesign::buildHierarchy() {
   }
 }
 
-bool VerilogDesign::isFlattened() {
+bool VerilogDesign::isHierarchical() {
   for (auto m: roots) {
-    if (!m->isFlattened()) {
-      return false;
+    if (m->isHierarchical()) {
+      return true;
     }
   }
-  return true;
+  return false;
 }
 
 void VerilogDesign::print(std::ostream& os) {

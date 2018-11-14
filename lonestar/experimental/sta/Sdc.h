@@ -78,6 +78,7 @@ private:
 public:
   std::vector<CellLib*>& libs;
   VerilogModule& m;
+  std::unordered_map<std::string, CellLib*> mapName2Libs;
 
   // boundary conditions
   std::unordered_map<VerilogPin*, SDCDrivingCell*> mapPin2DrivingCells;
@@ -111,6 +112,10 @@ public:
   }
 
   SDC(std::vector<CellLib*>& libs, VerilogModule& m): libs(libs), m(m) {
+    for (auto i: libs) {
+      mapName2Libs[i->name] = i;
+    }
+
     maxDelayPI2PO = std::numeric_limits<MyFloat>::infinity();
     maxDelayPI2RI = std::numeric_limits<MyFloat>::infinity();
     maxDelayRO2RI = std::numeric_limits<MyFloat>::infinity();

@@ -1,25 +1,29 @@
 #include "TimingEngine.h"
 
-TimingEngine::TimingEngine(VerilogDesign& v, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew)
-  : v(v), libs(libs), modes(modes), isExactSlew(isExactSlew)
-{
-  for (auto i: v.modules) {
+void TimingEngine::readDesign(VerilogDesign* design) {
+  clearTimingGraphs();
+  assert(libs.size()); // need cell lib info for TimingGraphs
+  assert(design);
+  v = design;
+
+  for (auto i: v->modules) {
     auto m = i.second;
-    if (m->isFlattened()) {
+    if (!m->isHierarchical()) {
       TimingGraph* g = new TimingGraph(*m, libs, modes, isExactSlew);
       modules[m] = g;
       g->construct();
     }
     else {
-      std::cout << "Not supported: module " << m->name << " is not flattened" << std::endl;
+      std::cout << "Not supported: module " << m->name << " is hierarchical" << std::endl;
     }
   }
 }
 
-TimingEngine::~TimingEngine() {
+void TimingEngine::clearTimingGraphs() {
   for (auto& i: modules) {
     delete i.second;
   }
+  modules.clear();
 }
 
 TimingGraph* TimingEngine::findTimingGraph(VerilogModule* m) {
@@ -28,7 +32,7 @@ TimingGraph* TimingEngine::findTimingGraph(VerilogModule* m) {
     return it->second;
   }
   else {
-    std::cout << "Module " << m->name << " does not exist or is not flattened." << std::endl;
+    std::cout << "Module " << m->name << " does not exist or is hierarchical." << std::endl;
     return nullptr;
   }
 }

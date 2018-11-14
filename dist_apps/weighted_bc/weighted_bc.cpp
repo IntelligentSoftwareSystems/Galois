@@ -31,10 +31,10 @@ constexpr static const char* const REGION_NAME = "BC";
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 
-#define __USE_BFS__ // also defined in bc_push_cuda.h
+//#define __USE_BFS__ // also defined in weighted_bc_cuda.h
 
 #ifdef __GALOIS_HET_CUDA__
-#include "bc_push_cuda.h"
+#include "weighted_bc_cuda.h"
 struct CUDA_Context* cuda_ctx;
 #endif
 
@@ -135,7 +135,7 @@ galois::DynamicBitSet bitset_propagation_flag;
 galois::DynamicBitSet bitset_dependency;
 
 // sync structures
-#include "bc_push_sync.hh"
+#include "weighted_bc_sync.hh"
 
 /******************************************************************************/
 /* Functors for running the algorithm */

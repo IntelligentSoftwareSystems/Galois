@@ -102,7 +102,6 @@ struct VerilogModule {
   std::unordered_map<std::string, VerilogPin*> pins;
   std::unordered_set<VerilogPin*> inPins;
   std::unordered_set<VerilogPin*> outPins;
-  std::unordered_map<VerilogPin*, VerilogWire*> assigns;
 
   // for dependencies among modules
   std::unordered_set<VerilogModule*> pred;
@@ -168,12 +167,8 @@ public:
     return wire;
   }
 
-  VerilogWire* findWire(std::string name) {
-    auto it = wires.find(name);
-    return (it == wires.end()) ? nullptr : it->second;
-  }
-
-  bool isFlattened();
+  VerilogWire* findWire(std::string name);
+  bool isHierarchical();
 };
 
 struct VerilogDesign {
@@ -182,14 +177,14 @@ struct VerilogDesign {
 
 private:
   void clear();
-  void clearHierarchy();
+  void clearDependency();
 
 public:
   void parse(std::string inName, bool toClear = false);
   void print(std::ostream& os = std::cout);
 
-  void buildHierarchy();
-  bool isFlattened();
+  void buildDependency();
+  bool isHierarchical();
 
   ~VerilogDesign() { clear(); }
 

@@ -481,9 +481,7 @@ inline bool CutManager::checkCutDominance(Cut* smallerCut, Cut* largerCut) {
         break;
       }
     }
-    if (j ==
-        largerCut
-            ->nLeaves) { // node i in smallerCut is not contained in largerCut
+    if (j == largerCut->nLeaves) { // node i in smallerCut is not contained in largerCut
       return false;
     }
   }

@@ -10,6 +10,8 @@
 
 #include "TimingDefinition.h"
 #include "Tokenizer.h"
+#include "WireLoad.h"
+#include "Verilog.h"
 
 // forward declaration
 struct Lut;
@@ -26,6 +28,15 @@ enum WireTreeType {
   TREE_TYPE_BEST_CASE = 0,
   TREE_TYPE_BALANCED,
   TREE_TYPE_WORST_CASE,
+};
+
+enum VariableType {
+  VARIABLE_INPUT_TRANSITION_TIME = 0,
+  VARIABLE_CONSTRAINED_PIN_TRANSITION,
+  VARIABLE_RELATED_PIN_TRANSITION,
+  VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE,
+  VARIABLE_INPUT_NET_TRANSITION,
+  VARIABLE_TIME,
 };
 
 struct CellLibParser {
@@ -64,7 +75,7 @@ public:
 struct LutTemplate {
   std::vector<size_t> shape;
   std::vector<size_t> stride;
-  std::vector<std::string> var;
+  std::vector<VariableType> var;
   std::string name;
   CellLib* lib;
 
@@ -72,17 +83,20 @@ public:
   void print(std::ostream& os = std::cout);
 };
 
+using Parameter = std::unordered_map<VariableType, MyFloat>;
+using VecOfMyFloat = std::vector<MyFloat>;
+
 struct Lut {
   LutTemplate* lutTemplate;
 
-  std::vector<std::vector<MyFloat>> index;
-  std::vector<MyFloat> value;
+  std::vector<VecOfMyFloat> index;
+  VecOfMyFloat value;
 
 private:
-  MyFloat lookupInternal(std::vector<MyFloat>& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
+  MyFloat lookupInternal(VecOfMyFloat& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
-  MyFloat lookup(std::vector<MyFloat>& param);
+  MyFloat lookup(Parameter& param);
   void print(std::string attr, std::ostream& os = std::cout);
 };
 
@@ -110,10 +124,10 @@ struct CellPin {
 
 public:
   void print(std::ostream& os = std::cout);
-  bool isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise);
-  MyFloat extract(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
-  std::pair<MyFloat, std::string> extractMax(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
-  std::pair<MyFloat, std::string> extractMin(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  bool isEdgeDefined(CellPin* inPin, bool isNeg, bool isRise, TableType index = TABLE_DELAY);
+  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
+  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
 
   void addLut(Lut* lut, TableType tType, bool isRise, CellPin* relatedPin, std::string when, bool isPos, bool isNeg) {
     if (isPos) {
@@ -186,8 +200,7 @@ public:
   }
 };
 
-struct WireLoad {
-  std::string name;
+struct PreLayoutWireLoad: public WireLoad {
   MyFloat c;
   MyFloat r;
   MyFloat slope;
@@ -198,9 +211,8 @@ private:
   MyFloat wireLength(size_t deg);
 
 public:
-  MyFloat wireR(size_t deg);
-  MyFloat wireC(size_t deg);
-  MyFloat wireDelay(MyFloat loadC, size_t deg);
+  MyFloat wireC(VerilogWire* wire);
+  MyFloat wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin);
   void print(std::ostream& os = std::cout);
 
   void addFanoutLength(size_t fanout, MyFloat length) {
@@ -211,14 +223,14 @@ public:
 struct CellLib {
   std::string name;
   std::string opCond;
-  WireLoad* defaultWireLoad;
+  PreLayoutWireLoad* defaultWireLoad;
   MyFloat defaultInoutPinCap;
   MyFloat defaultInputPinCap;
   MyFloat defaultOutputPinCap;
   MyFloat defaultMaxSlew;
   WireTreeType wireTreeType;
 
-  std::unordered_map<std::string, WireLoad*> wireLoads;
+  std::unordered_map<std::string, PreLayoutWireLoad*> wireLoads;
   std::unordered_map<std::string, Cell*> cells;
   std::unordered_map<std::string, LutTemplate*> lutTemplates;
 
@@ -249,15 +261,15 @@ public:
     return (it == cells.end()) ? nullptr : it->second;
   }
 
-  WireLoad* addWireLoad(std::string name) {
-    WireLoad* wireLoad = new WireLoad;
+  PreLayoutWireLoad* addWireLoad(std::string name) {
+    PreLayoutWireLoad* wireLoad = new PreLayoutWireLoad;
     wireLoad->name = name;
     wireLoad->lib = this;
     wireLoads[name] = wireLoad;
     return wireLoad;
   }
 
-  WireLoad* findWireLoad(std::string name) {
+  PreLayoutWireLoad* findWireLoad(std::string name) {
     auto it = wireLoads.find(name);
     return (it == wireLoads.end()) ? nullptr : it->second;
   }

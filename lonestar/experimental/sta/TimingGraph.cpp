@@ -80,8 +80,8 @@ void TimingGraph::addGate(VerilogGate* gate) {
     for (auto in: inNodes) {
       auto& iData = g.getData(in, unprotected);
       auto ip = iData.t[0].pin;
-      auto isNegUnate = (oData.isRise != iData.isRise);
-      if (op->isUnateAtEdge(ip, isNegUnate, oData.isRise)) {
+      auto isNeg = (oData.isRise != iData.isRise);
+      if (op->isEdgeDefined(ip, isNeg, oData.isRise)) {
         auto e = g.addMultiEdge(in, on, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -462,7 +462,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
         iData.revTopoL = oData.revTopoL + 1;
         bool isNeg = (oData.isRise != iData.isRise);
 
-        if (dCell->toCellPin->isUnateAtEdge(dCell->fromCellPin, isNeg, oData.isRise)) {
+        if (dCell->toCellPin->isEdgeDefined(dCell->fromCellPin, isNeg, oData.isRise)) {
           auto e = g.addMultiEdge(in, on, unprotected);
           auto& eData = g.getEdgeData(e);
           eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
@@ -483,14 +483,13 @@ void TimingGraph::computeDriveC(GNode n) {
 
   for (auto e: g.edges(n)) {
     auto& eData = g.getEdgeData(e);
-    auto wOutDeg = eData.wire->outDeg();
 
     auto succ = g.getEdgeDst(e);
     auto& succData = g.getData(succ);
 
     for (size_t k = 0; k < libs.size(); k++) {
       if (e == g.edge_begin(n)) {
-        data.t[k].wireC = eData.t[k].wireLoad->wireC(wOutDeg);
+        data.t[k].wireC = eData.t[k].wireLoad->wireC(eData.wire);
       }
       data.t[k].pinC += succData.t[k].pinC;
     }
@@ -504,7 +503,6 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
   auto& predData = g.getData(pred);
 
   auto& ieData = g.getEdgeData(ie);
-  auto wOutDeg = ieData.wire->outDeg();
 
   for (size_t k = 0; k < libs.size(); k++) {
     MyFloat loadC = 0.0;
@@ -514,7 +512,7 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
     else if (TREE_TYPE_WORST_CASE == libs[k]->wireTreeType) {
       loadC = predData.t[k].pinC;
     }
-    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, wOutDeg);
+    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, ieData.wire, data.pin);
     ieData.t[k].delay = delay;
     data.t[k].arrival = predData.t[k].arrival + delay;
     data.t[k].slew = predData.t[k].slew;
@@ -536,8 +534,16 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   }
 
   bool isNeg = (data.isRise != predData.isRise);
-  std::vector<MyFloat> param = {predData.t[k].slew, (data.t[k].pinC + data.t[k].wireC)};
-  std::vector<MyFloat> paramNoC = {predData.t[k].slew, 0.0};
+
+  Parameter param = {
+    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
+  };
+
+  Parameter paramNoC = {
+    {VARIABLE_INPUT_NET_TRANSITION,         predData.t[k].slew},
+    {VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE, 0.0}
+  };
 
   auto& ieData = g.getEdgeData(ie);
 
@@ -596,6 +602,7 @@ void TimingGraph::computeArrivalTime() {
     return g.getData(n, unprotected).topoL;
   };
 
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
   using LIFO = galois::worklists::PerThreadChunkLIFO<>;
   using OBIM
       = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
@@ -638,12 +645,14 @@ void TimingGraph::computeArrivalTime() {
       for (auto e: g.edges(n)) {
         auto succ = g.getEdgeDst(e);
         auto& succData = g.getData(succ);
-        if ((1 == succData.topoL - data.topoL) && !succData.isDummy) {
+        if (/*(1 == succData.topoL - data.topoL) &&*/ !succData.isDummy) {
           auto& succInQueue = succData.flag;
-          bool succQueued = false;
-          if (succInQueue.compare_exchange_strong(succQueued, true)) {
-            *(enqueued[succData.topoL]) += 1;
-            ctx.push(succ);
+          if (!succInQueue) {
+            bool succQueued = false;
+            if (succInQueue.compare_exchange_strong(succQueued, true)) {
+              *(enqueued[succData.topoL]) += 1;
+              ctx.push(succ);
+            }
           }
         }
       }
@@ -653,15 +662,20 @@ void TimingGraph::computeArrivalTime() {
     , galois::wl<OBIM>(topoLIndexer)
   );
 
+  size_t totalEnqueued = 0;
+  size_t totalExecuted = 0;
   for (size_t i = 0; i < numLevels; i++) {
     auto q = enqueued[i]->reduce();
     auto x = executed[i]->reduce();
+    totalEnqueued += q;
+    totalExecuted += x;
     if (q != x) {
       std::cout << "Level " << i << ": " << q << " enqueued, " << x << " executed." << std::endl;
     }
     delete enqueued[i];
     delete executed[i];
   }
+  std::cout << totalEnqueued << " enqueued, " << totalExecuted << " executed." << std::endl;
 
   std::cout << "ComputeArrivalTime done." << std::endl;
   print();

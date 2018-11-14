@@ -48,7 +48,7 @@ static T interpolate(T x0, T y0, T x1, T y1, T x) {
   }
 }
 
-MyFloat Lut::lookupInternal(std::vector<MyFloat>& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
+MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
   auto lb = bound[lv].first;
   auto ub = bound[lv].second;
   auto start_l = start + stride[lv] * lb;
@@ -59,7 +59,7 @@ MyFloat Lut::lookupInternal(std::vector<MyFloat>& param, std::vector<Bound>& bou
   return interpolate(index[lv][lb], y0, index[lv][ub], y1, param[lv]);
 }
 
-MyFloat Lut::lookup(std::vector<MyFloat>& param) {
+MyFloat Lut::lookup(Parameter& param) {
   auto paramSize = param.size();
   assert(paramSize == index.size());
 
@@ -68,13 +68,20 @@ MyFloat Lut::lookup(std::vector<MyFloat>& param) {
     return value[0];
   }
 
+  // sort parameter by the var order in lutTemplate
+  // assume no repeated variables
+  VecOfMyFloat sortedParam;
+  for (size_t i = 0; i < paramSize; ++i) {
+    sortedParam.push_back(param.at(lutTemplate->var[i]));
+  }
+
   // find bounds for each dimension
   std::vector<Bound> bound;
   for (size_t i = 0; i < paramSize; ++i) {
-    bound.push_back(findBound(param[i], index[i]));
+    bound.push_back(findBound(sortedParam[i], index[i]));
   }
 
-  return lookupInternal(param, bound, lutTemplate->stride, 0, 0);
+  return lookupInternal(sortedParam, bound, lutTemplate->stride, 0, 0);
 }
 
 void Lut::print(std::string attr, std::ostream& os) {
@@ -119,16 +126,16 @@ void Lut::print(std::string attr, std::ostream& os) {
   os << "        }" << std::endl;
 }
 
-bool CellPin::isUnateAtEdge(CellPin* inPin, bool isNeg, bool isRise) {
-  return !tables[inPin][isRise][TABLE_DELAY][isNeg].empty();
+bool CellPin::isEdgeDefined(CellPin* inPin, bool isNeg, bool isRise, TableType index) {
+  return !tables[inPin][isRise][index][isNeg].empty();
 }
 
-MyFloat CellPin::extract(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
+MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
   return tables[inPin][isRise][index][isNeg][when]->lookup(param);
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMax(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
   MyFloat ret = -std::numeric_limits<MyFloat>::infinity();
   std::string when;
   for (auto& i: tables[inPin][isRise][index][isNeg]) {
@@ -142,7 +149,7 @@ CellPin::extractMax(std::vector<MyFloat>& param, TableType index, CellPin* inPin
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMin(std::vector<MyFloat>& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
   MyFloat ret = std::numeric_limits<MyFloat>::infinity();
   std::string when;
   for (auto& i: tables[inPin][isRise][index][isNeg]) {
@@ -306,7 +313,7 @@ void LutTemplate::print(std::ostream& os) {
   os << "  }" << std::endl;
 }
 
-MyFloat WireLoad::wireLength(size_t deg) {
+MyFloat PreLayoutWireLoad::wireLength(size_t deg) {
   auto lb = fanoutLength.lower_bound(deg);
   // extrapolation from upper limit
   if (lb == fanoutLength.end()) {
@@ -331,20 +338,17 @@ MyFloat WireLoad::wireLength(size_t deg) {
   }
 }
 
-MyFloat WireLoad::wireR(size_t deg) {
-  return r * wireLength(deg);
+MyFloat PreLayoutWireLoad::wireC(VerilogWire* wire) {
+  return c * wireLength(wire->outDeg());
 }
 
-MyFloat WireLoad::wireC(size_t deg) {
-  return c * wireLength(deg);
-}
-
-MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
+MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin) {
   // best-case tree
   if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
     return 0.0;
   }
   else {
+    auto deg = wire->outDeg();
     auto wL = wireLength(deg);
     auto wC = c * wL;
     auto wR = r * wL;
@@ -360,14 +364,14 @@ MyFloat WireLoad::wireDelay(MyFloat loadC, size_t deg) {
     //      Springer, 2009.
 //      auto delay = wR * (wC / 2 + loadC);
 
-    // delay formula used by Cadence genus
+    // delay formula used by Cadence Genus' report_net_delay_calculation
     auto delay = wR * (wC + loadC);
 
     return delay;
   }
 }
 
-void WireLoad::print(std::ostream& os) {
+void PreLayoutWireLoad::print(std::ostream& os) {
   os << "  wire_load (\"" << name << "\") {" << std::endl;
   os << "    capacitance: " << c << ";" << std::endl;
   os << "    resistance: " << r << ";" << std::endl;
@@ -497,6 +501,15 @@ void CellLibParser::parseWireLoad() {
   curToken += 1; // consume "}"
 }
 
+static std::unordered_map<std::string, VariableType> mapVarName2Type = {
+  {"input_transition_time",        VARIABLE_INPUT_TRANSITION_TIME},
+  {"constrained_pin_transition",   VARIABLE_CONSTRAINED_PIN_TRANSITION},
+  {"related_pin_transition",       VARIABLE_RELATED_PIN_TRANSITION},
+  {"total_output_net_capacitance", VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE},
+  {"input_net_transition",         VARIABLE_INPUT_NET_TRANSITION},
+  {"time",                         VARIABLE_TIME}
+};
+
 void CellLibParser::parseLutTemplate() {
   // lu_table_template (name) {...}
   curToken += 2; // consume "lu_table_tamplate" and "("
@@ -508,7 +521,7 @@ void CellLibParser::parseLutTemplate() {
     // variable_*: name;
     if ("variable_1" == *curToken || "variable_2" == *curToken || "variable_3" == *curToken) {
       curToken += 2; // consume "variable_*" and ":"
-      lutTemplate->var.push_back(*curToken);
+      lutTemplate->var.push_back(mapVarName2Type.at(*curToken));
       curToken += 2; // consume name and ";"
       unmatched++;
     }
@@ -552,7 +565,7 @@ void CellLibParser::parseLut(Lut* lut) {
     // index_* ("num1[,num*]");
     if ("index_1" == *curToken || "index_2" == *curToken || "index_3" == *curToken) {
       curToken += 3; // consume "index_*", "(" and "\""
-      std::vector<MyFloat> v;
+      VecOfMyFloat v;
       while (!isEndOfTokenStream() && ")" != *curToken) {
         v.push_back(getMyFloat(*curToken));
         curToken += 2; // consume num*, and "," in between or "\"" at the end
@@ -1012,7 +1025,6 @@ void CellLib::clear() {
 void CellLib::setup() {
   // add a LUT template for scalar case
   auto scalar = addLutTemplate("scalar");
-  scalar->var.push_back("");
   scalar->shape.push_back(1);
   scalar->stride.push_back(1);
 }
