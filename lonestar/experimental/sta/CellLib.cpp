@@ -222,12 +222,122 @@ void TimingTable::print(std::ostream& os) {
 
 void TimingTable::wrapUpConstruction() {
   // lookup for the pin now
-  // because not all dependent pins show up before the table when parsing
+  // because not all related pins show up before the table when parsing
   assert(!nameOfRelatedPin.empty());
   relatedPin = endPin->cell->findCellPin(nameOfRelatedPin);
   assert(relatedPin);
 
   // relate tables to lookup structure
+  switch (tType) {
+  // combinational/async delay arcs
+  case COMBINATIONAL:
+  case COMBINATIONAL_RISE:
+  case COMBINATIONAL_FALL:
+  case PRESET:
+  case CLEAR:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) {
+        endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+        endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      }
+      if (delay[1]) {
+        endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+        endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      }
+      if (slew[0]) {
+        endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+        endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      }
+      if (slew[1]) {
+        endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+        endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+      }
+    }
+    break;
+
+  // sequential delay arcs
+  // relatedPin is always rising
+  case RISING_EDGE:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    break;
+
+  // relatedPin is always falling
+  case FALLING_EDGE:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    break;
+
+  // sequential constraints
+  case HOLD_RISING:
+  case REMOVAL_RISING:
+    if (constraint[0]) endPin->timingMap[relatedPin][1][0][MIN_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][1][1][MIN_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case HOLD_FALLING:
+  case REMOVAL_FALLING:
+    if (constraint[0]) endPin->timingMap[relatedPin][0][0][MIN_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][0][1][MIN_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case SETUP_RISING:
+  case RECOVERY_RISING:
+    if (constraint[0]) endPin->timingMap[relatedPin][1][0][MAX_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][1][1][MAX_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case SETUP_FALLING:
+  case RECOVERY_FALLING:
+    if (constraint[0]) endPin->timingMap[relatedPin][0][0][MAX_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][0][1][MAX_CONSTRAINT][when] = constraint[1];
+    break;
+
+  default:
+    // the following types of timing arcs are not handled for now
+    // three-state delay
+    // non-sequential constraints
+    // clock waveform constraints
+    // clock skew constraints
+    // no-change constraints
+    break;
+  } // end switch tType
 }
 
 PowerTable::~PowerTable() {
@@ -267,22 +377,24 @@ void PowerTable::print(std::ostream& os) {
 }
 
 bool CellPin::isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index) {
-  return true;
+  return !timingMap.at(inPin)[isInRise][isMeRise][index].empty();
 }
 
 MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when) {
-  if (POWER == index) {
-    return 0.0;
-  }
-  else {
-    return 0.0;
-  }
+  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param);
 }
 
 std::pair<MyFloat, std::string>
 CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
   MyFloat ret = -std::numeric_limits<MyFloat>::infinity();
   std::string when;
+  for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
+    auto tmp = i.second->lookup(param);
+    if (tmp > ret) {
+      ret = tmp;
+      when = i.first;
+    }
+  }
   return {ret, when};
 }
 
@@ -290,6 +402,13 @@ std::pair<MyFloat, std::string>
 CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
   MyFloat ret = std::numeric_limits<MyFloat>::infinity();
   std::string when;
+  for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
+    auto tmp = i.second->lookup(param);
+    if (tmp < ret) {
+      ret = tmp;
+      when = i.first;
+    }
+  }
   return {ret, when};
 }
 

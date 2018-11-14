@@ -24,8 +24,9 @@ struct Cell;
 enum TableType {
   DELAY = 0,
   SLEW,
-  CONSTRAINT,
-  POWER,
+  MIN_CONSTRAINT,
+  MAX_CONSTRAINT,
+//  POWER,
 };
 
 enum WireTreeType {
@@ -55,6 +56,7 @@ enum TimingType {
   COMBINATIONAL = 0,
   COMBINATIONAL_RISE,
   COMBINATIONAL_FALL,
+  // three-state delay arcs
   THREE_STATE_DISABLE,
   THREE_STATE_DISABLE_RISE,
   THREE_STATE_DISABLE_FALL,
@@ -64,6 +66,7 @@ enum TimingType {
   // sequential delay arcs
   RISING_EDGE,
   FALLING_EDGE,
+  // async delay arcs
   PRESET,
   CLEAR,
   // sequential constraints
@@ -218,6 +221,16 @@ struct CellPin {
 
   std::unordered_set<TimingTable*> timings;
   std::unordered_set<PowerTable*> powers;
+
+  // organization of tables for lookup
+  // order of keys:
+  //   1. incoming pin
+  //   2. inRise
+  //   3. meRise
+  //   4. delay/slew/min_constraint/max_constraint
+  //   5. when
+  using InnerTimingMap = std::unordered_map<std::string, Lut*>;
+  std::unordered_map<CellPin*, InnerTimingMap[2][2][4]> timingMap;
 
 public:
   ~CellPin();
