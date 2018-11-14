@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-  lib.print();
+//  lib.print();
 
 #if 1
   auto and2X1 = lib.findCell("AND2_X1");
@@ -107,7 +107,7 @@ int main(int argc, char *argv[]) {
   auto res = outPin->extractMax(param, DELAY, inPin, false, true);
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
-/*
+
   VerilogDesign design;
   design.parse(verilogName);
 //  design.print();
@@ -132,6 +132,6 @@ int main(int argc, char *argv[]) {
 
   engine.constrain(m, sdc);
   engine.time(m);
-*/
+
   return 0;
 }

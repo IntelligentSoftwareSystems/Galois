@@ -66,27 +66,29 @@ enum TimingType {
   FALLING_EDGE,
   PRESET,
   CLEAR,
-  // sequential constraint arcs
+  // sequential constraints
   HOLD_RISING,
   HOLD_FALLING,
   SETUP_RISING,
   SETUP_FALLING,
   RECOVERY_RISING,
   RECOVERY_FALLING,
-  SKEW_RISING,
-  SKEW_FALLING,
   REMOVAL_RISING,
   REMOVAL_FALLING,
+  // clock waveform constraints
   MIN_PULSE_WIDTH,
   MINIMUM_PERIOD,
+  // clock skew constraints
+  SKEW_RISING,
+  SKEW_FALLING,
   MAX_CLOCK_TREE_PATH,
   MIN_CLOCK_TREE_PATH,
-  // non-sequential constraint arcs
+  // non-sequential constraints
   NON_SEQ_SETUP_RISING,
   NON_SEQ_SETUP_FALLING,
   NON_SEQ_HOLD_RISING,
   NON_SEQ_HOLD_FALLING,
-  // no-change constraint arcs
+  // no-change constraints
   NOCHANGE_HIGH_HIGH,
   NOCHANGE_HIGH_LOW,
   NOCHANGE_LOW_HIGH,
