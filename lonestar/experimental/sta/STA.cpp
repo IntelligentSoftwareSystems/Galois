@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-  lib.print();
+//  lib.print();
 
 #if 0
   // assume the input is NanGate 45nm NLDM .lib at typical corner
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
   auto res = outPin->extractMax(param, DELAY, inPin, false, true);
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
-/*
+
   VerilogDesign design;
   design.parse(verilogName);
 //  design.print();
@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Abort: Not supporting multiple/hierarchical modules for now." << std::endl;
     return 0;
   }
-
+/*
   TimingEngine engine;
   engine.addCellLib(&lib, TIMING_MODE_MAX_DELAY);
 //  engine.addCellLib(&lib, TIMING_MODE_MIN_DELAY);

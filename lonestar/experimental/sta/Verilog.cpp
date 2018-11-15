@@ -14,8 +14,9 @@ static bool isNameForGnd(std::string name) {
 void VerilogParser::tokenizeFile(std::string inName) {
   std::vector<char> delimiters = {'(', ')', ',', ';', '\\', '[', ']', '=', '.'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
+  std::vector<std::string> comments = {"//", "\n", "/*", "*/"};
 
-  Tokenizer tokenizer(delimiters, separators);
+  Tokenizer tokenizer(delimiters, separators, comments);
   tokens = tokenizer.tokenize(inName);
   curToken = tokens.begin();
 }

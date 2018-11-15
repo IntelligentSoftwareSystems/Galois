@@ -61,29 +61,46 @@ void Tokenizer::readFile2Buffer(std::string inName) {
   //  std::cout << buffer;
 }
 
+// assume comments in the form of {"form1_begin", "form1_end", ...}
+// e.g., {"/*", "*/", "//", "\n"} for C-style comments
 void Tokenizer::skipComment() {
   while (cursor < bufferEnd) {
-    if ('/' != *cursor) {
-      return;
-    }
-
-    // skip a line of comment
-    if ('/' == *(cursor+1)) {
-      for (cursor += 2; cursor < bufferEnd; ++cursor) {
-        if ('\n' == *cursor) {
-          ++cursor;
+    // check which form of comments is used
+    auto cmtForm = comments.begin();
+    auto endOfCmtForms = comments.end();
+    for ( ; cmtForm != endOfCmtForms; cmtForm += 2) {
+      bool isStartOfComment = true;
+      auto& cmtStart = *cmtForm;
+      for (size_t j = 0; j < cmtStart.size(); ++j) {
+        if (cmtStart[j] != *(cursor+j)) {
+          isStartOfComment = false;
           break;
         }
       }
+      if (isStartOfComment) {
+        break;
+      }
     }
 
-    // skip a block of comment
-    else if ('*' == *(cursor+1)) {
-      for (cursor += 2; cursor < bufferEnd; ++cursor) {
-        if ('*' == *cursor && '/' == *(cursor+1)) {
-          cursor += 2;
+    // no comment begins at cursor
+    if (endOfCmtForms == cmtForm) {
+      return;
+    }
+
+    // remove the comment based on the form identified
+    auto& cmtStart = *cmtForm;
+    auto& cmtEnd = *(cmtForm+1);
+    for (cursor += cmtStart.size(); cursor < bufferEnd; ++cursor) {
+      bool isEndOfComment = true;
+      for (size_t j = 0; j < cmtEnd.size(); ++j) {
+        if (cmtEnd[j] != *(cursor+j)) {
+          isEndOfComment = false;
           break;
         }
+      }
+      if (isEndOfComment) {
+        cursor += cmtEnd.size();
+        break;
       }
     }
   } // end while

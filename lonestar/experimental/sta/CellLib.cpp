@@ -1301,7 +1301,9 @@ void CellLibParser::tokenizeFile(std::string inName) {
     '(', ')', ',', ':', ';', '/', '#', '[', ']', '{', '}', 
     '*', '\"', '\\', '!', '^', '\'', '+', '&', '|'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
-  Tokenizer tokenizer(delimiters, separators);
+  std::vector<std::string> comments = {"//", "\n", "/*", "*/"};
+
+  Tokenizer tokenizer(delimiters, separators, comments);
   tokens = tokenizer.tokenize(inName); 
   curToken = tokens.begin();
 }
