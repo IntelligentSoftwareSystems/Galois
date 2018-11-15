@@ -126,19 +126,263 @@ void Lut::print(std::string attr, std::ostream& os) {
   os << "        }" << std::endl;
 }
 
-bool CellPin::isEdgeDefined(CellPin* inPin, bool isNeg, bool isRise, TableType index) {
-  return !tables[inPin][isRise][index][isNeg].empty();
+void Lut::wrapUpConstruction() {
+  // use index from the template when not specified
+  if (0 == index.size()) {
+    index = lutTemplate->index;
+  }
 }
 
-MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when) {
-  return tables[inPin][isRise][index][isNeg][when]->lookup(param);
+TimingTable::~TimingTable() {
+  for (int i = 0; i < 2; i++) {
+    auto t = delay[i];
+    if (t) { delete t; }
+    t = slew[i];
+    if (t) { delete t; }
+    t = constraint[i];
+    if (t) { delete t; }
+  }
+}
+
+static std::unordered_map<TimingSense, std::string> mapTSense2Name = {
+  {POSITIVE_UNATE, "positive_unate"},
+  {NEGATIVE_UNATE, "negative_unate"},
+  {NON_UNATE,      "non_unate"},
+};
+
+static std::unordered_map<TimingType, std::string> mapTType2Name = {
+  {COMBINATIONAL,             "combinational"},
+  {COMBINATIONAL_RISE,        "combinational_rise"},
+  {COMBINATIONAL_FALL,        "combinational_fall"},
+  {THREE_STATE_DISABLE,       "three_state_disable"},
+  {THREE_STATE_DISABLE_RISE,  "three_state_disable_rise"},
+  {THREE_STATE_DISABLE_FALL,  "three_state_disable_fall"},
+  {THREE_STATE_ENABLE,        "three_state_enable"},
+  {THREE_STATE_ENABLE_RISE,   "three_state_enable_rise"},
+  {THREE_STATE_ENABLE_FALL,   "three_state_enable_fall"},
+  {RISING_EDGE,               "rising_edge"},
+  {FALLING_EDGE,              "falling_edge"},
+  {PRESET,                    "preset"},
+  {CLEAR,                     "clear"},
+  {HOLD_RISING,               "hold_rising"},
+  {HOLD_FALLING,              "hold_falling"},
+  {SETUP_RISING,              "setup_rising"},
+  {SETUP_FALLING,             "setup_falling"},
+  {RECOVERY_RISING,           "recovery_rising"},
+  {RECOVERY_FALLING,          "recovery_falling"},
+  {SKEW_RISING,               "skew_rising"},
+  {SKEW_FALLING,              "skew_falling"},
+  {REMOVAL_RISING,            "removal_rising"},
+  {REMOVAL_FALLING,           "removal_falling"},
+  {MIN_PULSE_WIDTH,           "min_pulse_width"},
+  {MINIMUM_PERIOD,            "minimum_period"},
+  {MAX_CLOCK_TREE_PATH,       "max_clock_tree_path"},
+  {MIN_CLOCK_TREE_PATH,       "min_clock_tree_path"},
+  {NON_SEQ_SETUP_RISING,      "non_seq_setup_rising"},
+  {NON_SEQ_SETUP_FALLING,     "non_seq_setup_falling"},
+  {NON_SEQ_HOLD_RISING,       "non_seq_hold_rising"},
+  {NON_SEQ_HOLD_FALLING,      "non_seq_hold_falling"},
+  {NOCHANGE_HIGH_HIGH,        "nochange_high_high"},
+  {NOCHANGE_HIGH_LOW,         "nochange_high_low"},
+  {NOCHANGE_LOW_HIGH,         "nochange_low_high"},
+  {NOCHANGE_LOW_LOW,          "nochange_low_low"},
+};
+
+void TimingTable::print(std::ostream& os) {
+  os << "      timing () {" << std::endl;
+  os << "        related_pin: \"" << relatedPin->name << "\";" << std::endl;
+
+  // do not show combinational (default value)
+  if (COMBINATIONAL != tType) {
+    os << "        timing_type: " << mapTType2Name.at(tType) << ";" << std::endl;
+  }
+  if (!when.empty()) {
+    os << "        when: \"" << when << "\";" << std::endl;
+  }
+  // only delay arcs will show timing sense
+  if (unate != NOT_APPLICABLE) {
+    os << "        timing_sense: " << mapTSense2Name.at(unate) << ";" << std::endl;
+  }
+
+  if (delay[0]) delay[0]->print("cell_fall", os);
+  if (delay[1]) delay[1]->print("cell_rise", os);
+  if (slew[0]) slew[0]->print("fall_transition", os);
+  if (slew[1]) slew[1]->print("rise_transition", os);
+  if (constraint[0]) constraint[0]->print("fall_constraint", os);
+  if (constraint[1]) constraint[1]->print("rise_constraint", os);
+
+  os << "      }" << std::endl;
+}
+
+void TimingTable::wrapUpConstruction() {
+  // lookup for the pin now
+  // because not all related pins show up before the table when parsing
+  assert(!nameOfRelatedPin.empty());
+  relatedPin = endPin->cell->findCellPin(nameOfRelatedPin);
+  assert(relatedPin);
+
+  // relate tables to lookup structure
+  switch (tType) {
+  // combinational/async delay arcs
+  case COMBINATIONAL:
+  case COMBINATIONAL_RISE:
+  case COMBINATIONAL_FALL:
+  case PRESET:
+  case CLEAR:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) {
+        endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+        endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      }
+      if (delay[1]) {
+        endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+        endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      }
+      if (slew[0]) {
+        endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+        endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      }
+      if (slew[1]) {
+        endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+        endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+      }
+    }
+    break;
+
+  // sequential delay arcs
+  // relatedPin is always rising
+  case RISING_EDGE:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][1][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][1][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][1][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][1][1][SLEW][when] = slew[1];
+    }
+    break;
+
+  // relatedPin is always falling
+  case FALLING_EDGE:
+    if (POSITIVE_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+    }
+    else if (NEGATIVE_UNATE == unate) {
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    else if (NON_UNATE == unate) {
+      if (delay[0]) endPin->timingMap[relatedPin][0][0][DELAY][when] = delay[0];
+      if (delay[1]) endPin->timingMap[relatedPin][0][1][DELAY][when] = delay[1];
+      if (slew[0]) endPin->timingMap[relatedPin][0][0][SLEW][when] = slew[0];
+      if (slew[1]) endPin->timingMap[relatedPin][0][1][SLEW][when] = slew[1];
+    }
+    break;
+
+  // sequential constraints
+  case HOLD_RISING:
+  case REMOVAL_RISING:
+    if (constraint[0]) endPin->timingMap[relatedPin][1][0][MIN_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][1][1][MIN_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case HOLD_FALLING:
+  case REMOVAL_FALLING:
+    if (constraint[0]) endPin->timingMap[relatedPin][0][0][MIN_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][0][1][MIN_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case SETUP_RISING:
+  case RECOVERY_RISING:
+    if (constraint[0]) endPin->timingMap[relatedPin][1][0][MAX_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][1][1][MAX_CONSTRAINT][when] = constraint[1];
+    break;
+
+  case SETUP_FALLING:
+  case RECOVERY_FALLING:
+    if (constraint[0]) endPin->timingMap[relatedPin][0][0][MAX_CONSTRAINT][when] = constraint[0];
+    if (constraint[1]) endPin->timingMap[relatedPin][0][1][MAX_CONSTRAINT][when] = constraint[1];
+    break;
+
+  default:
+    // the following types of timing arcs are not handled for now
+    // three-state delay
+    // non-sequential constraints
+    // clock waveform constraints
+    // clock skew constraints
+    // no-change constraints
+    break;
+  } // end switch tType
+}
+
+PowerTable::~PowerTable() {
+  for (int i = 0; i < 2; i++) {
+    auto t = internalPower[i];
+    if (t) { delete t; }
+  }
+}
+
+void PowerTable::wrapUpConstruction() {
+  // find the pin now
+  // because not all dependent pins show up before the table when parsing
+  if (!nameOfRelatedPin.empty()) {
+    relatedPin = endPin->cell->findCellPin(nameOfRelatedPin);
+    assert(relatedPin);
+  }
+}
+
+void PowerTable::print(std::ostream& os) {
+  os << "      internal_power () {" << std::endl;
+  if (relatedPin) {
+    os << "        related_pin: " << relatedPin->name << ";" << std::endl;
+  }
+  if (!when.empty()) {
+    os << "        when: \"" << when << "\";" << std::endl;
+  }
+
+  for (int i = 0; i < 2; i++) {
+    std::string direction = (i) ? "rise" : "fall";
+    auto pt = internalPower[i];
+    if (pt) {
+      pt->print(direction + "_power", os);
+    }
+  }
+
+  os << "      }" << std::endl;
+}
+
+bool CellPin::isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index) {
+  return !timingMap.at(inPin)[isInRise][isMeRise][index].empty();
+}
+
+MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when) {
+  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param);
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
   MyFloat ret = -std::numeric_limits<MyFloat>::infinity();
   std::string when;
-  for (auto& i: tables[inPin][isRise][index][isNeg]) {
+  for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
     auto tmp = i.second->lookup(param);
     if (tmp > ret) {
       ret = tmp;
@@ -149,10 +393,10 @@ CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isNe
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise) {
+CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
   MyFloat ret = std::numeric_limits<MyFloat>::infinity();
   std::string when;
-  for (auto& i: tables[inPin][isRise][index][isNeg]) {
+  for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
     auto tmp = i.second->lookup(param);
     if (tmp < ret) {
       ret = tmp;
@@ -162,91 +406,71 @@ CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isNe
   return {ret, when};
 }
 
+static std::unordered_map<PinDirection, std::string> mapPinDir2Name = {
+  {INPUT,    "input"},
+  {OUTPUT,   "output"},
+  {INOUT,    "inout"},
+  {INTERNAL, "internal"}
+};
+
 void CellPin::print(std::ostream& os) {
   os << "    pin (" << name << ") {" << std::endl;
+  os << "      direction: " << mapPinDir2Name.at(dir) << ";" << std::endl;
 
-  std::string d = (isInput && !isOutput) ? "input" :
-                  (!isInput && isOutput) ? "output" :
-                  (isInput && isOutput) ? "inout" : "internal";
-  os << "      direction: " << d << ";" << std::endl;
-
-  if (isInput) {
+  if (INPUT == dir || INOUT == dir) {
+    if (isClock) {
+      if (isClockGated) {
+        os << "      clock_gate_clock_pin: true;" << std::endl;
+      }
+      else {
+        os << "      clock: true;" << std::endl;
+      }
+    }
     os << "      capactance: " << ((c[1] > c[0]) ? c[1] : c[0]) << ";" << std::endl;
     os << "      rise_capacitance: " << c[1] << ";" << std::endl;
     os << "      fall_capacitance: " << c[0] << ";" << std::endl;
   }
 
-  if (isOutput) {
+  if (OUTPUT == dir || INOUT == dir) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
-    os << "      function: \"" << func << "\";" << std::endl;
-
-    // convert tables to printing order
-    // order of keys: pin, unateness, when, delay/slew, fall/rise
-    using InnerMap = std::unordered_map<std::string, Lut*[2][2]>;
-    using OuterMap = std::unordered_map<CellPin*, InnerMap[2]>;
-    OuterMap printTables;
-    for (auto& i: tables) {
-      auto pin = i.first;
-      for (int fr = 0; fr < 2; fr++) {
-        for (int ds = 0; ds < 2; ds++) {
-          for (int pn = 0; pn < 2; pn++) {
-            for (auto& j: i.second[fr][ds][pn]) {
-              printTables[pin][pn][j.first][ds][fr] = j.second;
-            }
-          }
-        }
-      }
+    if (func.size()) {
+      os << "      function: \"" << func << "\";" << std::endl;
     }
+    if (func_up.size()) {
+      os << "      function_up: \"" << func_up << "\";" << std::endl;
+    }
+    if (func_down.size()) {
+      os << "      function_down: \"" << func_down << "\";" << std::endl;
+    }
+  }
 
-    // print tables
-    for (auto& i: printTables) {
-      auto pin = i.first;
-      auto outMap = i.second;
-      for (int pn = 0; pn < 2; pn++) {
-        for (auto& j: outMap[pn]) {
-          auto& when = j.first;
-          std::string unateness;
-          if (0 == pn) {
-            unateness = (outMap[1].count(when)) ? "positive_unate" : "non_unate";
-          }
-          else {
-            unateness = "negative_unate";
-            if (outMap[0].count(when)) {
-              continue;
-            }
-          }
+  for (auto& i: timings) {
+    i->print(os);
+  }
 
-          os << "      timing () {" << std::endl;
-          os << "        related_pin: \"" << pin->name << "\";" << std::endl;
-          if (!when.empty()) {
-            os << "        when: \"" << when << "\";" << std::endl;
-          }
-          os << "        timing_sense: " << unateness << ";" << std::endl;
-
-          auto& t = j.second;
-          auto lut = t[TABLE_DELAY][0];
-          if (lut) {
-            lut->print("cell_fall", os);
-          }
-          lut = t[TABLE_DELAY][1];
-          if (lut) {
-            lut->print("cell_rise", os);
-          }
-          lut = t[TABLE_SLEW][0];
-          if (lut) {
-            lut->print("fall_transition", os);
-          }
-          lut = t[TABLE_SLEW][1];
-          if (lut) {
-            lut->print("rise_transition", os);
-          }
-          os << "      }" << std::endl;
-        }
-      }
-    } // end for printTables
-  } // end if (isOutput)
+  for (auto& i: powers) {
+    i->print(os);
+  }
 
   os << "    }" << std::endl;
+}
+
+void CellPin::wrapUpConstruction() {
+  for (auto& i: timings) {
+    i->wrapUpConstruction();
+  }
+  for (auto& i: powers) {
+    i->wrapUpConstruction();
+  }
+}
+
+CellPin::~CellPin() {
+  for (auto& i: timings) {
+    delete i;
+  }
+  for (auto& i: powers) {
+    delete i;
+  }
 }
 
 void Cell::print(std::ostream& os) {
@@ -264,34 +488,67 @@ void Cell::print(std::ostream& os) {
   }
 
   for (auto& i: inPins) {
-    i.second->print(os);
+    i->print(os);
   }
 
   for (auto& i: internalPins) {
-    i.second->print(os);
+    i->print(os);
   }
 
   for (auto& i: outPins) {
-    i.second->print(os);
+    i->print(os);
   }
 
   os << "  }" << std::endl;
 }
 
+void Cell::wrapUpConstruction() {
+  for (auto& i: pins) {
+    i.second->wrapUpConstruction();
+  }
+}
+
+Cell::~Cell() {
+  for (auto& i: pins) {
+    delete i.second;
+  }
+}
+
+static std::unordered_map<VariableType, std::string> mapVarType2Name = {
+  {INPUT_TRANSITION_TIME,        "input_transition_time"},
+  {CONSTRAINED_PIN_TRANSITION,   "constrained_pin_transition"},
+  {RELATED_PIN_TRANSITION,       "related_pin_transition"},
+  {TOTAL_OUTPUT_NET_CAPACITANCE, "total_output_net_capacitance"},
+  {INPUT_NET_TRANSITION,         "input_net_transition"},
+  {TIME,                         "time"}
+};
+
+void LutTemplate::wrapUpConstruction() {
+  // find stride for each dimension
+  stride.insert(stride.begin(), shape.size(), 1);
+  for (size_t i = shape.size() - 1; i >= 1; --i) {
+    stride[i-1] = stride[i] * shape[i];
+  }
+}
+
 void LutTemplate::print(std::ostream& os) {
-  os << "  lu_table_template (" << name << ") {" << std::endl;
+  if ("scalar" == name) { return; }
+
+  std::string attr = (isForPower) ? "power_lut_template" : "lu_table_template";
+  os << "  " << attr << " (" << name << ") {" << std::endl;
   size_t i = 0;
   for (auto& v: var) {
-    os << "    variable_" << ++i << ": " << v << ";" << std::endl;
+    os << "    variable_" << ++i << ": " << mapVarType2Name.at(v) << ";" << std::endl;
   }
 
   i = 0;
-  for (auto& d: shape) {
+  for (auto& idx: index) {
     os << "    index_" << ++i << " (\"";
-    size_t j = 1;
-    os << MyFloat(j) * 0.0010f;
-    while (j < d) {
-      os << ", " << (MyFloat)(++j) * 0.0010f;
+    for (size_t j = 0; j < idx.size(); j++) {
+      os << idx[j];
+      if (j < idx.size() - 1) {
+        os << ", ";
+      }
     }
     os << "\");" << std::endl;
   }
@@ -344,7 +601,7 @@ MyFloat PreLayoutWireLoad::wireC(VerilogWire* wire) {
 
 MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin) {
   // best-case tree
-  if (TREE_TYPE_BEST_CASE == lib->wireTreeType) {
+  if (BEST_CASE_TREE == lib->wireTreeType) {
     return 0.0;
   }
   else {
@@ -354,7 +611,7 @@ MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPi
     auto wR = r * wL;
 
     // balanced tree
-    if (TREE_TYPE_BALANCED == lib->wireTreeType) {
+    if (BALANCED_TREE == lib->wireTreeType) {
       wC /= (MyFloat)deg;
       wR /= (MyFloat)deg;
     }
@@ -362,10 +619,10 @@ MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPi
     // Elmore delay for worst-case & balanced tree
     // Ref: J. Bhasker, R. Chadha. STA for nanometer designs: a practical approach
     //      Springer, 2009.
-//      auto delay = wR * (wC / 2 + loadC);
+    auto delay = wR * (wC / 2 + loadC);
 
     // delay formula used by Cadence Genus' report_net_delay_calculation
-    auto delay = wR * (wC + loadC);
+//    auto delay = wR * (wC + loadC);
 
     return delay;
   }
@@ -501,19 +758,19 @@ void CellLibParser::parseWireLoad() {
   curToken += 1; // consume "}"
 }
 
-static std::unordered_map<std::string, VariableType> mapVarName2Type = {
-  {"input_transition_time",        VARIABLE_INPUT_TRANSITION_TIME},
-  {"constrained_pin_transition",   VARIABLE_CONSTRAINED_PIN_TRANSITION},
-  {"related_pin_transition",       VARIABLE_RELATED_PIN_TRANSITION},
-  {"total_output_net_capacitance", VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE},
-  {"input_net_transition",         VARIABLE_INPUT_NET_TRANSITION},
-  {"time",                         VARIABLE_TIME}
+static std::unordered_map<std::string, VariableType> mapName2VarType = {
+  {"input_transition_time",        INPUT_TRANSITION_TIME},
+  {"constrained_pin_transition",   CONSTRAINED_PIN_TRANSITION},
+  {"related_pin_transition",       RELATED_PIN_TRANSITION},
+  {"total_output_net_capacitance", TOTAL_OUTPUT_NET_CAPACITANCE},
+  {"input_net_transition",         INPUT_NET_TRANSITION},
+  {"time",                         TIME}
 };
 
-void CellLibParser::parseLutTemplate() {
-  // lu_table_template (name) {...}
-  curToken += 2; // consume "lu_table_tamplate" and "("
-  auto lutTemplate = lib->addLutTemplate(*curToken);
+void CellLibParser::parseLutTemplate(bool isForPower) {
+  // lu_table_template/power_lut_template (name) {...}
+  curToken += 2; // consume "lu_table_tamplate/power_lut_template" and "("
+  auto lutTemplate = lib->addLutTemplate(*curToken, isForPower);
   curToken += 3; // consume name, ")", and "{"
 
   int unmatched = 0;
@@ -521,19 +778,23 @@ void CellLibParser::parseLutTemplate() {
     // variable_*: name;
     if ("variable_1" == *curToken || "variable_2" == *curToken || "variable_3" == *curToken) {
       curToken += 2; // consume "variable_*" and ":"
-      lutTemplate->var.push_back(mapVarName2Type.at(*curToken));
+      lutTemplate->var.push_back(mapName2VarType.at(*curToken));
       curToken += 2; // consume name and ";"
       unmatched++;
     }
     // index_* ("num1[,num*]");
     else if ("index_1" == *curToken || "index_2" == *curToken || "index_3" == *curToken) {
-      curToken += 4; // consume "index_*", "(", "\"" and num1
-      size_t num = 1;
+      curToken += 3; // consume "index_*", "(", "\""
+      VecOfMyFloat oneIndex;
+      oneIndex.push_back(getMyFloat(*curToken));
+      curToken += 1; // consume value
       while ("," == *curToken) {
-        curToken += 2; // consume "," and num*
-        num++;
+        curToken += 1; // consume ","
+        oneIndex.push_back(getMyFloat(*curToken));
+        curToken += 1; // consume value
       }
-      lutTemplate->shape.push_back(num);
+      lutTemplate->shape.push_back(oneIndex.size());
+      lutTemplate->index.push_back(oneIndex);
       curToken += 3; // consume "\"", ")" and ";"
       unmatched--;
     }
@@ -542,22 +803,15 @@ void CellLibParser::parseLutTemplate() {
     }
   }
 
-  // find stride for each dimension
-  auto& shape = lutTemplate->shape;
-  auto& stride = lutTemplate->stride;
-  stride.insert(stride.begin(), shape.size(), 1);
-  for (size_t i = shape.size() - 1; i >= 1; --i) {
-    stride[i-1] = stride[i] * shape[i];
-  }
-
   assert(!unmatched);
   curToken += 1; // consume "}"
+  lutTemplate->wrapUpConstruction();
 }
 
-void CellLibParser::parseLut(Lut* lut) {
+void CellLibParser::parseLut(Lut* lut, bool isForPower) {
   // key_word (name) {...}
   curToken += 2; // consume key_word and "("
-  lut->lutTemplate = lib->findLutTemplate(*curToken);
+  lut->lutTemplate = lib->findLutTemplate(*curToken, isForPower);
   assert(lut->lutTemplate);
   curToken += 3; // consume name, ")" and "{"
 
@@ -575,12 +829,18 @@ void CellLibParser::parseLut(Lut* lut) {
     }
     // values ("num1[,num*]"[, \ "num1[,num*]"]);
     else if ("values" == *curToken) {
-      curToken += 3; // consume "value", "(" and "\""
+      curToken += 3; // consume "value", "(" and "\"" or "\\"
+      if ("\"" == *curToken) {
+        curToken += 1; // consume "\"" preceded by "\\"
+      }
       while (!isEndOfTokenStream() && ")" != *curToken) {
         lut->value.push_back(getMyFloat(*curToken));
         curToken += 2;
         if ("," == *curToken) {
-          curToken += 3; // consume ",", "\\" and "\""
+          curToken += 2; // consume "," and "\\" or "\""
+        }
+        if ("\"" == *curToken) {
+          curToken += 1; // consume "\"" preceded by "\\"
         }
       }
       curToken += 2; // consume ")" and ";"
@@ -591,78 +851,146 @@ void CellLibParser::parseLut(Lut* lut) {
   }
 
   curToken += 1; // consume "}"
+  lut->wrapUpConstruction();
 }
 
-void CellLibParser::parseTiming(CellPin* pin) {
+static std::unordered_map<std::string, TimingSense> mapName2TSense = {
+  {"positive_unate", POSITIVE_UNATE},
+  {"negative_unate", NEGATIVE_UNATE},
+  {"non_unate",      NON_UNATE}
+};
+
+static std::unordered_map<std::string, TimingType> mapName2TType = {
+  {"combinational",            COMBINATIONAL},
+  {"combinational_rise",       COMBINATIONAL_RISE},
+  {"combinational_fall",       COMBINATIONAL_FALL},
+  {"three_state_disable",      THREE_STATE_DISABLE},
+  {"three_state_disable_rise", THREE_STATE_DISABLE_RISE},
+  {"three_state_disable_fall", THREE_STATE_DISABLE_FALL},
+  {"three_state_enable",       THREE_STATE_ENABLE},
+  {"three_state_enable_rise",  THREE_STATE_ENABLE_RISE},
+  {"three_state_enable_fall",  THREE_STATE_ENABLE_FALL},
+  {"rising_edge",              RISING_EDGE},
+  {"falling_edge",             FALLING_EDGE},
+  {"preset",                   PRESET},
+  {"clear",                    CLEAR},
+  {"hold_rising",              HOLD_RISING},
+  {"hold_falling",             HOLD_FALLING},
+  {"setup_rising",             SETUP_RISING},
+  {"setup_falling",            SETUP_FALLING},
+  {"recovery_rising",          RECOVERY_RISING},
+  {"recovery_falling",         RECOVERY_FALLING},
+  {"skew_rising",              SKEW_RISING},
+  {"skew_falling",             SKEW_FALLING},
+  {"removal_rising",           REMOVAL_RISING},
+  {"removal_falling",          REMOVAL_FALLING},
+  {"min_pulse_width",          MIN_PULSE_WIDTH},
+  {"minimum_period",           MINIMUM_PERIOD},
+  {"max_clock_tree_path",      MAX_CLOCK_TREE_PATH},
+  {"min_clock_tree_path",      MIN_CLOCK_TREE_PATH},
+  {"non_seq_setup_rising",     NON_SEQ_SETUP_RISING},
+  {"non_seq_setup_falling",    NON_SEQ_SETUP_FALLING},
+  {"non_seq_hold_rising",      NON_SEQ_HOLD_RISING},
+  {"non_seq_hold_falling",     NON_SEQ_HOLD_FALLING},
+  {"nochange_high_high",       NOCHANGE_HIGH_HIGH},
+  {"nochange_high_low",        NOCHANGE_HIGH_LOW},
+  {"nochange_low_high",        NOCHANGE_LOW_HIGH},
+  {"nochange_low_low",         NOCHANGE_LOW_LOW},
+};
+
+void CellLibParser::parseTiming(TimingTable* tTable) {
   // timing () {...}
   curToken += 4; // consume "timing", "(", ")" and "{"
 
-  bool isPos = false, isNeg = false;
-  CellPin* relatedPin = nullptr;
-  Token when = "";
   while (!isEndOfGroup()) {
     if ("cell_fall" == *curToken) {
-      if (!isPos && !isNeg) {
-        skip();
-        continue;
-      }
-      auto lut = lib->addLut();
-      pin->addLut(lut, TABLE_DELAY, false, relatedPin, when, isPos, isNeg);
+      Lut* lut = new Lut;
+      tTable->delay[0] = lut;
       parseLut(lut);
     }
     else if ("cell_rise" == *curToken) {
-      if (!isPos && !isNeg) {
-        skip();
-        continue;
-      }
-      auto lut = lib->addLut();
-      pin->addLut(lut, TABLE_DELAY, true, relatedPin, when, isPos, isNeg);
+      Lut* lut = new Lut;
+      tTable->delay[1] = lut;
       parseLut(lut);
     }
     else if ("fall_transition" == *curToken) {
-      if (!isPos && !isNeg) {
-        skip();
-        continue;
-      }
-      auto lut = lib->addLut();
-      pin->addLut(lut, TABLE_SLEW, false, relatedPin, when, isPos, isNeg);
+      Lut* lut = new Lut;
+      tTable->slew[0] = lut;
       parseLut(lut);
     }
     else if ("rise_transition" == *curToken) {
-      if (!isPos && !isNeg) {
-        skip();
-        continue;
-      }
-      auto lut = lib->addLut();
-      pin->addLut(lut, TABLE_SLEW, true, relatedPin, when, isPos, isNeg);
+      Lut* lut = new Lut;
+      tTable->slew[1] = lut;
+      parseLut(lut);
+    }
+    else if ("fall_constraint" == *curToken) {
+      Lut* lut = new Lut;
+      tTable->constraint[0] = lut;
+      parseLut(lut);
+    }
+    else if ("rise_constraint" == *curToken) {
+      Lut* lut = new Lut;
+      tTable->constraint[1] = lut;
       parseLut(lut);
     }
     // when: "...";
     else if ("when" == *curToken) {
       curToken += 2; // consume "when" and ":"
-      when = getBooleanExpression();
+      tTable->when = getBooleanExpression();
       curToken += 1; // consume ";"
     }
     // related_pin: "name";
     else if ("related_pin" == *curToken) {
       curToken += 3; // consume "related_pin", ":" and "\""
-      relatedPin = pin->cell->findCellPin(*curToken);
+      tTable->nameOfRelatedPin = *curToken;
       curToken += 3; // consume name, "\"" and ";"
     }
     // timing_sense: value;
     else if ("timing_sense" == *curToken) {
       curToken += 2; // consume "timing_sense" and ":"
-      if ("positive_unate" == *curToken) {
-        isPos = true;
-      }
-      else if ("negative_unate" == *curToken) {
-        isNeg = true;
-      }
-      else if ("non_unate" == *curToken) {
-        isPos = true;
-        isNeg = true;
-      }
+      tTable->unate = mapName2TSense.at(*curToken);
       curToken += 2; // consume value and ";"
+    }
+    // timing_type: value;
+    else if ("timing_type" == *curToken) {
+      curToken += 2; // consume "timing_sense" and ":"
+      tTable->tType = mapName2TType.at(*curToken);
+      curToken += 2; // consume value and ";"
+    }
+    else {
+      skip();
+    }
+  } // end while
+
+  curToken += 1; // consume "}"
+}
+
+void CellLibParser::parseInternalPower(PowerTable* pTable) {
+  // internal_power () {...}
+  curToken += 4; // consume "internal_power", "(", ")" and "{"
+
+  while (!isEndOfGroup()) {
+    if ("fall_power" == *curToken) {
+      Lut* lut = new Lut;
+      pTable->internalPower[0] = lut;
+      parseLut(lut, true);
+    }
+    else if ("rise_power" == *curToken) {
+      Lut* lut = new Lut;
+      pTable->internalPower[1] = lut;
+      parseLut(lut, true);
+    }
+    // when: "...";
+    else if ("when" == *curToken) {
+      curToken += 2; // consume "when" and ":"
+      pTable->when = getBooleanExpression();
+      curToken += 1; // consume ";"
+    }
+    // related_pin: "name";
+    else if ("related_pin" == *curToken) {
+      curToken += 3; // consume "related_pin", ":" and "\""
+      pTable->nameOfRelatedPin = *curToken;
+      curToken += 3; // consume name, "\"" and ";"
     }
     else {
       skip();
@@ -754,8 +1082,11 @@ void CellLibParser::parseCellPin(Cell* cell) {
   curToken += 3; // consume name, ")" and "{"
 
   while (!isEndOfGroup()) {
-    if ("timing" == *curToken && pin->isOutput) {
-      parseTiming(pin);
+    if ("timing" == *curToken) {
+      parseTiming(pin->addTimingTable());
+    }
+    else if ("internal_power" == *curToken) {
+      parseInternalPower(pin->addPowerTable());
     }
     // direction: value;
     else if ("direction" == *curToken) {
@@ -804,6 +1135,34 @@ void CellLibParser::parseCellPin(Cell* cell) {
       pin->func = getBooleanExpression();
       curToken += 1; // consume ";"
     }
+    // function_up: "...";
+    else if ("function_up" == *curToken) {
+      curToken += 2; // consume "function_up" and ":"
+      pin->func_up = getBooleanExpression();
+      curToken += 1; // consume ";"
+    }
+    // function_down: "...";
+    else if ("function_down" == *curToken) {
+      curToken += 2; // consume "function_down" and ":"
+      pin->func_down = getBooleanExpression();
+      curToken += 1; // consume ";"
+    }
+    // clock: true/false;
+    else if ("clock" == *curToken) {
+      curToken += 2; // consume "clock" and ":"
+      if ("true" == *curToken) {
+         cell->addClockPin(pin);
+      }
+      curToken += 2; // consume value and ";"
+    }
+    // clock_gate_clock_pin: true/false
+    else if ("clock_gate_clock_pin" == *curToken) {
+      curToken += 2; // consume "clock_gate_clock_pin" and ":"
+      if ("true" == *curToken) {
+        cell->addClockPin(pin, true);
+      }
+      curToken += 2;
+    }
     else {
       skip();
     }
@@ -847,7 +1206,14 @@ void CellLibParser::parseCell() {
   }
 
   curToken += 1; // consume "}"
+  cell->wrapUpConstruction();
 }
+
+static std::unordered_map<std::string, WireTreeType> mapName2WireTreeType = {
+  {"best_case_tree",  BEST_CASE_TREE},
+  {"balanced_tree",   BALANCED_TREE},
+  {"worst_case_tree", WORST_CASE_TREE}
+};
 
 void CellLibParser::parseOperatingConditions() {
   // p[erating_conditions (name) {...}
@@ -859,15 +1225,7 @@ void CellLibParser::parseOperatingConditions() {
     // tree_type = value;
     if ("tree_type" == *curToken) {
       curToken += 2; // consume "tree_type" and ":"
-      if ("best_case_tree" == *curToken) {
-        lib->wireTreeType = TREE_TYPE_BEST_CASE;
-      }
-      else if ("balanced_tree" == *curToken) {
-        lib->wireTreeType = TREE_TYPE_BALANCED;
-      }
-      else if ("worst_case_tree" == *curToken) {
-        lib->wireTreeType = TREE_TYPE_WORST_CASE;
-      }
+      lib->wireTreeType = mapName2WireTreeType.at(*curToken);
       curToken += 2; // consume value and ";"
     }
     else {
@@ -890,6 +1248,9 @@ void CellLibParser::parseCellLibrary() {
     }
     else if ("lu_table_template" == *curToken) {
       parseLutTemplate();
+    }
+    else if ("power_lut_template" == *curToken) {
+      parseLutTemplate(true);
     }
     else if ("cell" == *curToken) {
       parseCell();
@@ -966,6 +1327,12 @@ void CellLib::parse(std::string inName, bool toClear) {
   parser.parse(inName);
 }
 
+static std::unordered_map<WireTreeType, std::string> mapWireTreeType2Name = {
+  {BEST_CASE_TREE,  "best_case_tree"},
+  {BALANCED_TREE,   "balanced_tree"},
+  {WORST_CASE_TREE, "worst_case_tree"}
+};
+
 void CellLib::print(std::ostream& os) {
   os << "library (" << name << ") {" << std::endl;
 
@@ -975,16 +1342,21 @@ void CellLib::print(std::ostream& os) {
   os << "  default_max_transition: " << defaultMaxSlew << ";" << std::endl;
 
   os << "  operating_conditions (" << opCond << ") {" << std::endl;
-  std::string treeTypeName[] = {"best_case_tree", "balanced_tree", "worst_case_tree"};
-  os << "    tree_type: " << treeTypeName[wireTreeType] << ";" << std::endl;
+  os << "    tree_type: " << mapWireTreeType2Name.at(wireTreeType) << ";" << std::endl;
   os << "  }" << std::endl;
 
   for (auto& i: wireLoads) {
     i.second->print(os);
   }
-  os << "  default_wire_load: \"" << defaultWireLoad->name << "\";" << std::endl;
+  if (defaultWireLoad) {
+    os << "  default_wire_load: \"" << defaultWireLoad->name << "\";" << std::endl;
+  }
 
   for (auto& i: lutTemplates) {
+    i.second->print(os);
+  }
+
+  for (auto& i: powerLutTemplates) {
     i.second->print(os);
   }
 
@@ -1002,12 +1374,7 @@ void CellLib::clear() {
   wireLoads.clear();
 
   for (auto& i: cells) {
-    auto c = i.second;
-    for (auto& j: c->pins) {
-      delete j.second;
-    }
-    c->pins.clear();
-    delete c;
+    delete i.second;
   }
   cells.clear();
 
@@ -1016,17 +1383,31 @@ void CellLib::clear() {
   }
   lutTemplates.clear();
 
-  for (auto& i: luts) {
-    delete i;
+  for (auto& i: powerLutTemplates) {
+    delete i.second;
   }
-  luts.clear();
+  powerLutTemplates.clear();
 }
 
 void CellLib::setup() {
   // add a LUT template for scalar case
+  // default in liberty format
   auto scalar = addLutTemplate("scalar");
   scalar->shape.push_back(1);
   scalar->stride.push_back(1);
+
+  // add a power LUT template for scalar case
+  // default in liberty format
+  scalar = addLutTemplate("scalar", true);
+  scalar->shape.push_back(1);
+  scalar->stride.push_back(1);
+
+  defaultWireLoad = nullptr;
+  wireTreeType = BEST_CASE_TREE;
+  defaultInoutPinCap = 0.0;
+  defaultInputPinCap = 0.0;
+  defaultOutputPinCap = 0.0;
+  defaultMaxSlew = std::numeric_limits<MyFloat>::infinity();
 }
 
 CellLib::CellLib() {

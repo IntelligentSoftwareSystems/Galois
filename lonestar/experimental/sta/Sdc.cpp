@@ -67,7 +67,7 @@ void SDCParser::tokenizeFile(std::string inName) {
 
 void SDCParser::parseClock() {
   curToken += 1; // consume "create_clock"
-  auto clk = new SDCClock;
+  auto clk = new Clock;
   clk->src = nullptr;
   clk->period = 0.0;
   clk->name = "";
@@ -112,7 +112,7 @@ void SDCParser::parseClock() {
   }
   else {
     std::sort(wv.begin(), wv.end(),
-        [&] (const SDCClockEdge& e1, const SDCClockEdge& e2) -> bool {
+        [&] (const ClockEdge& e1, const ClockEdge& e2) -> bool {
           return (e1.t < e2.t);
         }
     );
@@ -182,7 +182,7 @@ void SDCParser::parseDrivingCell() {
   }
 
   if (nullptr == dCell->fromCellPin) {
-    dCell->fromCellPin = cell->inPins.begin()->second;
+    dCell->fromCellPin = *(cell->inPins.begin());
   }
 
   for (auto& i: ports) {
@@ -362,22 +362,6 @@ void SDC::print(std::ostream& os) {
       os << "  Load of " << i.first->name << " = " << i.second << std::endl;
     }
   }
-}
-
-void SDCClock::print(std::ostream& os) {
-  os << "  Clock " << name << ":" << std::endl;
-  os << "    period = " << period << std::endl;
-  os << "    src pin = " << ((src) ? src->name : "(virtual)") << std::endl;
-  os << "    wave from = { ";
-  for (auto& i: waveform) {
-    i.print(os);
-    os << " ";
-  }
-  os << "}" << std::endl;
-}
-
-void SDCClockEdge::print(std::ostream& os) {
-  os << "(" << t << ", " << ((isRise) ? "r" : "f") << ")";
 }
 
 void SDCDrivingCell::print(std::ostream& os) {
