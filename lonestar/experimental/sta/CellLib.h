@@ -211,6 +211,7 @@ struct CellPin {
 
   PinDirection dir;
   bool isClock;
+  bool isClockGated;
 
   MyFloat c[2]; // fall/rise capaitance
   MyFloat maxC; // maximum capacitance
@@ -313,8 +314,9 @@ public:
     internalPins.insert(pin);
   }
 
-  void addClockPin(CellPin* pin) {
+  void addClockPin(CellPin* pin, bool isGated = false) {
     pin->isClock = true;
+    pin->isClockGated = isGated;
     clockPins.insert(pin);
   }
 
@@ -326,6 +328,7 @@ public:
     pin->c[1] = 0.0;
     pin->maxC = 0.0;
     pin->isClock = false;
+    pin->isClockGated = false;
     pins[name] = pin;
     return pin;
   }
@@ -339,7 +342,7 @@ public:
     leakagePower[when] = value;
   }
 
-  bool isSequntialCell() { return !clockPins.empty(); }
+  bool isSequentialCell() { return !clockPins.empty(); }
 };
 
 struct PreLayoutWireLoad: public WireLoad {

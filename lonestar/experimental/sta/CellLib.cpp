@@ -419,7 +419,12 @@ void CellPin::print(std::ostream& os) {
 
   if (INPUT == dir || INOUT == dir) {
     if (isClock) {
-      os << "      clock: true;" << std::endl;
+      if (isClockGated) {
+        os << "      clock_gate_clock_pin: true;" << std::endl;
+      }
+      else {
+        os << "      clock: true;" << std::endl;
+      }
     }
     os << "      capactance: " << ((c[1] > c[0]) ? c[1] : c[0]) << ";" << std::endl;
     os << "      rise_capacitance: " << c[1] << ";" << std::endl;
@@ -1149,6 +1154,14 @@ void CellLibParser::parseCellPin(Cell* cell) {
          cell->addClockPin(pin);
       }
       curToken += 2; // consume value and ";"
+    }
+    // clock_gate_clock_pin: true/false
+    else if ("clock_gate_clock_pin" == *curToken) {
+      curToken += 2; // consume "clock_gate_clock_pin" and ":"
+      if ("true" == *curToken) {
+        cell->addClockPin(pin, true);
+      }
+      curToken += 2;
     }
     else {
       skip();
