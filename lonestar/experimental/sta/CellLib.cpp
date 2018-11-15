@@ -204,18 +204,12 @@ void TimingTable::print(std::ostream& os) {
     os << "        timing_sense: " << mapTSense2Name.at(unate) << ";" << std::endl;
   }
 
-  for (int i = 0; i < 2; i++) {
-    std::string direction = (i) ? "rise" : "fall";
-    if (delay[i]) {
-      delay[i]->print("cell_" + direction, os);
-    }
-    if (slew[i]) {
-      slew[i]->print(direction + "_transition", os);
-    }
-    if (constraint[i]) {
-      constraint[i]->print(direction + "_constraint", os);
-    }
-  }
+  if (delay[0]) delay[0]->print("cell_fall", os);
+  if (delay[1]) delay[1]->print("cell_rise", os);
+  if (slew[0]) slew[0]->print("fall_transition", os);
+  if (slew[1]) slew[1]->print("rise_transition", os);
+  if (constraint[0]) constraint[0]->print("fall_constraint", os);
+  if (constraint[1]) constraint[1]->print("rise_constraint", os);
 
   os << "      }" << std::endl;
 }
@@ -620,10 +614,10 @@ MyFloat PreLayoutWireLoad::wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPi
     // Elmore delay for worst-case & balanced tree
     // Ref: J. Bhasker, R. Chadha. STA for nanometer designs: a practical approach
     //      Springer, 2009.
-//      auto delay = wR * (wC / 2 + loadC);
+    auto delay = wR * (wC / 2 + loadC);
 
     // delay formula used by Cadence Genus' report_net_delay_calculation
-    auto delay = wR * (wC + loadC);
+//    auto delay = wR * (wC + loadC);
 
     return delay;
   }
@@ -830,12 +824,18 @@ void CellLibParser::parseLut(Lut* lut, bool isForPower) {
     }
     // values ("num1[,num*]"[, \ "num1[,num*]"]);
     else if ("values" == *curToken) {
-      curToken += 3; // consume "value", "(" and "\""
+      curToken += 3; // consume "value", "(" and "\"" or "\\"
+      if ("\"" == *curToken) {
+        curToken += 1; // consume "\"" preceded by "\\"
+      }
       while (!isEndOfTokenStream() && ")" != *curToken) {
         lut->value.push_back(getMyFloat(*curToken));
         curToken += 2;
         if ("," == *curToken) {
-          curToken += 3; // consume ",", "\\" and "\""
+          curToken += 2; // consume "," and "\\" or "\""
+        }
+        if ("\"" == *curToken) {
+          curToken += 1; // consume "\"" preceded by "\\"
         }
       }
       curToken += 2; // consume ")" and ";"
@@ -1388,6 +1388,13 @@ void CellLib::setup() {
   scalar = addLutTemplate("scalar", true);
   scalar->shape.push_back(1);
   scalar->stride.push_back(1);
+
+  defaultWireLoad = nullptr;
+  wireTreeType = BEST_CASE_TREE;
+  defaultInoutPinCap = 0.0;
+  defaultInputPinCap = 0.0;
+  defaultOutputPinCap = 0.0;
+  defaultMaxSlew = std::numeric_limits<MyFloat>::infinity();
 }
 
 CellLib::CellLib() {

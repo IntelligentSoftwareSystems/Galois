@@ -19,7 +19,7 @@ static cll::opt<std::string>
 static cll::opt<std::string>
     verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
 static cll::opt<std::string>
-    sdcName("sdc", cll::desc("path to .sdc (Synopsis design constraints)"));
+    sdcName("sdc", cll::desc("path to .sdc (Synopsys design constraints)"));
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
 
   CellLib lib;
   lib.parse(cellLibName);
-//  lib.print();
+  lib.print();
 
 #if 0
   // assume the input is NanGate 45nm NLDM .lib at typical corner

@@ -322,6 +322,10 @@ public:
     auto pin = new CellPin;
     pin->name = name;
     pin->cell = this;
+    pin->c[0] = 0.0;
+    pin->c[1] = 0.0;
+    pin->maxC = 0.0;
+    pin->isClock = false;
     pins[name] = pin;
     return pin;
   }
@@ -387,6 +391,9 @@ public:
     Cell* cell = new Cell;
     cell->name = name;
     cell->lib = this;
+    cell->driveStrength = 0;
+    cell->area = 0.0;
+    cell->cellLeakagePower = 0.0;
     cells[name] = cell;
     return cell;
   }
@@ -400,6 +407,9 @@ public:
     PreLayoutWireLoad* wireLoad = new PreLayoutWireLoad;
     wireLoad->name = name;
     wireLoad->lib = this;
+    wireLoad->c = 0.0;
+    wireLoad->r = 0.0;
+    wireLoad->slope = 0.0;
     wireLoads[name] = wireLoad;
     return wireLoad;
   }
