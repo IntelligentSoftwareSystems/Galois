@@ -464,6 +464,12 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
+  // Set up metadata mode to neverOnlyData (this is required for correctness
+  // of distributed execution of this implementation)
+  if (enforce_metadata != neverOnlyData) {
+    enforce_metadata = neverOnlyData;
+  }
+
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
