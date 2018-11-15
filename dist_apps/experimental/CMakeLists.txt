@@ -38,7 +38,6 @@ endfunction()
 distAppNoGPU(pr_bc)
 distAppNoGPU(pr_bc_v2)
 distAppNoGPU(pr_bc_opt)
-distAppNoGPU(pr_bc_opt_v2)
 
 distAppNoGPU(debug_bc_level)
 
