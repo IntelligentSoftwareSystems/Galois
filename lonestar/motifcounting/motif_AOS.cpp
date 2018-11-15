@@ -212,13 +212,16 @@ template <typename VecTy, typename ElemTy>
 bool vertexNotInTuple(const VecTy& vec, const ElemTy& elem){
   return (std::find(vec.begin(), vec.end(), elem) == vec.end());
 }
-
+template <typename VecTy, typename ElemTy, typename KeyTy>
+bool isPresentOnLeft(const VecTy& vec, const ElemTy& elem, const KeyTy& key){
+  return (std::find(vec.begin(), vec.begin() + key, elem) != (vec.begin() + key));
+}
 template <typename VecTy>
 size_t uniqueInTuple(const VecTy& vec){
   return (std::set<GNode>(vec.begin(), vec.end()).size());
 }
-template <typename VecTy, typename ElemTy>
-bool edgeNotInTuple(const VecTy& vec, const ElemTy& elem, const uint32_t& st_info_elem){
+template <typename VecTy, typename ElemTy, typename KeyTy>
+bool edgeNotInTuple(const VecTy& vec, const ElemTy& elem, const KeyTy& st_info_elem){
   auto it = std::find(vec.begin(), vec.end(), elem); 
   if (it == vec.end()) {
     return true;
@@ -229,44 +232,23 @@ bool edgeNotInTuple(const VecTy& vec, const ElemTy& elem, const uint32_t& st_inf
 }
 
 typedef galois::gstl::Vector<GNode> VecGNodeTy;
-typedef galois::gstl::Vector<uint32_t> VecUnsignedTy;
+typedef galois::gstl::Vector<uint8_t> VecUnsignedTy;
 void nodeIteratingAlgoWithStruct(Graph& graph) {
 
   struct SubGraphTuple {
     VecGNodeTy vertices;
-    uint32_t key;
+    uint8_t key;
     VecUnsignedTy st_info;
-    SubGraphTuple(const VecGNodeTy& v1, const uint32_t& k1, const VecUnsignedTy& s1) : vertices(v1), key(k1), st_info(s1) {}
+    bool check_loop;
+    SubGraphTuple(const VecGNodeTy& v1, const uint8_t& k1, const VecUnsignedTy& s1, bool _check_loop = false) : vertices(v1), key(k1), st_info(s1), check_loop(_check_loop) {}
   };
   galois::InsertBag<SubGraphTuple> items;
   galois::InsertBag<SubGraphTuple> items_active;
-  galois::InsertBag<SubGraphTuple> items3;
+  galois::InsertBag<SubGraphTuple> items_loops;
   galois::InsertBag<SubGraphTuple> items_final;
+  galois::GAccumulator<size_t> kMotifCount;
   galois::GAccumulator<size_t> numClosedStructures;
 
-#if 0
-  galois::do_all(galois::iterate(graph),
-                [&](GNode n) {
-                // Partition neighbors
-                // [first, ea) [n] [bb, last)
-                auto& ndata = graph.getData(n);
-                Graph::edge_iterator first =
-                    graph.edge_begin(n, galois::MethodFlag::UNPROTECTED);
-                Graph::edge_iterator last =
-                    graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
-                Graph::edge_iterator ea =
-                    lowerBound(first, last, LessThan<Graph>(graph, n));
-                Graph::edge_iterator bb =
-                    lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
-
-                  ndata.ea = std::abs(std::distance(first, ea));
-                  ndata.bb = std::abs(std::distance(first, bb));
-
-                 },
-                 galois::loopname("Initialize"));
-    //std::cout << "numItems: " << numItems.reduce() << "\n";
-    std::cout << "Done Initializing\n";
-#endif
        galois::do_all(
             galois::iterate(graph),
             [&](const GNode& n) {
@@ -308,68 +290,62 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
               Graph::edge_iterator last =
                   graph.edge_end(n, galois::MethodFlag::UNPROTECTED);
 
-              auto first_elem = sg.vertices[0];
-              auto max_elem = first_elem;
+              //auto first_elem = sg.vertices[0];
+              auto max_elem = sg.vertices[0];
               //If n is duplicated, find the first instance of n else it will find n:
               //n is gauranteed to be present in the tuple
-              auto first_instance_of_n_it = std::find(sg.vertices.begin(), sg.vertices.end(), n);
+              auto first_instance_of_n = std::distance(sg.vertices.begin(), std::find(sg.vertices.begin(), sg.vertices.end(), n));
               //If no duplicates are present than first_instance_of_n == sg.key
-              auto first_instance_of_n  = std::distance(sg.vertices.begin(), first_instance_of_n_it); 
-
-              auto max_elem_after_n  = std::max_element(sg.vertices.begin() + first_instance_of_n + 1, sg.vertices.end());
-              if (max_elem_after_n != sg.vertices.end()) {
-                max_elem = std::max(*max_elem_after_n, max_elem);
+              //auto first_instance_of_n  = std::distance(sg.vertices.begin(), first_instance_of_n_it);
+              if(sg.vertices.begin() + first_instance_of_n + 1 < sg.vertices.end()){
+                auto max_elem_after_n  = std::max_element(sg.vertices.begin() + first_instance_of_n + 1, sg.vertices.end());
+                if (max_elem_after_n != sg.vertices.end()) {
+                  max_elem = std::max(*max_elem_after_n, max_elem);
+                }
               }
 
               Graph::edge_iterator bb = lowerBound(
-                  first, last, GreaterThanOrEqual<Graph>(graph, max_elem));
+                  first, last, LessThan<Graph>(graph, max_elem));
+
               for (; bb != last; ++bb) {
                 GNode dst = graph.getEdgeDst(bb);
+                auto verts = sg.vertices;
+                auto st_info = sg.st_info;
+                if (isPresentOnLeft(verts, dst, sg.key)) {
+                    continue;
+                }
                 //Do not add duplicate edges
-                if (edgeNotInTuple(sg.vertices, dst, sg.st_info[sg.key])){
-                  auto verts = sg.vertices;
-                  auto st_info = sg.st_info;
+                if (edgeNotInTuple(verts, dst, st_info[sg.key])){
+                  /**
+                   * If adding duplicate nodes, check the order of structure
+                   */
+                  auto tupleSize = verts.size();
+                  if (verts[tupleSize - 1] == dst) {
+                    /*
+                     * Should never be equal, since edgeNotInTuple should discard it
+                     */
+                    if (st_info[tupleSize - 1] >= sg.key)
+                      continue;
+                  }
                   verts.push_back(dst);
                   st_info.push_back(sg.key);
                   //Should have k unique elements
                   if (uniqueInTuple(verts) == k) {
-                    items_final.push(SubGraphTuple(verts, sg.key, st_info));
-                    //Find close structures using same rules of canonicality
-                    for (auto j = 0; j < verts.size(); ++j) {
-                      auto n_local = verts[j];
-                      auto first_elem = verts[0];
-                      auto max_elem = first_elem;
-                      //If n is duplicated, find the first instance of n else it will find n:
-                      //n is gauranteed to be present in the tuple
-                      auto first_instance_of_n_it = std::find(verts.begin(), verts.end(), n_local);
-                      //If no duplicates are present than first_instance_of_n == sg.key
-                      auto first_instance_of_n  = std::distance(verts.begin(), first_instance_of_n_it);
+                      //items_final.push(SubGraphTuple(verts, sg.key, st_info));
+                      kMotifCount += 1;
 
-                      auto max_elem_after_n_it  = std::max_element(verts.begin() + first_instance_of_n + 1, verts.end());
-                      if (max_elem_after_n_it != verts.end()) {
-                        max_elem = std::max(*max_elem_after_n_it, max_elem);
-                      }
-                      Graph::edge_iterator first_local =
-                        graph.edge_begin(n_local, galois::MethodFlag::UNPROTECTED);
-                      Graph::edge_iterator last_local =
-                        graph.edge_end(n_local, galois::MethodFlag::UNPROTECTED);
-                      Graph::edge_iterator bb = lowerBound(
-                          first_local, last_local, GreaterThanOrEqual<Graph>(graph, max_elem));
-                      for (; bb != last_local; ++bb) {
-                        GNode dst = graph.getEdgeDst(bb);
-                        if(vertexNotInTuple(verts, dst))
-                          continue;
-                        if (edgeNotInTuple(verts, dst, st_info[j])) {
-                          verts.push_back(dst);
-                          st_info.push_back(j);
-                          items_final.push(SubGraphTuple(verts, j, st_info));
-                          numClosedStructures += 1;
+                      std::set<GNode> local_set{verts.begin(), verts.end()};
+                      for (auto v : local_set) {
+                        //for (auto j = 0; j < verts.size(); ++j) {
+                        auto first_instance_of_v_it = std::find(verts.begin(), verts.end(), v);
+                        auto i = std::distance(verts.begin(), first_instance_of_v_it);
+                        if(std::count(st_info.begin() + 2, st_info.end(), i) < k - 2) {
+                          items_active.push(SubGraphTuple(verts, i, st_info));
                         }
                       }
-                    }
                   }
                   else {
-                      //TODO:: Only push unique elements
+                      //Only push unique elements
                     std::set<GNode> local_set{verts.begin(), verts.end()};
                     for (auto v : local_set) {
                       auto first_instance_of_v_it = std::find(verts.begin(), verts.end(), v);
@@ -380,32 +356,30 @@ void nodeIteratingAlgoWithStruct(Graph& graph) {
                 }
               }
             },
-            galois::chunk_size<512>(), galois::steal(), galois::no_conflicts(),
+            galois::chunk_size<512>(), /*galois::steal(), */galois::no_conflicts(),
             galois::loopname("nodeIteratingAlgoWithStruct"));
             } else {
                 items_final.swap(items_active);
                 items_active.clear();
             }
-  
 #if 0
   std::cout << "items2" << "\n";
   for(auto ii = items_final.begin(); ii != items_final.end(); ++ii){
-    std::cout << "key : " << (*ii).key << "\n";
     for(auto i :  (*ii).vertices){
       std::cout << i << "--";
     }
-#if 0
-    std::cout <<"\n";
+    std::cout << "key : " << (uint32_t)(*ii).key << "\n";
+    //std::cout <<"\n";
     for(auto i :  (*ii).st_info){
-      std::cout << i << "--";
+      std::cout <<  (uint32_t)i << "--";
     }
     std::cout << "\n";
-#endif
   }
 #endif
 
-  std::cout << "Num " << k << "-motif: " << std::distance(items_final.begin(), items_final.end()) << "\n";
-  std::cout << "NumClosedStructures: " << numClosedStructures.reduce() << "\n";
+  //std::cout << "Num " << k << "-motif: " << std::distance(items_final.begin(), items_final.end()) << "\n";
+  std::cout << "Num " << k << "-motif: " << kMotifCount.reduce() << "\n";
+  //std::cout << "NumClosedStructures: " << numClosedStructures.reduce() << "\n";
 }
 void makeGraph(Graph& graph, const std::string& triangleFilename) {
   typedef galois::graphs::FileGraph G;
@@ -484,7 +458,7 @@ int main(int argc, char** argv) {
   Tinitial.stop();
   galois::gPrint("Done readGraph\n");
 
-  //galois::preAlloc(500);
+  galois::preAlloc(600);
   //galois::preAlloc(numThreads + 16 * (graph.size() + graph.sizeEdges()) /
                                     //galois::runtime::pagePoolSize());
   galois::reportPageAlloc("MeminfoPre");
