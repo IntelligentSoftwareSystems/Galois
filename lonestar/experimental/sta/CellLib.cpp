@@ -433,6 +433,7 @@ void CellPin::print(std::ostream& os) {
 
   if (OUTPUT == dir || INOUT == dir) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
+    os << "      min_capacitance: " << minC << ";" << std::endl;
     if (func.size()) {
       os << "      function: \"" << func << "\";" << std::endl;
     }
@@ -1123,10 +1124,24 @@ void CellLibParser::parseCellPin(Cell* cell) {
       pin->c[1] = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
+    // capacitance: value
+    else if ("capacitance" == *curToken) {
+      curToken += 2; // consume "capacitance" and ":"
+      auto c = getMyFloat(*curToken);
+      pin->c[0] = c;
+      pin->c[1] = c;
+      curToken += 2; // consume value and ";"
+    }
     // max_capacitance: value;
     else if ("max_capacitance" == *curToken) {
       curToken += 2; // consume "max_capacitance" and ":"
       pin->maxC = getMyFloat(*curToken);
+      curToken += 2; // consume value and ";"
+    }
+    // min_capacitance: value;
+    else if ("min_capacitance" == *curToken) {
+      curToken += 2; // consume "min_capacitance" and ":"
+      pin->minC = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // function: "...";

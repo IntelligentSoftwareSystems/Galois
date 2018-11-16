@@ -237,8 +237,8 @@ int main(int argc, char *argv[]) {
   }
 /*
   TimingEngine engine;
-  engine.addCellLib(&lib, TIMING_MODE_MAX_DELAY);
-//  engine.addCellLib(&lib, TIMING_MODE_MIN_DELAY);
+  engine.addCellLib(&lib, MAX_DELAY_MODE);
+//  engine.addCellLib(&lib, MIN_DELAY_MODE);
   engine.readDesign(&design);
 
   auto m = *(design.roots.begin());

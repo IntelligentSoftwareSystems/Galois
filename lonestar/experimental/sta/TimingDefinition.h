@@ -6,8 +6,8 @@
 using MyFloat = double;
 
 enum TimingMode {
-  TIMING_MODE_MAX_DELAY = 0,
-  TIMING_MODE_MIN_DELAY,
+  MAX_DELAY_MODE = 0,
+  MIN_DELAY_MODE,
 };
 
 MyFloat getMyFloat(std::string& str);

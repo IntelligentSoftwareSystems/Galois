@@ -341,7 +341,7 @@ void TimingGraph::initialize() {
 
         // for timing computation
         for (size_t k = 0; k < libs.size(); k++) {
-          if (TIMING_MODE_MAX_DELAY == modes[k]) {
+          if (MAX_DELAY_MODE == modes[k]) {
             data.t[k].slew = 0.0;
             data.t[k].arrival = (data.isTimingSource()) ? 0.0 : -infinity;
             data.t[k].required = infinity;
@@ -379,7 +379,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
       auto n = nodeMap[p][j];
       auto& data = g.getData(n, unprotected);
       for (size_t k = 0; k < libs.size(); k++) {
-        if (TIMING_MODE_MAX_DELAY == modes[k]) {
+        if (MAX_DELAY_MODE == modes[k]) {
           data.t[k].required = sdc.maxDelayPI2PO;
         }
       }
@@ -412,7 +412,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
       for (size_t k = 0; k < libs.size(); k++) {
         data.t[k].pin = dCell->toCellPin;
         // treat this pin as internal pins
-        if (TIMING_MODE_MAX_DELAY == modes[k]) {
+        if (MAX_DELAY_MODE == modes[k]) {
           data.t[k].arrival = -infinity;
         }
         else {
@@ -441,7 +441,7 @@ void TimingGraph::setConstraints(SDC& sdc) {
         data.t[k].pinC = 0.0;
         data.t[k].wireC = 0.0;
 
-        if (TIMING_MODE_MAX_DELAY == modes[k]) {
+        if (MAX_DELAY_MODE == modes[k]) {
           data.t[k].required = infinity;
         }
         else {
@@ -544,7 +544,7 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
 
   auto& ieData = g.getEdgeData(ie);
 
-  if (TIMING_MODE_MAX_DELAY == modes[k]) {
+  if (MAX_DELAY_MODE == modes[k]) {
     auto delayResult = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise);
     auto delay = delayResult.first;
     if (predData.isDrivingCell) {

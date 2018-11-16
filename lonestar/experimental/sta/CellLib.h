@@ -215,6 +215,7 @@ struct CellPin {
 
   MyFloat c[2]; // fall/rise capaitance
   MyFloat maxC; // maximum capacitance
+  MyFloat minC;
   Cell* cell;
   std::string func;
   std::string func_up;
@@ -327,6 +328,7 @@ public:
     pin->c[0] = 0.0;
     pin->c[1] = 0.0;
     pin->maxC = 0.0;
+    pin->minC = 0.0;
     pin->isClock = false;
     pin->isClockGated = false;
     pins[name] = pin;
