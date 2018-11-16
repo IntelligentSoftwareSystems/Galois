@@ -371,7 +371,7 @@ private:
    */
   std::vector<uint64_t> createMasterMirrorNodes(
       const std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-      galois::DynamicBitSet& ghosts,
+      galois::DynamicBitSet<>& ghosts,
       std::vector<std::vector<size_t>>& mirrorNodes) {
     numNodes = 0;
     numEdges = 0;
@@ -463,7 +463,7 @@ private:
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
     auto& id              = base_DistGraph::id;
 
-    galois::DynamicBitSet ghosts;
+    galois::DynamicBitSet<> ghosts;
     ghosts.resize(base_DistGraph::numGlobalNodes);
 
     // Assign edges to hosts

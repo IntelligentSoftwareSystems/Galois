@@ -492,7 +492,7 @@ private:
         base_DistGraph::gid2host[base_DistGraph::id].second -
         base_DistGraph::gid2host[base_DistGraph::id].first;
 
-    std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
+    std::vector<galois::DynamicBitSet<>> hasIncomingEdge(numColumnHosts);
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t columnBlockSize = 0;
       for (auto b = 0U; b < base_DistGraph::numHosts; ++b) {
@@ -635,7 +635,7 @@ private:
       auto range =
           galois::block_range((uint64_t)0, base_DistGraph::numGlobalNodes, h,
                               base_DistGraph::numHosts);
-      galois::DynamicBitSet createNode;
+      galois::DynamicBitSet<> createNode;
       createNode.resize(range.second - range.first);
       galois::do_all(
           galois::iterate(range.first, range.second),

@@ -447,7 +447,7 @@ private:
    * well as a counter for how many local edges nodes have.
    */
   void inOutMetadataInitialization(
-    std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+    std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
     VectorOfVector64& numOutgoingEdges
   ) {
     // create bitmaps to mark which nodes have incoming edges for each column
@@ -485,7 +485,7 @@ private:
    */
   void edgeInspection(
     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-    std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+    std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
     VectorOfVector64& numOutgoingEdges,
     galois::Timer& inspectionTimer
   ) {
@@ -528,7 +528,7 @@ private:
    * will eventually receive these local nodes/edges
    */
   void communicateColumnMetadata(
-    std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+    std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
     VectorOfVector64& numOutgoingEdges
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
@@ -610,7 +610,7 @@ private:
   /**
    * Create metadata of the source nodes of edges that we are responsible for.
    */
-  void inspectOutgoingNodes(std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+  void inspectOutgoingNodes(std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
                            VectorOfVector64& numOutgoingEdges,
                            std::vector<uint64_t>& prefixSumOfEdges) {
     galois::gDebug("Creating outgoing node mapping");
@@ -699,7 +699,7 @@ private:
    * Create metadata for endpoints of edges that we are responsible for.
    */
   void inspectIncomingNodes(
-    std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+    std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
     std::vector<uint64_t>& prefixSumOfEdges
   ) {
     galois::gDebug("Creating incoming node mapping");
@@ -815,7 +815,7 @@ private:
       base_DistGraph::gid2host[base_DistGraph::id].first;
 
     // initialize metadata tracking for columns
-    std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
+    std::vector<galois::DynamicBitSet<>> hasIncomingEdge(numColumnHosts);
     VectorOfVector64 numOutgoingEdges;
     inOutMetadataInitialization(hasIncomingEdge, numOutgoingEdges);
 

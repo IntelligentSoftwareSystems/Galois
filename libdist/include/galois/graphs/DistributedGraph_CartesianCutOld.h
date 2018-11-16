@@ -514,7 +514,7 @@ private:
               .first;
     }
 
-    std::vector<galois::DynamicBitSet> hasIncomingEdge(numColumnHosts);
+    std::vector<galois::DynamicBitSet<>> hasIncomingEdge(numColumnHosts);
 
     for (unsigned i = 0; i < numColumnHosts; ++i) {
       uint64_t columnBlockSize = 0;

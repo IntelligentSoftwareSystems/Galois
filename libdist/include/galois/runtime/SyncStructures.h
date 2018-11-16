@@ -1312,7 +1312,7 @@ public:
     static constexpr bool is_vector_bitset() { return false; }                 \
     static bool is_valid() { return true; }                                    \
                                                                                \
-    static galois::DynamicBitSet& get() {                                      \
+    static galois::DynamicBitSet<>& get() {                                      \
       if (personality == GPU_CUDA)                                             \
         get_bitset_##fieldname##_cuda(                                         \
             cuda_ctx, (uint64_t*)bitset_##fieldname.get_vec().data());         \
@@ -1336,7 +1336,7 @@ public:
                                                                                \
     static constexpr bool is_valid() { return true; }                          \
                                                                                \
-    static galois::DynamicBitSet& get() { return bitset_##fieldname; }         \
+    static galois::DynamicBitSet<>& get() { return bitset_##fieldname; }         \
                                                                                \
     static void reset_range(size_t begin, size_t end) {                        \
       bitset_##fieldname.reset(begin, end);                                    \
@@ -1363,7 +1363,7 @@ public:
                                                                                \
     static constexpr bool is_valid() { return true; }                          \
                                                                                \
-    static galois::DynamicBitSet& get(unsigned i) {                            \
+    static galois::DynamicBitSet<>& get(unsigned i) {                            \
       return vbitset_##fieldname[i];                                           \
     }                                                                          \
                                                                                \

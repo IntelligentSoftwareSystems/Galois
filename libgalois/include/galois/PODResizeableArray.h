@@ -20,12 +20,20 @@
 #ifndef GALOIS_PODRESIZEABLEARRAY_H
 #define GALOIS_PODRESIZEABLEARRAY_H
 
+#ifndef USE_ALLOCATOR
+#define USE_ALLOCATOR
+#endif
+
 #include <iterator>
 #include <stdexcept>
 #include <cstddef>
 #include <algorithm>
 #include <utility>
 #include <type_traits>
+
+// Statistics & Debug
+// #include "galois/Timer.h"
+#include "galois/gIO.h"
 
 namespace galois {
 
@@ -37,6 +45,7 @@ namespace galois {
 template <typename _Tp, typename _Alloc = std::allocator<_Tp>>
 class PODResizeableArray {
   _Tp* data_;
+  _Alloc alloc_;
   size_t capacity_;
   size_t size_;
 
@@ -88,7 +97,7 @@ public:
 
   //! move assignment operator
   PODResizeableArray& operator=(PODResizeableArray&& v) {
-    if (data_ != NULL) free(data_);
+    if (data_ != NULL) alloc_.deallocate(data_, capacity_);
     data_ = v.data_;
     capacity_ = v.capacity_;
     size_ = v.size_;
@@ -98,7 +107,7 @@ public:
     return *this;
   }
 
-  ~PODResizeableArray() { if (data_ != NULL) free(data_); }
+  ~PODResizeableArray() { if (data_ != NULL) alloc_.deallocate(data_, capacity_); }
 
   // iterators:
   iterator begin() { return iterator(&data_[0]); }
@@ -126,11 +135,28 @@ public:
   bool empty() const { return size_ == 0; }
 
   void reserve(size_t n) {
+    // galois::StatTimer StatTimer_reserve("reserve", "PR_BC");
+    // StatTimer_reserve.start();
     if (n > capacity_) {
+      size_t old_cap = capacity_;
       if (capacity_ == 0) capacity_ = 1;
       while (capacity_ < n) capacity_ <<= 1;
+      #ifndef USE_ALLOCATOR
       data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
+      #else
+      if (data_ == NULL) {
+        data_ = alloc_.allocate(capacity_);
+      }
+      else {
+        pointer old_mem = data_;
+        data_ = alloc_.allocate(capacity_);
+        galois::gDebug("memcpy: ", old_mem, " -> ", data_);
+        memcpy(data_, old_mem, old_cap * sizeof(_Tp));
+        alloc_.deallocate(old_mem, old_cap);
+      }
+      #endif
     }
+    // StatTimer_reserve.stop();
   }
 
   void resize(size_t n) {
@@ -140,6 +166,15 @@ public:
 
   void clear() {
     size_ = 0;
+  }
+
+  void release() {
+    if (data_ != NULL) {
+      alloc_.deallocate(data_, capacity_);
+      data_ = NULL;
+      capacity_ = 0;
+      size_ = 0;
+    }
   }
 
   // element access:

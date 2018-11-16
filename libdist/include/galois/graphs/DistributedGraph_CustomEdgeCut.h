@@ -384,7 +384,7 @@ public:
     // Go over assigned nodes and distribute edges.
     std::vector<std::vector<uint64_t>> numOutgoingEdges(
         base_DistGraph::numHosts);
-    std::vector<galois::DynamicBitSet> hasIncomingEdge(
+    std::vector<galois::DynamicBitSet<>> hasIncomingEdge(
         base_DistGraph::numHosts);
     std::vector<galois::GAccumulator<uint64_t>> num_assigned_edges_perhost(
         base_DistGraph::numHosts);
@@ -460,8 +460,8 @@ public:
 
     numOwned = num_assigned_nodes_perhost[base_DistGraph::id].reduce();
 
-    galois::DynamicBitSet sentHosts;
-    galois::DynamicBitSet recvHosts;
+    galois::DynamicBitSet<> sentHosts;
+    galois::DynamicBitSet<> recvHosts;
     sentHosts.resize(net.Num);
     recvHosts.resize(net.Num);
 
