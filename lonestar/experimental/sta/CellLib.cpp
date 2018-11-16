@@ -812,9 +812,16 @@ void CellLibParser::parseLutTemplate(bool isForPower) {
 void CellLibParser::parseLut(Lut* lut, bool isForPower) {
   // key_word (name) {...}
   curToken += 2; // consume key_word and "("
+  if ("\"" == *curToken) {
+    curToken += 1; // in case template name is quoted
+  }
   lut->lutTemplate = lib->findLutTemplate(*curToken, isForPower);
   assert(lut->lutTemplate);
-  curToken += 3; // consume name, ")" and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1; // in case template name is quoted
+  }
+  curToken += 2; // consume ")" and "{"
 
   while (!isEndOfGroup()) {
     // index_* ("num1[,num*]");
@@ -830,7 +837,7 @@ void CellLibParser::parseLut(Lut* lut, bool isForPower) {
     }
     // values ("num1[,num*]"[, \ "num1[,num*]"]);
     else if ("values" == *curToken) {
-      curToken += 3; // consume "value", "(" and "\"" or "\\"
+      curToken += 3; // consume "values", "(" and "\"" or "\\"
       if ("\"" == *curToken) {
         curToken += 1; // consume "\"" preceded by "\\"
       }
@@ -842,6 +849,9 @@ void CellLibParser::parseLut(Lut* lut, bool isForPower) {
         }
         if ("\"" == *curToken) {
           curToken += 1; // consume "\"" preceded by "\\"
+        }
+        if ("\\" == *curToken) {
+          curToken += 1; // consume "\\" before ")"
         }
       }
       curToken += 2; // consume ")" and ";"
