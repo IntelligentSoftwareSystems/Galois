@@ -4,11 +4,11 @@ static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
 
 static bool isNameForVdd(std::string name) {
-  return (name == name0 || name == "1\'h0");
+  return (name == name1 || name == "1\'h1");
 }
 
 static bool isNameForGnd(std::string name) {
-  return (name == name1 || name == "1\'h1");
+  return (name == name0 || name == "1\'h0");
 }
 
 void VerilogParser::tokenizeFile(std::string inName) {
@@ -109,7 +109,7 @@ void VerilogParser::parseAssign() {
   auto wire = curModule->findWire(getVarName());
   assert(wire);
   curToken += 1; // consume ";"
-  
+
   pin->wire = wire;
   wire->addPin(pin);
 }
