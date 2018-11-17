@@ -17,17 +17,17 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#ifndef _PRBCTREE_
-#define _PRBCTREE_
+#ifndef _MRBCTREE_
+#define _MRBCTREE_
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
 const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
 
 /**
- * Binary tree class to make finding a source's message to send out during PRBC
+ * Binary tree class to make finding a source's message to send out during MRBC
  * easier.
  */
-class PRBCTree {
+class MRBCTree {
   using FlatSet = boost::container::flat_set<uint32_t, 
                     std::less<uint32_t>, galois::gstl::Pow2Alloc<uint32_t>>;
   using FlatMap = boost::container::flat_map<uint32_t, FlatSet,
