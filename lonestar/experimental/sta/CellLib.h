@@ -348,6 +348,8 @@ public:
   bool isSequentialCell() { return !clockPins.empty(); }
 };
 
+// compute wire value as in cell lib
+// if user needs to set values, use SDFWireLoad instead
 struct PreLayoutWireLoad: public WireLoad {
   MyFloat c;
   MyFloat r;
@@ -362,6 +364,9 @@ public:
   MyFloat wireC(VerilogWire* wire);
   MyFloat wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin);
   void print(std::ostream& os = std::cout);
+
+  void setWireC(VerilogWire*, MyFloat) { }
+  void setWireDelay(VerilogWire*, VerilogPin*, MyFloat) { }
 
   void addFanoutLength(size_t fanout, MyFloat length) {
     fanoutLength[fanout] = length;
