@@ -23,6 +23,9 @@ using TimingPath = std::vector<TimingPathNode>;
 struct TimingEngine {
   std::vector<CellLib*> libs;
   std::vector<TimingMode> modes;
+  using Corner = std::pair<CellLib*, TimingMode>;
+  std::unordered_map<Corner, size_t, boost::hash<Corner> > cornerMap;
+  size_t numCorners;
   VerilogDesign* v;
 
   // slew merging
@@ -37,22 +40,23 @@ private:
   void clearTimingGraphs();
 
 public:
-  TimingEngine(bool isExactSlew = false): isExactSlew(isExactSlew) {}
+  TimingEngine(bool isExactSlew = false): numCorners(0), isExactSlew(isExactSlew) {}
   ~TimingEngine() { clearTimingGraphs(); }
 
   void addCellLib(CellLib* lib, TimingMode mode) {
     libs.push_back(lib);
     modes.push_back(mode);
+    cornerMap[std::make_pair(lib, mode)] = numCorners;
+    numCorners += 1;
   }
 
   void readDesign(VerilogDesign* design);
-  void update(VerilogModule* m); // for incremental timing analysis
   void constrain(VerilogModule* m, SDC& sdc);  // add constraints to the module
   void time(VerilogModule* m);  // timing analysis from scratch
 
-  MyFloat reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
-  MyFloat reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner);
-  std::vector<TimingPath> reportTopKCriticalPaths(VerilogModule* m, size_t corner, size_t k = 1);
+  MyFloat reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode);
+  MyFloat reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode);
+  std::vector<TimingPath> reportTopKCriticalPaths(VerilogModule* m, CellLib* lib, TimingMode mode, size_t k = 1);
 };
 
 #endif // GALOIS_EDA_TIMING_ENGINE_H
