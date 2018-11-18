@@ -13,6 +13,7 @@
 #include <vector>
 #include <unordered_map>
 #include <atomic>
+#include <boost/functional/hash.hpp>
 
 struct NodeTiming {
   CellPin* pin;
@@ -24,65 +25,26 @@ struct NodeTiming {
   MyFloat slack;
 };
 
+enum TimingNodeType {
+  PRIMARY_INPUT = 0,
+  PRIMARY_OUTPUT,
+  GATE_INPUT,
+  GATE_OUTPUT,
+  GATE_INTERNAL,
+  GATE_INOUT,
+  POWER_VDD,
+  POWER_GND,
+  DUMMY_POWER,
+};
+
 struct Node {
   bool isRise;
-  bool isOutput;
-  bool isPrimary;
-  bool isPowerNode;
-  bool isClock;
-  bool isDummy;
-  bool isDrivingCell;
+  TimingNodeType nType;
   size_t topoL;
   size_t revTopoL;
   std::atomic<bool> flag;
   std::vector<NodeTiming> t;
   VerilogPin* pin;
-
-public:
-  bool isPrimaryInput() {
-    return (!isDummy && !isPowerNode && isPrimary && !isOutput);
-  }
-
-  bool isPrimaryOutput() {
-    return (!isDummy && !isPowerNode && isPrimary && isOutput);
-  }
-
-  bool isGateInput() {
-    return (!isDummy && !isPowerNode && !isPrimary && !isOutput);
-  }
-
-  bool isGateOutput() {
-    return (!isDummy && !isPowerNode && !isPrimary && isOutput);
-  }
-
-  bool isRealPowerNode() {
-    return (isPowerNode && !isDummy);
-  }
-
-  bool isRealDummy() {
-    return (isDummy && !isPowerNode);
-  }
-
-  bool isSequentialInput() {
-    return false;
-  }
-
-  bool isSequentialOutput() {
-    return false;
-  }
-
-  bool isPseudoPrimaryInput() {
-    return (isPrimaryInput() || isSequentialOutput());
-  }
-
-  bool isPseudoPrimaryOutput() {
-    return (isPrimaryOutput() || isSequentialInput());
-  }
-
-  // TODO: add clock pins of all modules/gates
-  bool isTimingSource() {
-    return (isPseudoPrimaryInput() || isRealPowerNode());
-  }
 };
 
 struct EdgeTiming {
@@ -93,7 +55,10 @@ struct EdgeTiming {
 struct Edge {
   std::vector<EdgeTiming> t;
   VerilogWire* wire;
+  bool isConstraint;
 };
+
+struct TimingEngine;
 
 struct TimingGraph {
 public:
@@ -102,19 +67,18 @@ public:
   using GNode = Graph::GraphNode;
 
 public:
-  // external inputs from TimingEngine
   VerilogModule& m;
-  std::vector<CellLib*>& libs;
-  std::vector<TimingMode>& modes;
-  bool isExactSlew;
+  TimingEngine* engine;
 
   // internal graph
   Graph g;
 
   // internal mapping
-  GNode dummySrc;
-  GNode dummySink;
   std::unordered_map<VerilogPin*, GNode[2]> nodeMap;
+
+  // forward/backward frontiers
+  galois::InsertBag<GNode> fFront;
+  galois::InsertBag<GNode> bFront;
 
 private:
   // arrival time computation
@@ -128,16 +92,15 @@ private:
   void computeRevTopoL();
 
   // graph construction
-  void addDummyNodes();
   void addPin(VerilogPin* p);
   void addGate(VerilogGate* g);
-  void addWire(VerilogWire* w);
+  void addWire(VerilogPin* p);
 
   // debug printing
   std::string getNodeName(GNode n);
 
 public:
-  TimingGraph(VerilogModule& m, std::vector<CellLib*>& libs, std::vector<TimingMode>& modes, bool isExactSlew): m(m), libs(libs), modes(modes), isExactSlew(isExactSlew) {}
+  TimingGraph(VerilogModule& m, TimingEngine* engine): m(m), engine(engine) {}
 
   void construct();
   void initialize();

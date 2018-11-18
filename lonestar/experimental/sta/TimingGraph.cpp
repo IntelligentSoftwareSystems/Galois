@@ -1,3 +1,4 @@
+#include "TimingEngine.h"
 #include "TimingGraph.h"
 #include "galois/Bag.h"
 #include "galois/Reduction.h"
@@ -21,31 +22,27 @@ void TimingGraph::addPin(VerilogPin* pin) {
     auto& data = g.getData(n, unprotected);
     data.pin = pin;
     data.isRise = (bool)j;
-    if (pin->name == name0 || pin->name == name1) {
-      data.isPowerNode = true;
-      // rising gnd and falling vdd are dummy nodes to simplify computation
-      if ((pin->name == name0 && 1 == j) || (pin->name == name1 && 0 == j)) {
-        data.isDummy = true;
-      }
+    if (pin->name == name0) {
+      data.nType = (0 == j) ? POWER_GND : DUMMY_POWER;
+    }
+    else if (pin->name == name1) {
+      data.nType = (1 == j) ? DUMMY_POWER : POWER_VDD;
+    }
+    else if (m.isOutPin(pin)) {
+      data.nType = PRIMARY_OUTPUT;
     }
     else {
-      data.isPrimary = true;
-      if (m.isOutPin(pin)) {
-        data.isOutput = true;
-      }
+      data.nType = PRIMARY_INPUT;
     }
 
-    data.t.insert(data.t.begin(), libs.size(), NodeTiming());
-    for (size_t k = 0; k < libs.size(); k++) {
+    data.t.insert(data.t.begin(), engine->numCorners, NodeTiming());
+    for (size_t k = 0; k < engine->numCorners; k++) {
       data.t[k].pin = nullptr;
     }
   }
 }
 
 void TimingGraph::addGate(VerilogGate* gate) {
-  std::unordered_set<GNode> outNodes;
-  std::unordered_set<GNode> inNodes;
-
   // allocate fall/rise pins in gate
   for (auto& gp: gate->pins) {
     auto p = gp.second;
@@ -58,132 +55,82 @@ void TimingGraph::addGate(VerilogGate* gate) {
       data.pin = p;
       data.isRise = (bool)j;
 
-      data.t.insert(data.t.begin(), libs.size(), NodeTiming());
-      for (size_t k = 0; k < libs.size(); k++) {
-        data.t[k].pin = libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
+      data.t.insert(data.t.begin(), engine->numCorners, NodeTiming());
+      for (size_t k = 0; k < engine->numCorners; k++) {
+        data.t[k].pin = engine->libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
       }
 
       auto dir = data.t[0].pin->pinDir();
-      if (OUTPUT == dir || INOUT == dir) {
-        data.isOutput = true;
-        outNodes.insert(n);
-      }
-      if (INPUT == dir || INOUT == dir) {
-        inNodes.insert(n);
+      switch (dir) {
+      case INPUT:
+        data.nType = GATE_INPUT;
+        break;
+      case OUTPUT:
+        data.nType = GATE_OUTPUT;
+        break;
+      case INOUT:
+        data.nType = GATE_INOUT;
+        break;
+      case INTERNAL:
+        data.nType = GATE_INTERNAL;
+        break;
       }
     }
   }
+
+  auto addTimingArc =
+      [&] (GNode i, GNode o, bool isConstraint) {
+        auto e = g.addMultiEdge(i, o, unprotected);
+        auto& eData = g.getEdgeData(e);
+        eData.wire = nullptr;
+        eData.isConstraint = isConstraint;
+        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeTiming());
+        for (size_t k = 0; k < engine->numCorners; k++) {
+          eData.t[k].wireLoad = nullptr;
+          eData.t[k].delay = 0.0;
+        }
+      };
 
   // add timing arcs among gate pins
-  for (auto on: outNodes) {
-    auto& oData = g.getData(on, unprotected);
-    auto op = oData.t[0].pin;
-    for (auto in: inNodes) {
-      auto& iData = g.getData(in, unprotected);
-      auto ip = iData.t[0].pin;
-      if (op->isEdgeDefined(ip, iData.isRise, oData.isRise)) {
-        auto e = g.addMultiEdge(in, on, unprotected);
-        auto& eData = g.getEdgeData(e);
-        eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
-        for (size_t k = 0; k < libs.size(); k++) {
-          eData.t[k].wireLoad = nullptr;
-          eData.t[k].delay = 0.0;
-        }
-      }
-    }
-  }
+  for (auto& ov: gate->pins) {
+    auto ovp = ov.second;
+    for (auto& iv: gate->pins) {
+      auto ivp = iv.second;
+      for (size_t i = 0; i < 2; i++) {
+        auto on = nodeMap[ovp][i];
+        auto op = g.getData(on, unprotected).t[0].pin;
+        for (size_t j = 0; j < 2; j++) {
+          auto in = nodeMap[ivp][j];
+          auto ip = g.getData(in, unprotected).t[0].pin;
+          if (op->isEdgeDefined(ip, j, i)) {
+            addTimingArc(in, on, false);
+          }
+          else if (op->isEdgeDefined(ip, j, i, MIN_CONSTRAINT)) {
+            addTimingArc(in, on, true);
+          }
+          else if (op->isEdgeDefined(ip, j, i, MAX_CONSTRAINT)) {
+            addTimingArc(in, on, true);
+          }
+        } // end for j
+      } // end for i
+    } // end for iv
+  } // end for ov
 }
 
-void TimingGraph::addWire(VerilogWire* w) {
-  // dangling wires due to assign statements
-  if (0 == w->outDeg()) {
-    return;
-  }
-
-  // scan for the source of w
-  GNode src[2];
-  for (auto p: w->pins) {
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto& data = g.getData(n, unprotected);
-      // w goes from 1'b0 or 1'b1
-      if (data.isPowerNode) {
-        src[j] = n;
-      }
-      // w goes from primary input
-      else if (data.isPrimary && !data.isOutput) {
-        src[j] = n;
-      }
-      // w goes from gate output 
-      else if (!data.isPrimary && data.isOutput) {
-        src[j] = n;
-      }
-    }
-  }
-
-  // connect w.src to other pins
+void TimingGraph::addWire(VerilogPin* p) {
+  // p is the source of a wire
   for (size_t j = 0; j < 2; j++) {
-    for (auto p: w->pins) {
-      auto n = nodeMap[p][j];
-      if (n != src[j]) {
-        auto e = g.addMultiEdge(src[j], n, unprotected);
+    auto src = nodeMap[p][j];
+    for (auto to: p->wire->pins) {
+      if (to != p) {
+        auto dst = nodeMap[to][j];
+        auto e = g.addMultiEdge(src, dst, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.wire = p->wire;
-        eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
-        for (size_t k = 0; k < libs.size(); k++) {
-          eData.t[k].wireLoad = libs[k]->defaultWireLoad;
-          eData.t[k].delay = 0.0;
-        }
-      }
-    }
-  }
-}
-
-void TimingGraph::addDummyNodes() {
-  dummySrc = g.createNode();
-  g.addNode(dummySrc, unprotected);
-  auto& dSrcData = g.getData(dummySrc, unprotected);
-  dSrcData.isDummy = true;
-  dSrcData.pin = nullptr;
-  dSrcData.t.insert(dSrcData.t.begin(), libs.size(), NodeTiming());
-  for (size_t k = 0; k < libs.size(); k++) {
-    dSrcData.t[k].pin = nullptr;
-  }
-
-  dummySink = g.createNode();
-  g.addNode(dummySink, unprotected);
-  auto& dSinkData = g.getData(dummySink, unprotected);
-  dSinkData.isDummy = true;
-  dSinkData.isOutput = true;
-  dSinkData.pin = nullptr;
-  dSinkData.t.insert(dSinkData.t.begin(), libs.size(), NodeTiming());
-  for (size_t k = 0; k < libs.size(); k++) {
-    dSinkData.t[k].pin = nullptr;
-  }
-
-  for (auto i: m.pins) {
-    auto p = i.second;
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto numPred = std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected));
-      if (!numPred) {
-        auto e = g.addMultiEdge(dummySrc, n, unprotected);
-        auto& eData = g.getEdgeData(e);
-        eData.wire = nullptr;
-        eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
-        for (size_t k = 0; k < libs.size(); k++) {
-          eData.t[k].wireLoad = nullptr;
-          eData.t[k].delay = 0.0;
-        }
-      }
-      auto numSucc = std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
-      if (!numSucc) {
-        auto e = g.addMultiEdge(n, dummySink, unprotected);
-        auto& eData = g.getEdgeData(e);
-        eData.wire = nullptr;
-        eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
-        for (size_t k = 0; k < libs.size(); k++) {
-          eData.t[k].wireLoad = nullptr;
+        eData.isConstraint = false;
+        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeTiming());
+        for (size_t k = 0; k < engine->numCorners; k++) {
+          eData.t[k].wireLoad = engine->libs[k]->defaultWireLoad;
           eData.t[k].delay = 0.0;
         }
       }
@@ -192,20 +139,61 @@ void TimingGraph::addDummyNodes() {
 }
 
 void TimingGraph::construct() {
+  // add nodes for module ports
   for (auto& i: m.pins) {
     addPin(i.second);
   }
 
+  // add nodes for gate pins
   for (auto& i: m.gates) {
     addGate(i.second);
   }
 
-  // add wires among pins
-  for (auto& i: m.wires) {
-    addWire(i.second);
+  // add edges for wires from power nodes or primary inputs
+  for (auto& i: m.pins) {
+    auto p = i.second;
+    switch (g.getData(nodeMap[p][0], unprotected).nType) {
+    case PRIMARY_INPUT:
+    case DUMMY_POWER:
+    case POWER_GND:
+    case POWER_VDD:
+      addWire(p);
+      break;
+    default:
+      break;
+    }
   }
 
-  addDummyNodes();
+  // add edges for wires from gate outputs
+  for (auto& i: m.gates) {
+    for (auto j: i.second->pins) {
+      auto p = j.second;
+      switch (g.getData(nodeMap[p][0], unprotected).nType) {
+      case GATE_OUTPUT:
+      case GATE_INOUT:
+        addWire(p);
+        break;
+      default:
+        break;
+      }
+    }
+  }
+
+  // get end points
+  galois::do_all(
+      galois::iterate(g),
+      [&] (GNode n) {
+        auto& data = g.getData(n);
+        data.topoL = 1;
+        data.revTopoL = 1;
+        auto numEdges = std::distance(g.edge_begin(n), g.edge_end(n));
+        if (!numEdges) { bFront.push_back(n); }
+        auto numInEdges = std::distance(g.in_edge_begin(n), g.in_edge_end(n));
+        if (!numInEdges) { fFront.push_back(n); }
+      }
+      , galois::loopname("ConstructTimingGraphFrontiers")
+      , galois::steal()
+  );
 }
 
 void TimingGraph::initFlag(bool value) {
@@ -221,15 +209,20 @@ void TimingGraph::computeTopoL() {
   // data.flag indicates "to be done" if true in this function
   initFlag(true);
 
+  std::cout << "Forward frontier:" << std::endl;
+  for (auto& i: fFront) {
+    std::cout << "  " << getNodeName(i) << std::endl;
+  }
+
   galois::for_each(
-      galois::iterate({dummySrc}),
+      galois::iterate(fFront),
       [&] (GNode n, auto& ctx) {
         auto& data = g.getData(n);
         if (!data.flag.load()) {
           return; // this node is already done
         }
 
-        size_t myTopoL = 0;
+        size_t myTopoL = 1;
         for (auto ie: g.in_edges(n)) {
           auto pred = g.getEdgeDst(ie);
           auto& predData = g.getData(pred);
@@ -251,7 +244,7 @@ void TimingGraph::computeTopoL() {
       , galois::no_conflicts()
   );
 
-#if 0
+#if 1
   std::map<size_t, size_t> numInEachTopoL;
   std::for_each(
       g.begin(), g.end(),
@@ -279,15 +272,20 @@ void TimingGraph::computeRevTopoL() {
   // data.flag indicates "to be done" if true in this function
   initFlag(true);
 
+  std::cout << "Backward frontier:" << std::endl;
+  for (auto& i: bFront) {
+    std::cout << "  " << getNodeName(i) << std::endl;
+  }
+
   galois::for_each(
-      galois::iterate({dummySink}),
+      galois::iterate(bFront),
       [&] (GNode n, auto& ctx) {
         auto& data = g.getData(n);
         if (!data.flag.load()) {
           return; // this node is already done
         }
 
-        size_t myRevTopoL = 0;
+        size_t myRevTopoL = 1;
         for (auto e: g.edges(n)) {
           auto succ = g.getEdgeDst(e);
           auto& succData = g.getData(succ);
@@ -309,7 +307,7 @@ void TimingGraph::computeRevTopoL() {
       , galois::no_conflicts()
   );
 
-#if 0
+#if 1
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
@@ -333,33 +331,26 @@ void TimingGraph::initialize() {
       [&] (GNode n) {
         auto& data = g.getData(n, unprotected);
 
-        // remove driving cells. to be re-established by sdc
-        if (data.isDrivingCell) {
-          g.removeNode(n);
-          return;
-        }
-
         // for timing computation
-        for (size_t k = 0; k < libs.size(); k++) {
-          if (MAX_DELAY_MODE == modes[k]) {
+        bool isTimingSource =
+            (PRIMARY_INPUT == data.nType) ||
+            (POWER_VDD == data.nType) ||
+            (POWER_GND == data.nType);
+        for (size_t k = 0; k < engine->numCorners; k++) {
+          if (MAX_DELAY_MODE == engine->modes[k]) {
             data.t[k].slew = 0.0;
-            data.t[k].arrival = (data.isTimingSource()) ? 0.0 : -infinity;
+            data.t[k].arrival = (isTimingSource) ? 0.0 : -infinity;
             data.t[k].required = infinity;
           }
           else {
-            data.t[k].slew = (data.isTimingSource()) ? 0.0 : libs[k]->defaultMaxSlew;
-            data.t[k].arrival = (data.isTimingSource()) ? 0.0 : infinity;
+            data.t[k].slew = (isTimingSource) ? 0.0 : infinity;
+            data.t[k].arrival = (isTimingSource) ? 0.0 : infinity;
             data.t[k].required = -infinity;
           }
 
           data.t[k].slack = infinity;
-          data.t[k].pinC = (data.isGateInput()) ? data.t[k].pin->c[data.isRise] : 0.0;
+          data.t[k].pinC = (GATE_INPUT == data.nType) ? data.t[k].pin->c[data.isRise] : 0.0;
           data.t[k].wireC = 0.0;
-
-          // get rid of any driving cell info
-          if (data.isPrimaryInput()) {
-            data.t[k].pin = nullptr;
-          }
         }
       }
       , galois::loopname("TimingGraphInitialize")
@@ -368,113 +359,11 @@ void TimingGraph::initialize() {
 
   computeTopoL();
   computeRevTopoL();
-//  std::cout << "Levelization done.\n" << std::endl;
-//  print();
+  std::cout << "Levelization done.\n" << std::endl;
+  print();
 }
 
 void TimingGraph::setConstraints(SDC& sdc) {
-  // set max required time
-  for (auto& p: m.outPins) {
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto& data = g.getData(n, unprotected);
-      for (size_t k = 0; k < libs.size(); k++) {
-        if (MAX_DELAY_MODE == modes[k]) {
-          data.t[k].required = sdc.maxDelayPI2PO;
-        }
-      }
-    }
-  }
-
-  // set output loads
-  for (auto& i: sdc.pinLoads) {
-    auto p = i.first;
-    auto load = i.second;
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto& data = g.getData(n, unprotected);
-      for (size_t k = 0; k < libs.size(); k++) {
-        data.t[k].pinC = load;
-      }
-    }
-  }
-
-  // set driving cells
-  for (auto& i: sdc.mapPin2DrivingCells) {
-    auto p = i.first;
-    auto dCell = i.second;
-    GNode dN[2];
-
-    // set primary input as the output pin of the driving cell
-    for (size_t j = 0; j < 2; j++) {
-      auto n = nodeMap[p][j];
-      auto& data = g.getData(n, unprotected);
-      for (size_t k = 0; k < libs.size(); k++) {
-        data.t[k].pin = dCell->toCellPin;
-        // treat this pin as internal pins
-        if (MAX_DELAY_MODE == modes[k]) {
-          data.t[k].arrival = -infinity;
-        }
-        else {
-          data.t[k].slew = libs[k]->defaultMaxSlew;
-          data.t[k].arrival = infinity;
-        }
-      }
-    }
-
-    // allocate the input pin of the driving cell
-    for (size_t j = 0; j < 2; j++) {
-      auto n = g.createNode();
-      g.addNode(n);
-      dN[j] = n;
-
-      auto& data = g.getData(n, unprotected);
-      data.pin = nullptr;
-      data.isRise = (bool)j;
-      data.isDrivingCell = true;
-      data.t.insert(data.t.begin(), libs.size(), NodeTiming());
-      for (size_t k = 0; k < libs.size(); k++) {
-        data.t[k].pin = dCell->fromCellPin;
-        data.t[k].slew = dCell->slew[j];
-        data.t[k].arrival = 0.0;
-        data.t[k].slack = infinity;
-        data.t[k].pinC = 0.0;
-        data.t[k].wireC = 0.0;
-
-        if (MAX_DELAY_MODE == modes[k]) {
-          data.t[k].required = infinity;
-        }
-        else {
-          data.t[k].required = -infinity;
-        }
-      }
-    }
-
-    // connect the primiray input to the driving pin
-    for (size_t j = 0; j < 2; j++) {
-      auto on = nodeMap[p][j];
-      auto& oData = g.getData(on, unprotected);
-
-      for (size_t d = 0; d < 2; d++) {
-        auto in = dN[d];
-        auto& iData = g.getData(in, unprotected);
-        iData.topoL = 0;
-        iData.revTopoL = oData.revTopoL + 1;
-
-        if (dCell->toCellPin->isEdgeDefined(dCell->fromCellPin, iData.isRise, oData.isRise)) {
-          auto e = g.addMultiEdge(in, on, unprotected);
-          auto& eData = g.getEdgeData(e);
-          eData.t.insert(eData.t.begin(), libs.size(), EdgeTiming());
-          for (size_t k = 0; k < libs.size(); k++) {
-            eData.t[k].wireLoad = nullptr;
-            eData.t[k].delay = 0.0;
-          }
-        }
-      }
-    }
-  }
-
-//  print();
 }
 
 void TimingGraph::computeDriveC(GNode n) {
@@ -486,7 +375,7 @@ void TimingGraph::computeDriveC(GNode n) {
     auto succ = g.getEdgeDst(e);
     auto& succData = g.getData(succ);
 
-    for (size_t k = 0; k < libs.size(); k++) {
+    for (size_t k = 0; k < engine->numCorners; k++) {
       if (e == g.edge_begin(n)) {
         data.t[k].wireC = eData.t[k].wireLoad->wireC(eData.wire);
       }
@@ -503,12 +392,12 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
 
   auto& ieData = g.getEdgeData(ie);
 
-  for (size_t k = 0; k < libs.size(); k++) {
+  for (size_t k = 0; k < engine->numCorners; k++) {
     MyFloat loadC = 0.0;
-    if (BALANCED_TREE == libs[k]->wireTreeType) {
+    if (BALANCED_TREE == engine->libs[k]->wireTreeType) {
       loadC = data.t[k].pinC;
     }
-    else if (WORST_CASE_TREE == libs[k]->wireTreeType) {
+    else if (WORST_CASE_TREE == engine->libs[k]->wireTreeType) {
       loadC = predData.t[k].pinC;
     }
     auto delay = ieData.t[k].wireLoad->wireDelay(loadC, ieData.wire, data.pin);
@@ -521,47 +410,30 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
 void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k) {
   auto& data = g.getData(n);
   auto outPin = data.t[k].pin;
-  if (!outPin) {
-    return; // not driven by a timing arc
-  }
 
   auto pred = g.getEdgeDst(ie);
   auto& predData = g.getData(pred);
   auto inPin = predData.t[k].pin;
-  if (predData.isRealDummy()) {
-    return; // invalid timing arc
-  }
 
   Parameter param = {
     {INPUT_NET_TRANSITION,         predData.t[k].slew},
     {TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
   };
 
-  Parameter paramNoC = {
-    {INPUT_NET_TRANSITION,         predData.t[k].slew},
-    {TOTAL_OUTPUT_NET_CAPACITANCE, 0.0}
-  };
-
   auto& ieData = g.getEdgeData(ie);
 
-  if (MAX_DELAY_MODE == modes[k]) {
+  if (MAX_DELAY_MODE == engine->modes[k]) {
     auto delayResult = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise);
     auto delay = delayResult.first;
-    if (predData.isDrivingCell) {
-      // offset for the primary inputs =
-      //     delay for the driving cell with the load
-      //   - delay for the driving cell without the load (Genus)
-      delay -= outPin->extractMax(paramNoC, DELAY, inPin, predData.isRise, data.isRise).first;
-    }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival < predData.t[k].arrival + delay) {
       data.t[k].arrival = predData.t[k].arrival + delay;
-      if (isExactSlew) {
+      if (engine->isExactSlew) {
         data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
       }
     }
-    if (!isExactSlew) {
+    if (!engine->isExactSlew) {
       auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise).first;
       if (data.t[k].slew < slew) {
         data.t[k].slew = slew;
@@ -571,21 +443,15 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   else {
     auto delayResult = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise);
     auto delay = delayResult.first;
-    if (predData.isDrivingCell) {
-      // offset for the primary inputs =
-      //     delay for the driving cell with the load
-      //   - delay for the driving cell without the load (Genus)
-      delay -= outPin->extractMin(paramNoC, DELAY, inPin, predData.isRise, data.isRise).first;
-    }
     auto& when = delayResult.second;
     ieData.t[k].delay = delay;
     if (data.t[k].arrival > predData.t[k].arrival + delay) {
       data.t[k].arrival = predData.t[k].arrival + delay;
-      if (isExactSlew) {
+      if (engine->isExactSlew) {
         data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
       }
     }
-    if (!isExactSlew) {
+    if (!engine->isExactSlew) {
       auto slew = outPin->extractMin(param, SLEW, inPin, predData.isRise, data.isRise).first;
       if (data.t[k].slew > slew) {
         data.t[k].slew = slew;
@@ -599,7 +465,6 @@ void TimingGraph::computeArrivalTime() {
     return g.getData(n, unprotected).topoL;
   };
 
-  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
   using LIFO = galois::worklists::PerThreadChunkLIFO<>;
   using OBIM
       = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
@@ -607,33 +472,30 @@ void TimingGraph::computeArrivalTime() {
 //        ::template with_monotonic<true>::type
         ;
 
-  size_t numLevels = g.getData(dummySink, unprotected).topoL + 1;
-  std::vector<galois::GAccumulator<size_t>*> enqueued, executed;
-  for (size_t i = 0; i < numLevels; i++) {
-    enqueued.push_back(new galois::GAccumulator<size_t>);
-    executed.push_back(new galois::GAccumulator<size_t>);
-  }
-  *(enqueued[g.getData(dummySrc, unprotected).topoL]) += 1;
-
   galois::for_each(
-    galois::iterate({dummySrc}),
+    galois::iterate(fFront),
     [&] (GNode n, auto& ctx) {
       auto& data = g.getData(n);
-      *(executed[data.topoL]) += 1;
 
-      if (data.isGateInput() || data.isPseudoPrimaryOutput()) {
-        // should have one incoming neighbor only
+      switch (data.nType) {
+      case GATE_INPUT:
+      case PRIMARY_OUTPUT:
+        // should have only one incoming neighbor of wire
         for (auto ie: g.in_edges(n)) {
           this->computeArrivalByWire(n, ie);
         }
-      }
-      else if (data.isGateOutput() || data.isPseudoPrimaryInput()) {
+        break;
+      case GATE_OUTPUT:
+      case PRIMARY_INPUT:
         this->computeDriveC(n);
         for (auto ie: g.in_edges(n)) {
-          for (size_t k = 0; k < libs.size(); k++) {
+          for (size_t k = 0; k < engine->numCorners; k++) {
             this->computeArrivalByTimingArc(n, ie, k);
           }
         }
+        break;
+      default:
+        break;
       }
 
       data.flag.store(false);
@@ -642,12 +504,11 @@ void TimingGraph::computeArrivalTime() {
       for (auto e: g.edges(n)) {
         auto succ = g.getEdgeDst(e);
         auto& succData = g.getData(succ);
-        if (/*(1 == succData.topoL - data.topoL) &&*/ !succData.isDummy) {
+        if (/*(1 == succData.topoL - data.topoL) &&*/ true) {
           auto& succInQueue = succData.flag;
           if (!succInQueue) {
             bool succQueued = false;
             if (succInQueue.compare_exchange_strong(succQueued, true)) {
-              *(enqueued[succData.topoL]) += 1;
               ctx.push(succ);
             }
           }
@@ -659,21 +520,6 @@ void TimingGraph::computeArrivalTime() {
     , galois::wl<OBIM>(topoLIndexer)
   );
 
-  size_t totalEnqueued = 0;
-  size_t totalExecuted = 0;
-  for (size_t i = 0; i < numLevels; i++) {
-    auto q = enqueued[i]->reduce();
-    auto x = executed[i]->reduce();
-    totalEnqueued += q;
-    totalExecuted += x;
-    if (q != x) {
-      std::cout << "Level " << i << ": " << q << " enqueued, " << x << " executed." << std::endl;
-    }
-    delete enqueued[i];
-    delete executed[i];
-  }
-  std::cout << totalEnqueued << " enqueued, " << totalExecuted << " executed." << std::endl;
-
   std::cout << "ComputeArrivalTime done." << std::endl;
   print();
 }
@@ -682,47 +528,52 @@ std::string TimingGraph::getNodeName(GNode n) {
   auto& data = g.getData(n, unprotected);
 
   std::string nName;
-  if (data.isDrivingCell) {
-    nName = "Driving cell pin, ";
-    nName += (data.isRise) ? "rise" : "fall";
-  }
-  else if (data.isPowerNode) {
+  switch (data.nType) {
+  case POWER_VDD:
+  case POWER_GND:
+  case DUMMY_POWER:
     nName = "Power ";
     nName += data.pin->name;
     nName += ", ";
-    nName += (data.isRise) ? "rise" : "fall";
-  }
-  else if (data.isDummy) {
-    if (data.isOutput) {
-      nName = "Dummy output";
-    }
-    else {
-      nName = "Dummy input";
-    }
-  }
-  else if (data.isPrimary) {
-    if (data.isOutput) {
-      nName = "Primary output ";
-    }
-    else {
-      nName = "Primary input ";
-    }
-    nName += data.pin->name;
+    nName += (data.isRise) ? "r" : "f";
+    break;
+#if 0
+  case DUMMY_SOURCE:
+    nName = "Dummy input";
+    break;
+  case DUMMY_SINK:
+    nName = "Dummy output";
+    break;
+#endif
+  case PRIMARY_OUTPUT:
+    nName = "Primary output " + data.pin->name;
     nName += ", ";
-    nName += (data.isRise) ? "rise" : "fall";
-  }
-  else {
-    if (data.isOutput) {
-      nName = "Gate output ";
-    }
-    else {
-      nName = "Gate input ";
-    }
+    nName += (data.isRise) ? "r" : "f";
+    break;
+  case PRIMARY_INPUT:
+    nName = "Primary input " + data.pin->name;
+    nName += ", ";
+    nName += (data.isRise) ? "r" : "f";
+    break;
+  case GATE_OUTPUT:
+    nName = "Gate output ";
     nName += data.pin->gate->name;
     nName += "/";
     nName += data.pin->name;
     nName += ", ";
-    nName += (data.isRise) ? "rise" : "fall";
+    nName += (data.isRise) ? "r" : "f";
+    break;
+  case GATE_INPUT:
+    nName = "Gate input ";
+    nName += data.pin->gate->name;
+    nName += "/";
+    nName += data.pin->name;
+    nName += ", ";
+    nName += (data.isRise) ? "r" : "f";
+    break;
+  default:
+    nName = "(NOT_HANDLED_PIN_TYPE)";
+    break;
   }
 
   return nName;
@@ -735,15 +586,12 @@ void TimingGraph::print(std::ostream& os) {
 
   for (auto n: g) {
     auto& data = g.getData(n, unprotected);
-    if (data.isDrivingCell) {
-      continue;
-    }
 
     os << "  " << getNodeName(n) << std::endl;
     os << "    topoL = " << data.topoL << ", revTopoL = " << data.revTopoL << std::endl;
     os << "    outDeg = " << std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
     os << ", inDeg = " << std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected)) << std::endl;
-    for (size_t k = 0; k < libs.size(); k++) {
+    for (size_t k = 0; k < engine->numCorners; k++) {
       os << "    corner " << k;
       os << ": arrival = " << data.t[k].arrival;
       os << ", slew = " << data.t[k].slew;
@@ -753,35 +601,43 @@ void TimingGraph::print(std::ostream& os) {
     }
 
     for (auto ie: g.in_edges(n)) {
-      auto w = g.getEdgeData(ie).wire;
+      auto& eData = g.getEdgeData(ie);
+      auto w = eData.wire;
       if (w) {
         os << "    Wire " << w->name;
       }
       else {
         os << "    Timing arc";
+        if (eData.isConstraint) {
+          os << " (constraint)";
+        }
       }
       os << " from " << getNodeName(g.getEdgeDst(ie)) << std::endl;
 
-      for (size_t k = 0; k < libs.size(); k++) {
+      for (size_t k = 0; k < engine->numCorners; k++) {
         os << "    corner " << k;
-        os << ": delay = " << g.getEdgeData(ie).t[k].delay;
+        os << ": delay = " << eData.t[k].delay;
         os << std::endl;
       }
     }
 
     for (auto e: g.edges(n)) {
-      auto w = g.getEdgeData(e).wire;
+      auto& eData = g.getEdgeData(e);
+      auto w = eData.wire;
       if (w) {
         os << "    Wire " << w->name;
       }
       else {
         os << "    Timing arc";
+        if (eData.isConstraint) {
+          os << " (constraint)";
+        }
       }
       os << " to " << getNodeName(g.getEdgeDst(e)) << std::endl;
 
-      for (size_t k = 0; k < libs.size(); k++) {
+      for (size_t k = 0; k < engine->numCorners; k++) {
         os << "    corner " << k;
-        os << ": delay = " << g.getEdgeData(e).t[k].delay;
+        os << ": delay = " << eData.t[k].delay;
         os << std::endl;
       }
     }
