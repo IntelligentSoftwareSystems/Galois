@@ -15,16 +15,6 @@
 #include <atomic>
 #include <boost/functional/hash.hpp>
 
-struct NodeTiming {
-  CellPin* pin;
-  MyFloat pinC;
-  MyFloat wireC;
-  MyFloat slew;
-  MyFloat arrival;
-  MyFloat required;
-  MyFloat slack;
-};
-
 enum TimingNodeType {
   PRIMARY_INPUT = 0,
   PRIMARY_OUTPUT,
@@ -35,6 +25,16 @@ enum TimingNodeType {
   POWER_VDD,
   POWER_GND,
   DUMMY_POWER,
+};
+
+struct NodeTiming {
+  CellPin* pin;
+  MyFloat pinC;
+  MyFloat wireC;
+  MyFloat slew;
+  MyFloat arrival;
+  MyFloat required;
+  MyFloat slack;
 };
 
 struct Node {
@@ -82,17 +82,21 @@ public:
   galois::InsertBag<GNode> bFront;
 
 private:
-  // arrival time computation
+  // forward computation
   void computeDriveC(GNode n);
-  void computeArrivalByWire(GNode n, Graph::in_edge_iterator ie);
-  void computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie, size_t k);
+  void computeExtremeSlew(GNode n);
+  bool computeDelayAndExactSlew(GNode n);
+  void computeConstraint(GNode n);
+  void initNodeForward(GNode n);
+  void computeTopoL();
+
+  // backward computation
+  void computeSlack(GNode n);
+  void initNodeBackward(GNode n);
+  void computeRevTopoL();
 
   // initialization
   void initFlag(bool value);
-  void computeTopoL();
-  void computeRevTopoL();
-  void initNodeForward(GNode n);
-  void initNodeBackward(GNode n);
 
   // graph construction
   void addPin(VerilogPin* p);
