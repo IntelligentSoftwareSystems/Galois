@@ -69,6 +69,7 @@ public:
 public:
   VerilogModule& m;
   TimingEngine* engine;
+  Clock* clk;
 
   // internal graph
   Graph g;

@@ -209,10 +209,12 @@ void TimingGraph::computeTopoL() {
   // data.flag indicates "to be done" if true in this function
   initFlag(true);
 
+#if 0
   std::cout << "Forward frontier:" << std::endl;
   for (auto& i: fFront) {
     std::cout << "  " << getNodeName(i) << std::endl;
   }
+#endif
 
   galois::for_each(
       galois::iterate(fFront),
@@ -272,10 +274,12 @@ void TimingGraph::computeRevTopoL() {
   // data.flag indicates "to be done" if true in this function
   initFlag(true);
 
+#if 0
   std::cout << "Backward frontier:" << std::endl;
   for (auto& i: bFront) {
     std::cout << "  " << getNodeName(i) << std::endl;
   }
+#endif
 
   galois::for_each(
       galois::iterate(bFront),
@@ -326,6 +330,8 @@ void TimingGraph::computeRevTopoL() {
 }
 
 void TimingGraph::initialize() {
+  clk = nullptr;
+
   galois::do_all(
       galois::iterate(g),
       [&] (GNode n) {
@@ -359,11 +365,69 @@ void TimingGraph::initialize() {
 
   computeTopoL();
   computeRevTopoL();
-  std::cout << "Levelization done.\n" << std::endl;
-  print();
+//  std::cout << "Levelization done.\n" << std::endl;
+//  print();
 }
 
 void TimingGraph::setConstraints(SDC& sdc) {
+  // assume only one clock
+  assert(1 == sdc.clocks.size());
+  clk = sdc.clocks.begin()->second;
+
+  // clock port. assume waveform = (0:r, p/2:f)
+  if (clk->src) {
+    auto& fData = g.getData(nodeMap[clk->src][0]);
+    auto& rData = g.getData(nodeMap[clk->src][1]);
+    for (size_t k = 0; k < engine->numCorners; k++) {
+      fData.t[k].arrival = (clk->period) / 2.0;
+      rData.t[k].arrival = 0.0;
+    }
+  }
+
+  // input arrival time & slew
+  // assume all relative to rising edge
+  for (auto& p: m.inPins) {
+    if (sdc.envAtPorts.count(p)) {
+      auto env = sdc.envAtPorts[p];
+      for (size_t j = 0; j < 2; j++) {
+        auto& data = g.getData(nodeMap[p][j]);
+        for (size_t k = 0; k < engine->numCorners; k++) {
+          auto mode = engine->modes[k];
+          if (env->inputDelay[mode][j] != infinity) {
+            data.t[k].arrival = env->inputDelay[mode][j];
+          }
+          if (env->inputSlew[mode][j] != infinity) {
+            data.t[k].slew = env->inputSlew[mode][j];
+          }
+        }
+      }
+    }
+  } // end for inPins
+
+  // output required time & pinC
+  // assume all relative to rising edge
+  for (auto& p: m.outPins) {
+    if (sdc.envAtPorts.count(p)) {
+      auto env = sdc.envAtPorts[p];
+      for (size_t j = 0; j < 2; j++) {
+        auto& data = g.getData(nodeMap[p][j]);
+        for (size_t k = 0; k < engine->numCorners; k++) {
+          auto mode = engine->modes[k];
+          if (env->outputDelay[mode][j] != infinity) {
+            data.t[k].required = -(env->outputDelay[mode][j]);
+            if (MAX_DELAY_MODE == mode) {
+              data.t[k].required += clk->period;
+            }
+          }
+          if (env->outputLoad != infinity) {
+            data.t[k].pinC = env->outputLoad;
+          }
+        }
+      }
+    }
+  } // end for outPins
+
+  print();
 }
 
 void TimingGraph::computeDriveC(GNode n) {
@@ -594,6 +658,7 @@ void TimingGraph::print(std::ostream& os) {
     for (size_t k = 0; k < engine->numCorners; k++) {
       os << "    corner " << k;
       os << ": arrival = " << data.t[k].arrival;
+      os << ", required = " << data.t[k].required;
       os << ", slew = " << data.t[k].slew;
       os << ", pinC = " << data.t[k].pinC;
       os << ", wireC = " << data.t[k].wireC;

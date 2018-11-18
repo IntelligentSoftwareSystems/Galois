@@ -91,6 +91,7 @@ void SDCParser::parseCreateClock() {
     }
     else if ("[" == *curToken) {
       auto ports = getPorts();
+      assert(1 == ports.size());
       if (!ports.empty()) {
         clk->src = *(ports.begin());
       }
