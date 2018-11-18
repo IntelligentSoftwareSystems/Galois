@@ -1,4 +1,5 @@
 #include "TimingEngine.h"
+#include "galois/Timer.h"
 
 void TimingEngine::readDesign(VerilogDesign* design) {
   clearTimingGraphs();
@@ -48,8 +49,12 @@ void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
 void TimingEngine::time(VerilogModule* m) {
   auto g = findTimingGraph(m);
   if (g) {
+    galois::StatTimer Tmain;
+    Tmain.start();
     g->computeForward();
     g->computeBackward();
+    Tmain.stop();
+
     g->print();
   }
 }
