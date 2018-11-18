@@ -160,11 +160,16 @@ public:
   }
 
   VerilogWire* addWire(std::string name) {
-    VerilogWire* wire = new VerilogWire;
-    wire->name = name;
-    wire->module = this;
-    wires[name] = wire;
-    return wire;
+    if (wires.count(name)) {
+      return wires[name];
+    }
+    else {
+      VerilogWire* wire = new VerilogWire;
+      wire->name = name;
+      wire->module = this;
+      wires[name] = wire;
+      return wire;
+    }
   }
 
   VerilogWire* findWire(std::string name);

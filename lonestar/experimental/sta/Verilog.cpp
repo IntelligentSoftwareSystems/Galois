@@ -28,7 +28,9 @@ void VerilogParser::parseModule() {
   curToken += 2; // consume name and "("
   
   while (!isEndOfStatement()) {
-    curModule->addPin(getVarName());
+    Token t = getVarName();
+    curModule->addPin(t);
+    curModule->addWire(t); // avoid missing wire for a pin
     curToken += 1; // consume port1 and ","/")"
   }
   curToken += 1; // consume ";"
