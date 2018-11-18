@@ -33,6 +33,10 @@ struct TimingEngine {
   //   by best/worst arrival if true
   bool isExactSlew;
 
+  // when true, use idealWireLoad for all wires
+  // default to false
+  bool isWireIdeal;
+
   std::unordered_map<VerilogModule*, TimingGraph*> modules;
 
 private:
@@ -40,8 +44,10 @@ private:
   void clearTimingGraphs();
 
 public:
-  TimingEngine(bool isExactSlew = false): numCorners(0), isExactSlew(isExactSlew) {}
+  TimingEngine(bool isExactSlew = false): numCorners(0), isExactSlew(isExactSlew), isWireIdeal(false) {}
   ~TimingEngine() { clearTimingGraphs(); }
+
+  void useIdealWire(bool flag) { isWireIdeal = flag; }
 
   void addCellLib(CellLib* lib, TimingMode mode) {
     auto corner = std::make_pair(lib, mode);

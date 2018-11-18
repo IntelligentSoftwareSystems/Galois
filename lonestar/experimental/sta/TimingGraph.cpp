@@ -117,6 +117,11 @@ void TimingGraph::addGate(VerilogGate* gate) {
   } // end for ov
 }
 
+void TimingGraph::setWireLoad(WireLoad** wWL, WireLoad* wl) {
+  assert(wWL);
+  *wWL = (nullptr == wl) ? idealWireLoad : wl;
+}
+
 void TimingGraph::addWire(VerilogPin* p) {
   // p is the source of a wire
   for (size_t j = 0; j < 2; j++) {
@@ -130,7 +135,7 @@ void TimingGraph::addWire(VerilogPin* p) {
         eData.isConstraint = false;
         eData.t.insert(eData.t.begin(), engine->numCorners, EdgeTiming());
         for (size_t k = 0; k < engine->numCorners; k++) {
-          eData.t[k].wireLoad = engine->libs[k]->defaultWireLoad;
+          setWireLoad(&(eData.t[k].wireLoad), engine->libs[k]->defaultWireLoad);
           eData.t[k].delay = 0.0;
         }
       }
@@ -183,9 +188,6 @@ void TimingGraph::construct() {
   galois::do_all(
       galois::iterate(g),
       [&] (GNode n) {
-        auto& data = g.getData(n);
-        data.topoL = 1;
-        data.revTopoL = 1;
         auto numEdges = std::distance(g.edge_begin(n), g.edge_end(n));
         if (!numEdges) { bFront.push_back(n); }
         auto numInEdges = std::distance(g.in_edge_begin(n), g.in_edge_end(n));
@@ -329,6 +331,61 @@ void TimingGraph::computeRevTopoL() {
 #endif
 }
 
+void TimingGraph::initNodeBackward(GNode n) {
+  auto& data = g.getData(n);
+
+  // sink points of timing graph
+  // no one can reschedule them again when computeBackward
+  auto numEdges =
+      std::distance(g.edge_begin(n, unprotected), g.edge_end(n, unprotected));
+  if (!numEdges) {
+    return;
+  }
+
+  for (size_t k = 0; k < engine->numCorners; k++) {
+    if (MAX_DELAY_MODE == engine->modes[k]) {
+      data.t[k].required = infinity;
+    }
+    else {
+      data.t[k].required = -infinity;
+    }
+  } 
+}
+
+void TimingGraph::initNodeForward(GNode n) {
+  auto& data = g.getData(n);
+
+  switch (data.nType) {
+  case PRIMARY_INPUT:
+  case POWER_VDD:
+  case POWER_GND:
+  case DUMMY_POWER:
+    // source points of the timing graph
+    // no one can schedule them again
+    return;
+
+  default:
+    for (size_t k = 0; k < engine->numCorners; k++) {
+      data.t[k].wireC = 0.0;
+      if (MAX_DELAY_MODE == engine->modes[k]) {
+        data.t[k].slew = 0.0;
+        data.t[k].arrival = -infinity;
+        if (data.nType != PRIMARY_OUTPUT) {
+          data.t[k].required = infinity; // for forward constraint
+        }
+      }
+      else {
+        data.t[k].slew = infinity;
+        data.t[k].arrival = infinity;
+        if (data.nType != PRIMARY_OUTPUT) {
+          data.t[k].required = -infinity; // for forward constraint
+        }
+      }
+    }
+    break;
+  }
+}
+
 void TimingGraph::initialize() {
   clk = nullptr;
 
@@ -343,6 +400,10 @@ void TimingGraph::initialize() {
             (POWER_VDD == data.nType) ||
             (POWER_GND == data.nType);
         for (size_t k = 0; k < engine->numCorners; k++) {
+          data.t[k].slack = infinity;
+          data.t[k].pinC = (GATE_INPUT == data.nType) ? data.t[k].pin->c[data.isRise] : 0.0;
+          data.t[k].wireC = 0.0;
+
           if (MAX_DELAY_MODE == engine->modes[k]) {
             data.t[k].slew = 0.0;
             data.t[k].arrival = (isTimingSource) ? 0.0 : -infinity;
@@ -353,10 +414,6 @@ void TimingGraph::initialize() {
             data.t[k].arrival = (isTimingSource) ? 0.0 : infinity;
             data.t[k].required = -infinity;
           }
-
-          data.t[k].slack = infinity;
-          data.t[k].pinC = (GATE_INPUT == data.nType) ? data.t[k].pin->c[data.isRise] : 0.0;
-          data.t[k].wireC = 0.0;
         }
       }
       , galois::loopname("TimingGraphInitialize")
@@ -433,17 +490,21 @@ void TimingGraph::setConstraints(SDC& sdc) {
 void TimingGraph::computeDriveC(GNode n) {
   auto& data = g.getData(n);
 
-  for (auto e: g.edges(n)) {
+  for (auto e: g.edges(n, unprotected)) {
     auto& eData = g.getEdgeData(e);
 
     auto succ = g.getEdgeDst(e);
-    auto& succData = g.getData(succ);
+    auto& succData = g.getData(succ, unprotected);
 
     for (size_t k = 0; k < engine->numCorners; k++) {
-      if (e == g.edge_begin(n)) {
-        data.t[k].wireC = eData.t[k].wireLoad->wireC(eData.wire);
+      if (e == g.edge_begin(n, unprotected)) {
+        data.t[k].wireC = (engine->isWireIdeal) ? idealWireLoad->wireC(eData.wire) :
+            eData.t[k].wireLoad->wireC(eData.wire);
+        data.t[k].pinC = succData.t[k].pinC;
       }
-      data.t[k].pinC += succData.t[k].pinC;
+      else {
+        data.t[k].pinC += succData.t[k].pinC;
+      }
     }
   }
 }
@@ -457,14 +518,22 @@ void TimingGraph::computeArrivalByWire(GNode n, Graph::in_edge_iterator ie) {
   auto& ieData = g.getEdgeData(ie);
 
   for (size_t k = 0; k < engine->numCorners; k++) {
-    MyFloat loadC = 0.0;
-    if (BALANCED_TREE == engine->libs[k]->wireTreeType) {
-      loadC = data.t[k].pinC;
+    MyFloat delay = 0.0;
+
+    if (engine->isWireIdeal) {
+      delay = idealWireLoad->wireDelay(0.0, ieData.wire, data.pin);
     }
-    else if (WORST_CASE_TREE == engine->libs[k]->wireTreeType) {
-      loadC = predData.t[k].pinC;
+    else {
+      auto ieWL = ieData.t[k].wireLoad;
+      MyFloat loadC = data.t[k].pinC;
+      if (dynamic_cast<PreLayoutWireLoad*>(ieWL)) {
+        if (WORST_CASE_TREE == engine->libs[k]->wireTreeType) {
+          loadC = predData.t[k].pinC;
+        }
+      }
+      delay = ieWL->wireDelay(loadC, ieData.wire, data.pin);
     }
-    auto delay = ieData.t[k].wireLoad->wireDelay(loadC, ieData.wire, data.pin);
+
     ieData.t[k].delay = delay;
     data.t[k].arrival = predData.t[k].arrival + delay;
     data.t[k].slew = predData.t[k].slew;
@@ -524,15 +593,15 @@ void TimingGraph::computeArrivalByTimingArc(GNode n, Graph::in_edge_iterator ie,
   }
 }
 
-void TimingGraph::computeArrivalTime() {
+void TimingGraph::computeForward() {
   auto topoLIndexer = [&] (GNode n) {
     return g.getData(n, unprotected).topoL;
   };
 
-  using LIFO = galois::worklists::PerThreadChunkLIFO<>;
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
   using OBIM
-      = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), LIFO>
-        ::template with_barrier<true>::type
+      = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), FIFO>
+//        ::template with_barrier<true>::type
 //        ::template with_monotonic<true>::type
         ;
 
@@ -586,6 +655,10 @@ void TimingGraph::computeArrivalTime() {
 
   std::cout << "ComputeArrivalTime done." << std::endl;
   print();
+}
+
+void TimingGraph::computeBackward() {
+
 }
 
 std::string TimingGraph::getNodeName(GNode n) {

@@ -48,7 +48,8 @@ void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
 void TimingEngine::time(VerilogModule* m) {
   auto g = findTimingGraph(m);
   if (g) {
-    g->computeArrivalTime();
+    g->computeForward();
+    g->computeBackward();
   }
 }
 

@@ -91,11 +91,14 @@ private:
   void initFlag(bool value);
   void computeTopoL();
   void computeRevTopoL();
+  void initNodeForward(GNode n);
+  void initNodeBackward(GNode n);
 
   // graph construction
   void addPin(VerilogPin* p);
   void addGate(VerilogGate* g);
   void addWire(VerilogPin* p);
+  void setWireLoad(WireLoad** wWL, WireLoad* wl);
 
   // debug printing
   std::string getNodeName(GNode n);
@@ -106,7 +109,8 @@ public:
   void construct();
   void initialize();
   void setConstraints(SDC& sdc);
-  void computeArrivalTime();
+  void computeForward();
+  void computeBackward();
   void print(std::ostream& os = std::cout);
 };
 
