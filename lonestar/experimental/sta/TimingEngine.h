@@ -44,10 +44,13 @@ public:
   ~TimingEngine() { clearTimingGraphs(); }
 
   void addCellLib(CellLib* lib, TimingMode mode) {
-    libs.push_back(lib);
-    modes.push_back(mode);
-    cornerMap[std::make_pair(lib, mode)] = numCorners;
-    numCorners += 1;
+    auto corner = std::make_pair(lib, mode);
+    if (!cornerMap.count(corner)) {
+      libs.push_back(lib);
+      modes.push_back(mode);
+      cornerMap[corner] = numCorners;
+      numCorners += 1;
+    }
   }
 
   void readDesign(VerilogDesign* design);
