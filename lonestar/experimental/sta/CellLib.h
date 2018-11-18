@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <limits>
 
 #include "TimingDefinition.h"
 #include "Tokenizer.h"
@@ -325,8 +326,8 @@ public:
     auto pin = new CellPin;
     pin->name = name;
     pin->cell = this;
-    pin->c[0] = 0.0;
-    pin->c[1] = 0.0;
+    pin->c[0] = std::numeric_limits<MyFloat>::infinity();
+    pin->c[1] = std::numeric_limits<MyFloat>::infinity();
     pin->maxC = 0.0;
     pin->minC = 0.0;
     pin->isClock = false;
