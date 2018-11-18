@@ -50,6 +50,7 @@ void TimingEngine::time(VerilogModule* m) {
   if (g) {
     g->computeForward();
     g->computeBackward();
+    g->print();
   }
 }
 

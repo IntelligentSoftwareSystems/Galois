@@ -289,6 +289,7 @@ int main(int argc, char *argv[]) {
 //  sdc.print();
 
   TimingEngine engine;
+  engine.useIdealWire(true);
   if (slowLib) {
     engine.addCellLib(slowLib, MAX_DELAY_MODE);
   }
@@ -297,7 +298,7 @@ int main(int argc, char *argv[]) {
   }
   engine.readDesign(&design);
   engine.constrain(m, sdc);
-//  engine.time(m);
+  engine.time(m);
 
   return 0;
 }

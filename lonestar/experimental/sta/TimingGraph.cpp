@@ -193,7 +193,7 @@ void TimingGraph::construct() {
         auto numInEdges = std::distance(g.in_edge_begin(n), g.in_edge_end(n));
         if (!numInEdges) { fFront.push_back(n); }
       }
-      , galois::loopname("ConstructTimingGraphFrontiers")
+      , galois::loopname("ConstructFrontiers")
       , galois::steal()
   );
 }
@@ -416,12 +416,9 @@ void TimingGraph::initialize() {
           }
         }
       }
-      , galois::loopname("TimingGraphInitialize")
+      , galois::loopname("Initialization")
       , galois::steal()
   );
-
-  computeTopoL();
-  computeRevTopoL();
 }
 
 void TimingGraph::setConstraints(SDC& sdc) {
@@ -567,16 +564,10 @@ void TimingGraph::computeConstraint(GNode n) {
 
         if (MAX_DELAY_MODE == engine->modes[k]) {
           auto budget = outPin->extractMax(param, MAX_CONSTRAINT, inPin, predData.isRise, data.isRise).first;
-          std::cout << "related_pin_transition = " << predData.t[k].slew;
-          std::cout << ", constrained_pin_transition = " << data.t[k].slew;
-          std::cout << ", setup constraint = " << budget << std::endl;
           data.t[k].required = clk->period + predData.t[k].arrival - budget;
         }
         else {
           auto budget = outPin->extractMax(param, MIN_CONSTRAINT, inPin, predData.isRise, data.isRise).first;
-          std::cout << "related_pin_transition = " << predData.t[k].slew;
-          std::cout << ", constrained_pin_transition = " << data.t[k].slew;
-          std::cout << ", hold constraint = " << budget << std::endl;
           data.t[k].required = predData.t[k].arrival + budget;
         }
       }
@@ -673,6 +664,8 @@ void TimingGraph::computeForward() {
         ::template with_monotonic<true>::type
         ;
 
+  computeTopoL();
+
   galois::for_each(
     galois::iterate(fFront),
     [&] (GNode n, auto& ctx) {
@@ -706,6 +699,7 @@ void TimingGraph::computeForward() {
         break;
       }
 
+      // signal that n is not in queue
       data.flag.store(false);
 
       // schedule outgoing neighbors
@@ -729,8 +723,83 @@ void TimingGraph::computeForward() {
   );
 }
 
-void TimingGraph::computeBackward() {
+void TimingGraph::computeSlack(GNode n) {
+  auto& data = g.getData(n);
 
+  // update required time
+  for (auto e: g.edges(n, unprotected)) {
+    auto succ = g.getEdgeDst(e);
+    auto& succData = g.getData(succ, unprotected);
+    auto& eData = g.getEdgeData(e);
+
+    for (size_t k = 0; k < engine->numCorners; k++) {
+      auto proposedRequired = succData.t[k].required - eData.t[k].delay;
+      if (MAX_DELAY_MODE == engine->modes[k]) {
+        if (data.t[k].required > proposedRequired) {
+          data.t[k].required = proposedRequired;
+        }
+      }
+      else {
+        if (data.t[k].required < proposedRequired) {
+          data.t[k].required = proposedRequired;
+        }
+      }
+    } // end for k
+  } // end for e
+
+  // update slack
+  for (size_t k = 0; k < engine->numCorners; k++) {
+    if (MAX_DELAY_MODE == engine->modes[k]) {
+      data.t[k].slack = data.t[k].required - data.t[k].arrival;
+    }
+    else {
+      data.t[k].slack = data.t[k].arrival - data.t[k].required;
+    }
+  }
+}
+
+void TimingGraph::computeBackward() {
+  auto revTopoLIndexer = [&] (GNode n) {
+    return g.getData(n, unprotected).revTopoL;
+  };
+
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
+  using OBIM
+      = galois::worklists::OrderedByIntegerMetric<decltype(revTopoLIndexer), FIFO>
+        ::template with_barrier<true>::type
+        ::template with_monotonic<true>::type
+        ;
+
+  computeRevTopoL();
+
+  galois::for_each(
+      galois::iterate(bFront),
+      [&] (GNode n, auto& ctx) {
+        auto& data = g.getData(n);
+        computeSlack(n);
+
+        // signal that n is not in queue
+        data.flag.store(false);
+
+        // schedule incoming neighbors
+        for (auto ie: g.in_edges(n, unprotected)) {
+          auto pred = g.getEdgeDst(ie);
+          auto& predData = g.getData(pred);
+          if (1 == (predData.revTopoL - data.revTopoL)) {
+            auto& predInQueue = predData.flag;
+            if (!predInQueue) {
+              bool predQueued = false;
+              if (predInQueue.compare_exchange_strong(predQueued, true)) {
+                ctx.push(pred);
+              }
+            }
+          }
+        }
+      }
+      , galois::loopname("ComputeBackward")
+      , galois::no_conflicts()
+      , galois::wl<OBIM>(revTopoLIndexer)
+  );
 }
 
 std::string TimingGraph::getNodeName(GNode n) {
@@ -802,9 +871,10 @@ void TimingGraph::print(std::ostream& os) {
     os << ", inDeg = " << std::distance(g.in_edge_begin(n, unprotected), g.in_edge_end(n, unprotected)) << std::endl;
     for (size_t k = 0; k < engine->numCorners; k++) {
       os << "    corner " << k;
-      os << ": arrival = " << data.t[k].arrival;
+      os << ": slew = " << data.t[k].slew;
+      os << ", arrival = " << data.t[k].arrival;
       os << ", required = " << data.t[k].required;
-      os << ", slew = " << data.t[k].slew;
+      os << ", slack = " << data.t[k].slack;
       os << ", pinC = " << data.t[k].pinC;
       os << ", wireC = " << data.t[k].wireC;
       os << std::endl;
