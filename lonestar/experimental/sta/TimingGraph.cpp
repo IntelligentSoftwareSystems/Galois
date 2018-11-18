@@ -248,7 +248,7 @@ void TimingGraph::computeTopoL() {
       , galois::no_conflicts()
   );
 
-#if 1
+#if 0
 //  std::map<size_t, size_t> numInEachTopoL;
   std::for_each(
       g.begin(), g.end(),
@@ -313,7 +313,7 @@ void TimingGraph::computeRevTopoL() {
       , galois::no_conflicts()
   );
 
-#if 1
+#if 0
   std::for_each(
       g.begin(), g.end(),
       [&] (GNode n) {
