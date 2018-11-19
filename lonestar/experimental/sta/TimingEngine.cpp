@@ -50,10 +50,10 @@ void TimingEngine::time(VerilogModule* m, TimingPropAlgo algo) {
   auto g = findTimingGraph(m);
   if (g) {
     switch (algo) {
-    case ALGO_TOPO_BARRIER:
-    case ALGO_BY_DEPENDENCY:
-    case ALGO_UNORDERED:
-    case ALGO_TOPO_SOFT_PRIORITY:
+    case TopoBarrier:
+    case ByDependency:
+    case Unordered:
+    case TopoSoftPriority:
       // legal algo
       break;
     default:

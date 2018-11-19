@@ -17,10 +17,10 @@ enum TimingMode {
 };
 
 enum TimingPropAlgo {
-  ALGO_TOPO_BARRIER = 0,
-  ALGO_BY_DEPENDENCY,
-  ALGO_UNORDERED,
-  ALGO_TOPO_SOFT_PRIORITY,
+  TopoBarrier = 0,
+  ByDependency,
+  Unordered,
+  TopoSoftPriority,
 };
 
 MyFloat getMyFloat(std::string& str);

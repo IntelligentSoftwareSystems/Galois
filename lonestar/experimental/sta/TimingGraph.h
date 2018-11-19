@@ -94,7 +94,7 @@ private:
   void computeForwardTopoBarrier();
   void computeForwardByDependency();
   void computeForwardUnordered();
-  void computeForwardTopoPriority();
+  void computeForwardTopoSoftPriority();
 
   // components for backward computation
   void computeSlack(GNode n);
@@ -105,7 +105,7 @@ private:
   void computeBackwardTopoBarrier();
   void computeBackwardByDependency();
   void computeBackwardUnordered();
-  void computeBackwardTopoPriority();
+  void computeBackwardTopoSoftPriority();
 
   // initialization
   void initFlag(bool value);

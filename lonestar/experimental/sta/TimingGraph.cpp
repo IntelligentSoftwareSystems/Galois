@@ -717,37 +717,186 @@ void TimingGraph::computeForwardTopoBarrier() {
         }
       }
     }
-    , galois::loopname("ComputeForward")
+    , galois::loopname("ComputeForwardTopoBarrier")
     , galois::no_conflicts()
     , galois::wl<OBIM>(topoLIndexer)
   );
 }
 
 void TimingGraph::computeForwardByDependency() {
+  galois::for_each(
+    galois::iterate(fFront),
+    [&] (GNode n, auto& ctx) {
+      auto& data = g.getData(n);
 
+      // check if all predecessors are not being processed
+      for (auto ie: g.in_edges(n, unprotected)) {
+        auto pred = g.getEdgeDst(ie);
+        auto& predData = g.getData(pred, unprotected);
+        if (predData.flag.load()) {
+          return; // this pred is not finished
+        }
+      }
+
+      switch (data.nType) {
+      case GATE_INPUT:
+      case PRIMARY_OUTPUT:
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      case PRIMARY_INPUT:
+      case POWER_VDD:
+      case POWER_GND:
+      case GATE_OUTPUT:
+        computeDriveC(n);
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      default:
+        break;
+      }
+
+      // signal that n is finished
+      data.flag.store(false);
+
+      // schedule outgoing neighbors
+      for (auto e: g.edges(n, unprotected)) {
+        auto succ = g.getEdgeDst(e);
+        auto& succData = g.getData(succ, unprotected);
+        succData.flag.store(true); // succ is to be done
+        ctx.push(succ);
+      }
+    }
+    , galois::loopname("ComputeForwardByDependency")
+  );
 }
 
 void TimingGraph::computeForwardUnordered() {
+  galois::for_each(
+    galois::iterate(fFront),
+    [&] (GNode n, auto& ctx) {
+      auto& data = g.getData(n);
+      initNodeForward(n);
 
+      switch (data.nType) {
+      case GATE_INPUT:
+      case PRIMARY_OUTPUT:
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      case PRIMARY_INPUT:
+      case POWER_VDD:
+      case POWER_GND:
+      case GATE_OUTPUT:
+        computeDriveC(n);
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      default:
+        break;
+      }
+
+      // schedule outgoing neighbors
+      for (auto e: g.edges(n, unprotected)) {
+        auto succ = g.getEdgeDst(e);
+        ctx.push(succ);
+      }
+    }
+    , galois::loopname("ComputeForwardUnordered")
+  );
 }
 
-void TimingGraph::computeForwardTopoPriority() {
+void TimingGraph::computeForwardTopoSoftPriority() {
+  auto topoLIndexer = [&] (GNode n) {
+    return g.getData(n, unprotected).topoL;
+  };
 
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
+  using OBIMSoft
+      = galois::worklists::OrderedByIntegerMetric<decltype(topoLIndexer), FIFO>
+        ::template with_monotonic<true>::type
+        ;
+
+  computeTopoL();
+
+  galois::for_each(
+    galois::iterate(fFront),
+    [&] (GNode n, auto& ctx) {
+      auto& data = g.getData(n);
+      initNodeForward(n);
+
+      switch (data.nType) {
+      case GATE_INPUT:
+      case PRIMARY_OUTPUT:
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      case PRIMARY_INPUT:
+      case POWER_VDD:
+      case POWER_GND:
+      case GATE_OUTPUT:
+        computeDriveC(n);
+        if (!engine->isExactSlew) {
+          computeExtremeSlew(n);
+        }
+        if (computeDelayAndExactSlew(n)) {
+          computeConstraint(n);
+        }
+        break;
+
+      default:
+        break;
+      }
+
+      // schedule outgoing neighbors
+      for (auto e: g.edges(n, unprotected)) {
+        auto succ = g.getEdgeDst(e);
+        ctx.push(succ);
+      }
+    }
+    , galois::loopname("ComputeForwardTopoSoftPriority")
+    , galois::wl<OBIMSoft>(topoLIndexer)
+  );
 }
 
 void TimingGraph::computeForward(TimingPropAlgo algo) {
   switch (algo) {
-  case ALGO_TOPO_BARRIER:
+  case TopoBarrier:
     computeForwardTopoBarrier();
     break;
-  case ALGO_BY_DEPENDENCY:
+  case ByDependency:
     computeForwardByDependency();
     break;
-  case ALGO_UNORDERED:
+  case Unordered:
     computeForwardUnordered();
     break;
-  case ALGO_TOPO_SOFT_PRIORITY:
-    computeForwardTopoPriority();
+  case TopoSoftPriority:
+    computeForwardTopoSoftPriority();
     break;
   default:
     return; // unreachable
@@ -795,7 +944,7 @@ void TimingGraph::computeBackwardTopoBarrier() {
   };
 
   using FIFO = galois::worklists::PerThreadChunkFIFO<>;
-  using OBIM
+  using OBIMHard
       = galois::worklists::OrderedByIntegerMetric<decltype(revTopoLIndexer), FIFO>
         ::template with_barrier<true>::type
         ::template with_monotonic<true>::type
@@ -827,37 +976,104 @@ void TimingGraph::computeBackwardTopoBarrier() {
           }
         }
       }
-      , galois::loopname("ComputeBackward")
+      , galois::loopname("ComputeBackwardTopoBarrier")
       , galois::no_conflicts()
-      , galois::wl<OBIM>(revTopoLIndexer)
+      , galois::wl<OBIMHard>(revTopoLIndexer)
   );
 }
 
 void TimingGraph::computeBackwardByDependency() {
+  galois::for_each(
+      galois::iterate(bFront),
+      [&] (GNode n, auto& ctx) {
+        auto& data = g.getData(n);
 
+        // check if all successors are done
+        for (auto e: g.edges(n, unprotected)) {
+          auto succ = g.getEdgeDst(e);
+          auto& succData = g.getData(succ, unprotected);
+          if (succData.flag.load()) {
+            return; // succ is not finished
+          }
+        }
+
+        computeSlack(n);
+
+        // signal that n is not in queue
+        data.flag.store(false);
+
+        // schedule incoming neighbors
+        for (auto ie: g.in_edges(n, unprotected)) {
+          auto pred = g.getEdgeDst(ie);
+          auto& predData = g.getData(pred, unprotected);
+          predData.flag.store(true); // signal that pred is to be done
+          ctx.push(pred);
+        }
+      }
+      , galois::loopname("ComputeBackwardByDependency")
+  );
 }
 
 void TimingGraph::computeBackwardUnordered() {
+  galois::for_each(
+      galois::iterate(bFront),
+      [&] (GNode n, auto& ctx) {
+        initNodeBackward(n);
+        computeSlack(n);
 
+        // schedule incoming neighbors
+        for (auto ie: g.in_edges(n, unprotected)) {
+          auto pred = g.getEdgeDst(ie);
+          ctx.push(pred);
+        }
+      }
+      , galois::loopname("ComputeBackwardUnordered")
+  );
 }
 
-void TimingGraph::computeBackwardTopoPriority() {
+void TimingGraph::computeBackwardTopoSoftPriority() {
+  auto revTopoLIndexer = [&] (GNode n) {
+    return g.getData(n, unprotected).revTopoL;
+  };
 
+  using FIFO = galois::worklists::PerThreadChunkFIFO<>;
+  using OBIMSoft
+      = galois::worklists::OrderedByIntegerMetric<decltype(revTopoLIndexer), FIFO>
+        ::template with_monotonic<true>::type
+        ;
+
+  computeRevTopoL();
+
+  galois::for_each(
+      galois::iterate(bFront),
+      [&] (GNode n, auto& ctx) {
+        initNodeBackward(n);
+        computeSlack(n);
+
+        // schedule incoming neighbors
+        for (auto ie: g.in_edges(n, unprotected)) {
+          auto pred = g.getEdgeDst(ie);
+          ctx.push(pred);
+        }
+      }
+      , galois::loopname("ComputeBackwardTopoSoftPriority")
+      , galois::wl<OBIMSoft>(revTopoLIndexer)
+  );
 }
 
 void TimingGraph::computeBackward(TimingPropAlgo algo) {
   switch (algo) {
-  case ALGO_TOPO_BARRIER:
+  case TopoBarrier:
     computeBackwardTopoBarrier();
     break;
-  case ALGO_BY_DEPENDENCY:
+  case ByDependency:
     computeBackwardByDependency();
     break;
-  case ALGO_UNORDERED:
+  case Unordered:
     computeBackwardUnordered();
     break;
-  case ALGO_TOPO_SOFT_PRIORITY:
-    computeBackwardTopoPriority();
+  case TopoSoftPriority:
+    computeBackwardTopoSoftPriority();
     break;
   default:
     return; // unreachable
@@ -877,14 +1093,6 @@ std::string TimingGraph::getNodeName(GNode n) {
     nName += ", ";
     nName += (data.isRise) ? "r" : "f";
     break;
-#if 0
-  case DUMMY_SOURCE:
-    nName = "Dummy input";
-    break;
-  case DUMMY_SINK:
-    nName = "Dummy output";
-    break;
-#endif
   case PRIMARY_OUTPUT:
     nName = "Primary output " + data.pin->name;
     nName += ", ";

@@ -24,12 +24,12 @@ static cll::opt<std::string>
     sdcName("sdc", cll::desc("path to .sdc (Synopsys design constraints)"), cll::Required);
 static cll::opt<TimingPropAlgo>
     algo("algo", cll::desc("Choose an algorithm:"),
-         cll::values(clEnumVal(ALGO_TOPO_BARRIER, "topoBarrier"),
-                     clEnumVal(ALGO_BY_DEPENDENCY, "byDenpendency"),
-                     clEnumVal(ALGO_UNORDERED, "unordered"),
-                     clEnumVal(ALGO_TOPO_SOFT_PRIORITY, "topoSoftPriority"),
+         cll::values(clEnumVal(TopoBarrier, "TopoBarrier"),
+                     clEnumVal(ByDependency, "ByDependency"),
+                     clEnumVal(Unordered, "Unordered"),
+                     clEnumVal(TopoSoftPriority, "TopoSoftPriority"),
                      clEnumValEnd),
-         cll::init(ALGO_TOPO_BARRIER));
+         cll::init(TopoBarrier));
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
