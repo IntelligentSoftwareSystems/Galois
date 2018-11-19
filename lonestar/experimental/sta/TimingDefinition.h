@@ -3,7 +3,13 @@
 
 #include <string>
 
-using MyFloat = double;
+#define GALOIS_EDA_USE_DOUBLE_AS_MY_FLOAT 1
+
+#ifdef GALOIS_EDA_USE_DOUBLE_AS_MY_FLOAT
+  using MyFloat = double;
+#else
+  using MyFloat = float;
+#endif
 
 enum TimingMode {
   MAX_DELAY_MODE = 0,

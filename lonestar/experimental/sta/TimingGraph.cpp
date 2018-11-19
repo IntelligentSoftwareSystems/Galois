@@ -26,7 +26,7 @@ void TimingGraph::addPin(VerilogPin* pin) {
       data.nType = (0 == j) ? POWER_GND : DUMMY_POWER;
     }
     else if (pin->name == name1) {
-      data.nType = (1 == j) ? DUMMY_POWER : POWER_VDD;
+      data.nType = (1 == j) ? POWER_VDD : DUMMY_POWER;
     }
     else if (m.isOutPin(pin)) {
       data.nType = PRIMARY_OUTPUT;
