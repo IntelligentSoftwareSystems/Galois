@@ -67,7 +67,7 @@ void TimingEngine::time(VerilogModule* m, TimingPropAlgo algo) {
     g->computeBackward(algo);
     Tmain.stop();
 
-    g->print();
+//    g->print();
   }
 }
 

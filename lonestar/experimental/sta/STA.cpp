@@ -44,28 +44,31 @@ int main(int argc, char *argv[]) {
   libSpecified |= !fastLibName.empty() << 0x1;
   libSpecified |= !slowLibName.empty();
 
+  auto parseAndSetLib =
+      [&] (CellLib& lib, CellLib** libPtr, std::string name) {
+        lib.parse(name);
+        *libPtr = &lib;
+        std::cout << "Parsed cell library " << name << std::endl;
+      };
+
   switch (libSpecified) {
   // fastLib and slowLib
   case 0x3:
-    fLib.parse(fastLibName);
-    fastLib = &fLib;
+    parseAndSetLib(fLib, &fastLib, fastLibName);
     if (fastLibName == slowLibName) {
       slowLib = &fLib;
     }
     else {
-      sLib.parse(slowLibName);
-      slowLib = &sLib;
+      parseAndSetLib(sLib, &slowLib, slowLibName);
     }
     break;
   // fastLib only
   case 0x2:
-    fLib.parse(fastLibName);
-    fastLib = &fLib;
+    parseAndSetLib(fLib, &fastLib, fastLibName);
     break;
   // slowLib only
   case 0x1:
-    sLib.parse(slowLibName);
-    slowLib = &sLib;
+    parseAndSetLib(sLib, &slowLib, slowLibName);
     break;
   // no libs are specified
   case 0x0:
@@ -282,6 +285,7 @@ int main(int argc, char *argv[]) {
 
   VerilogDesign design;
   design.parse(verilogName);
+  std::cout << "Parsed " << design.modules.size() << " Verilog module(s) in " << verilogName << std::endl;
 //  design.print();
   design.buildDependency();
 //  std::cout << "design is " << (design.isHierarchical() ? "" : "not ") << "hierarchical." << std::endl;
@@ -295,6 +299,7 @@ int main(int argc, char *argv[]) {
   SDC sdc(*m);
   sdc.parse(sdcName);
 //  sdc.print();
+  std::cout << "Parsed SDC commands in " << sdcName << std::endl;
 
   TimingEngine engine;
   engine.useIdealWire(true);
@@ -307,6 +312,12 @@ int main(int argc, char *argv[]) {
   engine.readDesign(&design);
   engine.constrain(m, sdc);
   engine.time(m, algo);
+  std::cout << "Timed Verilog module " << m->name;
+  std::cout << ": " << m->numPorts() << " ports";
+  std::cout << ", " << m->numGates() << " gates";
+  std::cout << ", " << m->numInternalPins() << " internal pins";
+  std::cout << ", " << m->numWires() << " nets";
+  std::cout << std::endl;
 
   return 0;
 }

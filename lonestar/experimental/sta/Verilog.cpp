@@ -288,6 +288,34 @@ VerilogWire* VerilogModule::findWire(std::string name) {
   return (it == wires.end()) ? nullptr : it->second;
 }
 
+size_t VerilogModule::numPorts() {
+  return inPins.size() + outPins.size();
+}
+
+size_t VerilogModule::numGates() {
+  return gates.size();
+}
+
+size_t VerilogModule::numInternalPins() {
+  size_t numPins = 0;
+  for (auto& i: gates) {
+    auto g = i.second;
+    numPins += g->pins.size();
+  }
+  return numPins;
+}
+
+size_t VerilogModule::numWires() {
+  size_t numW = wires.size();
+  for (auto& i: wires) {
+    auto w = i.second;
+    if (w->pins.size() < 2) {
+      numW -= 1;
+    }
+  }
+  return numW;
+}
+
 void VerilogDesign::clear() {
   clearDependency();
   for (auto& i: modules) {

@@ -174,6 +174,10 @@ public:
 
   VerilogWire* findWire(std::string name);
   bool isHierarchical();
+  size_t numPorts();
+  size_t numGates();
+  size_t numInternalPins();
+  size_t numWires();
 };
 
 struct VerilogDesign {
