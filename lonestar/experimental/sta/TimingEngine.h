@@ -61,7 +61,7 @@ public:
 
   void readDesign(VerilogDesign* design);
   void constrain(VerilogModule* m, SDC& sdc);  // add constraints to the module
-  void time(VerilogModule* m);  // timing analysis from scratch
+  void time(VerilogModule* m, TimingPropAlgo algo);  // timing analysis from scratch
 
   MyFloat reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode);
   MyFloat reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode);

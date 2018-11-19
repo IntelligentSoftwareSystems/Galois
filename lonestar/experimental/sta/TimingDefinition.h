@@ -16,6 +16,13 @@ enum TimingMode {
   MIN_DELAY_MODE,
 };
 
+enum TimingPropAlgo {
+  ALGO_TOPO_BARRIER = 0,
+  ALGO_BY_DEPENDENCY,
+  ALGO_UNORDERED,
+  ALGO_TOPO_SOFT_PRIORITY,
+};
+
 MyFloat getMyFloat(std::string& str);
 
 #endif // GALOIS_EDA_TIMING_DEFINITION_H

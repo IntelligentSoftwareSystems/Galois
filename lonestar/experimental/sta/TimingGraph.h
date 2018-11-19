@@ -82,7 +82,7 @@ public:
   galois::InsertBag<GNode> bFront;
 
 private:
-  // forward computation
+  // components for forward computation
   void computeDriveC(GNode n);
   void computeExtremeSlew(GNode n);
   bool computeDelayAndExactSlew(GNode n);
@@ -90,10 +90,22 @@ private:
   void initNodeForward(GNode n);
   void computeTopoL();
 
-  // backward computation
+  // scheduling policies for forward computation
+  void computeForwardTopoBarrier();
+  void computeForwardByDependency();
+  void computeForwardUnordered();
+  void computeForwardTopoPriority();
+
+  // components for backward computation
   void computeSlack(GNode n);
   void initNodeBackward(GNode n);
   void computeRevTopoL();
+
+  // scheduling policies for backward computation
+  void computeBackwardTopoBarrier();
+  void computeBackwardByDependency();
+  void computeBackwardUnordered();
+  void computeBackwardTopoPriority();
 
   // initialization
   void initFlag(bool value);
@@ -113,8 +125,8 @@ public:
   void construct();
   void initialize();
   void setConstraints(SDC& sdc);
-  void computeForward();
-  void computeBackward();
+  void computeForward(TimingPropAlgo algo);
+  void computeBackward(TimingPropAlgo algo);
   void print(std::ostream& os = std::cout);
 };
 

@@ -46,13 +46,25 @@ void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
   }
 }
 
-void TimingEngine::time(VerilogModule* m) {
+void TimingEngine::time(VerilogModule* m, TimingPropAlgo algo) {
   auto g = findTimingGraph(m);
   if (g) {
+    switch (algo) {
+    case ALGO_TOPO_BARRIER:
+    case ALGO_BY_DEPENDENCY:
+    case ALGO_UNORDERED:
+    case ALGO_TOPO_SOFT_PRIORITY:
+      // legal algo
+      break;
+    default:
+      std::cout << "Unknown timing propagation algorithm." << std::endl;
+      return;
+    };
+
     galois::StatTimer Tmain;
     Tmain.start();
-    g->computeForward();
-    g->computeBackward();
+    g->computeForward(algo);
+    g->computeBackward(algo);
     Tmain.stop();
 
     g->print();

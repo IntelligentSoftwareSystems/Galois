@@ -22,6 +22,14 @@ static cll::opt<std::string>
     verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
 static cll::opt<std::string>
     sdcName("sdc", cll::desc("path to .sdc (Synopsys design constraints)"), cll::Required);
+static cll::opt<TimingPropAlgo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(clEnumVal(ALGO_TOPO_BARRIER, "topoBarrier"),
+                     clEnumVal(ALGO_BY_DEPENDENCY, "byDenpendency"),
+                     clEnumVal(ALGO_UNORDERED, "unordered"),
+                     clEnumVal(ALGO_TOPO_SOFT_PRIORITY, "topoSoftPriority"),
+                     clEnumValEnd),
+         cll::init(ALGO_TOPO_BARRIER));
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
@@ -298,7 +306,7 @@ int main(int argc, char *argv[]) {
   }
   engine.readDesign(&design);
   engine.constrain(m, sdc);
-  engine.time(m);
+  engine.time(m, algo);
 
   return 0;
 }

@@ -603,7 +603,7 @@ bool TimingGraph::computeDelayAndExactSlew(GNode n) {
           MyFloat loadC = data.t[k].pinC;
           if (dynamic_cast<PreLayoutWireLoad*>(ieWL)) {
             if (WORST_CASE_TREE == engine->libs[k]->wireTreeType) {
-              loadC = predData.t[k].pinC;
+              loadC = predData.t[k].pinC; // the sum of all pin capacitance in the net
             }
           }
           delay = ieWL->wireDelay(loadC, ieData.wire, data.pin);
@@ -652,7 +652,7 @@ bool TimingGraph::computeDelayAndExactSlew(GNode n) {
   return existConstraints;
 }
 
-void TimingGraph::computeForward() {
+void TimingGraph::computeForwardTopoBarrier() {
   auto topoLIndexer = [&] (GNode n) {
     return g.getData(n, unprotected).topoL;
   };
@@ -723,6 +723,37 @@ void TimingGraph::computeForward() {
   );
 }
 
+void TimingGraph::computeForwardByDependency() {
+
+}
+
+void TimingGraph::computeForwardUnordered() {
+
+}
+
+void TimingGraph::computeForwardTopoPriority() {
+
+}
+
+void TimingGraph::computeForward(TimingPropAlgo algo) {
+  switch (algo) {
+  case ALGO_TOPO_BARRIER:
+    computeForwardTopoBarrier();
+    break;
+  case ALGO_BY_DEPENDENCY:
+    computeForwardByDependency();
+    break;
+  case ALGO_UNORDERED:
+    computeForwardUnordered();
+    break;
+  case ALGO_TOPO_SOFT_PRIORITY:
+    computeForwardTopoPriority();
+    break;
+  default:
+    return; // unreachable
+  }
+}
+
 void TimingGraph::computeSlack(GNode n) {
   auto& data = g.getData(n);
 
@@ -758,7 +789,7 @@ void TimingGraph::computeSlack(GNode n) {
   }
 }
 
-void TimingGraph::computeBackward() {
+void TimingGraph::computeBackwardTopoBarrier() {
   auto revTopoLIndexer = [&] (GNode n) {
     return g.getData(n, unprotected).revTopoL;
   };
@@ -800,6 +831,37 @@ void TimingGraph::computeBackward() {
       , galois::no_conflicts()
       , galois::wl<OBIM>(revTopoLIndexer)
   );
+}
+
+void TimingGraph::computeBackwardByDependency() {
+
+}
+
+void TimingGraph::computeBackwardUnordered() {
+
+}
+
+void TimingGraph::computeBackwardTopoPriority() {
+
+}
+
+void TimingGraph::computeBackward(TimingPropAlgo algo) {
+  switch (algo) {
+  case ALGO_TOPO_BARRIER:
+    computeBackwardTopoBarrier();
+    break;
+  case ALGO_BY_DEPENDENCY:
+    computeBackwardByDependency();
+    break;
+  case ALGO_UNORDERED:
+    computeBackwardUnordered();
+    break;
+  case ALGO_TOPO_SOFT_PRIORITY:
+    computeBackwardTopoPriority();
+    break;
+  default:
+    return; // unreachable
+  }
 }
 
 std::string TimingGraph::getNodeName(GNode n) {
