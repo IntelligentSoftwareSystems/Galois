@@ -342,9 +342,9 @@ struct BackwardPass {
         auto& dst_data = graph->getData(dst);
 
         if (dest_to_find == dst_data.current_length.load()) {
-          float contrib = (1.0 + dst_data.dependency) /
+          float contrib = ((float)1 + dst_data.dependency) /
                           dst_data.num_shortest_paths;
-          galois::add(src_data.dependency, contrib);
+          src_data.dependency = src_data.dependency + contrib;
           bitset_dependency.set(src);
         }
       }
@@ -392,7 +392,7 @@ struct BC {
     NodeData& src_data = graph->getData(src);
 
     if (src_data.dependency > 0) {
-      galois::add(src_data.betweeness_centrality, src_data.dependency);
+      src_data.betweeness_centrality += src_data.dependency;
     }
   }
 };
@@ -463,6 +463,12 @@ constexpr static const char* const url = 0;
 int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
+
+  // Set up metadata mode to neverOnlyData (this is required for correctness
+  // of distributed execution of this implementation)
+  if (enforce_metadata != neverOnlyData) {
+    enforce_metadata = neverOnlyData;
+  }
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 

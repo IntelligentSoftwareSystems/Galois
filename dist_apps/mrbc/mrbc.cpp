@@ -17,7 +17,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-constexpr static const char* const REGION_NAME = "PR_BC";
+constexpr static const char* const REGION_NAME = "MRBC";
 
 #include <iostream>
 
@@ -67,8 +67,8 @@ static cll::opt<unsigned int>
                          "used for node data"),
                cll::init(0), cll::Hidden);
 
-// moved here so PRBCTree has access to numSourcesPerRound
-#include "PRBCTree.h"
+// moved here so MRBCTree has access to numSourcesPerRound
+#include "MRBCTree.h"
 
 /******************************************************************************/
 /* Graph structure declarations */
@@ -88,7 +88,7 @@ struct NodeData {
   // final bc value
   float bc;
 
-  PRBCTree dTree;
+  MRBCTree dTree;
 };
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a
@@ -99,7 +99,7 @@ galois::DynamicBitSet bitset_dependency;
 using Graph = galois::graphs::DistGraph<NodeData, void>;
 using GNode = typename Graph::GraphNode;
 
-#include "pr_bc_opt_sync.hh"
+#include "mrbc_sync.hh"
 
 /******************************************************************************/
 /* Functions for running the algorithm */
@@ -521,9 +521,8 @@ void Sanity(Graph& graph) {
 /* Main method for running */
 /******************************************************************************/
 
-constexpr static const char* const name = "Pontecorvi-Ramachandran Betweeness "
-                                          "Centrality";
-constexpr static const char* const desc = "Pontecorvi-Ramachandran Betweeness "
+constexpr static const char* const name = "Min-Rounds Betweeness Centrality";
+constexpr static const char* const desc = "Min-Rounds Betweeness "
                                           "Centrality on Distributed Galois.";
 constexpr static const char* const url = 0;
 

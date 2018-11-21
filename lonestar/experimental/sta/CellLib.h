@@ -15,28 +15,94 @@
 
 // forward declaration
 struct Lut;
+struct TimingTable;
+struct PowerTable;
 struct CellLib;
 struct CellPin;
 struct Cell;
 
 enum TableType {
-  TABLE_DELAY = 0,
-  TABLE_SLEW,
+  DELAY = 0,
+  SLEW,
+  MIN_CONSTRAINT,
+  MAX_CONSTRAINT,
+//  POWER,
 };
 
 enum WireTreeType {
-  TREE_TYPE_BEST_CASE = 0,
-  TREE_TYPE_BALANCED,
-  TREE_TYPE_WORST_CASE,
+  BEST_CASE_TREE = 0,
+  BALANCED_TREE,
+  WORST_CASE_TREE,
 };
 
 enum VariableType {
-  VARIABLE_INPUT_TRANSITION_TIME = 0,
-  VARIABLE_CONSTRAINED_PIN_TRANSITION,
-  VARIABLE_RELATED_PIN_TRANSITION,
-  VARIABLE_TOTAL_OUTPUT_NET_CAPACITANCE,
-  VARIABLE_INPUT_NET_TRANSITION,
-  VARIABLE_TIME,
+  INPUT_TRANSITION_TIME = 0,
+  CONSTRAINED_PIN_TRANSITION,
+  RELATED_PIN_TRANSITION,
+  TOTAL_OUTPUT_NET_CAPACITANCE,
+  INPUT_NET_TRANSITION,
+  TIME,
+};
+
+enum TimingSense {
+  POSITIVE_UNATE = 0,
+  NEGATIVE_UNATE,
+  NON_UNATE,
+  NOT_APPLICABLE,
+};
+
+enum TimingType {
+  // combinational delay arcs
+  COMBINATIONAL = 0,
+  COMBINATIONAL_RISE,
+  COMBINATIONAL_FALL,
+  // three-state delay arcs
+  THREE_STATE_DISABLE,
+  THREE_STATE_DISABLE_RISE,
+  THREE_STATE_DISABLE_FALL,
+  THREE_STATE_ENABLE,
+  THREE_STATE_ENABLE_RISE,
+  THREE_STATE_ENABLE_FALL,
+  // sequential delay arcs
+  RISING_EDGE,
+  FALLING_EDGE,
+  // async delay arcs
+  PRESET,
+  CLEAR,
+  // sequential constraints
+  HOLD_RISING,
+  HOLD_FALLING,
+  SETUP_RISING,
+  SETUP_FALLING,
+  RECOVERY_RISING,
+  RECOVERY_FALLING,
+  REMOVAL_RISING,
+  REMOVAL_FALLING,
+  // clock waveform constraints
+  MIN_PULSE_WIDTH,
+  MINIMUM_PERIOD,
+  // clock skew constraints
+  SKEW_RISING,
+  SKEW_FALLING,
+  MAX_CLOCK_TREE_PATH,
+  MIN_CLOCK_TREE_PATH,
+  // non-sequential constraints
+  NON_SEQ_SETUP_RISING,
+  NON_SEQ_SETUP_FALLING,
+  NON_SEQ_HOLD_RISING,
+  NON_SEQ_HOLD_FALLING,
+  // no-change constraints
+  NOCHANGE_HIGH_HIGH,
+  NOCHANGE_HIGH_LOW,
+  NOCHANGE_LOW_HIGH,
+  NOCHANGE_LOW_LOW,
+};
+
+enum PinDirection {
+  INPUT = 0,
+  OUTPUT,
+  INOUT,
+  INTERNAL,
 };
 
 struct CellLibParser {
@@ -58,9 +124,10 @@ private:
 
   // for parsing group statements
   void parseWireLoad();
-  void parseLutTemplate();
-  void parseLut(Lut* lut);
-  void parseTiming(CellPin* pin);
+  void parseLutTemplate(bool isForPower = false);
+  void parseLut(Lut* lut, bool isForPower = false);
+  void parseTiming(TimingTable* tTable);
+  void parseInternalPower(PowerTable* pTable);
   void parseCellPin(Cell* cell);
   void parseCellLeakagePower(Cell* cell);
   void parseCell();
@@ -72,19 +139,23 @@ public:
   void parse(std::string inName);
 };
 
+using VecOfMyFloat = std::vector<MyFloat>;
+
 struct LutTemplate {
   std::vector<size_t> shape;
   std::vector<size_t> stride;
   std::vector<VariableType> var;
+  std::vector<VecOfMyFloat> index;
   std::string name;
+  bool isForPower;
   CellLib* lib;
 
 public:
   void print(std::ostream& os = std::cout);
+  void wrapUpConstruction();
 };
 
 using Parameter = std::unordered_map<VariableType, MyFloat>;
-using VecOfMyFloat = std::vector<MyFloat>;
 
 struct Lut {
   LutTemplate* lutTemplate;
@@ -98,44 +169,106 @@ private:
 public:
   MyFloat lookup(Parameter& param);
   void print(std::string attr, std::ostream& os = std::cout);
+  void wrapUpConstruction();
+};
+
+struct TimingTable {
+  CellPin* relatedPin;
+  TimingType tType;
+  TimingSense unate;
+  std::string when;
+  std::string nameOfRelatedPin;
+
+  // tables. ~[0] for falling, ~[1] for rising
+  Lut* delay[2];
+  Lut* slew[2];
+  Lut* constraint[2];
+
+  // end point of an arc, i.e. the pin owning the tables
+  CellPin* endPin;
+
+public:
+  ~TimingTable();
+  void print(std::ostream& os = std::cout);
+  void wrapUpConstruction();
+};
+
+struct PowerTable {
+  CellPin* relatedPin;
+  std::string when;
+  Lut* internalPower[2];
+  CellPin* endPin;
+  std::string nameOfRelatedPin;
+
+public:
+  ~PowerTable();
+  void print(std::ostream& os = std::cout);
+  void wrapUpConstruction();
 };
 
 struct CellPin {
   std::string name;
 
-  // direction
-  // inout = isInput & isOutput, input = isInput & !isOutput,
-  // output = !isInput & isOutput, internal = !isInput & !isOutput
-  bool isInput;
-  bool isOutput;
+  PinDirection dir;
   bool isClock;
+  bool isClockGated;
 
-  MyFloat c[2];
-  MyFloat maxC;
+  MyFloat c[2]; // fall/rise capaitance
+  MyFloat maxC; // maximum capacitance
   Cell* cell;
   std::string func;
+  std::string func_up;
+  std::string func_down;
 
+  std::unordered_set<TimingTable*> timings;
+  std::unordered_set<PowerTable*> powers;
+
+  // organization of tables for lookup
   // order of keys:
-  // pin, fall/rise, delay/slew(/power in the future), unateness, when
-  using MapWhen2Lut = std::unordered_map<std::string, Lut*>;
-  using MapFromPin = std::unordered_map<CellPin*, MapWhen2Lut[2][2][2]>;
-
-  MapFromPin tables;
+  //   1. incoming pin
+  //   2. inRise
+  //   3. meRise
+  //   4. delay/slew/min_constraint/max_constraint
+  //   5. when
+  using InnerTimingMap = std::unordered_map<std::string, Lut*>;
+  std::unordered_map<CellPin*, InnerTimingMap[2][2][4]> timingMap;
 
 public:
+  ~CellPin();
   void print(std::ostream& os = std::cout);
-  bool isEdgeDefined(CellPin* inPin, bool isNeg, bool isRise, TableType index = TABLE_DELAY);
-  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise, std::string when);
-  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
-  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isNeg, bool isRise);
+  void wrapUpConstruction();
+  bool isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index = DELAY);
+  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when);
+  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
+  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
 
-  void addLut(Lut* lut, TableType tType, bool isRise, CellPin* relatedPin, std::string when, bool isPos, bool isNeg) {
-    if (isPos) {
-      tables[relatedPin][isRise][tType][0][when] = lut;
+  PinDirection pinDir() { return dir; }
+  bool isClockPin() { return isClock; }
+
+  TimingTable* addTimingTable() {
+    TimingTable* tTable = new TimingTable;
+    tTable->endPin = this;
+    tTable->relatedPin = nullptr;
+    tTable->unate = NOT_APPLICABLE;
+    tTable->tType = COMBINATIONAL;
+    for (int i = 0; i < 2; i++) {
+      tTable->delay[i] = nullptr;
+      tTable->slew[i] = nullptr;
+      tTable->constraint[i] = nullptr;
     }
-    if (isNeg) {
-      tables[relatedPin][isRise][tType][1][when] = lut;
+    timings.insert(tTable);
+    return tTable;
+  }
+
+  PowerTable* addPowerTable() {
+    PowerTable* pTable = new PowerTable;
+    pTable->endPin = this;
+    pTable->relatedPin = nullptr;
+    for (int i = 0; i < 2; i++) {
+      pTable->internalPower[i] = nullptr;
     }
+    powers.insert(pTable);
+    return pTable;
   }
 };
 
@@ -147,45 +280,55 @@ struct Cell {
   std::unordered_map<std::string, MyFloat> leakagePower;
   CellLib* lib;
 
-  using MapCellPin = std::unordered_map<std::string, CellPin*>;
+  std::unordered_map<std::string, CellPin*> pins;
 
-  MapCellPin pins;
-  MapCellPin outPins;
-  MapCellPin inPins;
-  MapCellPin internalPins;
+  using PinSet = std::unordered_set<CellPin*>;
+  PinSet outPins;
+  PinSet inPins;
+  PinSet internalPins;
+  PinSet clockPins;
 
 public:
+  ~Cell();
+  void wrapUpConstruction();
   void print(std::ostream& os = std::cout);
 
   void addInOutPin(CellPin* pin) {
-    pin->isInput = true;
-    pin->isOutput = true;
-    inPins[pin->name] = pin;
-    outPins[pin->name] = pin;
+    pin->dir = INOUT;
+    inPins.insert(pin);
+    outPins.insert(pin);
   }
 
   void addInPin(CellPin* pin) {
-    pin->isInput = true;
-    pin->isOutput = false;
-    inPins[pin->name] = pin;
+    pin->dir = INPUT;
+    inPins.insert(pin);
   }
 
   void addOutPin(CellPin* pin) {
-    pin->isInput = false;
-    pin->isOutput = true;
-    outPins[pin->name] = pin;
+    pin->dir = OUTPUT;
+    outPins.insert(pin);
   }
 
   void addInternalPin(CellPin* pin) {
-    pin->isInput = false;
-    pin->isOutput = false;
-    internalPins[pin->name] = pin;
+    pin->dir = INTERNAL;
+    internalPins.insert(pin);
+  }
+
+  void addClockPin(CellPin* pin, bool isGated = false) {
+    pin->isClock = true;
+    pin->isClockGated = isGated;
+    clockPins.insert(pin);
   }
 
   CellPin* addCellPin(std::string name) {
     auto pin = new CellPin;
     pin->name = name;
     pin->cell = this;
+    pin->c[0] = 0.0;
+    pin->c[1] = 0.0;
+    pin->maxC = 0.0;
+    pin->isClock = false;
+    pin->isClockGated = false;
     pins[name] = pin;
     return pin;
   }
@@ -198,6 +341,8 @@ public:
   void addLeakagePower(std::string when, MyFloat value) {
     leakagePower[when] = value;
   }
+
+  bool isSequentialCell() { return !clockPins.empty(); }
 };
 
 struct PreLayoutWireLoad: public WireLoad {
@@ -233,10 +378,7 @@ struct CellLib {
   std::unordered_map<std::string, PreLayoutWireLoad*> wireLoads;
   std::unordered_map<std::string, Cell*> cells;
   std::unordered_map<std::string, LutTemplate*> lutTemplates;
-
-  // set of LUTs to avoid double free
-  // lookup should be done from pins
-  std::unordered_set<Lut*> luts;
+  std::unordered_map<std::string, LutTemplate*> powerLutTemplates;
 
 private:
   void clear();
@@ -252,6 +394,9 @@ public:
     Cell* cell = new Cell;
     cell->name = name;
     cell->lib = this;
+    cell->driveStrength = 0;
+    cell->area = 0.0;
+    cell->cellLeakagePower = 0.0;
     cells[name] = cell;
     return cell;
   }
@@ -265,6 +410,9 @@ public:
     PreLayoutWireLoad* wireLoad = new PreLayoutWireLoad;
     wireLoad->name = name;
     wireLoad->lib = this;
+    wireLoad->c = 0.0;
+    wireLoad->r = 0.0;
+    wireLoad->slope = 0.0;
     wireLoads[name] = wireLoad;
     return wireLoad;
   }
@@ -274,23 +422,20 @@ public:
     return (it == wireLoads.end()) ? nullptr : it->second;
   }
 
-  LutTemplate* addLutTemplate(std::string name) {
+  LutTemplate* addLutTemplate(std::string name, bool isForPower = false) {
     LutTemplate* lutTemplate = new LutTemplate;
     lutTemplate->name = name;
     lutTemplate->lib = this;
-    lutTemplates[name] = lutTemplate;
+    lutTemplate->isForPower = isForPower;
+    auto& map = (isForPower) ? powerLutTemplates : lutTemplates;
+    map[name] = lutTemplate;
     return lutTemplate;
   }
 
-  LutTemplate* findLutTemplate(std::string name) {
-    auto it = lutTemplates.find(name);
-    return (it == lutTemplates.end()) ? nullptr : it->second;
-  }
-
-  Lut* addLut() {
-    Lut* lut = new Lut;
-    luts.insert(lut);
-    return lut;
+  LutTemplate* findLutTemplate(std::string name, bool isForPower = false) {
+    auto& map = (isForPower) ? powerLutTemplates : lutTemplates;
+    auto it = map.find(name);
+    return (it == map.end()) ? nullptr : it->second;
   }
 };
 

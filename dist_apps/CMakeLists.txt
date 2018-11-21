@@ -90,3 +90,5 @@ distApp(sssp_pull)
 distApp(sssp_push)
 
 distAppNoGPU(partition)
+
+distAppNoGPU(mrbc)
