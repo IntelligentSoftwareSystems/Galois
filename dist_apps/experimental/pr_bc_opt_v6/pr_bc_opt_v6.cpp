@@ -597,7 +597,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
         if (cur_data.roundIndexToSend != infinity) {
-          cur_data.dTree.markSent(roundNumber);
+          cur_data.dTree.markSent(roundNumber, cur_data.roundIndexToSend);
         }
       },
       galois::loopname(

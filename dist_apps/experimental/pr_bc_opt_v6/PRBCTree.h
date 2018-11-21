@@ -87,8 +87,9 @@ public:
     // reset iterator
     if (endCurKey != distanceTree.end()) {
       galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
-      curKey = distanceTree.end();
+      curKey = distanceTree.begin();
       endCurKey = distanceTree.end();
+      assert(curKey + 1 == endCurKey);
     }
   }
 
@@ -102,19 +103,20 @@ public:
     uint32_t indexToSend = infinity;
 
     if (curKey == endCurKey) {
-      curKey = distanceTree.find(distanceToCheck);
+      return indexToSend;
     }
-    else if (curKey->first != distanceToCheck
-              && (curKey + 1) != endCurKey
-              && (curKey + 1)->first == distanceToCheck) {
+
+    if (curKey->first != distanceToCheck
+          && (curKey + 1) != endCurKey
+          && (curKey + 1)->first == distanceToCheck) {
       ++curKey;
     }
 
-    if (curKey != endCurKey && curKey->first == distanceToCheck) {
+    // if (curKey != endCurKey && curKey->first == distanceToCheck) {
+    if (curKey->first == distanceToCheck) {
       BitSet& setToCheck = curKey->second;
-      auto index = setToCheck.getIndicator();
-      if (index != setToCheck.npos) {
-        indexToSend = index;
+      if (!setToCheck.nposInd()) {
+        indexToSend = setToCheck.getIndicator();
       }
     }
     return indexToSend;
@@ -127,12 +129,25 @@ public:
 
 /*** ConfirmMessageToSend *****************************************************/
 
+  // void validateIterator() {
+  //   // reset iterator
+  //   if (endCurKey != distanceTree.end()) {
+  //     galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
+  //     curKey += distanceTree.end() - endCurKey;
+  //     endCurKey = distanceTree.end();
+  //   }
+  // }
+
   /**
    * Note that a particular source's message has already been sent in the data
    * structure and increment the number of sent sources.
    */
-  void markSent(uint32_t roundNumber) {
-    assert(curKey != endCurKey);
+  void markSent(uint32_t roundNumber, uint32_t index) {
+    if (curKey->first < roundNumber - numSentSources) {
+      assert((curKey->second).nposInd());
+      ++curKey;
+      assert(curKey != endCurKey && curKey->first == roundNumber - numSentSources);
+    }
     BitSet& setToCheck = curKey->second;
     setToCheck.forward_indicator();
 
@@ -146,6 +161,8 @@ public:
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
+    assert(endCurKey == distanceTree.end());
+
     if (oldDistance == newDistance) {
       return;
     }
@@ -169,7 +186,7 @@ public:
     // reset iterator
     if (endCurKey != distanceTree.end()) {
       galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
-      curKey = distanceTree.end();
+      curKey += distanceTree.end() - endCurKey - 1;
       endCurKey = distanceTree.end();
     }
   }
