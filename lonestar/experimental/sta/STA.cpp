@@ -27,7 +27,7 @@ static cll::opt<TimingPropAlgo>
          cll::values(clEnumVal(TopoBarrier, "TopoBarrier"),
                      clEnumVal(ByDependency, "ByDependency"),
                      clEnumValEnd),
-         cll::init(TopoBarrier));
+         cll::init(ByDependency));
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
