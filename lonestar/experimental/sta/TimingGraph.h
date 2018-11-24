@@ -82,6 +82,10 @@ public:
   galois::InsertBag<GNode> bFront;
 
 private:
+  // utility functions
+  size_t outDegree(GNode n);
+  size_t inDegree(GNode n);
+
   // components for forward computation
   void computeDriveC(GNode n);
   void computeExtremeSlew(GNode n);
@@ -93,8 +97,6 @@ private:
   // scheduling policies for forward computation
   void computeForwardTopoBarrier();
   void computeForwardByDependency();
-  void computeForwardUnordered();
-  void computeForwardTopoSoftPriority();
 
   // components for backward computation
   void computeSlack(GNode n);
@@ -104,11 +106,10 @@ private:
   // scheduling policies for backward computation
   void computeBackwardTopoBarrier();
   void computeBackwardByDependency();
-  void computeBackwardUnordered();
-  void computeBackwardTopoSoftPriority();
 
   // initialization
   void initFlag(bool value);
+  void getEndPoints();
 
   // graph construction
   void addPin(VerilogPin* p);

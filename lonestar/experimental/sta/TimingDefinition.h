@@ -19,8 +19,6 @@ enum TimingMode {
 enum TimingPropAlgo {
   TopoBarrier = 0,
   ByDependency,
-  Unordered,
-  TopoSoftPriority,
 };
 
 MyFloat getMyFloat(std::string& str);

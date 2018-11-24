@@ -26,8 +26,6 @@ static cll::opt<TimingPropAlgo>
     algo("algo", cll::desc("Choose an algorithm:"),
          cll::values(clEnumVal(TopoBarrier, "TopoBarrier"),
                      clEnumVal(ByDependency, "ByDependency"),
-                     clEnumVal(Unordered, "Unordered"),
-                     clEnumVal(TopoSoftPriority, "TopoSoftPriority"),
                      clEnumValEnd),
          cll::init(TopoBarrier));
 

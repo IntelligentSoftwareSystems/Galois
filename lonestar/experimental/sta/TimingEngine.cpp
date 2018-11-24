@@ -52,8 +52,6 @@ void TimingEngine::time(VerilogModule* m, TimingPropAlgo algo) {
     switch (algo) {
     case TopoBarrier:
     case ByDependency:
-    case Unordered:
-    case TopoSoftPriority:
       // legal algo
       break;
     default:
