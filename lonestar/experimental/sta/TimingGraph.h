@@ -42,7 +42,7 @@ struct Node {
   TimingNodeType nType;
   size_t topoL;
   size_t revTopoL;
-  std::atomic<bool> flag;
+  bool flag;
   std::vector<NodeTiming> t;
   VerilogPin* pin;
 };
@@ -85,14 +85,19 @@ private:
   // utility functions
   size_t outDegree(GNode n);
   size_t inDegree(GNode n);
+  void getEndPoints();
+  void setForwardDependencyInFull();
+  void setBackwardDependencyInFull();
+  void computeTopoL();
+  void computeRevTopoL();
 
   // components for forward computation
   void computeDriveC(GNode n);
   void computeExtremeSlew(GNode n);
   bool computeDelayAndExactSlew(GNode n);
   void computeConstraint(GNode n);
+  void computeForwardOperator(GNode n);
   void initNodeForward(GNode n);
-  void computeTopoL();
 
   // scheduling policies for forward computation
   void computeForwardTopoBarrier();
@@ -101,15 +106,10 @@ private:
   // components for backward computation
   void computeSlack(GNode n);
   void initNodeBackward(GNode n);
-  void computeRevTopoL();
 
   // scheduling policies for backward computation
   void computeBackwardTopoBarrier();
   void computeBackwardByDependency();
-
-  // initialization
-  void initFlag(bool value);
-  void getEndPoints();
 
   // graph construction
   void addPin(VerilogPin* p);
