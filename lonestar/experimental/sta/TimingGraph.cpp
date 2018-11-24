@@ -183,7 +183,8 @@ void TimingGraph::construct() {
       }
     }
   }
-
+//  outDegHistogram();
+//  inDegHistogram();
 }
 
 void TimingGraph::computeTopoL() {
@@ -973,4 +974,24 @@ void TimingGraph::print(std::ostream& os) {
       }
     }
   } // end for n
+}
+
+void TimingGraph::outDegHistogram(std::ostream& os) {
+  std::map<size_t, size_t> outDegHist;
+  for (auto n: g) {
+    outDegHist[outDegree(n)] += 1;
+  }
+  for (auto& i: outDegHist) {
+    os << i.first << ", " << i.second << std::endl;
+  }
+}
+
+void TimingGraph::inDegHistogram(std::ostream& os) {
+  std::map<size_t, size_t> inDegHist;
+  for (auto n: g) {
+    inDegHist[inDegree(n)] += 1;
+  }
+  for (auto& i: inDegHist) {
+    os << i.first << ", " << i.second << std::endl;
+  }
 }

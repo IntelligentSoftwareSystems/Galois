@@ -129,6 +129,8 @@ public:
   void computeForward(TimingPropAlgo algo);
   void computeBackward(TimingPropAlgo algo);
   void print(std::ostream& os = std::cout);
+  void outDegHistogram(std::ostream& os = std::cout);
+  void inDegHistogram(std::ostream& os = std::cout);
 };
 
 #endif // GALOIS_EDA_TIMING_GRAPH_H
