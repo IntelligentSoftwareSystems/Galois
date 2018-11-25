@@ -3,6 +3,8 @@
 #include "galois/Bag.h"
 #include "galois/Reduction.h"
 
+#include "galois/runtime/Profile.h"
+
 #include <unordered_set>
 #include <string>
 #include <iostream>
@@ -760,7 +762,10 @@ void TimingGraph::computeForward(TimingPropAlgo algo) {
     computeForwardTopoBarrier();
     break;
   case ByDependency:
-    computeForwardByDependency();
+    galois::runtime::profileVtune(
+        [&]() { computeForwardByDependency(); },
+        "ComputeForwardByDependency_VTune"
+    );
     break;
   default:
     return; // unreachable
