@@ -174,7 +174,9 @@ struct Lut {
   VecOfMyFloat value;
 
 private:
-  MyFloat lookupInternal(VecOfMyFloat& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
+  MyFloat lookupInternal(std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other>& param, 
+                         std::vector<std::pair<size_t, size_t>, galois::PerIterAllocTy::rebind<std::pair<size_t, size_t>>::other>& bound,
+                         std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
   MyFloat lookup(Parameter& param, galois::PerIterAllocTy& alloc);

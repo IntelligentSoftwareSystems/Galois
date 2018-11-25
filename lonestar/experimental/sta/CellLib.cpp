@@ -50,7 +50,10 @@ static T interpolate(T x0, T y0, T x1, T y1, T x) {
   }
 }
 
-MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
+MyFloat Lut::lookupInternal(std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other>& param, 
+                            std::vector<Bound, galois::PerIterAllocTy::rebind<Bound>::other>& bound, 
+                            std::vector<size_t>& stride, size_t start, size_t lv)
+{
   auto lb = bound[lv].first;
   auto ub = bound[lv].second;
   auto start_l = start + stride[lv] * lb;
@@ -64,7 +67,7 @@ MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std:
 MyFloat Lut::lookup(Parameter& param, galois::PerIterAllocTy& alloc) {
   // sort parameter by the var order in lutTemplate
   // assume no repeated variables
-  VecOfMyFloat sortedParam;
+  std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other> sortedParam(alloc);
   for (size_t i = 0; i < index.size(); ++i) {
     sortedParam.push_back(param.at(lutTemplate->var[i]));
   }
@@ -75,7 +78,7 @@ MyFloat Lut::lookup(Parameter& param, galois::PerIterAllocTy& alloc) {
   }
 
   // find bounds for each dimension
-  std::vector<Bound> bound;
+  std::vector<Bound, galois::PerIterAllocTy::rebind<Bound>::other> bound(alloc);
   for (size_t i = 0; i < index.size(); ++i) {
     bound.push_back(findBound(sortedParam[i], index[i]));
   }
