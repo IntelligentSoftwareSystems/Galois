@@ -93,10 +93,10 @@ private:
 
   // components for forward computation
   void computeDriveC(GNode n);
-  void computeExtremeSlew(GNode n);
-  bool computeDelayAndExactSlew(GNode n);
-  void computeConstraint(GNode n);
-  void computeForwardOperator(GNode n);
+  void computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc);
+  bool computeDelayAndExactSlew(GNode n, galois::PerIterAllocTy& alloc);
+  void computeConstraint(GNode n, galois::PerIterAllocTy& alloc);
+  void computeForwardOperator(GNode n, galois::PerIterAllocTy& alloc);
   void initNodeForward(GNode n);
 
   // scheduling policies for forward computation

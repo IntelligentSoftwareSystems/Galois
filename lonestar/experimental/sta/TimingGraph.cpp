@@ -527,7 +527,7 @@ void TimingGraph::computeDriveC(GNode n) {
   }
 }
 
-void TimingGraph::computeExtremeSlew(GNode n) {
+void TimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc) {
   if (engine->isExactSlew) {
     return;
   }
@@ -546,20 +546,20 @@ void TimingGraph::computeExtremeSlew(GNode n) {
       }
       // from a timing arc. compute and take the extreme one
       else if (!ieData.isConstraint) {
-        Parameter param = {
-            {INPUT_NET_TRANSITION,         predData.t[k].slew},
-            {TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
-        };
+        Parameter param(alloc);
+        param[INPUT_NET_TRANSITION] = predData.t[k].slew;
+        param[TOTAL_OUTPUT_NET_CAPACITANCE] = data.t[k].pinC + data.t[k].wireC;
+
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
         if (MAX_DELAY_MODE == engine->modes[k]) {
-          auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise).first;
+          auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
           if (data.t[k].slew < slew) {
             data.t[k].slew = slew;
           }
         }
         else {
-          auto slew = outPin->extractMin(param, SLEW, inPin, predData.isRise, data.isRise).first;
+          auto slew = outPin->extractMin(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
           if (data.t[k].slew > slew) {
             data.t[k].slew = slew;
           }
@@ -569,7 +569,7 @@ void TimingGraph::computeExtremeSlew(GNode n) {
   } // end for ie
 }
 
-void TimingGraph::computeConstraint(GNode n) {
+void TimingGraph::computeConstraint(GNode n, galois::PerIterAllocTy& alloc) {
   auto& data = g.getData(n);
 
   for (auto ie: g.in_edges(n, unprotected)) {
@@ -580,19 +580,19 @@ void TimingGraph::computeConstraint(GNode n) {
     for (size_t k = 0; k < engine->numCorners; k++) {
       // from a timing arc for constraints
       if (ieData.isConstraint) {
-        Parameter param = {
-            {RELATED_PIN_TRANSITION,     predData.t[k].slew},
-            {CONSTRAINED_PIN_TRANSITION, data.t[k].slew}
-        };
+        Parameter param(alloc);
+        param[RELATED_PIN_TRANSITION] = predData.t[k].slew;
+        param[CONSTRAINED_PIN_TRANSITION] = data.t[k].slew;
+
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
 
         if (MAX_DELAY_MODE == engine->modes[k]) {
-          auto budget = outPin->extractMax(param, MAX_CONSTRAINT, inPin, predData.isRise, data.isRise).first;
+          auto budget = outPin->extractMax(param, MAX_CONSTRAINT, inPin, predData.isRise, data.isRise, alloc).first;
           data.t[k].required = clk->period + predData.t[k].arrival - budget;
         }
         else {
-          auto budget = outPin->extractMax(param, MIN_CONSTRAINT, inPin, predData.isRise, data.isRise).first;
+          auto budget = outPin->extractMax(param, MIN_CONSTRAINT, inPin, predData.isRise, data.isRise, alloc).first;
           data.t[k].required = predData.t[k].arrival + budget;
         }
       }
@@ -601,7 +601,7 @@ void TimingGraph::computeConstraint(GNode n) {
 }
 
 // return true if there is a timing constraint to be handled
-bool TimingGraph::computeDelayAndExactSlew(GNode n) {
+bool TimingGraph::computeDelayAndExactSlew(GNode n, galois::PerIterAllocTy& alloc) {
   auto& data = g.getData(n);
   bool existConstraints = false;
 
@@ -639,34 +639,34 @@ bool TimingGraph::computeDelayAndExactSlew(GNode n) {
       }
       // from a timing arc
       else {
-        Parameter param = {
-            {INPUT_NET_TRANSITION,         predData.t[k].slew},
-            {TOTAL_OUTPUT_NET_CAPACITANCE, data.t[k].pinC + data.t[k].wireC}
-        };
+        Parameter param(alloc);
+        param[INPUT_NET_TRANSITION] = predData.t[k].slew;
+        param[TOTAL_OUTPUT_NET_CAPACITANCE] = data.t[k].pinC + data.t[k].wireC;
+
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
 
         if (MAX_DELAY_MODE == engine->modes[k]) {
-          auto delayResult = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise);
+          auto delayResult = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise, alloc);
           auto delay = delayResult.first;
           auto& when = delayResult.second;
           ieData.t[k].delay = delay;
           if (data.t[k].arrival < predData.t[k].arrival + delay) {
             data.t[k].arrival = predData.t[k].arrival + delay;
             if (engine->isExactSlew) {
-              data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
+              data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when, alloc);
             }
           }
         }
         else {
-          auto delayResult = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise);
+          auto delayResult = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise, alloc);
           auto delay = delayResult.first;
           auto& when = delayResult.second;
           ieData.t[k].delay = delay;
           if (data.t[k].arrival > predData.t[k].arrival + delay) {
             data.t[k].arrival = predData.t[k].arrival + delay;
             if (engine->isExactSlew) {
-              data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when);
+              data.t[k].slew = outPin->extract(param, SLEW, inPin, predData.isRise, data.isRise, when, alloc);
             }
           }
         }
@@ -677,17 +677,17 @@ bool TimingGraph::computeDelayAndExactSlew(GNode n) {
   return existConstraints;
 }
 
-void TimingGraph::computeForwardOperator(GNode n) {
+void TimingGraph::computeForwardOperator(GNode n, galois::PerIterAllocTy& alloc) {
   auto& data = g.getData(n);
 
   switch (data.nType) {
   case GATE_INPUT:
   case PRIMARY_OUTPUT:
     if (!engine->isExactSlew) {
-      computeExtremeSlew(n);
+      computeExtremeSlew(n, alloc);
     }
-    if (computeDelayAndExactSlew(n)) {
-      computeConstraint(n);
+    if (computeDelayAndExactSlew(n, alloc)) {
+      computeConstraint(n, alloc);
     }
     break;
 
@@ -697,10 +697,10 @@ void TimingGraph::computeForwardOperator(GNode n) {
   case GATE_OUTPUT:
     computeDriveC(n);
     if (!engine->isExactSlew) {
-      computeExtremeSlew(n);
+      computeExtremeSlew(n, alloc);
     }
-    if (computeDelayAndExactSlew(n)) {
-      computeConstraint(n);
+    if (computeDelayAndExactSlew(n, alloc)) {
+      computeConstraint(n, alloc);
     }
     break;
 
@@ -726,10 +726,11 @@ void TimingGraph::computeForwardTopoBarrier() {
   galois::for_each(
     galois::iterate(g),
     [&] (GNode n, auto& ctx) {
-      computeForwardOperator(n);
+      computeForwardOperator(n, ctx.getPerIterAlloc());
     }
     , galois::loopname("ComputeForwardTopoBarrier")
     , galois::no_conflicts()
+    , galois::per_iter_alloc()
     , galois::wl<OBIM>(topoLIndexer)
   );
 }
@@ -740,7 +741,7 @@ void TimingGraph::computeForwardByDependency() {
   galois::for_each(
     galois::iterate(fFront),
     [&] (GNode n, auto& ctx) {
-      computeForwardOperator(n);
+      computeForwardOperator(n, ctx.getPerIterAlloc());
 
       // schedule an outgoing neighbor if all its dependencies are satisfied
       for (auto e: g.edges(n, unprotected)) {
@@ -752,6 +753,7 @@ void TimingGraph::computeForwardByDependency() {
       }
     }
     , galois::loopname("ComputeForwardByDependency")
+    , galois::per_iter_alloc()
     , galois::no_conflicts()
   );
 }

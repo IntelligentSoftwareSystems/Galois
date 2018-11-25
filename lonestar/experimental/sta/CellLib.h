@@ -14,6 +14,8 @@
 #include "WireLoad.h"
 #include "Verilog.h"
 
+#include "galois/Galois.h"
+
 // forward declaration
 struct Lut;
 struct TimingTable;
@@ -156,7 +158,14 @@ public:
   void wrapUpConstruction();
 };
 
-using Parameter = std::unordered_map<VariableType, MyFloat>;
+using Parameter =
+    std::unordered_map<
+      VariableType,
+      MyFloat,
+      std::hash<VariableType>,
+      std::equal_to<VariableType>,
+      galois::PerIterAllocTy::rebind<std::pair<const VariableType, MyFloat>>::other
+    >;
 
 struct Lut {
   LutTemplate* lutTemplate;
@@ -168,7 +177,7 @@ private:
   MyFloat lookupInternal(VecOfMyFloat& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
-  MyFloat lookup(Parameter& param);
+  MyFloat lookup(Parameter& param, galois::PerIterAllocTy& alloc);
   void print(std::string attr, std::ostream& os = std::cout);
   void wrapUpConstruction();
 };
@@ -240,9 +249,9 @@ public:
   void print(std::ostream& os = std::cout);
   void wrapUpConstruction();
   bool isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index = DELAY);
-  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when);
-  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
-  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
+  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when, galois::PerIterAllocTy& alloc);
+  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc);
+  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc);
 
   PinDirection pinDir() { return dir; }
   bool isClockPin() { return isClock; }

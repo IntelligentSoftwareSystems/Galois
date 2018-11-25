@@ -61,7 +61,7 @@ MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std:
   return interpolate(index[lv][lb], y0, index[lv][ub], y1, param[lv]);
 }
 
-MyFloat Lut::lookup(Parameter& param) {
+MyFloat Lut::lookup(Parameter& param, galois::PerIterAllocTy& alloc) {
   // sort parameter by the var order in lutTemplate
   // assume no repeated variables
   VecOfMyFloat sortedParam;
@@ -373,16 +373,16 @@ bool CellPin::isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableT
   return !timingMap[inPin][isInRise][isMeRise][index].empty();
 }
 
-MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when) {
-  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param);
+MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when, galois::PerIterAllocTy& alloc) {
+  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param, alloc);
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
+CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc) {
   MyFloat ret = -infinity;
   std::string when;
   for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
-    auto tmp = i.second->lookup(param);
+    auto tmp = i.second->lookup(param, alloc);
     if (tmp > ret) {
       ret = tmp;
       when = i.first;
@@ -392,11 +392,11 @@ CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isIn
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
+CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc) {
   MyFloat ret = infinity;
   std::string when;
   for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
-    auto tmp = i.second->lookup(param);
+    auto tmp = i.second->lookup(param, alloc);
     if (tmp < ret) {
       ret = tmp;
       when = i.first;
