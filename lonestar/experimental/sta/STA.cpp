@@ -15,23 +15,79 @@ static const char* desc = "Static Timing Analysis";
 
 namespace cll = llvm::cl;
 static cll::opt<std::string>
-    cellLibName("lib", cll::desc("path to .lib (cell library)"), cll::Required);
+    fastLibName("libFast", cll::desc("path to .lib for the fast corner"));
+static cll::opt<std::string>
+    slowLibName("libSlow", cll::desc("path to .lib for the slow corner"));
 static cll::opt<std::string>
     verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
 static cll::opt<std::string>
-    sdcName("sdc", cll::desc("path to .sdc (Synopsys design constraints)"));
+    sdcName("sdc", cll::desc("path to .sdc (Synopsys design constraints)"), cll::Required);
+static cll::opt<TimingPropAlgo>
+    algo("algo", cll::desc("Choose an algorithm:"),
+         cll::values(clEnumVal(TopoBarrier, "TopoBarrier"),
+                     clEnumVal(ByDependency, "ByDependency"),
+                     clEnumValEnd),
+         cll::init(ByDependency));
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
 
-  CellLib lib;
-  lib.parse(cellLibName);
-  lib.print();
+  CellLib fLib;
+  CellLib sLib;
+  CellLib* fastLib = nullptr;
+  CellLib* slowLib = nullptr;
+
+  size_t libSpecified = 0x0;
+  libSpecified |= !fastLibName.empty() << 0x1;
+  libSpecified |= !slowLibName.empty();
+
+  auto parseAndSetLib =
+      [&] (CellLib& lib, CellLib** libPtr, std::string name) {
+        lib.parse(name);
+        *libPtr = &lib;
+        std::cout << "Parsed cell library " << name << std::endl;
+      };
+
+  switch (libSpecified) {
+  // fastLib and slowLib
+  case 0x3:
+    parseAndSetLib(fLib, &fastLib, fastLibName);
+    if (fastLibName == slowLibName) {
+      slowLib = &fLib;
+    }
+    else {
+      parseAndSetLib(sLib, &slowLib, slowLibName);
+    }
+    break;
+  // fastLib only
+  case 0x2:
+    parseAndSetLib(fLib, &fastLib, fastLibName);
+    break;
+  // slowLib only
+  case 0x1:
+    parseAndSetLib(sLib, &slowLib, slowLibName);
+    break;
+  // no libs are specified
+  case 0x0:
+  default:
+    std::cout << "Need to specify at least one .lib file via -libSlow or -libFast." << std::endl;
+    return 0;
+  }
 
 #if 0
-  // assume the input is NanGate 45nm NLDM .lib at typical corner
-  auto and2X1 = lib.findCell("AND2_X1");
+  if (fastLib) {
+    fLib.print();
+  }
+  if (slowLib && slowLib != fastLib) {
+    sLib.print();
+  }
+#endif
+
+#if 0
+  // cell lib test
+  // assume the input is NanGate 45nm NLDM .lib at typical corner for fLib
+  auto and2X1 = fLib.findCell("AND2_X1");
   auto pinZN = and2X1->findCellPin("ZN");
   auto pinA1 = and2X1->findCellPin("A1");
   auto pinA2 = and2X1->findCellPin("A2");
@@ -44,7 +100,7 @@ int main(int argc, char *argv[]) {
   std::cout << "AND2_X1: (A2-r, ZN-f) is " << pinZN->isEdgeDefined(pinA2, true, false) << std::endl;
   std::cout << "AND2_X1: (A2-r, ZN-r) is " << pinZN->isEdgeDefined(pinA2, true, true) << std::endl;   // true
 
-  auto nand2X1 = lib.findCell("NAND2_X1");
+  auto nand2X1 = fLib.findCell("NAND2_X1");
   pinZN = nand2X1->findCellPin("ZN");
   pinA1 = nand2X1->findCellPin("A1");
   pinA2 = nand2X1->findCellPin("A2");
@@ -57,7 +113,7 @@ int main(int argc, char *argv[]) {
   std::cout << "NAND2_X1: (A2-r, ZN-f) is " << pinZN->isEdgeDefined(pinA2, true, false) << std::endl;  // true
   std::cout << "NAND2_X1: (A2-r, ZN-r) is " << pinZN->isEdgeDefined(pinA2, true, true) << std::endl;
 
-  auto xor2X1 = lib.findCell("XOR2_X1");
+  auto xor2X1 = fLib.findCell("XOR2_X1");
   auto pinZ = xor2X1->findCellPin("Z");
   auto pinA = xor2X1->findCellPin("A");
   auto pinB = xor2X1->findCellPin("B");
@@ -70,7 +126,7 @@ int main(int argc, char *argv[]) {
   std::cout << "XOR2_X1: (B-r, Z-f) is " << pinZ->isEdgeDefined(pinB, true, false) << std::endl;  // true
   std::cout << "XOR2_X1: (B-r, Z-r) is " << pinZ->isEdgeDefined(pinB, true, true) << std::endl;   // true
 
-  auto dffrsX1 = lib.findCell("DFFRS_X1");
+  auto dffrsX1 = fLib.findCell("DFFRS_X1");
   auto pinD = dffrsX1->findCellPin("D");
   auto pinQ = dffrsX1->findCellPin("Q");
   auto pinQN = dffrsX1->findCellPin("QN");
@@ -192,7 +248,7 @@ int main(int argc, char *argv[]) {
     pins.push_back(new VerilogPin);
   }
 
-  auto wireLoad = lib.defaultWireLoad;
+  auto wireLoad = fLib.defaultWireLoad;
 
   for (size_t i = 0; i < 2; ++i) {
     wire->addPin(pins[i]);
@@ -214,7 +270,7 @@ int main(int argc, char *argv[]) {
   }
   delete wire;
 
-  auto invX1 = lib.findCell("INV_X1");
+  auto invX1 = fLib.findCell("INV_X1");
   auto outPin = invX1->findCellPin("ZN");
   auto inPin = invX1->findCellPin("A");
   Parameter param = {
@@ -224,9 +280,10 @@ int main(int argc, char *argv[]) {
   auto res = outPin->extractMax(param, DELAY, inPin, false, true);
   std::cout << "invX1.riseDelay(slew=0.0, drive c=4.0) = " << res.first << std::endl;
 #endif
-/*
+
   VerilogDesign design;
   design.parse(verilogName);
+  std::cout << "Parsed " << design.modules.size() << " Verilog module(s) in " << verilogName << std::endl;
 //  design.print();
   design.buildDependency();
 //  std::cout << "design is " << (design.isHierarchical() ? "" : "not ") << "hierarchical." << std::endl;
@@ -236,19 +293,29 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  TimingEngine engine;
-  engine.addCellLib(&lib, TIMING_MODE_MAX_DELAY);
-//  engine.addCellLib(&lib, TIMING_MODE_MIN_DELAY);
-  engine.readDesign(&design);
-
   auto m = *(design.roots.begin());
-
-  SDC sdc(engine.libs, *m);
+  SDC sdc(*m);
   sdc.parse(sdcName);
 //  sdc.print();
+  std::cout << "Parsed SDC commands in " << sdcName << std::endl;
 
+  TimingEngine engine;
+  engine.useIdealWire(true);
+  if (slowLib) {
+    engine.addCellLib(slowLib, MAX_DELAY_MODE);
+  }
+  if (fastLib) {
+    engine.addCellLib(fastLib, MIN_DELAY_MODE);
+  }
+  engine.readDesign(&design);
   engine.constrain(m, sdc);
-  engine.time(m);
-*/
+  engine.time(m, algo);
+  std::cout << "Timed Verilog module " << m->name;
+  std::cout << ": " << m->numPorts() << " ports";
+  std::cout << ", " << m->numGates() << " gates";
+  std::cout << ", " << m->numInternalPins() << " internal pins";
+  std::cout << ", " << m->numWires() << " nets";
+  std::cout << std::endl;
+
   return 0;
 }

@@ -7,6 +7,7 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <limits>
 
 #include "TimingDefinition.h"
 #include "Tokenizer.h"
@@ -215,6 +216,7 @@ struct CellPin {
 
   MyFloat c[2]; // fall/rise capaitance
   MyFloat maxC; // maximum capacitance
+  MyFloat minC;
   Cell* cell;
   std::string func;
   std::string func_up;
@@ -324,9 +326,10 @@ public:
     auto pin = new CellPin;
     pin->name = name;
     pin->cell = this;
-    pin->c[0] = 0.0;
-    pin->c[1] = 0.0;
+    pin->c[0] = std::numeric_limits<MyFloat>::infinity();
+    pin->c[1] = std::numeric_limits<MyFloat>::infinity();
     pin->maxC = 0.0;
+    pin->minC = 0.0;
     pin->isClock = false;
     pin->isClockGated = false;
     pins[name] = pin;
@@ -345,6 +348,8 @@ public:
   bool isSequentialCell() { return !clockPins.empty(); }
 };
 
+// compute wire value as in cell lib
+// if user needs to set values, use SDFWireLoad instead
 struct PreLayoutWireLoad: public WireLoad {
   MyFloat c;
   MyFloat r;
@@ -359,6 +364,9 @@ public:
   MyFloat wireC(VerilogWire* wire);
   MyFloat wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin);
   void print(std::ostream& os = std::cout);
+
+  void setWireC(VerilogWire*, MyFloat) { }
+  void setWireDelay(VerilogWire*, VerilogPin*, MyFloat) { }
 
   void addFanoutLength(size_t fanout, MyFloat length) {
     fanoutLength[fanout] = length;

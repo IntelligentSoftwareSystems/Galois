@@ -4,6 +4,7 @@
 #include <algorithm>
 
 using PinSet = std::unordered_set<VerilogPin*>;
+static const MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
 
 void SDCParser::collectPort(PinSet& ports, Token name) {
   auto pin = sdc.m.findPin(name);
@@ -58,14 +59,15 @@ PinSet SDCParser::getPorts() {
 
 void SDCParser::tokenizeFile(std::string inName) {
   std::vector<char> delimiters = {'[', ']', '{', '}', '\\', '/', '\"'};
-  std::vector<char> separators = {' ', '\t', '\n', '\r'};
+  std::vector<char> separators = {' ', '\t', '\n', '\r', ';'};
+  std::vector<std::string> comments = {"#", "\n"};
 
-  Tokenizer tokenizer(delimiters, separators);
+  Tokenizer tokenizer(delimiters, separators, comments);
   tokens = tokenizer.tokenize(inName);
   curToken = tokens.begin();
 }
 
-void SDCParser::parseClock() {
+void SDCParser::parseCreateClock() {
   curToken += 1; // consume "create_clock"
   auto clk = new Clock;
   clk->src = nullptr;
@@ -89,6 +91,7 @@ void SDCParser::parseClock() {
     }
     else if ("[" == *curToken) {
       auto ports = getPorts();
+      assert(1 == ports.size());
       if (!ports.empty()) {
         clk->src = *(ports.begin());
       }
@@ -133,64 +136,7 @@ void SDCParser::parseClock() {
   sdc.clocks[clk->name] = clk;
 }
 
-void SDCParser::parseDrivingCell() {
-  // set_driving_cell -lib_cell cell -pin pin [port_list] -input_transition_fall value -input_transition_rise value
-  curToken += 1; // consume "set_driving_cell"
-
-  PinSet ports;
-  Cell* cell = nullptr;
-  auto dCell = sdc.addDrivingCell();
-  dCell->toCellPin = nullptr;
-  dCell->fromCellPin = nullptr;
-  dCell->slew[0] = 0.0;
-  dCell->slew[1] = 0.0;
-
-  while (!isEndOfCommand()) {
-    if ("-lib_cell" == *curToken) {
-      curToken += 1; // consume "-lib_cell"
-      cell = curLib->findCell(getVarName());
-    }
-    else if ("-pin" == *curToken) {
-      curToken += 1; // consume "-pin"
-      dCell->toCellPin = cell->findCellPin(getVarName());
-    }
-    else if ("-from_pin" == *curToken) {
-      curToken += 1; // consume "-from_pin"
-      dCell->fromCellPin = cell->findCellPin(getVarName());
-    }
-    else if ("[" == *curToken) {
-      ports = getPorts();
-    }
-    else if ("-input_transition_fall" == *curToken) {
-      curToken += 1; // consume "-input_transition_fall"
-      dCell->slew[0] = getMyFloat(*curToken);
-      curToken += 1; // consume value
-    }
-    else if ("-input_transition_rise" == *curToken) {
-      curToken += 1; // consume "-input_transition_rise"
-      dCell->slew[1] = getMyFloat(*curToken);
-      curToken += 1; // consume value
-    }
-    // skip trailing "\\"
-    else if ("\\" == *curToken) {
-      curToken += 1;
-    }
-    else {
-      std::cout << "Abort: unsupported attribute " << *curToken << " in sdc command set_driving_cell." << std::endl;
-      std::abort();
-    }
-  }
-
-  if (nullptr == dCell->fromCellPin) {
-    dCell->fromCellPin = *(cell->inPins.begin());
-  }
-
-  for (auto& i: ports) {
-    sdc.attachPin2DrivingCell(i, dCell);
-  }
-}
-
-void SDCParser::parseLoad() {
+void SDCParser::parseSetLoad() {
   // set_load -pin_load value [port_list]
   curToken += 1; // consume "set_load"
 
@@ -216,41 +162,170 @@ void SDCParser::parseLoad() {
   }
 
   for (auto& i: ports) {
-    sdc.pinLoads[i] = value;
+    sdc.getEnvAtPort(i)->outputLoad = value;
   }
 }
 
-void SDCParser::parseMaxDelay() {
-  // set_max_delay value -from [port_list] -to [port_list]
-  curToken += 1; // consume "set_max_delay"
+void SDCParser::parseSetInputDelay() {
+  // set_input_delay value -max/min -fall/rise [port_list] -clock clk_name
+  curToken += 1; // consume "set_input_delay"
 
   MyFloat value = getMyFloat(*curToken);
-  curToken += 1; // consume value
+  curToken += 1;
 
-  PinSet fromPins, toPins;
+  PinSet ports;
+  TimingMode mode = MAX_DELAY_MODE;
+  bool isRise = false;
+  Clock* clk = nullptr;
+
   while (!isEndOfCommand()) {
-    if ("-from" == *curToken) {
-      curToken += 1; // consume "-from"
-      fromPins = getPorts();
-    }
-    else if ("-to" == *curToken) {
+    if ("-max" == *curToken) {
+      mode = MAX_DELAY_MODE;
       curToken += 1;
-      toPins = getPorts();
+    }
+    else if ("-min" == *curToken) {
+      mode = MIN_DELAY_MODE;
+      curToken += 1;
+    }
+    else if ("-fall" == *curToken) {
+      isRise = false;
+      curToken += 1;
+    }
+    else if ("-rise" == *curToken) {
+      isRise = true;
+      curToken += 1;
+    }
+    else if ("-clock" == *curToken) {
+      curToken += 1; // consume "clock"
+      clk = sdc.getClock(getVarName()); // consume clk_name
+    }
+    else if ("[" == *curToken) {
+      ports = getPorts();
     }
     // skip trailing "\\"
     else if ("\\" == *curToken) {
       curToken += 1;
     }
     else {
-      std::cout << "Abort: unsupported attribute " << *curToken << " in sdc command set_max_delay." << std::endl;
+      std::cout << "Abort: unsupported attribute " << *curToken << " in sdc command create_clock." << std::endl;
       std::abort();
     }
   }
 
-  if ((fromPins == sdc.m.inPins) && (toPins == sdc.m.outPins)) {
-    sdc.maxDelayPI2PO = value;
+  for (auto& i: ports) {
+    auto env = sdc.getEnvAtPort(i);
+    env->inputDelay[mode][isRise] = value;
+    env->clk = clk;
+    env->pin = i;
   }
-  // TODO: handle register cases
+}
+
+void SDCParser::parseSetInputTransition() {
+  // set_input_transition value -max/min -fall/rise [port_list] -clock clk_name
+  curToken += 1; // consume "set_input_transition"
+
+  MyFloat value = getMyFloat(*curToken);
+  curToken += 1;
+
+  PinSet ports;
+  TimingMode mode = MAX_DELAY_MODE;
+  bool isRise = false;
+  Clock* clk = nullptr;
+
+  while (!isEndOfCommand()) {
+    if ("-max" == *curToken) {
+      mode = MAX_DELAY_MODE;
+      curToken += 1;
+    }
+    else if ("-min" == *curToken) {
+      mode = MIN_DELAY_MODE;
+      curToken += 1;
+    }
+    else if ("-fall" == *curToken) {
+      isRise = false;
+      curToken += 1;
+    }
+    else if ("-rise" == *curToken) {
+      isRise = true;
+      curToken += 1;
+    }
+    else if ("-clock" == *curToken) {
+      curToken += 1; // consume "clock"
+      clk = sdc.getClock(getVarName()); // consume clk_name
+    }
+    else if ("[" == *curToken) {
+      ports = getPorts();
+    }
+    // skip trailing "\\"
+    else if ("\\" == *curToken) {
+      curToken += 1;
+    }
+    else {
+      std::cout << "Abort: unsupported attribute " << *curToken << " in sdc command create_clock." << std::endl;
+      std::abort();
+    }
+  }
+
+  for (auto& i: ports) {
+    auto env = sdc.getEnvAtPort(i);
+    env->inputSlew[mode][isRise] = value;
+    env->clk = clk;
+    env->pin = i;
+  }
+}
+
+void SDCParser::parseSetOutputDelay() {
+  // set_output_delay value -max/min -fall/rise [port_list] -clock clk_name
+  curToken += 1; // consume "set_output_delay"
+
+  MyFloat value = getMyFloat(*curToken);
+  curToken += 1;
+
+  PinSet ports;
+  TimingMode mode = MAX_DELAY_MODE;
+  bool isRise = false;
+  Clock* clk = nullptr;
+
+  while (!isEndOfCommand()) {
+    if ("-max" == *curToken) {
+      mode = MAX_DELAY_MODE;
+      curToken += 1;
+    }
+    else if ("-min" == *curToken) {
+      mode = MIN_DELAY_MODE;
+      curToken += 1;
+    }
+    else if ("-fall" == *curToken) {
+      isRise = false;
+      curToken += 1;
+    }
+    else if ("-rise" == *curToken) {
+      isRise = true;
+      curToken += 1;
+    }
+    else if ("-clock" == *curToken) {
+      curToken += 1; // consume "clock"
+      clk = sdc.getClock(getVarName()); // consume clk_name
+    }
+    else if ("[" == *curToken) {
+      ports = getPorts();
+    }
+    // skip trailing "\\"
+    else if ("\\" == *curToken) {
+      curToken += 1;
+    }
+    else {
+      std::cout << "Abort: unsupported attribute " << *curToken << " in sdc command create_clock." << std::endl;
+      std::abort();
+    }
+  }
+
+  for (auto& i: ports) {
+    auto env = sdc.getEnvAtPort(i);
+    env->outputDelay[mode][isRise] = value;
+    env->clk = clk;
+    env->pin = i;
+  }
 }
 
 Token SDCParser::getVarName() {
@@ -284,23 +359,22 @@ Token SDCParser::getVarName() {
 
 void SDCParser::parse(std::string inName) {
   tokenizeFile(inName);
-  defaultLib = *(sdc.libs.begin());
-  std::cout << defaultLib->name << " is used" << std::endl;
 
   while (!isEndOfTokenStream()) {
-    curLib = defaultLib;
-
     if ("create_clock" == *curToken) {
-      parseClock();
-    }
-    else if ("set_max_delay" == *curToken) {
-      parseMaxDelay();
-    }
-    else if ("set_driving_cell" == *curToken) {
-      parseDrivingCell();
+      parseCreateClock();
     }
     else if ("set_load" == *curToken) {
-      parseLoad();
+      parseSetLoad();
+    }
+    else if ("set_input_delay" == *curToken) {
+      parseSetInputDelay();
+    }
+    else if ("set_input_transition" == *curToken) {
+      parseSetInputTransition();
+    }
+    else if ("set_output_delay" == *curToken) {
+      parseSetOutputDelay();
     }
     else {
       std::cout << "Abort SDC: unsupported command " << *curToken << "." << std::endl;
@@ -309,16 +383,54 @@ void SDCParser::parse(std::string inName) {
   }
 }
 
-void SDC::clear() {
-  for (auto i: drivingCells) {
-    delete i;
-  }
-  drivingCells.clear();
+static std::unordered_map<TimingMode, std::string> mapTMode2Name = {
+  {MAX_DELAY_MODE, "-max"},
+  {MIN_DELAY_MODE, "-min"}
+};
 
+static std::unordered_map<bool, std::string> mapRF2Name = {
+  {false, "-fall"},
+  {true, "-rise"}
+};
+
+void SDCEnvAtPort::print(std::ostream& os) {
+  auto printItem =
+      [&] (std::string prompt, MyFloat value, TimingMode i, bool j) {
+        if (value != infinity) {
+          os << prompt << " " << value;
+          os << " " << mapTMode2Name[i];
+          os << " " << mapRF2Name[j];
+          os << " [get_ports " << pin->name << "]";
+          os << " -clock " << clk->name << std::endl;
+        }
+      };
+
+  for (int i = 0; i < 2; i++) {
+    TimingMode mode = (TimingMode)i;
+    for (int j = 0; j < 2; j++) {
+      bool rf = (bool)j;
+      printItem("set_input_delay", inputDelay[i][j], mode, rf);
+      printItem("set_input_transition", inputSlew[i][j], mode, rf);
+      printItem("set_output_delay", outputDelay[i][j], mode, rf);
+    }
+  }
+
+  if (outputLoad != infinity) {
+    os << "set_load -pin_load " << outputLoad;
+    os << " [get_ports " << pin->name << "]" << std::endl;
+  }
+}
+
+void SDC::clear() {
   for (auto& i: clocks) {
     delete i.second;
   }
   clocks.clear();
+
+  for (auto& i: envAtPorts) {
+    delete i.second;
+  }
+  envAtPorts.clear();
 }
 
 void SDC::parse(std::string inName, bool toClear) {
@@ -335,39 +447,11 @@ void SDC::parse(std::string inName, bool toClear) {
 }
 
 void SDC::print(std::ostream& os) {
-  os << "SDC max delays:" << std::endl;
-  os << "  PI 2 PO: " << maxDelayPI2PO << std::endl;
-  os << "  PI 2 RI: " << maxDelayPI2RI << std::endl;
-  os << "  RO 2 RI: " << maxDelayRO2RI << std::endl;
-  os << "  RO 2 PO: " << maxDelayRO2PO << std::endl;
-
-  if (!clocks.empty()) {
-    os << "SDC clocks:" << std::endl;
-    for (auto& i: clocks) {
-      i.second->print(os);
-    }
+  for (auto& c: clocks) {
+    c.second->print(os);
   }
 
-  if (!mapPin2DrivingCells.empty()) {
-    os << "SDC driving cells:" << std::endl;
-    for (auto& i: mapPin2DrivingCells) {
-      os << "  Driving cell of " << i.first->name << ":" << std::endl;
-      i.second->print(os);
-    }
+  for (auto& i: envAtPorts) {
+    i.second->print(os);
   }
-
-  if (!pinLoads.empty()) {
-    os << "SDC pin loads:" << std::endl;
-    for (auto& i: pinLoads) {
-      os << "  Load of " << i.first->name << " = " << i.second << std::endl;
-    }
-  }
-}
-
-void SDCDrivingCell::print(std::ostream& os) {
-  std::string cellName = toCellPin->cell->name;
-  os << "    pin = " << cellName << "." << toCellPin->name << std::endl;
-  os << "    from_pin = " << cellName << "." << fromCellPin->name << std::endl;
-  os << "    input_transition_fall = " << slew[0] << std::endl;
-  os << "    input_transition_rise = " << slew[1] << std::endl;
 }

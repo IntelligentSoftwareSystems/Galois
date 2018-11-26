@@ -1,15 +1,12 @@
 #include "Clock.h"
 
 void Clock::print(std::ostream& os) {
-  os << "  Clock " << name << ":" << std::endl;
-  os << "    period = " << period << std::endl;
-  os << "    src pin = " << ((src) ? src->name : "(virtual)") << std::endl;
-  os << "    wave from = { ";
-  for (auto& i: waveform) {
-    i.print(os);
-    os << " ";
+  os << "create_clock -period " << period;
+  os << " -name " << name;
+  if (src) {
+    os << " [get_ports " << src->name << "]";
   }
-  os << "}" << std::endl;
+  os << std::endl;
 }
 
 void ClockEdge::print(std::ostream& os) {
