@@ -25,23 +25,22 @@
 #include <climits> // CHAR_BIT
 #include <vector>
 
-/**
- * Optimized mode: enable ONLY ONE of them at most
- */
+/*** OPTIONS **********/
+
+/* Optimized mode: enable ONLY ONE of them at most */
 // #define REVERSE_MODE
 // #define FLIP_MODE
 
-
-/**
- * Do you need an indicator?
- */
+/* Do you need an indicator? */
 #define USE_INDICATOR
+
+/*********************/
 
 /**
  * Derivate from DynamicBitSet
  **/
 // template <typename Block=uint32_t, typename Allocator=galois::gstl::Pow2Alloc<Block>>
-class PRBCBitSet : public galois::DynamicBitSet {
+class PRBCBitSet : public galois::DynamicBitSet<> {
   // @DynamicBitSet (protected)
   // galois::PODResizeableArray<galois::CopyableAtomic<uint64_t>> bitvec;
   // size_t num_bits;
@@ -107,6 +106,9 @@ class PRBCBitSet : public galois::DynamicBitSet {
   }
 
 public:
+  typedef size_t iterator;
+  typedef size_t reverse_iterator;
+
   //! sign for N/A
   static const size_t npos = std::numeric_limits<size_t>::max();
 
@@ -261,9 +263,18 @@ public:
     return find_from_block(bitvec.size() - 1, false);
   }
 
-  inline size_t begin() { return find_first(); }
-  inline size_t rbegin() { return find_last(); }
+  #ifdef REVERSE_MODE
+    inline size_t begin() { return reverse(find_last()); }
+  #else
+    inline size_t begin() { return find_first(); }
+  #endif
   inline size_t end() { return npos; }
+
+  #if defined(REVERSE_MODE) || defined(FLIP_MODE)
+    inline size_t rbegin() { return reverse(find_first()); }
+  #else
+    inline size_t rbegin() { return find_last(); }
+  #endif
   inline size_t rend() { return npos; }
 
   /**
@@ -298,36 +309,50 @@ public:
         find_from_block(--curBlock, false) : npos);
   }
 
+  /**
+   * To move iterator to the previous set bit, and return the old value.
+   */
+  inline size_t forward_iterate(size_t& i) {
+    size_t old = i;
+    #ifdef REVERSE_MODE
+      i = reverse(find_prev(reverse(i)));
+    #else
+      i = find_next(i);
+    #endif
+    return old;
+  }
+
+  /**
+   * To move iterator to the next set bit.
+   */
+  inline size_t backward_iterate(size_t& i) {
+    size_t old = i;
+    #ifdef FLIP_MODE
+      i = nposInd()? find_first() : find_next(i);
+      return reverse(old);
+    #else
+      #ifdef REVERSE_MODE
+      i = reverse(find_next(reverse(i)));
+      #else
+      i = find_prev(i);
+      #endif
+      return old;
+    #endif
+  }
+
   #ifdef USE_INDICATOR
     /**
      * To move indicator to the previous set bit, and return the old value.
      */
     size_t forward_indicator() {
-      size_t old = indicator;
-      #ifdef REVERSE_MODE
-        indicator = reverse(find_prev(reverse(indicator)));
-      #else
-        indicator = find_next(indicator);
-      #endif
-      return old;
+      return forward_iterate(indicator);
     }
 
     /**
      * To move indicator to the next set bit.
      */
     size_t backward_indicator() {
-      size_t old = indicator;
-      #ifdef FLIP_MODE
-        indicator = nposInd()? find_first() : find_next(indicator);
-        return reverse(old);
-      #else
-        #ifdef REVERSE_MODE
-        indicator = reverse(find_next(reverse(indicator)));
-        #else
-        indicator = find_prev(indicator);
-        #endif
-        return old;
-      #endif
+      return backward_iterate(indicator);
     }
   #endif
 };

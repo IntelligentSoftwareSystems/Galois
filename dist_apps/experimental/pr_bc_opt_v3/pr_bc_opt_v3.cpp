@@ -90,12 +90,11 @@ using GNode = typename Graph::GraphNode;
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a
 // particular field
-galois::DynamicBitSet bitset_minDistances;
-galois::DynamicBitSet bitset_dependency;
+galois::DynamicBitSet<> bitset_minDistances;
+galois::DynamicBitSet<> bitset_dependency;
 
 // moved here for access to ShortPathType, NodeData, DynamicBitSets
 #include "pr_bc_opt_sync.hh"
-
 
 constexpr static const char* const REGION_NAME = "PR_BC";
 constexpr static const char* const name = "Pontecorvi-Ramachandran Betweeness "
@@ -103,6 +102,7 @@ constexpr static const char* const name = "Pontecorvi-Ramachandran Betweeness "
 constexpr static const char* const desc = "Pontecorvi-Ramachandran Betweeness "
                                           "Centrality on Distributed Galois.";
 constexpr static const char* const url = 0;
+
 uint64_t macroRound = 0; // macro round, i.e. number of batches done so far
 
 /******************************************************************************/
@@ -125,7 +125,7 @@ void Sanity(Graph& graph);
 /******************************************************************************/
 int main(int argc, char** argv) {
 
-  /* Initialize the distributed system */
+  /* Initialize the distributed system, including ThreadPool */
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
   auto& net = galois::runtime::getSystemNetworkInterface();
