@@ -7,11 +7,14 @@
 #include <map>
 #include <vector>
 #include <iostream>
+#include <limits>
 
 #include "TimingDefinition.h"
 #include "Tokenizer.h"
 #include "WireLoad.h"
 #include "Verilog.h"
+
+#include "galois/Galois.h"
 
 // forward declaration
 struct Lut;
@@ -155,7 +158,14 @@ public:
   void wrapUpConstruction();
 };
 
-using Parameter = std::unordered_map<VariableType, MyFloat>;
+using Parameter =
+    std::unordered_map<
+      VariableType,
+      MyFloat,
+      std::hash<VariableType>,
+      std::equal_to<VariableType>,
+      galois::PerIterAllocTy::rebind<std::pair<const VariableType, MyFloat>>::other
+    >;
 
 struct Lut {
   LutTemplate* lutTemplate;
@@ -164,10 +174,12 @@ struct Lut {
   VecOfMyFloat value;
 
 private:
-  MyFloat lookupInternal(VecOfMyFloat& param, std::vector<std::pair<size_t, size_t>>& bound, std::vector<size_t>& stride, size_t start, size_t lv);
+  MyFloat lookupInternal(std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other>& param, 
+                         std::vector<std::pair<size_t, size_t>, galois::PerIterAllocTy::rebind<std::pair<size_t, size_t>>::other>& bound,
+                         std::vector<size_t>& stride, size_t start, size_t lv);
 
 public:
-  MyFloat lookup(Parameter& param);
+  MyFloat lookup(Parameter& param, galois::PerIterAllocTy& alloc);
   void print(std::string attr, std::ostream& os = std::cout);
   void wrapUpConstruction();
 };
@@ -215,6 +227,7 @@ struct CellPin {
 
   MyFloat c[2]; // fall/rise capaitance
   MyFloat maxC; // maximum capacitance
+  MyFloat minC;
   Cell* cell;
   std::string func;
   std::string func_up;
@@ -238,9 +251,9 @@ public:
   void print(std::ostream& os = std::cout);
   void wrapUpConstruction();
   bool isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index = DELAY);
-  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when);
-  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
-  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise);
+  MyFloat extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when, galois::PerIterAllocTy& alloc);
+  std::pair<MyFloat, std::string> extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc);
+  std::pair<MyFloat, std::string> extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc);
 
   PinDirection pinDir() { return dir; }
   bool isClockPin() { return isClock; }
@@ -324,9 +337,10 @@ public:
     auto pin = new CellPin;
     pin->name = name;
     pin->cell = this;
-    pin->c[0] = 0.0;
-    pin->c[1] = 0.0;
+    pin->c[0] = std::numeric_limits<MyFloat>::infinity();
+    pin->c[1] = std::numeric_limits<MyFloat>::infinity();
     pin->maxC = 0.0;
+    pin->minC = 0.0;
     pin->isClock = false;
     pin->isClockGated = false;
     pins[name] = pin;
@@ -345,6 +359,8 @@ public:
   bool isSequentialCell() { return !clockPins.empty(); }
 };
 
+// compute wire value as in cell lib
+// if user needs to set values, use SDFWireLoad instead
 struct PreLayoutWireLoad: public WireLoad {
   MyFloat c;
   MyFloat r;
@@ -359,6 +375,9 @@ public:
   MyFloat wireC(VerilogWire* wire);
   MyFloat wireDelay(MyFloat loadC, VerilogWire* wire, VerilogPin* vPin);
   void print(std::ostream& os = std::cout);
+
+  void setWireC(VerilogWire*, MyFloat) { }
+  void setWireDelay(VerilogWire*, VerilogPin*, MyFloat) { }
 
   void addFanoutLength(size_t fanout, MyFloat length) {
     fanoutLength[fanout] = length;

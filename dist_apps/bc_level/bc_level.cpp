@@ -70,14 +70,16 @@ struct NodeData {
   // SSSP vars
   std::atomic<uint32_t> current_length;
   // Betweeness centrality vars
-  std::atomic<ShortPathType> num_shortest_paths;
+  ShortPathType num_shortest_paths;
+  std::atomic<ShortPathType> num_shortest_paths_accum;
   float dependency;
+  float dependency_accum;
   float betweeness_centrality;
 
 //#ifdef BCDEBUG
   void dump() {
     galois::gPrint("DUMP: ", current_length.load(), " ",
-                   num_shortest_paths.load(), " ", dependency, "\n");
+                   num_shortest_paths, " ", dependency, "\n");
   }
 //#endif
 };
@@ -91,8 +93,9 @@ using GNode = typename Graph::GraphNode;
 
 // bitsets for tracking updates
 galois::DynamicBitSet bitset_num_shortest_paths;
+galois::DynamicBitSet bitset_num_shortest_paths_accum;
 galois::DynamicBitSet bitset_current_length;
-galois::DynamicBitSet bitset_dependency;
+galois::DynamicBitSet bitset_dependency_accum;
 
 // sync structures
 #include "bc_level_sync.hh"
@@ -121,9 +124,11 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
 
-    src_data.betweeness_centrality = 0;
-    src_data.num_shortest_paths    = 0;
-    src_data.dependency            = 0;
+    src_data.betweeness_centrality      = 0;
+    src_data.num_shortest_paths         = 0;
+    src_data.num_shortest_paths_accum   = 0;
+    src_data.dependency                 = 0;
+    src_data.dependency_accum           = 0;
   }
 };
 
@@ -163,7 +168,39 @@ struct InitializeIteration {
       src_data.current_length     = 0;
       src_data.num_shortest_paths = 1;
     }
-    src_data.dependency       = 0;
+    src_data.dependency               = 0;
+    src_data.dependency_accum         = 0;
+    src_data.num_shortest_paths_accum = 0;
+  }
+};
+
+/**
+ * Accmulation from num_short_paths_accum var
+ */
+struct ForwardAccumulation {
+  Graph* graph;
+
+  ForwardAccumulation(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesWithEdgesRange();
+
+    galois::do_all(
+      galois::iterate(allNodes),
+      ForwardAccumulation{&_graph},
+      galois::loopname(_graph.get_run_identifier("ForwardAccumulation").c_str()),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode n) const {
+    NodeData& nData = graph->getData(n);
+
+    // if non-zero, add and reset
+    if (nData.num_shortest_paths_accum > 0) {
+      nData.num_shortest_paths += nData.num_shortest_paths_accum;
+      nData.num_shortest_paths_accum = 0;
+    }
   }
 };
 
@@ -176,7 +213,7 @@ struct ForwardPass {
   galois::DGAccumulator<uint32_t>& dga;
   uint32_t r;
 
-  ForwardPass(Graph* _graph, galois::DGAccumulator<uint32_t>& _dga, 
+  ForwardPass(Graph* _graph, galois::DGAccumulator<uint32_t>& _dga,
               uint32_t roundNum)
     : graph(_graph), dga(_dga), r(roundNum) {}
 
@@ -188,7 +225,7 @@ struct ForwardPass {
    * @param _dga distributed accumulator
    * @param[out] roundNumber Number of rounds taken to finish
    */
-  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& _dga, 
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& _dga,
                  uint32_t& roundNumber) {
     roundNumber = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
@@ -213,10 +250,12 @@ struct ForwardPass {
         _graph.sync<writeDestination, readAny, Reduce_min_current_length,
                     Broadcast_current_length,
                     Bitset_current_length>("ForwardPass");
-        _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
-                    Broadcast_num_shortest_paths,
-                    Bitset_num_shortest_paths>("ForwardPass");
+        _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths_accum,
+                    Broadcast_num_shortest_paths_accum,
+                    Bitset_num_shortest_paths_accum>("ForwardPass");
       }
+
+      ForwardAccumulation::go(_graph);
 
       roundNumber++;
     } while (_dga.reduce(_graph.get_run_identifier()));
@@ -237,18 +276,18 @@ struct ForwardPass {
           //assert(src_data.num_shortest_paths > 0);
 
           bitset_current_length.set(dst);
-          galois::atomicAdd(dst_data.num_shortest_paths, 
-                            src_data.num_shortest_paths.load());
-          bitset_num_shortest_paths.set(dst);
+          galois::atomicAdd(dst_data.num_shortest_paths_accum,
+                            src_data.num_shortest_paths);
+          bitset_num_shortest_paths_accum.set(dst);
 
           dga += 1;
         } else if (old == new_dist) {
           //assert(src_data.num_shortest_paths > 0);
           //assert(dst_data.current_length == r + 1);
 
-          galois::atomicAdd(dst_data.num_shortest_paths, 
-                            src_data.num_shortest_paths.load());
-          bitset_num_shortest_paths.set(dst);
+          galois::atomicAdd(dst_data.num_shortest_paths_accum,
+                            src_data.num_shortest_paths);
+          bitset_num_shortest_paths_accum.set(dst);
 
           dga += 1;
         }
@@ -266,9 +305,9 @@ struct MiddleSync {
   Graph* graph;
   const uint32_t local_infinity;
 
-  MiddleSync(Graph* _graph, const uint32_t li) 
+  MiddleSync(Graph* _graph, const uint32_t li)
     : graph(_graph), local_infinity(li) {};
-           
+
   void static go(Graph& _graph, const uint32_t _li) {
     // step only required if more than one host
     if (galois::runtime::getSystemNetworkInterface().Num > 1) {
@@ -282,7 +321,8 @@ struct MiddleSync {
       );
 
       _graph.sync<writeSource, readAny, Reduce_set_num_shortest_paths,
-                  Broadcast_num_shortest_paths>("MiddleSync");
+                  Broadcast_num_shortest_paths,
+                  Bitset_num_shortest_paths>("MiddleSync");
     }
   }
 
@@ -298,6 +338,35 @@ struct MiddleSync {
   }
 };
 
+/**
+ * Accmulation from dependency_accum var
+ */
+struct BackwardAccumulation {
+  Graph* graph;
+
+  BackwardAccumulation(Graph* _graph) : graph(_graph) {}
+
+  void static go(Graph& _graph) {
+    const auto& allNodes = _graph.allNodesRange();
+
+    galois::do_all(
+      galois::iterate(allNodes),
+      BackwardAccumulation{&_graph},
+      galois::loopname(_graph.get_run_identifier("BackwardAccumulation").c_str()),
+      galois::no_stats()
+    );
+  }
+
+  void operator()(GNode n) const {
+    NodeData& nData = graph->getData(n);
+
+    // if non-zero, add and reset
+    if (nData.dependency_accum > 0) {
+      nData.dependency += nData.dependency_accum;
+      nData.dependency_accum = 0;
+    }
+  }
+};
 
 /**
  * Propagate dependency backward by iterating backward over levels of BFS tree
@@ -322,9 +391,12 @@ struct BackwardPass {
       );
 
       if (moreThanOne) {
-        _graph.sync<writeSource, readDestination, Reduce_add_dependency,
-                    Broadcast_dependency, Bitset_dependency>("BackwardPass");
+        _graph.sync<writeSource, readDestination, Reduce_add_dependency_accum,
+                    Broadcast_dependency_accum, Bitset_dependency_accum>("BackwardPass");
       }
+
+      // dependency accumulation after sync
+      BackwardAccumulation::go(_graph);
     }
   }
 
@@ -344,11 +416,11 @@ struct BackwardPass {
         if (dest_to_find == dst_data.current_length.load()) {
           float contrib = ((float)1 + dst_data.dependency) /
                           dst_data.num_shortest_paths;
-          src_data.dependency = src_data.dependency + contrib;
-          bitset_dependency.set(src);
+          src_data.dependency_accum = src_data.dependency_accum + contrib;
+          bitset_dependency_accum.set(src);
         }
       }
-      src_data.dependency *= src_data.num_shortest_paths;
+      src_data.dependency_accum *= src_data.num_shortest_paths;
     }
   }
 };
@@ -386,7 +458,7 @@ struct BC {
   }
 
   /**
-   * Adds dependency measure to BC measure 
+   * Adds dependency measure to BC measure
    */
   void operator()(GNode src) const {
     NodeData& src_data = graph->getData(src);
@@ -464,12 +536,6 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  // Set up metadata mode to neverOnlyData (this is required for correctness
-  // of distributed execution of this implementation)
-  if (enforce_metadata != neverOnlyData) {
-    enforce_metadata = neverOnlyData;
-  }
-
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
@@ -487,8 +553,9 @@ int main(int argc, char** argv) {
   }
 
   bitset_num_shortest_paths.resize(h_graph->size());
+  bitset_num_shortest_paths_accum.resize(h_graph->size());
   bitset_current_length.resize(h_graph->size());
-  bitset_dependency.resize(h_graph->size());
+  bitset_dependency_accum.resize(h_graph->size());
 
   galois::gPrint("[", net.ID, "] InitializeGraph::go called\n");
 
@@ -575,8 +642,9 @@ int main(int argc, char** argv) {
 
       {
         bitset_num_shortest_paths.reset();
+        bitset_num_shortest_paths_accum.reset();
         bitset_current_length.reset();
-        bitset_dependency.reset();
+        bitset_dependency_accum.reset();
       }
 
       InitializeGraph::go((*h_graph));

@@ -3,6 +3,8 @@
 
 #include "CellLib.h"
 
+static const MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
+
 using Bound = std::pair<size_t, size_t>;
 
 template<typename T>
@@ -48,7 +50,10 @@ static T interpolate(T x0, T y0, T x1, T y1, T x) {
   }
 }
 
-MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std::vector<size_t>& stride, size_t start, size_t lv) {
+MyFloat Lut::lookupInternal(std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other>& param, 
+                            std::vector<Bound, galois::PerIterAllocTy::rebind<Bound>::other>& bound, 
+                            std::vector<size_t>& stride, size_t start, size_t lv)
+{
   auto lb = bound[lv].first;
   auto ub = bound[lv].second;
   auto start_l = start + stride[lv] * lb;
@@ -59,25 +64,22 @@ MyFloat Lut::lookupInternal(VecOfMyFloat& param, std::vector<Bound>& bound, std:
   return interpolate(index[lv][lb], y0, index[lv][ub], y1, param[lv]);
 }
 
-MyFloat Lut::lookup(Parameter& param) {
-  auto paramSize = param.size();
-  assert(paramSize == index.size());
-
-  // scalar case, return the value immediately
-  if (0 == paramSize) {
-    return value[0];
-  }
-
+MyFloat Lut::lookup(Parameter& param, galois::PerIterAllocTy& alloc) {
   // sort parameter by the var order in lutTemplate
   // assume no repeated variables
-  VecOfMyFloat sortedParam;
-  for (size_t i = 0; i < paramSize; ++i) {
+  std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other> sortedParam(alloc);
+  for (size_t i = 0; i < index.size(); ++i) {
     sortedParam.push_back(param.at(lutTemplate->var[i]));
   }
 
+  // scalar case, return the value immediately
+  if (0 == sortedParam.size()) {
+    return value[0];
+  }
+
   // find bounds for each dimension
-  std::vector<Bound> bound;
-  for (size_t i = 0; i < paramSize; ++i) {
+  std::vector<Bound, galois::PerIterAllocTy::rebind<Bound>::other> bound(alloc);
+  for (size_t i = 0; i < index.size(); ++i) {
     bound.push_back(findBound(sortedParam[i], index[i]));
   }
 
@@ -371,19 +373,19 @@ void PowerTable::print(std::ostream& os) {
 }
 
 bool CellPin::isEdgeDefined(CellPin* inPin, bool isInRise, bool isMeRise, TableType index) {
-  return !timingMap.at(inPin)[isInRise][isMeRise][index].empty();
+  return !timingMap[inPin][isInRise][isMeRise][index].empty();
 }
 
-MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when) {
-  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param);
+MyFloat CellPin::extract(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, std::string when, galois::PerIterAllocTy& alloc) {
+  return timingMap.at(inPin)[isInRise][isMeRise][index].at(when)->lookup(param, alloc);
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
-  MyFloat ret = -std::numeric_limits<MyFloat>::infinity();
+CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc) {
+  MyFloat ret = -infinity;
   std::string when;
   for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
-    auto tmp = i.second->lookup(param);
+    auto tmp = i.second->lookup(param, alloc);
     if (tmp > ret) {
       ret = tmp;
       when = i.first;
@@ -393,11 +395,11 @@ CellPin::extractMax(Parameter& param, TableType index, CellPin* inPin, bool isIn
 }
 
 std::pair<MyFloat, std::string>
-CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise) {
-  MyFloat ret = std::numeric_limits<MyFloat>::infinity();
+CellPin::extractMin(Parameter& param, TableType index, CellPin* inPin, bool isInRise, bool isMeRise, galois::PerIterAllocTy& alloc) {
+  MyFloat ret = infinity;
   std::string when;
   for (auto& i: timingMap.at(inPin)[isInRise][isMeRise][index]) {
-    auto tmp = i.second->lookup(param);
+    auto tmp = i.second->lookup(param, alloc);
     if (tmp < ret) {
       ret = tmp;
       when = i.first;
@@ -426,13 +428,14 @@ void CellPin::print(std::ostream& os) {
         os << "      clock: true;" << std::endl;
       }
     }
-    os << "      capactance: " << ((c[1] > c[0]) ? c[1] : c[0]) << ";" << std::endl;
+    os << "      capacitance: " << ((c[1] > c[0]) ? c[1] : c[0]) << ";" << std::endl;
     os << "      rise_capacitance: " << c[1] << ";" << std::endl;
     os << "      fall_capacitance: " << c[0] << ";" << std::endl;
   }
 
   if (OUTPUT == dir || INOUT == dir) {
     os << "      max_capacitance: " << maxC << ";" << std::endl;
+    os << "      min_capacitance: " << minC << ";" << std::endl;
     if (func.size()) {
       os << "      function: \"" << func << "\";" << std::endl;
     }
@@ -718,9 +721,16 @@ void CellLibParser::skip(bool isTopCall) {
 
 void CellLibParser::parseWireLoad() {
   // wire_load ("name") {...}
-  curToken += 3; // consume "wire_load", "\"", and "("
+  curToken += 2; // consume "wire_load" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   auto wireLoad = lib->addWireLoad(*curToken);
-  curToken += 4; // consume name, "\"", ")", and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume name, ")", and "{"
 
   while (!isEndOfGroup()) {
     // capacitance: value;
@@ -770,8 +780,15 @@ static std::unordered_map<std::string, VariableType> mapName2VarType = {
 void CellLibParser::parseLutTemplate(bool isForPower) {
   // lu_table_template/power_lut_template (name) {...}
   curToken += 2; // consume "lu_table_tamplate/power_lut_template" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   auto lutTemplate = lib->addLutTemplate(*curToken, isForPower);
-  curToken += 3; // consume name, ")", and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume ")", and "{"
 
   int unmatched = 0;
   while (!isEndOfGroup()) {
@@ -811,9 +828,16 @@ void CellLibParser::parseLutTemplate(bool isForPower) {
 void CellLibParser::parseLut(Lut* lut, bool isForPower) {
   // key_word (name) {...}
   curToken += 2; // consume key_word and "("
+  if ("\"" == *curToken) {
+    curToken += 1; // in case template name is quoted
+  }
   lut->lutTemplate = lib->findLutTemplate(*curToken, isForPower);
   assert(lut->lutTemplate);
-  curToken += 3; // consume name, ")" and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1; // in case template name is quoted
+  }
+  curToken += 2; // consume ")" and "{"
 
   while (!isEndOfGroup()) {
     // index_* ("num1[,num*]");
@@ -829,7 +853,7 @@ void CellLibParser::parseLut(Lut* lut, bool isForPower) {
     }
     // values ("num1[,num*]"[, \ "num1[,num*]"]);
     else if ("values" == *curToken) {
-      curToken += 3; // consume "value", "(" and "\"" or "\\"
+      curToken += 3; // consume "values", "(" and "\"" or "\\"
       if ("\"" == *curToken) {
         curToken += 1; // consume "\"" preceded by "\\"
       }
@@ -841,6 +865,9 @@ void CellLibParser::parseLut(Lut* lut, bool isForPower) {
         }
         if ("\"" == *curToken) {
           curToken += 1; // consume "\"" preceded by "\\"
+        }
+        if ("\\" == *curToken) {
+          curToken += 1; // consume "\\" before ")"
         }
       }
       curToken += 2; // consume ")" and ";"
@@ -941,9 +968,16 @@ void CellLibParser::parseTiming(TimingTable* tTable) {
     }
     // related_pin: "name";
     else if ("related_pin" == *curToken) {
-      curToken += 3; // consume "related_pin", ":" and "\""
+      curToken += 2; // consume "related_pin" and ":"
+      if ("\"" == *curToken) {
+        curToken += 1;
+      }
       tTable->nameOfRelatedPin = *curToken;
-      curToken += 3; // consume name, "\"" and ";"
+      curToken += 1; // consume name
+      if ("\"" == *curToken) {
+        curToken += 1;
+      }
+      curToken += 1; // consume ";"
     }
     // timing_sense: value;
     else if ("timing_sense" == *curToken) {
@@ -1077,9 +1111,16 @@ void CellLibParser::parseCellLeakagePower(Cell* cell) {
 
 void CellLibParser::parseCellPin(Cell* cell) {
   // pin (name) {...}
-  curToken += 2; // consume "pin" and "{"
+  curToken += 2; // consume "pin" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   auto pin = cell->addCellPin(*curToken);
-  curToken += 3; // consume name, ")" and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume ")" and "{"
 
   while (!isEndOfGroup()) {
     if ("timing" == *curToken) {
@@ -1092,21 +1133,21 @@ void CellLibParser::parseCellPin(Cell* cell) {
     else if ("direction" == *curToken) {
       curToken += 2; // consume "direction" and ":"
       if ("input" == *curToken) {
-        pin->c[1] = lib->defaultInputPinCap;
-        pin->c[0] = lib->defaultInputPinCap;
+        pin->c[1] = (infinity == pin->c[1]) ? lib->defaultInputPinCap : pin->c[1];
+        pin->c[0] = (infinity == pin->c[0]) ? lib->defaultInputPinCap : pin->c[0];
         cell->addInPin(pin);
       }
       else if("output" == *curToken) {
-        pin->c[1] = lib->defaultOutputPinCap;
-        pin->c[0] = lib->defaultOutputPinCap;
+        pin->c[1] = (infinity == pin->c[1]) ? lib->defaultOutputPinCap : pin->c[1];
+        pin->c[0] = (infinity == pin->c[0]) ? lib->defaultOutputPinCap : pin->c[0];
         cell->addOutPin(pin);
       }
       else if ("internal" == *curToken) {
         cell->addInternalPin(pin);
       }
       else if ("inout" == *curToken) {
-        pin->c[1] = lib->defaultInoutPinCap;
-        pin->c[0] = lib->defaultInoutPinCap;
+        pin->c[1] = (infinity == pin->c[1]) ? lib->defaultInoutPinCap : pin->c[1];
+        pin->c[0] = (infinity == pin->c[0]) ? lib->defaultInoutPinCap : pin->c[0];
         cell->addInOutPin(pin);
       }
       curToken += 2; // consume value and ";"
@@ -1123,10 +1164,24 @@ void CellLibParser::parseCellPin(Cell* cell) {
       pin->c[1] = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
+    // capacitance: value
+    else if ("capacitance" == *curToken) {
+      curToken += 2; // consume "capacitance" and ":"
+      auto c = getMyFloat(*curToken);
+      pin->c[0] = c;
+      pin->c[1] = c;
+      curToken += 2; // consume value and ";"
+    }
     // max_capacitance: value;
     else if ("max_capacitance" == *curToken) {
       curToken += 2; // consume "max_capacitance" and ":"
       pin->maxC = getMyFloat(*curToken);
+      curToken += 2; // consume value and ";"
+    }
+    // min_capacitance: value;
+    else if ("min_capacitance" == *curToken) {
+      curToken += 2; // consume "min_capacitance" and ":"
+      pin->minC = getMyFloat(*curToken);
       curToken += 2; // consume value and ";"
     }
     // function: "...";
@@ -1174,8 +1229,15 @@ void CellLibParser::parseCellPin(Cell* cell) {
 void CellLibParser::parseCell() {
   // cell (name) {...}
   curToken += 2; // consume "cell" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   auto cell = lib->addCell(*curToken);
-  curToken += 3; // consume name, ")" and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume ")" and "{"
 
   while (!isEndOfGroup()) {
     if ("pin" == *curToken) {
@@ -1218,15 +1280,29 @@ static std::unordered_map<std::string, WireTreeType> mapName2WireTreeType = {
 void CellLibParser::parseOperatingConditions() {
   // p[erating_conditions (name) {...}
   curToken += 2; // consume "operating_conditions" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   lib->opCond = *curToken;
-  curToken += 3; // consume name, ")" and "{"
+  curToken += 1; // consume name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume ")" and "{"
 
   while(!isEndOfGroup()) {
     // tree_type = value;
     if ("tree_type" == *curToken) {
       curToken += 2; // consume "tree_type" and ":"
+      if ("\"" == *curToken) {
+        curToken += 1;
+      }
       lib->wireTreeType = mapName2WireTreeType.at(*curToken);
-      curToken += 2; // consume value and ";"
+      curToken += 1; // consume value
+      if ("\"" == *curToken) {
+        curToken += 1;
+      }
+      curToken += 1; // consume ";"
     }
     else {
       skip();
@@ -1239,8 +1315,15 @@ void CellLibParser::parseOperatingConditions() {
 void CellLibParser::parseCellLibrary() {
   // library (libraryName) {...}
   curToken += 2; // consume "library" and "("
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
   lib->name = *curToken;
-  curToken += 3; // consume lib->name, ")" "{"
+  curToken += 1; // consume lib->name
+  if ("\"" == *curToken) {
+    curToken += 1;
+  }
+  curToken += 2; // consume ")" and "{"
 
   while (!isEndOfGroup()) {
     if ("wire_load" == *curToken) {
@@ -1301,7 +1384,9 @@ void CellLibParser::tokenizeFile(std::string inName) {
     '(', ')', ',', ':', ';', '/', '#', '[', ']', '{', '}', 
     '*', '\"', '\\', '!', '^', '\'', '+', '&', '|'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
-  Tokenizer tokenizer(delimiters, separators);
+  std::vector<std::string> comments = {"//", "\n", "/*", "*/"};
+
+  Tokenizer tokenizer(delimiters, separators, comments);
   tokens = tokenizer.tokenize(inName); 
   curToken = tokens.begin();
 }
@@ -1407,7 +1492,7 @@ void CellLib::setup() {
   defaultInoutPinCap = 0.0;
   defaultInputPinCap = 0.0;
   defaultOutputPinCap = 0.0;
-  defaultMaxSlew = std::numeric_limits<MyFloat>::infinity();
+  defaultMaxSlew = infinity;
 }
 
 CellLib::CellLib() {
