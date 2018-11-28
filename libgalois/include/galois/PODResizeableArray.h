@@ -20,10 +20,6 @@
 #ifndef GALOIS_PODRESIZEABLEARRAY_H
 #define GALOIS_PODRESIZEABLEARRAY_H
 
-#ifndef USE_ALLOCATOR
-#define USE_ALLOCATOR
-#endif
-
 #include <iterator>
 #include <stdexcept>
 #include <cstddef>
@@ -133,34 +129,36 @@ public:
   size_type size() const { return size_; }
   size_type max_size() const { return capacity_; }
   bool empty() const { return size_ == 0; }
-
+  
+  template <bool _Realloc = true>
   void reserve(size_t n) {
     // galois::StatTimer StatTimer_reserve("reserve", "PR_BC");
     // StatTimer_reserve.start();
     if (n > capacity_) {
       size_t old_cap = capacity_;
       if (capacity_ == 0) capacity_ = 1;
+      else galois::gDebug("PODResizeableArray enlarged");
       while (capacity_ < n) capacity_ <<= 1;
-      #ifndef USE_ALLOCATOR
-      data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
-      #else
-      if (data_ == NULL) {
-        data_ = alloc_.allocate(capacity_);
+      if(_Realloc)
+        data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
+      else{
+        if (data_ == NULL) {
+          data_ = alloc_.allocate(capacity_);
+        }
+        else {
+          pointer old_mem = data_;
+          data_ = alloc_.allocate(capacity_);
+          galois::gDebug("memcpy: ", old_mem, " -> ", data_);
+          memcpy(data_, old_mem, old_cap * sizeof(_Tp));
+          alloc_.deallocate(old_mem, old_cap);
+        }
       }
-      else {
-        pointer old_mem = data_;
-        data_ = alloc_.allocate(capacity_);
-        galois::gDebug("memcpy: ", old_mem, " -> ", data_);
-        memcpy(data_, old_mem, old_cap * sizeof(_Tp));
-        alloc_.deallocate(old_mem, old_cap);
-      }
-      #endif
     }
     // StatTimer_reserve.stop();
   }
 
   void resize(size_t n) {
-    reserve(n);
+    reserve<false>(n);
     size_ = n;
   }
 

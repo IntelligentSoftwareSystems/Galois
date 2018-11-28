@@ -24,8 +24,8 @@
 
 /** OPTIONS **********/
 /** 1. Optimized mode: enable ONLY ONE of them at most **/
-// #define REVERSE_MODE
-// #define FLIP_MODE
+// #define REVERSE_MODE //! Not applicable for v6
+// #define FLIP_MODE  //! Not applicable for v6
 /** 2. Do you need an indicator? **/
 #define USE_INDICATOR
 /*********************/

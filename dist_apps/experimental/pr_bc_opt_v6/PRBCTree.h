@@ -30,9 +30,7 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
  */
 class PRBCTree {
 
-  // using BitSet = bitset_with_indicator<uint32_t>;
-  using BitSet = PRBCBitSet<galois::CopyableAtomic<uint64_t>, 
-                            galois::gstl::Pow2Alloc<galois::CopyableAtomic<uint64_t>>>;
+  using BitSet = PRBCBitSet<galois::CopyableAtomic<uint64_t>>;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
                                               galois::gstl::Pow2Alloc<std::pair<uint32_t, BitSet>>>;
@@ -142,7 +140,7 @@ public:
    * Note that a particular source's message has already been sent in the data
    * structure and increment the number of sent sources.
    */
-  void markSent(uint32_t roundNumber, uint32_t index) {
+  void markSent(uint32_t roundNumber) {
     if (curKey->first < roundNumber - numSentSources) {
       assert((curKey->second).nposInd());
       ++curKey;

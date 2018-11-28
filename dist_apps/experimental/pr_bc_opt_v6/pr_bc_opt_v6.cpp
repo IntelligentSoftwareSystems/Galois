@@ -17,9 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#define ENABLE_PAGE_REPORT
-// #define USE_PREALLOC
-// Go to line:230 to configure preAlloc
+// #define ENABLE_PAGE_REPORT
+// #define USE_PREALLOC /* Go to line:230 to configure preAlloc */
 
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
@@ -230,9 +229,11 @@ int main(int argc, char** argv) {
      ========= ========= ========= ========= ========= ========= =========
      Fitting: y = 38.2509 x + 2105.54 (r2 = 0.999984, sufficient bias: 2155.54)
      */
-    // Related arg's: hg->size(), hg->sizeEdges(), numberThreads, numSourcesPerRound
-    // galois::runtime::pagePoolSize()
-    // ghostwheel4 - HugePages_Total: 65536
+    /* Related Arg's
+     * hg->size(), hg->sizeEdges(), numberThreads, numSourcesPerRound
+     * galois::runtime::pagePoolSize()
+     * ghostwheel4 - HugePages_Total: 65536
+     */
     galois::StatTimer StatTimer_preAlloc("PreAlloc", REGION_NAME);
     StatTimer_preAlloc.start();
     galois::reportPageAlloc("MeminfoPre");
@@ -597,7 +598,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
         if (cur_data.roundIndexToSend != infinity) {
-          cur_data.dTree.markSent(roundNumber, cur_data.roundIndexToSend);
+          cur_data.dTree.markSent(roundNumber);
         }
       },
       galois::loopname(

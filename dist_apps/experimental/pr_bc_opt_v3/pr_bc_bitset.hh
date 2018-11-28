@@ -16,24 +16,18 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-#ifndef _PR_BC_BITSET_
-#define _PR_BC_BITSET_
+#ifndef _PR_BC_BIT_SET_
+#define _PR_BC_BIT_SET_
 
-#include "galois/AtomicWrapper.h"
-#include "galois/PODResizeableArray.h"
+#include "galois/DynamicBitset.h"
 #include <boost/random/detail/integer_log2.hpp>
-#include <climits> // CHAR_BIT
-#include <vector>
 
-/*** OPTIONS **********/
-
-/* Optimized mode: enable ONLY ONE of them at most */
+/** OPTIONS **********/
+/** 1. Optimized mode: enable ONLY ONE of them at most **/
 // #define REVERSE_MODE
 // #define FLIP_MODE
-
-/* Do you need an indicator? */
+/** 2. Do you need an indicator? **/
 #define USE_INDICATOR
-
 /*********************/
 
 /**
@@ -131,9 +125,7 @@ public:
 
   //! Constructor which initializes to an empty bitset.
   PRBCBitSet() {
-    num_bits = numSourcesPerRound;
-    bitvec.resize((numSourcesPerRound - 1) / bits_uint64 + 1);
-    reset();
+    resize(numSourcesPerRound);
     #ifdef USE_INDICATOR
       indicator = npos;
     #endif
