@@ -33,6 +33,15 @@ constexpr static const char* const REGION_NAME = "MRBC";
 // type of short path
 using ShortPathType = double;
 
+/**
+ * Structure for holding data calculated during BC
+ */
+struct BCData {
+  uint32_t minDistance;
+  ShortPathType shortPathCount;
+  galois::CopyableAtomic<float> dependencyValue;
+};
+
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -55,16 +64,16 @@ static cll::opt<unsigned long long> startNode("startNode",
                                 cll::init(0));
 static cll::opt<unsigned int> vIndex("index",
                                 cll::desc("DEBUG: Index to print for "
-                                                          "dist/short paths"),
+                                          "dist/short paths"),
                                 cll::init(0), cll::Hidden);
 // debug vars
 static cll::opt<bool> outputDistPaths("outputDistPaths",
                                 cll::desc("DEBUG: Output min distance"
-                                                "/short path counts instead"),
+                                          "/short path counts instead"),
                                 cll::init(false), cll::Hidden);
 static cll::opt<unsigned int> vectorSize("vectorSize",
                                 cll::desc("DEBUG: Specify size of vector "
-                                                        "used for node data"),
+                                          "used for node data"),
                                 cll::init(0), cll::Hidden);
 
 // moved here so PRBCTree has access to numSourcesPerRound
@@ -77,12 +86,7 @@ static cll::opt<unsigned int> vectorSize("vectorSize",
 // NOTE: declared types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
-  // current min distances for each source
-  galois::gstl::Vector<uint32_t>                      minDistances;
-  // actual shortest path number
-  galois::gstl::Vector<ShortPathType>                 shortestPathNumbers;
-  // dependency values
-  galois::gstl::Vector<galois::CopyableAtomic<float>> dependencyValues;
+  galois::gstl::Vector<BCData> sourceData;
   // distance map
   PRBCTree dTree;
   // final bc value
@@ -118,10 +122,7 @@ void InitializeGraph(Graph& graph) {
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
-
-        cur_data.minDistances.resize(vectorSize);
-        cur_data.shortestPathNumbers.resize(vectorSize);
-        cur_data.dependencyValues.resize(vectorSize);
+        cur_data.sourceData.resize(vectorSize);
         cur_data.bc = 0.0;
       },
       galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()),
@@ -148,15 +149,15 @@ void InitializeIteration(Graph& graph,
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           // min distance and short path count setup
           if (nodesToConsider[i] == graph.getGID(curNode)) { // source node
-            cur_data.minDistances[i] = 0;
-            cur_data.shortestPathNumbers[i] = 1;
-            cur_data.dTree.setDistance(i, 0); // Set dTree with entry (0, self)
+            cur_data.sourceData[i].minDistance = 0;
+            cur_data.sourceData[i].shortPathCount = 1;
+            cur_data.sourceData[i].dependencyValue = 0.0;
+            cur_data.dTree.setDistance(i, 0);
           } else { // non-source node
-            cur_data.minDistances[i]        = infinity;
-            cur_data.shortestPathNumbers[i] = 0;
+            cur_data.sourceData[i].minDistance = infinity;
+            cur_data.sourceData[i].shortPathCount = 0;
+            cur_data.sourceData[i].dependencyValue = 0.0;
           }
-
-          cur_data.dependencyValues[i]  = 0.0;
         }
       },
       galois::loopname(graph.get_run_identifier("InitializeIteration").c_str()),
@@ -183,7 +184,7 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
         cur_data.roundIndexToSend = cur_data.dTree.getIndexToSend(roundNumber);
 
         if (cur_data.roundIndexToSend != infinity) {
-          if (cur_data.minDistances[cur_data.roundIndexToSend] != 0) {
+          if (cur_data.sourceData[cur_data.roundIndexToSend].minDistance != 0) {
             bitset_minDistances.set(curNode);
           }
           dga += 1;
@@ -246,23 +247,22 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
           uint32_t indexToSend = src_data.roundIndexToSend;
 
           if (indexToSend != infinity) {
-            uint32_t distValue = src_data.minDistances[indexToSend];
+            uint32_t distValue = src_data.sourceData[indexToSend].minDistance;
             uint32_t newValue  = distValue + 1;
             // Update minDistance vector
             uint32_t oldValue =
-                galois::min(dnode.minDistances[indexToSend], newValue);
+                galois::min(dnode.sourceData[indexToSend].minDistance, newValue);
 
-            // Update dTree & shortestPathNumbers
             if (oldValue > newValue) {
               dnode.dTree.setDistance(indexToSend, oldValue, newValue);
               // overwrite short path with this node's shortest path
-              dnode.shortestPathNumbers[indexToSend] =
-                  src_data.shortestPathNumbers[indexToSend];
+              dnode.sourceData[indexToSend].shortPathCount =
+                  src_data.sourceData[indexToSend].shortPathCount;
             } else if (oldValue == newValue) {
-              assert(src_data.shortestPathNumbers[indexToSend] != 0);
+              assert(src_data.sourceData[indexToSend].shortPathCount != 0);
               // add to short path
-              dnode.shortestPathNumbers[indexToSend] +=
-                  src_data.shortestPathNumbers[indexToSend];
+              dnode.sourceData[indexToSend].shortPathCount +=
+                  src_data.sourceData[indexToSend].shortPathCount;
             }
 
             dga += 1;
@@ -360,7 +360,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
 
           if (dst_data.roundIndexToSend != infinity) {
             // only comm if not redundant 0
-            if (dst_data.dependencyValues[dst_data.roundIndexToSend] != 0) {
+            if (dst_data.sourceData[dst_data.roundIndexToSend].dependencyValue != 0) {
               bitset_dependency.set(dst);
             }
           }
@@ -403,21 +403,22 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
           unsigned i         = dst_data.roundIndexToSend;
 
           if (i != infinity) {
-            uint32_t myDistance = dst_data.minDistances[i];
+            uint32_t myDistance = dst_data.sourceData[i].minDistance;
 
             // calculate final dependency value
-            dst_data.dependencyValues[i] =
-                dst_data.dependencyValues[i] * dst_data.shortestPathNumbers[i];
+            dst_data.sourceData[i].dependencyValue =
+              dst_data.sourceData[i].dependencyValue *
+                dst_data.sourceData[i].shortPathCount;
 
             // get the value to add to predecessors
-            float toAdd = ((float)1 + dst_data.dependencyValues[i]) /
-                          dst_data.shortestPathNumbers[i];
+            float toAdd = ((float)1 + dst_data.sourceData[i].dependencyValue) /
+                          dst_data.sourceData[i].shortPathCount;
 
             for (auto inEdge : graph.edges(dst)) {
               GNode src      = graph.getEdgeDst(inEdge);
               auto& src_data = graph.getData(src);
 
-              uint32_t sourceDistance = src_data.minDistances[i];
+              uint32_t sourceDistance = src_data.sourceData[i].minDistance;
 
               // source nodes of this batch (i.e. distance 0) can be safely
               // ignored
@@ -425,7 +426,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
                 // determine if this source is a predecessor
                 if (myDistance == (sourceDistance + 1)) {
                   // add to dependency of predecessor using our finalized one
-                  galois::atomicAdd(src_data.dependencyValues[i], toAdd);
+                  galois::atomicAdd(src_data.sourceData[i].dependencyValue, toAdd);
                 }
               }
             }
@@ -459,7 +460,7 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           // exclude sources themselves from BC calculation
           if (graph.getGID(node) != nodesToConsider[i]) {
-            cur_data.bc += cur_data.dependencyValues[i];
+            cur_data.bc += cur_data.sourceData[i].dependencyValue;
           }
         }
       },
@@ -542,7 +543,7 @@ int main(int argc, char** argv) {
   }
 
   // set vector size in node data
-  if (vectorSize == 0) { // minDistances, shortestPathNumbers, dependencyValues
+  if (vectorSize == 0) {
     vectorSize = numSourcesPerRound;
   }
   GALOIS_ASSERT(vectorSize >= numSourcesPerRound);
@@ -757,40 +758,14 @@ int main(int argc, char** argv) {
         // outputs betweenness centrality
         sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
       } else {
-        // sprintf(v_out, "%lu ", (*hg).getGID(*ii));
-        // galois::runtime::printOutput(v_out);
-        // for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        //  if ((*hg).getData(*ii).savedRoundNumbers[i] != infinity) {
-        //    sprintf(v_out, "%u", (*hg).getData(*ii).savedRoundNumbers[i]);
-        //    galois::runtime::printOutput(v_out);
-        //  }
-        //}
-        ////sprintf(v_out, " ");
-        ////galois::runtime::printOutput(v_out);
-
-        ////for (unsigned i = 0; i < numSourcesPerRound; i++) {
-        ////  sprintf(v_out, "%lu", (*hg).getData(*ii).shortestPathNumbers[i]);
-        ////  galois::runtime::printOutput(v_out);
-        ////}
-        // sprintf(v_out, "\n");
-        // galois::runtime::printOutput(v_out);
-
         uint64_t a      = 0;
         ShortPathType b = 0;
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          if ((*hg).getData(*ii).minDistances[i] != infinity) {
-            a += (*hg).getData(*ii).minDistances[i];
+          if ((*hg).getData(*ii).sourceData[i].minDistance != infinity) {
+            a += (*hg).getData(*ii).sourceData[i].minDistance;
           }
-          b += (*hg).getData(*ii).shortestPathNumbers[i];
+          b += (*hg).getData(*ii).sourceData[i].shortPathCount;
         }
-
-        // outputs min distance and short path numbers
-        // sprintf(v_out, "%lu %lu %lu %lu\n", (*hg).getGID(*ii), a, b, c);
-        // sprintf(v_out, "%lu %lu %lu\n", (*hg).getGID(*ii), a, c);
-        // sprintf(v_out, "%lu %lu\n", (*hg).getGID(*ii), b);
-        // sprintf(v_out, "%lu %u %lu\n", (*hg).getGID(*ii),
-        //                              (*hg).getData(*ii).minDistances[vIndex],
-        //                              (*hg).getData(*ii).shortestPathNumbers[vIndex]);
       }
 
       galois::runtime::printOutput(v_out);
