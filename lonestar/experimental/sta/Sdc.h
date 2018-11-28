@@ -16,21 +16,10 @@
 
 struct SDC;
 
-struct SDCDrivingCell {
-  CellPin* toCellPin;
-  CellPin* fromCellPin;
-  MyFloat slew[2];
-
-public:
-  void print(std::ostream& os);
-};
-
 struct SDCParser {
   SDC& sdc;
   std::vector<Token> tokens;
   std::vector<Token>::iterator curToken;
-  CellLib* defaultLib;
-  CellLib* curLib;
 
 private:
   // for token stream
@@ -42,10 +31,11 @@ private:
   // for parsing sdc commands
   std::unordered_set<VerilogPin*> getPorts();
   void collectPort(std::unordered_set<VerilogPin*>& ports, Token name);
-  void parseClock();
-  void parseDrivingCell();
-  void parseLoad();
-  void parseMaxDelay();
+  void parseCreateClock();
+  void parseSetInputDelay();
+  void parseSetInputTransition();
+  void parseSetLoad();
+  void parseSetOutputDelay();
   Token getVarName();
 
 public:
@@ -54,71 +44,61 @@ public:
   void parse(std::string inName);
 };
 
+struct SDCEnvAtPort {
+  // index: MAX_DELAY_MODE/MIN_DELAY_MODE, fall/rise
+  MyFloat inputDelay[2][2];
+  MyFloat inputSlew[2][2];
+  MyFloat outputDelay[2][2];
+  MyFloat outputLoad;
+  Clock* clk;
+  VerilogPin* pin;
+
+public:
+  void print(std::ostream& os = std::cout);
+};
+
 struct SDC {
 private:
   void clear();
 
 public:
-  std::vector<CellLib*>& libs;
   VerilogModule& m;
-  std::unordered_map<std::string, CellLib*> mapName2Libs;
-
-  // boundary conditions
-  std::unordered_map<VerilogPin*, SDCDrivingCell*> mapPin2DrivingCells;
-  std::unordered_set<SDCDrivingCell*> drivingCells;
-  std::unordered_map<VerilogPin*, MyFloat> pinLoads;
-  std::unordered_map<VerilogPin*, MyFloat> wireLoads;
-
-  // usual delay constraints
-  MyFloat maxDelayPI2PO;
-  MyFloat maxDelayPI2RI;
-  MyFloat maxDelayRO2RI;
-  MyFloat maxDelayRO2PO;
 
   std::unordered_map<std::string, Clock*> clocks;
+  std::unordered_map<VerilogPin*, SDCEnvAtPort*> envAtPorts;
 
 public:
   void parse(std::string inName, bool toClear = false);
   void print(std::ostream& os = std::cout);
 
-  SDCDrivingCell* addDrivingCell() {
-    SDCDrivingCell* c = new SDCDrivingCell;
-    drivingCells.insert(c);
-    return c;
-  }
-
-  void attachPin2DrivingCell(VerilogPin* pin, SDCDrivingCell* c) {
-    mapPin2DrivingCells[pin] = c;
-  }
-
-  SDCDrivingCell* findDrivingCell(VerilogPin* pin) {
-    return mapPin2DrivingCells.at(pin);
-  }
-
-  SDC(std::vector<CellLib*>& libs, VerilogModule& m): libs(libs), m(m) {
-    for (auto i: libs) {
-      mapName2Libs[i->name] = i;
+  SDCEnvAtPort* getEnvAtPort(VerilogPin* pin) {
+    MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
+    if (!envAtPorts.count(pin)) {
+      auto env = new SDCEnvAtPort;
+      for (size_t i = 0; i < 2; i++) {
+        for (size_t j = 0; j < 2; j++) {
+          env->inputDelay[i][j] = infinity;
+          env->inputSlew[i][j] = infinity;
+          env->outputDelay[i][j] = infinity;
+        }
+      }
+      env->outputLoad = infinity;
+      env->clk = nullptr;
+      env->pin = nullptr;
+      envAtPorts[pin] = env;
     }
-
-    maxDelayPI2PO = std::numeric_limits<MyFloat>::infinity();
-    maxDelayPI2RI = std::numeric_limits<MyFloat>::infinity();
-    maxDelayRO2RI = std::numeric_limits<MyFloat>::infinity();
-    maxDelayRO2PO = std::numeric_limits<MyFloat>::infinity();
+    return envAtPorts[pin];
   }
 
+  Clock* getClock(std::string name) {
+    if (!clocks.count(name)) {
+      clocks[name] = new Clock;
+    }
+    return clocks[name];
+  }
+
+  SDC(VerilogModule& m): m(m) {}
   ~SDC() { clear(); }
-};
-
-struct SdcSetInputTransition {
-
-};
-
-struct SdcSetInputDelay {
-
-};
-
-struct SdcSetOutputDelay {
-
 };
 
 #endif // GALOIS_EDA_SDC_H

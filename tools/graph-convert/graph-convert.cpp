@@ -49,6 +49,7 @@ enum ConvertMode {
   gr2bsml,
   gr2cgr,
   gr2dimacs,
+  gr2adjacencylist,
   gr2edgelist,
   gr2edgelist1ind,
   gr2linegr,
@@ -135,6 +136,7 @@ static cll::opt<ConvertMode> convertMode(
         clEnumVal(gr2cgr,
                   "Clean up binary gr: remove self edges and multi-edges"),
         clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
+        clEnumVal(gr2adjacencylist, "Convert binary gr to adjacency list"),
         clEnumVal(gr2edgelist, "Convert binary gr to edgelist"),
         clEnumVal(gr2edgelist1ind, "Convert binary gr to edgelist, 1-indexed"),
         clEnumVal(gr2linegr, "Overlay line graph"),
@@ -683,6 +685,36 @@ struct Nodelist2Gr : public HasOnlyVoidSpecialization {
     printStatus(numNodes, numEdges);
   }
 };
+
+struct Gr2Adjacencylist : public Conversion {
+  template <typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef galois::graphs::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef galois::LargeArray<EdgeTy> EdgeData;
+    typedef typename EdgeData::value_type edge_value_type;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    std::ofstream file(outfilename.c_str());
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      file << src;
+      for (Graph::edge_iterator jj = graph.edge_begin(src),
+                                ej = graph.edge_end(src);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        file << " " << dst;
+      }
+      file << "\n";
+    }
+    file.close();
+
+    printStatus(graph.size(), graph.sizeEdges());
+  }
+};
+
 
 struct Gr2Edgelist : public Conversion {
   template <typename EdgeTy>
@@ -2766,6 +2798,9 @@ int main(int argc, char** argv) {
     break;
   case gr2dimacs:
     convert<Gr2Dimacs>();
+    break;
+  case gr2adjacencylist:
+    convert<Gr2Adjacencylist>();
     break;
   case gr2edgelist:
     convert<Gr2Edgelist>();

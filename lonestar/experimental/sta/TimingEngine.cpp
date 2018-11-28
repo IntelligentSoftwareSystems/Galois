@@ -1,15 +1,16 @@
 #include "TimingEngine.h"
+#include "galois/Timer.h"
 
 void TimingEngine::readDesign(VerilogDesign* design) {
   clearTimingGraphs();
-  assert(libs.size()); // need cell lib info for TimingGraphs
+  assert(numCorners); // need cell lib info for TimingGraphs
   assert(design);
   v = design;
 
   for (auto i: v->modules) {
     auto m = i.second;
     if (!m->isHierarchical()) {
-      TimingGraph* g = new TimingGraph(*m, libs, modes, isExactSlew);
+      TimingGraph* g = new TimingGraph(*m, this);
       modules[m] = g;
       g->construct();
     }
@@ -37,10 +38,6 @@ TimingGraph* TimingEngine::findTimingGraph(VerilogModule* m) {
   }
 }
 
-void TimingEngine::update(VerilogModule* m) {
-
-}
-
 void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
   auto g = findTimingGraph(m);
   if (g) {
@@ -49,21 +46,37 @@ void TimingEngine::constrain(VerilogModule* m, SDC& sdc) {
   }
 }
 
-void TimingEngine::time(VerilogModule* m) {
+void TimingEngine::time(VerilogModule* m, TimingPropAlgo algo) {
   auto g = findTimingGraph(m);
   if (g) {
-    g->computeArrivalTime();
+    switch (algo) {
+    case TopoBarrier:
+    case ByDependency:
+      // legal algo
+      break;
+    default:
+      std::cout << "Unknown timing propagation algorithm." << std::endl;
+      return;
+    };
+
+    galois::StatTimer Tmain;
+    Tmain.start();
+    g->computeForward(algo);
+    g->computeBackward(algo);
+    Tmain.stop();
+
+//    g->print();
   }
 }
 
-MyFloat TimingEngine::reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
+MyFloat TimingEngine::reportArrivalTime(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode) {
   return 0.0;
 }
 
-MyFloat TimingEngine::reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, size_t corner) {
+MyFloat TimingEngine::reportSlack(VerilogModule* m, VerilogPin* p, bool isRise, CellLib* lib, TimingMode mode) {
   return 0.0;
 }
 
-std::vector<TimingPath> TimingEngine::reportTopKCriticalPaths(VerilogModule* m, size_t corner, size_t k) {
+std::vector<TimingPath> TimingEngine::reportTopKCriticalPaths(VerilogModule* m, CellLib* lib, TimingMode mode, size_t k) {
   return {};
 }

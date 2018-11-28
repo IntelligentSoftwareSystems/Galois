@@ -366,7 +366,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
         // out since we don't care about dependecy for sources (i.e. distance
         // 0)
         if (!dst_data.dTree.isZeroReached()) {
-          dst_data.roundIndexToSend = 
+          dst_data.roundIndexToSend =
             dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
 
           if (dst_data.dTree.isZeroReached()) {
@@ -433,7 +433,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
               uint32_t sourceDistance = src_data.minDistances[i];
 
-              // source nodes of this batch (i.e. distance 0) can be safely 
+              // source nodes of this batch (i.e. distance 0) can be safely
               // ignored
               if (sourceDistance != 0) {
                 // determine if this source is a predecessor
@@ -675,7 +675,7 @@ int main(int argc, char** argv) {
           //hg->get_run_identifier("NumBackwardRounds", macroRound),
           hg->get_run_identifier("NumBackwardRounds"),
           lastRoundNumber + 1);
-        galois::runtime::reportStat_Tsum(REGION_NAME,
+        galois::runtime::reportStat_Single(REGION_NAME,
           hg->get_run_identifier("TotalRounds"),
           lastRoundNumber + lastRoundNumber + 3);
       }
