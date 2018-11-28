@@ -28,6 +28,10 @@ using Token = std::string;
 class Tokenizer {
   std::vector<char>& delimiters;
   std::vector<char>& separators;
+
+  // should be provided as {"form1_begin", "form1_end", ...}
+  std::vector<std::string>& comments;
+
   char* buffer;
   char* bufferEnd;
   char* cursor;
@@ -40,7 +44,8 @@ private:
   Token getNextToken();
 
 public:
-  Tokenizer(std::vector<char>& d, std::vector<char>& s): delimiters(d), separators(s) {}
+  Tokenizer(std::vector<char>& d, std::vector<char>& s, std::vector<std::string>& cm)
+      : delimiters(d), separators(s), comments(cm) {}
   std::vector<Token> tokenize(std::string inName);
 };
 

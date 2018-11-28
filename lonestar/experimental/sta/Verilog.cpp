@@ -4,18 +4,19 @@ static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
 
 static bool isNameForVdd(std::string name) {
-  return (name == name0 || name == "1\'h0");
+  return (name == name1 || name == "1\'h1");
 }
 
 static bool isNameForGnd(std::string name) {
-  return (name == name1 || name == "1\'h1");
+  return (name == name0 || name == "1\'h0");
 }
 
 void VerilogParser::tokenizeFile(std::string inName) {
   std::vector<char> delimiters = {'(', ')', ',', ';', '\\', '[', ']', '=', '.'};
   std::vector<char> separators = {' ', '\t', '\n', '\r'};
+  std::vector<std::string> comments = {"//", "\n", "/*", "*/"};
 
-  Tokenizer tokenizer(delimiters, separators);
+  Tokenizer tokenizer(delimiters, separators, comments);
   tokens = tokenizer.tokenize(inName);
   curToken = tokens.begin();
 }
@@ -27,7 +28,9 @@ void VerilogParser::parseModule() {
   curToken += 2; // consume name and "("
   
   while (!isEndOfStatement()) {
-    curModule->addPin(getVarName());
+    Token t = getVarName();
+    curModule->addPin(t);
+    curModule->addWire(t); // avoid missing wire for a pin
     curToken += 1; // consume port1 and ","/")"
   }
   curToken += 1; // consume ";"
@@ -108,7 +111,7 @@ void VerilogParser::parseAssign() {
   auto wire = curModule->findWire(getVarName());
   assert(wire);
   curToken += 1; // consume ";"
-  
+
   pin->wire = wire;
   wire->addPin(pin);
 }
@@ -283,6 +286,34 @@ VerilogWire* VerilogModule::findWire(std::string name) {
          isNameForVdd(name) ? name1 : name;
   auto it = wires.find(name);
   return (it == wires.end()) ? nullptr : it->second;
+}
+
+size_t VerilogModule::numPorts() {
+  return inPins.size() + outPins.size();
+}
+
+size_t VerilogModule::numGates() {
+  return gates.size();
+}
+
+size_t VerilogModule::numInternalPins() {
+  size_t numPins = 0;
+  for (auto& i: gates) {
+    auto g = i.second;
+    numPins += g->pins.size();
+  }
+  return numPins;
+}
+
+size_t VerilogModule::numWires() {
+  size_t numW = wires.size();
+  for (auto& i: wires) {
+    auto w = i.second;
+    if (w->pins.size() < 2) {
+      numW -= 1;
+    }
+  }
+  return numW;
 }
 
 void VerilogDesign::clear() {
