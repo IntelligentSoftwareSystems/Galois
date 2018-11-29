@@ -246,6 +246,7 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
       galois::iterate(allNodesWithEdges),
       [&](GNode dst) {
         auto& dnode = graph.getData(dst);
+        auto& dnodeData = dnode.sourceData;
 
         for (auto inEdge : graph.edges(dst)) {
           NodeData& src_data   = graph.getData(graph.getEdgeDst(inEdge));
@@ -255,18 +256,19 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
             uint32_t distValue = src_data.sourceData[indexToSend].minDistance;
             uint32_t newValue  = distValue + 1;
             // Update minDistance vector
-            uint32_t oldValue =
-                galois::min(dnode.sourceData[indexToSend].minDistance, newValue);
+            auto& dnodeIndex = dnodeData[indexToSend];
+            uint32_t oldValue = dnodeIndex.minDistance;
 
             if (oldValue > newValue) {
+              dnodeIndex.minDistance = newValue;
               dnode.dTree.setDistance(indexToSend, oldValue, newValue);
               // overwrite short path with this node's shortest path
-              dnode.sourceData[indexToSend].shortPathCount =
+              dnodeIndex.shortPathCount =
                   src_data.sourceData[indexToSend].shortPathCount;
             } else if (oldValue == newValue) {
               assert(src_data.sourceData[indexToSend].shortPathCount != 0);
               // add to short path
-              dnode.sourceData[indexToSend].shortPathCount +=
+              dnodeIndex.shortPathCount +=
                   src_data.sourceData[indexToSend].shortPathCount;
             }
 
