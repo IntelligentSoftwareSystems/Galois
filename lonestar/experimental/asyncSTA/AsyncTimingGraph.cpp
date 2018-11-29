@@ -13,7 +13,6 @@
 static auto unprotected = galois::MethodFlag::UNPROTECTED;
 static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
-static MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
 
 void AsyncTimingGraph::addPin(VerilogPin* pin) {
   for (size_t j = 0; j < 2; j++) {
@@ -37,7 +36,7 @@ void AsyncTimingGraph::addPin(VerilogPin* pin) {
       data.nType = PRIMARY_INPUT;
     }
 
-    data.t.insert(data.t.begin(), engine->numCorners, NodeTiming());
+    data.t.insert(data.t.begin(), engine->numCorners, NodeAsyncTiming());
     for (size_t k = 0; k < engine->numCorners; k++) {
       data.t[k].pin = nullptr;
     }
@@ -57,7 +56,7 @@ void AsyncTimingGraph::addGate(VerilogGate* gate) {
       data.pin = p;
       data.isRise = (bool)j;
 
-      data.t.insert(data.t.begin(), engine->numCorners, NodeTiming());
+      data.t.insert(data.t.begin(), engine->numCorners, NodeAsyncTiming());
       for (size_t k = 0; k < engine->numCorners; k++) {
         data.t[k].pin = engine->libs[k]->findCell(p->gate->cellType)->findCellPin(p->name);
       }
@@ -80,18 +79,20 @@ void AsyncTimingGraph::addGate(VerilogGate* gate) {
     }
   }
 
-  auto addTimingArc =
-      [&] (GNode i, GNode o, bool isConstraint) {
+  auto addAsyncTimingArc =
+      [&] (GNode i, GNode o, bool isTicked) {
         auto e = g.addMultiEdge(i, o, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.wire = nullptr;
-        eData.isConstraint = isConstraint;
-        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeTiming());
+        eData.isTicked = isTicked;
+        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeAsyncTiming());
         for (size_t k = 0; k < engine->numCorners; k++) {
           eData.t[k].wireLoad = nullptr;
           eData.t[k].delay = 0.0;
         }
       };
+
+  auto arcSet = engine->arcs->findArcSetForModule(&m);
 
   // add timing arcs among gate pins
   for (auto& ov: gate->pins) {
@@ -104,14 +105,9 @@ void AsyncTimingGraph::addGate(VerilogGate* gate) {
         for (size_t j = 0; j < 2; j++) {
           auto in = nodeMap[ivp][j];
           auto ip = g.getData(in, unprotected).t[0].pin;
-          if (op->isEdgeDefined(ip, j, i)) {
-            addTimingArc(in, on, false);
-          }
-          else if (op->isEdgeDefined(ip, j, i, MIN_CONSTRAINT)) {
-            addTimingArc(in, on, true);
-          }
-          else if (op->isEdgeDefined(ip, j, i, MAX_CONSTRAINT)) {
-            addTimingArc(in, on, true);
+          // only connect legal & required timing arcs
+          if (op->isEdgeDefined(ip, j, i) && arcSet->isRequiredArc(ivp, j, ovp, i)) {
+            addAsyncTimingArc(in, on, arcSet->isTickedArc(ivp, j, ovp, i));
           }
         } // end for j
       } // end for i
@@ -134,8 +130,7 @@ void AsyncTimingGraph::addWire(VerilogPin* p) {
         auto e = g.addMultiEdge(src, dst, unprotected);
         auto& eData = g.getEdgeData(e);
         eData.wire = p->wire;
-        eData.isConstraint = false;
-        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeTiming());
+        eData.t.insert(eData.t.begin(), engine->numCorners, EdgeAsyncTiming());
         for (size_t k = 0; k < engine->numCorners; k++) {
           setWireLoad(&(eData.t[k].wireLoad), engine->libs[k]->defaultWireLoad);
           eData.t[k].delay = 0.0;
@@ -204,25 +199,12 @@ void AsyncTimingGraph::initialize() {
         auto& data = g.getData(n, unprotected);
 
         // for timing computation
-        bool isTimingSource =
-            (PRIMARY_INPUT == data.nType) ||
-            (POWER_VDD == data.nType) ||
-            (POWER_GND == data.nType);
         for (size_t k = 0; k < engine->numCorners; k++) {
-          data.t[k].slack = infinity;
           data.t[k].pinC = (GATE_INPUT == data.nType) ? data.t[k].pin->c[data.isRise] : 0.0;
           data.t[k].wireC = 0.0;
-
-          if (MAX_DELAY_MODE == engine->modes[k]) {
-            data.t[k].slew = 0.0;
-            data.t[k].arrival = (isTimingSource) ? 0.0 : -infinity;
-            data.t[k].required = infinity;
-          }
-          else {
-            data.t[k].slew = (isTimingSource) ? 0.0 : infinity;
-            data.t[k].arrival = (isTimingSource) ? 0.0 : infinity;
-            data.t[k].required = -infinity;
-          }
+          data.t[k].slew = 0.0;
+          data.t[k].tmpSlew[0] = 0.0;
+          data.t[k].tmpSlew[1] = 0.0;
         }
       }
       , galois::loopname("Initialization")
@@ -285,7 +267,7 @@ void AsyncTimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc
             data.t[k].slew = slew;
           }
         }
-      } // end else if ieDada.isConstraint
+      } // end else for ieDada.wire
     } // end for k
   } // end for ie
 }
@@ -318,7 +300,6 @@ void AsyncTimingGraph::computeExtremeDelay(GNode n, galois::PerIterAllocTy& allo
         }
 
         ieData.t[k].delay = delay;
-        data.t[k].arrival = predData.t[k].arrival + delay;
       }
       // from a timing arc
       else {
@@ -332,16 +313,10 @@ void AsyncTimingGraph::computeExtremeDelay(GNode n, galois::PerIterAllocTy& allo
         if (MAX_DELAY_MODE == engine->modes[k]) {
           auto delay = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise, alloc).first;
           ieData.t[k].delay = delay;
-          if (data.t[k].arrival < predData.t[k].arrival + delay) {
-            data.t[k].arrival = predData.t[k].arrival + delay;
-          }
         }
         else {
           auto delay = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise, alloc).first;
           ieData.t[k].delay = delay;
-          if (data.t[k].arrival > predData.t[k].arrival + delay) {
-            data.t[k].arrival = predData.t[k].arrival + delay;
-          }
         }
       } // end else for (ieData.wire)
     } // end for k
@@ -410,9 +385,6 @@ void AsyncTimingGraph::print(std::ostream& os) {
     for (size_t k = 0; k < engine->numCorners; k++) {
       os << "    corner " << k;
       os << ": slew = " << data.t[k].slew;
-      os << ", arrival = " << data.t[k].arrival;
-      os << ", required = " << data.t[k].required;
-      os << ", slack = " << data.t[k].slack;
       os << ", pinC = " << data.t[k].pinC;
       os << ", wireC = " << data.t[k].wireC;
       os << std::endl;
@@ -426,8 +398,8 @@ void AsyncTimingGraph::print(std::ostream& os) {
       }
       else {
         os << "    Timing arc";
-        if (eData.isConstraint) {
-          os << " (constraint)";
+        if (eData.isTicked) {
+          os << " (ticked)";
         }
       }
       os << " from " << getNodeName(g.getEdgeDst(ie)) << std::endl;
@@ -447,8 +419,8 @@ void AsyncTimingGraph::print(std::ostream& os) {
       }
       else {
         os << "    Timing arc";
-        if (eData.isConstraint) {
-          os << " (constraint)";
+        if (eData.isTicked) {
+          os << " (ticked)";
         }
       }
       os << " to " << getNodeName(g.getEdgeDst(e)) << std::endl;

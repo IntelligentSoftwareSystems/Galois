@@ -39,16 +39,17 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  // prepare your set of timing arcs here
-//  AsyncTimingArcSet arcSet;
-  
+  auto m = *(design.roots.begin()); // top-level module
+
+  AsyncTimingArcCollection arcs(design);
+  auto arcSet = arcs.findArcSetForModule(m);
+  // add required timing arcs and ticked timing arcs here
 
   AsyncTimingEngine engine;
   engine.useIdealWire(true);
   engine.addCellLib(&lib, MAX_DELAY_MODE);
-  engine.readDesign(&design);
+  engine.readDesign(&design, &arcs);
 
-  auto m = *(design.roots.begin());
   engine.time(m);
   std::cout << "Timed Verilog module " << m->name;
   std::cout << ": " << m->numPorts() << " ports";

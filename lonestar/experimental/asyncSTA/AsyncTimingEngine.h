@@ -17,6 +17,7 @@ struct AsyncTimingEngine {
   std::unordered_map<Corner, size_t, boost::hash<Corner> > cornerMap;
   size_t numCorners;
   VerilogDesign* v;
+  AsyncTimingArcCollection* arcs;
 
   // when true, use idealWireLoad for all wires
   // default to false
@@ -44,7 +45,7 @@ public:
     }
   }
 
-  void readDesign(VerilogDesign* design);
+  void readDesign(VerilogDesign* design, AsyncTimingArcCollection* arcCollection);
   void time(VerilogModule* m);  // timing analysis from scratch
 };
 

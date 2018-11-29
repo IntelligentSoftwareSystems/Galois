@@ -14,7 +14,7 @@
 #include <atomic>
 #include <boost/functional/hash.hpp>
 
-enum TimingNodeType {
+enum AsyncTimingNodeType {
   PRIMARY_INPUT = 0,
   PRIMARY_OUTPUT,
   GATE_INPUT,
@@ -26,35 +26,30 @@ enum TimingNodeType {
   DUMMY_POWER,
 };
 
-struct NodeTiming {
+struct NodeAsyncTiming {
   CellPin* pin;
   MyFloat pinC;
   MyFloat wireC;
-  MyFloat slew;
-  MyFloat arrival;
-  MyFloat required;
-  MyFloat slack;
+  MyFloat slew; // for delay calculation
+  MyFloat tmpSlew[2]; // for propagation
 };
 
 struct Node {
   bool isRise;
-  TimingNodeType nType;
-  size_t topoL;
-  size_t revTopoL;
-  bool flag;
-  std::vector<NodeTiming> t;
+  AsyncTimingNodeType nType;
+  std::vector<NodeAsyncTiming> t;
   VerilogPin* pin;
 };
 
-struct EdgeTiming {
+struct EdgeAsyncTiming {
   WireLoad* wireLoad; // nullptr for timing arcs
   MyFloat delay;
 };
 
 struct Edge {
-  std::vector<EdgeTiming> t;
+  std::vector<EdgeAsyncTiming> t;
   VerilogWire* wire;
-  bool isConstraint;
+  bool isTicked;
 };
 
 struct AsyncTimingEngine;
