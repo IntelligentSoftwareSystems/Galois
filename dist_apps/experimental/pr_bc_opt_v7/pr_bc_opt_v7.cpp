@@ -239,42 +239,46 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @param dga Distributed accumulator for determining if work was done in
  * an iteration across all hosts
  */
+void SendAPSPMessagesOp(GNode dst, Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
+  auto& dnode = graph.getData(dst);
+  auto& dnodeData = dnode.sourceData;
+
+  for (auto inEdge : graph.edges(dst)) {
+    NodeData& src_data   = graph.getData(graph.getEdgeDst(inEdge));
+    uint32_t indexToSend = src_data.roundIndexToSend;
+
+    if (indexToSend != infinity) {
+      uint32_t distValue = src_data.sourceData[indexToSend].minDistance;
+      uint32_t newValue  = distValue + 1;
+      // Update minDistance vector
+      auto& dnodeIndex = dnodeData[indexToSend];
+      uint32_t oldValue = dnodeIndex.minDistance;
+
+      if (oldValue > newValue) {
+        dnodeIndex.minDistance = newValue;
+        dnode.dTree.setDistance(indexToSend, oldValue, newValue);
+        // overwrite short path with this node's shortest path
+        dnodeIndex.shortPathCount =
+            src_data.sourceData[indexToSend].shortPathCount;
+      } else if (oldValue == newValue) {
+        assert(src_data.sourceData[indexToSend].shortPathCount != 0);
+        // add to short path
+        dnodeIndex.shortPathCount +=
+            src_data.sourceData[indexToSend].shortPathCount;
+      }
+
+      dga += 1;
+    }
+  }
+}
+
 void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
 
   galois::do_all(
       galois::iterate(allNodesWithEdges),
       [&](GNode dst) {
-        auto& dnode = graph.getData(dst);
-        auto& dnodeData = dnode.sourceData;
-
-        for (auto inEdge : graph.edges(dst)) {
-          NodeData& src_data   = graph.getData(graph.getEdgeDst(inEdge));
-          uint32_t indexToSend = src_data.roundIndexToSend;
-
-          if (indexToSend != infinity) {
-            uint32_t distValue = src_data.sourceData[indexToSend].minDistance;
-            uint32_t newValue  = distValue + 1;
-            // Update minDistance vector
-            auto& dnodeIndex = dnodeData[indexToSend];
-            uint32_t oldValue = dnodeIndex.minDistance;
-
-            if (oldValue > newValue) {
-              dnodeIndex.minDistance = newValue;
-              dnode.dTree.setDistance(indexToSend, oldValue, newValue);
-              // overwrite short path with this node's shortest path
-              dnodeIndex.shortPathCount =
-                  src_data.sourceData[indexToSend].shortPathCount;
-            } else if (oldValue == newValue) {
-              assert(src_data.sourceData[indexToSend].shortPathCount != 0);
-              // add to short path
-              dnodeIndex.shortPathCount +=
-                  src_data.sourceData[indexToSend].shortPathCount;
-            }
-
-            dga += 1;
-          }
-        }
+        SendAPSPMessagesOp(dst, graph, dga);
       },
       galois::loopname(
           graph.get_run_identifier("SendAPSPMessages").c_str()),
@@ -386,6 +390,40 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @param graph Local graph to operate on
  * @param lastRoundNumber last round number in the APSP phase
  */
+void BackPropOp(GNode dst, Graph& graph) {
+  NodeData& dst_data = graph.getData(dst);
+  unsigned i         = dst_data.roundIndexToSend;
+
+  if (i != infinity) {
+    uint32_t myDistance = dst_data.sourceData[i].minDistance;
+
+    // calculate final dependency value
+    dst_data.sourceData[i].dependencyValue =
+      dst_data.sourceData[i].dependencyValue *
+        dst_data.sourceData[i].shortPathCount;
+
+    // get the value to add to predecessors
+    float toAdd = ((float)1 + dst_data.sourceData[i].dependencyValue) /
+                  dst_data.sourceData[i].shortPathCount;
+
+    for (auto inEdge : graph.edges(dst)) {
+      GNode src      = graph.getEdgeDst(inEdge);
+      auto& src_data = graph.getData(src);
+
+      uint32_t sourceDistance = src_data.sourceData[i].minDistance;
+
+      // source nodes of this batch (i.e. distance 0) can be safely
+      // ignored
+      if (sourceDistance != 0) {
+        // determine if this source is a predecessor
+        if (myDistance == (sourceDistance + 1)) {
+          // add to dependency of predecessor using our finalized one
+          galois::atomicAdd(src_data.sourceData[i].dependencyValue, toAdd);
+        }
+      }
+    }
+  }
+}
 void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   // All nodes WITH EDGES (another at SendMessage)
   const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
@@ -406,38 +444,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
     galois::do_all(
         galois::iterate(allNodesWithEdges),
         [&](GNode dst) {
-          NodeData& dst_data = graph.getData(dst);
-          unsigned i         = dst_data.roundIndexToSend;
-
-          if (i != infinity) {
-            uint32_t myDistance = dst_data.sourceData[i].minDistance;
-
-            // calculate final dependency value
-            dst_data.sourceData[i].dependencyValue =
-              dst_data.sourceData[i].dependencyValue *
-                dst_data.sourceData[i].shortPathCount;
-
-            // get the value to add to predecessors
-            float toAdd = ((float)1 + dst_data.sourceData[i].dependencyValue) /
-                          dst_data.sourceData[i].shortPathCount;
-
-            for (auto inEdge : graph.edges(dst)) {
-              GNode src      = graph.getEdgeDst(inEdge);
-              auto& src_data = graph.getData(src);
-
-              uint32_t sourceDistance = src_data.sourceData[i].minDistance;
-
-              // source nodes of this batch (i.e. distance 0) can be safely
-              // ignored
-              if (sourceDistance != 0) {
-                // determine if this source is a predecessor
-                if (myDistance == (sourceDistance + 1)) {
-                  // add to dependency of predecessor using our finalized one
-                  galois::atomicAdd(src_data.sourceData[i].dependencyValue, toAdd);
-                }
-              }
-            }
-          }
+          BackPropOp(dst, graph);
         },
         galois::loopname(
             graph.get_run_identifier("BackProp").c_str()),
