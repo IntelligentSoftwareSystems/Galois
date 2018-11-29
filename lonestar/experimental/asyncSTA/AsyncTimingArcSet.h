@@ -1,0 +1,6 @@
+#ifndef GALOIS_EDA_ASYNC_TIMING_ARC_SET_H
+#define GALOIS_EDA_ASYNC_TIMING_ARC_SET_H
+
+#include <unordered_set>
+
+#endif // GALOIS_EDA_ASYNC_TIMING_ARC_SET_H
