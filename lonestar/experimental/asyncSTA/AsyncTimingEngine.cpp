@@ -1,21 +1,25 @@
 #include "AsyncTimingEngine.h"
 #include "galois/Timer.h"
 
-void AsyncTimingEngine::readDesign(VerilogDesign* design) {
+void AsyncTimingEngine::readDesign(VerilogDesign* design, AsyncTimingArcCollection* arcCollection) {
   clearAsyncTimingGraphs();
   assert(numCorners); // need cell lib info for AsyncTimingGraphs
   assert(design);
   v = design;
+  arcs = arcCollection;
 
   for (auto i: v->modules) {
     auto m = i.second;
-    if (!m->isHierarchical()) {
+    if (m->isHierarchical()) {
+      std::cout << "Not supported: module " << m->name << " is hierarchical" << std::endl;
+    }
+    else if (arcs->findArcSetForModule(m)) {
       AsyncTimingGraph* g = new AsyncTimingGraph(*m, this);
       modules[m] = g;
       g->construct();
     }
     else {
-      std::cout << "Not supported: module " << m->name << " is hierarchical" << std::endl;
+      std::cout << "No timing arc set exist for module " << m->name << std::endl;
     }
   }
 }
