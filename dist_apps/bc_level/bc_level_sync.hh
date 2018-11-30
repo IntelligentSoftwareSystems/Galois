@@ -74,7 +74,7 @@ struct Reduce_add_dependency {
 
   static ValTy extract(uint32_t node_id, struct NodeData& node) {
     // only send in round before use; else send 0
-    if (node.current_length == backRoundCount - 1) {
+    if (node.current_length == backRoundCount) {
       return node.dependency;
     } else {
       return (ValTy)0;
