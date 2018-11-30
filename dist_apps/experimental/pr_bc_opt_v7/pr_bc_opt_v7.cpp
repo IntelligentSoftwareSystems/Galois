@@ -42,9 +42,6 @@ struct BCData {
   galois::CopyableAtomic<float> dependencyValue;
 };
 
-// typedef for separate BC value container
-using BCArray = galois::LargeArray<float>;
-
 /******************************************************************************/
 /* Declaration of command line arguments */
 /******************************************************************************/
@@ -86,14 +83,14 @@ static cll::opt<unsigned int> vectorSize("vectorSize",
 /* Graph structure declarations */
 /******************************************************************************/
 
-BCArray bcValues;
-
 // NOTE: declared types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
   galois::gstl::Vector<BCData> sourceData;
   // distance map
   PRBCTree dTree;
+  // final bc value
+  float bc;
   // index that needs to be pulled in a round
   uint32_t roundIndexToSend;
 };
@@ -120,15 +117,13 @@ galois::DynamicBitSet<> bitset_dependency;
  */
 void InitializeGraph(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
-  // allocate array for BC values
-  bcValues.allocateInterleaved(graph.globalSize());
 
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
         NodeData& cur_data = graph.getData(curNode);
         cur_data.sourceData.resize(vectorSize);
-        bcValues[curNode] = 0.0;
+        cur_data.bc = 0.0;
       },
       galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()),
       galois::no_stats()); // Only stats the runtime by loopname
@@ -474,7 +469,7 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
         for (unsigned i = 0; i < numSourcesPerRound; i++) {
           // exclude sources themselves from BC calculation
           if (graph.getGID(node) != nodesToConsider[i]) {
-            bcValues[node] += cur_data.sourceData[i].dependencyValue;
+            cur_data.bc += cur_data.sourceData[i].dependencyValue;
           }
         }
       },
@@ -498,9 +493,11 @@ void Sanity(Graph& graph) {
   galois::do_all(galois::iterate(graph.masterNodesRange().begin(),
                                  graph.masterNodesRange().end()),
                  [&](auto src) {
-                   DGA_max.update(bcValues[src]);
-                   DGA_min.update(bcValues[src]);
-                   DGA_sum += bcValues[src];
+                   NodeData& sdata = graph.getData(src);
+
+                   DGA_max.update(sdata.bc);
+                   DGA_min.update(sdata.bc);
+                   DGA_sum += sdata.bc;
                  },
                  galois::no_stats(), galois::loopname("Sanity"));
 
@@ -768,7 +765,7 @@ int main(int argc, char** argv) {
          ii != (*hg).masterNodesRange().end(); ++ii) {
       if (!outputDistPaths) {
         // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), bcValues[*ii]);
+        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
       } else {
         uint64_t a      = 0;
         ShortPathType b = 0;
