@@ -68,6 +68,8 @@ static cll::opt<unsigned int>
 /******************************************************************************/
 const uint32_t infinity          = std::numeric_limits<uint32_t>::max() / 4;
 static uint64_t current_src_node = 0;
+uint32_t globalRoundNumber = 0;
+uint32_t backRoundCount = 0;
 
 // NOTE: types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
@@ -193,9 +195,8 @@ struct ForwardPass {
    * @param _dga distributed accumulator
    * @param[out] roundNumber Number of rounds taken to finish
    */
-  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& _dga, 
-                 uint32_t& roundNumber) {
-    roundNumber = 0;
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& _dga) {
+    globalRoundNumber = 0;
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     bool moreThanOne = galois::runtime::getSystemNetworkInterface().Num > 1;
@@ -205,7 +206,7 @@ struct ForwardPass {
 
       galois::do_all(
         galois::iterate(nodesWithEdges),
-        ForwardPass(&_graph, _dga, roundNumber),
+        ForwardPass(&_graph, _dga, globalRoundNumber),
         galois::loopname(_graph.get_run_identifier("ForwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
@@ -223,7 +224,7 @@ struct ForwardPass {
                     Bitset_num_shortest_paths>("ForwardPass");
       }
 
-      roundNumber++;
+      globalRoundNumber++;
     } while (_dga.reduce(_graph.get_run_identifier()));
   }
 
@@ -317,10 +318,12 @@ struct BackwardPass {
     const auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
     bool moreThanOne = galois::runtime::getSystemNetworkInterface().Num > 1;
 
-    for (uint32_t i = roundNumber - 1; i > 0; i--) {
+    backRoundCount = roundNumber - 1;
+
+    for (; backRoundCount > 0; backRoundCount--) {
       galois::do_all(
         galois::iterate(nodesWithEdges),
-        BackwardPass(&_graph, i),
+        BackwardPass(&_graph, backRoundCount),
         galois::loopname(_graph.get_run_identifier("BackwardPass").c_str()),
         galois::steal(),
         galois::no_stats()
@@ -364,19 +367,18 @@ struct BC {
 
   BC(Graph* _graph) : graph(_graph) {}
 
-  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga,
-                 uint32_t& roundNum) {
-    roundNum = 0;
+  void static go(Graph& _graph, galois::DGAccumulator<uint32_t>& dga) {
+    globalRoundNumber = 0;
     // reset the graph aside from the between-cent measure
     InitializeIteration::go(_graph);
     // get distances and num paths
-    ForwardPass::go(_graph, dga, roundNum);
+    ForwardPass::go(_graph, dga);
 
     // dependency calc only matters if there's a node with distance at
     // least 2
-    if (roundNum > 2) {
+    if (globalRoundNumber > 2) {
       MiddleSync::go(_graph, infinity);
-      BackwardPass::go(_graph, roundNum - 1);
+      BackwardPass::go(_graph, globalRoundNumber - 1);
 
       const auto& masters = _graph.masterNodesRange();
       // finally, since dependencies are finalized for this round at this
@@ -546,28 +548,29 @@ int main(int argc, char** argv) {
         current_src_node = i;
       }
 
-      uint32_t roundNum = 0;
+      globalRoundNumber = 0;
+      backRoundCount = 0;
 
       StatTimer_main.start();
-      BC::go(*h_graph, dga, roundNum);
+      BC::go(*h_graph, dga);
       StatTimer_main.stop();
 
       // Round reporting
       if (galois::runtime::getSystemNetworkInterface().ID == 0) {
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumRounds", i), roundNum);
+          h_graph->get_run_identifier("NumRounds", i), globalRoundNumber);
         uint32_t backRounds;
-        if (roundNum > 2) {
-          backRounds = roundNum - 2;
+        if (globalRoundNumber > 2) {
+          backRounds = globalRoundNumber - 2;
         } else {
           backRounds = 0;
         }
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumForwardRounds", i), roundNum);
+          h_graph->get_run_identifier("NumForwardRounds", i), globalRoundNumber);
         galois::runtime::reportStat_Single(REGION_NAME,
           h_graph->get_run_identifier("NumBackRounds", i), backRounds);
         galois::runtime::reportStat_Single(REGION_NAME,
-          std::string("TotalRounds_") + std::to_string(run), roundNum + backRounds);
+          std::string("TotalRounds_") + std::to_string(run), globalRoundNumber + backRounds);
       }
     }
 
