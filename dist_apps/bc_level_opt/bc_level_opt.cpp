@@ -68,6 +68,7 @@ static cll::opt<unsigned int>
 /******************************************************************************/
 const uint32_t infinity          = std::numeric_limits<uint32_t>::max() / 4;
 static uint64_t current_src_node = 0;
+// global round numbers; 1 for forward, 1 for back; used in sync structs as well
 uint32_t globalRoundNumber = 0;
 uint32_t backRoundCount = 0;
 
@@ -471,12 +472,6 @@ int main(int argc, char** argv) {
   galois::DistMemSys G;
   DistBenchStart(argc, argv, name, desc, url);
 
-  // Set up metadata mode to neverOnlyData (this is required for correctness
-  // of distributed execution of this implementation)
-  if (enforce_metadata != neverOnlyData) {
-    enforce_metadata = neverOnlyData;
-  }
-
   auto& net = galois::runtime::getSystemNetworkInterface();
 
   galois::StatTimer StatTimer_total("TimerTotal", REGION_NAME);
@@ -566,11 +561,13 @@ int main(int argc, char** argv) {
           backRounds = 0;
         }
         galois::runtime::reportStat_Single(REGION_NAME,
-          h_graph->get_run_identifier("NumForwardRounds", i), globalRoundNumber);
+          h_graph->get_run_identifier("NumForwardRounds", i),
+          globalRoundNumber);
         galois::runtime::reportStat_Single(REGION_NAME,
           h_graph->get_run_identifier("NumBackRounds", i), backRounds);
         galois::runtime::reportStat_Single(REGION_NAME,
-          std::string("TotalRounds_") + std::to_string(run), globalRoundNumber + backRounds);
+          std::string("TotalRounds_") + std::to_string(run),
+          globalRoundNumber + backRounds);
       }
     }
 
