@@ -182,6 +182,7 @@ void AsyncTimingGraph::construct() {
   }
 //  outDegHistogram();
 //  inDegHistogram();
+  print();
 }
 
 size_t AsyncTimingGraph::outDegree(GNode n) {
