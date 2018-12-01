@@ -17,6 +17,8 @@ static cll::opt<std::string>
     libName("lib", cll::desc("path to .lib (Liberty file)"), cll::Required);
 static cll::opt<std::string>
     verilogName(cll::Positional, cll::desc("path to .v (Verilog file)"), cll::Required);
+static cll::opt<std::string>
+    arcName("arc", cll::desc("path to the file of timing arcs"), cll::Required);
 
 int main(int argc, char *argv[]) {
   galois::SharedMemSys G;
@@ -25,7 +27,7 @@ int main(int argc, char *argv[]) {
   CellLib lib;
   lib.parse(libName);
 //  lib.print();
-  std::cout << "Parsed cell library " << name << std::endl;
+  std::cout << "Parsed cell library " << libName << std::endl;
 
   VerilogDesign design;
   design.parse(verilogName);
@@ -39,17 +41,17 @@ int main(int argc, char *argv[]) {
     return 0;
   }
 
-  auto m = *(design.roots.begin()); // top-level module
-
-  AsyncTimingArcCollection arcs(design);
-  auto arcSet = arcs.findArcSetForModule(m);
-  // add required timing arcs and ticked timing arcs here
+  AsyncTimingArcCollection arcs(design, lib);
+  arcs.parse(arcName);
+  arcs.print();
+  std::cout << "Parsed timing arcs in " << arcName << std::endl;
 
   AsyncTimingEngine engine;
   engine.useIdealWire(true);
   engine.addCellLib(&lib, MAX_DELAY_MODE);
   engine.readDesign(&design, &arcs);
 
+  auto m = *(design.roots.begin()); // top-level module
   engine.time(m);
   std::cout << "Timed Verilog module " << m->name;
   std::cout << ": " << m->numPorts() << " ports";

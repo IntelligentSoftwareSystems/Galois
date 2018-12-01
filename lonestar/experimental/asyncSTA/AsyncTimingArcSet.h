@@ -2,7 +2,10 @@
 #define GALOIS_EDA_ASYNC_TIMING_ARC_SET_H
 
 #include "Verilog.h"
+#include "CellLib.h"
 
+#include <string>
+#include <iostream>
 #include <unordered_set>
 #include <unordered_map>
 #include <boost/functional/hash.hpp>
@@ -15,6 +18,8 @@ struct AsyncTimingArcSet {
   std::unordered_set<AsyncTimingArc, boost::hash<AsyncTimingArc>> tickedArcs;
 
 public:
+  void print(std::ostream& os = std::cout);
+
   void addRequiredArc(VerilogPin* in, bool inRise, VerilogPin* out, bool outRise) {
     auto inNode = std::make_pair(in, inRise);
     auto outNode = std::make_pair(out, outRise);
@@ -46,6 +51,7 @@ public:
 
 struct AsyncTimingArcCollection {
   VerilogDesign& v;
+  CellLib& lib;
   std::unordered_map<VerilogModule*, AsyncTimingArcSet*> modules;
 
 private:
@@ -53,13 +59,30 @@ private:
   void clear();
 
 public:
-  AsyncTimingArcCollection(VerilogDesign& design): v(design) { setup(); }
+  AsyncTimingArcCollection(VerilogDesign& design, CellLib& lib): v(design), lib(lib) { setup(); }
   ~AsyncTimingArcCollection() { clear(); }
+  void parse(std::string inName);
+  void print(std::ostream& os = std::cout);
 
   AsyncTimingArcSet* findArcSetForModule(VerilogModule* m) {
     auto it = modules.find(m);
     return (it == modules.end()) ? nullptr : it->second;
   }
+};
+
+struct AsyncTimingArcParser {
+  std::vector<Token> tokens;
+  std::vector<Token>::iterator curToken;
+  AsyncTimingArcCollection& c;
+
+private:
+  void tokenizeFile(std::string inName);
+  bool isEndOfTokenStream() { return curToken == tokens.end(); }
+  void parseTimingArc(VerilogModule* m);
+
+public:
+  AsyncTimingArcParser(AsyncTimingArcCollection& c): c(c) {}
+  void parse(std::string inName);
 };
 
 #endif // GALOIS_EDA_ASYNC_TIMING_ARC_SET_H
