@@ -181,10 +181,22 @@ void VerilogPin::print(std::ostream& os) {
 }
 
 void VerilogWire::print(std::ostream& os) {
+#if 1
   // do not print wires for constants
   if (!isNameForGnd(name) && !isNameForVdd(name)) {
     os << "  wire " << name << ";" << std::endl;
   }
+#else
+  // debug printing
+  os << "  wire " << name << ";" << std::endl;
+  for (auto& p: pins) {
+    os << "    ";
+    if (p->gate) {
+      os << p->gate->name << ".";
+    }
+    os << p->name << std::endl;
+  }
+#endif
 }
 
 void VerilogGate::print(std::ostream& os) {
