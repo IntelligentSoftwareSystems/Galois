@@ -1036,11 +1036,10 @@ void CellLibParser::parseInternalPower(PowerTable* pTable) {
 
 Token CellLibParser::getBooleanExpression() {
   // "..."
+  auto prevToken = curToken;
   curToken += 1; // consume "\""
 
-  Token t = *curToken;
-  auto prevToken = curToken;
-  curToken += 1;
+  Token t;
   for ( ; !isEndOfTokenStream(); prevToken = curToken, curToken += 1) {
     if ("\'" == *curToken || ")" == *curToken) {
       t += *curToken;
