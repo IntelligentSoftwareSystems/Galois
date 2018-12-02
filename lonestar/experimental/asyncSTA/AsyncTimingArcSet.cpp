@@ -1,5 +1,7 @@
 #include "AsyncTimingArcSet.h"
 
+#include <cassert>
+
 void AsyncTimingArcSet::print(std::ostream& os) {
   for (auto& i: requiredArcs) {
     auto ip = i.first.first;
@@ -83,6 +85,7 @@ void AsyncTimingArcParser::parseTimingArc(VerilogModule* m) {
       }
     }
   }
+  assert(op);
 
   // add arcs to op from p in wire_1, p & op in the same gate
   auto arcSet = c.findArcSetForModule(m);
