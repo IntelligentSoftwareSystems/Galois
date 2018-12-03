@@ -29,7 +29,6 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
  * easier.
  */
 class PRBCTree {
-
   using BitSet = PRBCBitSet;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
@@ -45,7 +44,7 @@ class PRBCTree {
   bool zeroReached;
 
   //! reverse iterator over map
-  using TreeIter = typename FlatMap::iterator;
+  using TreeIter = typename FlatMap::reverse_iterator;
   //! Current iterator for reverse map
   TreeIter curKey;
   //! End key for reverse map iterator
@@ -66,9 +65,6 @@ public:
     numNonInfinity = 0;
     // reset the flag for backward phase
     zeroReached = false;
-
-    curKey = distanceTree.begin();
-    endCurKey = distanceTree.end();
   }
 
   /**
@@ -77,18 +73,10 @@ public:
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
     // Only for iterstion initialization
-    assert(newDistance == 0);
-
+    // assert(newDistance == 0);
+    // assert(distanceTree[newDistance].size() == numSourcesPerRound);
     distanceTree[newDistance].set_indicator(index);
     numNonInfinity++;
-
-    // reset iterator
-    if (endCurKey != distanceTree.end()) {
-      galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
-      curKey = distanceTree.begin();
-      endCurKey = distanceTree.end();
-      assert(curKey + 1 == endCurKey);
-    }
   }
 
 /*** FindMessageToSync ********************************************************/
@@ -100,21 +88,12 @@ public:
     uint32_t distanceToCheck = roundNumber - numSentSources;
     uint32_t indexToSend = infinity;
 
-    if (curKey == endCurKey) {
-      return indexToSend;
-    }
-
-    if (curKey->first != distanceToCheck
-          && (curKey + 1) != endCurKey
-          && (curKey + 1)->first == distanceToCheck) {
-      ++curKey;
-    }
-
-    // if (curKey != endCurKey && curKey->first == distanceToCheck) {
-    if (curKey->first == distanceToCheck) {
-      BitSet& setToCheck = curKey->second;
-      if (!setToCheck.nposInd()) {
-        indexToSend = setToCheck.getIndicator();
+    auto setIter = distanceTree.find(distanceToCheck);
+    if (setIter != distanceTree.end()) {
+      BitSet& setToCheck = setIter->second;
+      auto index = setToCheck.getIndicator();
+      if (index != setToCheck.npos) {
+        indexToSend = index;
       }
     }
     return indexToSend;
@@ -127,26 +106,13 @@ public:
 
 /*** ConfirmMessageToSend *****************************************************/
 
-  // void validateIterator() {
-  //   // reset iterator
-  //   if (endCurKey != distanceTree.end()) {
-  //     galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
-  //     curKey += distanceTree.end() - endCurKey;
-  //     endCurKey = distanceTree.end();
-  //   }
-  // }
-
   /**
    * Note that a particular source's message has already been sent in the data
    * structure and increment the number of sent sources.
    */
   void markSent(uint32_t roundNumber) {
-    if (curKey->first < roundNumber - numSentSources) {
-      assert((curKey->second).nposInd());
-      ++curKey;
-      assert(curKey != endCurKey && curKey->first == roundNumber - numSentSources);
-    }
-    BitSet& setToCheck = curKey->second;
+    uint32_t distanceToCheck = roundNumber - numSentSources;
+    BitSet& setToCheck = distanceTree[distanceToCheck];
     setToCheck.forward_indicator();
 
     numSentSources++;
@@ -159,8 +125,6 @@ public:
    * distance, remove the old distance and replace with new distance.
    */
   void setDistance(uint32_t index, uint32_t oldDistance, uint32_t newDistance) {
-    assert(endCurKey == distanceTree.end());
-
     if (oldDistance == newDistance) {
       return;
     }
@@ -181,12 +145,6 @@ public:
     // asset(distanceTree[newDistance].size() == numSourcesPerRound);
     distanceTree[newDistance].set_indicator(index);
 
-    // reset iterator
-    if (endCurKey != distanceTree.end()) {
-      galois::gDebug(endCurKey.get_ptr(), " -> ", distanceTree.end().get_ptr());
-      curKey += distanceTree.end() - endCurKey - 1;
-      endCurKey = distanceTree.end();
-    }
   }
 
 /*** RoundUpdate **************************************************************/
@@ -196,10 +154,8 @@ public:
    * iterators.
    */
   void prepForBackPhase() {
-    curKey = distanceTree.end();
-    endCurKey = distanceTree.begin();
-    --curKey;
-    --endCurKey;
+    curKey = distanceTree.rbegin();
+    endCurKey = distanceTree.rend();
 
     if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
@@ -208,7 +164,6 @@ public:
       #endif
       curSet.backward_indicator();
     }
-
   }
 
 /*** BackFindMessageToSend *****************************************************/
@@ -241,7 +196,7 @@ public:
           break;
       } else {
         // set exhausted; go onto next set
-        for (--curKey; curKey != endCurKey && curKey->second.none(); --curKey);
+        for (++curKey; curKey != endCurKey && curKey->second.none(); ++curKey);
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {

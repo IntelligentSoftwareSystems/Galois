@@ -220,7 +220,7 @@ public:
     globalOffset = nodeBegin;
     _numEdges    = edgeEnd - edgeBegin;
 
-    galois::DynamicBitSet<> ghosts;
+    galois::DynamicBitSet ghosts;
     ghosts.resize(g.size());
 
     galois::StatTimer timer("EdgeInspection", GRNAME);

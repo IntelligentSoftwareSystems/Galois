@@ -41,12 +41,9 @@ namespace galois {
 /**
  * Concurrent dynamically allocated bitset
  **/
-template <typename _Tp=galois::CopyableAtomic<uint64_t>, 
-          typename _Alloc=std::allocator<_Tp>, 
-          typename _VecTp=galois::PODResizeableArray<_Tp, _Alloc>>
 class DynamicBitSet {
 protected:
-  _VecTp bitvec;
+  galois::PODResizeableArray<galois::CopyableAtomic<uint64_t>> bitvec;
   size_t num_bits;
   static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
 
@@ -327,7 +324,7 @@ public:
 };
 
 //! An empty bitset object; used mainly by InvalidBitsetFnTy
-static galois::DynamicBitSet<> EmptyBitset;
+static galois::DynamicBitSet EmptyBitset;
 
 //! A structure representing an empty bitset.
 struct InvalidBitsetFnTy {
@@ -338,7 +335,7 @@ struct InvalidBitsetFnTy {
   static constexpr bool is_valid() { return false; }
 
   //! Returns the empty bitset
-  static galois::DynamicBitSet<>& get() { return EmptyBitset; }
+  static galois::DynamicBitSet& get() { return EmptyBitset; }
 
   //! No-op since it's an empty bitset
   static void reset_range(size_t begin, size_t end) {}

@@ -656,7 +656,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
  * @param [in] data dynamic bitset to serialize
  */
 inline void gSerializeObj(SerializeBuffer& buf,
-                          const galois::DynamicBitSet<>& data) {
+                          const galois::DynamicBitSet& data) {
   gSerializeObj(buf, data.size());
   gSerializeObj(buf, data.get_vec());
 }
@@ -979,7 +979,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, galois::gdeque<T, CS>& data) {
  * @param data [in,out] bitset to deserialize into
  */
 inline void gDeserializeObj(DeSerializeBuffer& buf,
-                            galois::DynamicBitSet<>& data) {
+                            galois::DynamicBitSet& data) {
   size_t size = 0;
   gDeserializeObj(buf, size);
   data.resize(size);

@@ -20,13 +20,17 @@
 constexpr static const char* const REGION_NAME = "MRBC";
 
 //#define ENABLE_PAGE_REPORT
-//#define USE_PREALLOC
-//Go to line:230 to configure preAlloc
+//#define USE_PREALLOC //Go to main() to configure preAlloc
+#define USE_VTUNE
 
 #include "galois/DistGalois.h"
 #include "galois/DReducible.h"
 #include "galois/runtime/Tracer.h"
 #include "DistBenchStart.h"
+
+#ifdef USE_VTUNE
+#include "galois/runtime/Profile.h"
+#endif
 
 #include <iostream>
 
@@ -41,6 +45,9 @@ struct BCData {
   ShortPathType shortPathCount;
   galois::CopyableAtomic<float> dependencyValue;
 };
+
+// typedef for separate BC value container
+using BCArray = galois::LargeArray<float>;
 
 /******************************************************************************/
 /* Declaration of command line arguments */
@@ -83,14 +90,14 @@ static cll::opt<unsigned int> vectorSize("vectorSize",
 /* Graph structure declarations */
 /******************************************************************************/
 
+BCArray bcValues;
+
 // NOTE: declared types assume that these values will not reach uint64_t: it may
 // need to be changed for very large graphs
 struct NodeData {
   galois::gstl::Vector<BCData> sourceData;
   // distance map
   PRBCTree dTree;
-  // final bc value
-  float bc;
   // index that needs to be pulled in a round
   uint32_t roundIndexToSend;
 };
@@ -100,8 +107,8 @@ using GNode = typename Graph::GraphNode;
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a
 // particular field
-galois::DynamicBitSet<> bitset_minDistances;
-galois::DynamicBitSet<> bitset_dependency;
+galois::DynamicBitSet bitset_minDistances;
+galois::DynamicBitSet bitset_dependency;
 
 // moved here for access to ShortPathType, NodeData, DynamicBitSets
 #include "pr_bc_opt_sync.hh"
@@ -115,15 +122,20 @@ galois::DynamicBitSet<> bitset_dependency;
  *
  * @param graph Local graph to operate on
  */
+inline void InitializeGraphOp(GNode curNode, Graph& graph) {
+  NodeData& cur_data = graph.getData(curNode);
+  cur_data.sourceData.resize(vectorSize);
+  bcValues[curNode] = 0.0;
+}
 void InitializeGraph(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
+  // allocate array for BC values
+  bcValues.allocateInterleaved(graph.globalSize());
 
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
-        NodeData& cur_data = graph.getData(curNode);
-        cur_data.sourceData.resize(vectorSize);
-        cur_data.bc = 0.0;
+        InitializeGraphOp(curNode, graph);
       },
       galois::loopname(graph.get_run_identifier("InitializeGraph").c_str()),
       galois::no_stats()); // Only stats the runtime by loopname
@@ -136,29 +148,34 @@ void InitializeGraph(Graph& graph) {
  * @param graph Local graph to operate on
  * @param offset Offset into sources (i.e. number of sources already done)
  **/
+inline void InitializeIterationOp(GNode curNode, Graph& graph,
+                         const std::vector<uint64_t>& nodesToConsider) {
+  NodeData& cur_data = graph.getData(curNode);
+  cur_data.roundIndexToSend = infinity;
+  cur_data.dTree.initialize();
+  for (unsigned i = 0; i < numSourcesPerRound; i++) {
+    // min distance and short path count setup
+    if (nodesToConsider[i] == graph.getGID(curNode)) { // source node
+      cur_data.sourceData[i].minDistance = 0;
+      cur_data.sourceData[i].shortPathCount = 1;
+      cur_data.sourceData[i].dependencyValue = 0.0;
+      cur_data.dTree.setDistance(i, 0);
+    } else { // non-source node
+      cur_data.sourceData[i].minDistance = infinity;
+      cur_data.sourceData[i].shortPathCount = 0;
+      cur_data.sourceData[i].dependencyValue = 0.0;
+    }
+  }
+}
 void InitializeIteration(Graph& graph,
                          const std::vector<uint64_t>& nodesToConsider) {
   const auto& allNodes = graph.allNodesRange();
 
+
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
-        NodeData& cur_data = graph.getData(curNode);
-        cur_data.roundIndexToSend = infinity;
-        cur_data.dTree.initialize();
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          // min distance and short path count setup
-          if (nodesToConsider[i] == graph.getGID(curNode)) { // source node
-            cur_data.sourceData[i].minDistance = 0;
-            cur_data.sourceData[i].shortPathCount = 1;
-            cur_data.sourceData[i].dependencyValue = 0.0;
-            cur_data.dTree.setDistance(i, 0);
-          } else { // non-source node
-            cur_data.sourceData[i].minDistance = infinity;
-            cur_data.sourceData[i].shortPathCount = 0;
-            cur_data.sourceData[i].dependencyValue = 0.0;
-          }
-        }
+        InitializeIterationOp(curNode, graph, nodesToConsider);
       },
       galois::loopname(graph.get_run_identifier("InitializeIteration").c_str()),
       galois::no_stats());
@@ -173,29 +190,41 @@ void InitializeIteration(Graph& graph,
  * @param dga Distributed accumulator for determining if work was done in
  * an iteration across all hosts
  */
+inline void FindMessageToSyncOp(GNode curNode, Graph& graph, const uint32_t roundNumber,
+                       galois::DGAccumulator<uint32_t>& dga) {
+  NodeData& cur_data = graph.getData(curNode);
+  cur_data.roundIndexToSend = cur_data.dTree.getIndexToSend(roundNumber);
+
+  if (cur_data.roundIndexToSend != infinity) {
+    if (cur_data.sourceData[cur_data.roundIndexToSend].minDistance != 0) {
+      bitset_minDistances.set(curNode);
+    }
+    dga += 1;
+  } else if (cur_data.dTree.moreWork()) {
+    dga += 1;
+  }
+}
 void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
                        galois::DGAccumulator<uint32_t>& dga) {
   const auto& allNodes = graph.allNodesRange();
 
+  // #ifdef USE_VTUNE
+  // galois::runtime::profileVtune(
+  //  [&](){
+  // #endif
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
-        NodeData& cur_data = graph.getData(curNode);
-        cur_data.roundIndexToSend = cur_data.dTree.getIndexToSend(roundNumber);
-
-        if (cur_data.roundIndexToSend != infinity) {
-          if (cur_data.sourceData[cur_data.roundIndexToSend].minDistance != 0) {
-            bitset_minDistances.set(curNode);
-          }
-          dga += 1;
-        } else if (cur_data.dTree.moreWork()) {
-          dga += 1;
-        }
+        FindMessageToSyncOp(curNode, graph, roundNumber, dga);
       },
       galois::loopname(
           graph.get_run_identifier("FindMessageToSync").c_str()),
       galois::steal(),
       galois::no_stats());
+  // #ifdef USE_VTUNE
+  // },
+  // "FindMessageToSync");
+  // #endif
 }
 
 /**
@@ -206,21 +235,33 @@ void FindMessageToSync(Graph& graph, const uint32_t roundNumber,
  * @param dga Distributed accumulator for determining if work was done in
  * an iteration across all hosts
  */
+inline void ConfirmMessageToSendOp(GNode curNode, Graph& graph, const uint32_t roundNumber,
+                          galois::DGAccumulator<uint32_t>& dga) {
+  NodeData& cur_data = graph.getData(curNode);
+  if (cur_data.roundIndexToSend != infinity) {
+    cur_data.dTree.markSent(roundNumber);
+  }
+}
 void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
                           galois::DGAccumulator<uint32_t>& dga) {
   const auto& allNodes = graph.allNodesRange();
 
+  // #ifdef USE_VTUNE
+  // galois::runtime::profileVtune(
+  //  [&](){
+  // #endif
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode curNode) {
-        NodeData& cur_data = graph.getData(curNode);
-        if (cur_data.roundIndexToSend != infinity) {
-          cur_data.dTree.markSent(roundNumber);
-        }
+        ConfirmMessageToSendOp(curNode, graph, roundNumber, dga);
       },
       galois::loopname(
           graph.get_run_identifier("ConfirmMessageToSend").c_str()),
       galois::no_stats());
+ //  #ifdef USE_VTUNE
+  // },
+  // "ConfirmMessageToSend");
+  // #endif
 }
 
 /**
@@ -234,7 +275,7 @@ void ConfirmMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @param dga Distributed accumulator for determining if work was done in
  * an iteration across all hosts
  */
-void SendAPSPMessagesOp(GNode dst, Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
+inline void SendAPSPMessagesOp(GNode dst, Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   auto& dnode = graph.getData(dst);
   auto& dnodeData = dnode.sourceData;
 
@@ -270,6 +311,10 @@ void SendAPSPMessagesOp(GNode dst, Graph& graph, galois::DGAccumulator<uint32_t>
 void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
   const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
 
+  // #ifdef USE_VTUNE
+  // galois::runtime::profileVtune(
+  //   [&](){
+  // #endif
   galois::do_all(
       galois::iterate(allNodesWithEdges),
       [&](GNode dst) {
@@ -279,6 +324,10 @@ void SendAPSPMessages(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
           graph.get_run_identifier("SendAPSPMessages").c_str()),
       galois::steal(),
       galois::no_stats());
+  // #ifdef USE_VTUNE
+  // },
+  // "VTune_SendAPSPMessages");
+  // #endif
 }
 
 /**
@@ -327,6 +376,10 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
  *
  * @param graph Local graph to operate on
  */
+inline void RoundUpdateOp(GNode node, Graph& graph) {
+  NodeData& cur_data = graph.getData(node);
+  cur_data.dTree.prepForBackPhase();
+}
 void RoundUpdate(Graph& graph) {
   const auto& allNodes = graph.allNodesRange();
   graph.set_num_round(0);
@@ -334,8 +387,7 @@ void RoundUpdate(Graph& graph) {
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode node) {
-        NodeData& cur_data = graph.getData(node);
-        cur_data.dTree.prepForBackPhase();
+        RoundUpdateOp(node, graph);
       },
       galois::loopname(
           graph.get_run_identifier("RoundUpdate").c_str()),
@@ -346,36 +398,48 @@ void RoundUpdate(Graph& graph) {
  * Find the message that needs to be back propagated this round by checking
  * round number.
  */
+inline void BackFindMessageToSendOp(GNode dst, Graph& graph, const uint32_t roundNumber,
+                           const uint32_t lastRoundNumber) {
+  NodeData& dst_data = graph.getData(dst);
+
+  // if zero distances already reached, there is no point sending things
+  // out since we don't care about dependecy for sources (i.e. distance
+  // 0)
+  if (!dst_data.dTree.isZeroReached()) {
+    dst_data.roundIndexToSend =
+      dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
+
+    if (dst_data.roundIndexToSend != infinity) {
+      // only comm if not redundant 0
+      if (dst_data.sourceData[dst_data.roundIndexToSend].dependencyValue != 0) {
+        bitset_dependency.set(dst);
+      }
+    }
+  }
+}
 void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
                            const uint32_t lastRoundNumber) {
   // has to be all nodes because even nodes without edges may have dependency
   // that needs to be sync'd
   const auto& allNodes = graph.allNodesRange();
 
+  // #ifdef USE_VTUNE
+  // galois::runtime::profileVtune(
+  //   [&](){
+  // #endif
   galois::do_all(
       galois::iterate(allNodes.begin(), allNodes.end()),
       [&](GNode dst) {
-        NodeData& dst_data        = graph.getData(dst);
-
-        // if zero distances already reached, there is no point sending things
-        // out since we don't care about dependecy for sources (i.e. distance
-        // 0)
-        if (!dst_data.dTree.isZeroReached()) {
-          dst_data.roundIndexToSend =
-            dst_data.dTree.backGetIndexToSend(roundNumber, lastRoundNumber);
-
-          if (dst_data.roundIndexToSend != infinity) {
-            // only comm if not redundant 0
-            if (dst_data.sourceData[dst_data.roundIndexToSend].dependencyValue != 0) {
-              bitset_dependency.set(dst);
-            }
-          }
-        }
+        BackFindMessageToSendOp(dst, graph, roundNumber, lastRoundNumber);
       },
       galois::loopname(
         graph.get_run_identifier("BackFindMessageToSend").c_str()
       ),
       galois::no_stats());
+  // #ifdef USE_VTUNE
+  // },
+  // "VTune_BackFindMessageToSend");
+  // #endif
 }
 
 /**
@@ -385,7 +449,7 @@ void BackFindMessageToSend(Graph& graph, const uint32_t roundNumber,
  * @param graph Local graph to operate on
  * @param lastRoundNumber last round number in the APSP phase
  */
-void BackPropOp(GNode dst, Graph& graph) {
+inline void BackPropOp(GNode dst, Graph& graph) {
   NodeData& dst_data = graph.getData(dst);
   unsigned i         = dst_data.roundIndexToSend;
 
@@ -436,6 +500,10 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
                DependencyBroadcast, Bitset_dependency>(
         std::string("DependencySync"));
 
+    // #ifdef USE_VTUNE
+    // galois::runtime::profileVtune(
+    //   [&](){
+    // #endif
     galois::do_all(
         galois::iterate(allNodesWithEdges),
         [&](GNode dst) {
@@ -445,6 +513,10 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
             graph.get_run_identifier("BackProp").c_str()),
         galois::steal(),
         galois::no_stats());
+    // #ifdef USE_VTUNE
+    // },
+    // "VTune_BackProp");
+    // #endif
 
     currentRound++;
   }
@@ -457,6 +529,16 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
  * @param graph Local graph to operate on
  * @param offset Offset into sources (i.e. number of sources already done)
  */
+inline void BCOp(GNode node, Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
+  NodeData& cur_data = graph.getData(node);
+
+  for (unsigned i = 0; i < numSourcesPerRound; i++) {
+    // exclude sources themselves from BC calculation
+    if (graph.getGID(node) != nodesToConsider[i]) {
+      bcValues[node] += cur_data.sourceData[i].dependencyValue;
+    }
+  }
+}
 void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
   const auto& masterNodes = graph.masterNodesRange();
   graph.set_num_round(0);
@@ -464,14 +546,7 @@ void BC(Graph& graph, const std::vector<uint64_t>& nodesToConsider) {
   galois::do_all(
       galois::iterate(masterNodes.begin(), masterNodes.end()),
       [&](GNode node) {
-        NodeData& cur_data = graph.getData(node);
-
-        for (unsigned i = 0; i < numSourcesPerRound; i++) {
-          // exclude sources themselves from BC calculation
-          if (graph.getGID(node) != nodesToConsider[i]) {
-            cur_data.bc += cur_data.sourceData[i].dependencyValue;
-          }
-        }
+        BCOp(node, graph, nodesToConsider);
       },
       galois::loopname(graph.get_run_identifier("BC").c_str()),
       galois::no_stats());
@@ -493,11 +568,9 @@ void Sanity(Graph& graph) {
   galois::do_all(galois::iterate(graph.masterNodesRange().begin(),
                                  graph.masterNodesRange().end()),
                  [&](auto src) {
-                   NodeData& sdata = graph.getData(src);
-
-                   DGA_max.update(sdata.bc);
-                   DGA_min.update(sdata.bc);
-                   DGA_sum += sdata.bc;
+                   DGA_max.update(bcValues[src]);
+                   DGA_min.update(bcValues[src]);
+                   DGA_sum += bcValues[src];
                  },
                  galois::no_stats(), galois::loopname("Sanity"));
 
@@ -696,16 +769,29 @@ int main(int argc, char** argv) {
 
       // accumulate time per batch
       StatTimer_main.start();
+
+      uint32_t lastRoundNumber;
+
+      #ifdef USE_VTUNE
+      galois::runtime::profileVtune(
+        [&](){
+      #endif
+
       InitializeIteration(*hg, nodesToConsider);
 
       // APSP returns total number of rounds taken
       // subtract 2 to get to last round where message was sent (round
       // after that is empty round where nothing is done)
-      uint32_t lastRoundNumber = APSP(*hg, dga) - 2;
+      lastRoundNumber = APSP(*hg, dga) - 2;
       RoundUpdate(*hg);
       BackProp(*hg, lastRoundNumber);
       BC(*hg, nodesToConsider);
 
+      #ifdef USE_VTUNE
+      },
+      "VTune_BackProp");
+      #endif
+      
       StatTimer_main.stop();
 
       hg->set_num_round(0);
@@ -765,7 +851,7 @@ int main(int argc, char** argv) {
          ii != (*hg).masterNodesRange().end(); ++ii) {
       if (!outputDistPaths) {
         // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), (*hg).getData(*ii).bc);
+        sprintf(v_out, "%lu %.9f\n", (*hg).getGID(*ii), bcValues[*ii]);
       } else {
         uint64_t a      = 0;
         ShortPathType b = 0;

@@ -24,8 +24,8 @@
 
 /** OPTIONS **********/
 /** 1. Optimized mode: enable ONLY ONE of them at most **/
-// #define REVERSE_MODE
-// #define FLIP_MODE
+// #define REVERSE_MODE //! Not applicable for v6
+// #define FLIP_MODE  //! Not applicable for v6
 /** 2. Do you need an indicator? **/
 #define USE_INDICATOR
 /*********************/
@@ -33,12 +33,12 @@
 /**
  * Derivate from DynamicBitSet
  **/
-// template <typename Block=uint32_t, typename Allocator=galois::gstl::Pow2Alloc<Block>>
 class PRBCBitSet : public galois::DynamicBitSet {
+  // using Base = galois::DynamicBitSet;
   // @DynamicBitSet (protected)
-  // galois::PODResizeableArray<galois::CopyableAtomic<uint64_t>> bitvec;
-  // size_t num_bits;
-  // static constexpr uint32_t bits_uint64 = sizeof(uint64_t) * CHAR_BIT;
+  // using Base::bitvec;
+  // using Base::num_bits;
+  // using Base::bits_uint64;
 
   #ifdef USE_INDICATOR
     //! indicate the index of bit to process
@@ -121,7 +121,11 @@ public:
   #endif
 
   // @DynamicBitSet
+  #ifdef _GALOIS_DYNAMIC_BIT_SET_
+  // using Base::size;
+  #else
   size_t size() const { return num_bits; }
+  #endif
 
   //! Constructor which initializes to an empty bitset.
   PRBCBitSet() {
@@ -131,12 +135,16 @@ public:
     #endif
   }
 
-  // assumes bit_vector is not updated (set) in parallel
+  #ifdef _GALOIS_DYNAMIC_BIT_SET_
+  // using Base::test;
+  #else
+  // @DynamicBitSet
   bool test(size_t index) const {
     size_t bit_index = get_word(index);
     uint64_t bit_mask = get_mask(index);
     return ((bitvec[bit_index] & bit_mask) != 0);
   }
+  #endif
 
   /**
    * Test and then set
@@ -161,6 +169,10 @@ public:
     return ret;
   }
 
+  #ifdef _GALOIS_DYNAMIC_BIT_SET_
+  // using Base::set;
+  #else
+  // @DynamicBitSet
   void set(size_t index) {
     size_t bit_index = get_word(index);
     uint64_t bit_mask = get_mask(index);
@@ -171,7 +183,9 @@ public:
           std::memory_order_relaxed));
     }
   }
+  #endif
 
+  // DISABLED @DynamicBitSet
   void reset(size_t index) {
     size_t bit_index = get_word(index);
     uint64_t bit_mask = get_mask(index);
@@ -182,6 +196,10 @@ public:
     //   std::memory_order_relaxed));
   }
 
+  #ifdef _GALOIS_DYNAMIC_BIT_SET_
+  // using Base::reset;
+  // using Base::resize;
+  #else
   // @DynamicBitSet
   void reset() { std::fill(bitvec.begin(), bitvec.end(), uint64_t(0)); }
 
@@ -192,6 +210,7 @@ public:
     bitvec.resize((n + bits_uint64 - 1) / bits_uint64);
     reset();
   }
+  #endif
 
   bool none() {
     for (size_t i = 0; i < bitvec.size(); ++i)
@@ -280,7 +299,11 @@ public:
       return npos;
     }
     size_t curBlock = get_word(pos);
-    uint64_t res = bitvec[curBlock] >> get_offset(pos);
+    auto curOffset = get_offset(pos);
+    auto seg = bitvec[curBlock];
+    while (seg != bitvec[curBlock])
+      seg = bitvec[curBlock];
+    uint64_t res = seg >> curOffset;
     return res?
       pos + right_most_bit(res) : find_from_block(++curBlock);
   }

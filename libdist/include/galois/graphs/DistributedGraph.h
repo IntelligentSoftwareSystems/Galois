@@ -218,7 +218,7 @@ private:
   std::vector<MPI_Group> mpi_identity_groups;
 #endif
 
-  galois::DynamicBitSet<> syncBitset;
+  galois::DynamicBitSet syncBitset;
   galois::PODResizeableArray<unsigned int> syncOffsets;
 
 protected:
@@ -1259,7 +1259,7 @@ private:
    */
   template <SyncType syncType>
   void get_offsets_from_bitset(const std::string& loopName,
-                               const galois::DynamicBitSet<>& bitset_comm,
+                               const galois::DynamicBitSet& bitset_comm,
                                galois::PODResizeableArray<unsigned int>& offsets,
                                size_t& bit_set_count) const {
     // timer creation
@@ -1365,8 +1365,8 @@ private:
   template <typename FnTy, SyncType syncType>
   void get_bitset_and_offsets(const std::string& loopName,
                               const std::vector<size_t>& indices,
-                              const galois::DynamicBitSet<>& bitset_compute,
-                              galois::DynamicBitSet<>& bitset_comm,
+                              const galois::DynamicBitSet& bitset_compute,
+                              galois::DynamicBitSet& bitset_comm,
                               galois::PODResizeableArray<unsigned int>& offsets,
                               size_t& bit_set_count,
                               DataCommMode& data_mode) const {
@@ -1803,7 +1803,7 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet<>& bit_set_compute) {
+                          galois::DynamicBitSet& bit_set_compute) {
 #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     FnTy::reduce(lid, d, val);
@@ -1834,7 +1834,7 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncReduce>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet<>& bit_set_compute,
+                          galois::DynamicBitSet& bit_set_compute,
                           unsigned vecIndex) {
     if (FnTy::reduce(lid, getData(lid), val, vecIndex)) {
       if (bit_set_compute.size() != 0)
@@ -1855,7 +1855,7 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet<>&) {
+                          galois::DynamicBitSet&) {
 #ifdef __GALOIS_HET_OPENCL__
     CLNodeDataWrapper d = clGraph.getDataW(lid);
     FnTy::setVal(lid, d, val_vec[n]);
@@ -1881,7 +1881,7 @@ private:
   template <typename FnTy, SyncType syncType,
             typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet<>&, unsigned vecIndex) {
+                          galois::DynamicBitSet&, unsigned vecIndex) {
     FnTy::setVal(lid, getData(lid), val, vecIndex);
   }
 
@@ -1913,7 +1913,7 @@ private:
   void set_subset(const std::string& loopName, const VecTy& indices,
                   size_t size, const galois::PODResizeableArray<unsigned int>& offsets,
                   galois::PODResizeableArray<typename FnTy::ValTy>& val_vec,
-                  galois::DynamicBitSet<>& bit_set_compute, size_t start = 0) {
+                  galois::DynamicBitSet& bit_set_compute, size_t start = 0) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string doall_str(syncTypeStr + "SetVal_" +
                           get_run_identifier(loopName));
@@ -1990,7 +1990,7 @@ private:
   void set_subset(const std::string& loopName, const VecTy& indices,
                   size_t size, const galois::PODResizeableArray<unsigned int>& offsets,
                   galois::PODResizeableArray<typename FnTy::ValTy>& val_vec,
-                  galois::DynamicBitSet<>& bit_set_compute, unsigned vecIndex,
+                  galois::DynamicBitSet& bit_set_compute, unsigned vecIndex,
                   size_t start = 0) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string doall_str(syncTypeStr + "SetValVector_" +
@@ -2346,7 +2346,7 @@ private:
   template <typename SyncFnTy>
   void reportRedundantSize(std::string loopName, std::string syncTypeStr,
                            uint32_t totalToSend, size_t bitSetCount,
-                           const galois::DynamicBitSet<>& bitSetComm) {
+                           const galois::DynamicBitSet& bitSetComm) {
     size_t redundant_size =
         (totalToSend - bitSetCount) * sizeof(typename SyncFnTy::ValTy);
     size_t bit_set_size = (bitSetComm.get_vec().size() * sizeof(uint64_t));
@@ -2381,7 +2381,7 @@ private:
   void serializeMessage(std::string loopName, DataCommMode data_mode,
                         size_t bit_set_count, std::vector<size_t>& indices,
                         galois::PODResizeableArray<unsigned int>& offsets,
-                        galois::DynamicBitSet<>& bit_set_comm, VecType& val_vec,
+                        galois::DynamicBitSet& bit_set_comm, VecType& val_vec,
                         galois::runtime::SendBuffer& b) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "SerializeMessage_" +
@@ -2443,7 +2443,7 @@ private:
                    std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
-    galois::DynamicBitSet<>& bit_set_comm = syncBitset;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
@@ -2492,7 +2492,7 @@ private:
         offsets.resize(num);
         val_vec.resize(num);
         Textractalloc.stop();
-        const galois::DynamicBitSet<>& bit_set_compute = BitsetFnTy::get();
+        const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
         get_bitset_and_offsets<SyncFnTy, syncType>(
             loopName, indices, bit_set_compute, bit_set_comm, offsets,
@@ -2592,7 +2592,7 @@ private:
                    std::vector<size_t>& indices,
                    galois::runtime::SendBuffer& b) {
     uint32_t num = indices.size();
-    galois::DynamicBitSet<>& bit_set_comm = syncBitset;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
@@ -2623,7 +2623,7 @@ private:
         size_t bit_set_count = 0;
 
         // No GPU support currently
-        const galois::DynamicBitSet<>& bit_set_compute = BitsetFnTy::get(i);
+        const galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get(i);
 
         get_bitset_and_offsets<SyncFnTy, syncType>(
             loopName, indices, bit_set_compute, bit_set_comm, offsets,
@@ -2903,7 +2903,7 @@ private:
                        uint32_t num, galois::runtime::RecvBuffer& buf,
                        size_t& bit_set_count,
                        galois::PODResizeableArray<unsigned int>& offsets,
-                       galois::DynamicBitSet<>& bit_set_comm, size_t& buf_start,
+                       galois::DynamicBitSet& bit_set_comm, size_t& buf_start,
                        size_t& retval, VecType& val_vec) {
     std::string syncTypeStr = (syncType == syncReduce) ? "Reduce" : "Broadcast";
     std::string serialize_timer_str(syncTypeStr + "DeserializeMessage_" +
@@ -2966,7 +2966,7 @@ private:
     galois::CondStatTimer<MORE_COMM_STATS> Tsetbatch(
         set_batch_timer_str.c_str(), GRNAME);
 
-    galois::DynamicBitSet<>& bit_set_comm = syncBitset;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
@@ -3003,7 +3003,7 @@ private:
           offsets.reserve(maxSharedSize);
           val_vec.reserve(maxSharedSize);
 
-          galois::DynamicBitSet<>& bit_set_compute = BitsetFnTy::get();
+          galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get();
 
           if (data_mode == bitsetData) {
             size_t bit_set_count2;
@@ -3071,7 +3071,7 @@ private:
                               get_run_identifier(loopName));
     galois::CondStatTimer<MORE_COMM_STATS> Tset(set_timer_str.c_str(), GRNAME);
 
-    galois::DynamicBitSet<>& bit_set_comm = syncBitset;
+    galois::DynamicBitSet& bit_set_comm = syncBitset;
     static galois::PODResizeableArray<typename SyncFnTy::ValTy> val_vec;
     galois::PODResizeableArray<unsigned int>& offsets = syncOffsets;
 
@@ -3097,7 +3097,7 @@ private:
                                     bit_set_count, offsets, bit_set_comm,
                                     buf_start, retval, val_vec);
 
-          galois::DynamicBitSet<>& bit_set_compute = BitsetFnTy::get(i);
+          galois::DynamicBitSet& bit_set_compute = BitsetFnTy::get(i);
 
           if (data_mode == bitsetData) {
             size_t bit_set_count2;

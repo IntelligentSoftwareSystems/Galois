@@ -33,10 +33,8 @@
 /**
  * Derivate from DynamicBitSet
  **/
-template <typename _Tp=galois::CopyableAtomic<uint64_t>, 
-          typename _Alloc=std::allocator<_Tp>>
-class PRBCBitSet : public galois::DynamicBitSet<_Tp, _Alloc> {
-  using Base = galois::DynamicBitSet<_Tp, _Alloc>;
+class PRBCBitSet : public galois::DynamicBitSet {
+  using Base = galois::DynamicBitSet;
   // @DynamicBitSet (protected)
   using Base::bitvec;
   using Base::num_bits;

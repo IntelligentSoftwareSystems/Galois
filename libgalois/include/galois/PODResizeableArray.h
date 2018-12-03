@@ -29,7 +29,7 @@
 
 // Statistics & Debug
 // #include "galois/Timer.h"
-#include "galois/gIO.h"
+// #include "galois/gIO.h"
 
 namespace galois {
 
@@ -38,16 +38,14 @@ namespace galois {
  * of plain-old-datatype (POD) elements.
  * There is no initialization or destruction of elements.
  */
-template <typename _Tp, typename _Alloc = std::allocator<_Tp>>
+template <typename _Tp>
 class PODResizeableArray {
   _Tp* data_;
-  _Alloc alloc_;
   size_t capacity_;
   size_t size_;
 
 public:
   typedef _Tp value_type;
-  typedef _Alloc allocator_type;
   typedef size_t size_type;
   typedef ptrdiff_t difference_type;
   typedef value_type& reference;
@@ -93,7 +91,7 @@ public:
 
   //! move assignment operator
   PODResizeableArray& operator=(PODResizeableArray&& v) {
-    if (data_ != NULL) alloc_.deallocate(data_, capacity_);
+    if (data_ != NULL) free(data_);
     data_ = v.data_;
     capacity_ = v.capacity_;
     size_ = v.size_;
@@ -103,7 +101,7 @@ public:
     return *this;
   }
 
-  ~PODResizeableArray() { if (data_ != NULL) alloc_.deallocate(data_, capacity_); }
+  ~PODResizeableArray() { if (data_ != NULL) free(data_); }
 
   // iterators:
   iterator begin() { return iterator(&data_[0]); }
@@ -129,36 +127,35 @@ public:
   size_type size() const { return size_; }
   size_type max_size() const { return capacity_; }
   bool empty() const { return size_ == 0; }
-  
-  template <bool _Realloc = true>
+
   void reserve(size_t n) {
     // galois::StatTimer StatTimer_reserve("reserve", "PR_BC");
     // StatTimer_reserve.start();
     if (n > capacity_) {
-      size_t old_cap = capacity_;
+      // size_t old_cap = capacity_;
       if (capacity_ == 0) capacity_ = 1;
-      else galois::gDebug("PODResizeableArray enlarged");
+      // else galois::gDebug("PODResizeableArray enlarged");
       while (capacity_ < n) capacity_ <<= 1;
-      if(_Realloc)
+      // if(_Realloc)
         data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
-      else{
-        if (data_ == NULL) {
-          data_ = alloc_.allocate(capacity_);
-        }
-        else {
-          pointer old_mem = data_;
-          data_ = alloc_.allocate(capacity_);
-          galois::gDebug("memcpy: ", old_mem, " -> ", data_);
-          memcpy(data_, old_mem, old_cap * sizeof(_Tp));
-          alloc_.deallocate(old_mem, old_cap);
-        }
-      }
+      // else{
+      //   if (data_ == NULL) {
+      //     data_ = alloc_.allocate(capacity_);
+      //   }
+      //   else {
+      //     pointer old_mem = data_;
+      //     data_ = alloc_.allocate(capacity_);
+      //     galois::gDebug("memcpy: ", old_mem, " -> ", data_);
+      //     memcpy(data_, old_mem, old_cap * sizeof(_Tp));
+      //     alloc_.deallocate(old_mem, old_cap);
+      //   }
+      // }
     }
     // StatTimer_reserve.stop();
   }
 
   void resize(size_t n) {
-    reserve<false>(n);
+    reserve(n);
     size_ = n;
   }
 
@@ -166,14 +163,14 @@ public:
     size_ = 0;
   }
 
-  void release() {
-    if (data_ != NULL) {
-      alloc_.deallocate(data_, capacity_);
-      data_ = NULL;
-      capacity_ = 0;
-      size_ = 0;
-    }
-  }
+  // void release() {
+  //   if (data_ != NULL) {
+  //     alloc_.deallocate(data_, capacity_);
+  //     data_ = NULL;
+  //     capacity_ = 0;
+  //     size_ = 0;
+  //   }
+  // }
 
   // element access:
   reference operator[](size_type __n) { return data_[__n]; }

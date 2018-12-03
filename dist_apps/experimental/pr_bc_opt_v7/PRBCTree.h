@@ -30,7 +30,7 @@ const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
  */
 class PRBCTree {
 
-  using BitSet = PRBCBitSet<galois::CopyableAtomic<uint64_t>>;
+  using BitSet = PRBCBitSet;
   using FlatMap = boost::container::flat_map<uint32_t, BitSet,
                                               std::less<uint32_t>,
                                               galois::gstl::Pow2Alloc<std::pair<uint32_t, BitSet>>>;

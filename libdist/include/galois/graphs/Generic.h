@@ -201,7 +201,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // this host
     std::vector<std::vector<uint64_t>> numOutgoingEdges;
     // signifies if a host should create a node because it has an incoming edge
-    std::vector<galois::DynamicBitSet<>> hasIncomingEdge;
+    std::vector<galois::DynamicBitSet> hasIncomingEdge;
 
     // only need to use for things that need communication
     if (!graphPartitioner->noCommunication()) {
@@ -227,7 +227,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     if (!graphPartitioner->noCommunication()) {
       edgeInspection(bufGraph, numOutgoingEdges, hasIncomingEdge,
                      inspectionTimer);
-      galois::DynamicBitSet<>& finalIncoming = hasIncomingEdge[base_DistGraph::id];
+      galois::DynamicBitSet& finalIncoming = hasIncomingEdge[base_DistGraph::id];
 
       galois::StatTimer mapTimer("NodeMapping", GRNAME);
       mapTimer.start();
@@ -334,7 +334,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                          galois::StatTimer& inspectionTimer,
                          uint64_t edgeOffset,
                          galois::gstl::Vector<uint64_t>& prefixSumOfEdges) {
-    galois::DynamicBitSet<> incomingMirrors;
+    galois::DynamicBitSet incomingMirrors;
     incomingMirrors.resize(base_DistGraph::numGlobalNodes);
     incomingMirrors.reset();
     uint32_t myID = base_DistGraph::id;
@@ -574,7 +574,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void edgeInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
                       std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-                      std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
+                      std::vector<galois::DynamicBitSet>& hasIncomingEdge,
                       galois::StatTimer& inspectionTimer) {
     // number of nodes that this host has read from disk
     uint32_t numRead = base_DistGraph::gid2host[base_DistGraph::id].second -
@@ -585,7 +585,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       numOutgoingEdges[i].assign(numRead, 0);
     }
 
-    galois::DynamicBitSet<> hostHasOutgoing;
+    galois::DynamicBitSet hostHasOutgoing;
     hostHasOutgoing.resize(base_DistGraph::numHosts);
     hostHasOutgoing.reset();
     assignEdges(bufGraph, numOutgoingEdges, hasIncomingEdge, hostHasOutgoing);
@@ -626,8 +626,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void assignEdges(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
                    std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-                   std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
-                   galois::DynamicBitSet<>& hostHasOutgoing) {
+                   std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+                   galois::DynamicBitSet& hostHasOutgoing) {
     std::vector<galois::CopyableAtomic<char>>
       indicatorVars(base_DistGraph::numHosts);
     // initialize indicators of initialized bitsets to 0
@@ -700,8 +700,8 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * edges from this host
    */
   void sendInspectionData(std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-                          std::vector<galois::DynamicBitSet<>>& hasIncomingEdge,
-                          galois::DynamicBitSet<>& hostHasOutgoing) {
+                          std::vector<galois::DynamicBitSet>& hasIncomingEdge,
+                          galois::DynamicBitSet& hostHasOutgoing) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     galois::GAccumulator<uint64_t> bytesSent;
@@ -771,7 +771,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * created) on this host have incoming edges
    */
   void recvInspectionData(std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-                          galois::DynamicBitSet<>& hasIncomingEdge) {
+                          galois::DynamicBitSet& hasIncomingEdge) {
     auto& net = galois::runtime::getSystemNetworkInterface();
 
     for (unsigned h = 0; h < net.Num - 1; h++) {
@@ -801,7 +801,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::runtime::gDeserialize(p->second, bitsetMetaMode);
       if (bitsetMetaMode == 1) {
         // sent as bitset; deserialize then or with main bitset
-        galois::DynamicBitSet<> recvSet;
+        galois::DynamicBitSet recvSet;
         galois::runtime::gDeserialize(p->second, recvSet);
         hasIncomingEdge.bitwise_or(recvSet);
       } else if (bitsetMetaMode == 2) {
@@ -827,7 +827,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   galois::gstl::Vector<uint64_t> nodeMapping(
     std::vector<std::vector<uint64_t>>& numOutgoingEdges,
-    galois::DynamicBitSet<>& hasIncomingEdge,
+    galois::DynamicBitSet& hasIncomingEdge,
     galois::gstl::Vector<uint64_t>& prefixSumOfEdges
   ) {
     numNodes = 0;
@@ -1089,7 +1089,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * incoming node creation if is doesn't already exist + if actually amrked
    * as having incoming node
    */
-  void inspectIncomingNodes(galois::DynamicBitSet<>& hasIncomingEdge,
+  void inspectIncomingNodes(galois::DynamicBitSet& hasIncomingEdge,
                             galois::gstl::Vector<uint64_t>& prefixSumOfEdges) {
     uint32_t totalNumNodes = base_DistGraph::numGlobalNodes;
 

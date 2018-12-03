@@ -72,7 +72,7 @@ public:
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    // asset(distanceTree[newDistance].size() == numSourcesPerRound);
+    // assert(distanceTree[newDistance].size() == numSourcesPerRound);
     distanceTree[newDistance].set_indicator(index);
 
     numNonInfinity++;

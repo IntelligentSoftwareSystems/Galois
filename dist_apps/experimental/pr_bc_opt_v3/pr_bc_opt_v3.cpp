@@ -90,8 +90,8 @@ using GNode = typename Graph::GraphNode;
 
 // Bitsets for tracking which nodes need to be sync'd with respect to a
 // particular field
-galois::DynamicBitSet<> bitset_minDistances;
-galois::DynamicBitSet<> bitset_dependency;
+galois::DynamicBitSet bitset_minDistances;
+galois::DynamicBitSet bitset_dependency;
 
 // moved here for access to ShortPathType, NodeData, DynamicBitSets
 #include "pr_bc_opt_sync.hh"
