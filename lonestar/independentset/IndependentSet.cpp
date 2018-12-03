@@ -435,7 +435,6 @@ struct EdgeTiledPrioAlgo {
     galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<float> nedges;
     galois::GReduceLogicalOR unmatched;
-    // bool unmatched = true;
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
     galois::InsertBag<EdgeTile> works;
     const int EDGE_TILE_SIZE = 64;
@@ -640,10 +639,8 @@ bool verify(Graph& graph, Algo& algo) {
           prioNode& nodedata =
               graph.getData(src, galois::MethodFlag::UNPROTECTED);
           if (nodedata.flag == (unsigned char)0xfe) {
-            //std::cout << "matched" << std::endl;
             nodedata.flag = MATCHED;
           } else if (nodedata.flag == (unsigned char)0x00) {
-            //std::cout << "other matched" << std::endl;
             nodedata.flag = OTHER_MATCHED;
           } else
             std::cout << "error in verify_change! Some nodes are not decided."
