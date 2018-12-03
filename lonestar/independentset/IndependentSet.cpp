@@ -154,15 +154,9 @@ struct DefaultAlgo {
   template <typename C>
   void processNode(Graph& graph, const GNode& src, C& ctx) {
     bool mod;
-    if (ctx.isFirstPass()) {
-      mod = build<galois::MethodFlag::WRITE>(graph, src);
-      graph.getData(src, galois::MethodFlag::WRITE);
-      ctx.cautiousPoint(); // Failsafe point
-
-    } else {
-      LocalState* localState = ctx.template getLocalState<LocalState>();
-      mod                    = localState->mod;
-    }
+    mod = build<galois::MethodFlag::WRITE>(graph, src);
+    graph.getData(src, galois::MethodFlag::WRITE);
+    ctx.cautiousPoint(); // Failsafe point
 
     if (mod) {
       modify(graph, src);
@@ -646,8 +640,10 @@ bool verify(Graph& graph, Algo& algo) {
           prioNode& nodedata =
               graph.getData(src, galois::MethodFlag::UNPROTECTED);
           if (nodedata.flag == (unsigned char)0xfe) {
+            //std::cout << "matched" << std::endl;
             nodedata.flag = MATCHED;
           } else if (nodedata.flag == (unsigned char)0x00) {
+            //std::cout << "other matched" << std::endl;
             nodedata.flag = OTHER_MATCHED;
           } else
             std::cout << "error in verify_change! Some nodes are not decided."
@@ -688,16 +684,17 @@ void run() {
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
 
-  std::cout << "Cardinality of maximal independent set: "
-            << galois::ParallelSTL::count_if(graph.begin(), graph.end(),
-                                             is_matched<Graph>(graph))
-            << "\n";
 
   if (!skipVerify && !verify(graph, algo)) {
     std::cerr << "verification failed\n";
     assert(0 && "verification failed");
     abort();
   }
+
+  std::cout << "Cardinality of maximal independent set: "
+            << galois::ParallelSTL::count_if(graph.begin(), graph.end(),
+                                             is_matched<Graph>(graph))
+            << "\n";
 }
 
 int main(int argc, char** argv) {
