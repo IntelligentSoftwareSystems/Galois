@@ -256,17 +256,9 @@ void AsyncTimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc
 
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
-        if (MAX_DELAY_MODE == engine->modes[k]) {
-          auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
-          if (data.t[k].slew < slew) {
-            data.t[k].slew = slew;
-          }
-        }
-        else {
-          auto slew = outPin->extractMin(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
-          if (data.t[k].slew > slew) {
-            data.t[k].slew = slew;
-          }
+        auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
+        if (data.t[k].slew < slew) {
+          data.t[k].slew = slew;
         }
       } // end else for ieDada.wire
     } // end for k
@@ -310,15 +302,8 @@ void AsyncTimingGraph::computeExtremeDelay(GNode n, galois::PerIterAllocTy& allo
 
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
-
-        if (MAX_DELAY_MODE == engine->modes[k]) {
-          auto delay = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise, alloc).first;
-          ieData.t[k].delay = delay;
-        }
-        else {
-          auto delay = outPin->extractMin(param, DELAY, inPin, predData.isRise, data.isRise, alloc).first;
-          ieData.t[k].delay = delay;
-        }
+        auto delay = outPin->extractMax(param, DELAY, inPin, predData.isRise, data.isRise, alloc).first;
+        ieData.t[k].delay = delay;
       } // end else for (ieData.wire)
     } // end for k
   } // end for ie

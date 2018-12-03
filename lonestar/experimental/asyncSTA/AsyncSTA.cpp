@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
   AsyncTimingEngine engine;
   engine.useIdealWire(true);
-  engine.addCellLib(&lib, MAX_DELAY_MODE);
+  engine.addCellLib(&lib);
   engine.readDesign(&design, &arcs);
 
   auto m = *(design.roots.begin()); // top-level module

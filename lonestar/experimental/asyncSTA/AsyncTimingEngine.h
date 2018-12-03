@@ -12,9 +12,7 @@
 
 struct AsyncTimingEngine {
   std::vector<CellLib*> libs;
-  std::vector<TimingMode> modes;
-  using Corner = std::pair<CellLib*, TimingMode>;
-  std::unordered_map<Corner, size_t, boost::hash<Corner> > cornerMap;
+  std::unordered_map<CellLib*, size_t> cornerMap;
   size_t numCorners;
   VerilogDesign* v;
   AsyncTimingArcCollection* arcs;
@@ -35,12 +33,10 @@ public:
 
   void useIdealWire(bool flag) { isWireIdeal = flag; }
 
-  void addCellLib(CellLib* lib, TimingMode mode) {
-    auto corner = std::make_pair(lib, mode);
-    if (!cornerMap.count(corner)) {
+  void addCellLib(CellLib* lib) {
+    if (!cornerMap.count(lib)) {
       libs.push_back(lib);
-      modes.push_back(mode);
-      cornerMap[corner] = numCorners;
+      cornerMap[lib] = numCorners;
       numCorners += 1;
     }
   }
