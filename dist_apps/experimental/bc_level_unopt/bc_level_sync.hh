@@ -23,36 +23,10 @@
 // # short paths
 ////////////////////////////////////////////////////////////////////////////
 
-struct Reduce_add_num_shortest_paths {
-  using ValTy = ShortPathType;
+GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_shortest_paths_accum, ShortPathType);
+GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths_accum, ShortPathType);
+GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths_accum);
 
-  static ValTy extract(uint32_t node_id, struct NodeData& node) {
-    // only send in round before use; else send 0
-    if (node.current_length == globalRoundNumber + 1) {
-      return node.num_shortest_paths;
-    } else {
-      return (ValTy)0;
-    }
-  }
-
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
-                                  DataCommMode*) { return false; }
-
-  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
-
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
-    galois::add(node.num_shortest_paths, y);
-    return true;
-  }
-
-  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
-
-  // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) {
-    node.num_shortest_paths = (ValTy)0;
-  }
-};
-// used for middle sync only
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
@@ -69,34 +43,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 // Dependency
 ////////////////////////////////////////////////////////////////////////////
 
-struct Reduce_add_dependency {
-  using ValTy = float;
-
-  static ValTy extract(uint32_t node_id, struct NodeData& node) {
-    // only send in round before use; else send 0
-    if (node.current_length == backRoundCount) {
-      return node.dependency;
-    } else {
-      return (ValTy)0;
-    }
-  }
-
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
-                                  DataCommMode*) { return false; }
-
-  static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
-
-  static bool reduce(uint32_t node_id, struct NodeData& node, ValTy y) {
-    galois::add(node.dependency, y);
-    return true;
-  }
-
-  static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
-
-  // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) {
-    node.dependency = (ValTy)0;
-  }
-};
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, float);
-GALOIS_SYNC_STRUCTURE_BITSET(dependency);
+GALOIS_SYNC_STRUCTURE_REDUCE_ADD(dependency_accum, float);
+GALOIS_SYNC_STRUCTURE_BROADCAST(dependency_accum, float);
+GALOIS_SYNC_STRUCTURE_BITSET(dependency_accum);
