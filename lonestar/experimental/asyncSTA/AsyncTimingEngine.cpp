@@ -17,6 +17,7 @@ void AsyncTimingEngine::readDesign(VerilogDesign* design, AsyncTimingArcCollecti
       AsyncTimingGraph* g = new AsyncTimingGraph(*m, this);
       modules[m] = g;
       g->construct();
+      g->initialize();
     }
     else {
       std::cout << "No timing arc set exist for module " << m->name << std::endl;
@@ -47,11 +48,9 @@ void AsyncTimingEngine::time(VerilogModule* m) {
   if (g) {
     galois::StatTimer Tmain;
     Tmain.start();
-    // compute slew
-    // compute delay
-    // compute maximum cycle ratio
+    g->timeFromScratch();
     Tmain.stop();
 
-//    g->print();
+    g->print();
   }
 }
