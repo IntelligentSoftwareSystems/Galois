@@ -9,10 +9,13 @@
 #include <string>
 #include <iostream>
 #include <map>
+#include <limits>
 
 static auto unprotected = galois::MethodFlag::UNPROTECTED;
 static std::string name0 = "1\'b0";
 static std::string name1 = "1\'b1";
+
+static const MyFloat infinity = std::numeric_limits<MyFloat>::infinity();
 
 void AsyncTimingGraph::addPin(VerilogPin* pin) {
   for (size_t j = 0; j < 2; j++) {
@@ -182,7 +185,7 @@ void AsyncTimingGraph::construct() {
   }
 //  outDegHistogram();
 //  inDegHistogram();
-  print();
+//  print();
 }
 
 size_t AsyncTimingGraph::outDegree(GNode n) {
@@ -203,9 +206,9 @@ void AsyncTimingGraph::initialize() {
         for (size_t k = 0; k < engine->numCorners; k++) {
           data.t[k].pinC = (GATE_INPUT == data.nType) ? data.t[k].pin->c[data.isRise] : 0.0;
           data.t[k].wireC = 0.0;
-          data.t[k].slew = 0.0;
+          data.t[k].slew = infinity;
           data.t[k].tmpSlew[0] = 0.0;
-          data.t[k].tmpSlew[1] = 0.0;
+          data.t[k].tmpSlew[1] = engine->libs[k]->defaultMaxSlew;
         }
       }
       , galois::loopname("Initialization")
@@ -235,9 +238,26 @@ void AsyncTimingGraph::computeDriveC(GNode n) {
   }
 }
 
-void AsyncTimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc) {
+// returns true actial slew computation happens
+bool AsyncTimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc) {
   auto& data = g.getData(n);
 
+  bool toCompute = false;
+  for (size_t k = 0; k < engine->numCorners; k++) {
+    if (infinity == data.t[k].slew) {
+      toCompute = true;
+      break;
+    }
+  }
+  if (!toCompute) {
+    return false;
+  }
+
+  using PerIterAllocVecMyFloat = std::vector<MyFloat, galois::PerIterAllocTy::rebind<MyFloat>::other>;
+  PerIterAllocVecMyFloat tmpSlewMin(engine->numCorners, 0.0, alloc);
+  PerIterAllocVecMyFloat tmpSlewMax(engine->numCorners, 0.0, alloc);
+
+  // compute max slew from the interval [tmpSlew[0], tmpSlew[1]] of predData.t[k]
   for (auto ie: g.in_edges(n, unprotected)) {
     auto pred = g.getEdgeDst(ie);
     auto& predData = g.getData(pred, unprotected);
@@ -246,23 +266,51 @@ void AsyncTimingGraph::computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc
     for (size_t k = 0; k < engine->numCorners; k++) {
       // from a wire. take the predecessor's slew
       if (ieData.wire) {
-        data.t[k].slew = predData.t[k].slew;
+        // __atomic_load(*ptr, *ret, mem): *ret = *ptr w/ barrier mem
+        __atomic_load(&(predData.t[k].tmpSlew[0]), &(tmpSlewMin[k]), __ATOMIC_RELAXED);
+        __atomic_load(&(predData.t[k].tmpSlew[1]), &(tmpSlewMax[k]), __ATOMIC_RELAXED);
       }
       // from a timing arc. compute and take the extreme one
       else {
         Parameter param(alloc);
-        param[INPUT_NET_TRANSITION] = predData.t[k].slew;
         param[TOTAL_OUTPUT_NET_CAPACITANCE] = data.t[k].pinC + data.t[k].wireC;
-
         auto outPin = data.t[k].pin;
         auto inPin = predData.t[k].pin;
+
+        __atomic_load(&(predData.t[k].tmpSlew[0]), &param[INPUT_NET_TRANSITION], __ATOMIC_RELAXED);
         auto slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
-        if (data.t[k].slew < slew) {
-          data.t[k].slew = slew;
+        if (tmpSlewMin[k] < slew) {
+          tmpSlewMin[k] = slew;
+        }
+
+        __atomic_load(&(predData.t[k].tmpSlew[1]), &param[INPUT_NET_TRANSITION], __ATOMIC_RELAXED);
+        slew = outPin->extractMax(param, SLEW, inPin, predData.isRise, data.isRise, alloc).first;
+        if (tmpSlewMax[k] < slew) {
+          tmpSlewMax[k] = slew;
         }
       } // end else for ieDada.wire
     } // end for k
   } // end for ie
+
+  // record k corners' interval
+  bool converged = true;
+  for (size_t k = 0; k < engine->numCorners; k++) {
+    __atomic_store(&(data.t[k].tmpSlew[0]), &(tmpSlewMin[k]), __ATOMIC_RELAXED);
+    __atomic_store(&(data.t[k].tmpSlew[1]), &(tmpSlewMax[k]), __ATOMIC_RELAXED);
+    if (tmpSlewMax[k] - tmpSlewMin[k] >= engine->libs[k]->defaultMaxSlew / (MyFloat)1000.0) {
+      converged = false;
+    }
+  }
+
+  // keep the final results
+  if (converged) {
+    for (size_t k = 0; k < engine->numCorners; k++) {
+      data.t[k].slew = (data.t[k].tmpSlew[0] + data.t[k].tmpSlew[1]) / (MyFloat)2.0;
+    }
+  }
+
+  // need to propagate slew to successors
+  return true;
 }
 
 void AsyncTimingGraph::computeExtremeDelay(GNode n, galois::PerIterAllocTy& alloc) {
@@ -307,6 +355,94 @@ void AsyncTimingGraph::computeExtremeDelay(GNode n, galois::PerIterAllocTy& allo
       } // end else for (ieData.wire)
     } // end for k
   } // end for ie
+}
+
+void AsyncTimingGraph::setDriveCAndIdealSlew() {
+  galois::do_all(galois::iterate(g),
+      [&] (GNode n) {
+        auto& data = g.getData(n);
+
+        switch (data.nType) {
+        // from environment: ideal slew across such wires
+        case PRIMARY_INPUT:
+        case POWER_VDD:
+        case POWER_GND:
+          computeDriveC(n);
+          for (size_t k = 0; k < engine->numCorners; k++) {
+            data.t[k].tmpSlew[1] = 0.0;
+          }
+          for (auto e: g.edges(n, unprotected)) {
+            auto succ = g.getEdgeDst(e);
+            auto& succData = g.getData(succ, unprotected);
+            for (size_t k = 0; k < engine->numCorners; k++) {
+              succData.t[k].tmpSlew[1] = 0.0;
+            }
+          }
+          break;
+
+        case GATE_OUTPUT:
+          computeDriveC(n);
+          break;
+
+        default:
+          break;
+        }
+      }
+      , galois::loopname("SetDriveCAndIdealSlew")
+      , galois::steal()
+  );
+}
+
+void AsyncTimingGraph::computeSlew() {
+  galois::for_each(galois::iterate(g),
+      [&] (GNode n, auto& ctx) {
+        auto& data = g.getData(n);
+
+        switch (data.nType) {
+        case PRIMARY_INPUT:
+        case POWER_VDD:
+        case POWER_GND:
+        case GATE_OUTPUT:
+        case GATE_INPUT:
+        case PRIMARY_OUTPUT:
+          // slew computation happened, propagate to successors
+          if (computeExtremeSlew(n, ctx.getPerIterAlloc())) {
+            for (auto e: g.edges(n, unprotected)) {
+              auto succ = g.getEdgeDst(e);
+              ctx.push(succ);
+            }
+          }
+          break;
+
+        default:
+          break;
+        }
+      }
+      , galois::loopname("ComputeSlew")
+      , galois::per_iter_alloc()
+  );
+}
+
+void AsyncTimingGraph::computeDelay() {
+  galois::for_each(galois::iterate(g),
+      [&] (GNode n, auto& ctx) {
+        computeExtremeDelay(n, ctx.getPerIterAlloc());
+      }
+      , galois::loopname("ComputeDelay")
+      , galois::no_conflicts()
+      , galois::per_iter_alloc()
+  );
+}
+
+void AsyncTimingGraph::timeFromScratch() {
+  setDriveCAndIdealSlew();
+  computeSlew();
+  computeDelay();
+
+  // compute maximum cycle ratio
+  // compute time on critical cycle
+  // compute arrival time
+  // compute required time
 }
 
 std::string AsyncTimingGraph::getNodeName(GNode n) {
@@ -371,6 +507,8 @@ void AsyncTimingGraph::print(std::ostream& os) {
     for (size_t k = 0; k < engine->numCorners; k++) {
       os << "    corner " << k;
       os << ": slew = " << data.t[k].slew;
+//      os << ", tmpSlew[0] = " << data.t[k].tmpSlew[0];
+//      os << ", tmpSlew[1] = " << data.t[k].tmpSlew[1];
       os << ", pinC = " << data.t[k].pinC;
       os << ", wireC = " << data.t[k].wireC;
       os << std::endl;
@@ -391,7 +529,7 @@ void AsyncTimingGraph::print(std::ostream& os) {
       os << " from " << getNodeName(g.getEdgeDst(ie)) << std::endl;
 
       for (size_t k = 0; k < engine->numCorners; k++) {
-        os << "    corner " << k;
+        os << "      corner " << k;
         os << ": delay = " << eData.t[k].delay;
         os << std::endl;
       }
@@ -412,7 +550,7 @@ void AsyncTimingGraph::print(std::ostream& os) {
       os << " to " << getNodeName(g.getEdgeDst(e)) << std::endl;
 
       for (size_t k = 0; k < engine->numCorners; k++) {
-        os << "    corner " << k;
+        os << "      corner " << k;
         os << ": delay = " << eData.t[k].delay;
         os << std::endl;
       }

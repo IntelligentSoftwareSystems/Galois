@@ -32,6 +32,9 @@ struct NodeAsyncTiming {
   MyFloat wireC;
   MyFloat slew; // for delay calculation
   MyFloat tmpSlew[2]; // for propagation
+  std::vector<std::vector<MyFloat>> arrival;
+  std::vector<std::vector<MyFloat>> required;
+  std::vector<std::vector<MyFloat>> slack;
 };
 
 struct Node {
@@ -76,8 +79,11 @@ private:
   size_t inDegree(GNode n);
 
   void computeDriveC(GNode n);
-  void computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc);
+  bool computeExtremeSlew(GNode n, galois::PerIterAllocTy& alloc);
   void computeExtremeDelay(GNode n, galois::PerIterAllocTy& alloc);
+  void setDriveCAndIdealSlew();
+  void computeSlew();
+  void computeDelay();
 
   // graph construction
   void addPin(VerilogPin* p);
@@ -93,6 +99,7 @@ public:
 
   void construct();
   void initialize();
+  void timeFromScratch();
   void print(std::ostream& os = std::cout);
 };
 
