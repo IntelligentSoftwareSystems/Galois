@@ -16,6 +16,7 @@ function(distApp name)
   app(${name} ${name}/gen.cpp DISTSAFE)
   target_link_libraries(${name} galois_dist distbench)
   target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  #target_compile_definitions(${name} PRIVATE MORE_COMM_STATS=1)
 
   if(ENABLE_HETERO_GALOIS)
     target_compile_definitions(${name} PRIVATE __GALOIS_HET_CUDA__=1)
