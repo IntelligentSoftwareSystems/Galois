@@ -45,6 +45,7 @@ distAppNoGPU(pr_bc_opt_v5)
 distAppNoGPU(pr_bc_opt_v6)
 distAppNoGPU(pr_bc_opt_v7)
 distAppNoGPU(pr_bc_opt_v8)
+distAppNoGPU(pr_bc_opt_v9)
 
 distAppNoGPU(debug_bc_level)
 
