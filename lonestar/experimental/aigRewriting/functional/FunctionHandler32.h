@@ -35,8 +35,13 @@
 
 #include "../xxHash/xxhash.h"
 #include <cmath>
-#include <iostream>
 #include <cassert>
+#include <cstring>
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <iomanip>
+#include <stdexcept>
 
 namespace Functional32 {
 
@@ -48,11 +53,16 @@ static inline void AND(word* result, word* lhs, word* rhs, int nWords);
 static inline void NAND(word* result, word* lhs, word* rhs, int nWords);
 static inline void OR(word* result, word* lhs, word* rhs, int nWords);
 static inline void XOR(word* result, word* lhs, word* rhs, int nWords);
+static inline bool isConstZero(word* function, int nVars);
+static inline bool isConstOne(word* function, int nVars);
 static inline int countOnes(unsigned uWord);
 static inline int wordNum(int nVars);
 static void truthStretch(word* result, word* input, int inVars, int nVars,
                          unsigned phase);
 static void swapAdjacentVars(word* result, word* input, int nVars, int iVar);
+static std::string toCubeString( word* function, int nWords, int nVars);
+static std::string toHex(word* function, int nWords);
+static std::string toBin(word* function, int nWords);
 
 void copy(word* result, word* original, int nWords) {
 
@@ -94,6 +104,35 @@ void XOR(word* result, word* lhs, word* rhs, int nWords) {
   for (int i = 0; i < nWords; i++) {
     result[i] = lhs[i] ^ rhs[i];
   }
+}
+
+bool isConstZero(word* function, int nVars) {
+
+  word* pFunction = function;
+  word* pLimit    = pFunction + wordNum(nVars);
+
+  while (pFunction != pLimit) {
+    if (*pFunction++ != 0U) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool isConstOne(word* function, int nVars) {
+
+  word* pFunction = function;
+  word* pLimit    = pFunction + wordNum(nVars);
+  const word ONE  = ~0U;
+
+  while (pFunction != pLimit) {
+    if (*pFunction++ != ONE) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 int countOnes(unsigned uWord) {
@@ -190,6 +229,90 @@ void swapAdjacentVars(word* result, word* input, int nVars, int iVar) {
       }
     }
   }
+}
+
+std::string toBin(word* function, int nWords) {
+
+  if (function != nullptr) {
+
+    std::stringstream result;
+
+    result << "";
+
+    for (int i = nWords - 1; i >= 0; i--) {
+      for (int j = 31; j >= 0; j--) {
+        if ((function[i] >> j) & 1) {
+          result << ("1");
+        } else {
+          result << ("0");
+        }
+      }
+    }
+
+    return result.str();
+  } else {
+    return "nullptr";
+  }
+}
+std::string toHex(word* function, int nWords) {
+
+  std::stringstream result;
+
+  result << "0x";
+
+  for (int i = nWords - 1; i >= 0; i--) {
+    result << std::setw(16) << std::setfill('0') << std::hex << function[i];
+  }
+
+  return result.str();
+}
+
+std::string toCubeString( word* function, int nWords, int nVars) {
+
+	std::stringstream cubes;
+	word mask, cube;
+	int nRows;
+
+	if ( nWords == 1 ) {
+		nRows = 2 << nVars-1;
+		mask = 1;
+		for (int j = 0; j < nRows; j++) {
+			if ( function[0] & mask ) {
+				cube = j;
+				for (int k = 0; k < nVars; k++) {
+					if ((cube >> k) & 1) {
+						cubes << ("1");
+					}
+					else {
+						cubes << ("0");
+					}
+				}
+				cubes << " 1" << std::endl;
+			}
+			mask = mask << 1;
+		}
+	}
+	else {
+		for (int i = 0; i < nWords; i++) {
+			mask = 1;
+			for (int j = 0; j < 32; j++) {
+				if ( function[i] & mask ) {
+					cube = (i*32)+j;
+					for (int k = 0; k < nVars; k++) {
+						if ((cube >> k) & 1) {
+							cubes << ("1");
+						} 
+						else {
+							cubes << ("0");
+						}
+					}
+					cubes << " 1" << std::endl;
+				}
+				mask = mask << 1;
+			}
+		}
+	}
+	return cubes.str();
 }
 
 } /* namespace Functional32 */
