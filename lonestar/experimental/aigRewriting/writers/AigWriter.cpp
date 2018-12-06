@@ -23,7 +23,6 @@
 AigWriter::AigWriter() {}
 
 AigWriter::AigWriter(std::string path) {
-  this->path = path;
   setFile(path);
 }
 

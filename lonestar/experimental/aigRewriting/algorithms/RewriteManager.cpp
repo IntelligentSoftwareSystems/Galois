@@ -189,7 +189,7 @@ aig::GNode RewriteManager::rewriteNode(ThreadContextData* threadCtx,
 
   assert(bestGraph != nullptr);
 
-  // Preparing structure/AIG tracking for updating the AIG
+  // Preparing structure/AIG tracking for updating the AIG 
   for (int j = 0; j < 20; j++) {
     if (j < 4) {
       threadCtx->decNodeFunc[j] =
@@ -354,12 +354,13 @@ DecGraph* RewriteManager::evaluateCut(ThreadContextData* threadCtx,
     // threadCtx->decNodeLevel[i] = faninData.level;
   }
 
-  // determine the best subgrap
+	// Pruning
   int nSubgraphs = subgraphs.size();
-  if (nSubgraphs > this->triesNGraphs) { // Pruning
+  if (nSubgraphs > this->triesNGraphs) {
     nSubgraphs = this->triesNGraphs;
   }
 
+  // determine the best subgrap
   for (int i = 0; i < nSubgraphs; i++) {
     node = subgraphs[i];
     // get the current graph
@@ -441,8 +442,6 @@ int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
     // if they are both present, find the resulting node
     if (lhsAnd && rhsAnd) {
       if (lhsNode->id < 4) { // If lhs is a cut leaf
-        // lhsPol = node->eEdge0.fCompl ? !(false ^ threadCtx->currentFaninsPol[
-        // lhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ lhsNode->id ]);
         lhsPol = node->eEdge0.fCompl
                      ? !(threadCtx->currentFaninsPol[lhsNode->id])
                      : threadCtx->currentFaninsPol[lhsNode->id];
@@ -451,8 +450,6 @@ int RewriteManager::decGraphToAigCount(ThreadContextData* threadCtx,
       }
 
       if (rhsNode->id < 4) { // If rhs is a cut leaf
-        // rhsPol = node->eEdge1.fCompl ? !(false ^ threadCtx->currentFaninsPol[
-        // rhsNode->id ]) : !(true ^ threadCtx->currentFaninsPol[ rhsNode->id ]);
         rhsPol = node->eEdge1.fCompl
                      ? !(threadCtx->currentFaninsPol[rhsNode->id])
                      : threadCtx->currentFaninsPol[rhsNode->id];
@@ -617,9 +614,6 @@ aig::GNode RewriteManager::decGraphToAig(ThreadContextData* threadCtx,
     rhsAnd = threadCtx->decNodeFunc[rhsNode->id];
 
     if (lhsNode->id < 4) { // If lhs is a cut leaf
-      // lhsAndPol = decNode->eEdge0.fCompl ? !(false ^
-      // threadCtx->bestFaninsPol[ lhsNode->id ]) : !(true ^
-      // threadCtx->bestFaninsPol[ lhsNode->id ]);
       lhsAndPol = decNode->eEdge0.fCompl
                       ? !(threadCtx->bestFaninsPol[lhsNode->id])
                       : threadCtx->bestFaninsPol[lhsNode->id];
@@ -628,9 +622,6 @@ aig::GNode RewriteManager::decGraphToAig(ThreadContextData* threadCtx,
     }
 
     if (rhsNode->id < 4) { // If rhs is a cut leaf
-      // rhsAndPol = decNode->eEdge1.fCompl ? !(false ^
-      // threadCtx->bestFaninsPol[ rhsNode->id ]) : !(true ^
-      // threadCtx->bestFaninsPol[ rhsNode->id ]);
       rhsAndPol = decNode->eEdge1.fCompl
                       ? !(threadCtx->bestFaninsPol[rhsNode->id])
                       : threadCtx->bestFaninsPol[rhsNode->id];
