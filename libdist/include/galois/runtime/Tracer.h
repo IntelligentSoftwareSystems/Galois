@@ -30,7 +30,6 @@
 
 #include <sstream>
 #include <functional>
-#include <vector>
 
 namespace galois {
 namespace runtime {
@@ -95,7 +94,7 @@ public:
 /**
  * Operator to print a vector given a vecPrinter object
  */
-template <typename T, typename A>
+template <typename T>
 std::ostream& operator<<(std::ostream& os, const vecPrinter<T>& vp) {
   vp.print(os);
   return os;
