@@ -2201,8 +2201,6 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
       b.reserve(sizeof(DataCommMode)
           + sizeof(size_t)
           + (num * sizeof(typename SyncFnTy::ValTy)));
@@ -2286,8 +2284,6 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
       b.reserve(sizeof(DataCommMode)
           + sizeof(size_t)
           + (num * sizeof(typename SyncFnTy::ValTy)));
@@ -2468,11 +2464,35 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
-      b.reserve(sizeof(DataCommMode)
-          + sizeof(size_t)
-          + (num * sizeof(typename SyncFnTy::ValTy)));
+      if (enforce_data_mode == gidsData) {
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t)
+            + (num * sizeof(unsigned int))
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else if (enforce_data_mode == offsetsData) {
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t)
+            + (num * sizeof(unsigned int))
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else if (enforce_data_mode == bitsetData) {
+        size_t bitset_alloc_size =
+            ((num + 63) / 64) * sizeof(uint64_t);
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t) // bitset size
+            + sizeof(size_t) // bitset vector size
+            + bitset_alloc_size
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else { // onlyData or noData (auto)
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      }
       Textractalloc.stop();
 
       Textractbatch.start();
