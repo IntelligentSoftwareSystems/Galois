@@ -143,16 +143,30 @@ matrix:
             - cmake3
             - boost1.67
     - env:
-        - CLANG_VER=6.0
+        - CLANG_VER=7
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+            - llvm-toolchain-trusty-7
+            - sourceline: 'ppa:mhier/libboost-latest'
+          packages:
+            - clang-7
+            - gcc-8
+            - g++-8
+            - cmake3
+            - boost1.67
+    - env:
+        - CLANG_VER=7
         - BUILD_TYPE=Debug
       addons:
         apt:
           sources:
             - ubuntu-toolchain-r-test
-            - llvm-toolchain-trusty-6.0
+            - llvm-toolchain-trusty-7
             - sourceline: 'ppa:mhier/libboost-latest'
           packages:
-            - clang-6.0
+            - clang-7
             - gcc-8
             - g++-8
             - cmake3

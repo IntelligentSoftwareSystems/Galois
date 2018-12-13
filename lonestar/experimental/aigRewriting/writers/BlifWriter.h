@@ -17,36 +17,44 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
+/*
+
+ @Vinicius Possani
+ Blif format writer, October 17, 2018.
+
+*/
+
+#ifndef BLIFWRITER_H_
+#define BLIFWRITER_H_
+
+#include <fstream>
+#include <iostream>
 #include <string>
-#include <vector>
+#include <unordered_map>
 
-#ifndef GALOIS_EDA_TOKENIZER_H
-#define GALOIS_EDA_TOKENIZER_H
+#include "../subjectgraph/aig/Aig.h"
+#include "../algorithms/PriorityCutManager.h"
+#include "galois/Galois.h"
 
-using Token = std::string;
 
-class Tokenizer {
-  std::vector<char>& delimiters;
-  std::vector<char>& separators;
-
-  // should be provided as {"form1_begin", "form1_end", ...}
-  std::vector<std::string>& comments;
-
-  char* buffer;
-  char* bufferEnd;
-  char* cursor;
+class BlifWriter {
 
 private:
-  bool isSeparator(char c);
-  bool isDelimiter(char c);
-  void readFile2Buffer(std::string inName);
-  void skipComment();
-  Token getNextToken();
+  std::ofstream blifFile;
+  std::string path;
 
 public:
-  Tokenizer(std::vector<char>& d, std::vector<char>& s, std::vector<std::string>& cm)
-      : delimiters(d), separators(s), comments(cm) {}
-  std::vector<Token> tokenize(std::string inName);
+	BlifWriter();
+	BlifWriter(std::string path);
+	~BlifWriter();
+
+	void setFile(std::string path);
+	bool isOpen();
+	void close();
+	int countDigits( int n );
+
+	void writeNetlist( aig::Aig & aig, algorithm::PriCutManager & cutMan );
+
 };
 
-#endif // GALOIS_EDA_TOKENIZER_H
+#endif /* BLIFWRITER_H_ */
