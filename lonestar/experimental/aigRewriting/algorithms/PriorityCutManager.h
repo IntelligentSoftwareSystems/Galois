@@ -20,7 +20,7 @@
 /*
 
  @Vinicius Possani
- Parallel Rewriting January 5, 2018.
+ Parallel Parallel LUT-Based Tech Mapping October 16, 2018.
  ABC-based implementation on Galois.
 
 */
@@ -33,6 +33,7 @@
 #include "CutManager.h"
 #include "../functional/FunctionHandler32.h"
 #include "galois/Reduction.h"
+#include <unordered_map>
 
 namespace algorithm {
 
@@ -52,9 +53,25 @@ typedef struct pricutList_ {
 
 } PriCutList;
 
+typedef struct LUT_ {
+
+	PriCut* bestCut;
+	int rootId;
+	int level;
+	
+	LUT_() {
+		bestCut = nullptr;
+		rootId = 0;
+		level = 0;
+	}
+
+} LUT;
+
 typedef galois::substrate::PerThreadStorage<PriCutPool> PerThreadPriCutPool;
 typedef galois::substrate::PerThreadStorage<PriCutList> PerThreadPriCutList;
 typedef galois::substrate::PerThreadStorage<AuxTruth> PerThreadAuxTruth;
+
+typedef std::unordered_map< int, LUT > Covering;
 
 class PriCutManager {
 
@@ -77,6 +94,10 @@ private:
   PerThreadAuxTruth perThreadAuxTruth;
   PriCut** nodePriCuts;
 
+	Covering covering;
+	int nLUTs;
+	int nLevels;
+
   // Cuts Statistics //
   galois::GAccumulator<long int> nCuts;
   galois::GAccumulator<long int> nTriv;
@@ -90,22 +111,23 @@ private:
   galois::GAccumulator<long int> compTime;
   galois::GAccumulator<long int> scheduleTime;
 
-  void computePriCutsRec(aig::GNode node, PriCutPool* cutPool, PriCutList* cutList,
-                      AuxTruth* auxTruth);
-
-
+  void computePriCutsRec(aig::GNode node, PriCutPool* cutPool, PriCutList* cutList, AuxTruth* auxTruth);
   PriCut* mergeCuts(PriCutPool* cutPool, PriCut* lhsCut, PriCut* rhsCut);
   inline bool cutFilter(PriCutPool* cutPool, PriCutList* cutList, PriCut* resCut);
   inline bool checkCutDominance(PriCut* smallerCut, PriCut* largerCut);
   inline void commitCuts(int nodeId, PriCutList* cutList);
-  void computeTruth(AuxTruth* auxTruth, PriCut* resCut, PriCut* lhsCut, PriCut* rhsCut,
-                    bool lhsPolarity, bool rhsPolarity);
-
+  void computeTruth(AuxTruth* auxTruth, PriCut* resCut, PriCut* lhsCut, PriCut* rhsCut, bool lhsPolarity, bool rhsPolarity);
   inline unsigned truthPhase(PriCut* resCut, PriCut* inCut);
 	float cutAreaRef( PriCut * cut );
 	float cutAreaDeref( PriCut * cut );
-
+	void cutSort(PriCutPool * cutPool, PriCutList * cutList, PriCut * resCut);
+	int sortCompare(PriCut * lhsCut, PriCut * rhsCut);
+	float cutAreaFlow( PriCut * cut );
+	float cutAreaDerefed( PriCut * cut );
+	float cutDelay( PriCut * cut );
+	float cutEdgeFlow( PriCut * cut );
 public:
+
   PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool compTruth);
 
   ~PriCutManager();
@@ -118,19 +140,20 @@ public:
 
   unsigned int* readTruth(PriCut* cut);
   void recycleNodeCuts(int nodeId);
-	void cutSort(PriCutPool * cutPool, PriCutList * cutList, PriCut * resCut);
-	int sortCompare(PriCut * lhsCut, PriCut * rhsCut);
-	float cutAreaFlow( PriCut * cut );
-	float cutAreaDerefed( PriCut * cut );
-	float cutDelay( PriCut * cut );
-	float cutEdgeFlow( PriCut * cut );
 	PriCut * getBestCut( int nodeId );
+	void computeCovering();
+	int computeCoveringRec( aig::Graph & aigGraph, aig::GNode node );
+	void printCovering();
   void printNodeCuts(int nodeId, long int& counter);
   void printAllCuts();
+	void printNodeBestCut(int nodeId);
+	void printBestCuts();
   void printCutStatistics();
   void printRuntimes();
 
   aig::Aig& getAig();
+	int getNumLUTs();
+	int getNumLevels();
   int getK();
   int getC();
   int getNWords();
@@ -142,6 +165,7 @@ public:
   PerThreadPriCutList& getPerThreadPriCutList();
   PerThreadAuxTruth& getPerThreadAuxTruth();
   PriCut** getNodePriCuts();
+	Covering & getCovering();
 };
 
 // Function that runs the KCut operator define in the end of file CutManager.cpp

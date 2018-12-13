@@ -154,15 +154,9 @@ struct DefaultAlgo {
   template <typename C>
   void processNode(Graph& graph, const GNode& src, C& ctx) {
     bool mod;
-    if (ctx.isFirstPass()) {
-      mod = build<galois::MethodFlag::WRITE>(graph, src);
-      graph.getData(src, galois::MethodFlag::WRITE);
-      ctx.cautiousPoint(); // Failsafe point
-
-    } else {
-      LocalState* localState = ctx.template getLocalState<LocalState>();
-      mod                    = localState->mod;
-    }
+    mod = build<galois::MethodFlag::WRITE>(graph, src);
+    graph.getData(src, galois::MethodFlag::WRITE);
+    ctx.cautiousPoint(); // Failsafe point
 
     if (mod) {
       modify(graph, src);
@@ -441,7 +435,6 @@ struct EdgeTiledPrioAlgo {
     galois::GAccumulator<size_t> rounds;
     galois::GAccumulator<float> nedges;
     galois::GReduceLogicalOR unmatched;
-    // bool unmatched = true;
     galois::substrate::PerThreadStorage<std::mt19937*> generator;
     galois::InsertBag<EdgeTile> works;
     const int EDGE_TILE_SIZE = 64;
@@ -688,16 +681,17 @@ void run() {
   T.stop();
   galois::reportPageAlloc("MeminfoPost");
 
-  std::cout << "Cardinality of maximal independent set: "
-            << galois::ParallelSTL::count_if(graph.begin(), graph.end(),
-                                             is_matched<Graph>(graph))
-            << "\n";
 
   if (!skipVerify && !verify(graph, algo)) {
     std::cerr << "verification failed\n";
     assert(0 && "verification failed");
     abort();
   }
+
+  std::cout << "Cardinality of maximal independent set: "
+            << galois::ParallelSTL::count_if(graph.begin(), graph.end(),
+                                             is_matched<Graph>(graph))
+            << "\n";
 }
 
 int main(int argc, char** argv) {
