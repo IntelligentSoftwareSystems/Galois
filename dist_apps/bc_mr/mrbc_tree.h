@@ -20,24 +20,22 @@
 #ifndef _MRBCTREE_
 #define _MRBCTREE_
 #include <boost/container/flat_map.hpp>
-#include <boost/container/flat_set.hpp>
-const uint32_t infinity = std::numeric_limits<uint32_t>::max() / 4;
+#include "mrbc_bitset.hh"
+
+const uint32_t infinity = std::numeric_limits<uint32_t>::max() >> 2;
 
 /**
  * Binary tree class to make finding a source's message to send out during MRBC
  * easier.
  */
 class MRBCTree {
-  using FlatSet = boost::container::flat_set<uint32_t, 
-                    std::less<uint32_t>, galois::gstl::Pow2Alloc<uint32_t>>;
-  using FlatMap = boost::container::flat_map<uint32_t, FlatSet,
-                 std::less<uint32_t>,
-                 galois::gstl::Pow2Alloc<std::pair<uint32_t, FlatSet>>>;
+  using BitSet = MRBCBitSet;
+  using FlatMap = boost::container::flat_map<uint32_t, BitSet,
+                                              std::less<uint32_t>,
+                                              galois::gstl::Pow2Alloc<std::pair<uint32_t, BitSet>>>;
 
   //! map to a bitset of nodes that belong in a particular distance group
   FlatMap distanceTree;
-  //! marks if a message has already been sent for a source
-  galois::gstl::Vector<bool> sentFlag;
   //! number of sources that have already been sent out
   uint32_t numSentSources;
   //! number of non-infinity values (i.e. number of sources added already)
@@ -46,36 +44,26 @@ class MRBCTree {
   bool zeroReached;
 
   //! reverse iterator over map
-  using TreeIter = typename FlatMap::const_reverse_iterator;
-  //! reverse iterator over set
-  using SetIter = typename FlatSet::const_reverse_iterator;
-
+  using TreeIter = typename FlatMap::reverse_iterator;
   //! Current iterator for reverse map
   TreeIter curKey;
   //! End key for reverse map iterator
   TreeIter endCurKey;
-  //! Current set iterator
-  SetIter curSet;
-  //! End of set iterator
-  SetIter endCurSet;
 
- public:
+public:
+/*** InitializeIteration *****************************************************/
+
   /**
    * Reset the map, initialize all distances to infinity, and reset the "sent"
    * vector and num sent sources.
    */
   void initialize() {
     distanceTree.clear();
-    // reset sent flags
-    sentFlag.resize(numSourcesPerRound);
-    for (unsigned i = 0; i < numSourcesPerRound; i++) {
-      sentFlag[i] = 0;
-    }
     // reset number of sent sources
     numSentSources = 0;
     // reset number of non infinity sources that exist
     numNonInfinity = 0;
-
+    // reset the flag for backward phase
     zeroReached = false;
   }
 
@@ -84,9 +72,53 @@ class MRBCTree {
    * of index somewhere.
    */
   void setDistance(uint32_t index, uint32_t newDistance) {
-    distanceTree[newDistance].insert(index);
+    // Only for iterstion initialization
+    // assert(newDistance == 0);
+    // assert(distanceTree[newDistance].size() == numSourcesPerRound);
+    distanceTree[newDistance].set_indicator(index);
     numNonInfinity++;
   }
+
+/*** FindMessageToSync ********************************************************/
+
+  /**
+   * Get the index that needs to be sent out this round given the round number.
+   */
+  uint32_t getIndexToSend(uint32_t roundNumber) {
+    uint32_t distanceToCheck = roundNumber - numSentSources;
+    uint32_t indexToSend = infinity;
+
+    auto setIter = distanceTree.find(distanceToCheck);
+    if (setIter != distanceTree.end()) {
+      BitSet& setToCheck = setIter->second;
+      auto index = setToCheck.getIndicator();
+      if (index != setToCheck.npos) {
+        indexToSend = index;
+      }
+    }
+    return indexToSend;
+  }
+
+  /**
+   * Return true if potentially more work exists to be done
+   */
+  bool moreWork() { return numNonInfinity > numSentSources; }
+
+/*** ConfirmMessageToSend *****************************************************/
+
+  /**
+   * Note that a particular source's message has already been sent in the data
+   * structure and increment the number of sent sources.
+   */
+  void markSent(uint32_t roundNumber) {
+    uint32_t distanceToCheck = roundNumber - numSentSources;
+    BitSet& setToCheck = distanceTree[distanceToCheck];
+    setToCheck.forward_indicator();
+
+    numSentSources++;
+  }
+
+/*** SendAPSPMessages *********************************************************/
 
   /**
    * Update the distance map: given an index to update as well as its old 
@@ -98,74 +130,43 @@ class MRBCTree {
     }
 
     auto setIter = distanceTree.find(oldDistance);
-    size_t count = 0;
+    bool existed = false;
     // if it exists, remove it
     if (setIter != distanceTree.end()) {
-      FlatSet& setToChange = setIter->second;
-      count = setToChange.erase(index);
+      BitSet& setToChange = setIter->second;
+      existed = setToChange.test_set_indicator(index, false); // Test, set, update
     }
 
     // if it didn't exist before, add to number of non-infinity nodes
-    if (count == 0) {
+    if (!existed) {
       numNonInfinity++;
     }
-    distanceTree[newDistance].insert(index);
+
+    // asset(distanceTree[newDistance].size() == numSourcesPerRound);
+    distanceTree[newDistance].set_indicator(index);
+
   }
 
-  /**
-   * Get the index that needs to be sent out this round given the round number.
-   */
-  uint32_t getIndexToSend(uint32_t roundNumber) {
-    uint32_t distanceToCheck = roundNumber - numSentSources;
-    uint32_t indexToSend = infinity;
-
-    auto setIter = distanceTree.find(distanceToCheck);
-    if (setIter != distanceTree.end()) {
-      FlatSet& setToCheck = setIter->second;
-
-      for (const uint32_t index : setToCheck) {
-        if (!sentFlag[index]) {
-          indexToSend = index;
-          break;
-        }
-      }
-    }
-    return indexToSend;
-  }
-
-  
-  /**
-   * Note that a particular source's message has already been sent in the data
-   * structure and increment the number of sent sources.
-   */
-  void markSent(uint32_t index) {
-    sentFlag[index] = 1;
-    numSentSources++; 
-  }
-
-  /**
-   * Return true if potentially more work exists to be done
-   */
-  bool moreWork() {
-    return numNonInfinity > numSentSources;
-  }
+/*** RoundUpdate **************************************************************/
 
   /**
    * Begin the setup for the back propagation phase by setting up the 
    * iterators.
    */
   void prepForBackPhase() {
-    curKey = distanceTree.crbegin();
-    endCurKey = distanceTree.crend();
+    curKey = distanceTree.rbegin();
+    endCurKey = distanceTree.rend();
 
     if (curKey != endCurKey) {
-      curSet = curKey->second.crbegin();
-      endCurSet = curKey->second.crend();
+      BitSet& curSet = curKey->second;
+      #ifdef FLIP_MODE
+        curSet.flip();
+      #endif
+      curSet.backward_indicator();
     }
-
   }
 
-  // distance + numSentSources - 1 == lastRound - curRoundNumber
+/*** BackFindMessageToSend *****************************************************/
 
   /**
    * Given a round number, figure out which index needs to be sent out for the
@@ -176,32 +177,34 @@ class MRBCTree {
     uint32_t indexToReturn = infinity;
 
     while (curKey != endCurKey) {
-      if (curSet != endCurSet) {
-        uint32_t curNumber = *curSet;
-        uint32_t distance = curKey->first;
+      uint32_t distance = curKey->first;
+      if ((distance + numSentSources - 1) != (lastRound - roundNumber)){
+        // round to send not reached yet; get out
+        return infinity;
+      }
 
-        if (distance == 0) {
-          zeroReached = true;
-        }
+      if (distance == 0) {
+        zeroReached = true;
+        return infinity;
+      }
 
-        if ((distance + numSentSources - 1) == (lastRound - roundNumber)) {
+      BitSet& curSet = curKey->second;
+      if (!curSet.nposInd()) {
           // this number should be sent out this round
-          indexToReturn = curNumber;
-          curSet++;
+          indexToReturn = curSet.backward_indicator();
           numSentSources--;
           break;
-        } else {
-          // round to send not reached yet; get out
-          break;
-        }
       } else {
         // set exhausted; go onto next set
-        curKey++;
+        for (++curKey; curKey != endCurKey && curKey->second.none(); ++curKey);
 
         // if another set exists, set it up, else do nothing
         if (curKey != endCurKey) {
-          curSet = curKey->second.crbegin();
-          endCurSet = curKey->second.crend();
+          BitSet& nextSet = curKey->second;
+          #ifdef FLIP_MODE
+            nextSet.flip();
+          #endif
+          nextSet.backward_indicator();
         }
       }
     }
