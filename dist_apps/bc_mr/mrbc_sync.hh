@@ -34,9 +34,9 @@ struct APSPReduce {
     a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      b = node.minDistances[indexToGet];
-      c = node.shortestPathNumbers[indexToGet];
-      node.shortestPathNumbers[indexToGet] = 0;
+      b = node.sourceData[indexToGet].minDistance;
+      c = node.sourceData[indexToGet].shortPathCount;
+      node.sourceData[indexToGet].shortPathCount = 0;
     } else {
       // no-op
       b = infinity;
@@ -46,7 +46,7 @@ struct APSPReduce {
     return ValTy(a, b, c);
   }
 
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, 
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
                                   DataCommMode*) { return false; }
 
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
@@ -59,25 +59,26 @@ struct APSPReduce {
       ShortPathType rNumPaths = y.third;
 
       // do updates based on received numbers
-      uint32_t old = galois::min(node.minDistances[rIndex], rDistance);
+      uint32_t old = galois::min(node.sourceData[rIndex].minDistance, rDistance);
 
       // reset shortest paths if min dist changed (i.e. don't add to it)
       if (old > rDistance) {
         node.dTree.setDistance(rIndex, old, rDistance);
         assert(rNumPaths != 0);
-        node.shortestPathNumbers[rIndex] = rNumPaths;
+        node.sourceData[rIndex].shortPathCount = rNumPaths;
       } else if (old == rDistance) {
         // add to short path
-        node.shortestPathNumbers[rIndex] += rNumPaths;
+        node.sourceData[rIndex].shortPathCount += rNumPaths;
       }
 
       // if received distance is smaller than current candidate for sending, send
       // it out instead (if tie breaker wins i.e. lower in position)
-      if (node.roundIndexToSend == infinity || 
-            (node.minDistances[rIndex] < node.minDistances[node.roundIndexToSend])) {
+      if (node.roundIndexToSend == infinity ||
+          (node.sourceData[rIndex].minDistance <
+            node.sourceData[node.roundIndexToSend].minDistance)) {
           node.roundIndexToSend = rIndex;
-      } else if (node.minDistances[rIndex] == 
-                 node.minDistances[node.roundIndexToSend]) {
+      } else if (node.sourceData[rIndex].minDistance ==
+                 node.sourceData[node.roundIndexToSend].minDistance) {
         if (rIndex < node.roundIndexToSend) {
           node.roundIndexToSend = rIndex;
         }
@@ -95,9 +96,9 @@ struct APSPReduce {
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) { 
+  static void reset(uint32_t node_id, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
-      node.shortestPathNumbers[node.roundIndexToSend] = 0;
+      node.sourceData[node.roundIndexToSend].shortPathCount = 0;
     }
   }
 };
@@ -115,8 +116,8 @@ struct APSPBroadcast {
     a = indexToGet;
     if (indexToGet != infinity) {
       // get min distance and # shortest paths
-      b = node.minDistances[indexToGet];
-      c = node.shortestPathNumbers[indexToGet];
+      b = node.sourceData[indexToGet].minDistance;
+      c = node.sourceData[indexToGet].shortPathCount;
       assert(c != 0); // should not send out 0 for # paths
     } else {
       // no-op
@@ -140,10 +141,10 @@ struct APSPBroadcast {
 
       // values from master are canonical ones for this round
       node.roundIndexToSend = rIndex;
-      uint32_t oldDistance = node.minDistances[rIndex];
-      node.minDistances[rIndex] = rDistance;
+      uint32_t oldDistance = node.sourceData[rIndex].minDistance;
+      node.sourceData[rIndex].minDistance = rDistance;
+      node.sourceData[rIndex].shortPathCount = rNumPaths;
       node.dTree.setDistance(rIndex, oldDistance, rDistance);
-      node.shortestPathNumbers[rIndex] = rNumPaths;
     }
   }
 
@@ -159,7 +160,7 @@ struct DependencyReduce {
     uint32_t indexToGet = node.roundIndexToSend;
     float thing;
     if (indexToGet != infinity) {
-      thing = node.dependencyValues[indexToGet];
+      thing = node.sourceData[indexToGet].dependencyValue;
     } else {
       thing = 0;
     }
@@ -167,7 +168,7 @@ struct DependencyReduce {
     return ValTy(indexToGet, thing);
   }
 
-  static bool extract_reset_batch(unsigned, uint8_t*, size_t*, 
+  static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
                                   DataCommMode*) { return false; }
 
   static bool extract_reset_batch(unsigned, uint8_t*) { return false; }
@@ -182,7 +183,7 @@ struct DependencyReduce {
       assert(node.roundIndexToSend == rIndex);
 
       float rToAdd = y.second;
-      galois::atomicAdd(node.dependencyValues[rIndex], rToAdd);
+      galois::atomicAdd(node.sourceData[rIndex].dependencyValue, rToAdd);
       return true;
     }
 
@@ -192,9 +193,9 @@ struct DependencyReduce {
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
   // reset the number of shortest paths (the master will now have it)
-  static void reset(uint32_t node_id, struct NodeData &node) { 
+  static void reset(uint32_t node_id, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
-      node.dependencyValues[node.roundIndexToSend] = 0;
+      node.sourceData[node.roundIndexToSend].dependencyValue = 0;
     }
   }
 };
@@ -207,7 +208,7 @@ struct DependencyBroadcast {
 
     float thing;
     if (indexToGet != infinity) {
-      thing = node.dependencyValues[indexToGet];
+      thing = node.sourceData[indexToGet].dependencyValue;
     } else {
       thing = 0;
     }
@@ -225,7 +226,7 @@ struct DependencyBroadcast {
     if (rIndex != infinity) {
       float rDep = y.second;
       assert(node.roundIndexToSend == rIndex);
-      node.dependencyValues[rIndex] = rDep;
+      node.sourceData[rIndex].dependencyValue = rDep;
     }
   }
 

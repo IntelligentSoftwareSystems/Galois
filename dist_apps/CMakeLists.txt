@@ -91,4 +91,4 @@ distApp(sssp_push)
 
 distAppNoGPU(partition)
 
-distAppNoGPU(mrbc)
+distAppNoGPU(bc_mr)
