@@ -31,7 +31,6 @@
 
 namespace galois {
 namespace graphs {
-
 /**
  * @tparam NodeTy type of node data for the graph
  * @tparam EdgeTy type of edge data for the graph
@@ -461,13 +460,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::increment_evilPhase();
   }
 
+  // TODO signature as well
+  void syncLoad() {
+
+  }
+
   /**
    * phase responsible for master assignment
    */
   void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
     galois::gstl::Vector<galois::DynamicBitSet> neighborOnHosts;
     neighborOnHosts.resize(base_DistGraph::numHosts);
-    std::vector<uint32_t> localNodeToMaster;
 
     // determine on which hosts that this host's read nodes havs neighbors on
     phase0BitsetSetup(bufGraph, neighborOnHosts);
@@ -481,10 +484,53 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // setup other partitioning metadata: nodes on each host, edges on each
     // host (as determined by edge cut)
+    std::vector<uint64_t> nodeLoads;
+    std::vector<uint64_t> edgeLoads;
+    std::vector<galois::CopyableAtomic<uint64_t>> nodeAccum;
+    std::vector<galois::CopyableAtomic<uint64_t>> edgeAccum;
+    nodeLoads.assign(base_DistGraph::numHosts, 0);
+    edgeLoads.assign(base_DistGraph::numHosts, 0);
+    nodeAccum.assign(base_DistGraph::numHosts, 0);
+    nodeAccum.assign(base_DistGraph::numHosts, 0);
+    // this above all to be synchronized via DGAccumulators
+
     uint32_t numLocalNodes =
       base_DistGraph::gid2host[base_DistGraph::id].second -
       base_DistGraph::gid2host[base_DistGraph::id].first;
-    localNodeToMaster.resize(numLocalNodes + neighborCount);        
+
+    std::vector<uint32_t> localNodeToMaster;
+    localNodeToMaster.assign(numLocalNodes + neighborCount, -1);
+    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
+      uint32_t beginNode;
+      uint32_t endNode;
+      std::tie(beginNode, endNode) = galois::block_range(
+        globalOffset, base_DistGraph::gid2host[base_DistGraph::id].second,
+        syncRound, stateRounds);
+
+      galois::do_all(
+        // iterate over my read nodes
+        galois::iterate(beginNode, endNode),
+        [&] (uint32_t src) {
+          galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
+                         " ", src);
+        },
+        #if MORE_DIST_STATS
+        galois::loopname("DetermineMasters"),
+        #endif
+        galois::steal(),
+        galois::no_stats()
+      );
+
+      //syncLoad(nodeLoads, nodeAccum);
+      //syncLoad(edgeLoads, edgeAccum);
+      //// debug prints
+      //printLoad(nodeLoads);
+      //printLoad(edgeLoads);
+
+      // do synchronization of master assignment of neighbors
+    }
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,

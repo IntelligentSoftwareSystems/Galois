@@ -120,3 +120,8 @@ cll::opt<unsigned>
                              cll::desc("Buffer size for batching edges to "
                                        "send during partitioning."),
                              cll::init(32000), cll::Hidden);
+
+cll::opt<uint32_t> stateRounds("stateRounds",
+                               cll::desc("Frequency of updates in "
+                                         "partitioning"),
+                               cll::init(1), cll::Hidden);

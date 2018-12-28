@@ -91,6 +91,7 @@ extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
 //! Specifies the size of the buffer used for
 extern cll::opt<unsigned> edgePartitionSendBufSize;
+extern cll::opt<uint32_t> stateRounds;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
