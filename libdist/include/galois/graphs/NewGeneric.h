@@ -70,7 +70,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * get reader of a particular node
    */
   unsigned getHostReader(uint64_t gid) const {
-    for (auto i = 0U; i < hostNodes.size(); ++i) {
+    for (auto i = 0U; i < base_DistGraph::numHosts; ++i) {
       uint64_t start, end;
       std::tie(start, end) = base_DistGraph::gid2host[i];
       if (gid >= start && gid < end) {
@@ -222,23 +222,25 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
 
-    // phase 1
-
-    // loop over all nodes, determine where neighbors are
-
-
-    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
-    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
-    inspectionTimer.start();
-
+    // phase 0
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
+    bufGraph.resetReadCounters();
+    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
     graphReadTimer.start();
     bufGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin,
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
-    bufGraph.resetReadCounters();
 
+    // loop over all nodes, determine where neighbors are, assign masters
+    galois::StatTimer phase0Timer("Phase0", GRNAME);
+    phase0Timer.start();
+    phase0(bufGraph);
+    phase0Timer.stop();
+
+    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
+    inspectionTimer.start();
+    bufGraph.resetReadCounters();
     galois::gstl::Vector<uint64_t> prefixSumOfEdges;
 
     // assign edges to other nodes
@@ -260,6 +262,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       edgeCutInspection(bufGraph, inspectionTimer, edgeOffset,
                         prefixSumOfEdges);
     }
+    // inspection timer is stopped in edgeInspection function
 
     // get memory back from inspection metadata
     numOutgoingEdges.clear();
@@ -288,9 +291,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // get memory from prefix sum back
     prefixSumOfEdges.clear();
     freeVector(prefixSumOfEdges); // should no longer use this variable
-
     fillMirrors();
-
 
     base_DistGraph::printStatistics();
 
@@ -348,6 +349,144 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
  private:
+  // steps 1 and 2 of neighbor location setup: memory allocation, bitset setting
+  void phase0BitsetSetup(
+    galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+    galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
+  ) {
+    // Step 1: setup bitsets
+    galois::do_all( 
+      galois::iterate(0u, (unsigned)base_DistGraph::numHosts),
+      [&] (unsigned h) {
+        // get number of nodes on host h
+        uint64_t startNode;
+        uint64_t endNode;
+        std::tie(startNode, endNode) = base_DistGraph::gid2host[h];
+        // setup bitset
+        neighborOnHosts[h].resize(endNode - startNode);
+        neighborOnHosts[h].reset();
+      },
+      #if MORE_DIST_STATS
+      galois::loopname("SetupNeighborHostBitsets"),
+      #endif
+      galois::steal(),
+      galois::no_stats()
+    );
+
+    // Step 2: loop over all local nodes, determine neighbor locations
+    galois::do_all( 
+      galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+                      base_DistGraph::gid2host[base_DistGraph::id].second),
+      [&] (unsigned n) {
+        auto ii = bufGraph.edgeBegin(n);
+        auto ee = bufGraph.edgeEnd(n);
+        for (; ii < ee; ++ii) {
+          uint32_t dst = bufGraph.edgeDestination(*ii);
+          unsigned hostLocation = getHostReader(dst);
+          // set on bitset
+          neighborOnHosts[getHostReader(dst)].set(
+            dst - base_DistGraph::gid2host[hostLocation].first
+          );
+        }
+      },
+      #if MORE_DIST_STATS
+      galois::loopname("DetermineNeighborLocations"),
+      #endif
+      galois::steal(),
+      galois::no_stats()
+    );
+  }
+
+  // sets up the gid to lid mapping for phase 0
+  // returns number of set bits
+  uint64_t phase0MapSetup(
+    galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
+    std::map<uint64_t, uint32_t>& gid2Offset
+  ) {
+    uint64_t curCount = 0;
+
+    for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
+      if (h != base_DistGraph::id) {
+        uint64_t hostOffset = base_DistGraph::gid2host[h].first;
+        // get set bits in the bitset
+        std::vector<uint32_t> setOffsets = neighborOnHosts[h].getOffsets();
+
+        // map the gid to a local id
+        for (uint32_t i : setOffsets) {
+          gid2Offset[i + hostOffset] = curCount;
+          galois::gDebug("[", base_DistGraph::id, "] ", i + hostOffset, " map to"
+                         " offset ", curCount);
+          curCount++;
+        }
+      }
+    }
+    
+    return curCount;
+  }
+
+  // steps 4 and 5 of neighbor location setup
+  void phase0SendRecv(
+    galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
+  ) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    // Step 4: send bitset to other hosts
+    for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
+      galois::runtime::SendBuffer bitsetBuffer;
+
+      if (h != base_DistGraph::id) {
+        galois::runtime::gSerialize(bitsetBuffer, neighborOnHosts[h]);
+        net.sendTagged(h, galois::runtime::evilPhase, bitsetBuffer);
+      }
+    }
+
+    // Step 5: recv bitset to other hosts; this indicates which local nodes each
+    // other host needs to be informed of updates of
+    for (unsigned h = 0; h < net.Num - 1; h++) {
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      do {
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
+      uint32_t sendingHost = p->first;
+      // deserialize into neighbor bitsets
+      galois::runtime::gDeserialize(p->second, neighborOnHosts[sendingHost]);
+
+      for (uint32_t i : neighborOnHosts[sendingHost].getOffsets()) {
+        galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
+      }
+    }
+
+
+    // comm phase complete
+    base_DistGraph::increment_evilPhase();
+  }
+
+  /**
+   * phase responsible for master assignment
+   */
+  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
+    galois::gstl::Vector<galois::DynamicBitSet> neighborOnHosts;
+    neighborOnHosts.resize(base_DistGraph::numHosts);
+    std::vector<uint32_t> localNodeToMaster;
+
+    // determine on which hosts that this host's read nodes havs neighbors on
+    phase0BitsetSetup(bufGraph, neighborOnHosts);
+    // gid to vector offset setup
+    std::map<uint64_t, uint32_t> gid2offsets;
+    uint64_t neighborCount = phase0MapSetup(neighborOnHosts, gid2offsets);
+    galois::gDebug("[", base_DistGraph::id, "] num neighbors found is ",
+                   neighborCount);
+    // send off neighbor metadata
+    phase0SendRecv(neighborOnHosts);
+
+    // setup other partitioning metadata: nodes on each host, edges on each
+    // host (as determined by edge cut)
+    uint32_t numLocalNodes =
+      base_DistGraph::gid2host[base_DistGraph::id].second -
+      base_DistGraph::gid2host[base_DistGraph::id].first;
+    localNodeToMaster.resize(numLocalNodes + neighborCount);        
+  }
+
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
                          galois::StatTimer& inspectionTimer,
                          uint64_t edgeOffset,
