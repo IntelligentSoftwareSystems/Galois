@@ -469,7 +469,7 @@ class GingerP{
   GingerP(uint32_t hostID, uint32_t numHosts) {
     _hostID = hostID;
     _numHosts = numHosts;
-    _vCutThreshold = 100;
+    _vCutThreshold = 1000;
   }
 
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
@@ -503,13 +503,78 @@ class GingerP{
   }
 
   template<typename EdgeTy>
-  uint32_t determineMaster(uint32_t node,
+  uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      std::vector<uint32_t>& localNodeToMaster,
-      std::vector<uint64_t>& nodeLoads,
+      const std::vector<uint32_t>& localNodeToMaster,
+      std::map<uint64_t, uint32_t>& gid2offsets,
+      const std::vector<uint64_t>& nodeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
-      std::vector<uint64_t>& edgeLoads,
+      const std::vector<uint64_t>& edgeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+
+    auto ii = bufGraph.edgeBegin(src);
+    auto ee = bufGraph.edgeEnd(src);
+
+    // low degree nodes don't get moved
+    if (std::distance(ii, ee) <= _vCutThreshold) {
+      return _hostID;
+    } else {
+    // high degree nodes move based on augmented FENNEL scoring metric
+      // initialize array to hold scores
+      galois::PODResizeableArray<float> scores;
+      scores.resize(_numHosts);
+      for (unsigned i = 0; i < _numHosts; i++) {
+        scores[i] = 0.0;
+      }
+
+      for (; ii < ee; ++ii) {
+        uint64_t dst = bufGraph.edgeDestination(*ii);
+        size_t offsetIntoMap = (unsigned)-1;
+
+        if (getHostReader(dst) != _hostID) {
+          // offset can be found using map
+          assert(gid2offsets.find(dst) != gid2offsets.end());
+          offsetIntoMap = gid2offsets[dst];
+        } else {
+          // determine offset
+          offsetIntoMap = dst - bufGraph.getNodeOffset();
+        }
+
+        assert(offsetIntoMap != (unsigned)-1);
+        assert(offsetIntoMap >= 0);
+        assert(offsetIntoMap < localNodeToMaster.size());
+
+        unsigned currentAssignment = localNodeToMaster[offsetIntoMap];
+
+        if (currentAssignment != (unsigned)-1) {
+          scores[currentAssignment] += 1.0;
+        } else {
+          galois::gDebug("[", _hostID, "] ", dst, " unassigned");
+        }
+      }
+
+      // TODO subtraction of the composite balance term
+      // alpha * gamma * balance ^ gamma - 1
+      // gamma = 3/2
+      // alpha = sqrt # hosts * edges divided by number of nodes power 3/2
+      // x ^ (gamma - 1)
+      // balance: # nodes on partition + # edges on partition * 3/2 all
+      // divided by 2
+
+      unsigned bestHost = -1;
+      float bestScore = 0;
+      // find max score
+      for (unsigned i = 0; i < _numHosts; i++) {
+        if (scores[i] >= bestScore) {
+          bestScore = scores[i];
+          bestHost = i;
+        }
+      }
+
+      galois::gDebug("[", _hostID, "] ", src, " assigned to ", bestHost);
+      return bestHost;
+    }
+
     return 0;
   }
 
@@ -551,6 +616,21 @@ class GingerP{
   bool noCommunication() {
     return false;
   }
+
+  /**
+   * get reader of a particular node
+   */
+  unsigned getHostReader(uint64_t gid) const {
+    for (auto i = 0U; i < _numHosts; ++i) {
+      uint64_t start, end;
+      std::tie(start, end) = _gid2host[i];
+      if (gid >= start && gid < end) {
+        return i;
+      }
+    }
+    return -1;
+  }
+
 };
 
 #endif

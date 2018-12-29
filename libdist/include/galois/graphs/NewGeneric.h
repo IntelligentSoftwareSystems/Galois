@@ -696,8 +696,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           // determine master function takes source node, iterator of
           // neighbors
           uint32_t assignedHost = graphPartitioner->determineMaster(node,
-                                    bufGraph, localNodeToMaster, nodeLoads,
-                                    nodeAccum, edgeLoads, edgeAccum);
+                                    bufGraph, localNodeToMaster, gid2offsets,
+                                    nodeLoads, nodeAccum, edgeLoads, edgeAccum);
           // != -1 means it was assigned a host
           if (assignedHost != (uint32_t)-1) {
             // update mapping; this is a local node, so can get position
