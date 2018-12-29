@@ -27,6 +27,7 @@
 #define _GALOIS_DIST_NEWGENERIC_H
 
 #include "galois/graphs/DistributedGraph.h"
+#include "galois/DReducible.h"
 #include <sstream>
 
 namespace galois {
@@ -219,7 +220,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       numOutgoingEdges.resize(base_DistGraph::numHosts);
       hasIncomingEdge.resize(base_DistGraph::numHosts);
     }
-
 
     // phase 0
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
@@ -461,8 +461,27 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
   // TODO signature as well
-  void syncLoad() {
+  void syncLoad(std::vector<uint64_t>& loads,
+                std::vector<galois::CopyableAtomic<uint64_t>>& accums) {
+    assert(loads.size() == accums.size());
+    galois::DGAccumulator<uint64_t> syncer;
+    // sync accum for each host one by one
+    for (unsigned i = 0; i < loads.size(); i++) {
+      syncer.reset();
+      syncer += (accums[i].load());
+      accums[i].store(0);
+      uint64_t accumulation = syncer.reduce();
+      loads[i] += accumulation;
+    }
+  }
 
+  void printLoad(std::vector<uint64_t>& loads,
+                 std::vector<galois::CopyableAtomic<uint64_t>>& accums) {
+    assert(loads.size() == accums.size());
+    for (unsigned i = 0; i < loads.size(); i++) {
+      galois::gDebug("[", base_DistGraph::id, "] ", i, " total ", loads[i],
+                     " accum ", accums[i].load());
+    }
   }
 
   /**
@@ -491,7 +510,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     nodeLoads.assign(base_DistGraph::numHosts, 0);
     edgeLoads.assign(base_DistGraph::numHosts, 0);
     nodeAccum.assign(base_DistGraph::numHosts, 0);
-    nodeAccum.assign(base_DistGraph::numHosts, 0);
+    edgeAccum.assign(base_DistGraph::numHosts, 0);
     // this above all to be synchronized via DGAccumulators
 
     uint32_t numLocalNodes =
@@ -501,6 +520,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<uint32_t> localNodeToMaster;
     localNodeToMaster.assign(numLocalNodes + neighborCount, -1);
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    // bitset setup for newly assigned nodes
+    galois::DynamicBitSet newAssignedNodes;
+    newAssignedNodes.resize(numLocalNodes);
+    newAssignedNodes.reset();
 
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode;
@@ -512,9 +536,29 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::do_all(
         // iterate over my read nodes
         galois::iterate(beginNode, endNode),
-        [&] (uint32_t src) {
+        [&] (uint32_t node) {
           galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-                         " ", src);
+                         " ", node);
+          // determine master function takes source node, iterator of
+          // neighbors
+          uint32_t assignedHost = graphPartitioner->determineMaster(node,
+                                    bufGraph, localNodeToMaster, nodeLoads,
+                                    nodeAccum, edgeLoads, edgeAccum);
+          // != -1 means it was assigned a host
+          if (assignedHost != (uint32_t)-1) {
+            // update mapping; this is a local node, so can get position
+            // on map with subtraction
+            localNodeToMaster[node - globalOffset] = assignedHost;
+            // set update bitset
+            newAssignedNodes.set(node - globalOffset);
+            uint64_t ne = std::distance(bufGraph.edgeBegin(node),
+                                              bufGraph.edgeEnd(node));
+            galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
+                           " ", node, " num edge ", ne);
+            // update node/edge metadata
+            galois::atomicAdd(nodeAccum[assignedHost], (uint64_t)1);
+            galois::atomicAdd(edgeAccum[assignedHost], ne);
+          }
         },
         #if MORE_DIST_STATS
         galois::loopname("DetermineMasters"),
@@ -523,13 +567,15 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::no_stats()
       );
 
-      //syncLoad(nodeLoads, nodeAccum);
-      //syncLoad(edgeLoads, edgeAccum);
-      //// debug prints
-      //printLoad(nodeLoads);
-      //printLoad(edgeLoads);
+      // debug prints
+      //printLoad(nodeLoads, nodeAccum);
+      //printLoad(edgeLoads, edgeAccum);
+      // sync node/edge loads
+      syncLoad(nodeLoads, nodeAccum);
+      syncLoad(edgeLoads, edgeAccum);
 
       // do synchronization of master assignment of neighbors
+      // TODO this is the core of it all
     }
   }
 

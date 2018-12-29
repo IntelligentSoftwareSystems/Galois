@@ -459,4 +459,98 @@ class GenericHVC {
     return false;
   }
 };
+
+class GingerP{
+  std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
+  uint32_t _hostID;
+  uint32_t _numHosts;
+  uint32_t _vCutThreshold;
+ public:
+  GingerP(uint32_t hostID, uint32_t numHosts) {
+    _hostID = hostID;
+    _numHosts = numHosts;
+    _vCutThreshold = 100;
+  }
+
+  void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
+    _gid2host = gid2host;
+  }
+
+  // TODO
+  uint32_t getMaster(uint32_t gid) const {
+    for (auto h = 0U; h < _numHosts; ++h) {
+      uint64_t start, end;
+      std::tie(start, end) = _gid2host[h];
+      if (gid >= start && gid < end) {
+        return h;
+      }
+    }
+    return _numHosts;
+  }
+
+  uint32_t getMaster(uint32_t gid,
+                     std::map<uint64_t, uint32_t> mapping) const {
+    for (auto h = 0U; h < _numHosts; ++h) {
+      uint64_t start, end;
+      std::tie(start, end) = _gid2host[h];
+      if (gid >= start && gid < end) {
+        return h;
+      }
+    }
+
+    assert(false);
+    return _numHosts;
+  }
+
+  template<typename EdgeTy>
+  uint32_t determineMaster(uint32_t node,
+      galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+      std::vector<uint32_t>& localNodeToMaster,
+      std::vector<uint64_t>& nodeLoads,
+      std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+      std::vector<uint64_t>& edgeLoads,
+      std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+    return 0;
+  }
+
+
+  // TODO
+  uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+    if (numEdges > _vCutThreshold) {
+      return getMaster(dst);
+    } else {
+      return getMaster(src);
+    }
+  }
+
+  // TODO I should be able to make this runtime detectable
+  bool isVertexCut() const {
+    return true;
+  }
+
+  constexpr static bool isCartCut() {
+    return false;
+  }
+
+  // not used by this
+  bool isNotCommunicationPartner(unsigned host, unsigned syncType,
+                                 WriteLocation writeLocation,
+                                 ReadLocation readLocation,
+                                 bool transposed) {
+    return false;
+  }
+
+  void serializePartition(boost::archive::binary_oarchive& ar) {
+    return;
+  }
+
+  void deserializePartition(boost::archive::binary_iarchive& ar) {
+    return;
+  }
+
+  bool noCommunication() {
+    return false;
+  }
+};
+
 #endif

@@ -35,6 +35,7 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 #include "galois/graphs/Generic.h"
+#include "galois/graphs/NewGeneric.h"
 #include "galois/graphs/GenericPartitioners.h"
 
 /*******************************************************************************
@@ -60,7 +61,8 @@ enum PARTITIONING_SCHEME {
   CEC,                    //!< custom edge cut
   GCVC,                    //!< generic cvc
   GHIVC,                    //!< generic hivc
-  GOEC                    //!< generic oec
+  GOEC,                    //!< generic oec
+  GING                    //!< Ginger
 };
 
 /**
@@ -103,6 +105,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "ghivc";
   case GOEC:
     return "goec";
+  case GING:
+    return "ginger";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -279,6 +283,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -329,6 +334,9 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
+  case GING:
+    return new Ging(inputFile, net.ID, net.Num, false);
+
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -372,6 +380,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -456,6 +465,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
+  case GING:
+    return new Ging(inputFile, net.ID, net.Num, false);
+
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -504,6 +516,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -641,6 +654,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
 
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, true);
+
+  case GING:
+    return new Ging(inputFile, net.ID, net.Num, true);
 
 
   default:
