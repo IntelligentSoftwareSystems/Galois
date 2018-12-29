@@ -354,7 +354,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
   ) {
     // Step 1: setup bitsets
-    galois::do_all( 
+    galois::do_all(
       galois::iterate(0u, (unsigned)base_DistGraph::numHosts),
       [&] (unsigned h) {
         // get number of nodes on host h
@@ -373,7 +373,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     );
 
     // Step 2: loop over all local nodes, determine neighbor locations
-    galois::do_all( 
+    galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                       base_DistGraph::gid2host[base_DistGraph::id].second),
       [&] (unsigned n) {
@@ -400,9 +400,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   // returns number of set bits
   uint64_t phase0MapSetup(
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
-    std::map<uint64_t, uint32_t>& gid2Offset
+    std::map<uint64_t, uint32_t>& gid2Offsets
   ) {
     uint64_t curCount = 0;
+    uint64_t numLocal = base_DistGraph::gid2host[base_DistGraph::id].second -
+                        base_DistGraph::gid2host[base_DistGraph::id].first;
 
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
       if (h != base_DistGraph::id) {
@@ -412,14 +414,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         // map the gid to a local id
         for (uint32_t i : setOffsets) {
-          gid2Offset[i + hostOffset] = curCount;
+          gid2Offsets[i + hostOffset] = numLocal + curCount;
           galois::gDebug("[", base_DistGraph::id, "] ", i + hostOffset, " map to"
-                         " offset ", curCount);
+                         " offset ", numLocal +   curCount);
           curCount++;
         }
       }
     }
-    
+
     return curCount;
   }
 
@@ -460,7 +462,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     base_DistGraph::increment_evilPhase();
   }
 
-  // TODO signature as well
   void syncLoad(std::vector<uint64_t>& loads,
                 std::vector<galois::CopyableAtomic<uint64_t>>& accums) {
     assert(loads.size() == accums.size());
@@ -484,6 +485,157 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
   }
 
+  template <typename T>
+  std::vector<T> getDataFromOffsets(galois::DynamicBitSet& offsets,
+                                    const std::vector<T>& dataVector) {
+    std::vector<T> toReturn;
+    toReturn.resize(offsets.count());
+    std::vector<uint32_t> offsetVector = offsets.getOffsets();
+    assert(offsetVector.size() == toReturn.size());
+
+    galois::do_all(
+      galois::iterate((size_t)0, offsetVector.size()),
+      [&] (unsigned i) {
+        toReturn[i] = dataVector[offsetVector[i]];
+      },
+      galois::no_stats()
+    );
+
+    return toReturn;
+  }
+
+
+  void syncAssignment(galois::DynamicBitSet& newAssignedNodes,
+      std::vector<uint32_t>& localNodeToMaster,
+      galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
+      std::map<uint64_t, uint32_t>& gid2offsets) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    galois::DynamicBitSet toSync;
+    toSync.resize(newAssignedNodes.size());
+
+    // send loop
+    for (unsigned h = 0; h < net.Num; h++) {
+      if (h != net.ID) {
+        toSync.reset();
+        assert(newAssignedNodes.size() == neighborOnHosts[h].size());
+
+        // do bitwise and with updates, see if any new updates exist to send
+        toSync.bitwise_and(newAssignedNodes, neighborOnHosts[h]);
+
+        // this means there are updates to send
+        if (toSync.count()) {
+          //for (unsigned i : toSync.getOffsets()) {
+          //  galois::gDebug("[", base_DistGraph::id, "] send gid ",
+          //  i + base_DistGraph::gid2host[net.ID].first, " to ", h);
+          //}
+          // get masters to send into a vector
+          std::vector<uint32_t> mastersToSend =
+            getDataFromOffsets(toSync, localNodeToMaster);
+
+          for (unsigned i : mastersToSend) {
+            galois::gDebug("[", base_DistGraph::id, "] gid ",
+            i + base_DistGraph::gid2host[net.ID].first,
+            " master send ", i);
+          }
+          assert(mastersToSend.size());
+
+          size_t num_selected = toSync.count();
+          size_t num_total = toSync.size();
+          // figure out how to send (most efficient method; either bitset
+          // and data or offsets + data)
+          size_t bitset_alloc_size =
+              ((num_total + 63) / 64) * sizeof(uint64_t) + (2 * sizeof(size_t));
+          size_t bitsetDataSize = (num_selected * sizeof(uint32_t)) +
+                                  bitset_alloc_size + sizeof(num_selected);
+          size_t offsetsDataSize = (num_selected * sizeof(uint32_t)) +
+                                   (num_selected * sizeof(unsigned int)) +
+                                   sizeof(uint32_t) + sizeof(num_selected);
+
+          galois::runtime::SendBuffer b;
+
+          // tag with send method and do send
+          if (bitsetDataSize < offsetsDataSize) {
+            // send bitset, tag 1
+            galois::runtime::gSerialize(b, 1u);
+            galois::runtime::gSerialize(b, toSync);
+            galois::runtime::gSerialize(b, mastersToSend);
+          } else {
+            // send offsets, tag 2
+            galois::runtime::gSerialize(b, 2u);
+            galois::runtime::gSerialize(b, toSync.getOffsets());
+            galois::runtime::gSerialize(b, mastersToSend);
+          }
+
+          net.sendTagged(h, galois::runtime::evilPhase, b);
+        } else {
+          // send empty no-op message, tag 0
+          galois::runtime::SendBuffer b;
+          galois::runtime::gSerialize(b, 0u);
+          net.sendTagged(h, galois::runtime::evilPhase, b);
+        }
+      }
+    }
+
+    // receive loop
+    for (unsigned h = 0; h < net.Num - 1; h++) {
+      galois::gDebug("[", base_DistGraph::id, "] waiting for ", h, "th host");
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+      do {
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+      } while (!p);
+      uint32_t sendingHost = p->first;
+      uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
+      galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost, " offset ",
+                     hostOffset);
+      unsigned messageType = (unsigned)-1;
+
+      // deserialize message type
+      galois::runtime::gDeserialize(p->second, messageType);
+
+      std::vector<uint32_t> receivedMasters;
+      std::vector<uint32_t> receivedOffsets;
+      if (messageType == 1) {
+        // bitset; deserialize, then get offsets
+        galois::DynamicBitSet receivedSet;
+        galois::runtime::gDeserialize(p->second, receivedSet);
+        receivedOffsets = receivedSet.getOffsets();
+        galois::runtime::gDeserialize(p->second, receivedMasters);
+      } else if (messageType == 2) {
+        // offsets
+        galois::runtime::gDeserialize(p->second, receivedOffsets);
+        galois::runtime::gDeserialize(p->second, receivedMasters);
+      } else if (messageType != 0) {
+        GALOIS_DIE("Invalid message type for sync of master assignments");
+      }
+
+      galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
+                     " message type ", messageType);
+
+      if (messageType == 1 || messageType == 2) {
+        // if execution gets here, messageType was 1 or 2
+        assert(receivedMasters.size() == receivedOffsets.size());
+
+        galois::do_all(
+          galois::iterate((size_t)0, receivedMasters.size()),
+          [&] (size_t i) {
+            uint64_t curGID = hostOffset + receivedOffsets[i];
+            uint32_t indexIntoMap = gid2offsets[curGID];
+            galois::gDebug("[", base_DistGraph::id, "] gid ", curGID,
+                           " offset ", indexIntoMap);
+            localNodeToMaster[indexIntoMap] = receivedMasters[i];
+          },
+          galois::no_stats()
+        );
+      }
+
+      //for (uint32_t i : neighborOnHosts[sendingHost].getOffsets()) {
+      //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
+      //}
+    }
+
+    newAssignedNodes.reset();
+  }
   /**
    * phase responsible for master assignment
    */
@@ -518,13 +670,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::gid2host[base_DistGraph::id].first;
 
     std::vector<uint32_t> localNodeToMaster;
-    localNodeToMaster.assign(numLocalNodes + neighborCount, -1);
+    localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
     // bitset setup for newly assigned nodes
     galois::DynamicBitSet newAssignedNodes;
     newAssignedNodes.resize(numLocalNodes);
     newAssignedNodes.reset();
+
+    for (uint32_t i : localNodeToMaster) {
+      assert(i == (uint32_t)-1);
+    }
 
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode;
@@ -537,8 +693,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // iterate over my read nodes
         galois::iterate(beginNode, endNode),
         [&] (uint32_t node) {
-          galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-                         " ", node);
           // determine master function takes source node, iterator of
           // neighbors
           uint32_t assignedHost = graphPartitioner->determineMaster(node,
@@ -554,7 +708,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             uint64_t ne = std::distance(bufGraph.edgeBegin(node),
                                               bufGraph.edgeEnd(node));
             galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-                           " ", node, " num edge ", ne);
+                           " ", node, " num edge ", ne, " ", node - globalOffset);
             // update node/edge metadata
             galois::atomicAdd(nodeAccum[assignedHost], (uint64_t)1);
             galois::atomicAdd(edgeAccum[assignedHost], ne);
@@ -567,16 +721,25 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::no_stats()
       );
 
+      // do synchronization of master assignment of neighbors
+      syncAssignment(newAssignedNodes, localNodeToMaster, neighborOnHosts,
+                     gid2offsets);
+
       // debug prints
-      //printLoad(nodeLoads, nodeAccum);
-      //printLoad(edgeLoads, edgeAccum);
+      printLoad(nodeLoads, nodeAccum);
+      printLoad(edgeLoads, edgeAccum);
       // sync node/edge loads
       syncLoad(nodeLoads, nodeAccum);
       syncLoad(edgeLoads, edgeAccum);
-
-      // do synchronization of master assignment of neighbors
-      // TODO this is the core of it all
     }
+
+    for (uint32_t i = 0; i < localNodeToMaster.size(); i++) {
+      if (localNodeToMaster[i] == (uint32_t)-1) {
+        //galois::gDebug("[", base_DistGraph::id, "] bad index ", i);
+        assert(localNodeToMaster[i] != (uint32_t)-1);
+      }
+    }
+    base_DistGraph::increment_evilPhase();
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
