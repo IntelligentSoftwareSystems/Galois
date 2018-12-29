@@ -299,6 +299,9 @@ public:
    */
   uint32_t sizeEdges() const { return globalEdgeSize; }
 
+  //! @returns node offset of this buffered graph
+  uint64_t getNodeOffset() const { return nodeOffset; }
+
   /**
    * Loads given Galois CSR graph into memory.
    *
