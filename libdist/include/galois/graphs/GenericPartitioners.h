@@ -3,6 +3,7 @@
 
 #include "DistributedGraph.h"
 #include <utility>
+#include <cmath>
 
 class NoCommunication {
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
@@ -467,6 +468,18 @@ class GingerP{
   uint32_t _vCutThreshold;
   uint64_t _numNodes;
   uint64_t _numEdges;
+  // ginger scoring constants
+  double _gamma;
+  double _alpha;
+  // ginger node/edge ratio
+  double _neRatio;
+
+      // gamma = 3/2
+      // alpha = sqrt # hosts * edges divided by number of nodes power 3/2
+      // x ^ (gamma - 1)
+      // balance: # nodes on partition + # edges on partition * 3/2 all
+      // divided by 2
+
  public:
   GingerP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
          uint64_t numEdges) {
@@ -475,6 +488,10 @@ class GingerP{
     _vCutThreshold = 10000;
     _numNodes = numNodes;
     _numEdges = numEdges;
+    _gamma = 1.5;
+    _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
+    galois::gDebug("Alpha is ", _alpha);
+    _neRatio = (double)numNodes / (double)numEdges;
   }
 
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
@@ -528,7 +545,7 @@ class GingerP{
     } else {
     // low in degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
-      galois::PODResizeableArray<float> scores;
+      galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
       for (unsigned i = 0; i < _numHosts; i++) {
         scores[i] = 0.0;
@@ -569,7 +586,7 @@ class GingerP{
       // divided by 2
 
       unsigned bestHost = -1;
-      float bestScore = 0;
+      double bestScore = 0;
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
@@ -590,8 +607,6 @@ class GingerP{
 
       return bestHost;
     }
-
-    return 0;
   }
 
 
