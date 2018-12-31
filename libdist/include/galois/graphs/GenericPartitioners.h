@@ -4,6 +4,7 @@
 #include "DistributedGraph.h"
 #include <utility>
 #include <cmath>
+#include <limits>
 
 class NoCommunication {
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
@@ -602,24 +603,18 @@ class GingerP{
 
       // subtraction of the composite balance term
       for (unsigned i = 0; i < _numHosts; i++) {
-
+        scores[i] -= getFennelBalanceScore(getCompositeBalanceParam(
+                                             i, nodeLoads, nodeAccum,
+                                             edgeLoads, edgeAccum
+                                           ));
       }
 
-      // alpha * gamma * balance ^ gamma - 1
-      // gamma = 3/2
-      // alpha = sqrt # hosts * edges divided by number of nodes power 3/2
-      // x ^ (gamma - 1)
-      // balance: # nodes on partition + # edges on partition * 3/2 all
-      // divided by 2
-
       unsigned bestHost = -1;
-      double bestScore = 0;
+      double bestScore = std::numeric_limits<double>::lowest();
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          if (scores[i] > 0) {
-            galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
-          }
+          galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
           bestHost = i;
         }
