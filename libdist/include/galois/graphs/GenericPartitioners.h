@@ -469,7 +469,7 @@ class GingerP{
   GingerP(uint32_t hostID, uint32_t numHosts) {
     _hostID = hostID;
     _numHosts = numHosts;
-    _vCutThreshold = 1000;
+    _vCutThreshold = 10000;
   }
 
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
@@ -514,12 +514,14 @@ class GingerP{
 
     auto ii = bufGraph.edgeBegin(src);
     auto ee = bufGraph.edgeEnd(src);
+    // number of edges
+    uint64_t ne = std::distance(ii, ee);
 
-    // low degree nodes don't get moved
-    if (std::distance(ii, ee) <= _vCutThreshold) {
+    // high in-degree nodes masters stay the same
+    if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // high degree nodes move based on augmented FENNEL scoring metric
+    // low in degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<float> scores;
       scores.resize(_numHosts);
@@ -566,12 +568,21 @@ class GingerP{
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
+          if (scores[i] > 0) {
+            galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          }
           bestScore = scores[i];
           bestHost = i;
         }
       }
 
-      galois::gDebug("[", _hostID, "] ", src, " assigned to ", bestHost);
+      galois::gDebug("[", _hostID, "] ", src, " assigned to ", bestHost, 
+                     " with num edge ", ne);
+
+      // update metadata; TODO make this a nicer interface
+      galois::atomicAdd(nodeAccum[bestHost], (uint64_t)1);
+      galois::atomicAdd(edgeAccum[bestHost], ne);
+
       return bestHost;
     }
 
@@ -581,6 +592,8 @@ class GingerP{
 
   // TODO
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
+    // if high indegree, then stay on destination (src), else get moved to source (dst)
+    // note "dst" here is actually the source since we're reading transpose
     if (numEdges > _vCutThreshold) {
       return getMaster(dst);
     } else {

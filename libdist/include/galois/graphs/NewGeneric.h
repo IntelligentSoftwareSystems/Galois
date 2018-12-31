@@ -705,13 +705,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             localNodeToMaster[node - globalOffset] = assignedHost;
             // set update bitset
             newAssignedNodes.set(node - globalOffset);
-            uint64_t ne = std::distance(bufGraph.edgeBegin(node),
-                                              bufGraph.edgeEnd(node));
+            //uint64_t ne = std::distance(bufGraph.edgeBegin(node),
+            //                            bufGraph.edgeEnd(node));
             galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-                           " ", node, " num edge ", ne, " ", node - globalOffset);
+                           " ", node, " ", node - globalOffset);
+            // below now delegated for user to do
             // update node/edge metadata
-            galois::atomicAdd(nodeAccum[assignedHost], (uint64_t)1);
-            galois::atomicAdd(edgeAccum[assignedHost], ne);
+            //galois::atomicAdd(nodeAccum[assignedHost], (uint64_t)1);
+            //galois::atomicAdd(edgeAccum[assignedHost], ne);
           }
         },
         #if MORE_DIST_STATS
