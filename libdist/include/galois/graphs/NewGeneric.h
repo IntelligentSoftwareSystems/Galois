@@ -198,7 +198,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // not actually getting masters, but getting assigned readers for nodes
     base_DistGraph::computeMasters(g, dummy);
 
-    graphPartitioner = new Partitioner(host, _numHosts);
+    graphPartitioner = new Partitioner(host, _numHosts,
+                                       base_DistGraph::numGlobalNodes,
+                                       base_DistGraph::numGlobalEdges);
     // TODO abstract this away somehow
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
@@ -2067,7 +2069,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
   virtual void boostDeSerializeLocalGraph(boost::archive::binary_iarchive& ar,
                                           const unsigned int version = 0) {
-    graphPartitioner = new Partitioner(base_DistGraph::id, base_DistGraph::numHosts);
+    graphPartitioner = new Partitioner(base_DistGraph::id, base_DistGraph::numHosts,
+                                       base_DistGraph::numGlobalNodes,
+                                       base_DistGraph::numGlobalEdges);
+
     graphPartitioner->saveGIDToHost(base_DistGraph::gid2host);
 
     // unsigned ints

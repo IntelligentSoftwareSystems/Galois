@@ -465,11 +465,16 @@ class GingerP{
   uint32_t _hostID;
   uint32_t _numHosts;
   uint32_t _vCutThreshold;
+  uint64_t _numNodes;
+  uint64_t _numEdges;
  public:
-  GingerP(uint32_t hostID, uint32_t numHosts) {
+  GingerP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
+         uint64_t numEdges) {
     _hostID = hostID;
     _numHosts = numHosts;
     _vCutThreshold = 10000;
+    _numNodes = numNodes;
+    _numEdges = numEdges;
   }
 
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
