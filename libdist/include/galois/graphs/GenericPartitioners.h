@@ -524,6 +524,29 @@ class GingerP{
     return _numHosts;
   }
 
+  /**
+   * Returns Ginger's composite balance parameter for a given host
+   */
+  double getCompositeBalanceParam(unsigned host,
+          const std::vector<uint64_t>& nodeLoads,
+          const std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
+          const std::vector<uint64_t>& edgeLoads,
+          const std::vector<galois::CopyableAtomic<uint64_t>>& edgeAccum) {
+    // get node/edge loads
+    uint64_t hostNodeLoad = nodeLoads[host] + nodeAccum[host].load();
+    uint64_t hostEdgeLoad = edgeLoads[host] + edgeAccum[host].load();
+
+    return (hostNodeLoad + (_neRatio * hostEdgeLoad)) / 2;
+  }
+
+  /**
+   * Use FENNEL balance equation to get a score value for partition
+   * scoring
+   */
+  double getFennelBalanceScore(double param) {
+    return _alpha * _gamma * pow(param, _gamma - 1);
+  }
+
   template<typename EdgeTy>
   uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
@@ -577,7 +600,11 @@ class GingerP{
         }
       }
 
-      // TODO subtraction of the composite balance term
+      // subtraction of the composite balance term
+      for (unsigned i = 0; i < _numHosts; i++) {
+
+      }
+
       // alpha * gamma * balance ^ gamma - 1
       // gamma = 3/2
       // alpha = sqrt # hosts * edges divided by number of nodes power 3/2
@@ -598,7 +625,7 @@ class GingerP{
         }
       }
 
-      galois::gDebug("[", _hostID, "] ", src, " assigned to ", bestHost, 
+      galois::gDebug("[", _hostID, "] ", src, " assigned to ", bestHost,
                      " with num edge ", ne);
 
       // update metadata; TODO make this a nicer interface
