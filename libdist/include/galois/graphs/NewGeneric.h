@@ -743,6 +743,29 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       }
     }
     base_DistGraph::increment_evilPhase();
+
+    graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
+                                       bufGraph.getNodeOffset());
+    
+    // TODO get master info on hosts that need it with another communication
+    // phase
+
+    // step 1: create bitsets for all hosts again that is size of the master
+    // map
+
+    // step 2: loop over all local edges, see where they end up (basically
+    // inspection; can proabably merge with inspection as well, but
+    // for modularity we'll do it again here)
+    // for endpoints, mark offsets for that host's bitset
+
+
+    // step 3: extract masters from offsets, send off (this is very similar
+    // to how it works in the previous phase where host asks for neighbor
+    // updates
+
+
+    // step 4: serialize and send messages: gids necessary (bitset won't work
+    // because other hosts do not know how things are laid out)
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
@@ -1137,6 +1160,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       if (hostHasOutgoing.test(h)) {
         galois::runtime::gSerialize(b, 1); // token saying data exists
         galois::runtime::gSerialize(b, numOutgoingEdges[h]);
+
+        // TODO if need to send master map data, do it too
       } else {
         galois::runtime::gSerialize(b, 0); // token saying no data exists
       }
@@ -1154,10 +1179,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         std::vector<uint32_t> offsets = curBitset.getOffsets();
         galois::runtime::gSerialize(b, 2); // 2 = only offsets
         galois::runtime::gSerialize(b, offsets);
+
+        // TODO send master data
       } else {
         // send entire bitset
         galois::runtime::gSerialize(b, 1);
         galois::runtime::gSerialize(b, curBitset);
+
+        // TODO send master data
       }
       // get memory from bitset back
       curBitset.resize(0);
@@ -1205,6 +1234,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       if (outgoingExists == 1) {
         // actual data sent
         galois::runtime::gDeserialize(p->second, numOutgoingEdges[sendingHost]);
+
+        // TODO recv master data
       } else if (outgoingExists == 0) {
         // no data sent; just clear again
         numOutgoingEdges[sendingHost].clear();
@@ -1219,6 +1250,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::DynamicBitSet recvSet;
         galois::runtime::gDeserialize(p->second, recvSet);
         hasIncomingEdge.bitwise_or(recvSet);
+
+        // TODO recv/process master data
       } else if (bitsetMetaMode == 2) {
         // sent as vector of offsets
         std::vector<uint32_t> recvOffsets;
@@ -1226,6 +1259,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         for (uint32_t offset : recvOffsets) {
           hasIncomingEdge.set(offset);
         }
+
+        // TODO recv/process master data
       } else if (bitsetMetaMode == 0) {
         // do nothing; there was nothing to receive
       } else {
@@ -1255,11 +1290,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     localToGlobalVector.reserve(base_DistGraph::numGlobalNodes /
                                 base_DistGraph::numHosts * 1.15);
 
+    galois::gPrint("HI1\n");
     inspectMasterNodes(numOutgoingEdges, prefixSumOfEdges);
+    galois::gPrint("HI2\n");
     inspectOutgoingNodes(numOutgoingEdges, prefixSumOfEdges);
+    galois::gPrint("HI3\n");
     createIntermediateMetadata(prefixSumOfEdges, hasIncomingEdge.count());
+    galois::gPrint("HI4\n");
     inspectIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
+    galois::gPrint("HI5\n");
     finalizeInspection(prefixSumOfEdges);
+    galois::gPrint("HI6\n");
 
     galois::gDebug("[", base_DistGraph::id, "] To receive this many nodes: ",
                    nodesToReceive);

@@ -466,7 +466,9 @@ class GingerP{
   std::vector<std::pair<uint64_t, uint64_t>> _gid2host;
   uint32_t _hostID;
   uint32_t _numHosts;
+  // used in hybrid cut
   uint32_t _vCutThreshold;
+  // useful graph metadata
   uint64_t _numNodes;
   uint64_t _numEdges;
   // ginger scoring constants
@@ -474,12 +476,13 @@ class GingerP{
   double _alpha;
   // ginger node/edge ratio
   double _neRatio;
+  char status;
+  // metadata for determining where a node's master is
+  std::map<uint64_t, uint32_t> _gid2offsets;
+  std::vector<uint32_t> _localNodeToMaster;
+  uint64_t _nodeOffset;
 
-      // gamma = 3/2
-      // alpha = sqrt # hosts * edges divided by number of nodes power 3/2
-      // x ^ (gamma - 1)
-      // balance: # nodes on partition + # edges on partition * 3/2 all
-      // divided by 2
+
 
  public:
   GingerP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
@@ -493,37 +496,56 @@ class GingerP{
     _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     galois::gDebug("Alpha is ", _alpha);
     _neRatio = (double)numNodes / (double)numEdges;
+    status = 0;
   }
 
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
   }
 
-  // TODO
+  void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
+                        std::vector<uint32_t>& localNodeToMaster,
+                        uint64_t nodeOffset) {
+    _gid2offsets = std::move(gid2offsets);
+    _localNodeToMaster = std::move(localNodeToMaster);
+    _nodeOffset = nodeOffset;
+    // setup complete
+    status = 1;
+  }
+
   uint32_t getMaster(uint32_t gid) const {
-    for (auto h = 0U; h < _numHosts; ++h) {
-      uint64_t start, end;
-      std::tie(start, end) = _gid2host[h];
-      if (gid >= start && gid < end) {
-        return h;
-      }
+    if (status == 1) {
+      return getMasterP0(gid);
+    } else if (status == 2) {
+      return getMasterP1(gid);
+    } else {
+      GALOIS_DIE("Master setup incomplete");
     }
-    return _numHosts;
   }
 
-  uint32_t getMaster(uint32_t gid,
-                     std::map<uint64_t, uint32_t> mapping) const {
-    for (auto h = 0U; h < _numHosts; ++h) {
-      uint64_t start, end;
-      std::tie(start, end) = _gid2host[h];
-      if (gid >= start && gid < end) {
-        return h;
-      }
+  uint32_t getMasterP0(uint32_t gid) const {
+    uint32_t offsetIntoMap = (uint32_t)-1;
+    if (getHostReader(gid) != _hostID) {
+      // offset can be found using map
+      assert(_gid2offsets.find(gid) != _gid2offsets.end());
+      offsetIntoMap = (*(_gid2offsets.find(gid))).second;
+    } else {
+      // determine offset
+      offsetIntoMap = gid - _nodeOffset;
     }
 
-    assert(false);
-    return _numHosts;
+    assert(offsetIntoMap != (uint32_t)-1);
+    assert(offsetIntoMap >= 0);
+    assert(offsetIntoMap < _localNodeToMaster.size());
+
+    return _localNodeToMaster[offsetIntoMap];
   }
+
+  // TODO
+  uint32_t getMasterP1(uint32_t gid) const {
+    return -1;
+  }
+
 
   /**
    * Returns Ginger's composite balance parameter for a given host
@@ -632,9 +654,9 @@ class GingerP{
   }
 
 
-  // TODO
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
-    // if high indegree, then stay on destination (src), else get moved to source (dst)
+    // if high indegree, then stay on destination (src), else get moved to
+    // source (dst)
     // note "dst" here is actually the source since we're reading transpose
     if (numEdges > _vCutThreshold) {
       return getMaster(dst);
