@@ -168,7 +168,7 @@ protected:
   uint32_t numNodesWithEdges; //!< Number of nodes (masters + mirrors) that have
                               //!< outgoing edges
 
-  //! Information that converts GID to host that has master proxy of that node
+  //! Information that converts host to range of nodes that host reads
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
   uint64_t last_nodeID_withEdges_bipartite; //!< used only for bipartite graphs
