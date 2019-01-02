@@ -499,6 +499,11 @@ class GingerP{
     status = 0;
   }
 
+  // returns true as this partitioner relies on the master assignment phase
+  bool masterAssignPhase() const {
+    return true;
+  }
+
   void saveGIDToHost(std::vector<std::pair<uint64_t, uint64_t>>& gid2host) {
     _gid2host = gid2host;
   }

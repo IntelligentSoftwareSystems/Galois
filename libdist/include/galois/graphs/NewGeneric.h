@@ -314,7 +314,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     if (transpose && (numNodes > 0)) {
       // consider all nodes to have outgoing edges (TODO better way to do this?)
-      // for now it's fine I guess
       base_DistGraph::numNodesWithEdges = numNodes;
       base_DistGraph::graph.transpose(GRNAME);
       base_DistGraph::transposed = true;
@@ -746,26 +745,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
                                        bufGraph.getNodeOffset());
-    
-    // TODO get master info on hosts that need it with another communication
-    // phase
-
-    // step 1: create bitsets for all hosts again that is size of the master
-    // map
-
-    // step 2: loop over all local edges, see where they end up (basically
-    // inspection; can proabably merge with inspection as well, but
-    // for modularity we'll do it again here)
-    // for endpoints, mark offsets for that host's bitset
-
-
-    // step 3: extract masters from offsets, send off (this is very similar
-    // to how it works in the previous phase where host asks for neighbor
-    // updates
-
-
-    // step 4: serialize and send messages: gids necessary (bitset won't work
-    // because other hosts do not know how things are laid out)
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
@@ -811,7 +790,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         "] Edge inspection time: ", inspectionTimer.get_usec() / 1000000.0f,
         " seconds to read ", allBytesRead, " bytes (",
         allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
-
 
     // get incoming mirrors ready for creation
     uint32_t additionalMirrorCount = incomingMirrors.count();
@@ -1128,6 +1106,97 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
   /**
+   * Given a vector specifying which nodes have edges for an unspecified
+   * receiver host, save the masters of those nodes (which are known on this
+   * host but not necessarily other hosts) into a vector and serialize it for
+   * the receiver to update their master node mapping.
+   *
+   * @param b Send buffer
+   * @param hostOutgoingEdges Number of edges that the receiver of this
+   * vector should expect for each node on this host
+   */
+  void serializeOutgoingMasterMap(galois::runtime::SendBuffer& b,
+                                  std::vector<uint64_t>& hostOutgoingEdges) {
+    // 2 phase: one phase determines amount of work each thread does,
+    // second has threads actually do copies
+    uint32_t activeThreads = galois::getActiveThreads();
+    std::vector<uint64_t> threadPrefixSums(activeThreads);
+    size_t hostSize = base_DistGraph::gid2host[base_DistGraph::id].second -
+                      base_DistGraph::gid2host[base_DistGraph::id].first;
+    assert(hostSize == hostOutgoingEdges.size());
+
+    // for each thread, figure out how many items it will work with
+    // (non-zero outgoing edges)
+    galois::on_each(
+      [&](unsigned tid, unsigned nthreads) {
+        size_t beginNode;
+        size_t endNode;
+        std::tie(beginNode, endNode) = galois::block_range((size_t)0, hostSize,
+                                                           tid, nthreads);
+        uint64_t count = 0;
+        for (size_t i = beginNode; i < endNode; i++) {
+          if (hostOutgoingEdges[i] > 0) {
+            count++;
+          }
+        }
+        threadPrefixSums[tid] = count;
+      }
+    );
+
+    // get prefix sums
+    for (unsigned int i = 1; i < threadPrefixSums.size(); i++) {
+      threadPrefixSums[i] += threadPrefixSums[i - 1];
+    }
+
+    uint32_t numNonZero = threadPrefixSums[activeThreads - 1];
+    std::vector<uint32_t> masterLocation;
+    masterLocation.resize(numNonZero, (uint32_t)-1);
+    // should only be in here if there's something to send in first place
+    assert(numNonZero > 0);
+
+    uint64_t startNode = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    // do actual work, second on_each; find non-zeros again, get master
+    // corresponding to that non-zero and send to other end
+    galois::on_each(
+      [&] (unsigned tid, unsigned nthreads) {
+        size_t beginNode;
+        size_t endNode;
+        std::tie(beginNode, endNode) = galois::block_range((size_t)0, hostSize,
+                                                           tid, nthreads);
+        // start location to start adding things into prefix sums/vectors
+        uint32_t threadStartLocation = 0;
+        if (tid != 0) {
+          threadStartLocation = threadPrefixSums[tid - 1];
+        }
+
+        uint32_t handledNodes = 0;
+        for (size_t i = beginNode; i < endNode; i++) {
+          if (hostOutgoingEdges[i] > 0) {
+            // get master of i
+            masterLocation[threadStartLocation + handledNodes] =
+                graphPartitioner->getMaster(i + startNode);
+            handledNodes++;
+          }
+        }
+      }
+    );
+
+    for (uint32_t i : masterLocation) {
+      assert(i != (uint32_t)-1);
+    }
+
+    // serialize into buffer; since this is sent along with vector receiver end
+    // will know how to deal with it
+    galois::runtime::gSerialize(b, masterLocation);
+  }
+
+  void deserializeOutgoingMasterMap() {
+    // TODO
+  }
+
+
+  /**
    * Send data out from inspection to other hosts.
    *
    * @param[in,out] numOutgoingEdges specifies which nodes on a host will have
@@ -1160,8 +1229,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       if (hostHasOutgoing.test(h)) {
         galois::runtime::gSerialize(b, 1); // token saying data exists
         galois::runtime::gSerialize(b, numOutgoingEdges[h]);
-
-        // TODO if need to send master map data, do it too
+        if (graphPartitioner->masterAssignPhase()) {
+          serializeOutgoingMasterMap(b, numOutgoingEdges[h]);
+        }
       } else {
         galois::runtime::gSerialize(b, 0); // token saying no data exists
       }
@@ -1202,7 +1272,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       GRNAME, std::string("EdgeInspectionBytesSent"), bytesSent.reduce()
     );
 
-    galois::gPrint("[", base_DistGraph::id, "] Insepection sends complete.\n");
+    galois::gPrint("[", base_DistGraph::id, "] Inspection sends complete.\n");
   }
 
   /**
