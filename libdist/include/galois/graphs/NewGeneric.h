@@ -265,7 +265,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     // inspection timer is stopped in edgeInspection function
 
-
     // flip partitioners that have a master assignment phase to stage 2
     // (meaning all nodes and masters that will be on this host are present in
     // the partitioner's metadata)
@@ -1197,6 +1196,32 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::runtime::gSerialize(b, masterLocation);
   }
 
+  void serializeIncomingMasterMap(galois::runtime::SendBuffer& b,
+                             const galois::DynamicBitSet& hostIncomingEdges) {
+    size_t numOfNodes = hostIncomingEdges.count();
+    std::vector<uint32_t> masterMap;
+    masterMap.resize(numOfNodes, (uint32_t)-1);
+
+    std::vector<uint32_t> bitsetOffsets = hostIncomingEdges.getOffsets();
+
+    galois::do_all(
+      galois::iterate((size_t)0, numOfNodes),
+      [&] (size_t offset) {
+        masterMap[offset] = graphPartitioner->getMaster(bitsetOffsets[offset]);
+      },
+      galois::no_stats()
+    );
+
+    for (uint32_t i : masterMap) {
+      assert(i != (uint32_t)-1);
+      assert(i >= 0 && i < base_DistGraph::numHosts);
+    }
+
+    // serialize into buffer; since this is sent along with vector receiver end
+    // will know how to deal with it
+    galois::runtime::gSerialize(b, masterMap);
+  }
+
   void deserializeOutgoingMasterMap(uint32_t senderHost,
                           const std::vector<uint64_t>& hostOutgoingEdges,
                           const std::vector<uint32_t>& recvMasterLocations) {
@@ -1286,7 +1311,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       numOutgoingEdges[h].clear();
 
       // determine form to send bitset in
-      auto& curBitset = hasIncomingEdge[h];
+      galois::DynamicBitSet& curBitset = hasIncomingEdge[h];
       uint64_t bitsetSize = curBitset.size(); // num bits
       uint64_t onlyOffsetsSize = curBitset.count() * 32;
       if (bitsetSize == 0) {
@@ -1298,13 +1323,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, 2); // 2 = only offsets
         galois::runtime::gSerialize(b, offsets);
 
-        // TODO send master data
+        if (graphPartitioner->masterAssignPhase()) {
+          galois::gDebug("incoming master map serialization");
+          serializeIncomingMasterMap(b, curBitset);
+        }
       } else {
         // send entire bitset
         galois::runtime::gSerialize(b, 1);
         galois::runtime::gSerialize(b, curBitset);
-
-        // TODO send master data
+        if (graphPartitioner->masterAssignPhase()) {
+          galois::gDebug("incoming master map serialization");
+          serializeIncomingMasterMap(b, curBitset);
+        }
       }
       // get memory from bitset back
       curBitset.resize(0);
