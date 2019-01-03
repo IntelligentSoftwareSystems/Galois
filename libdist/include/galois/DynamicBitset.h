@@ -294,6 +294,7 @@ public:
    *
    * @returns vector with offsets into set bits
    */
+  // TODO uint32_t is somewhat dangerous; change in the future
   std::vector<uint32_t> getOffsets() {
     uint32_t activeThreads = galois::getActiveThreads();
     std::vector<unsigned int> tPrefixBitCounts(activeThreads);
