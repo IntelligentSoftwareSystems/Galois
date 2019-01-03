@@ -1208,38 +1208,33 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::iterate((size_t)0, hostOutgoingEdges.size()),
       [&] (size_t offset) {
         if (hostOutgoingEdges[offset] > 0) {
-          uint32_t masterOnThisHost =
-              graphPartitioner->getMaster(offset + hostOffset);
-          // make sure mapping doesn't already exist
-          if (masterOnThisHost == (uint32_t)-1) {
-            galois::gDebug("[", base_DistGraph::id, "] ", "setting ", 
-                           offset + hostOffset, " from host ", senderHost);
-            offsetsToConsider.set(offset);
-          } else {
-            galois::gDebug("[", base_DistGraph::id, "] ", offset + hostOffset,
-                          " already mapped on this host to ", masterOnThisHost);
-          }
+          offsetsToConsider.set(offset);
         }
       },
       galois::no_stats(),
       galois::steal()
     );
-    assert(offsetsToConsider.count() <= recvMasterLocations.size());
-    galois::gDebug("[", base_DistGraph::id, "] host ", senderHost, ": set ",
-                   offsetsToConsider.count(), " out of ",
-                   recvMasterLocations.size());
+    assert(offsetsToConsider.count() == recvMasterLocations.size());
 
     // step 2: using bitset that tells which offsets are set, add
     // to already master map in partitioner (this is single threaded
     // since map is not a concurrent data structure)
     size_t curCount = 0;
+    //size_t actuallySet = 0;
     for (uint32_t offset : offsetsToConsider.getOffsets()) {
+      galois::gDebug("[", base_DistGraph::id, "] ", " setting ",
+                     offset + hostOffset, " from host ", senderHost,
+                     " to ", recvMasterLocations[curCount]);
       graphPartitioner->addMasterMapping(offset + hostOffset,
-                                         recvMasterLocations[i])
+                                         recvMasterLocations[curCount]);
+      //bool set = graphPartitioner->addMasterMapping(offset + hostOffset,
+      //                                          recvMasterLocations[curCount]);
+      //if (set) { actuallySet++; }
       curCount++;
     }
 
-
+    //galois::gDebug("[", base_DistGraph::id, "] host ", senderHost, ": set ",
+    //               actuallySet, " out of ", recvMasterLocations.size());
   }
 
 
