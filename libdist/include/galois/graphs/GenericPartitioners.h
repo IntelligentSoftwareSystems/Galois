@@ -506,6 +506,15 @@ class GingerP{
     _gid2host = gid2host;
   }
 
+  /**
+   * Given gid to master mapping info, save it into a local map.
+   *
+   * @param gid2offsets Map a GID to an offset into a vector containing master
+   * mapping information
+   * @param localNodeToMaster Vector that represents the master mapping of
+   * local nodes
+   * @param nodeOffset First GID of nodes read by this host
+   */
   void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
@@ -515,12 +524,16 @@ class GingerP{
       _gid2masters[i->first] = localNodeToMaster[i->second];
     }
     assert(_gid2masters.size() == gid2offsets.size());
+    // get memory back
     gid2offsets.clear();
-    // resize to fit only this host's read nodes
+
     size_t myLocalNodes = _gid2host[_hostID].second - _gid2host[_hostID].first;
     assert((myLocalNodes + _gid2masters.size()) == localNodeToMaster.size());
+    // copy over to this structure
     _localNodeToMaster = std::move(localNodeToMaster);
     assert(myLocalNodes <= _localNodeToMaster.size());
+
+    // resize to fit only this host's read nodes
     _localNodeToMaster.resize(myLocalNodes);
     _nodeOffset = nodeOffset;
 
@@ -530,22 +543,30 @@ class GingerP{
 
   /**
    * Add a new master mapping to the local map: needs to be in stage 1
+   *
+   * @param gid GID to map; should not be a GID read by this host (won't
+   * cause problems, but would just be a waste of compute resouces)
+   * @param mappedMaster master to map a GID to
+   * @returns true if new mapping added; false if already existed in map
    */
-  void addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
+  bool addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
     if (_status == 1) {
       auto offsetIntoMapIter = _gid2masters.find(gid);
       if (offsetIntoMapIter == _gid2masters.end()) {
         // NOT FOUND
         galois::gDebug("[", _hostID, "] ", gid, " not found; mapping!");
         _gid2masters[gid] = mappedMaster;
+        return true;
       } else {
         // already mapped
         galois::gDebug("[", _hostID, "] ", gid, " already mapped with master ",
                        offsetIntoMapIter->second, "!");
         assert(offsetIntoMapIter->second == mappedMaster);
+        return false;
       }
     } else {
       GALOIS_DIE("add master mapping should only be called in stage 1");
+      return false;
     }
   }
 
@@ -559,28 +580,13 @@ class GingerP{
     }
   }
 
-  //uint32_t getMasterP0(uint32_t gid) const {
-  //  uint32_t offsetIntoMap = (uint32_t)-1;
-  //  auto offsetIntoMapIter = _gid2masters.find(gid);
-  //  if (offsetIntoMapIter != _gid2masters.end()) {
-  //    offsetIntoMap = (*offsetIntoMapIter).second;
-  //    galois::gDebug("[", _hostID, "] ", gid, " found with master ",
-  //                   _localNodeToMaster[offsetIntoMap], "!");
-  //  } else {
-  //    // NOT FOUND (not necessarily a bad thing, and required for
-  //    // some cases)
-  //    galois::gDebug("[", _hostID, "] ", gid, " not found!");
-  //    return (uint32_t)-1;
-  //  }
-
-  //  // if it gets out here, make sure none of these are true
-  //  assert(offsetIntoMap != (uint32_t)-1);
-  //  assert(offsetIntoMap >= 0);
-  //  assert(offsetIntoMap < _localNodeToMaster.size());
-
-  //  return _localNodeToMaster[offsetIntoMap];
-  //}
-
+  /**
+   * Implementation of get master during stage 1: does not fail if a GID
+   * mapping is not found but instead returns -1.
+   *
+   * @param gid GID to get master of
+   * @returns Master of specified GID, -1, unsigned, if not found
+   */
   uint32_t getMasterP0(uint32_t gid) const {
     uint32_t offsetIntoMap = (uint32_t)-1;
     // use map if not a locally read node, else use vector
