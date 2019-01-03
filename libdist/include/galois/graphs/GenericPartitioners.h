@@ -478,11 +478,9 @@ class GingerP{
   double _neRatio;
   char status;
   // metadata for determining where a node's master is
-  std::map<uint64_t, uint32_t> _gid2offsets;
   std::vector<uint32_t> _localNodeToMaster;
+  std::map<uint64_t, uint32_t> _gid2masters;
   uint64_t _nodeOffset;
-
-
 
  public:
   GingerP(uint32_t hostID, uint32_t numHosts, uint64_t numNodes,
@@ -511,10 +509,20 @@ class GingerP{
   void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
-    _gid2offsets = std::move(gid2offsets);
+    for (auto i = gid2offsets.begin(); i != gid2offsets.end(); i++) {
+      _gid2masters[i->first] = localNodeToMaster[i->second];
+    }
+    assert(_gid2masters.size() == gid2offsets.size());
+    gid2offsets.clear();
+    // resize to fit only this host's read nodes
+    size_t myLocalNodes = _gid2host[_hostID].second - _gid2host[_hostID].first;
+    assert((myLocalNodes + _gid2masters.size()) == localNodeToMaster.size());
     _localNodeToMaster = std::move(localNodeToMaster);
+    assert(myLocalNodes <= _localNodeToMaster.size());
+    _localNodeToMaster.resize(myLocalNodes);
     _nodeOffset = nodeOffset;
-    // setup complete
+
+    // stage 1 setup complete
     status = 1;
   }
 
@@ -528,17 +536,49 @@ class GingerP{
     }
   }
 
+  //uint32_t getMasterP0(uint32_t gid) const {
+  //  uint32_t offsetIntoMap = (uint32_t)-1;
+  //  auto offsetIntoMapIter = _gid2masters.find(gid);
+  //  if (offsetIntoMapIter != _gid2masters.end()) {
+  //    offsetIntoMap = (*offsetIntoMapIter).second;
+  //    galois::gDebug("[", _hostID, "] ", gid, " found with master ",
+  //                   _localNodeToMaster[offsetIntoMap], "!");
+  //  } else {
+  //    // NOT FOUND (not necessarily a bad thing, and required for
+  //    // some cases)
+  //    galois::gDebug("[", _hostID, "] ", gid, " not found!");
+  //    return (uint32_t)-1;
+  //  }
+
+  //  // if it gets out here, make sure none of these are true
+  //  assert(offsetIntoMap != (uint32_t)-1);
+  //  assert(offsetIntoMap >= 0);
+  //  assert(offsetIntoMap < _localNodeToMaster.size());
+
+  //  return _localNodeToMaster[offsetIntoMap];
+  //}
+
   uint32_t getMasterP0(uint32_t gid) const {
     uint32_t offsetIntoMap = (uint32_t)-1;
+    // use map if not a locally read node, else use vector
     if (getHostReader(gid) != _hostID) {
-      // offset can be found using map
-      assert(_gid2offsets.find(gid) != _gid2offsets.end());
-      offsetIntoMap = (*(_gid2offsets.find(gid))).second;
+      auto offsetIntoMapIter = _gid2masters.find(gid);
+      if (offsetIntoMapIter != _gid2masters.end()) {
+        offsetIntoMap = offsetIntoMapIter->second;
+        galois::gDebug("[", _hostID, "] ", gid, " found with master ",
+                       offsetIntoMap, "!");
+      } else {
+        // NOT FOUND (not necessarily a bad thing, and required for
+        // some cases)
+        galois::gDebug("[", _hostID, "] ", gid, " not found!");
+        return (uint32_t)-1;
+      }
     } else {
       // determine offset
       offsetIntoMap = gid - _nodeOffset;
     }
 
+    // if it gets out here, make sure none of these are true
     assert(offsetIntoMap != (uint32_t)-1);
     assert(offsetIntoMap >= 0);
     assert(offsetIntoMap < _localNodeToMaster.size());
