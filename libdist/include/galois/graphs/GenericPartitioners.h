@@ -566,6 +566,7 @@ class GingerP{
    * @returns true if new mapping added; false if already existed in map
    */
   bool addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
+    assert(mappedMaster >= 0 && mappedMaster < _numHosts);
     if (_status == 1) {
       auto offsetIntoMapIter = _gid2masters.find(gid);
       if (offsetIntoMapIter == _gid2masters.end()) {
@@ -602,8 +603,8 @@ class GingerP{
         // found in map
         if (gidMasterIter != _gid2masters.end()) {
           uint32_t mappedMaster = gidMasterIter->second;
-          galois::gDebug("[", _hostID, "] ", gid, " found with master ",
-                         mappedMaster, "!");
+          //galois::gDebug("[", _hostID, "] ", gid, " found with master ",
+          //               mappedMaster, "!");
           // make sure host is in bounds
           assert(mappedMaster >= 0 && mappedMaster < _numHosts);
           return mappedMaster;
