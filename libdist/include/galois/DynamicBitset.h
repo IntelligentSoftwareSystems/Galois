@@ -268,7 +268,7 @@ public:
    *
    * @returns number of set bits in the bitset
    */
-  uint64_t count() {
+  uint64_t count() const {
     galois::GAccumulator<uint64_t> ret;
     galois::do_all(galois::iterate(bitvec.begin(), bitvec.end()),
                    [&](uint64_t n) {
@@ -295,7 +295,7 @@ public:
    * @returns vector with offsets into set bits
    */
   // TODO uint32_t is somewhat dangerous; change in the future
-  std::vector<uint32_t> getOffsets() {
+  std::vector<uint32_t> getOffsets() const {
     uint32_t activeThreads = galois::getActiveThreads();
     std::vector<unsigned int> tPrefixBitCounts(activeThreads);
 
