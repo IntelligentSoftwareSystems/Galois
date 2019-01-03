@@ -1116,7 +1116,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * vector should expect for each node on this host
    */
   void serializeOutgoingMasterMap(galois::runtime::SendBuffer& b,
-                                  std::vector<uint64_t>& hostOutgoingEdges) {
+                           const std::vector<uint64_t>& hostOutgoingEdges) {
     // 2 phase: one phase determines amount of work each thread does,
     // second has threads actually do copies
     uint32_t activeThreads = galois::getActiveThreads();
@@ -1191,8 +1191,55 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::runtime::gSerialize(b, masterLocation);
   }
 
-  void deserializeOutgoingMasterMap() {
-    // TODO
+  void deserializeOutgoingMasterMap(uint32_t senderHost,
+                          const std::vector<uint64_t>& hostOutgoingEdges,
+                          const std::vector<uint32_t>& recvMasterLocations) {
+    uint64_t hostOffset = base_DistGraph::gid2host[senderHost].first;
+    size_t hostSize = base_DistGraph::gid2host[senderHost].second -
+                      base_DistGraph::gid2host[senderHost].first;
+    assert(hostSize == hostOutgoingEdges.size());
+    galois::DynamicBitSet offsetsToConsider;
+    offsetsToConsider.resize(hostSize);
+    offsetsToConsider.reset();
+
+    // step 1: figure out offsets that need to be handled (i.e. non-zero): only
+    // handle if not already in map
+    galois::do_all(
+      galois::iterate((size_t)0, hostOutgoingEdges.size()),
+      [&] (size_t offset) {
+        if (hostOutgoingEdges[offset] > 0) {
+          uint32_t masterOnThisHost =
+              graphPartitioner->getMaster(offset + hostOffset);
+          // make sure mapping doesn't already exist
+          if (masterOnThisHost == (uint32_t)-1) {
+            galois::gDebug("[", base_DistGraph::id, "] ", "setting ", 
+                           offset + hostOffset, " from host ", senderHost);
+            offsetsToConsider.set(offset);
+          } else {
+            galois::gDebug("[", base_DistGraph::id, "] ", offset + hostOffset,
+                          " already mapped on this host to ", masterOnThisHost);
+          }
+        }
+      },
+      galois::no_stats(),
+      galois::steal()
+    );
+    assert(offsetsToConsider.count() <= recvMasterLocations.size());
+    galois::gDebug("[", base_DistGraph::id, "] host ", senderHost, ": set ",
+                   offsetsToConsider.count(), " out of ",
+                   recvMasterLocations.size());
+
+    // step 2: using bitset that tells which offsets are set, add
+    // to already master map in partitioner (this is single threaded
+    // since map is not a concurrent data structure)
+    size_t curCount = 0;
+    for (uint32_t offset : offsetsToConsider.getOffsets()) {
+      graphPartitioner->addMasterMapping(offset + hostOffset,
+                                         recvMasterLocations[i])
+      curCount++;
+    }
+
+
   }
 
 
@@ -1305,7 +1352,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // actual data sent
         galois::runtime::gDeserialize(p->second, numOutgoingEdges[sendingHost]);
 
-        // TODO recv master data
+        if (graphPartitioner->masterAssignPhase()) {
+          //galois::gPrint("SIASDFASDG\n");
+          std::vector<uint32_t> recvMasterLocations;
+          galois::runtime::gDeserialize(p->second, recvMasterLocations);
+          deserializeOutgoingMasterMap(sendingHost,
+                                       numOutgoingEdges[sendingHost],
+                                       recvMasterLocations);
+        }
       } else if (outgoingExists == 0) {
         // no data sent; just clear again
         numOutgoingEdges[sendingHost].clear();
