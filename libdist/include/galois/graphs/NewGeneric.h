@@ -265,6 +265,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     // inspection timer is stopped in edgeInspection function
 
+
+    // flip partitioners that have a master assignment phase to stage 2
+    // (meaning all nodes and masters that will be on this host are present in
+    // the partitioner's metadata)
+    graphPartitioner->enterStage2();
+
     // get memory back from inspection metadata
     numOutgoingEdges.clear();
     hasIncomingEdge.clear();
@@ -1348,7 +1354,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gDeserialize(p->second, numOutgoingEdges[sendingHost]);
 
         if (graphPartitioner->masterAssignPhase()) {
-          //galois::gPrint("SIASDFASDG\n");
           std::vector<uint32_t> recvMasterLocations;
           galois::runtime::gDeserialize(p->second, recvMasterLocations);
           deserializeOutgoingMasterMap(sendingHost,
@@ -1387,7 +1392,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       }
     }
 
-    galois::gPrint("[", base_DistGraph::id, "] Insepection receives complete.\n");
+    galois::gPrint("[", base_DistGraph::id,
+                   "] Insepection receives complete.\n");
   }
 
   /**

@@ -542,6 +542,22 @@ class GingerP{
   }
 
   /**
+   * Enters stage 2 of partitioning, meaning all nodes that will be on this
+   * host have a master mapping on this partitioner.
+   */
+  void enterStage2() {
+    _status = 2;
+  }
+
+  /**
+   * Check to make sure certain metadata match up at the end of all
+   * partitioning.
+   */
+  void sanityCheck() {
+    // TODO
+  }
+
+  /**
    * Add a new master mapping to the local map: needs to be in stage 1
    *
    * @param gid GID to map; should not be a GID read by this host (won't
@@ -570,56 +586,52 @@ class GingerP{
     }
   }
 
-  uint32_t getMaster(uint32_t gid) const {
-    if (_status == 1) {
-      return getMasterP0(gid);
-    } else if (_status == 2) {
-      return getMasterP1(gid);
-    } else {
-      GALOIS_DIE("Master setup incomplete");
-    }
-  }
-
   /**
-   * Implementation of get master during stage 1: does not fail if a GID
-   * mapping is not found but instead returns -1.
+   * Implementation of get master: does not fail if a GID
+   * mapping is not found but instead returns -1 if in stage 1, else
+   * fails.
    *
    * @param gid GID to get master of
    * @returns Master of specified GID, -1, unsigned, if not found
    */
-  uint32_t getMasterP0(uint32_t gid) const {
-    uint32_t offsetIntoMap = (uint32_t)-1;
-    // use map if not a locally read node, else use vector
-    if (getHostReader(gid) != _hostID) {
-      auto offsetIntoMapIter = _gid2masters.find(gid);
-      if (offsetIntoMapIter != _gid2masters.end()) {
-        offsetIntoMap = offsetIntoMapIter->second;
-        galois::gDebug("[", _hostID, "] ", gid, " found with master ",
-                       offsetIntoMap, "!");
+  uint32_t getMaster(uint32_t gid) const {
+    if (_status != 0) {
+      // use map if not a locally read node, else use vector
+      if (getHostReader(gid) != _hostID) {
+        auto gidMasterIter = _gid2masters.find(gid);
+        // found in map
+        if (gidMasterIter != _gid2masters.end()) {
+          uint32_t mappedMaster = gidMasterIter->second;
+          galois::gDebug("[", _hostID, "] ", gid, " found with master ",
+                         mappedMaster, "!");
+          // make sure host is in bounds
+          assert(mappedMaster >= 0 && mappedMaster < _numHosts);
+          return mappedMaster;
+        } else {
+          // NOT FOUND (not necessarily a bad thing, and required for
+          // some cases)
+          galois::gDebug("[", _hostID, "] ", gid, " not found!");
+          if (_status == 2) {
+            // die if we expect all gids to be mapped already (stage 2)
+            GALOIS_DIE("should not fail to find a GID after stage 2 "
+                       "partitioning");
+          }
+          return (uint32_t)-1;
+        }
       } else {
-        // NOT FOUND (not necessarily a bad thing, and required for
-        // some cases)
-        galois::gDebug("[", _hostID, "] ", gid, " not found!");
-        return (uint32_t)-1;
+        // determine offset
+        uint32_t offsetIntoMap = gid - _nodeOffset;
+        assert(offsetIntoMap != (uint32_t)-1);
+        assert(offsetIntoMap >= 0);
+        assert(offsetIntoMap < _localNodeToMaster.size());
+        return _localNodeToMaster[offsetIntoMap];
       }
     } else {
-      // determine offset
-      offsetIntoMap = gid - _nodeOffset;
+      // stage 0 = this function shouldn't be called
+      GALOIS_DIE("Master setup incomplete");
+      return (uint32_t)-1;
     }
-
-    // if it gets out here, make sure none of these are true
-    assert(offsetIntoMap != (uint32_t)-1);
-    assert(offsetIntoMap >= 0);
-    assert(offsetIntoMap < _localNodeToMaster.size());
-
-    return _localNodeToMaster[offsetIntoMap];
   }
-
-  // TODO
-  uint32_t getMasterP1(uint32_t gid) const {
-    return -1;
-  }
-
 
   /**
    * Returns Ginger's composite balance parameter for a given host
