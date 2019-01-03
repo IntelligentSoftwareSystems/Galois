@@ -476,7 +476,7 @@ class GingerP{
   double _alpha;
   // ginger node/edge ratio
   double _neRatio;
-  char status;
+  char _status;
   // metadata for determining where a node's master is
   std::vector<uint32_t> _localNodeToMaster;
   std::map<uint64_t, uint32_t> _gid2masters;
@@ -494,7 +494,7 @@ class GingerP{
     _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
     galois::gDebug("Alpha is ", _alpha);
     _neRatio = (double)numNodes / (double)numEdges;
-    status = 0;
+    _status = 0;
   }
 
   // returns true as this partitioner relies on the master assignment phase
@@ -510,6 +510,8 @@ class GingerP{
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
     for (auto i = gid2offsets.begin(); i != gid2offsets.end(); i++) {
+      assert(i->second < localNodeToMaster.size());
+      galois::gDebug("Map ", i->first, " to ", localNodeToMaster[i->second]);
       _gid2masters[i->first] = localNodeToMaster[i->second];
     }
     assert(_gid2masters.size() == gid2offsets.size());
@@ -523,13 +525,34 @@ class GingerP{
     _nodeOffset = nodeOffset;
 
     // stage 1 setup complete
-    status = 1;
+    _status = 1;
+  }
+
+  /**
+   * Add a new master mapping to the local map: needs to be in stage 1
+   */
+  void addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
+    if (_status == 1) {
+      auto offsetIntoMapIter = _gid2masters.find(gid);
+      if (offsetIntoMapIter == _gid2masters.end()) {
+        // NOT FOUND
+        galois::gDebug("[", _hostID, "] ", gid, " not found; mapping!");
+        _gid2masters[gid] = mappedMaster;
+      } else {
+        // already mapped
+        galois::gDebug("[", _hostID, "] ", gid, " already mapped with master ",
+                       offsetIntoMapIter->second, "!");
+        assert(offsetIntoMapIter->second == mappedMaster);
+      }
+    } else {
+      GALOIS_DIE("add master mapping should only be called in stage 1");
+    }
   }
 
   uint32_t getMaster(uint32_t gid) const {
-    if (status == 1) {
+    if (_status == 1) {
       return getMasterP0(gid);
-    } else if (status == 2) {
+    } else if (_status == 2) {
       return getMasterP1(gid);
     } else {
       GALOIS_DIE("Master setup incomplete");
