@@ -776,6 +776,17 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     newAssignedNodes.resize(numLocalNodes);
     newAssignedNodes.reset();
 
+    std::vector<galois::DynamicBitSet> mastersOnHosts;
+    mastersOnHosts.resize(base_DistGraph::numHosts);
+    galois::do_all(
+      galois::iterate(0u, base_DistGraph::numHosts),
+      [&] (unsigned h) {
+        mastersOnHosts[h].resize(numLocalNodes);
+        mastersOnHosts[h].reset();
+      },
+      galois::no_stats()
+    );
+
     for (uint32_t i : localNodeToMaster) {
       assert(i == (uint32_t)-1);
     }
@@ -803,6 +814,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             localNodeToMaster[node - globalOffset] = assignedHost;
             // set update bitset
             newAssignedNodes.set(node - globalOffset);
+            // set the appropriate bitset signifying which host has the node
+            // as the master
+            mastersOnHosts[assignedHost].set(node - globalOffset);
             galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
                            " set ", node, " ", node - globalOffset);
           }
