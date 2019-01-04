@@ -563,6 +563,71 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     return toReturn;
   }
 
+
+  /**
+   * Given a host, a bitset that marks offsets, and a vector,
+   * send the data located at the offsets from the vector to the
+   * specified host. If bitset is unmarked, send a no-op.
+   *
+   * @param targetHost Host to send data to
+   * @param toSync Bitset that specifies which offsets in the data vector
+   * to send
+   * @param dataVector Data to be sent to the target host
+   */
+  void sendOffsets(unsigned targetHost, galois::DynamicBitSet& toSync,
+                   std::vector<uint32_t>& dataVector) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    // this means there are updates to send
+    if (toSync.count()) {
+      // get masters to send into a vector
+      std::vector<uint32_t> mastersToSend = getDataFromOffsets(toSync,
+                                                               dataVector);
+
+      for (unsigned i : mastersToSend) {
+        galois::gDebug("[", base_DistGraph::id, "] gid ",
+                       i + base_DistGraph::gid2host[net.ID].first,
+                       " master send ", i);
+      }
+      // assert it's a positive number
+      assert(mastersToSend.size());
+
+      size_t num_selected = toSync.count();
+      size_t num_total = toSync.size();
+      // figure out how to send (most efficient method; either bitset
+      // and data or offsets + data)
+      size_t bitset_alloc_size =
+          ((num_total + 63) / 64) * sizeof(uint64_t) + (2 * sizeof(size_t));
+      size_t bitsetDataSize = (num_selected * sizeof(uint32_t)) +
+                              bitset_alloc_size + sizeof(num_selected);
+      size_t offsetsDataSize = (num_selected * sizeof(uint32_t)) +
+                               (num_selected * sizeof(unsigned int)) +
+                               sizeof(uint32_t) + sizeof(num_selected);
+
+      galois::runtime::SendBuffer b;
+
+      // tag with send method and do send
+      if (bitsetDataSize < offsetsDataSize) {
+        // send bitset, tag 1
+        galois::runtime::gSerialize(b, 1u);
+        galois::runtime::gSerialize(b, toSync);
+        galois::runtime::gSerialize(b, mastersToSend);
+      } else {
+        // send offsets, tag 2
+        galois::runtime::gSerialize(b, 2u);
+        galois::runtime::gSerialize(b, toSync.getOffsets());
+        galois::runtime::gSerialize(b, mastersToSend);
+      }
+
+      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
+    } else {
+      // send empty no-op message, tag 0
+      galois::runtime::SendBuffer b;
+      galois::runtime::gSerialize(b, 0u);
+      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
+    }
+  }
+
   /**
    * Send new master assignment updates to other hosts based on bitsets
    * for each hosts prepared in advance.
@@ -577,67 +642,20 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   void syncAssignmentSends(galois::DynamicBitSet& newAssignedNodes,
                std::vector<uint32_t>& localNodeToMaster,
                galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
 
     galois::DynamicBitSet toSync;
     toSync.resize(newAssignedNodes.size());
 
     // send loop
-    for (unsigned h = 0; h < net.Num; h++) {
-      if (h != net.ID) {
+    for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
+      if (h != base_DistGraph::id) {
         toSync.reset();
         assert(newAssignedNodes.size() == neighborOnHosts[h].size());
 
         // do bitwise and with updates, see if any new updates exist to send
         toSync.bitwise_and(newAssignedNodes, neighborOnHosts[h]);
-
-        // this means there are updates to send
-        if (toSync.count()) {
-          // get masters to send into a vector
-          std::vector<uint32_t> mastersToSend =
-            getDataFromOffsets(toSync, localNodeToMaster);
-
-          for (unsigned i : mastersToSend) {
-            galois::gDebug("[", base_DistGraph::id, "] gid ",
-            i + base_DistGraph::gid2host[net.ID].first,
-            " master send ", i);
-          }
-          assert(mastersToSend.size());
-
-          size_t num_selected = toSync.count();
-          size_t num_total = toSync.size();
-          // figure out how to send (most efficient method; either bitset
-          // and data or offsets + data)
-          size_t bitset_alloc_size =
-              ((num_total + 63) / 64) * sizeof(uint64_t) + (2 * sizeof(size_t));
-          size_t bitsetDataSize = (num_selected * sizeof(uint32_t)) +
-                                  bitset_alloc_size + sizeof(num_selected);
-          size_t offsetsDataSize = (num_selected * sizeof(uint32_t)) +
-                                   (num_selected * sizeof(unsigned int)) +
-                                   sizeof(uint32_t) + sizeof(num_selected);
-
-          galois::runtime::SendBuffer b;
-
-          // tag with send method and do send
-          if (bitsetDataSize < offsetsDataSize) {
-            // send bitset, tag 1
-            galois::runtime::gSerialize(b, 1u);
-            galois::runtime::gSerialize(b, toSync);
-            galois::runtime::gSerialize(b, mastersToSend);
-          } else {
-            // send offsets, tag 2
-            galois::runtime::gSerialize(b, 2u);
-            galois::runtime::gSerialize(b, toSync.getOffsets());
-            galois::runtime::gSerialize(b, mastersToSend);
-          }
-
-          net.sendTagged(h, galois::runtime::evilPhase, b);
-        } else {
-          // send empty no-op message, tag 0
-          galois::runtime::SendBuffer b;
-          galois::runtime::gSerialize(b, 0u);
-          net.sendTagged(h, galois::runtime::evilPhase, b);
-        }
+        // do actual send based on sync bitset
+        sendOffsets(h, toSync, localNodeToMaster);
       }
     }
   }
@@ -732,6 +750,46 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     syncAssignmentSends(newAssignedNodes, localNodeToMaster, neighborOnHosts);
     syncAssignmentReceives(localNodeToMaster, gid2offsets);
     newAssignedNodes.reset();
+  }
+
+
+  /**
+   * Send masters mappings that were read on this host to their appropirate
+   * owners
+   *
+   * @param mastersOnHosts Vector with info on which local nodes belong on which
+   * masters
+   * @param localNodeToMaster local id to master mapping map
+   * @param neighborOnHosts bitsets specifying which hosts have which neighbors
+   * that this host has read
+   */
+  void sendMastersToOwners(std::vector<galois::DynamicBitSet>& mastersOnHosts,
+                 std::vector<uint32_t>& localNodeToMaster,
+                 galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts) {
+    // for each host, determine which master assignments still need to be sent
+    // (if a host is a master of a node, but that node is not present as a
+    // neighbor on the host, then this host needs to send the master assignment)
+    galois::DynamicBitSet toSend;
+    toSend.resize(base_DistGraph::gid2host[base_DistGraph::id].second -
+                  base_DistGraph::gid2host[base_DistGraph::id].first);
+
+    for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
+      if (h != base_DistGraph::id) {
+        toSend.reset();
+        // send if set on "mastersOnHosts" but not set on neighborOnHosts:
+        // xor with neighborOnHosts, then and on mastersOnHosts
+        toSend.bitwise_xor(mastersOnHosts[h], neighborOnHosts[h]);
+        toSend.bitwise_and(mastersOnHosts[h]);
+        sendOffsets(h, toSend, localNodeToMaster);
+      }
+    }
+  }
+
+  /**
+   * TODO
+   */
+  void recvMastersToOwners() {
+
   }
 
   /**
@@ -853,6 +911,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // TODO one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
     // it)
+    sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
+    //recvMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
                                        bufGraph.getNodeOffset());
