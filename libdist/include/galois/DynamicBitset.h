@@ -264,6 +264,40 @@ public:
   }
 
   /**
+   * Does an IN-PLACE bitwise xor of this bitset and another bitset
+   *
+   * @param other Other bitset to do bitwise xor with
+   */
+  void bitwise_xor(const DynamicBitSet& other) {
+    assert(size() == other.size());
+    auto& other_bitvec = other.get_vec();
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) { bitvec[i] ^= other_bitvec[i]; },
+                   galois::no_stats());
+  }
+
+  /**
+   * Does an IN-PLACE bitwise and of 2 passed in bitsets and saves to this
+   * bitset
+   *
+   * @param other1 Bitset to xor with other 2
+   * @param other2 Bitset to xor with other 1
+   */
+  void bitwise_xor(const DynamicBitSet& other1, const DynamicBitSet& other2) {
+    assert(size() == other1.size());
+    assert(size() == other2.size());
+    auto& other_bitvec1 = other1.get_vec();
+    auto& other_bitvec2 = other2.get_vec();
+
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) {
+                     bitvec[i] = other_bitvec1[i] ^ other_bitvec2[i];
+                   },
+                   galois::no_stats());
+  }
+
+
+  /**
    * Count how many bits are set in the bitset
    *
    * @returns number of set bits in the bitset
