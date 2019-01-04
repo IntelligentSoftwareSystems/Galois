@@ -661,6 +661,51 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
   /**
+   * Receive offsets and masters into the provided vectors and return sending
+   * host and the message type.
+   *
+   * @param receivedOffsets vector to receive offsets into
+   * @param receivedMasters vector to receive masters mappings into
+   * @returns sending host and message type of received data
+   */
+  std::pair<unsigned, unsigned> recvOffsetsAndMasters(
+      std::vector<uint32_t>& receivedOffsets,
+      std::vector<uint32_t>& receivedMasters
+  ) {
+    auto& net = galois::runtime::getSystemNetworkInterface();
+
+    decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
+    do {
+      p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
+    } while (!p);
+
+    uint32_t sendingHost = p->first;
+    unsigned messageType = (unsigned)-1;
+
+    // deserialize message type
+    galois::runtime::gDeserialize(p->second, messageType);
+
+    if (messageType == 1) {
+      // bitset; deserialize, then get offsets
+      galois::DynamicBitSet receivedSet;
+      galois::runtime::gDeserialize(p->second, receivedSet);
+      receivedOffsets = receivedSet.getOffsets();
+      galois::runtime::gDeserialize(p->second, receivedMasters);
+    } else if (messageType == 2) {
+      // offsets
+      galois::runtime::gDeserialize(p->second, receivedOffsets);
+      galois::runtime::gDeserialize(p->second, receivedMasters);
+    } else if (messageType != 0) {
+      GALOIS_DIE("Invalid message type for sync of master assignments");
+    }
+
+    galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
+                   " send message type ", messageType);
+
+    return std::make_pair(sendingHost, messageType);
+  }
+
+  /**
    * Receive new master assignment updates from other hosts and update local
    * mappings.
    *
@@ -671,42 +716,19 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void syncAssignmentReceives(std::vector<uint32_t>& localNodeToMaster,
                               std::map<uint64_t, uint32_t>& gid2offsets) {
-    auto& net = galois::runtime::getSystemNetworkInterface();
-
     // receive loop
-    for (unsigned h = 0; h < net.Num - 1; h++) {
-      galois::gDebug("[", base_DistGraph::id, "] waiting for ", h, "th host");
-      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr)) p;
-      do {
-        p = net.recieveTagged(galois::runtime::evilPhase, nullptr);
-      } while (!p);
-      uint32_t sendingHost = p->first;
+    for (unsigned h = 0; h < base_DistGraph::numHosts - 1; h++) {
+      unsigned sendingHost;
+      unsigned messageType;
+      std::vector<uint32_t> receivedOffsets;
+      std::vector<uint32_t> receivedMasters;
+
+      std::tie(sendingHost, messageType) =
+        recvOffsetsAndMasters(receivedOffsets, receivedMasters);
+
       uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
       galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
                      " offset ", hostOffset);
-      unsigned messageType = (unsigned)-1;
-
-      // deserialize message type
-      galois::runtime::gDeserialize(p->second, messageType);
-
-      std::vector<uint32_t> receivedMasters;
-      std::vector<uint32_t> receivedOffsets;
-      if (messageType == 1) {
-        // bitset; deserialize, then get offsets
-        galois::DynamicBitSet receivedSet;
-        galois::runtime::gDeserialize(p->second, receivedSet);
-        receivedOffsets = receivedSet.getOffsets();
-        galois::runtime::gDeserialize(p->second, receivedMasters);
-      } else if (messageType == 2) {
-        // offsets
-        galois::runtime::gDeserialize(p->second, receivedOffsets);
-        galois::runtime::gDeserialize(p->second, receivedMasters);
-      } else if (messageType != 0) {
-        GALOIS_DIE("Invalid message type for sync of master assignments");
-      }
-
-      galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
-                     " message type ", messageType);
 
       if (messageType == 1 || messageType == 2) {
         // if execution gets here, messageType was 1 or 2
@@ -724,7 +746,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           galois::no_stats()
         );
       }
-
       //for (uint32_t i : neighborOnHosts[sendingHost].getOffsets()) {
       //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
       //}
@@ -911,7 +932,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // TODO one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
     // it)
-    sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
+    //sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
     //recvMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
