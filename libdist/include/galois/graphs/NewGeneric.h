@@ -574,7 +574,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   void sendOffsets(unsigned targetHost, galois::DynamicBitSet& toSync,
                    std::vector<uint32_t>& dataVector) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-
     // this means there are updates to send
     if (toSync.count()) {
       // get masters to send into a vector
@@ -602,7 +601,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                sizeof(uint32_t) + sizeof(num_selected);
 
       galois::runtime::SendBuffer b;
-
       // tag with send method and do send
       if (bitsetDataSize < offsetsDataSize) {
         // send bitset, tag 1
@@ -615,10 +613,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, toSync.getOffsets());
         galois::runtime::gSerialize(b, mastersToSend);
       }
+      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     } else {
       // send empty no-op message, tag 0
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, 0u);
+      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     }
   }
 
