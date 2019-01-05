@@ -233,11 +233,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
 
-    // loop over all nodes, determine where neighbors are, assign masters
-    galois::StatTimer phase0Timer("Phase0", GRNAME);
-    phase0Timer.start();
-    phase0(bufGraph);
-    phase0Timer.stop();
+    if (graphPartitioner->masterAssignPhase()) {
+      // loop over all nodes, determine where neighbors are, assign masters
+      galois::StatTimer phase0Timer("Phase0", GRNAME);
+      phase0Timer.start();
+      phase0(bufGraph);
+      phase0Timer.stop();
+    }
 
     galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
     inspectionTimer.start();

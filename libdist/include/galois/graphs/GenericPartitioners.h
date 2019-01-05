@@ -487,7 +487,7 @@ class GingerP{
          uint64_t numEdges) {
     _hostID = hostID;
     _numHosts = numHosts;
-    _vCutThreshold = 10000;
+    _vCutThreshold = 1000;
     _numNodes = numNodes;
     _numEdges = numEdges;
     _gamma = 1.5;
@@ -746,9 +746,10 @@ class GingerP{
 
 
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
-    // if high indegree, then stay on destination (src), else get moved to
-    // source (dst)
-    // note "dst" here is actually the source since we're reading transpose
+    // if high indegree, then move to source (which is dst), else stay on
+    // dst (which is src)
+    // note "dst" here is actually the source on the actual graph
+    // since we're reading transpose
     if (numEdges > _vCutThreshold) {
       return getMaster(dst);
     } else {
