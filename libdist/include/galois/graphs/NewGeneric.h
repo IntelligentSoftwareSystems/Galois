@@ -807,10 +807,32 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   }
 
   /**
-   * TODO
+   * Receive master mapping messages from hosts and add it to the graph
+   * partitioner's map.
    */
   void recvMastersToOwners() {
+    for (unsigned h = 0; h < base_DistGraph::numHosts - 1; h++) {
+      unsigned sendingHost;
+      unsigned messageType;
+      std::vector<uint32_t> receivedOffsets;
+      std::vector<uint32_t> receivedMasters;
 
+      std::tie(sendingHost, messageType) =
+        recvOffsetsAndMasters(receivedOffsets, receivedMasters);
+
+      if (messageType == 1 || messageType == 2) {
+        assert(receivedMasters.size() == receivedOffsets.size());
+        uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
+
+        // must be single threaded as map updating isn't thread-safe
+        for (unsigned i = 0; i < receivedMasters.size(); i++) {
+          uint64_t gidToMap = hostOffset + receivedOffsets[i];
+          bool newMapped =
+            graphPartitioner->addMasterMapping(gidToMap, receivedMasters[i]);
+          assert(newMapped);
+        }
+      }
+    }
   }
 
   /**
@@ -932,8 +954,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // TODO one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
     // it)
-    //sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
-    //recvMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
+    sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
+    recvMastersToOwners();
+
+    base_DistGraph::increment_evilPhase();
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
                                        bufGraph.getNodeOffset());
