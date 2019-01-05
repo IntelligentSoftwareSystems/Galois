@@ -466,7 +466,12 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
   case GING:
-    return new Ging(inputFile, net.ID, net.Num, false);
+    if (inputFileTranspose.size()) {
+      return new Ging(inputFileTranspose, net.ID, net.Num, true);
+    } else {
+      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      break;
+    }
 
 
   default:
@@ -656,7 +661,13 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new GenericEC(inputFile, net.ID, net.Num, true);
 
   case GING:
-    return new Ging(inputFile, net.ID, net.Num, true);
+    if (inputFileTranspose.size()) {
+      return new Ging(inputFileTranspose, net.ID, net.Num, false);
+    } else {
+      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      break;
+    }
+
 
 
   default:
