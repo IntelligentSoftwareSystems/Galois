@@ -823,7 +823,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // must be single threaded as map updating isn't thread-safe
         for (unsigned i = 0; i < receivedMasters.size(); i++) {
           uint64_t gidToMap = hostOffset + receivedOffsets[i];
+          #ifndef NDEBUG
           bool newMapped =
+          #endif
             graphPartitioner->addMasterMapping(gidToMap, receivedMasters[i]);
           assert(newMapped);
         }
@@ -884,9 +886,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::no_stats()
     );
 
+    #ifndef NDEBUG
     for (uint32_t i : localNodeToMaster) {
       assert(i == (uint32_t)-1);
     }
+    #endif
 
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode;
@@ -1394,9 +1398,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       }
     );
 
+    #ifndef NDEBUG
     for (uint32_t i : masterLocation) {
       assert(i != (uint32_t)-1);
     }
+    #endif
 
     // serialize into buffer; since this is sent along with vector receiver end
     // will know how to deal with it
@@ -1419,10 +1425,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::no_stats()
     );
 
+    #ifndef NDEBUG
     for (uint32_t i : masterMap) {
       assert(i != (uint32_t)-1);
       assert(i >= 0 && i < base_DistGraph::numHosts);
     }
+    #endif
 
     // serialize into buffer; since this is sent along with vector receiver end
     // will know how to deal with it
