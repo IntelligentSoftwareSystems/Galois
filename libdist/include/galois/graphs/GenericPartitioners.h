@@ -492,7 +492,6 @@ class GingerP{
     _numEdges = numEdges;
     _gamma = 1.5;
     _alpha = numEdges * pow(numHosts, _gamma - 1.0) / pow(numNodes, _gamma);
-    galois::gDebug("Alpha is ", _alpha);
     _neRatio = (double)numNodes / (double)numEdges;
     _status = 0;
   }
@@ -518,17 +517,22 @@ class GingerP{
   void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
+    #ifndef NDEBUG
+    size_t originalSize = _gid2masters.size();
+    #endif
+
     for (auto i = gid2offsets.begin(); i != gid2offsets.end(); i++) {
       assert(i->second < localNodeToMaster.size());
       galois::gDebug("Map ", i->first, " to ", localNodeToMaster[i->second]);
       _gid2masters[i->first] = localNodeToMaster[i->second];
     }
-    assert(_gid2masters.size() == gid2offsets.size());
+    assert(_gid2masters.size() == (originalSize + gid2offsets.size()));
     // get memory back
     gid2offsets.clear();
 
     size_t myLocalNodes = _gid2host[_hostID].second - _gid2host[_hostID].first;
-    assert((myLocalNodes + _gid2masters.size()) == localNodeToMaster.size());
+    assert((myLocalNodes + _gid2masters.size() - originalSize) ==
+           localNodeToMaster.size());
     // copy over to this structure
     _localNodeToMaster = std::move(localNodeToMaster);
     assert(myLocalNodes <= _localNodeToMaster.size());
@@ -567,7 +571,7 @@ class GingerP{
    */
   bool addMasterMapping(uint32_t gid, uint32_t mappedMaster) {
     assert(mappedMaster >= 0 && mappedMaster < _numHosts);
-    if (_status == 1) {
+    if (_status <= 1) {
       auto offsetIntoMapIter = _gid2masters.find(gid);
       if (offsetIntoMapIter == _gid2masters.end()) {
         // NOT FOUND
@@ -582,7 +586,7 @@ class GingerP{
         return false;
       }
     } else {
-      GALOIS_DIE("add master mapping should only be called in stage 1");
+      GALOIS_DIE("add master mapping should only be called in stage 0/1");
       return false;
     }
   }
