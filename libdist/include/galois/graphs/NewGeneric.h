@@ -93,9 +93,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
   virtual bool isLocal(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);
-    if (globalToLocalMap.find(gid) == globalToLocalMap.end()) {
-      galois::gDebug("[", base_DistGraph::id, "] not found:: ", gid);
-    }
     return (globalToLocalMap.find(gid) != globalToLocalMap.end());
   }
 
@@ -441,8 +438,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // map the gid to a local id
         for (uint32_t i : setOffsets) {
           gid2Offsets[i + hostOffset] = numLocal + curCount;
-          galois::gDebug("[", base_DistGraph::id, "] ", i + hostOffset, " map to"
-                         " offset ", numLocal +   curCount);
+          //galois::gDebug("[", base_DistGraph::id, "] ", i + hostOffset, " map to"
+          //               " offset ", numLocal +   curCount);
           curCount++;
         }
       }
@@ -485,9 +482,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // deserialize into neighbor bitsets
       galois::runtime::gDeserialize(p->second, neighborOnHosts[sendingHost]);
 
-      for (uint32_t i : neighborOnHosts[sendingHost].getOffsets()) {
-        galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
-      }
+      //for (uint32_t i : neighborOnHosts[sendingHost].getOffsets()) {
+      //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
+      //}
     }
 
 
@@ -584,11 +581,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       std::vector<uint32_t> mastersToSend = getDataFromOffsets(toSync,
                                                                dataVector);
 
-      for (unsigned i : mastersToSend) {
-        galois::gDebug("[", base_DistGraph::id, "] gid ",
-                       i + base_DistGraph::gid2host[net.ID].first,
-                       " master send ", i);
-      }
+      //for (unsigned i : mastersToSend) {
+      //  galois::gDebug("[", base_DistGraph::id, "] gid ",
+      //                 i + base_DistGraph::gid2host[net.ID].first,
+      //                 " master send ", i);
+      //}
       // assert it's a positive number
       assert(mastersToSend.size());
 
@@ -618,13 +615,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, toSync.getOffsets());
         galois::runtime::gSerialize(b, mastersToSend);
       }
-
-      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     } else {
       // send empty no-op message, tag 0
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, 0u);
-      net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     }
   }
 
@@ -918,8 +912,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             // set the appropriate bitset signifying which host has the node
             // as the master
             mastersOnHosts[assignedHost].set(node - globalOffset);
-            galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-                           " set ", node, " ", node - globalOffset);
+            //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
+            //               " set ", node, " ", node - globalOffset);
           }
         },
         #if MORE_DIST_STATS
@@ -1464,9 +1458,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     size_t curCount = 0;
     //size_t actuallySet = 0;
     for (uint32_t offset : offsetsToConsider.getOffsets()) {
-      galois::gDebug("[", base_DistGraph::id, "] ", " setting ",
-                     offset + hostOffset, " from host ", senderHost,
-                     " to ", recvMasterLocations[curCount]);
+      //galois::gDebug("[", base_DistGraph::id, "] ", " setting ",
+      //               offset + hostOffset, " from host ", senderHost,
+      //               " to ", recvMasterLocations[curCount]);
       graphPartitioner->addMasterMapping(offset + hostOffset,
                                          recvMasterLocations[curCount]);
       //bool set = graphPartitioner->addMasterMapping(offset + hostOffset,
@@ -1492,8 +1486,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     size_t curCount = 0;
     for (uint64_t gid : gids) {
       assert(gid < base_DistGraph::numGlobalNodes);
-      galois::gDebug("[", base_DistGraph::id, "] ", " in-setting ", gid, " to ",
-                     recvMasterLocations[curCount]);
+      //galois::gDebug("[", base_DistGraph::id, "] ", " in-setting ", gid, " to ",
+      //               recvMasterLocations[curCount]);
       graphPartitioner->addMasterMapping(gid, recvMasterLocations[curCount]);
       curCount++;
     }
@@ -1554,7 +1548,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, offsets);
 
         if (graphPartitioner->masterAssignPhase()) {
-          galois::gDebug("incoming master map serialization");
+          //galois::gDebug("incoming master map serialization");
           serializeIncomingMasterMap(b, curBitset);
         }
       } else {
@@ -1562,7 +1556,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, 1);
         galois::runtime::gSerialize(b, curBitset);
         if (graphPartitioner->masterAssignPhase()) {
-          galois::gDebug("incoming master map serialization");
+          //galois::gDebug("incoming master map serialization");
           serializeIncomingMasterMap(b, curBitset);
         }
       }
@@ -1662,7 +1656,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
     galois::gPrint("[", base_DistGraph::id,
-                   "] Insepection receives complete.\n");
+                   "] Inspection receives complete.\n");
   }
 
   /**
@@ -1684,23 +1678,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     localToGlobalVector.reserve(base_DistGraph::numGlobalNodes /
                                 base_DistGraph::numHosts * 1.15);
 
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI1\n");
     inspectMasterNodes(numOutgoingEdges, prefixSumOfEdges);
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI2\n");
     inspectOutgoingNodes(numOutgoingEdges, prefixSumOfEdges);
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI3\n");
     createIntermediateMetadata(prefixSumOfEdges, hasIncomingEdge.count());
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI4\n");
     inspectIncomingNodes(hasIncomingEdge, prefixSumOfEdges);
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI5\n");
     finalizeInspection(prefixSumOfEdges);
-    galois::runtime::getHostBarrier().wait();
-    galois::gPrint("HI6\n");
 
     galois::gDebug("[", base_DistGraph::id, "] To receive this many nodes: ",
                    nodesToReceive);
@@ -1744,10 +1726,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                              hostSize, tid, nthreads);
           uint64_t count = 0;
           for (size_t i = beginNode; i < endNode; i++) {
-            galois::gDebug("[", base_DistGraph::id, "] ", i + startNode,
-                           " mapped to ",
-                           graphPartitioner->getMaster(i+startNode));
-
+            //galois::gDebug("[", base_DistGraph::id, "] ", i + startNode,
+            //               " mapped to ",
+            //               graphPartitioner->getMaster(i+startNode));
             if (graphPartitioner->getMaster(i + startNode) == myHID) {
               count++;
             }

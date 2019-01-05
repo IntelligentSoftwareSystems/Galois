@@ -727,7 +727,7 @@ class GingerP{
       // find max score
       for (unsigned i = 0; i < _numHosts; i++) {
         if (scores[i] >= bestScore) {
-          galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
+          //galois::gDebug("best score ", bestScore, " beaten by ", scores[i]);
           bestScore = scores[i];
           bestHost = i;
         }
