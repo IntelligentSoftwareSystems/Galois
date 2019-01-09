@@ -184,7 +184,7 @@ struct SynchronousAlgo {
         if (src >= dst)
           continue;
         Node& ddata = graph.getData(dst, galois::MethodFlag::UNPROTECTED);
-        next->push(Edge(src, &ddata, 0));
+        cur->push(Edge(src, &ddata, 0));
         break;
       }
     });
