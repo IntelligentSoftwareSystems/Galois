@@ -55,6 +55,8 @@ class DGTerminator {
   bool work_done;
 #ifndef GALOIS_USE_LWCI
   MPI_Request snapshot_request;
+#else
+  lc_colreq snapshot_request;
 #endif
 
 public:
@@ -136,9 +138,8 @@ public:
 
   void initiate_snapshot() {
 #ifdef GALOIS_USE_LWCI
-    assert(false);
-    lc_alreduce(&snapshot, &global_snapshot, sizeof(Ty),
-                &galois::runtime::internal::ompi_op_max<Ty>);
+    lc_ialreduce(&snapshot, &global_snapshot, sizeof(Ty),
+                 &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep, &snapshot_request);
 #else
     MPI_Iallreduce(&snapshot, &global_snapshot, 1, MPI::UNSIGNED_LONG, MPI_MAX,
                   MPI_COMM_WORLD, &snapshot_request);
@@ -156,11 +157,14 @@ public:
     if (!active) {
 #ifndef GALOIS_USE_LWCI
       MPI_Test(&snapshot_request, &snapshot_ended, MPI_STATUS_IGNORE);
+#else
+      lc_col_progress(&snapshot_request);
+      snapshot_ended = snapshot_request.flag;
 #endif
     }
     if (!active) { // check pending receives after checking snapshot
       active = net.anyPendingReceives();
-      //if (active) galois::gDebug("[", net.ID, "] pending receive \n");
+      if (active) galois::gDebug("[", net.ID, "] pending receive \n");
     }
     if (active) {
       work_done = true;

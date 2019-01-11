@@ -2853,7 +2853,7 @@ private:
       if ((!async) || (b.size() > 0)) {
         size_t syncTypePhase = 0;
         if (async && (syncType == syncBroadcast)) syncTypePhase = 1;
-        net.sendTagged(x, galois::runtime::evilPhase + syncTypePhase, b);
+        net.sendTagged(x, galois::runtime::evilPhase, b, syncTypePhase);
         ++numMessages;
       }
     }
@@ -3254,9 +3254,9 @@ private:
     if (async) {
       size_t syncTypePhase = 0;
       if (syncType == syncBroadcast) syncTypePhase = 1;
-      decltype(net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
 
         if (p) {
           syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
