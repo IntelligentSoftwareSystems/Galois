@@ -224,6 +224,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
     // phase 0
+
+    galois::gPrint("[", base_DistGraph::id, "] Starting graph reading.\n");
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
     bufGraph.resetReadCounters();
     galois::StatTimer graphReadTimer("GraphReading", GRNAME);
@@ -232,13 +234,16 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
+    galois::gPrint("[", base_DistGraph::id, "] Reading graph complete.\n");
 
     if (graphPartitioner->masterAssignPhase()) {
       // loop over all nodes, determine where neighbors are, assign masters
       galois::StatTimer phase0Timer("Phase0", GRNAME);
+      galois::gPrint("[", base_DistGraph::id, "] Starting master assignment.\n");
       phase0Timer.start();
       phase0(bufGraph);
       phase0Timer.stop();
+      galois::gPrint("[", base_DistGraph::id, "] Master assignment complete.\n");
     }
 
     galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
@@ -270,7 +275,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // flip partitioners that have a master assignment phase to stage 2
     // (meaning all nodes and masters that will be on this host are present in
     // the partitioner's metadata)
-    graphPartitioner->enterStage2();
+    if (graphPartitioner->masterAssignPhase()) {
+      graphPartitioner->enterStage2();
+    }
 
     // get memory back from inspection metadata
     numOutgoingEdges.clear();
@@ -299,7 +306,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // get memory from prefix sum back
     prefixSumOfEdges.clear();
     freeVector(prefixSumOfEdges); // should no longer use this variable
+    galois::CondStatTimer<MORE_DIST_STATS> TfillMirrors("FillMirrors", GRNAME);
+
+    TfillMirrors.start();
     fillMirrors();
+    TfillMirrors.stop();
 
     base_DistGraph::printStatistics();
 
@@ -892,6 +903,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     #endif
 
+    if (base_DistGraph::id == 0) {
+      galois::gPrint("Number of BSP sync rounds in master assignment: ",
+                     stateRounds, "\n");
+    }
+
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode;
       uint32_t endNode;
@@ -932,7 +948,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // do synchronization of master assignment of neighbors
       syncAssignment(newAssignedNodes, localNodeToMaster, neighborOnHosts,
                      gid2offsets);
-
       // debug build prints
       //printLoad(nodeLoads, nodeAccum);
       //printLoad(edgeLoads, edgeAccum);
@@ -940,6 +955,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // sync node/edge loads
       syncLoad(nodeLoads, nodeAccum);
       syncLoad(edgeLoads, edgeAccum);
+      if (base_DistGraph::id == 0) {
+        galois::gPrint("State Round ", syncRound, " complete\n");
+      }
     }
 
     // sanity check for correctness (all should be assigned)
@@ -951,16 +969,22 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     base_DistGraph::increment_evilPhase();
 
+    galois::gPrint("[", base_DistGraph::id, "] Local master assignment "
+                   "complete.\n");
+
     // TODO one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
     // it)
     sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
     recvMastersToOwners();
 
+    galois::gPrint("[", base_DistGraph::id, "] Received my master mappings.\n");
+
     base_DistGraph::increment_evilPhase();
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
                                        bufGraph.getNodeOffset());
+
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
@@ -1417,7 +1441,19 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     std::vector<uint32_t> bitsetOffsets = hostIncomingEdges.getOffsets();
 
+    //size_t firstBound = base_DistGraph::gid2host[h].first;
+    //size_t secondBound = base_DistGraph::gid2host[h].second;
+
+    //galois::do_all(
+    //  galois::iterate((size_t)0, firstBound),
+    //  [&] (size_t offset) {
+    //    masterMap[offset] = graphPartitioner->getMaster(bitsetOffsets[offset]);
+    //  },
+    //  galois::no_stats()
+    //);
+
     galois::do_all(
+      //galois::iterate((size_t)secondBound, numOfNodes),
       galois::iterate((size_t)0, numOfNodes),
       [&] (size_t offset) {
         masterMap[offset] = graphPartitioner->getMaster(bitsetOffsets[offset]);
@@ -1559,6 +1595,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         if (graphPartitioner->masterAssignPhase()) {
           //galois::gDebug("incoming master map serialization");
+          //serializeIncomingMasterMap(b, curBitset, h);
           serializeIncomingMasterMap(b, curBitset);
         }
       } else {
@@ -1567,6 +1604,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, curBitset);
         if (graphPartitioner->masterAssignPhase()) {
           //galois::gDebug("incoming master map serialization");
+          //serializeIncomingMasterMap(b, curBitset, h);
           serializeIncomingMasterMap(b, curBitset);
         }
       }
