@@ -381,6 +381,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
   ) {
+    galois::StatTimer bitsetSetupTimer("Phase0BitsetSetup", GRNAME);
+    bitsetSetupTimer.start();
+
     // Step 1: setup bitsets
     galois::do_all(
       galois::iterate(0u, (unsigned)base_DistGraph::numHosts),
@@ -422,6 +425,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::steal(),
       galois::no_stats()
     );
+
+    bitsetSetupTimer.stop();
   }
 
   // sets up the gid to lid mapping for phase 0
@@ -438,6 +443,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
     std::map<uint64_t, uint32_t>& gid2Offsets
   ) {
+    galois::StatTimer mapSetupTimer("Phase0MapSetup", GRNAME);
+    mapSetupTimer.start();
+
     uint64_t curCount = 0;
     uint64_t numLocal = base_DistGraph::gid2host[base_DistGraph::id].second -
                         base_DistGraph::gid2host[base_DistGraph::id].first;
@@ -458,6 +466,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       }
     }
 
+    mapSetupTimer.stop();
+
     return curCount;
   }
 
@@ -473,6 +483,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
+    galois::StatTimer p0BitsetCommTimer("Phase0SendRecvBitset", GRNAME);
+    p0BitsetCommTimer.start();
 
     // Step 4: send bitset to other hosts
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
@@ -500,6 +512,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       //}
     }
 
+    p0BitsetCommTimer.stop();
 
     // comm phase complete
     base_DistGraph::increment_evilPhase();
