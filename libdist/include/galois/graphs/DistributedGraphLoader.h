@@ -62,7 +62,8 @@ enum PARTITIONING_SCHEME {
   GCVC,                    //!< generic cvc
   GHIVC,                    //!< generic hivc
   GOEC,                    //!< generic oec
-  GING                    //!< Ginger
+  GING,                    //!< Ginger
+  FENNEL                    //!< Fennel
 };
 
 /**
@@ -107,6 +108,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "goec";
   case GING:
     return "ginger";
+  case FENNEL:
+    return "fennel";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -284,6 +287,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -337,6 +341,9 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GING:
     return new Ging(inputFile, net.ID, net.Num, false);
 
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, false);
+
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -381,6 +388,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -473,6 +481,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       break;
     }
 
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, false);
+
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -522,6 +533,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -668,7 +680,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       break;
     }
 
-
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, true);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
