@@ -483,8 +483,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
-    galois::StatTimer p0BitsetCommTimer("Phase0SendRecvBitset", GRNAME);
+    galois::StatTimer p0BitsetCommTimer("Phase0SendRecvBitsets", GRNAME);
     p0BitsetCommTimer.start();
+    uint64_t bytesSent = 0;
 
     // Step 4: send bitset to other hosts
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
@@ -492,6 +493,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
       if (h != base_DistGraph::id) {
         galois::runtime::gSerialize(bitsetBuffer, neighborOnHosts[h]);
+        bytesSent += bitsetBuffer.size();
         net.sendTagged(h, galois::runtime::evilPhase, bitsetBuffer);
       }
     }
@@ -513,6 +515,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
     p0BitsetCommTimer.stop();
+
+    galois::runtime::reportStat_Tsum(
+      GRNAME, std::string("Phase0SendRecvBitsetsBytesSent"), bytesSent
+    );
 
     // comm phase complete
     base_DistGraph::increment_evilPhase();
@@ -598,8 +604,16 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param dataVector Data to be sent to the target host
    */
   void sendOffsets(unsigned targetHost, galois::DynamicBitSet& toSync,
-                   std::vector<uint32_t>& dataVector) {
+                   std::vector<uint32_t>& dataVector,
+                   std::string timerName = std::string()) {
     auto& net = galois::runtime::getSystemNetworkInterface();
+    std::string statString = std::string("Phase0SendOffsets_") + timerName;
+    uint64_t bytesSent = 0;
+
+    galois::StatTimer sendOffsetsTimer(statString.c_str(), GRNAME);
+
+    sendOffsetsTimer.start();
+
     // this means there are updates to send
     if (toSync.count()) {
       // get masters to send into a vector
@@ -639,13 +653,19 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::runtime::gSerialize(b, toSync.getOffsets());
         galois::runtime::gSerialize(b, mastersToSend);
       }
+      bytesSent += b.size();
       net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     } else {
       // send empty no-op message, tag 0
       galois::runtime::SendBuffer b;
       galois::runtime::gSerialize(b, 0u);
+      bytesSent += b.size();
       net.sendTagged(targetHost, galois::runtime::evilPhase, b);
     }
+    sendOffsetsTimer.stop();
+
+    galois::runtime::reportStat_Tsum(GRNAME, statString + "_BytesSent",
+                                     bytesSent);
   }
 
   /**
@@ -675,7 +695,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // do bitwise and with updates, see if any new updates exist to send
         toSync.bitwise_and(newAssignedNodes, neighborOnHosts[h]);
         // do actual send based on sync bitset
-        sendOffsets(h, toSync, localNodeToMaster);
+        sendOffsets(h, toSync, localNodeToMaster, "NewAssignments");
       }
     }
   }
@@ -788,9 +808,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       std::vector<uint32_t>& localNodeToMaster,
       galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
       std::map<uint64_t, uint32_t>& gid2offsets) {
+    galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
+    syncAssignmentTimer.start();
+
     syncAssignmentSends(newAssignedNodes, localNodeToMaster, neighborOnHosts);
     syncAssignmentReceives(localNodeToMaster, gid2offsets);
     newAssignedNodes.reset();
+
+    syncAssignmentTimer.stop();
   }
 
 
@@ -821,7 +846,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // xor with neighborOnHosts, then and on mastersOnHosts
         toSend.bitwise_xor(mastersOnHosts[h], neighborOnHosts[h]);
         toSend.bitwise_and(mastersOnHosts[h]);
-        sendOffsets(h, toSend, localNodeToMaster);
+        sendOffsets(h, toSend, localNodeToMaster, "MastersToOwners");
       }
     }
   }
@@ -951,9 +976,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             //               " set ", node, " ", node - globalOffset);
           }
         },
-        #if MORE_DIST_STATS
-        galois::loopname("DetermineMasters"),
-        #endif
+        galois::loopname("Phase0DetermineMasters"),
         galois::steal(),
         galois::no_stats()
       );
@@ -966,8 +989,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       //printLoad(edgeLoads, edgeAccum);
 
       // sync node/edge loads
+      galois::StatTimer loadSyncTimer("Phase0LoadSyncTime", GRNAME);
+
+      loadSyncTimer.start();
       syncLoad(nodeLoads, nodeAccum);
       syncLoad(edgeLoads, edgeAccum);
+      loadSyncTimer.stop();
+
       if (base_DistGraph::id == 0) {
         galois::gPrint("State Round ", syncRound, " complete\n");
       }
@@ -988,8 +1016,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // TODO one more step: let masters know of nodes they own (if they don't
     // have the node locally then this is the only way they will learn about
     // it)
+    galois::StatTimer p0master2ownerTimer("Phase0MastersToOwners", GRNAME);
+
+    p0master2ownerTimer.start();
     sendMastersToOwners(mastersOnHosts, localNodeToMaster, neighborOnHosts);
     recvMastersToOwners();
+    p0master2ownerTimer.stop();
 
     galois::gPrint("[", base_DistGraph::id, "] Received my master mappings.\n");
 
@@ -997,7 +1029,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     graphPartitioner->saveGID2HostInfo(gid2offsets, localNodeToMaster,
                                        bufGraph.getNodeOffset());
-
   }
 
   void edgeCutInspection(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
