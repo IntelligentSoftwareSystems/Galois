@@ -479,7 +479,7 @@ class GingerP{
   char _status;
   // metadata for determining where a node's master is
   std::vector<uint32_t> _localNodeToMaster;
-  std::map<uint64_t, uint32_t> _gid2masters;
+  std::unordered_map<uint64_t, uint32_t> _gid2masters;
   uint64_t _nodeOffset;
 
  public:
@@ -514,7 +514,7 @@ class GingerP{
    * local nodes
    * @param nodeOffset First GID of nodes read by this host
    */
-  void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
+  void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
     #ifndef NDEBUG
@@ -665,7 +665,7 @@ class GingerP{
   uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
-      std::map<uint64_t, uint32_t>& gid2offsets,
+      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
       const std::vector<uint64_t>& nodeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
       const std::vector<uint64_t>& edgeLoads,
@@ -819,7 +819,7 @@ class FennelP {
   char _status;
   // metadata for determining where a node's master is
   std::vector<uint32_t> _localNodeToMaster;
-  std::map<uint64_t, uint32_t> _gid2masters;
+  std::unordered_map<uint64_t, uint32_t> _gid2masters;
   uint64_t _nodeOffset;
 
  public:
@@ -854,7 +854,7 @@ class FennelP {
    * local nodes
    * @param nodeOffset First GID of nodes read by this host
    */
-  void saveGID2HostInfo(std::map<uint64_t, uint32_t>& gid2offsets,
+  void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>& gid2offsets,
                         std::vector<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
     #ifndef NDEBUG
@@ -1005,7 +1005,7 @@ class FennelP {
   uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
       const std::vector<uint32_t>& localNodeToMaster,
-      std::map<uint64_t, uint32_t>& gid2offsets,
+      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
       const std::vector<uint64_t>& nodeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
       const std::vector<uint64_t>& edgeLoads,

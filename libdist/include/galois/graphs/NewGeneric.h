@@ -30,6 +30,8 @@
 #include "galois/DReducible.h"
 #include <sstream>
 
+#define CUSP_PT_TIMER 1
+
 namespace galois {
 namespace graphs {
 /**
@@ -396,18 +398,19 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         neighborOnHosts[h].resize(endNode - startNode);
         neighborOnHosts[h].reset();
       },
-      #if MORE_DIST_STATS
-      galois::loopname("SetupNeighborHostBitsets"),
-      #endif
+      galois::loopname("Phase0BitsetSetup_SetupNeighborHostBitsets"),
       galois::steal(),
       galois::no_stats()
     );
 
+    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
+                                             "Phase0DetNeighLocation");
     // Step 2: loop over all local nodes, determine neighbor locations
     galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                       base_DistGraph::gid2host[base_DistGraph::id].second),
       [&] (unsigned n) {
+        ptt.start();
         auto ii = bufGraph.edgeBegin(n);
         auto ee = bufGraph.edgeEnd(n);
         for (; ii < ee; ++ii) {
@@ -418,10 +421,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             dst - base_DistGraph::gid2host[hostLocation].first
           );
         }
+        ptt.stop();
       },
-      #if MORE_DIST_STATS
-      galois::loopname("DetermineNeighborLocations"),
-      #endif
+      galois::loopname("Phase0BitsetSetup_DetermineNeighborLocations"),
       galois::steal(),
       galois::no_stats()
     );
@@ -435,13 +437,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * read nodes occupy the first chunk, and nodes read by other hosts follow.
    *
    * @param neighborOnHost
-   * @param gid2Offsets mapping vector: element at an offset corresponds to a
+   * @param gid2offsets mapping vector: element at an offset corresponds to a
    * particular GID (and its master)
    * @returns Number of set bits over all bitsets
    */
   uint64_t phase0MapSetup(
     galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
-    std::map<uint64_t, uint32_t>& gid2Offsets
+    std::unordered_map<uint64_t, uint32_t>& gid2offsets
   ) {
     galois::StatTimer mapSetupTimer("Phase0MapSetup", GRNAME);
     mapSetupTimer.start();
@@ -449,6 +451,15 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     uint64_t curCount = 0;
     uint64_t numLocal = base_DistGraph::gid2host[base_DistGraph::id].second -
                         base_DistGraph::gid2host[base_DistGraph::id].first;
+
+
+    uint64_t numToReserve = 0;
+    for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
+      if (h != base_DistGraph::id) {
+        numToReserve += neighborOnHosts[h].count();
+      }
+    }
+    gid2offsets.reserve(numToReserve);
 
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
       if (h != base_DistGraph::id) {
@@ -458,7 +469,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         // map the gid to a local id
         for (uint32_t i : setOffsets) {
-          gid2Offsets[i + hostOffset] = numLocal + curCount;
+          gid2offsets[i + hostOffset] = numLocal + curCount;
           //galois::gDebug("[", base_DistGraph::id, "] ", i + hostOffset, " map to"
           //               " offset ", numLocal +   curCount);
           curCount++;
@@ -755,7 +766,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * corresponds to it
    */
   void syncAssignmentReceives(std::vector<uint32_t>& localNodeToMaster,
-                              std::map<uint64_t, uint32_t>& gid2offsets) {
+                              std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     // receive loop
     for (unsigned h = 0; h < base_DistGraph::numHosts - 1; h++) {
       unsigned sendingHost;
@@ -807,7 +818,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   void syncAssignment(galois::DynamicBitSet& newAssignedNodes,
       std::vector<uint32_t>& localNodeToMaster,
       galois::gstl::Vector<galois::DynamicBitSet>& neighborOnHosts,
-      std::map<uint64_t, uint32_t>& gid2offsets) {
+      std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
     syncAssignmentTimer.start();
 
@@ -892,7 +903,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // determine on which hosts that this host's read nodes havs neighbors on
     phase0BitsetSetup(bufGraph, neighborOnHosts);
     // gid to vector offset setup
-    std::map<uint64_t, uint32_t> gid2offsets;
+    std::unordered_map<uint64_t, uint32_t> gid2offsets;
     uint64_t neighborCount = phase0MapSetup(neighborOnHosts, gid2offsets);
     galois::gDebug("[", base_DistGraph::id, "] num neighbors found is ",
                    neighborCount);
@@ -946,6 +957,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                      stateRounds, "\n");
     }
 
+    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
+                                              "Phase0DetermineMaster");
+
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode;
       uint32_t endNode;
@@ -957,6 +971,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // iterate over my read nodes
         galois::iterate(beginNode, endNode),
         [&] (uint32_t node) {
+          ptt.start();
           // determine master function takes source node, iterator of
           // neighbors
           uint32_t assignedHost = graphPartitioner->determineMaster(node,
@@ -974,6 +989,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             mastersOnHosts[assignedHost].set(node - globalOffset);
             //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
             //               " set ", node, " ", node - globalOffset);
+            ptt.stop();
           }
         },
         galois::loopname("Phase0DetermineMasters"),
