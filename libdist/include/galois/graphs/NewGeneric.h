@@ -30,7 +30,7 @@
 #include "galois/DReducible.h"
 #include <sstream>
 
-#define CUSP_PT_TIMER 1
+#define CUSP_PT_TIMER 0
 
 namespace galois {
 namespace graphs {
@@ -403,14 +403,62 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::no_stats()
     );
 
-    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
-                                             "Phase0DetNeighLocation");
-    // Step 2: loop over all local nodes, determine neighbor locations
+
+
+    uint64_t numLocalNodes = base_DistGraph::gid2host[base_DistGraph::id].second -
+                             base_DistGraph::gid2host[base_DistGraph::id].first;
+    galois::PODResizeableArray<uint64_t> edgePrefixSum;
+    edgePrefixSum.resize(numLocalNodes);
+    uint64_t nodeOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    // get thread ranges with a prefix sum
     galois::do_all(
       galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
                       base_DistGraph::gid2host[base_DistGraph::id].second),
       [&] (unsigned n) {
+        uint64_t offset = n - nodeOffset;
+        edgePrefixSum[offset] = bufGraph.edgeEnd(n) - bufGraph.edgeBegin(n);
+      },
+      galois::loopname("Phase0BitsetSetup_ThreadRangesSetup"),
+      galois::steal(),
+      galois::no_stats()
+    );
+
+    for (unsigned i = 1; i < numLocalNodes; i++) {
+      edgePrefixSum[i] += edgePrefixSum[i - 1];
+    }
+
+    std::vector<uint32_t> assignedThreadRanges =
+      galois::graphs::determineUnitRangesFromPrefixSum(
+        galois::runtime::activeThreads, edgePrefixSum
+      );
+
+    for (unsigned i = 0; i < galois::runtime::activeThreads + 1; i++) {
+      assignedThreadRanges[i] += nodeOffset;
+    }
+
+    //galois::gPrint("[", base_DistGraph::id, "] num local is ", numLocalNodes, "\n");
+    //for (uint32_t i : assignedThreadRanges) {
+    //  galois::gPrint("[", base_DistGraph::id, "]", i , "\n");
+    //}
+    galois::runtime::SpecificRange<boost::counting_iterator<size_t>> work =
+      galois::runtime::makeSpecificRange(
+          boost::counting_iterator<size_t>(nodeOffset),
+          boost::counting_iterator<size_t>(nodeOffset + numLocalNodes),
+          assignedThreadRanges.data()
+      );
+
+    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
+                                             "Phase0DetNeighLocation");
+    // Step 2: loop over all local nodes, determine neighbor locations
+    galois::do_all(
+      galois::iterate(work),
+      //galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
+      //                base_DistGraph::gid2host[base_DistGraph::id].second),
+      [&] (unsigned n) {
         ptt.start();
+        //galois::gPrint("[", base_DistGraph::id, " ",
+        //galois::substrate::getThreadPool().getTID(), "] ", n, "\n");
         auto ii = bufGraph.edgeBegin(n);
         auto ee = bufGraph.edgeEnd(n);
         for (; ii < ee; ++ii) {
