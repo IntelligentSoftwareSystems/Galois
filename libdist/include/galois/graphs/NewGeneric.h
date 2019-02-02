@@ -373,6 +373,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   getSpecificThreadRange(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
                          std::vector<uint32_t>& assignedThreadRanges,
                          uint64_t startNode, uint64_t endNode) {
+    galois::StatTimer threadRangeTime("Phase0ThreadRangeTime");
+    threadRangeTime.start();
     uint64_t numLocalNodes = endNode - startNode;
     galois::PODResizeableArray<uint64_t> edgePrefixSum;
     edgePrefixSum.resize(numLocalNodes);
@@ -404,11 +406,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     //  galois::gPrint("[", base_DistGraph::id, "]", i , "\n");
     //}
 
-    return galois::runtime::makeSpecificRange(
+    auto toReturn = galois::runtime::makeSpecificRange(
       boost::counting_iterator<size_t>(startNode),
       boost::counting_iterator<size_t>(startNode + numLocalNodes),
       assignedThreadRanges.data()
     );
+
+    threadRangeTime.stop();
+    return toReturn;
   }
 
   /**
@@ -1024,11 +1029,19 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         globalOffset, base_DistGraph::gid2host[base_DistGraph::id].second,
         syncRound, stateRounds);
 
-      // create specific range for this block TODO
+      // create specific range for this block
+      std::vector<uint32_t> rangeVec;
+      auto work = getSpecificThreadRange(bufGraph, rangeVec, beginNode, endNode);
+
+      //galois::on_each([&] (unsigned i, unsigned j) {
+      //  galois::gPrint("[", base_DistGraph::id, " ", i, "] sync round ", syncRound, " local range ",
+      //                 *work.local_begin(), " ", *work.local_end(), "\n");
+      //});
 
       galois::do_all(
         // iterate over my read nodes
-        galois::iterate(beginNode, endNode),
+        galois::iterate(work),
+        //galois::iterate(beginNode, endNode),
         [&] (uint32_t node) {
           ptt.start();
           // determine master function takes source node, iterator of
