@@ -1062,21 +1062,18 @@ protected:
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(size()), allNodesRanges.data()));
-    allNodesRanges.clear();
 
     // 1 is master nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(beginMaster),
         boost::counting_iterator<size_t>(beginMaster + numOwned),
         masterRanges.data()));
-    masterRanges.clear();
 
     // 2 is with edge nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(numNodesWithEdges),
         withEdgeRanges.data()));
-    withEdgeRanges.clear();
 
     assert(specificRanges.size() == 3);
   }
