@@ -764,9 +764,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                           toSync.set(lid);
                         }
                       },
-  #if MORE_COMM_STATS
-                      galois::loopname(get_run_identifier(doall_str).c_str()),
-  #endif
                       galois::no_stats());
         // do actual send based on sync bitset
         sendOffsets(h, toSync, localNodeToMaster, "NewAssignments");
@@ -925,9 +922,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                         uint32_t lid = gid - start; // TODO: memoize this
                         toSend.reset(lid);
                       },
-  #if MORE_COMM_STATS
-                      galois::loopname(get_run_identifier(doall_str).c_str()),
-  #endif
                       galois::no_stats());
         
         sendOffsets(h, toSend, localNodeToMaster, "MastersToOwners");
