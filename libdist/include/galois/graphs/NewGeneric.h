@@ -637,12 +637,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @return Vector of extracted elements
    */
   template <typename T>
-  std::vector<T> getDataFromOffsets(galois::DynamicBitSet& offsets,
+  std::vector<T> getDataFromOffsets(std::vector<uint32_t>& offsetVector,
                                     const std::vector<T>& dataVector) {
     std::vector<T> toReturn;
-    toReturn.resize(offsets.count());
-    std::vector<uint32_t> offsetVector = offsets.getOffsets();
-    assert(offsetVector.size() == toReturn.size());
+    toReturn.resize(offsetVector.size());
 
     galois::do_all(
       galois::iterate((size_t)0, offsetVector.size()),
@@ -679,8 +677,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // this means there are updates to send
     if (toSync.count()) {
+      std::vector<uint32_t> offsetVector = toSync.getOffsets();
       // get masters to send into a vector
-      std::vector<uint32_t> mastersToSend = getDataFromOffsets(toSync,
+      std::vector<uint32_t> mastersToSend = getDataFromOffsets(offsetVector,
                                                                dataVector);
 
       //for (unsigned i : mastersToSend) {
@@ -713,8 +712,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       } else {
         // send offsets, tag 2
         galois::runtime::gSerialize(b, 2u);
-        // TODO: (FIX:) do not re-calculate offsets
-        galois::runtime::gSerialize(b, toSync.getOffsets());
+        galois::runtime::gSerialize(b, offsetVector);
         galois::runtime::gSerialize(b, mastersToSend);
       }
       bytesSent += b.size();
