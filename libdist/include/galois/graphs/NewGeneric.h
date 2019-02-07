@@ -495,7 +495,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   uint64_t phase0MapSetup(
     galois::DynamicBitSet& ghosts,
     std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-    galois::gstl::Vector<galois::gstl::Vector<uint64_t>>& syncNodes
+    galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes
   ) {
     galois::StatTimer mapSetupTimer("Phase0MapSetup", GRNAME);
     mapSetupTimer.start();
@@ -516,7 +516,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       for (uint64_t gid = start; gid < end; ++gid) {
         if (ghosts.test(gid)) {
           gid2offsets[gid] = lid;
-          syncNodes[h].push_back(gid);
+          syncNodes[h].push_back(gid - start);
           lid++;
         }
       }
@@ -543,7 +543,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * is on that host
    */
   void phase0SendRecv(
-    galois::gstl::Vector<galois::gstl::Vector<uint64_t>>& syncNodes
+    galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes
   ) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     galois::StatTimer p0BitsetCommTimer("Phase0SendRecvBitsets", GRNAME);
@@ -745,11 +745,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void syncAssignmentSends(galois::DynamicBitSet& newAssignedNodes,
                std::vector<uint32_t>& localNodeToMaster,
-               galois::gstl::Vector<galois::gstl::Vector<uint64_t>>& syncNodes) {
+               galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
 
     galois::DynamicBitSet toSync;
     toSync.resize(newAssignedNodes.size());
-    auto start = base_DistGraph::gid2host[base_DistGraph::id].first;
 
     // send loop
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
@@ -757,9 +756,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         toSync.reset();
         // send if set on newAssignedNodes and present in syncNodes[h]
         galois::do_all(galois::iterate(syncNodes[h]),
-                      [&](uint64_t gid) {
-                        // assumes each gid is unique as test is not thread safe
-                        uint32_t lid = gid - start; // TODO: memoize this
+                      [&](uint32_t lid) {
+                        // assumes each lid is unique as test is not thread safe
                         if (newAssignedNodes.test(lid)) {
                           toSync.set(lid);
                         }
@@ -877,7 +875,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void syncAssignment(galois::DynamicBitSet& newAssignedNodes,
       std::vector<uint32_t>& localNodeToMaster,
-      galois::gstl::Vector<galois::gstl::Vector<uint64_t>>& syncNodes,
+      galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
     syncAssignmentTimer.start();
@@ -902,14 +900,13 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void sendMastersToOwners(std::vector<galois::DynamicBitSet>& mastersOnHosts,
                  std::vector<uint32_t>& localNodeToMaster,
-                 galois::gstl::Vector<galois::gstl::Vector<uint64_t>>& syncNodes) {
+                 galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
     // for each host, determine which master assignments still need to be sent
     // (if a host is a master of a node, but that node is not present as a
     // neighbor on the host, then this host needs to send the master assignment)
     galois::DynamicBitSet toSend;
     toSend.resize(base_DistGraph::gid2host[base_DistGraph::id].second -
                   base_DistGraph::gid2host[base_DistGraph::id].first);
-    auto start = base_DistGraph::gid2host[base_DistGraph::id].first;
 
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
       if (h != base_DistGraph::id) {
@@ -917,9 +914,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         // send if set on mastersOnHosts but not present in syncNodes
         toSend.bitwise_or(mastersOnHosts[h]);
         galois::do_all(galois::iterate(syncNodes[h]),
-                      [&](uint64_t gid) {
-                        // assumes each gid is unique as test is not thread safe
-                        uint32_t lid = gid - start; // TODO: memoize this
+                      [&](uint32_t lid) {
+                        // assumes each lid is unique as test is not thread safe
                         toSend.reset(lid);
                       },
                       galois::no_stats());
@@ -965,7 +961,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
     galois::DynamicBitSet ghosts;
-    galois::gstl::Vector<galois::gstl::Vector<uint64_t>> syncNodes; // masterNodes
+    galois::gstl::Vector<galois::gstl::Vector<uint32_t>> syncNodes; // masterNodes
     syncNodes.resize(base_DistGraph::numHosts);
 
     // determine on which hosts that this host's read nodes havs neighbors on
