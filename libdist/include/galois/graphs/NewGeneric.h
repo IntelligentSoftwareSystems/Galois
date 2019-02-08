@@ -735,29 +735,28 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * Send new master assignment updates to other hosts based on syncNodes
    * for each host prepared in advance.
    *
-   * @param newAssignedNodes Bitset specifying which nodes on this host have
-   * been updated
+   * @param begin to end: which nodes on this host have been updated
+   * @param numLocalNodes: number of owned nodes
    * @param localNodeToMaster Vector map: an offset corresponds to a particular
    * GID; indicates masters of GIDs
    * @param syncNodes one vector of nodes for each host: contains mirrors on 
    * this host whose master is on that host
    */
-  void syncAssignmentSends(galois::DynamicBitSet& newAssignedNodes,
+  void syncAssignmentSends(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
                std::vector<uint32_t>& localNodeToMaster,
                galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
 
     galois::DynamicBitSet toSync;
-    toSync.resize(newAssignedNodes.size());
+    toSync.resize(numLocalNodes);
 
     // send loop
     for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
       if (h != base_DistGraph::id) {
         toSync.reset();
-        // send if set on newAssignedNodes and present in syncNodes[h]
+        // send if in [start,end) and present in syncNodes[h]
         galois::do_all(galois::iterate(syncNodes[h]),
                       [&](uint32_t lid) {
-                        // assumes each lid is unique as test is not thread safe
-                        if (newAssignedNodes.test(lid)) {
+                        if ((lid >= begin) && (lid < end)) {
                           toSync.set(lid);
                         }
                       },
@@ -863,8 +862,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   /**
    * Send/receive new master assignment updates to other hosts.
    *
-   * @param newAssignedNodes Bitset specifying which nodes on this host have
-   * been updated
+   * @param begin to end: which nodes on this host have been updated
+   * @param numLocalNodes: number of owned nodes
    * @param localNodeToMaster Vector map: an offset corresponds to a particular
    * GID; indicates masters of GIDs
    * @param syncNodes one vector of nodes for each host: contains mirrors on 
@@ -872,16 +871,15 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param gid2offsets Map of GIDs to the offset into the vector map that
    * corresponds to it
    */
-  void syncAssignment(galois::DynamicBitSet& newAssignedNodes,
+  void syncAssignment(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
       std::vector<uint32_t>& localNodeToMaster,
       galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
     syncAssignmentTimer.start();
 
-    syncAssignmentSends(newAssignedNodes, localNodeToMaster, syncNodes);
+    syncAssignmentSends(begin, end, numLocalNodes, localNodeToMaster, syncNodes);
     syncAssignmentReceives(localNodeToMaster, gid2offsets);
-    newAssignedNodes.reset();
 
     syncAssignmentTimer.stop();
   }
@@ -891,30 +889,33 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * Send masters mappings that were read on this host to their appropirate
    * owners
    *
-   * @param mastersOnHosts Vector with info on which local nodes belong on which
-   * masters
    * @param localNodeToMaster local id to master mapping map
    * @param ghosts bitsets specifying which hosts have which neighbors
    * that this host has read
    */
-  void sendMastersToOwners(std::vector<galois::DynamicBitSet>& mastersOnHosts,
-                 std::vector<uint32_t>& localNodeToMaster,
+  void sendMastersToOwners(std::vector<uint32_t>& localNodeToMaster,
                  galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
+    uint32_t begin = base_DistGraph::gid2host[base_DistGraph::id].first;
+    uint32_t end = base_DistGraph::gid2host[base_DistGraph::id].second;
     // for each host, determine which master assignments still need to be sent
     // (if a host is a master of a node, but that node is not present as a
     // neighbor on the host, then this host needs to send the master assignment)
     galois::DynamicBitSet toSend;
-    toSend.resize(base_DistGraph::gid2host[base_DistGraph::id].second -
-                  base_DistGraph::gid2host[base_DistGraph::id].first);
+    toSend.resize(end - begin);
 
     for (unsigned h = 0; h < base_DistGraph::numHosts; ++h) {
       if (h != base_DistGraph::id) {
         toSend.reset();
-        // send if set on mastersOnHosts but not present in syncNodes
-        toSend.bitwise_or(mastersOnHosts[h]);
+        // send if present in localNodeToMaster but not present in syncNodes
+        galois::do_all(galois::iterate((uint32_t)0, end - begin),
+                      [&](uint32_t lid) {
+                        if (localNodeToMaster[lid] == h) {
+                          toSend.set(lid);
+                        }
+                      },
+                      galois::no_stats());
         galois::do_all(galois::iterate(syncNodes[h]),
                       [&](uint32_t lid) {
-                        // assumes each lid is unique as test is not thread safe
                         toSend.reset(lid);
                       },
                       galois::no_stats());
@@ -993,22 +994,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
     uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
 
-    // bitset setup for newly assigned nodes
-    galois::DynamicBitSet newAssignedNodes;
-    newAssignedNodes.resize(numLocalNodes);
-    newAssignedNodes.reset();
-
-    std::vector<galois::DynamicBitSet> mastersOnHosts;
-    mastersOnHosts.resize(base_DistGraph::numHosts);
-    galois::do_all(
-      galois::iterate(0u, base_DistGraph::numHosts),
-      [&] (unsigned h) {
-        mastersOnHosts[h].resize(numLocalNodes);
-        mastersOnHosts[h].reset();
-      },
-      galois::no_stats()
-    );
-
     #ifndef NDEBUG
     for (uint32_t i : localNodeToMaster) {
       assert(i == (uint32_t)-1);
@@ -1051,19 +1036,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                     bufGraph, localNodeToMaster, gid2offsets,
                                     nodeLoads, nodeAccum, edgeLoads, edgeAccum);
           // != -1 means it was assigned a host
-          if (assignedHost != (uint32_t)-1) {
+          if (assignedHost != (uint32_t)-1) { // TODO: shouldn't this be an assertion?
             // update mapping; this is a local node, so can get position
             // on map with subtraction
             localNodeToMaster[node - globalOffset] = assignedHost;
-            // set update bitset
-            newAssignedNodes.set(node - globalOffset);
-            // set the appropriate bitset signifying which host has the node
-            // as the master
-            mastersOnHosts[assignedHost].set(node - globalOffset);
             //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
             //               " set ", node, " ", node - globalOffset);
-            ptt.stop();
           }
+          ptt.stop();
         },
         galois::loopname("Phase0DetermineMasters"),
         galois::steal(),
@@ -1071,8 +1051,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       );
 
       // do synchronization of master assignment of neighbors
-      syncAssignment(newAssignedNodes, localNodeToMaster, syncNodes,
-                     gid2offsets);
+      syncAssignment(beginNode - globalOffset, endNode - globalOffset,
+                     numLocalNodes, localNodeToMaster, syncNodes, gid2offsets);
       // debug build prints
       //printLoad(nodeLoads, nodeAccum);
       //printLoad(edgeLoads, edgeAccum);
@@ -1108,7 +1088,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::StatTimer p0master2ownerTimer("Phase0MastersToOwners", GRNAME);
 
     p0master2ownerTimer.start();
-    sendMastersToOwners(mastersOnHosts, localNodeToMaster, syncNodes);
+    sendMastersToOwners(localNodeToMaster, syncNodes);
     recvMastersToOwners();
     p0master2ownerTimer.stop();
 
