@@ -482,8 +482,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     //  galois::gPrint("[", base_DistGraph::id, " ", i, "] local range ", *work.local_begin(), " ",
     //  *work.local_end(), "\n");
     //});
-    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
-                                             "Phase0DetNeighLocation");
+    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
+      GRNAME, "Phase0DetNeighLocation_" + base_DistGraph::id
+    );
+
     // Step 2: loop over all local nodes, determine neighbor locations
     galois::do_all(
       galois::iterate(work),
@@ -778,6 +780,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   void syncAssignmentSends(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
                std::vector<uint32_t>& localNodeToMaster,
                galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
+    galois::StatTimer p0assignSendTime("Phase0AssignmentSendTime", GRNAME);
+    p0assignSendTime.start();
 
     galois::DynamicBitSet toSync;
     toSync.resize(numLocalNodes);
@@ -798,6 +802,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         sendOffsets(h, toSync, localNodeToMaster, "NewAssignments");
       }
     }
+
+    p0assignSendTime.stop();
   }
 
   /**
@@ -856,6 +862,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    */
   void syncAssignmentReceives(std::vector<uint32_t>& localNodeToMaster,
                               std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
+    galois::StatTimer p0assignReceiveTime("Phase0AssignmentReceiveTime", GRNAME);
+    p0assignReceiveTime.start();
+
     // receive loop
     for (unsigned h = 0; h < base_DistGraph::numHosts - 1; h++) {
       unsigned sendingHost;
@@ -890,6 +899,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
       //}
     }
+
+    p0assignReceiveTime.stop();
   }
 
   /**
@@ -1007,6 +1018,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     // send off neighbor metadata
     phase0SendRecv(syncNodes);
 
+    galois::StatTimer p0allocTimer("Phase0AllocationTime", GRNAME);
+
+    p0allocTimer.start();
+
     // setup other partitioning metadata: nodes on each host, edges on each
     // host (as determined by edge cut)
     std::vector<uint64_t> nodeLoads;
@@ -1027,6 +1042,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<uint32_t> localNodeToMaster;
     localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
 
+    p0allocTimer.stop();
+
     auto blockRanges = getBlockRanges(bufGraph,
                                       globalOffset,
                                       base_DistGraph::gid2host[base_DistGraph::id].second,
@@ -1043,8 +1060,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                      stateRounds, "\n");
     }
 
-    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
-                                              "Phase0DetermineMaster");
+    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
+      GRNAME, "Phase0DetermineMaster_" + base_DistGraph::id
+    );
 
 
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
@@ -1072,13 +1090,14 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                     bufGraph, localNodeToMaster, gid2offsets,
                                     nodeLoads, nodeAccum, edgeLoads, edgeAccum);
           // != -1 means it was assigned a host
-          if (assignedHost != (uint32_t)-1) { // TODO: shouldn't this be an assertion?
-            // update mapping; this is a local node, so can get position
-            // on map with subtraction
-            localNodeToMaster[node - globalOffset] = assignedHost;
-            //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
-            //               " set ", node, " ", node - globalOffset);
-          }
+          assert(assignedHost != (uint32_t)-1);
+          // update mapping; this is a local node, so can get position
+          // on map with subtraction
+          localNodeToMaster[node - globalOffset] = assignedHost;
+
+          //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
+          //               " set ", node, " ", node - globalOffset);
+
           ptt.stop();
         },
         galois::loopname("Phase0DetermineMasters"),
