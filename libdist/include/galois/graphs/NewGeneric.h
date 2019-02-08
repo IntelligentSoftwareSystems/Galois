@@ -520,9 +520,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           lid++;
         }
       }
+      galois::gDebug("[", base_DistGraph::id, " -> ", h, "] bitset size ", (end - start)/64, " vs. vector size ", 32*syncNodes[h].size());
     }
     lid -= numLocal;
-
+    
     assert(lid == numToReserve);
 
     ghosts.resize(0); // TODO: should not be used after this - refactor to make this clean
