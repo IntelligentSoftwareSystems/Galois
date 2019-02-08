@@ -478,7 +478,7 @@ class GingerP{
   double _neRatio;
   char _status;
   // metadata for determining where a node's master is
-  std::vector<uint32_t> _localNodeToMaster;
+  galois::LargeArray<uint32_t> _localNodeToMaster;
   std::unordered_map<uint64_t, uint32_t> _gid2masters;
   uint64_t _nodeOffset;
 
@@ -515,7 +515,7 @@ class GingerP{
    * @param nodeOffset First GID of nodes read by this host
    */
   void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-                        std::vector<uint32_t>& localNodeToMaster,
+                        galois::LargeArray<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
     #ifndef NDEBUG
     size_t originalSize = _gid2masters.size();
@@ -533,12 +533,22 @@ class GingerP{
     size_t myLocalNodes = _gid2host[_hostID].second - _gid2host[_hostID].first;
     assert((myLocalNodes + _gid2masters.size() - originalSize) ==
            localNodeToMaster.size());
+    _localNodeToMaster.allocateInterleaved(myLocalNodes);
+    galois::do_all(
+      galois::iterate((size_t)0, myLocalNodes),
+      [&] (size_t n) {
+        _localNodeToMaster[n] = localNodeToMaster[n];
+      },
+      galois::no_stats()
+    );
+
     // copy over to this structure
-    _localNodeToMaster = std::move(localNodeToMaster);
+    //localNodeToMaster = std::move(localNodeToMaster);
     assert(myLocalNodes <= _localNodeToMaster.size());
 
     // resize to fit only this host's read nodes
-    _localNodeToMaster.resize(myLocalNodes);
+    // TODO find a way to do this we large array
+    //_localNodeToMaster.resize(myLocalNodes);
     _nodeOffset = nodeOffset;
 
     // stage 1 setup complete
@@ -664,7 +674,7 @@ class GingerP{
   template<typename EdgeTy>
   uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
+      const galois::LargeArray<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
       const std::vector<uint64_t>& nodeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,
@@ -817,7 +827,7 @@ class FennelP {
   double _neRatio;
   char _status;
   // metadata for determining where a node's master is
-  std::vector<uint32_t> _localNodeToMaster;
+  galois::LargeArray<uint32_t> _localNodeToMaster;
   std::unordered_map<uint64_t, uint32_t> _gid2masters;
   uint64_t _nodeOffset;
 
@@ -854,7 +864,7 @@ class FennelP {
    * @param nodeOffset First GID of nodes read by this host
    */
   void saveGID2HostInfo(std::unordered_map<uint64_t, uint32_t>& gid2offsets,
-                        std::vector<uint32_t>& localNodeToMaster,
+                        galois::LargeArray<uint32_t>& localNodeToMaster,
                         uint64_t nodeOffset) {
     #ifndef NDEBUG
     size_t originalSize = _gid2masters.size();
@@ -872,12 +882,22 @@ class FennelP {
     size_t myLocalNodes = _gid2host[_hostID].second - _gid2host[_hostID].first;
     assert((myLocalNodes + _gid2masters.size() - originalSize) ==
            localNodeToMaster.size());
+    _localNodeToMaster.allocateInterleaved(myLocalNodes);
+    galois::do_all(
+      galois::iterate((size_t)0, myLocalNodes),
+      [&] (size_t n) {
+        _localNodeToMaster[n] = localNodeToMaster[n];
+      },
+      galois::no_stats()
+    );
+
     // copy over to this structure
-    _localNodeToMaster = std::move(localNodeToMaster);
+    //_localNodeToMaster = std::move(localNodeToMaster);
     assert(myLocalNodes <= _localNodeToMaster.size());
 
     // resize to fit only this host's read nodes
-    _localNodeToMaster.resize(myLocalNodes);
+    // TODO find a way to do this we large array
+    //_localNodeToMaster.resize(myLocalNodes);
     _nodeOffset = nodeOffset;
 
     // stage 1 setup complete
@@ -1003,7 +1023,7 @@ class FennelP {
   template<typename EdgeTy>
   uint32_t determineMaster(uint32_t src,
       galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-      const std::vector<uint32_t>& localNodeToMaster,
+      const galois::LargeArray<uint32_t>& localNodeToMaster,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets,
       const std::vector<uint64_t>& nodeLoads,
       std::vector<galois::CopyableAtomic<uint64_t>>& nodeAccum,

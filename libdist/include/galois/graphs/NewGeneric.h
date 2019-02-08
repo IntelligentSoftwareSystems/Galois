@@ -672,9 +672,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param dataVector Data vector to extract data from according to the bitset
    * @return Vector of extracted elements
    */
-  template <typename T>
+  template <template<typename> typename Con, typename T>
   std::vector<T> getDataFromOffsets(std::vector<uint32_t>& offsetVector,
-                                    const std::vector<T>& dataVector) {
+                                    const Con<T>& dataVector) {
     std::vector<T> toReturn;
     toReturn.resize(offsetVector.size());
 
@@ -700,8 +700,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * to send
    * @param dataVector Data to be sent to the target host
    */
+  template <typename VectorType>
   void sendOffsets(unsigned targetHost, galois::DynamicBitSet& toSync,
-                   std::vector<uint32_t>& dataVector,
+                   VectorType& dataVector,
                    std::string timerName = std::string()) {
     auto& net = galois::runtime::getSystemNetworkInterface();
     std::string statString = std::string("Phase0SendOffsets_") + timerName;
@@ -778,7 +779,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * this host whose master is on that host
    */
   void syncAssignmentSends(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
-               std::vector<uint32_t>& localNodeToMaster,
+               galois::LargeArray<uint32_t>& localNodeToMaster,
                galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
     galois::StatTimer p0assignSendTime("Phase0AssignmentSendTime", GRNAME);
     p0assignSendTime.start();
@@ -860,7 +861,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param gid2offsets Map of GIDs to the offset into the vector map that
    * corresponds to it
    */
-  void syncAssignmentReceives(std::vector<uint32_t>& localNodeToMaster,
+  void syncAssignmentReceives(galois::LargeArray<uint32_t>& localNodeToMaster,
                               std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     galois::StatTimer p0assignReceiveTime("Phase0AssignmentReceiveTime", GRNAME);
     p0assignReceiveTime.start();
@@ -916,7 +917,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * corresponds to it
    */
   void syncAssignment(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
-      std::vector<uint32_t>& localNodeToMaster,
+      galois::LargeArray<uint32_t>& localNodeToMaster,
       galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
     galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
@@ -937,7 +938,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param ghosts bitsets specifying which hosts have which neighbors
    * that this host has read
    */
-  void sendMastersToOwners(std::vector<uint32_t>& localNodeToMaster,
+  void sendMastersToOwners(galois::LargeArray<uint32_t>& localNodeToMaster,
                  galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes) {
     uint32_t begin = base_DistGraph::gid2host[base_DistGraph::id].first;
     uint32_t end = base_DistGraph::gid2host[base_DistGraph::id].second;
@@ -1039,8 +1040,16 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::gid2host[base_DistGraph::id].second -
       globalOffset;
 
-    std::vector<uint32_t> localNodeToMaster;
-    localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
+    galois::LargeArray<uint32_t> localNodeToMaster;
+    localNodeToMaster.allocateInterleaved(numLocalNodes + neighborCount);
+
+    galois::do_all(
+      galois::iterate((uint64_t)0, numLocalNodes + neighborCount),
+      [&] (unsigned n) {
+        localNodeToMaster[n] = -1;
+      },
+      galois::no_stats()
+    );
 
     p0allocTimer.stop();
 
