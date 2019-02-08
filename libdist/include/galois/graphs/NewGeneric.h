@@ -68,6 +68,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     vectorToKill.swap(dummyVector);
   }
 
+#if 0 // avoid using this
   /**
    * get reader of a particular node
    */
@@ -82,6 +83,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     return -1;
   }
+#endif
 
   unsigned getHostID(uint64_t gid) const {
     assert(gid < base_DistGraph::numGlobalNodes);

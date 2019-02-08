@@ -692,10 +692,9 @@ class GingerP{
         uint64_t dst = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
-        if (getHostReader(dst) != _hostID) {
-          // offset can be found using map
-          assert(gid2offsets.find(dst) != gid2offsets.end());
-          offsetIntoMap = gid2offsets[dst];
+        auto it = gid2offsets.find(dst);
+        if (it != gid2offsets.end()) {
+          offsetIntoMap = it->second;
         } else {
           // determine offset
           offsetIntoMap = dst - bufGraph.getNodeOffset();
@@ -1032,10 +1031,9 @@ class FennelP {
         uint64_t dst = bufGraph.edgeDestination(*ii);
         size_t offsetIntoMap = (unsigned)-1;
 
-        if (getHostReader(dst) != _hostID) {
-          // offset can be found using map
-          assert(gid2offsets.find(dst) != gid2offsets.end());
-          offsetIntoMap = gid2offsets[dst];
+        auto it = gid2offsets.find(dst);
+        if (it != gid2offsets.end()) {
+          offsetIntoMap = it->second;
         } else {
           // determine offset
           offsetIntoMap = dst - bufGraph.getNodeOffset();
