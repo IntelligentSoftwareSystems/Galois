@@ -418,6 +418,36 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     return toReturn;
   }
 
+  auto getBlockRanges(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
+                         uint64_t startNode, uint64_t endNode, uint32_t numBlocks) {
+    uint32_t numLocalNodes = endNode - startNode;
+    galois::PODResizeableArray<uint64_t> prefixSumOfEdges;
+    prefixSumOfEdges.resize(numLocalNodes);
+
+    galois::do_all(
+      galois::iterate(startNode, endNode),
+      [&] (uint64_t n) {
+        uint32_t offset = n - startNode;
+        prefixSumOfEdges[offset] = bufGraph.edgeEnd(n) - bufGraph.edgeBegin(n);
+      },
+      galois::no_stats()
+    );
+
+    for (uint32_t i = 1; i < numLocalNodes; i++) {
+      prefixSumOfEdges[i] += prefixSumOfEdges[i - 1];
+    }
+
+    auto blockRanges = galois::graphs::determineUnitRangesFromPrefixSum(
+        numBlocks, prefixSumOfEdges 
+    );
+
+    for (unsigned i = 0; i < numBlocks + 1; i++) {
+      blockRanges[i] += startNode;
+    }
+
+    return blockRanges;
+  }
+  
   /**
    * For each other host, determine which nodes that this host needs to get
    * info from
@@ -988,13 +1018,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     edgeAccum.assign(base_DistGraph::numHosts, 0);
     // this above all to be synchronized via DGAccumulators
 
+    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
     uint32_t numLocalNodes =
       base_DistGraph::gid2host[base_DistGraph::id].second -
-      base_DistGraph::gid2host[base_DistGraph::id].first;
+      globalOffset;
 
     std::vector<uint32_t> localNodeToMaster;
     localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
-    uint64_t globalOffset = base_DistGraph::gid2host[base_DistGraph::id].first;
+
+    auto blockRanges = getBlockRanges(bufGraph,
+                                      globalOffset,
+                                      base_DistGraph::gid2host[base_DistGraph::id].second,
+                                      stateRounds);
 
     #ifndef NDEBUG
     for (uint32_t i : localNodeToMaster) {
@@ -1010,12 +1045,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::PerThreadTimer<CUSP_PT_TIMER> ptt(GRNAME,
                                               "Phase0DetermineMaster");
 
+
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
-      uint32_t beginNode;
-      uint32_t endNode;
-      std::tie(beginNode, endNode) = galois::block_range(
-        globalOffset, base_DistGraph::gid2host[base_DistGraph::id].second,
-        syncRound, stateRounds);
+      uint32_t beginNode = blockRanges[syncRound];
+      uint32_t endNode = blockRanges[syncRound+1];
 
       // create specific range for this block
       std::vector<uint32_t> rangeVec;
