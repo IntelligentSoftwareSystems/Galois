@@ -20,6 +20,7 @@
 /*
 
  @Vinicius Possani
+ Parallel Parallel LUT-Based Tech Mapping October 16, 2018.
  Parallel Rewriting January 5, 2018.
  ABC-based implementation on Galois.
 
@@ -46,6 +47,8 @@ PriCutManager::PriCutManager(aig::Aig& aig, int K, int C, int nThreads, bool com
       cutPoolSize(nNodes / nThreads),
       perThreadPriCutPool(cutPoolSize, K, compTruth), perThreadPriCutList(C), perThreadAuxTruth(nWords) {
 
+	nLUTs = 0;
+	nLevels = 0;
 	sortMode = 1;
 	fPower = false;
 	fEpsilon = (float)0.005;
@@ -123,7 +126,7 @@ void PriCutManager::computePriCuts(PriCutPool* cutPool, PriCutList* cutList,
 
   for (PriCut* lhsCut = this->nodePriCuts[lhsId]; lhsCut != nullptr; lhsCut = lhsCut->nextCut) {
     for (PriCut* rhsCut = this->nodePriCuts[rhsId]; rhsCut != nullptr; rhsCut = rhsCut->nextCut) {
-
+			
 			if (Functional32::countOnes( lhsCut->sig | rhsCut->sig ) > this->K) {
 				continue;
 			}
@@ -146,18 +149,18 @@ void PriCutManager::computePriCuts(PriCutPool* cutPool, PriCutList* cutList,
 
   		if (this->compTruth) {
     		computeTruth(auxTruth, resCut, lhsCut, rhsCut, lhsPolarity, rhsPolarity);
-    		// printf( "%x\n", (*readTruth( resCut )) );
+				//std::cout << Functional32::toHex( readTruth( resCut ), getNWords() ) << std::endl;
   		}
 
-			//resCut->area 	= cutAreaDerefed( resCut );
-			resCut->area 	= cutAreaFlow( resCut );
-			resCut->delay = cutDelay( resCut );
-			resCut->edge 	= cutEdgeFlow( resCut );
+			if ( this->sortMode == 2 ) {
+				resCut->area = cutAreaDerefed( resCut ); // FIXME to use this heuristic the locks of neighbors must to be aquired first
+			}
+			else {
+				resCut->area = cutAreaFlow( resCut );
+			}
 
-			//std::cout << "area: " << resCut->area << std::endl;
-			//std::cout << "area deref: " << resCut->area << std::endl;
-			//std::cout << "delay: " << resCut->delay << std::endl;
-			//std::cout << "edge: " << resCut->edge << std::endl;
+			resCut->delay = cutDelay( resCut );
+			resCut->edge = cutEdgeFlow( resCut );
 
   		// add to the sorted list
   		cutSort(cutPool, cutList, resCut);
@@ -436,7 +439,7 @@ void PriCutManager::cutSort(PriCutPool* cutPool, PriCutList * cutList, PriCut * 
 	// the cut will be added - find its place
 	cutList->array[cutList->nCuts++] = resCut;
 
-	for (int i = cutList->nCuts-1; i >= 0 ; i--) {
+	for (int i = cutList->nCuts-2; i >= 0 ; i--) {
 		if (sortCompare( cutList->array[i], resCut ) <= 0)
 			break;
 		cutList->array[i+1] = cutList->array[i];
@@ -605,7 +608,7 @@ float PriCutManager::cutAreaFlow( PriCut * cut ) {
 
 		leafId = cut->leaves[i];
 		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ );
+		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED ); // Note: if the graph topology is not changed, it dont need to lock leaves.
 
 		if ( ( leafData.nFanout == 0 ) || ( leafData.type == aig::NodeType::CONSTZERO ) ) {
 			flow += getBestCut( leafId )->area; 
@@ -642,7 +645,7 @@ float PriCutManager::cutAreaRef( PriCut * cut ) {
 
 		leafId = cut->leaves[i];
 		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ );
+		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ ); // FIXME lock neigborhood earlier
 
 		assert( leafData.nFnaout >= 0 );
 
@@ -664,7 +667,7 @@ float PriCutManager::cutAreaDeref( PriCut * cut ) {
 
 		leafId = cut->leaves[i];
 		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ );
+		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ ); // FIXME lock neigborhood earlier
 
 		assert( leafData.nFanout > 0 );
 
@@ -699,7 +702,7 @@ float PriCutManager::cutEdgeFlow( PriCut * cut ) {
 
 		leafId = cut->leaves[i];
 		aig::GNode leaf = this->aig.getNodes()[ leafId ];
-		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::READ );
+		aig::NodeData & leafData = aigGraph.getData( leaf, galois::MethodFlag::UNPROTECTED ); // Note: if the graph topology is not changed, it dont need to lock leaves.
 
     if ( ( leafData.nFanout == 0 ) || ( leafData.type == aig::NodeType::CONSTZERO ) ) {
 			flow += getBestCut( leafId )->edge;
@@ -718,6 +721,124 @@ PriCut * PriCutManager::getBestCut( int nodeId ) {
 	return this->nodePriCuts[ nodeId ]; // the first cut is the best cut
 }
 
+
+void PriCutManager::computeCovering() { // FIXME to consider LATCHES
+
+  aig::Graph& aigGraph = this->aig.getGraph();
+	PriCut * bestCut;
+	aig::GNode leaf;
+	int currLevel, maxLevel;
+
+  for (auto po : this->aig.getOutputNodes()) {	
+    auto inEdgeIt = aigGraph.in_edge_begin( po );
+		aig::GNode inNode = aigGraph.getEdgeDst( inEdgeIt );
+		aig::NodeData& inNodeData = aigGraph.getData( inNode, galois::MethodFlag::UNPROTECTED ); // It will be executed serially
+		maxLevel = 0;
+
+		if ( ( inNodeData.type == aig::NodeType::PI ) 		||
+				 ( inNodeData.type == aig::NodeType::LATCH ) 	||
+				 ( inNodeData.type == aig::NodeType::CONSTZERO ) ) {
+			continue;
+		}
+
+		auto it = this->covering.find( inNodeData.id );
+
+		if ( it == this->covering.end() ) {
+
+			bestCut = getBestCut( inNodeData.id );
+			//printNodeBestCut( inNodeData.id );
+
+			for ( int i = 0; i < bestCut->nLeaves; i++ ) {
+				leaf = this->aig.getNodes()[ bestCut->leaves[i] ];
+				currLevel = computeCoveringRec( aigGraph, leaf );
+				if ( maxLevel < currLevel ) {
+					maxLevel = currLevel;
+				}
+			}
+
+			LUT newLUT;
+			newLUT.bestCut = bestCut;
+			newLUT.rootId = inNodeData.id;
+			newLUT.level = 1 + maxLevel;
+			maxLevel = newLUT.level;
+			this->covering.insert( { inNodeData.id, newLUT } );
+		}
+		else {
+			maxLevel = it->second.level;
+		}
+
+		if ( this->nLevels < maxLevel ) {
+			this->nLevels = maxLevel;
+		}
+	}
+}
+
+int PriCutManager::computeCoveringRec( aig::Graph & aigGraph, aig::GNode node ) { // FIXME to consider LATCHES
+
+	PriCut * bestCut;
+	aig::GNode leaf;
+	int currLevel, maxLevel = 0;
+
+	aig::NodeData& nodeData = aigGraph.getData( node, galois::MethodFlag::READ );
+	
+	if ( ( nodeData.type == aig::NodeType::PI ) 		|| 
+			 ( nodeData.type == aig::NodeType::LATCH ) 	||
+			 ( nodeData.type == aig::NodeType::CONSTZERO ) ) {
+		return 0;
+	}
+
+	auto it = this->covering.find( nodeData.id );
+
+	if ( it == this->covering.end() ) {
+
+		bestCut = getBestCut( nodeData.id );
+		//printNodeBestCut( nodeData.id );
+
+		for ( int i = 0; i < bestCut->nLeaves; i++ ) {
+			leaf = this->aig.getNodes()[ bestCut->leaves[i] ];
+			currLevel = computeCoveringRec( aigGraph, leaf );
+			if ( maxLevel < currLevel ) {
+					maxLevel = currLevel;
+			}
+		}
+		
+		LUT newLUT;
+		newLUT.bestCut = bestCut;
+		newLUT.rootId = nodeData.id;
+		newLUT.level = 1 + maxLevel;
+		this->covering.insert( { nodeData.id, newLUT } );
+		return newLUT.level;
+	}
+	else {
+		return it->second.level;
+	}
+}
+
+int PriCutManager::getNumLUTs() {
+	this->nLUTs = this->covering.size();
+	return this->nLUTs;
+}
+
+int PriCutManager::getNumLevels() {
+	return this->nLevels;
+}
+
+void PriCutManager::printCovering() {
+
+  std::cout << std::endl << "########## Mapping Covering ###############" << std::endl;
+	PriCut * bestCut;
+	for ( auto entry : this->covering ) {
+		std::cout << "Node " << entry.first << ": { ";
+		bestCut = entry.second.bestCut;		
+	  for (int i = 0; i < bestCut->nLeaves; i++) {
+  	  std::cout << bestCut->leaves[i] << " ";
+	  }
+  	std::cout << "}" << std::endl;
+	  //std::cout << "}[" << Functional32::toHex( readTruth( bestCut ), this->nWords )  << "] " << std::endl;
+	}
+  std::cout << std::endl << "###########################################" << std::endl;
+}
+
 void PriCutManager::printNodeCuts(int nodeId, long int& counter) {
 
   std::cout << "Node " << nodeId << ": { ";
@@ -728,7 +849,8 @@ void PriCutManager::printNodeCuts(int nodeId, long int& counter) {
     for (int i = 0; i < currentCut->nLeaves; i++) {
       std::cout << currentCut->leaves[i] << " ";
     }
-    std::cout << "} ";
+    std::cout << "}(" << currentCut->area << ") ";
+    //std::cout << "}[" << Functional32::toHex( readTruth( currentCut ), this->nWords )  << "] ";
   }
   std::cout << "}" << std::endl;
 }
@@ -745,6 +867,33 @@ void PriCutManager::printAllCuts() {
     if ((nodeData.type == aig::NodeType::AND) ||
         (nodeData.type == aig::NodeType::PI)) {
       printNodeCuts(nodeData.id, counter);
+    }
+  }
+  std::cout << "#################################" << std::endl;
+}
+
+void PriCutManager::printNodeBestCut(int nodeId) {
+
+	PriCut * bestCut = getBestCut( nodeId );
+  std::cout << "Node " << nodeId << ": { ";
+  for (int i = 0; i < bestCut->nLeaves; i++) {
+    std::cout << bestCut->leaves[i] << " ";
+  }
+  std::cout << "}(" << bestCut->area << ")" << std::endl;
+  //std::cout << "}[" << Functional32::toHex( readTruth( bestCut ), this->nWords )  << "] " << std::endl;
+}
+
+void PriCutManager::printBestCuts() {
+
+  aig::Graph& aigGraph = this->aig.getGraph();
+
+  std::cout << std::endl << "########## Best K-Cuts ###########" << std::endl;
+  for (aig::GNode node : aigGraph) {
+    aig::NodeData& nodeData =
+        aigGraph.getData(node, galois::MethodFlag::UNPROTECTED);
+    if ((nodeData.type == aig::NodeType::AND) ||
+        (nodeData.type == aig::NodeType::PI)) {
+				printNodeBestCut( nodeData.id );
     }
   }
   std::cout << "#################################" << std::endl;
@@ -813,6 +962,8 @@ PerThreadAuxTruth& PriCutManager::getPerThreadAuxTruth() {
 }
 
 PriCut** PriCutManager::getNodePriCuts() { return this->nodePriCuts; }
+
+Covering & PriCutManager::getCovering() { return this->covering; }
 
 // ######################## BEGIN OPERATOR ######################## //
 struct KPriCutOperator {
@@ -909,7 +1060,7 @@ void runKPriCutOperator(PriCutManager& cutMan) {
   typedef galois::worklists::PerSocketChunkBag<500> DC_BAG;
   // typedef galois::worklists::PerSocketChunkFIFO< 200 > DC_FIFO;
   // typedef galois::worklists::PerSocketChunkLIFO< 200 > DC_LIFO;
-  // typedef galois::worklists::PerThreadChunkFIFO< 200 > AC_FIFO;
+  // typedef galois::worklists::PerThreadChunkFIFO< 200 > AC_FIFO;	
 
   for (auto pi : cutMan.getAig().getInputNodes()) {
     workList.push(pi);
@@ -920,6 +1071,9 @@ void runKPriCutOperator(PriCutManager& cutMan) {
                    KPriCutOperator(cutMan),
 									 galois::wl<DC_BAG>(),
                    galois::loopname("KPriCutOperator"));
+
+
+	cutMan.computeCovering();
 
 
 	//galois::wl<galois::worklists::Deterministic<>>(),

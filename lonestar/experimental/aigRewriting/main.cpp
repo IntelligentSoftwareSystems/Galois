@@ -19,6 +19,7 @@
 
 #include "parsers/AigParser.h"
 #include "writers/AigWriter.h"
+#include "writers/BlifWriter.h"
 #include "subjectgraph/aig/Aig.h"
 #include "algorithms/CutManager.h"
 #include "algorithms/PriorityCutManager.h"
@@ -86,7 +87,7 @@ int main(int argc, char* argv[]) {
   //	std::cout << i++ << ": " << value << std::endl;
   //}
 
-  // aigRewriting(aig, fileName, nThreads, verbose);
+  //aigRewriting(aig, fileName, nThreads, verbose);
 
   //kcut( aig, fileName, nThreads, verbose );
 
@@ -223,8 +224,8 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose
 
   int numThreads = galois::setActiveThreads(nThreads);
 
-  int K = 6, C = 20;
-  bool compTruth = false;
+  int K = 6, C = 12;
+  bool compTruth = true;
 
   if (verbose == 1) {
     std::cout << "############# Configurations ############## " << std::endl;
@@ -234,7 +235,7 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose
     std::cout << "nThreads: " << numThreads << std::endl;
   }
 
-  long double kcutTime                 = 0;
+  long double kcutTime = 0;
   high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
   algorithm::PriCutManager cutMan(aig, K, C, numThreads, compTruth);
@@ -243,20 +244,32 @@ void prioritycut(aig::Aig& aig, std::string& fileName, int nThreads, int verbose
   high_resolution_clock::time_point t2 = high_resolution_clock::now();
   kcutTime = duration_cast<microseconds>(t2 - t1).count();
 
+	BlifWriter blifWriter( fileName + "_mapped.blif" );
+	blifWriter.writeNetlist( aig, cutMan );
+
   if (verbose == 0) {
     std::cout << fileName << ";" << K << ";" << C << ";" << compTruth << ";"
-              << aig.getNumAnds() << ";" << aig.getDepth() << ";" << numThreads
-              << ";" << kcutTime << std::endl;
+              << aig.getNumAnds() << ";" << aig.getDepth() << ";" 
+							<< cutMan.getNumLUTs() << ";" << cutMan.getNumLevels() << ";"
+							<< numThreads << ";" << kcutTime << std::endl;
   }
 
   if (verbose >= 1) {
     std::cout << "################ Results ################## " << std::endl;
+		//cutMan.printCovering();
     //cutMan.printAllCuts();
+    //cutMan.printBestCuts();
     // cutMan.printRuntimes();
     cutMan.printCutStatistics();
-    std::cout << "Size: " << aig.getNumAnds() << std::endl;
-    std::cout << "Depth: " << aig.getDepth() << std::endl;
+    std::cout << "AIG Size: " << aig.getNumAnds() << std::endl;
+    std::cout << "AIG Depth: " << aig.getDepth() << std::endl;
+    std::cout << "LUT Size: " << cutMan.getNumLUTs() << std::endl;
+    std::cout << "LUT Depth: " << cutMan.getNumLevels() << std::endl;
+
     std::cout << "Runtime (us): " << kcutTime << std::endl;
+
+	  // WRITE DOT //
+  	//aig.writeDot( fileName + ".dot", aig.toDot() );
   }
 }
 

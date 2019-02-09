@@ -27,6 +27,10 @@
 #include <utility>
 #include <type_traits>
 
+// Statistics & Debug
+// #include "galois/Timer.h"
+// #include "galois/gIO.h"
+
 namespace galois {
 
 /**
@@ -125,11 +129,29 @@ public:
   bool empty() const { return size_ == 0; }
 
   void reserve(size_t n) {
+    // galois::StatTimer StatTimer_reserve("reserve", "PR_BC");
+    // StatTimer_reserve.start();
     if (n > capacity_) {
+      // size_t old_cap = capacity_;
       if (capacity_ == 0) capacity_ = 1;
+      // else galois::gDebug("PODResizeableArray enlarged");
       while (capacity_ < n) capacity_ <<= 1;
-      data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
+      // if(_Realloc)
+        data_ = static_cast<_Tp*>(realloc(data_, capacity_ * sizeof(_Tp)));
+      // else{
+      //   if (data_ == NULL) {
+      //     data_ = alloc_.allocate(capacity_);
+      //   }
+      //   else {
+      //     pointer old_mem = data_;
+      //     data_ = alloc_.allocate(capacity_);
+      //     galois::gDebug("memcpy: ", old_mem, " -> ", data_);
+      //     memcpy(data_, old_mem, old_cap * sizeof(_Tp));
+      //     alloc_.deallocate(old_mem, old_cap);
+      //   }
+      // }
     }
+    // StatTimer_reserve.stop();
   }
 
   void resize(size_t n) {
@@ -140,6 +162,15 @@ public:
   void clear() {
     size_ = 0;
   }
+
+  // void release() {
+  //   if (data_ != NULL) {
+  //     alloc_.deallocate(data_, capacity_);
+  //     data_ = NULL;
+  //     capacity_ = 0;
+  //     size_ = 0;
+  //   }
+  // }
 
   // element access:
   reference operator[](size_type __n) { return data_[__n]; }

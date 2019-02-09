@@ -1286,7 +1286,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           gdst_vec[i].clear();
           gdata_vec[i].clear();
           gdst_vec[i].reserve(numEdgesL);
-          gdata_vec[i].reserve(numEdgesL);
+          //gdata_vec[i].reserve(numEdgesL);
         }
 
         for (; ee != ee_end; ++ee) {
@@ -1423,7 +1423,7 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
         for (unsigned i = 0; i < numHosts; ++i) {
           gdst_vec[i].clear();
-          gdst_vec[i].reserve(numEdges);
+          //gdst_vec[i].reserve(numEdges);
         }
 
         for (; ee != ee_end; ++ee) {

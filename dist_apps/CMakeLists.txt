@@ -27,6 +27,11 @@ if(ENABLE_HETERO_GALOIS)
   endif()
 endif()
 
+# CuSP uses DGAccumulator which uses LCI if enabled
+if (USE_LCI)
+  target_include_directories(distbench PUBLIC ${LWCI_INCLUDE})
+endif()
+
 function(distApp name)
   app(${name} ${name}/${name}.cpp DISTSAFE)
   target_link_libraries(${name} distbench galois_dist)
@@ -90,3 +95,5 @@ distApp(sssp_pull)
 distApp(sssp_push)
 
 distAppNoGPU(partition)
+
+distAppNoGPU(bc_mr)

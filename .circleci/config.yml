@@ -72,7 +72,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost
+          conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
@@ -100,7 +100,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost
+          conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
@@ -130,7 +130,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost
+          conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
@@ -150,7 +150,7 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          conda install -y -q -c conda-forge make cmake boost clangdev libcxx zlib
+          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx zlib
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" ..

@@ -91,6 +91,7 @@ extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
 //! Specifies the size of the buffer used for
 extern cll::opt<unsigned> edgePartitionSendBufSize;
+extern cll::opt<uint32_t> stateRounds;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -167,7 +168,7 @@ protected:
   uint32_t numNodesWithEdges; //!< Number of nodes (masters + mirrors) that have
                               //!< outgoing edges
 
-  //! Information that converts GID to host that has master proxy of that node
+  //! Information that converts host to range of nodes that host reads
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
   uint64_t last_nodeID_withEdges_bipartite; //!< used only for bipartite graphs
@@ -1061,21 +1062,18 @@ protected:
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(size()), allNodesRanges.data()));
-    allNodesRanges.clear();
 
     // 1 is master nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(beginMaster),
         boost::counting_iterator<size_t>(beginMaster + numOwned),
         masterRanges.data()));
-    masterRanges.clear();
 
     // 2 is with edge nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(numNodesWithEdges),
         withEdgeRanges.data()));
-    withEdgeRanges.clear();
 
     assert(specificRanges.size() == 3);
   }
@@ -2201,8 +2199,6 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
       b.reserve(sizeof(DataCommMode)
           + sizeof(size_t)
           + (num * sizeof(typename SyncFnTy::ValTy)));
@@ -2286,8 +2282,6 @@ private:
 
     if (num > 0) {
       data_mode = onlyData;
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
       b.reserve(sizeof(DataCommMode)
           + sizeof(size_t)
           + (num * sizeof(typename SyncFnTy::ValTy)));
@@ -2468,11 +2462,35 @@ private:
     if (num > 0) {
       size_t bit_set_count = 0;
       Textractalloc.start();
-      // NOTE: this allocation is insufficient for enforce_data_mode
-      // so, this will crash when enforce_data_mode is used for GPUs
-      b.reserve(sizeof(DataCommMode)
-          + sizeof(size_t)
-          + (num * sizeof(typename SyncFnTy::ValTy)));
+      if (enforce_data_mode == gidsData) {
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t)
+            + (num * sizeof(unsigned int))
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else if (enforce_data_mode == offsetsData) {
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t)
+            + (num * sizeof(unsigned int))
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else if (enforce_data_mode == bitsetData) {
+        size_t bitset_alloc_size =
+            ((num + 63) / 64) * sizeof(uint64_t);
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(bit_set_count)
+            + sizeof(size_t) // bitset size
+            + sizeof(size_t) // bitset vector size
+            + bitset_alloc_size
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      } else { // onlyData or noData (auto)
+        b.reserve(sizeof(DataCommMode)
+            + sizeof(size_t)
+            + (num * sizeof(typename SyncFnTy::ValTy)));
+      }
       Textractalloc.stop();
 
       Textractbatch.start();

@@ -64,6 +64,8 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
         clEnumValN(GHIVC, "ghivc", "HIVC using generic interface"),
         clEnumValN(GOEC, "goec", "oec generic interface"),
+        clEnumValN(GING, "ging", "ginger using cusp"),
+        clEnumValN(FENNEL, "fenn", "fennel using cusp"),
         clEnumValEnd),
     cll::init(OEC));
 cll::opt<unsigned int>

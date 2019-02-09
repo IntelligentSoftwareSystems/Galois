@@ -35,6 +35,7 @@
 #include "galois/graphs/DistributedGraph_JaggedCut.h"
 #include "galois/graphs/DistributedGraph_CustomEdgeCut.h"
 #include "galois/graphs/Generic.h"
+#include "galois/graphs/NewGeneric.h"
 #include "galois/graphs/GenericPartitioners.h"
 
 /*******************************************************************************
@@ -60,7 +61,9 @@ enum PARTITIONING_SCHEME {
   CEC,                    //!< custom edge cut
   GCVC,                    //!< generic cvc
   GHIVC,                    //!< generic hivc
-  GOEC                    //!< generic oec
+  GOEC,                    //!< generic oec
+  GING,                    //!< Ginger
+  FENNEL                    //!< Fennel
 };
 
 /**
@@ -103,6 +106,10 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "ghivc";
   case GOEC:
     return "goec";
+  case GING:
+    return "ginger";
+  case FENNEL:
+    return "fennel";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -279,6 +286,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -329,6 +338,12 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
+  case GING:
+    return new Ging(inputFile, net.ID, net.Num, false);
+
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, false);
+
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -372,6 +387,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -456,6 +473,17 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
+  case GING:
+    if (inputFileTranspose.size()) {
+      return new Ging(inputFileTranspose, net.ID, net.Num, true);
+    } else {
+      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      break;
+    }
+
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, false);
+
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -504,6 +532,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
+  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -642,6 +672,16 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, true);
 
+  case GING:
+    if (inputFileTranspose.size()) {
+      return new Ging(inputFileTranspose, net.ID, net.Num, false);
+    } else {
+      GALOIS_DIE("Error: attempting Ginger without transpose graph");
+      break;
+    }
+
+  case FENNEL:
+    return new Fenn(inputFile, net.ID, net.Num, true);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
