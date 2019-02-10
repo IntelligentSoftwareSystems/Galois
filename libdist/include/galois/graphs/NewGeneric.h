@@ -806,6 +806,30 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     p0assignSendTime.stop();
   }
 
+  /**
+   * Send message to all hosts saying we're done with assignments.
+   */
+  void sendAllClears() {
+    unsigned bytesSent = 0;
+    auto& net = galois::runtime::getSystemNetworkInterface();
+    galois::StatTimer allClearTimer("Phase0SendAllClearTime", GRNAME);
+    allClearTimer.start();
+
+    // send loop
+    for (unsigned h = 0; h < base_DistGraph::numHosts; h++) {
+      if (h != base_DistGraph::id) {
+        galois::runtime::SendBuffer b;
+        galois::runtime::gSerialize(b, 3u);
+        bytesSent += b.size();
+        net.sendTagged(h, galois::runtime::evilPhase, b);
+      }
+    }
+    allClearTimer.stop();
+
+    galois::runtime::reportStat_Tsum(GRNAME, "Phase0SendAllClear_BytesSent",
+                                     bytesSent);
+  }
+
   void saveReceivedMappings(std::vector<uint32_t>& localNodeToMaster,
                             std::unordered_map<uint64_t, uint32_t>& gid2offsets,
                             unsigned sendingHost,
