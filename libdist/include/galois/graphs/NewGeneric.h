@@ -438,7 +438,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
     auto blockRanges = galois::graphs::determineUnitRangesFromPrefixSum(
-        numBlocks, prefixSumOfEdges 
+        numBlocks, prefixSumOfEdges
     );
 
     for (unsigned i = 0; i < numBlocks + 1; i++) {
@@ -447,7 +447,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     return blockRanges;
   }
-  
+
   /**
    * For each other host, determine which nodes that this host needs to get
    * info from
@@ -522,7 +522,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param ghosts
    * @param gid2offsets mapping vector: element at an offset corresponds to a
    * particular GID (and its master)
-   * @param syncNodes one vector of nodes for each host: at the end of 
+   * @param syncNodes one vector of nodes for each host: at the end of
    * execution, will contain mirrors on this host whose master is on that host
    * @returns Number of set bits
    */
@@ -557,7 +557,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::gDebug("[", base_DistGraph::id, " -> ", h, "] bitset size ", (end - start)/64, " vs. vector size ", syncNodes[h].size()/2);
     }
     lid -= numLocal;
-    
+
     assert(lid == numToReserve);
     galois::gDebug("[", base_DistGraph::id, "] total bitset size ", (ghosts.size() - numLocal)/64, " vs. total vector size ", numToReserve/2);
 
@@ -573,9 +573,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * Let other hosts know which nodes they need to send to me by giving them
    * the bitset marked with nodes I am interested in on the other host.
    *
-   * @param syncNodes one vector of nodes for each host: at the begin of 
+   * @param syncNodes one vector of nodes for each host: at the begin of
    * execution, will contain mirrors on this host whose master is on that host;
-   * at the end of execution, will contain masters on this host whose mirror 
+   * at the end of execution, will contain masters on this host whose mirror
    * is on that host
    */
   void phase0SendRecv(
@@ -774,7 +774,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param numLocalNodes: number of owned nodes
    * @param localNodeToMaster Vector map: an offset corresponds to a particular
    * GID; indicates masters of GIDs
-   * @param syncNodes one vector of nodes for each host: contains mirrors on 
+   * @param syncNodes one vector of nodes for each host: contains mirrors on
    * this host whose master is on that host
    */
   void syncAssignmentSends(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
@@ -804,6 +804,31 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
 
     p0assignSendTime.stop();
+  }
+
+  void saveReceivedMappings(std::vector<uint32_t>& localNodeToMaster,
+                            std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+                            unsigned sendingHost,
+                            std::vector<uint32_t>& receivedOffsets,
+                            std::vector<uint32_t>& receivedMasters) {
+    uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
+    galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
+                   " offset ", hostOffset);
+
+    // if execution gets here, messageType was 1 or 2
+    assert(receivedMasters.size() == receivedOffsets.size());
+
+    galois::do_all(
+      galois::iterate((size_t)0, receivedMasters.size()),
+      [&] (size_t i) {
+        uint64_t curGID = hostOffset + receivedOffsets[i];
+        uint32_t indexIntoMap = gid2offsets[curGID];
+        galois::gDebug("[", base_DistGraph::id, "] gid ", curGID,
+                       " offset ", indexIntoMap);
+        localNodeToMaster[indexIntoMap] = receivedMasters[i];
+      },
+      galois::no_stats()
+    );
   }
 
   /**
@@ -875,29 +900,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       std::tie(sendingHost, messageType) =
         recvOffsetsAndMasters(receivedOffsets, receivedMasters);
 
-      uint64_t hostOffset = base_DistGraph::gid2host[sendingHost].first;
-      galois::gDebug("[", base_DistGraph::id, "] host ", sendingHost,
-                     " offset ", hostOffset);
-
       if (messageType == 1 || messageType == 2) {
-        // if execution gets here, messageType was 1 or 2
-        assert(receivedMasters.size() == receivedOffsets.size());
-
-        galois::do_all(
-          galois::iterate((size_t)0, receivedMasters.size()),
-          [&] (size_t i) {
-            uint64_t curGID = hostOffset + receivedOffsets[i];
-            uint32_t indexIntoMap = gid2offsets[curGID];
-            galois::gDebug("[", base_DistGraph::id, "] gid ", curGID,
-                           " offset ", indexIntoMap);
-            localNodeToMaster[indexIntoMap] = receivedMasters[i];
-          },
-          galois::no_stats()
-        );
+        saveReceivedMappings(localNodeToMaster, gid2offsets,
+                             sendingHost, receivedOffsets, receivedMasters);
       }
-      //for (uint32_t i : ghosts[sendingHost].getOffsets()) {
-      //  galois::gDebug("[", base_DistGraph::id, "] ", i, " is set");
-      //}
     }
 
     p0assignReceiveTime.stop();
@@ -910,7 +916,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * @param numLocalNodes: number of owned nodes
    * @param localNodeToMaster Vector map: an offset corresponds to a particular
    * GID; indicates masters of GIDs
-   * @param syncNodes one vector of nodes for each host: contains mirrors on 
+   * @param syncNodes one vector of nodes for each host: contains mirrors on
    * this host whose master is on that host
    * @param gid2offsets Map of GIDs to the offset into the vector map that
    * corresponds to it
@@ -963,7 +969,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                         toSend.reset(lid);
                       },
                       galois::no_stats());
-        
+
         sendOffsets(h, toSend, localNodeToMaster, "MastersToOwners");
       }
     }
