@@ -245,7 +245,8 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::StatTimer phase0Timer("Phase0", GRNAME);
       galois::gPrint("[", base_DistGraph::id, "] Starting master assignment.\n");
       phase0Timer.start();
-      phase0(bufGraph);
+      //phase0(bufGraph);
+      phase0(bufGraph, true);
       phase0Timer.stop();
       galois::gPrint("[", base_DistGraph::id, "] Master assignment complete.\n");
     }
@@ -482,9 +483,9 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     //  galois::gPrint("[", base_DistGraph::id, " ", i, "] local range ", *work.local_begin(), " ",
     //  *work.local_end(), "\n");
     //});
-    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
-      GRNAME, "Phase0DetNeighLocation_" + base_DistGraph::id
-    );
+    //galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
+    //  GRNAME, "Phase0DetNeighLocation_" + std::string(base_DistGraph::id)
+    //);
 
     // Step 2: loop over all local nodes, determine neighbor locations
     galois::do_all(
@@ -492,7 +493,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       //galois::iterate(base_DistGraph::gid2host[base_DistGraph::id].first,
       //                base_DistGraph::gid2host[base_DistGraph::id].second),
       [&] (unsigned n) {
-        ptt.start();
+        //ptt.start();
         //galois::gPrint("[", base_DistGraph::id, " ",
         //galois::substrate::getThreadPool().getTID(), "] ", n, "\n");
         auto ii = bufGraph.edgeBegin(n);
@@ -504,7 +505,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
             ghosts.set(dst);
           }
         }
-        ptt.stop();
+        //ptt.stop();
       },
       galois::loopname("Phase0BitsetSetup_DetermineNeighborLocations"),
       galois::steal(),
@@ -1020,11 +1021,25 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       std::vector<uint32_t>& localNodeToMaster,
       galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes,
       std::unordered_map<uint64_t, uint32_t>& gid2offsets) {
-    galois::StatTimer syncAssignmentTimer("Phase0SyncAssignment", GRNAME);
+    galois::StatTimer syncAssignmentTimer("Phase0SyncAssignmentTime", GRNAME);
     syncAssignmentTimer.start();
 
     syncAssignmentSends(begin, end, numLocalNodes, localNodeToMaster, syncNodes);
     syncAssignmentReceives(localNodeToMaster, gid2offsets);
+
+    syncAssignmentTimer.stop();
+  }
+
+  void syncAssignmentAsync(uint32_t begin, uint32_t end, uint32_t numLocalNodes,
+      std::vector<uint32_t>& localNodeToMaster,
+      galois::gstl::Vector<galois::gstl::Vector<uint32_t>>& syncNodes,
+      std::unordered_map<uint64_t, uint32_t>& gid2offsets,
+      galois::DynamicBitSet& hostFinished) {
+    galois::StatTimer syncAssignmentTimer("Phase0SyncAssignmentAsyncTime", GRNAME);
+    syncAssignmentTimer.start();
+
+    syncAssignmentSends(begin, end, numLocalNodes, localNodeToMaster, syncNodes);
+    syncAssignmentReceivesAsync(localNodeToMaster, gid2offsets, hostFinished);
 
     syncAssignmentTimer.stop();
   }
@@ -1104,7 +1119,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
   /**
    * phase responsible for master assignment
    */
-  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph) {
+  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph, bool async = false) {
     galois::DynamicBitSet ghosts;
     galois::gstl::Vector<galois::gstl::Vector<uint32_t>> syncNodes; // masterNodes
     syncNodes.resize(base_DistGraph::numHosts);
@@ -1143,6 +1158,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<uint32_t> localNodeToMaster;
     localNodeToMaster.assign(numLocalNodes + neighborCount, (uint32_t)-1);
 
+    galois::DynamicBitSet hostFinished;
+
+    if (async) {
+      hostFinished.resize(base_DistGraph::numHosts);
+    }
+
     p0allocTimer.stop();
 
     auto blockRanges = getBlockRanges(bufGraph,
@@ -1161,22 +1182,22 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                      stateRounds, "\n");
     }
 
-    galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
-      GRNAME, "Phase0DetermineMaster_" + base_DistGraph::id
-    );
-
+    //galois::PerThreadTimer<CUSP_PT_TIMER> ptt(
+    //  GRNAME, "Phase0DetermineMaster_" + std::string(base_DistGraph::id)
+    //);
 
     for (unsigned syncRound = 0; syncRound < stateRounds; syncRound++) {
       uint32_t beginNode = blockRanges[syncRound];
-      uint32_t endNode = blockRanges[syncRound+1];
+      uint32_t endNode = blockRanges[syncRound + 1];
 
       // create specific range for this block
       std::vector<uint32_t> rangeVec;
       auto work = getSpecificThreadRange(bufGraph, rangeVec, beginNode, endNode);
 
+      // debug print
       //galois::on_each([&] (unsigned i, unsigned j) {
-      //  galois::gPrint("[", base_DistGraph::id, " ", i, "] sync round ", syncRound, " local range ",
-      //                 *work.local_begin(), " ", *work.local_end(), "\n");
+      //  galois::gDebug("[", base_DistGraph::id, " ", i, "] sync round ", syncRound, " local range ",
+      //                 *work.local_begin(), " ", *work.local_end());
       //});
 
       galois::do_all(
@@ -1184,7 +1205,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         galois::iterate(work),
         //galois::iterate(beginNode, endNode),
         [&] (uint32_t node) {
-          ptt.start();
+          //ptt.start();
           // determine master function takes source node, iterator of
           // neighbors
           uint32_t assignedHost = graphPartitioner->determineMaster(node,
@@ -1199,7 +1220,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
           //galois::gDebug("[", base_DistGraph::id, "] state round ", syncRound,
           //               " set ", node, " ", node - globalOffset);
 
-          ptt.stop();
+          //ptt.stop();
         },
         galois::loopname("Phase0DetermineMasters"),
         galois::steal(),
@@ -1207,8 +1228,18 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       );
 
       // do synchronization of master assignment of neighbors
-      syncAssignment(beginNode - globalOffset, endNode - globalOffset,
-                     numLocalNodes, localNodeToMaster, syncNodes, gid2offsets);
+      if (!async) {
+        syncAssignment(beginNode - globalOffset, endNode - globalOffset,
+                       numLocalNodes, localNodeToMaster, syncNodes, gid2offsets);
+      } else {
+        // don't need to send anything if there is nothing to send unlike sync
+        if (beginNode != endNode) {
+          syncAssignmentAsync(beginNode - globalOffset, endNode - globalOffset,
+                         numLocalNodes, localNodeToMaster, syncNodes, gid2offsets,
+                         hostFinished);
+        }
+      }
+
       // debug build prints
       //printLoad(nodeLoads, nodeAccum);
       //printLoad(edgeLoads, edgeAccum);
@@ -1216,6 +1247,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       // sync node/edge loads
       galois::StatTimer loadSyncTimer("Phase0LoadSyncTime", GRNAME);
 
+      // TODO in async mode make this async as well...
       loadSyncTimer.start();
       syncLoad(nodeLoads, nodeAccum);
       syncLoad(edgeLoads, edgeAccum);
@@ -1223,6 +1255,25 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
       if (base_DistGraph::id == 0) {
         galois::gPrint("State Round ", syncRound, " complete\n");
+      }
+
+      #ifndef NDEBUG
+      if (async) {
+        galois::gDebug("[", base_DistGraph::id, "] host count ", hostFinished.count());
+      }
+      #endif
+    }
+
+    // if asynchronous, don't move on until everything is done
+    if (async) {
+      sendAllClears();
+      hostFinished.set(base_DistGraph::id);
+      while (hostFinished.count() != base_DistGraph::numHosts) {
+        #ifndef NDEBUG
+        galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts to finish, ",
+                       hostFinished.count());
+        #endif
+        syncAssignmentReceivesAsync(localNodeToMaster, gid2offsets, hostFinished);
       }
     }
 
