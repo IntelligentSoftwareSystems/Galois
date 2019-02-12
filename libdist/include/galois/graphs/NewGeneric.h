@@ -245,8 +245,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       galois::StatTimer phase0Timer("Phase0", GRNAME);
       galois::gPrint("[", base_DistGraph::id, "] Starting master assignment.\n");
       phase0Timer.start();
-      //phase0(bufGraph);
-      phase0(bufGraph, true);
+      phase0(bufGraph, cuspAsync);
       phase0Timer.stop();
       galois::gPrint("[", base_DistGraph::id, "] Master assignment complete.\n");
     }
@@ -675,7 +674,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     sendTimer.stop();
 
-    galois::runtime::reportStat_Tsum(GRNAME, "Phase0AsyncSendLoad_BytesSent",
+    galois::runtime::reportStat_Tsum(GRNAME, "Phase0AsyncSendLoadBytesSent",
                                      bytesSent);
   }
 
@@ -912,7 +911,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     sendOffsetsTimer.stop();
 
-    galois::runtime::reportStat_Tsum(GRNAME, statString + "_BytesSent",
+    galois::runtime::reportStat_Tsum(GRNAME, statString + "BytesSent",
                                      bytesSent);
   }
 
@@ -978,7 +977,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     }
     allClearTimer.stop();
 
-    galois::runtime::reportStat_Tsum(GRNAME, "Phase0SendAllClear_BytesSent",
+    galois::runtime::reportStat_Tsum(GRNAME, "Phase0SendAllClearBytesSent",
                                      bytesSent);
   }
 
@@ -1277,8 +1276,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
    * assignments BSP style or asynchronous style. Note regardless of which
    * is chosen there is a barrier at the end of master assignment.
    */
-  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph,
-              bool async = false) {
+  void phase0(galois::graphs::BufferedGraph<EdgeTy>& bufGraph, bool async) {
     galois::DynamicBitSet ghosts;
     galois::gstl::Vector<galois::gstl::Vector<uint32_t>> syncNodes; // masterNodes
     syncNodes.resize(base_DistGraph::numHosts);

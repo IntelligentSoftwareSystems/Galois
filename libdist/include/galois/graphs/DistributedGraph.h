@@ -91,7 +91,14 @@ extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
 //! Specifies the size of the buffer used for
 extern cll::opt<unsigned> edgePartitionSendBufSize;
+//! Number of rounds to split master assignment phase in in CuSP
+//! @todo move this to CuSP source and not here
 extern cll::opt<uint32_t> stateRounds;
+//! If true, CuSP will use asynchronous synchronization for master assignment
+//! phase (phase0)
+//! @todo move this to CuSP source and not here
+extern cll::opt<bool> cuspAsync;
+
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {

@@ -121,7 +121,17 @@ cll::opt<unsigned>
                                        "send during partitioning."),
                              cll::init(32000), cll::Hidden);
 
+//! Number of rounds to split master assignment phase in in CuSP
+//! @todo move this to CuSP source and not here
 cll::opt<uint32_t> stateRounds("stateRounds",
                                cll::desc("Frequency of updates in "
                                          "partitioning"),
                                cll::init(1), cll::Hidden);
+
+//! If true, CuSP will use asynchronous synchronization for master assignment
+//! phase (phase0)
+//! @todo move this to CuSP source and not here
+cll::opt<bool> cuspAsync("asyncMasterAssignment",
+                         cll::desc("Use async synchronization for CuSP "
+                                   "master assignment (default true)"),
+                         cll::init(true), cll::Hidden);
