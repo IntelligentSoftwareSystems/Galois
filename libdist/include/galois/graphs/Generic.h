@@ -209,17 +209,20 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       hasIncomingEdge.resize(base_DistGraph::numHosts);
     }
 
-    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
-    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
-    inspectionTimer.start();
-
+    galois::gPrint("[", base_DistGraph::id, "] Starting graph reading.\n");
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
+    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
     graphReadTimer.start();
     bufGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin,
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
     bufGraph.resetReadCounters();
+    galois::gPrint("[", base_DistGraph::id, "] Reading graph complete.\n");
+
+
+    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
+    inspectionTimer.start();
 
     galois::gstl::Vector<uint64_t> prefixSumOfEdges;
 
