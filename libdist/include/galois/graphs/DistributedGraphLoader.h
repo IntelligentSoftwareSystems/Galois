@@ -63,7 +63,8 @@ enum PARTITIONING_SCHEME {
   GHIVC,                    //!< generic hivc
   GOEC,                    //!< generic oec
   GING,                    //!< Ginger
-  FENNEL                    //!< Fennel
+  FENNEL_O,                   //!< Fennel, oec
+  FENNEL_I                    //!< Fennel, iec
 };
 
 /**
@@ -108,8 +109,10 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "goec";
   case GING:
     return "ginger";
-  case FENNEL:
-    return "fennel";
+  case FENNEL_O:
+    return "fennel-oec";
+  case FENNEL_I:
+    return "fennel-iec";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -341,7 +344,10 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GING:
     return new Ging(inputFile, net.ID, net.Num, false);
 
-  case FENNEL:
+  case FENNEL_O:
+    return new Fenn(inputFile, net.ID, net.Num, false);
+
+  case FENNEL_I:
     return new Fenn(inputFile, net.ID, net.Num, false);
 
   default:
@@ -481,9 +487,16 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       break;
     }
 
-  case FENNEL:
+  case FENNEL_O:
     return new Fenn(inputFile, net.ID, net.Num, false);
 
+  case FENNEL_I:
+    if (inputFileTranspose.size()) {
+      return new Fenn(inputFileTranspose, net.ID, net.Num, true);
+    } else {
+      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      break;
+    }
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -680,8 +693,16 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       break;
     }
 
-  case FENNEL:
+  case FENNEL_O:
     return new Fenn(inputFile, net.ID, net.Num, true);
+
+  case FENNEL_I:
+    if (inputFileTranspose.size()) {
+      return new Fenn(inputFileTranspose, net.ID, net.Num, false);
+    } else {
+      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      break;
+    }
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");

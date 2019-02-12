@@ -1015,11 +1015,11 @@ class FennelP {
     // number of edges
     uint64_t ne = std::distance(ii, ee);
 
-    // high in-degree nodes masters stay the same
+    // high degree nodes masters stay the same
     if (ne > _vCutThreshold) {
       return _hostID;
     } else {
-    // low in degree masters move based on augmented FENNEL scoring metric
+    // low degree masters move based on augmented FENNEL scoring metric
       // initialize array to hold scores
       galois::PODResizeableArray<double> scores;
       scores.resize(_numHosts);
@@ -1083,6 +1083,7 @@ class FennelP {
   }
 
 
+  // Fennel is an edge cut: all edges on source
   uint32_t getEdgeOwner(uint32_t src, uint32_t dst, uint64_t numEdges) const {
     return getMaster(src);
   }
