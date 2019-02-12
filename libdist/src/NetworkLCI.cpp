@@ -45,14 +45,24 @@ using vTy = galois::PODResizeableArray<uint8_t>;
 using namespace galois::runtime;
 using namespace galois::substrate;
 
+/* CRC-32C (iSCSI) polynomial in reversed bit order. */
+#define POLY 0x82f63b78
+inline uint32_t crc32c(char *buf, size_t len)
+{
+  uint32_t crc = 0;
+  int k;
+
+  crc = ~crc;
+  while (len--) {
+    crc ^= *buf++;
+    for (k = 0; k < 8; k++)
+      crc = crc & 1 ? (crc >> 1) ^ POLY : crc >> 1;
+  }
+  return ~crc;
+}
+
 lc_ep lc_p2p_ep[3];
 lc_ep lc_col_ep;
-
-void* alloc_cb(size_t size, void** ctx) {
-  vTy** vector = (vTy**) ctx;
-  *vector = new vTy(size);
-  return (*vector)->data();
-}
 
 struct pendingReq {
   uint32_t dest;
@@ -67,6 +77,12 @@ struct pendingReq {
     inflight--;
   }
 };
+
+static void* alloc_req(size_t size, void** ctx) {
+  vTy** vector = (vTy**) ctx;
+  *vector = new vTy(size);
+  return (*vector)->data();
+}
 
 static void free_req(void* ctx)
 {
@@ -130,7 +146,7 @@ public:
 
   NetworkInterfaceLCI() {
     lc_init(1, &lc_col_ep);
-    lc_opt opt = {.dev = 0, .desc = LC_DYN_CQ, .alloc = alloc_cb};
+    lc_opt opt = {.dev = 0, .desc = LC_DYN_CQ, .alloc = alloc_req};
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[0]);
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[1]);
     lc_ep_dup(&opt, lc_col_ep, &lc_p2p_ep[2]);
@@ -160,19 +176,19 @@ public:
 
     statSendNum += 1;
     statSendBytes += buf.size();
-
-    auto* msg = new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
     // int count = 0;
-
 #ifndef __GALOIS_HET_ASYNC__
-    while (lc_send(msg->buf.data(), msg->buf.size(), dest, tag, lc_p2p_ep[phase], free_req, msg) != LC_OK)
-#else
-    while (lc_sendl(msg->buf.data(), msg->buf.size(), dest, tag, lc_p2p_ep[phase], free_req, msg) != LC_OK)
+    if (buf.getVec().size() < 8192) {
+      while (lc_sendm(buf.getVec().data(), buf.getVec().size(), dest, tag, lc_p2p_ep[phase]) != LC_OK) {
+        sched_yield();
+      }
+    } else
 #endif
     {
-      sched_yield();
-      // if (count == 10000)
-      //  printf("[%d] Warning possible lock out on SEND %d\n", ID, tag);
+      pendingReq* msg = new pendingReq(dest, tag, phase, buf.getVec(), inflightSends);
+      while (lc_sendl(msg->buf.data(), msg->buf.size(), dest, tag, lc_p2p_ep[phase], free_req, msg) != LC_OK) {
+        sched_yield();
+      }
     }
   }
 
