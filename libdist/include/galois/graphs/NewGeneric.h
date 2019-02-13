@@ -1422,6 +1422,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
 
     // if asynchronous, don't move on until everything is done
     if (async) {
+      galois::StatTimer waitTime("Phase0AsyncWaitTime", GRNAME);
       // assignment clears
       sendAllClears();
       // load clears
@@ -1430,6 +1431,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       hostFinished.set(base_DistGraph::id);
       loadsClear.set(base_DistGraph::id);
 
+      waitTime.start();
       while (hostFinished.count() != base_DistGraph::numHosts ||
              loadsClear.count() != base_DistGraph::numHosts) {
         #ifndef NDEBUG
@@ -1444,6 +1446,7 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
                                     hostFinished);
         asyncRecvLoad(nodeLoads, edgeLoads, loadsClear);
       }
+      waitTime.stop();
     }
 
     #ifndef NDEBUG
