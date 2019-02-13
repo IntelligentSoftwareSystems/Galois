@@ -119,7 +119,7 @@ cll::opt<unsigned>
     edgePartitionSendBufSize("edgeBufferSize",
                              cll::desc("Buffer size for batching edges to "
                                        "send during partitioning."),
-                             cll::init(32000), cll::Hidden);
+                             cll::init(8388608), cll::Hidden);
 
 //! Number of rounds to split master assignment phase in in CuSP
 //! @todo move this to CuSP source and not here
