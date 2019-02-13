@@ -658,6 +658,12 @@ public:
     numGlobalEdges = 0;
     currentBVFlag  = nullptr;
 
+    // report edge buffer size
+    if (host == 0) {
+      galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
+                                         (unsigned)edgePartitionSendBufSize);
+    }
+
     initBareMPI();
   }
 

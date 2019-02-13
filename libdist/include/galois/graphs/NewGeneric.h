@@ -361,6 +361,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     Tgraph_construct_comm.start();
     base_DistGraph::setup_communication();
     Tgraph_construct_comm.stop();
+
+    // report state rounds
+    if (base_DistGraph::id == 0) {
+      galois::runtime::reportStat_Single(GRNAME, "CuSPStateRounds",
+                                         (uint32_t)stateRounds);
+    }
   }
 
   /**
