@@ -64,7 +64,8 @@ enum PARTITIONING_SCHEME {
   GOEC,                    //!< generic oec
   GING,                    //!< Ginger
   FENNEL_O,                   //!< Fennel, oec
-  FENNEL_I                    //!< Fennel, iec
+  FENNEL_I,                    //!< Fennel, iec
+  SUGAR_O                    //!< Sugar, oec
 };
 
 /**
@@ -113,6 +114,8 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "fennel-oec";
   case FENNEL_I:
     return "fennel-iec";
+  case SUGAR_O:
+    return "sugar-oec";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -291,6 +294,7 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
   using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -350,6 +354,9 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case FENNEL_I:
     return new Fenn(inputFile, net.ID, net.Num, false);
 
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, false);
+
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -395,6 +402,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
   using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -498,6 +506,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       break;
     }
 
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, false);
+
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
     return nullptr;
@@ -547,6 +558,7 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
   using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
   using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarColumnFlipP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -703,6 +715,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
       GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
       break;
     }
+
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, true);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
