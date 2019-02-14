@@ -154,7 +154,7 @@ for partition in 1 2 3 5 6 7 8; do
     eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
 
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
-    eval "python $checker -t=1 $OUTPUT output_${hostname}_0.log &> .output_diff"
+    eval "python $checker -t=0.01 $OUTPUT output_${hostname}_0.log &> .output_diff"
 
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
