@@ -64,12 +64,13 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
         clEnumValN(GHIVC, "ghivc", "HIVC using generic interface"),
         clEnumValN(GOEC, "goec", "oec generic interface"),
-        clEnumValN(GING, "ging", "ginger using cusp"),
-        clEnumValN(FENNEL_O, "fenn-o", "fennel, outgoing edge cut, using cusp"),
-        clEnumValN(FENNEL_I, "fenn-i", "fennel, incoming edge cut, using cusp"),
+        clEnumValN(GINGER, "ginger", "ginger using cusp"),
+        clEnumValN(FENNEL_O, "fennel-o", "fennel, outgoing edge cut, using cusp"),
+        clEnumValN(FENNEL_I, "fennel-i", "fennel, incoming edge cut, using cusp"),
         clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using cusp"),
         clEnumValEnd),
     cll::init(OEC));
+
 cll::opt<unsigned int>
     VCutThreshold("VCutThreshold",
                   cll::desc("Threshold for high degree edges."),

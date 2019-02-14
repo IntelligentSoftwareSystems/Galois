@@ -62,7 +62,7 @@ enum PARTITIONING_SCHEME {
   GCVC,                    //!< generic cvc
   GHIVC,                    //!< generic hivc
   GOEC,                    //!< generic oec
-  GING,                    //!< Ginger
+  GINGER,                    //!< Ginger
   FENNEL_O,                   //!< Fennel, oec
   FENNEL_I,                    //!< Fennel, iec
   SUGAR_O                    //!< Sugar, oec
@@ -108,7 +108,7 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "ghivc";
   case GOEC:
     return "goec";
-  case GING:
+  case GINGER:
     return "ginger";
   case FENNEL_O:
     return "fennel-oec";
@@ -292,8 +292,8 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
-  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
   using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -345,14 +345,14 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GING:
-    return new Ging(inputFile, net.ID, net.Num, false);
+  case GINGER:
+    return new Ginger(inputFile, net.ID, net.Num, false);
 
   case FENNEL_O:
-    return new Fenn(inputFile, net.ID, net.Num, false);
+    return new Fennel(inputFile, net.ID, net.Num, false);
 
   case FENNEL_I:
-    return new Fenn(inputFile, net.ID, net.Num, false);
+    return new Fennel(inputFile, net.ID, net.Num, false);
 
   case SUGAR_O:
     return new Sugar(inputFile, net.ID, net.Num, false);
@@ -400,8 +400,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
-  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
   using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -487,20 +487,20 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GING:
+  case GINGER:
     if (inputFileTranspose.size()) {
-      return new Ging(inputFileTranspose, net.ID, net.Num, true);
+      return new Ginger(inputFileTranspose, net.ID, net.Num, true);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
     }
 
   case FENNEL_O:
-    return new Fenn(inputFile, net.ID, net.Num, false);
+    return new Fennel(inputFile, net.ID, net.Num, false);
 
   case FENNEL_I:
     if (inputFileTranspose.size()) {
-      return new Fenn(inputFileTranspose, net.ID, net.Num, true);
+      return new Fennel(inputFileTranspose, net.ID, net.Num, true);
     } else {
       GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
       break;
@@ -556,8 +556,8 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
-  using Fenn = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
   using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarColumnFlipP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
@@ -697,20 +697,20 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, true);
 
-  case GING:
+  case GINGER:
     if (inputFileTranspose.size()) {
-      return new Ging(inputFileTranspose, net.ID, net.Num, false);
+      return new Ginger(inputFileTranspose, net.ID, net.Num, false);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
     }
 
   case FENNEL_O:
-    return new Fenn(inputFile, net.ID, net.Num, true);
+    return new Fennel(inputFile, net.ID, net.Num, true);
 
   case FENNEL_I:
     if (inputFileTranspose.size()) {
-      return new Fenn(inputFileTranspose, net.ID, net.Num, false);
+      return new Fennel(inputFileTranspose, net.ID, net.Num, false);
     } else {
       GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
       break;
