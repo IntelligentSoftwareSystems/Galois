@@ -3025,8 +3025,11 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;
     // order of nodes locally is masters, outgoing mirrors, incoming mirrors,
     // so just get from numOwned to end
-    mirrorRangesVector.push_back(std::make_pair(base_DistGraph::numOwned,
-                                                numNodes));
+    if (base_DistGraph::numOwned != numNodes) {
+      assert(base_DistGraph::numOwned < numNodes);
+      mirrorRangesVector.push_back(std::make_pair(base_DistGraph::numOwned,
+                                                  numNodes));
+    }
     return mirrorRangesVector;
   }
 

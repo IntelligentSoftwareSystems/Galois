@@ -4491,6 +4491,7 @@ public:
   void reset_mirrorField() {
     auto mirrorRanges = getMirrorRanges();
     for (auto r : mirrorRanges) {
+      if (r.first == r.second) continue;
       assert(r.first < r.second);
 
       // GPU call
