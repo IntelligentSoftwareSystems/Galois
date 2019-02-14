@@ -32,20 +32,16 @@ if [[ ($execname == *"bc"*) ]]; then
 fi
 
 # for bc, if using rmat15, then use all sources output (without ss)
-# TODO currently even rmat15 uses single source, hence rmat16 which doesn't 
-# exist
-if [[ ($execname == *"bc"*) && ($inputname == "rmat16") ]]; then
-  OUTPUT=${outputdirname}/rmat15.bc
+if [[ ($execname == *"bc"*) && ($inputname == "rmat15") ]]; then
+  OUTPUT=${outputdirname}/rmat15.bcbfsall
 fi
 
 MPI=mpiexec
 LOG=.verify_log
 
 FLAGS=
-#FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
-  # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -56,10 +52,14 @@ fi
 
 # bc: if rmat15 is not used, specify single source flags else do
 # all sources for rmat15
-# TODO currently uses rmat16 (doesn't exist) so everything does single source
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat15") ]]; then
   FLAGS+=" -singleSource"
   FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
+fi
+
+# batch multiple sources if using mrbc
+if [[ ($execname == *"bc_mr"*) ]]; then
+  FLAGS+=" -numRoundSources=4096"
 fi
 
 source_file=${inputdirname}/source
@@ -121,6 +121,18 @@ for partition in 1 2 3 5 6 7 8; do
     CUTTYPE+=" -partition=od2vc"
   elif [ $partition -eq 10 ]; then
     CUTTYPE+=" -partition=od4vc"
+  elif [ $partition -eq 11 ]; then
+    CUTTYPE+=" -partition=gcvc"
+  elif [ $partition -eq 12 ]; then
+    CUTTYPE+=" -partition=goec"
+  elif [ $partition -eq 13 ]; then
+    CUTTYPE+=" -partition=ghovc"
+  elif [ $partition -eq 14 ]; then
+    CUTTYPE+=" -partition=ginger-o -stateRounds=100"
+  elif [ $partition -eq 15 ]; then
+    CUTTYPE+=" -partition=fennel-o -stateRounds=100"
+  elif [ $partition -eq 16 ]; then
+    CUTTYPE+=" -partition=sugar-o -stateRounds=100"
   fi
 
   for task in $SET; do
@@ -167,6 +179,18 @@ for partition in 1 2 3 5 6 7 8; do
         failed_cases+="over-decompose 2 cvc $1 devices with $3 threads; "
       elif [ $partition -eq 10 ]; then
         failed_cases+="over-decompose 4 cvc $1 devices with $3 threads; "
+      elif [ $partition -eq 11 ]; then
+        failed_cases+="CuSP cvc $1 devices with $3 threads; "
+      elif [ $partition -eq 12 ]; then
+        failed_cases+="CuSP oec $1 devices with $3 threads; "
+      elif [ $partition -eq 13 ]; then
+        failed_cases+="CuSP hybrid outgoing $1 devices with $3 threads; "
+      elif [ $partition -eq 14 ]; then
+        failed_cases+="CuSP Ginger outgiong $1 devices with $3 threads; "
+      elif [ $partition -eq 15 ]; then
+        failed_cases+="CuSP FENNEL outgiong $1 devices with $3 threads; "
+      elif [ $partition -eq 16 ]; then
+        failed_cases+="CuSP Sugar outgiong $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
