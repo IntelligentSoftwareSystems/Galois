@@ -1443,13 +1443,12 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       waitTime.start();
       while (hostFinished.count() != base_DistGraph::numHosts ||
              loadsClear.count() != base_DistGraph::numHosts) {
-        #ifndef NDEBUG
-        galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts to finish, ",
-                       hostFinished.count());
-        galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts loads "
-                       "syncs to finish, ", loadsClear.count());
-
-        #endif
+        //#ifndef NDEBUG
+        //galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts to finish, ",
+        //               hostFinished.count());
+        //galois::gDebug("[", base_DistGraph::id, "] waiting for all hosts loads "
+        //               "syncs to finish, ", loadsClear.count());
+        //#endif
         // make sure all assignments are done and all loads are done
         syncAssignmentReceivesAsync(localNodeToMaster, gid2offsets,
                                     hostFinished);
