@@ -295,12 +295,14 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::numNodesWithEdges = numNodes;
     }
 
-    if (transpose && (numNodes > 0)) {
-      // consider all nodes to have outgoing edges (TODO better way to do this?)
-      // for now it's fine I guess
-      base_DistGraph::numNodesWithEdges = numNodes;
-      base_DistGraph::graph.transpose(GRNAME);
+    if (transpose) {
       base_DistGraph::transposed = true;
+      base_DistGraph::numNodesWithEdges = numNodes;
+      if (numNodes > 0) {
+        // consider all nodes to have outgoing edges (TODO better way to do this?)
+        // for now it's fine I guess
+        base_DistGraph::graph.transpose(GRNAME);
+      }
     }
 
     galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
