@@ -1324,6 +1324,10 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     galois::DynamicBitSet loadsClear;
 
     if (async) {
+      if (base_DistGraph::id == 0) {
+        galois::gPrint("Using asynchronous master determination sends.\n");
+      }
+
       hostFinished.resize(base_DistGraph::numHosts);
       loadsClear.resize(base_DistGraph::numHosts);
     }
@@ -1414,10 +1418,6 @@ class NewDistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         asyncSyncLoad(nodeLoads, nodeAccum, edgeLoads, edgeAccum, loadsClear);
       }
       loadSyncTimer.stop();
-
-      if (base_DistGraph::id == 0) {
-        galois::gPrint("State Round ", syncRound, " complete\n");
-      }
 
       #ifndef NDEBUG
       if (async) {
