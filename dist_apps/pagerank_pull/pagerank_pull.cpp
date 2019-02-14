@@ -249,7 +249,6 @@ struct PageRank {
     float priority = delta;
     if (maxRatio > 1) maxRatio = 1;
     galois::GAccumulator<uint32_t> work_items;
-    auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t prev_work_items = 0;
 
     do {
