@@ -75,7 +75,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" ..
           make -j4
   "CentOS-7-clang":
     # Clang on CentOS 7
@@ -103,7 +103,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" ..
           make -j4
   "CentOS-6-gcc":
     docker:
@@ -133,7 +133,7 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_CXX_FLAGS="-D_GLIBCXX_USE_CXX11_ABI=0" ..
           make -j4
   "CentOS-6-clang-libc++":
     # Clang on CentOS 7
