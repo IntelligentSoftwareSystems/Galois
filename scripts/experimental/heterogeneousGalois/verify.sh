@@ -8,12 +8,12 @@ execdirname="."
 execname=$1
 EXEC=${execdirname}/${execname}
 
-inputdirname=/net/ohm/export/cdgc/dist-inputs
+inputdirname=/net/ohm/export/iss/dist-inputs
 #inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/net/ohm/export/cdgc/dist-outputs
+outputdirname=/net/ohm/export/iss/dist-outputs
 #outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
