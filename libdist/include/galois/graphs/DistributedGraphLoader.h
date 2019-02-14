@@ -60,9 +60,11 @@ enum PARTITIONING_SCHEME {
   OVER_DECOMPOSE_4_VCUT, //!< overdecompose cvc by 4
   CEC,                    //!< custom edge cut
   GCVC,                    //!< generic cvc
+  GHOVC,                    //!< generic hovc
   GHIVC,                    //!< generic hivc
   GOEC,                    //!< generic oec
-  GINGER,                    //!< Ginger
+  GINGER_O,                    //!< Ginger, outgoing
+  GINGER_I,                    //!< Ginger, incoming
   FENNEL_O,                   //!< Fennel, oec
   FENNEL_I,                    //!< Fennel, iec
   SUGAR_O                    //!< Sugar, oec
@@ -104,12 +106,16 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "cec";
   case GCVC:
     return "gcvc";
+  case GHOVC:
+    return "ghovc";
   case GHIVC:
     return "ghivc";
   case GOEC:
     return "goec";
-  case GINGER:
-    return "ginger";
+  case GINGER_O:
+    return "ginger-oec";
+  case GINGER_I:
+    return "ginger-iec";
   case FENNEL_O:
     return "fennel-oec";
   case FENNEL_I:
@@ -339,18 +345,18 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false,
                           readFromFile, localGraphFileName);
+  case GHOVC:
   case GHIVC:
     return new GenericHVC(inputFile, net.ID, net.Num, false);
 
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GINGER:
+  case GINGER_O:
+  case GINGER_I:
     return new Ginger(inputFile, net.ID, net.Num, false);
 
   case FENNEL_O:
-    return new Fennel(inputFile, net.ID, net.Num, false);
-
   case FENNEL_I:
     return new Fennel(inputFile, net.ID, net.Num, false);
 
@@ -450,9 +456,16 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
                                   scaleFactor, false, readFromFile,
                                   localGraphFileName);
   case CART_VCUT_IEC:
-    return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
-                                  scaleFactor, true, readFromFile,
-                                  localGraphFileName);
+    if (inputFileTranspose.size()) {
+      return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
+                                    scaleFactor, true, readFromFile,
+                                    localGraphFileName);
+    } else {
+      GALOIS_DIE("Error: attempting cvc incoming cut without "
+                 "transpose graph");
+      break;
+    }
+
   case CART_VCUT_OLD:
     return new Graph_cartesianCutOld(inputFile, partFolder, net.ID, net.Num,
                                      scaleFactor, false, readFromFile,
@@ -475,6 +488,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false, readFromFile,
                           localGraphFileName);
+
+  case GHOVC:
+    return new GenericHVC(inputFile, net.ID, net.Num, false);
+
   case GHIVC:
     if (inputFileTranspose.size()) {
       return new GenericHVC(inputFileTranspose, net.ID, net.Num, true);
@@ -487,7 +504,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GINGER:
+  case GINGER_O:
+    return new Ginger(inputFile, net.ID, net.Num, false);
+
+  case GINGER_I:
     if (inputFileTranspose.size()) {
       return new Ginger(inputFileTranspose, net.ID, net.Num, true);
     } else {
@@ -685,6 +705,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new GenericCVC(inputFile, net.ID, net.Num, true, readFromFile,
                           localGraphFileName);
 
+  case GHOVC:
+    return new GenericHVC(inputFile, net.ID, net.Num, true);
+
   case GHIVC:
     if (inputFileTranspose.size()) {
       return new GenericHVC(inputFileTranspose, net.ID, net.Num, false);
@@ -697,7 +720,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, true);
 
-  case GINGER:
+  case GINGER_O:
+    return new Ginger(inputFile, net.ID, net.Num, true);
+
+  case GINGER_I:
     if (inputFileTranspose.size()) {
       return new Ginger(inputFileTranspose, net.ID, net.Num, false);
     } else {
