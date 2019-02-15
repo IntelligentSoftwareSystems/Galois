@@ -458,6 +458,20 @@ private:
       ++received;
     }
     increment_evilPhase();
+
+    #ifndef NDEBUG
+    for (unsigned h = 0; h < numHosts; h++) {
+      if (h == 0) {
+        assert(gid2host[h].first == 0);
+      } else if (h == numHosts - 1) {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == g.size());
+      } else {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == gid2host[h + 1].first);
+      }
+    }
+    #endif
   }
 
   /**

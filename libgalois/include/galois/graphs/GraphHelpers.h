@@ -74,8 +74,10 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
 
     size_t weight = num_edges * edgeWeight + mid * nodeWeight;
 
-    if (weight <= targetWeight) {
+    if (weight < targetWeight) {
       lb = mid + 1;
+    } else if (weight == targetWeight) {
+      return mid;
     } else {
       ub = mid;
     }
@@ -159,7 +161,7 @@ auto divideNodesBinarySearch(
   assert(id >= 0 && id < total);
 
   // weight of all data
-  uint64_t weight = numNodes * nodeWeight + numEdges * edgeWeight;
+  uint64_t weight = numNodes * nodeWeight + (numEdges + 1) * edgeWeight;
   // determine the number of blocks to divide among total divisions + setup the
   // scale factor vector if necessary
   uint32_t numBlocks = internal::determine_block_division(total, scaleFactor);
@@ -179,6 +181,9 @@ auto divideNodesBinarySearch(
   uint32_t blockUpper = scaleFactor[id];
 
   assert(blockLower <= blockUpper);
+  //galois::gDebug("Unit ", id, " block ", blockLower, " to ",
+  //               blockUpper, " ", blockLower * blockWeight, " ",
+  //               blockUpper * blockWeight);
 
   uint64_t nodesLower;
   // use prefix sum to find node bounds
@@ -208,6 +213,10 @@ auto divideNodesBinarySearch(
 
     edgesUpper = edgePrefixSum[nodesUpper - 1 + nodeOffset] - edgeOffset;
   }
+
+  //galois::gDebug("Unit ", id, " nodes ", nodesLower, " to ",
+  //               nodesUpper, " edges ", edgesLower, " ",
+  //               edgesUpper);
 
   return GraphRange(
       NodeRange(iterator(nodesLower), iterator(nodesUpper)),
@@ -275,17 +284,17 @@ void determineUnitRangesLoopGraph(GraphTy& graph, uint32_t unitsToSplit,
     // i.e. if there are actually assigned nodes
     if (nodeSplits.first != nodeSplits.second) {
       if (i != 0) {
-        assert(returnRanges[i] == *(nodeSplits.first));
+        assert(returnRanges[i] == *(nodeSplits.first) + beginNode);
       } else { // i == 0
         assert(returnRanges[i] == beginNode);
       }
       returnRanges[i + 1] = *(nodeSplits.second) + beginNode;
     } else {
-      // unit assinged no nodes
+      // unit assinged no nodes, copy last one
       returnRanges[i + 1] = returnRanges[i];
     }
 
-    galois::gDebug("Unit ", i, " gets nodes ", returnRanges[i], " to ",
+    galois::gDebug("LoopGraph Unit ", i, " gets nodes ", returnRanges[i], " to ",
                    returnRanges[i + 1], ", num edges is ",
                    graph.edge_end(returnRanges[i + 1] - 1) -
                        graph.edge_begin(returnRanges[i]));
@@ -343,7 +352,7 @@ void determineUnitRangesLoopPrefixSum(VectorTy& prefixSum,
     // i.e. if there are actually assigned nodes
     if (nodeSplits.first != nodeSplits.second) {
       if (i != 0) {
-        assert(returnRanges[i] == *(nodeSplits.first));
+        assert(returnRanges[i] == *(nodeSplits.first) + beginNode);
       } else { // i == 0
         assert(returnRanges[i] == beginNode);
       }
