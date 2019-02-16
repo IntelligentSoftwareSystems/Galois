@@ -76,9 +76,7 @@ size_t findIndexPrefixSum(size_t nodeWeight, size_t edgeWeight,
 
     if (weight < targetWeight) {
       lb = mid + 1;
-    } else if (weight == targetWeight) {
-      return mid;
-    } else {
+    } else if (weight >= targetWeight) {
       ub = mid;
     }
   }
@@ -168,6 +166,8 @@ auto divideNodesBinarySearch(
   // weight of a block (one block for each division by default; if scale
   // factor specifies something different, then use that instead)
   uint64_t blockWeight = (weight + numBlocks - 1) / numBlocks;
+  //galois::gDebug("weight ", weight, " numblock ", numBlocks, " blockwegith ",
+  //               blockWeight);
 
   // lower and upper blocks that this division should use determined
   // using scaleFactor
@@ -182,7 +182,7 @@ auto divideNodesBinarySearch(
 
   assert(blockLower <= blockUpper);
   //galois::gDebug("Unit ", id, " block ", blockLower, " to ",
-  //               blockUpper, " ", blockLower * blockWeight, " ",
+  //               blockUpper, "; ", blockLower * blockWeight, " ",
   //               blockUpper * blockWeight);
 
   uint64_t nodesLower;
