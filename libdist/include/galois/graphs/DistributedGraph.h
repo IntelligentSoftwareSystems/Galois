@@ -98,7 +98,9 @@ extern cll::opt<uint32_t> stateRounds;
 //! phase (phase0)
 //! @todo move this to CuSP source and not here
 extern cll::opt<bool> cuspAsync;
-
+//! If true, CuSP activates a barrier before the edge inspection sends.
+//! @todo move this to CuSP source and not here
+extern cll::opt<bool> inspectionBarrier;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {

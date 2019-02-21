@@ -604,6 +604,9 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         " seconds to read ", allBytesRead, " bytes (",
         allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
 
+    if (inspectionBarrier) {
+      galois::runtime::getHostBarrier().wait();
+    }
     sendInspectionData(numOutgoingEdges, hasIncomingEdge, hostHasOutgoing);
 
     // setup a single hasIncomingEdge bitvector

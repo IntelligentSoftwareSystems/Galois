@@ -135,3 +135,10 @@ cll::opt<bool> cuspAsync("asyncMasterAssignment",
                          cll::desc("Use async synchronization for CuSP "
                                    "master assignment (default true)"),
                          cll::init(true), cll::Hidden);
+
+//! If true, CuSP activates a barrier before the edge inspection sends.
+//! @todo move this to CuSP source and not here
+cll::opt<bool> inspectionBarrier("inspectionBarrier",
+                                 cll::desc("Activates barrier before CuSP edge inspection"
+                                           "(default false)"),
+                                 cll::init(false), cll::Hidden);
