@@ -41,6 +41,13 @@ static cll::opt<std::string> inputFilename(cll::Positional,
 static cll::opt<unsigned int> k_core_num("kcore", cll::desc("k-core value"),
                                          cll::Required);
 
+//! Flag that forces user to be aware that they should be passing in a
+//! symmetric graph
+static cll::opt<bool> symmetricGraph("symmetricGraph",
+  cll::desc("Flag should be used to make user aware they should be passing a "
+            "symmetric graph to this program"),
+  cll::init(false));
+
 /******************************************************************************/
 /* Graph structure declarations + other inits */
 /******************************************************************************/
@@ -175,6 +182,11 @@ constexpr static const char* const url  = 0;
 int main(int argc, char** argv) {
   galois::SharedMemSys G;
   LonestarStart(argc, argv, name, desc, url);
+
+  if (!symmetricGraph) {
+    GALOIS_DIE("User did not pass in symmetric graph flag signifying they are "
+               "aware this program needs to be passed a symmetric graph.");
+  }
 
   // some initial stat reporting
   galois::gInfo("Worklist chunk size of ", CHUNK_SIZE, ": best size may depend"
