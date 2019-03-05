@@ -18,10 +18,10 @@
  */
 
 #include "galois/Galois.h"
+#include "galois/gstl.h"
 #include "galois/Reduction.h"
 #include "galois/AtomicHelpers.h"
 #include "galois/graphs/LCGraph.h"
-#include "galois/gstl.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -44,7 +44,6 @@ static cll::opt<unsigned int> k_core_num("kcore", cll::desc("k-core value"),
 /******************************************************************************/
 /* Graph structure declarations + other inits */
 /******************************************************************************/
-
 // Node deadness can be derived from current degree and k value, so no field
 // necessary
 struct NodeData {
@@ -63,7 +62,6 @@ constexpr static const unsigned CHUNK_SIZE = 64u;
 /******************************************************************************/
 /* Functions for running the algorithm */
 /******************************************************************************/
-
 /**
  * Initialize degree fields in graph with current degree. Since symmetric,
  * out edge count is equivalent to in-edge count.
@@ -139,10 +137,10 @@ void cascadeKCore(Graph& graph, galois::InsertBag<GNode>& initialWorklist) {
 /******************************************************************************/
 /* Sanity check operators */
 /******************************************************************************/
-
-
 /**
  * Print number of nodes that are still alive.
+ *
+ * @param graph Graph to get alive count of
  */
 void kCoreSanity(Graph& graph) {
   galois::GAccumulator<uint32_t> aliveNodes;
@@ -224,23 +222,9 @@ int main(int argc, char** argv) {
   galois::reportPageAlloc("MemAllocPost");
 
   // sanity check
-  kCoreSanity(graph);
-
-  // TODO change this; leftover from distributed version
-  //if (verify) {
-  //  for (auto ii = (*h_graph).masterNodesRange().begin();
-  //       ii != (*h_graph).masterNodesRange().end(); ++ii) {
-  //    // prints the flag (alive/dead)
-  //    galois::runtime::printOutput("% %\n", (*h_graph).getGID(*ii),
-  //                                 (bool)(*h_graph).getData(*ii).flag);
-
-  //    // does a sanity check as well:
-  //    // degree higher than kcore if node is alive
-  //    if (!((*h_graph).getData(*ii).flag)) {
-  //      assert((*h_graph).getData(*ii).currentDegree < k_core_num);
-  //    }
-  //  }
-  //}
+  if (!skipVerify) {
+    kCoreSanity(graph);
+  }
 
   return 0;
 }
