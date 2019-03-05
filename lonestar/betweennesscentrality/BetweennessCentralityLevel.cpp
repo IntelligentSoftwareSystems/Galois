@@ -43,8 +43,6 @@ constexpr static const char* const REGION_NAME = "BC";
 
 #include "galois/runtime/Profile.h"
 
-
-
 // type of the num shortest paths variable
 using ShortPathType = double;
 
@@ -56,8 +54,7 @@ static cll::opt<std::string>
     filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string>
     sourcesToUse("sourcesToUse",
-                 cll::desc("Whitespace separated list "
-                           "of sources in a file to "
+                 cll::desc("Whitespace separated list of sources in a file to "
                            "use in BC (default empty)"),
                  cll::init(""));
 static cll::opt<bool>
@@ -506,7 +503,7 @@ int main(int argc, char** argv) {
   galois::GReduceMin<float> dga_min;
   galois::GAccumulator<float> dga_sum;
 
-  for (auto run = 0; run < numRuns; ++run) {
+  for (unsigned run = 0; run < numRuns; ++run) {
     galois::gPrint(" BC::go run ", run, " called\n");
     std::string timer_str("Timer_" + std::to_string(run));
 
@@ -589,14 +586,13 @@ int main(int argc, char** argv) {
   // Verify, i.e. print out graph data for examination
   if (verify) {
     char* v_out = (char*)malloc(40);
-      for (auto ii = (graph).begin();
-           ii != (graph).end(); ++ii) {
-        // outputs betweenness centrality
-        sprintf(v_out, "%lu %.9f\n", (*ii),
-                (graph).getData(*ii).betweeness_centrality);
+    for (auto ii = (graph).begin(); ii != (graph).end(); ++ii) {
+      // outputs betweenness centrality
+      sprintf(v_out, "%u %.9f\n", (*ii),
+              (graph).getData(*ii).betweeness_centrality);
 
-        galois::gPrint(v_out);
-      }
+      galois::gPrint(v_out);
+    }
     free(v_out);
   }
 
