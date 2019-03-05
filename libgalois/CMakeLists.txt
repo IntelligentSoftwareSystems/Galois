@@ -37,6 +37,7 @@ set(sources
         src/OCFileGraph.cpp
         src/GraphHelpers.cpp
         src/ParaMeter.cpp
+        src/DynamicBitset.cpp
 )
 
 add_library(galois_shmem STATIC ${sources})
