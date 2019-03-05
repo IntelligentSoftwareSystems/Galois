@@ -72,6 +72,9 @@ enable_testing()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 
+# generate compile_commands.json
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
   set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
@@ -170,7 +173,7 @@ if(ENABLE_DIST_GALOIS)
     add_definitions(-DGALOIS_USE_LWCI)
     set(LWCI_ROOT "${CMAKE_SOURCE_DIR}/liblci")
     set(LWCI_INCLUDE "${LWCI_ROOT}/include")
-    set(LWCI_LIBRARY "${LWCI_ROOT}/liblwci.a")
+    set(LWCI_LIBRARY "${LWCI_ROOT}/liblci.a")
     add_custom_command(
       OUTPUT ${LWCI_LIBRARY}
       COMMAND make -C ${LWCI_ROOT}

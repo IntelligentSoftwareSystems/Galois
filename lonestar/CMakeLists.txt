@@ -15,7 +15,6 @@ target_include_directories(lonestar PUBLIC
 )
 target_link_libraries(lonestar galois_shmem gllvm)
 
-
 add_subdirectory(barneshut)
 add_subdirectory(betweennesscentrality) 
 add_subdirectory(bfs)
@@ -25,6 +24,7 @@ add_subdirectory(delaunayrefinement)
 add_subdirectory(delaunaytriangulation)
 add_subdirectory(gmetis)
 add_subdirectory(independentset)
+add_subdirectory(kcore)
 add_subdirectory(matching)
 add_subdirectory(matrixcompletion)
 add_subdirectory(pagerank)

@@ -210,14 +210,17 @@ public:
     }
   }
 
-#if 0
-    void reset(size_t index) {
+  void reset(size_t index) {
     size_t bit_index = index/bits_uint64;
     uint64_t bit_offset = 1;
     bit_offset <<= (index%bits_uint64);
-    bitvec[bit_index].fetch_and(~bit_offset);
+    if ((bitvec[bit_index] & bit_offset) != 0) { // test and reset
+      size_t old_val = bitvec[bit_index];
+      while (!bitvec[bit_index].compare_exchange_weak(
+          old_val, old_val & ~bit_offset, std::memory_order_relaxed))
+        ;
+    }
   }
-#endif
 
   // assumes bit_vector is not updated (set) in parallel
   void bitwise_or(const DynamicBitSet& other) {
@@ -228,12 +231,81 @@ public:
                    galois::no_stats());
   }
 
+  // assumes bit_vector is not updated (set) in parallel
+
+  /**
+   * Does an IN-PLACE bitwise and of this bitset and another bitset
+   *
+   * @param other Other bitset to do bitwise and with
+   */
+  void bitwise_and(const DynamicBitSet& other) {
+    assert(size() == other.size());
+    auto& other_bitvec = other.get_vec();
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) { bitvec[i] &= other_bitvec[i]; },
+                   galois::no_stats());
+  }
+
+  /**
+   * Does an IN-PLACE bitwise and of 2 passed in bitsets and saves to this
+   * bitset
+   *
+   * @param other1 Bitset to and with other 2
+   * @param other2 Bitset to and with other 1
+   */
+  void bitwise_and(const DynamicBitSet& other1, const DynamicBitSet& other2) {
+    assert(size() == other1.size());
+    assert(size() == other2.size());
+    auto& other_bitvec1 = other1.get_vec();
+    auto& other_bitvec2 = other2.get_vec();
+
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) {
+                     bitvec[i] = other_bitvec1[i] & other_bitvec2[i];
+                   },
+                   galois::no_stats());
+  }
+
+  /**
+   * Does an IN-PLACE bitwise xor of this bitset and another bitset
+   *
+   * @param other Other bitset to do bitwise xor with
+   */
+  void bitwise_xor(const DynamicBitSet& other) {
+    assert(size() == other.size());
+    auto& other_bitvec = other.get_vec();
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) { bitvec[i] ^= other_bitvec[i]; },
+                   galois::no_stats());
+  }
+
+  /**
+   * Does an IN-PLACE bitwise and of 2 passed in bitsets and saves to this
+   * bitset
+   *
+   * @param other1 Bitset to xor with other 2
+   * @param other2 Bitset to xor with other 1
+   */
+  void bitwise_xor(const DynamicBitSet& other1, const DynamicBitSet& other2) {
+    assert(size() == other1.size());
+    assert(size() == other2.size());
+    auto& other_bitvec1 = other1.get_vec();
+    auto& other_bitvec2 = other2.get_vec();
+
+    galois::do_all(galois::iterate(0ul, bitvec.size()),
+                   [&](size_t i) {
+                     bitvec[i] = other_bitvec1[i] ^ other_bitvec2[i];
+                   },
+                   galois::no_stats());
+  }
+
+
   /**
    * Count how many bits are set in the bitset
    *
    * @returns number of set bits in the bitset
    */
-  uint64_t count() {
+  uint64_t count() const {
     galois::GAccumulator<uint64_t> ret;
     galois::do_all(galois::iterate(bitvec.begin(), bitvec.end()),
                    [&](uint64_t n) {
@@ -259,7 +331,8 @@ public:
    *
    * @returns vector with offsets into set bits
    */
-  std::vector<uint32_t> getOffsets() {
+  // TODO uint32_t is somewhat dangerous; change in the future
+  std::vector<uint32_t> getOffsets() const {
     uint32_t activeThreads = galois::getActiveThreads();
     std::vector<unsigned int> tPrefixBitCounts(activeThreads);
 

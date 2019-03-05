@@ -91,6 +91,16 @@ extern cll::opt<uint32_t> nodeAlphaRanges;
 extern cll::opt<unsigned> numFileThreads;
 //! Specifies the size of the buffer used for
 extern cll::opt<unsigned> edgePartitionSendBufSize;
+//! Number of rounds to split master assignment phase in in CuSP
+//! @todo move this to CuSP source and not here
+extern cll::opt<uint32_t> stateRounds;
+//! If true, CuSP will use asynchronous synchronization for master assignment
+//! phase (phase0)
+//! @todo move this to CuSP source and not here
+extern cll::opt<bool> cuspAsync;
+//! If true, CuSP activates a barrier before the edge inspection sends.
+//! @todo move this to CuSP source and not here
+extern cll::opt<bool> inspectionBarrier;
 
 //! Enumeration for specifiying write location for sync calls
 enum WriteLocation {
@@ -167,7 +177,7 @@ protected:
   uint32_t numNodesWithEdges; //!< Number of nodes (masters + mirrors) that have
                               //!< outgoing edges
 
-  //! Information that converts GID to host that has master proxy of that node
+  //! Information that converts host to range of nodes that host reads
   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
   uint64_t last_nodeID_withEdges_bipartite; //!< used only for bipartite graphs
@@ -450,6 +460,20 @@ private:
       ++received;
     }
     increment_evilPhase();
+
+    #ifndef NDEBUG
+    for (unsigned h = 0; h < numHosts; h++) {
+      if (h == 0) {
+        assert(gid2host[h].first == 0);
+      } else if (h == numHosts - 1) {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == g.size());
+      } else {
+        assert(gid2host[h].first == gid2host[h - 1].second);
+        assert(gid2host[h].second == gid2host[h + 1].first);
+      }
+    }
+    #endif
   }
 
   /**
@@ -649,6 +673,12 @@ public:
     num_round      = 0;
     numGlobalEdges = 0;
     currentBVFlag  = nullptr;
+
+    // report edge buffer size
+    if (host == 0) {
+      galois::runtime::reportStat_Single(GRNAME, "EdgePartitionBufferSize",
+                                         (unsigned)edgePartitionSendBufSize);
+    }
 
     initBareMPI();
   }
@@ -1061,21 +1091,18 @@ protected:
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(size()), allNodesRanges.data()));
-    allNodesRanges.clear();
 
     // 1 is master nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(beginMaster),
         boost::counting_iterator<size_t>(beginMaster + numOwned),
         masterRanges.data()));
-    masterRanges.clear();
 
     // 2 is with edge nodes
     specificRanges.push_back(galois::runtime::makeSpecificRange(
         boost::counting_iterator<size_t>(0),
         boost::counting_iterator<size_t>(numNodesWithEdges),
         withEdgeRanges.data()));
-    withEdgeRanges.clear();
 
     assert(specificRanges.size() == 3);
   }
@@ -2852,7 +2879,7 @@ private:
       if ((!async) || (b.size() > 0)) {
         size_t syncTypePhase = 0;
         if (async && (syncType == syncBroadcast)) syncTypePhase = 1;
-        net.sendTagged(x, galois::runtime::evilPhase + syncTypePhase, b);
+        net.sendTagged(x, galois::runtime::evilPhase, b, syncTypePhase);
         ++numMessages;
       }
     }
@@ -3253,9 +3280,9 @@ private:
     if (async) {
       size_t syncTypePhase = 0;
       if (syncType == syncBroadcast) syncTypePhase = 1;
-      decltype(net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr)) p;
+      decltype(net.recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase)) p;
       do {
-        p = net.recieveTagged(galois::runtime::evilPhase + syncTypePhase, nullptr);
+        p = net.recieveTagged(galois::runtime::evilPhase, nullptr, syncTypePhase);
 
         if (p) {
           syncRecvApply<syncType, SyncFnTy, BitsetFnTy>(p->first, p->second,
@@ -4480,6 +4507,7 @@ public:
   void reset_mirrorField() {
     auto mirrorRanges = getMirrorRanges();
     for (auto r : mirrorRanges) {
+      if (r.first == r.second) continue;
       assert(r.first < r.second);
 
       // GPU call

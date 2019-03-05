@@ -400,7 +400,6 @@ void BackPropOp(GNode dst, Graph& graph) {
     for (auto inEdge : graph.edges(dst)) {
       GNode src      = graph.getEdgeDst(inEdge);
       auto& src_data = graph.getData(src);
-
       uint32_t sourceDistance = src_data.sourceData[i].minDistance;
 
       // source nodes of this batch (i.e. distance 0) can be safely
@@ -415,6 +414,7 @@ void BackPropOp(GNode dst, Graph& graph) {
     }
   }
 }
+
 void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
   // All nodes WITH EDGES (another at SendMessage)
   const auto& allNodesWithEdges = graph.allNodesWithEdgesRange();
@@ -574,6 +574,11 @@ int main(int argc, char** argv) {
     sourceFile.close();
   }
 
+  if (startNode && sourceVector.size()) {
+    GALOIS_DIE("Should not use startNode cmd-line option with specified "
+               "sources");
+  }
+
   // "sourceVector" if file not provided
   std::vector<uint64_t> nodesToConsider;
   nodesToConsider.resize(numSourcesPerRound);
@@ -595,7 +600,7 @@ int main(int argc, char** argv) {
     uint64_t totalSourcesFound = 0;
 
     // offset into sources to operate on
-    uint64_t offset = 0;
+    uint64_t offset = startNode;
     // node boundary to end search at
     uint64_t nodeBoundary = sourceVector.size() == 0 ?
                             hg->globalSize() :
@@ -604,6 +609,8 @@ int main(int argc, char** argv) {
     while (offset < nodeBoundary && totalSourcesFound < totalNumSources) {
       if (useSingleSource) {
         nodesToConsider[0] = startNode;
+        totalNumSources = 1;
+        totalSourcesFound = 1;
       } else {
         unsigned sourcesFound = 0;
         while (sourcesFound < numSourcesPerRound &&
@@ -619,16 +626,16 @@ int main(int argc, char** argv) {
         }
 
         if (sourcesFound == 0) {
-          assert(offset == totalNumSources ||
+          assert((offset - startNode) == totalNumSources ||
                  totalSourcesFound == totalNumSources);
           break;
         }
 
-        if (offset < totalNumSources) {
+        if ((offset - startNode) < totalNumSources) {
           assert(numSourcesPerRound == sourcesFound);
         } else {
           // >= totalNumSources
-          assert(offset == totalNumSources);
+          assert((offset - startNode) == totalNumSources);
           galois::gDebug("Out of sources (found ", sourcesFound, ")");
           numSourcesPerRound = sourcesFound;
         }

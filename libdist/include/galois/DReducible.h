@@ -55,7 +55,7 @@ class DGAccumulator {
    */
   inline void reduce_lwci() {
     lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
-                &galois::runtime::internal::ompi_op_sum<Ty>, mv);
+                &galois::runtime::internal::ompi_op_sum<Ty>, lc_col_ep);
   }
 #else
   /**
@@ -210,7 +210,7 @@ class DGReduceMax {
    */
   inline void reduce_lwci() {
     lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
-                &galois::runtime::internal::ompi_op_max<Ty>, mv);
+                &galois::runtime::internal::ompi_op_max<Ty>, lc_col_ep);
   }
 #else
   /**
@@ -345,7 +345,7 @@ class DGReduceMin {
    */
   inline void reduce_lwci() {
     lc_alreduce(&local_mdata, &global_mdata, sizeof(Ty),
-                &galois::runtime::internal::ompi_op_min<Ty>, mv);
+                &galois::runtime::internal::ompi_op_min<Ty>, lc_col_ep);
   }
 #else
   /**

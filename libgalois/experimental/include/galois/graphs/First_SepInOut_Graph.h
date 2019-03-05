@@ -347,8 +347,8 @@ private:
     iterator begin() { return edges.begin(); }
     iterator end() { return edges.end(); }
 
-    iterator in_edges_begin() { return in_edges.begin(); }
-    iterator in_edges_end() { return in_edges.end(); }
+    iterator in_edge_begin() { return in_edges.begin(); }
+    iterator in_edge_end() { return in_edges.end(); }
 
     void erase(iterator ii, bool inEdge = false) {
       auto& edgelist = (inEdge) ? in_edges : edges;
@@ -842,7 +842,7 @@ public:
     assert(dst);
     dst->acquire(mflag);
     typename gNodeTypes::iterator ii = dst->find(src, true),
-                                  ei = dst->in_edges_end();
+                                  ei = dst->in_edge_end();
     is_in_edge edge_predicate;
     if (ii != ei && edge_predicate(*ii)) {
       // After finding edges, lock dst and verify still active
@@ -934,15 +934,15 @@ public:
     N->acquire(mflag);
 
     if (galois::runtime::shouldLock(mflag)) {
-      for (typename gNode::iterator ii = N->in_edges_begin(),
-                                    ee = N->in_edges_end();
+      for (typename gNode::iterator ii = N->in_edge_begin(),
+                                    ee = N->in_edge_end();
            ii != ee; ++ii) {
         if (ii->first()->active && ii->isInEdge())
           ii->first()->acquire(mflag);
       }
     }
-    return boost::make_filter_iterator(is_in_edge(), N->in_edges_begin(),
-                                       N->in_edges_end());
+    return boost::make_filter_iterator(is_in_edge(), N->in_edge_begin(),
+                                       N->in_edge_end());
   }
 
   template <bool _Undirected = !Directional>
@@ -970,8 +970,8 @@ public:
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
     // N->acquire(mflag);
-    return boost::make_filter_iterator(is_in_edge(), N->in_edges_end(),
-                                       N->in_edges_end());
+    return boost::make_filter_iterator(is_in_edge(), N->in_edge_end(),
+                                       N->in_edge_end());
   }
 
   template <bool _Undirected = !Directional>

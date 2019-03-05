@@ -113,6 +113,18 @@ const Ty add(Ty& a, const Ty& b) {
   return old_a;
 }
 
+/**
+ * atomic subtraction of delta (because atomicAdd with negative numbers implies
+ * a signed integer cast)
+ */
+template <typename Ty>
+const Ty atomicSubtract(std::atomic<Ty>& val, Ty delta) {
+  Ty old_val = val;
+  while (!val.compare_exchange_weak(old_val, old_val - delta,
+                                    std::memory_order_relaxed));
+  return old_val;
+}
+
 template <typename Ty>
 const Ty set(Ty& a, const Ty& b) {
   a = b;

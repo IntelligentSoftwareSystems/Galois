@@ -5,7 +5,7 @@ set(sources
         src/DistStats.cpp
         src/NetworkBuffered.cpp
         src/NetworkIOMPI.cpp
-        src/NetworkIOLWCI.cpp
+        src/NetworkLCI.cpp
         src/Network.cpp
         src/Barrier.cpp
         src/SyncStructures.cpp

@@ -202,7 +202,8 @@ struct SSSP {
 
     do {
 
-      if (work_items.reduce() == 0) priority += delta;
+      //if (work_items.reduce() == 0) 
+      priority += delta;
 
       _graph.set_num_round(_num_iterations);
       dga.reset();
