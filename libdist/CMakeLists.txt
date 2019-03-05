@@ -12,7 +12,6 @@ set(sources
         src/GlobalObj.cpp
         src/DistributedGraph.cpp
         src/DistributedGraphLoader.cpp
-        src/DynamicBitset.cpp
 )
 add_library(galois_dist STATIC ${sources})
 add_library(galois_dist_async STATIC ${sources})
