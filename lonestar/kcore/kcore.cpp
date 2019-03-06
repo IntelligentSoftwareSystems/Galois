@@ -198,7 +198,7 @@ int main(int argc, char** argv) {
   totalTimer.start();
 
   // graph reading from disk
-  galois::StatTimer graphReadingTimer("GraphReadingTime", REGION_NAME);
+  galois::StatTimer graphReadingTimer("GraphConstructTime", REGION_NAME);
   graphReadingTimer.start();
   Graph graph;
   galois::graphs::readGraph(graph, inputFilename);
