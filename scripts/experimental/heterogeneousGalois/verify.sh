@@ -79,7 +79,7 @@ INPUT=${inputdirname}/${inputname}.${extension}
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/Galois
 fi
-checker=${ABELIAN_GALOIS_ROOT}/dist_exp/scripts/result_checker.py
+checker=${ABELIAN_GALOIS_ROOT}/scripts/result_checker.py
 #checker=./result_checker.py
 
 hostname=`hostname`
@@ -97,8 +97,9 @@ fi
 pass=0
 fail=0
 failed_cases=""
-#for partition in 1 2 3 4 5 6 7 8 9 10; do
-for partition in 1 2 3 5 6 7 8; do
+#for partition in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+for partition in 11 12 13 14 15 16; do
+#for partition in 11; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
@@ -186,11 +187,11 @@ for partition in 1 2 3 5 6 7 8; do
       elif [ $partition -eq 13 ]; then
         failed_cases+="CuSP hybrid outgoing $1 devices with $3 threads; "
       elif [ $partition -eq 14 ]; then
-        failed_cases+="CuSP Ginger outgiong $1 devices with $3 threads; "
+        failed_cases+="CuSP Ginger outgoing $1 devices with $3 threads; "
       elif [ $partition -eq 15 ]; then
-        failed_cases+="CuSP FENNEL outgiong $1 devices with $3 threads; "
+        failed_cases+="CuSP FENNEL outgoing $1 devices with $3 threads; "
       elif [ $partition -eq 16 ]; then
-        failed_cases+="CuSP Sugar outgiong $1 devices with $3 threads; "
+        failed_cases+="CuSP Sugar outgoing $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1
