@@ -403,7 +403,7 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 
     // sync min distance (also resets shortPathAdd if necessary)
     graph.sync<writeDestination, readAny, ReducePairwiseMinAndResetDist,
-               Broadcast_minDistances, Bitset_minDistances>(
+               Bitset_minDistances>(
         std::string("MinDistSync") + "_" + std::to_string(macroRound));
 
     // updates short path count and the sent flag based on results of this
@@ -414,12 +414,12 @@ uint32_t APSP(Graph& graph, galois::DGAccumulator<uint32_t>& dga) {
 #ifndef _VECTOR_SYNC_
     graph.sync<writeDestination, readAny,
                Reduce_pair_wise_add_array_single_shortestPathToAdd,
-               Broadcast_shortestPathToAdd, Bitset_shortestPathToAdd>(
+               Bitset_shortestPathToAdd>(
         std::string("ShortPathSync") + "_" + std::to_string(macroRound));
 #else
     graph.sync<writeDestination, readAny,
                Reduce_pair_wise_add_array_shortestPathToAdd,
-               Broadcast_shortestPathToAdd, Bitset_shortestPathToAdd>(
+               Bitset_shortestPathToAdd>(
         std::string("ShortPathSync") + "_" + std::to_string(macroRound));
 #endif
 
@@ -558,11 +558,11 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 #ifndef _VECTOR_SYNC_
     graph.sync<writeSource, readAny,
                Reduce_pair_wise_add_array_single_dependencyToAdd,
-               Broadcast_dependencyToAdd, Bitset_dependencyToAdd>(
+               Bitset_dependencyToAdd>(
         std::string("DependencySync") + "_" + std::to_string(macroRound));
 #else
     graph.sync<writeSource, readAny, Reduce_pair_wise_add_array_dependencyToAdd,
-               Broadcast_dependencyToAdd, Bitset_dependencyToAdd>(
+               Bitset_dependencyToAdd>(
         std::string("DependencySync") + "_" + std::to_string(macroRound));
 #endif
 

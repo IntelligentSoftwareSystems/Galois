@@ -392,7 +392,7 @@ struct BackwardPass {
 
       if (moreThanOne) {
         _graph.sync<writeSource, readDestination, Reduce_add_dependency_accum,
-                    Broadcast_dependency_accum, Bitset_dependency_accum>("BackwardPass");
+                    Bitset_dependency_accum>("BackwardPass");
       }
 
       // dependency accumulation after sync

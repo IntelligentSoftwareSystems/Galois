@@ -24,10 +24,8 @@
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MAX(num_shortest_paths, ShortPathType);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, ShortPathType);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(path_accum, ShortPathType);
-GALOIS_SYNC_STRUCTURE_BROADCAST(path_accum, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(path_accum);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -35,7 +33,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(path_accum);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MIN(current_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(current_length, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -43,8 +40,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MAX(dependency, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, float);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(dep_accum, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dep_accum, float);
 GALOIS_SYNC_STRUCTURE_BITSET(dep_accum);

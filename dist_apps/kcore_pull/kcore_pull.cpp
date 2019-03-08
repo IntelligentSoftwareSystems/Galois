@@ -102,7 +102,7 @@ struct DegreeCounting {
                          _graph.get_run_identifier("DegreeCounting").c_str()));
 
     _graph.sync<writeSource, readAny, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "DegreeCounting");
   }
 
@@ -275,10 +275,10 @@ struct KCore {
             galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 
 #ifdef __GALOIS_HET_ASYNC__
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim, true>("KCore");
 #else
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #endif
 

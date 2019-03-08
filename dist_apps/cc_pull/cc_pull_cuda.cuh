@@ -121,8 +121,16 @@ void batch_set_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id
 	batch_set_shared_field<uint32_t, sharedMaster, setOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
+void batch_add_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, addOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
+}
+
 void batch_add_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
 	batch_set_shared_field<uint32_t, sharedMaster, addOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
+}
+
+void batch_min_mirror_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {
+	batch_set_shared_field<uint32_t, sharedMirror, minOp>(ctx, &ctx->comp_current, from_id, v, data_mode);
 }
 
 void batch_min_node_comp_current_cuda(struct CUDA_Context* ctx, unsigned from_id, uint8_t *v, DataCommMode data_mode) {

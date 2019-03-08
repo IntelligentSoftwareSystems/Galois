@@ -25,14 +25,12 @@
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(current_degree, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(current_degree, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(current_degree, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////////
 // trim
 ////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(trim, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(trim, uint32_t);
 
 
 GALOIS_SYNC_STRUCTURE_BITSET(current_degree);

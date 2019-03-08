@@ -259,7 +259,7 @@ struct SSSP {
 
       if (accum_result) {
         _graph.sync<writeSource, readDestination, Reduce_min_current_length,
-                    Broadcast_current_length, Bitset_current_length>("SSSP");
+                    Bitset_current_length>("SSSP");
       } else {
         // write destination, read any, fails if vertex cut + bitset.....
         // sync src and dst
@@ -271,7 +271,7 @@ struct SSSP {
           // TODO reason about if this still applies to pull style version;
           // I know it happened in push style....
           _graph.sync<writeSource, readDestination, Reduce_min_current_length,
-                      Broadcast_current_length, Bitset_current_length>("SSSP");
+                      Bitset_current_length>("SSSP");
           _graph.sync<writeSource, readSource, Reduce_min_current_length,
                       Broadcast_current_length>("SSSP");
         } else {
@@ -337,10 +337,10 @@ struct PredAndSucc {
     }
 
     _graph.sync<writeSource, readAny, Reduce_add_num_predecessors,
-                Broadcast_num_predecessors, Bitset_num_predecessors>(
+                Bitset_num_predecessors>(
         "PredAndSucc");
     _graph.sync<writeDestination, readAny, Reduce_add_num_successors,
-                Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
+                Bitset_num_successors>("PredAndSucc");
   }
 
   void operator()(GNode src) const {
@@ -484,9 +484,9 @@ struct NumShortestPaths {
       }
 
       // read any because destinations need it too
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim>("NumShortestPaths");
-      _graph.sync<writeSource, readAny, Reduce_add_to_add, Broadcast_to_add,
+      _graph.sync<writeSource, readAny, Reduce_add_to_add,
                   Bitset_to_add>("NumShortestPaths");
 
       // do predecessor decrementing using trim + dependency changes with
@@ -668,10 +668,10 @@ struct DependencyPropagation {
             galois::no_stats());
       }
 
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim>("DependencyPropagation");
       _graph.sync<writeDestination, readSource, Reduce_add_to_add_float,
-                  Broadcast_to_add_float, Bitset_to_add_float>(
+                  Bitset_to_add_float>(
           "DependencyPropagation");
 
       // use trim + to add to do appropriate changes

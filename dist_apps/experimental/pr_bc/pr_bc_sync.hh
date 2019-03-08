@@ -185,9 +185,7 @@ struct Broadcast_minDistances {
 
 // Incorrect sync structures
 //#ifndef _VECTOR_SYNC_
-//GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(minDistances, uint32_t);
 //#else
-//GALOIS_SYNC_STRUCTURE_BROADCAST(minDistances, galois::gstl::Vector<uint32_t>);
 //#endif
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -197,11 +195,9 @@ struct Broadcast_minDistances {
 #ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(shortestPathToAdd, 
                                                         uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(shortestPathToAdd, uint64_t);
 #else
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(shortestPathToAdd, 
                                                  galois::gstl::Vector<uint64_t>);
-GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd, 
                                 galois::gstl::Vector<uint64_t>);
 #endif
 
@@ -212,12 +208,10 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(shortestPathToAdd,
 #ifndef _VECTOR_SYNC_
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(dependencyToAdd, 
                                                         galois::CopyableAtomic<float>);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(dependencyToAdd, 
                                               galois::CopyableAtomic<float>);
 #else
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(dependencyToAdd,
   galois::gstl::Vector<galois::CopyableAtomic<float>>);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependencyToAdd, 
                            galois::gstl::Vector<galois::CopyableAtomic<float>>);
 #endif
 

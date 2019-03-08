@@ -180,7 +180,7 @@ struct ConnectedComp {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readDestination, Reduce_min_comp_current,
-                            Broadcast_comp_current, Bitset_comp_current>(
+                            Bitset_comp_current>(
           Flags_comp_current, "ConnectedComp");
 #endif
 
@@ -217,11 +217,11 @@ struct ConnectedComp {
 #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeSource, readAny, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 #endif
 
       //_graph.sync<writeSource, readDestination, Reduce_min_comp_current,

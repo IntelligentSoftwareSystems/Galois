@@ -38,8 +38,6 @@ GALOIS_SYNC_STRUCTURE_REDUCE_SET(latent_vector, VecTy);
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(latent_vector, VecTy);
 
 //Vector
-GALOIS_SYNC_STRUCTURE_BROADCAST(residual_latent_vector, VecAtomicTy);
-GALOIS_SYNC_STRUCTURE_BROADCAST(latent_vector, VecTy);
 
 #if __OPT_VERSION__ == 5
 galois::runtime::FieldFlags Flags_residual_latent_vector;

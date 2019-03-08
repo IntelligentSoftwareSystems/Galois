@@ -141,8 +141,7 @@ struct InitializeGraph {
 
     // due to latent_vector being generated randomly, it should be sync'd
     // to 1 consistent version across all hosts
-    _graph.sync<writeSource, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector>("InitializeGraph");
+    _graph.sync<writeSource, readAny, Reduce_set_latent_vector>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -238,8 +237,7 @@ struct SGD {
 
       // sync all residual latent vectors
       _graph.sync<writeAny, readAny,
-                  Reduce_pair_wise_add_array_residual_latent_vector,
-                  Broadcast_residual_latent_vector>("SGD");
+                  Reduce_pair_wise_add_array_residual_latent_vector>("SGD");
 
       SGD_mergeResidual::go(_graph);
 

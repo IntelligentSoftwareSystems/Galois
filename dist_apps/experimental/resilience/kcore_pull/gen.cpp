@@ -102,7 +102,7 @@ struct DegreeCounting {
                          _graph.get_run_identifier("DegreeCounting").c_str()));
 
     _graph.sync<writeSource, readAny, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "DegreeCounting");
   }
 
@@ -179,7 +179,7 @@ struct recovery {
         galois::loopname(_graph.get_run_identifier("RECOVERY").c_str()));
 
     //_graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-    // Broadcast_dist_current, Bitset_dist_current>("RECOVERY");
+    // Bitset_dist_current>("RECOVERY");
   }
 
   void operator()(GNode src) const { NodeData& snode = graph->getData(src); }
@@ -290,7 +290,7 @@ struct KCore {
             galois::steal(),
             galois::loopname(_graph.get_run_identifier("KCore").c_str()));
 
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 
       // update live/deadness

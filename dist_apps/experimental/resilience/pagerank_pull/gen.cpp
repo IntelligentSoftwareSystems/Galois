@@ -113,7 +113,7 @@ struct InitializeGraph {
         galois::steal(), galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
   }
 
@@ -175,7 +175,7 @@ struct InitializeGraph_crashed {
         galois::loopname(
             _graph.get_run_identifier("InitializeGraph_crashed").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph_crashed");
   }
 
@@ -235,7 +235,7 @@ struct InitializeGraph_healthy {
         galois::loopname(
             _graph.get_run_identifier("InitializeGraph_healthy").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph_healthy");
   }
 
@@ -373,7 +373,7 @@ struct PageRank {
           galois::no_stats(),
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
-      _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readAny, Reduce_add_residual,
                   Bitset_residual>("PageRank");
 
       /**************************CRASH SITE : start
@@ -395,7 +395,7 @@ struct PageRank {
                   _graph.get_run_identifier("RECOVERY_PageRank").c_str()));
 
           //_graph.sync<writeSource, readAny, Reduce_add_residual,
-          //Broadcast_residual, Bitset_residual>("PageRank-afterCrash");
+          //Bitset_residual>("PageRank-afterCrash");
           _graph.sync<writeSource, readAny, Reduce_add_residual,
                       Broadcast_residual>("RECOVERY_PageRank");
           bitset_residual.reset();

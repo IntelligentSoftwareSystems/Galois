@@ -25,7 +25,6 @@
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, ShortPathType);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -33,7 +32,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MIN(current_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(current_length, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -41,5 +39,4 @@ GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(dependency, double);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, double);
 GALOIS_SYNC_STRUCTURE_BITSET(dependency);

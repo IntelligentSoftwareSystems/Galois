@@ -145,10 +145,10 @@ struct SSSP {
 
 #ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current, true>("SSSP");
+                  Bitset_dist_current, true>("SSSP");
 #else
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                  Bitset_dist_current>("SSSP");
 #endif
 
       galois::runtime::reportStat_Tsum(

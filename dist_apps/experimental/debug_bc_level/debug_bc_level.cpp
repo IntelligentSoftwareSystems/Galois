@@ -315,7 +315,7 @@ struct BackwardPass {
       );
 
       _graph.sync<writeSource, readDestination, Reduce_add_dependency,
-                  Broadcast_dependency, Bitset_dependency>("BackwardPass");
+                  Bitset_dependency>("BackwardPass");
     }
   }
 

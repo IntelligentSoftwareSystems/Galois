@@ -204,7 +204,7 @@ struct InitializeGraph {
                          _graph.get_run_identifier("InitializeGraph").c_str()));
     }
 
-    _graph.sync<writeSource, readSource, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeSource, readSource, Reduce_add_nout,
                 Bitset_nout>("InitializeGraphNout");
   }
 
@@ -314,7 +314,7 @@ struct PageRank {
       }
 
       _graph.sync<writeDestination, readSource, Reduce_add_residual,
-                  Broadcast_residual, Bitset_residual>("PageRank");
+                  Bitset_residual>("PageRank");
 
       ++_num_iterations;
     } while ((_num_iterations < maxIterations) && !dist_wl.can_terminate());
