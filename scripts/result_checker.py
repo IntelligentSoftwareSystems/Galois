@@ -1,5 +1,6 @@
 #### Script to check the output of algorithms:
 ### Author: Gurbinder Gill (gurbinder533@gmail.com)
+### Author: Roshan Dathathri (roshan@cs.utexas.edu)
 ### Modified to calculate error + take tolerance as an error by Loc Hoang 
 
 ### python script.py masterFile allfile* [-t, -tolerance]=<tolerance>
@@ -13,10 +14,8 @@
 import sys
 import argparse
 
-def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
-  global_error = 0
-  global_error_squared = 0
-  num_nodes = 0
+def check_results(masterFile, otherFiles, tolerance, 
+  offset, errors, mrows, global_error_squared, num_nodes):
 
   with open(masterFile) as mfile, open(otherFiles) as ofile:
     mfile.seek(offset)
@@ -48,7 +47,7 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
         # absolute value of difference in fields
         field_difference = abs(float(split_line1[1]) - float(split_line2[1]))
 
-        global_error_squared += (field_difference * field_difference)
+        global_error_squared += (field_difference ** 2)
         num_nodes += 1
 
         if (field_difference > tolerance):
@@ -67,23 +66,27 @@ def check_results(masterFile, otherFiles, offset, errors, mrows, tolerance):
             errors = errors + 1;
       else:
         print "OFFSET MISMATCH: ", split_line1[0], split_line2[0]
-        return (-1, errors, mrows);
+        return (-1, errors, mrows, global_error_squared, num_nodes);
 
-  print("Mean error squared (for first field) is %f\n" % (global_error_squared / num_nodes))
-  return (offset, errors, mrows);
+  return (offset, errors, mrows, global_error_squared, num_nodes);
 
 def main(masterFile, allFiles_arr, tolerance):
-  offset = 0;
-  errors = 0;
-  mrows = 0;
+  offset = 0
+  errors = 0
+  mrows = 0
+  global_error_squared = 0
+  num_nodes = 0
 
   for i in range(0 , len(allFiles_arr)):
     print allFiles_arr[i]
     print offset
-    offset, errors, mrows = check_results(masterFile, allFiles_arr[i], offset, 
-                                          errors, mrows, tolerance)
+    offset, errors, mrows, global_error_squared, num_nodes = check_results(masterFile, allFiles_arr[i], tolerance, offset, errors, mrows, global_error_squared, num_nodes)
     if (offset == -1):
-      break;
+      break
+
+  rmse = (global_error_squared / num_nodes) ** 0.5
+  if (rmse > tolerance):
+    print "\nRoot mean square error (for first field): ", rmse
 
   if (offset != -1):
     mfile = open(masterFile)
@@ -92,21 +95,19 @@ def main(masterFile, allFiles_arr, tolerance):
     for line in mfile:
       mrows = mrows + 1
     if mrows > old_mrows:
-      print "INCOMPLETE OUTPUT FILE"
-  print "No of offsets/rows missing", mrows;
-
-  if (errors > 0):
-    print "No of mismatches", errors;
-    print "\nFAILED\n";
+      mrows = mrows - old_mrows
+      print "\nNo of offsets/rows missing: ", mrows
 
   if (offset == -1):
-    print "\nOFFSET NOT CORRECT\n";
+    print "\nOffset not correct"
 
-  if (errors > 0) or (offset == -1):
-    print allFiles_arr[i];
-    return -1;
+  if (errors > 0):
+    print "\nNo. of mismatches: ", errors
 
-  return 0;
+  if (errors > 0) or (offset == -1) or (mrows > 0) or (rmse > tolerance):
+    print "\nFAILED\n"
+  else:
+    print "\nSUCCESS\n"
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description="Check graph output results")
@@ -132,9 +133,6 @@ if __name__ == "__main__":
   # apparently if you pass in a tolerance argument it returns it as a list...
   # the default is just a float
   if isinstance(tolerance, list):
-    ret = main(masterFile, allFiles_arr, tolerance[0])
+    main(masterFile, allFiles_arr, tolerance[0])
   else:
-    ret = main(masterFile, allFiles_arr, tolerance)
-
-  if(ret == 0):
-    print "\nSUCCESS\n";
+    main(masterFile, allFiles_arr, tolerance)
