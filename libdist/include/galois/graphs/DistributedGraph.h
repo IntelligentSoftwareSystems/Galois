@@ -1441,18 +1441,15 @@ private:
    * @returns data (specified by FnTy) of node with local id lid
    */
   /* Reduction extract resets the value afterwards */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType>
   inline typename FnTy::ValTy extract_wrapper(size_t lid) {
-#ifdef __GALOIS_HET_OPENCL__
-    CLNodeDataWrapper d = clGraph.getDataW(lid);
-    auto val            = FnTy::extract(lid, getData(lid, d));
-    FnTy::reset(lid, d);
-#else
-    auto val = FnTy::extract(lid, getData(lid));
-    FnTy::reset(lid, getData(lid));
-#endif
-    return val;
+    if (syncType == syncReduce) {
+      auto val = FnTy::extract(lid, getData(lid));
+      FnTy::reset(lid, getData(lid));
+      return val;
+    } else {
+      return FnTy::extract(lid, getData(lid));
+    }
   }
 
   /**
@@ -1470,55 +1467,15 @@ private:
    * @returns data (specified by FnTy) of node with local id lid
    */
   /* Reduction extract resets the value afterwards */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType>
   inline typename FnTy::ValTy extract_wrapper(size_t lid, unsigned vecIndex) {
-    auto val = FnTy::extract(lid, getData(lid), vecIndex);
-    FnTy::reset(lid, getData(lid), vecIndex);
-    return val;
-  }
-
-  /**
-   * Extracts data at provided lid.
-   *
-   * This version (broadcast) does not reset the value after extract.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam syncType either reduce or broadcast; determines if reset is
-   * necessary
-   *
-   * @param lid local id of node to get data from
-   * @returns data (specified by FnTy) of node with local id lid
-   */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline typename FnTy::ValTy extract_wrapper(size_t lid) {
-#ifdef __GALOIS_HET_OPENCL__
-    CLNodeDataWrapper d = clGraph.getDataW(lid);
-    return FnTy::extract(lid, getData(lid, d));
-#else
-    return FnTy::extract(lid, getData(lid));
-#endif
-  }
-
-  /**
-   * Extracts data at provided lid; uses vecIndex to get the correct element
-   * from the vector in the node.
-   *
-   * This version (broadcast) does not reset the value after extract.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam syncType either reduce or broadcast; determines if reset is
-   * necessary
-   *
-   * @param lid local id of node to get data from
-   * @param vecIndex index to grab from vector in node
-   * @returns data (specified by FnTy) of node with local id lid
-   */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline typename FnTy::ValTy extract_wrapper(size_t lid, unsigned vecIndex) {
-    return FnTy::extract(lid, getData(lid), vecIndex);
+    if (syncType == syncReduce) {
+      auto val = FnTy::extract(lid, getData(lid), vecIndex);
+      FnTy::reset(lid, getData(lid), vecIndex);
+      return val;
+    } else {
+      return FnTy::extract(lid, getData(lid), vecIndex);
+    }
   }
 
   /**
@@ -1737,29 +1694,14 @@ private:
    *
    * @returns true if called on GPU device
    */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType>
   inline bool extract_batch_wrapper(unsigned x,
                                     galois::runtime::SendBuffer& b) {
-    return FnTy::extract_reset_batch(x, b.getVec().data());
-  }
-
-  /**
-   * GPU wrap function: extracts data from nodes. (Broadcast only)
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam SyncType Must be broadcast
-   *
-   * @param x node id to extract from
-   * @param v vector to extract data to
-   *
-   * @returns true if called on GPU device
-   */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool extract_batch_wrapper(unsigned x,
-                                    galois::runtime::SendBuffer& b) {
-    return FnTy::extract_batch(x, b.getVec().data());
+    if (syncType == syncReduce) {
+      return FnTy::extract_reset_batch(x, b.getVec().data());
+    } else {
+      return FnTy::extract_batch(x, b.getVec().data());
+    }
   }
 
   /**
@@ -1780,39 +1722,17 @@ private:
    *
    * @returns true if called on GPU device
    */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType>
   inline bool extract_batch_wrapper(unsigned x,
                                     galois::runtime::SendBuffer& b,
                                     size_t& s, DataCommMode& data_mode) {
-    return FnTy::extract_reset_batch(x,
-                                     b.getVec().data(), &s, &data_mode);
-  }
-
-  /**
-   * GPU wrap function: extracts data from nodes (Broadcast only)
-   *
-   * This version specifies more arguments.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam SyncType Must be broadcast
-   *
-   * @param x node id to extract from
-   * @param b
-   * @param o
-   * @param v
-   * @param s
-   * @param data_mode
-   *
-   * @returns true if called on GPU device
-   */
-  template <typename FnTy, SyncType syncType,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool extract_batch_wrapper(unsigned x,
-                                    galois::runtime::SendBuffer& b,
-                                    size_t& s, DataCommMode& data_mode) const {
-    return FnTy::extract_batch(x,
-                               b.getVec().data(), &s, &data_mode);
+    if (syncType == syncReduce) {
+      return FnTy::extract_reset_batch(x,
+                                b.getVec().data(), &s, &data_mode);
+    } else {
+      return FnTy::extract_batch(x,
+                                b.getVec().data(), &s, &data_mode);
+    }
   }
 
   /**
@@ -1827,19 +1747,18 @@ private:
    * @param bit_set_compute bitset indicating which nodes have changed; updated
    * if reduction causes a change
    */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType, bool async>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
                           galois::DynamicBitSet& bit_set_compute) {
-#ifdef __GALOIS_HET_OPENCL__
-    CLNodeDataWrapper d = clGraph.getDataW(lid);
-    FnTy::reduce(lid, d, val);
-#else
-    if (FnTy::reduce(lid, getData(lid), val)) {
-      if (bit_set_compute.size() != 0)
-        bit_set_compute.set(lid);
+    if (syncType == syncReduce) {
+      if (FnTy::reduce(lid, getData(lid), val)) {
+        if (bit_set_compute.size() != 0)
+          bit_set_compute.set(lid);
+      }
+    } else {
+      if (async) FnTy::reduce(lid, getData(lid), val);
+      else FnTy::setVal(lid, getData(lid), val);
     }
-#endif
   }
 
   /**
@@ -1858,60 +1777,19 @@ private:
    * if reduction causes a change
    * @param vecIndex which element of the vector to reduce in the node
    */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType, bool async>
   inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
                           galois::DynamicBitSet& bit_set_compute,
                           unsigned vecIndex) {
-    if (FnTy::reduce(lid, getData(lid), val, vecIndex)) {
-      if (bit_set_compute.size() != 0)
-        bit_set_compute.set(lid);
+    if (syncType == syncReduce) {
+      if (FnTy::reduce(lid, getData(lid), val, vecIndex)) {
+        if (bit_set_compute.size() != 0)
+          bit_set_compute.set(lid);
+      }
+    } else {
+      if (async) FnTy::reduce(lid, getData(lid), val, vecIndex);
+      else FnTy::setVal(lid, getData(lid), val, vecIndex);
     }
-  }
-
-  /**
-   * Broadcast variant. Takes a value and sets it according to the sync
-   * structure provided to the function.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam syncType Reduce sync or broadcast sync
-   *
-   * @param lid local id of node to reduce to
-   * @param val value to reduce to
-   */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet&) {
-#ifdef __GALOIS_HET_OPENCL__
-    CLNodeDataWrapper d = clGraph.getDataW(lid);
-    FnTy::setVal(lid, d, val_vec[n]);
-#else
-    if (async) FnTy::reduce(lid, getData(lid), val);
-    else FnTy::setVal(lid, getData(lid), val);
-#endif
-  }
-
-  /**
-   * VECTOR VARIANT.
-   *
-   * Broadcast variant. Takes a value and sets it according to the sync
-   * structure provided to the function. Only sets the element at the specified
-   * index of the vector in the node.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam syncType Reduce sync or broadcast sync
-   *
-   * @param lid local id of node to reduce to
-   * @param val value to reduce to
-   * @param vecIndex which element of the vector to set in the node
-   */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline void set_wrapper(size_t lid, typename FnTy::ValTy val,
-                          galois::DynamicBitSet&, unsigned vecIndex) {
-    if (async) FnTy::reduce(lid, getData(lid), val, vecIndex);
-    else FnTy::setVal(lid, getData(lid), val, vecIndex);
   }
 
   /**
@@ -2071,30 +1949,16 @@ private:
    *
    * @returns true if called on GPU device
    */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType, bool async>
   inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b) {
-    return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset());
-  }
-
-  /**
-   * GPU wrapper function to set multiple nodes at once.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam SyncType Must be broadcast
-   *
-   * @param x node id to set
-   * @param v
-   *
-   * @returns true if called on GPU device
-   */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b) {
-    if (async) {
-      return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset());
+    if (syncType == syncReduce) {
+      return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset());
     } else {
-      return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset());
+      if (async) {
+        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset());
+      } else {
+        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset());
+      }
     }
   }
 
@@ -2114,40 +1978,19 @@ private:
    *
    * @returns true if called on GPU device
    */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncReduce>::type* = nullptr>
+  template <typename FnTy, SyncType syncType, bool async>
   inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b,
                                 DataCommMode& data_mode) {
-    return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset(), data_mode);
-  }
-
-  /**
-   * GPU wrapper function to set multiple nodes at once. More detailed
-   * arguments.
-   *
-   * @tparam FnTy structure that specifies how synchronization is to be done
-   * @tparam SyncType Must be broadcast
-   *
-   * @param x node id to set
-   * @param b
-   * @param o
-   * @param v
-   * @param s
-   * @param data_mode
-   *
-   * @returns true if called on GPU device
-   */
-  template <typename FnTy, SyncType syncType, bool async,
-            typename std::enable_if<syncType == syncBroadcast>::type* = nullptr>
-  inline bool set_batch_wrapper(unsigned x, galois::runtime::RecvBuffer& b,
-                                DataCommMode& data_mode) {
-    if (async) {
-      return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+    if (syncType == syncReduce) {
+      return FnTy::reduce_batch(x, b.getVec().data() + b.getOffset(), data_mode);
     } else {
-      return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+      if (async) {
+        return FnTy::reduce_mirror_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+      } else {
+        return FnTy::setVal_batch(x, b.getVec().data() + b.getOffset(), data_mode);
+      }
     }
   }
-
   /**
    * Converts LIDs of nodes we are interested in into GIDs.
    *
