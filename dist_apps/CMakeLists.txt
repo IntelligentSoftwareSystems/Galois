@@ -79,6 +79,7 @@ distAppNoGPU(weighted_bc)
 
 distApp(bfs_pull)
 distApp(bfs_push)
+distApp(bfs_push_lb)
 
 distApp(cc_pull)
 distApp(cc_push)
