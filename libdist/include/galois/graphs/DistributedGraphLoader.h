@@ -60,9 +60,14 @@ enum PARTITIONING_SCHEME {
   OVER_DECOMPOSE_4_VCUT, //!< overdecompose cvc by 4
   CEC,                    //!< custom edge cut
   GCVC,                    //!< generic cvc
+  GHOVC,                    //!< generic hovc
   GHIVC,                    //!< generic hivc
   GOEC,                    //!< generic oec
-  GING                    //!< Ginger
+  GINGER_O,                    //!< Ginger, outgoing
+  GINGER_I,                    //!< Ginger, incoming
+  FENNEL_O,                   //!< Fennel, oec
+  FENNEL_I,                    //!< Fennel, iec
+  SUGAR_O                    //!< Sugar, oec
 };
 
 /**
@@ -101,12 +106,22 @@ inline const char* EnumToString(PARTITIONING_SCHEME e) {
     return "cec";
   case GCVC:
     return "gcvc";
+  case GHOVC:
+    return "ghovc";
   case GHIVC:
     return "ghivc";
   case GOEC:
     return "goec";
-  case GING:
-    return "ginger";
+  case GINGER_O:
+    return "ginger-oec";
+  case GINGER_I:
+    return "ginger-iec";
+  case FENNEL_O:
+    return "fennel-oec";
+  case FENNEL_I:
+    return "fennel-iec";
+  case SUGAR_O:
+    return "sugar-oec";
   default:
     GALOIS_DIE("Unsupported partition");
   }
@@ -283,7 +298,9 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -328,14 +345,23 @@ constructSymmetricGraph(std::vector<unsigned>& scaleFactor) {
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false,
                           readFromFile, localGraphFileName);
+  case GHOVC:
   case GHIVC:
     return new GenericHVC(inputFile, net.ID, net.Num, false);
 
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GING:
-    return new Ging(inputFile, net.ID, net.Num, false);
+  case GINGER_O:
+  case GINGER_I:
+    return new Ginger(inputFile, net.ID, net.Num, false);
+
+  case FENNEL_O:
+  case FENNEL_I:
+    return new Fennel(inputFile, net.ID, net.Num, false);
+
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, false);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -380,7 +406,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVC>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -428,9 +456,16 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
                                   scaleFactor, false, readFromFile,
                                   localGraphFileName);
   case CART_VCUT_IEC:
-    return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
-                                  scaleFactor, true, readFromFile,
-                                  localGraphFileName);
+    if (inputFileTranspose.size()) {
+      return new Graph_cartesianCut(inputFileTranspose, partFolder, net.ID, net.Num,
+                                    scaleFactor, true, readFromFile,
+                                    localGraphFileName);
+    } else {
+      GALOIS_DIE("Error: attempting cvc incoming cut without "
+                 "transpose graph");
+      break;
+    }
+
   case CART_VCUT_OLD:
     return new Graph_cartesianCutOld(inputFile, partFolder, net.ID, net.Num,
                                      scaleFactor, false, readFromFile,
@@ -453,6 +488,10 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GCVC:
     return new GenericCVC(inputFile, net.ID, net.Num, false, readFromFile,
                           localGraphFileName);
+
+  case GHOVC:
+    return new GenericHVC(inputFile, net.ID, net.Num, false);
+
   case GHIVC:
     if (inputFileTranspose.size()) {
       return new GenericHVC(inputFileTranspose, net.ID, net.Num, true);
@@ -465,14 +504,30 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, false);
 
-  case GING:
+  case GINGER_O:
+    return new Ginger(inputFile, net.ID, net.Num, false);
+
+  case GINGER_I:
     if (inputFileTranspose.size()) {
-      return new Ging(inputFileTranspose, net.ID, net.Num, true);
+      return new Ginger(inputFileTranspose, net.ID, net.Num, true);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
     }
 
+  case FENNEL_O:
+    return new Fennel(inputFile, net.ID, net.Num, false);
+
+  case FENNEL_I:
+    if (inputFileTranspose.size()) {
+      return new Fennel(inputFileTranspose, net.ID, net.Num, true);
+    } else {
+      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      break;
+    }
+
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, false);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");
@@ -521,7 +576,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   using GenericCVC = DistGraphGeneric<NodeData, EdgeData, GenericCVCColumnFlip>;
   using GenericHVC = DistGraphGeneric<NodeData, EdgeData, GenericHVC>;
   using GenericEC = DistGraphGeneric<NodeData, EdgeData, NoCommunication>;
-  using Ging = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Ginger = NewDistGraphGeneric<NodeData, EdgeData, GingerP>;
+  using Fennel = NewDistGraphGeneric<NodeData, EdgeData, FennelP>;
+  using Sugar = NewDistGraphGeneric<NodeData, EdgeData, SugarColumnFlipP>;
 
   auto& net = galois::runtime::getSystemNetworkInterface();
 
@@ -648,6 +705,9 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
     return new GenericCVC(inputFile, net.ID, net.Num, true, readFromFile,
                           localGraphFileName);
 
+  case GHOVC:
+    return new GenericHVC(inputFile, net.ID, net.Num, true);
+
   case GHIVC:
     if (inputFileTranspose.size()) {
       return new GenericHVC(inputFileTranspose, net.ID, net.Num, false);
@@ -660,15 +720,30 @@ constructGraph(std::vector<unsigned>& scaleFactor) {
   case GOEC:
     return new GenericEC(inputFile, net.ID, net.Num, true);
 
-  case GING:
+  case GINGER_O:
+    return new Ginger(inputFile, net.ID, net.Num, true);
+
+  case GINGER_I:
     if (inputFileTranspose.size()) {
-      return new Ging(inputFileTranspose, net.ID, net.Num, false);
+      return new Ginger(inputFileTranspose, net.ID, net.Num, false);
     } else {
       GALOIS_DIE("Error: attempting Ginger without transpose graph");
       break;
     }
 
+  case FENNEL_O:
+    return new Fennel(inputFile, net.ID, net.Num, true);
 
+  case FENNEL_I:
+    if (inputFileTranspose.size()) {
+      return new Fennel(inputFileTranspose, net.ID, net.Num, false);
+    } else {
+      GALOIS_DIE("Error: attempting Fennel incoming without transpose graph");
+      break;
+    }
+
+  case SUGAR_O:
+    return new Sugar(inputFile, net.ID, net.Num, true);
 
   default:
     GALOIS_DIE("Error: partition scheme specified is invalid");

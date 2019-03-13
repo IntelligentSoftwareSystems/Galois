@@ -169,7 +169,7 @@ struct FirstItr_ConnectedComp {
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_comp_current,
-                Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                Bitset_comp_current>("ConnectedComp");
 
     galois::runtime::reportStat_Tsum(
         REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
@@ -236,7 +236,7 @@ struct ConnectedComp {
       }
 
       _graph.sync<writeDestination, readSource, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 
       /**************************CRASH SITE : start
        * *****************************************/

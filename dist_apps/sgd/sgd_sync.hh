@@ -44,11 +44,3 @@ GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY(residual_latent_vector, VecAtom
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(latent_vector, VecTy);
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_AVG_ARRAY(latent_vector, VecTy);
 
-//Old arrays
-//GALOIS_SYNC_STRUCTURE_BROADCAST(residual_latent_vector, ArrAtomicTy);
-//GALOIS_SYNC_STRUCTURE_BROADCAST(latent_vector, ArrTy);
-
-//Vector
-GALOIS_SYNC_STRUCTURE_BROADCAST(residual_latent_vector, VecAtomicTy);
-GALOIS_SYNC_STRUCTURE_BROADCAST(latent_vector, VecTy);
-

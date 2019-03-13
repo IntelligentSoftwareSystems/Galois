@@ -158,6 +158,14 @@ public:
     endCurKey = distanceTree.rend();
 
     if (curKey != endCurKey) {
+      // find non-empty distance if first one happens to be empty
+      if (curKey->second.none()) {
+        for (++curKey; curKey != endCurKey && curKey->second.none(); ++curKey);
+      }
+    }
+
+    // setup if not empty
+    if (curKey != endCurKey) {
       BitSet& curSet = curKey->second;
       #ifdef FLIP_MODE
         curSet.flip();

@@ -240,7 +240,7 @@ struct InitializeGraph_crashed {
                      galois::loopname("InitializeGraph_crashed"));
 
     _graph.sync<writeAny, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector, Bitset_latent_vector>(
+                Bitset_latent_vector>(
         "InitializeGraph_crashed");
   }
 
@@ -285,7 +285,7 @@ struct InitializeGraph_healthy {
                      galois::loopname("InitializeGraph_healthy"));
 
     _graph.sync<writeAny, readAny, Reduce_set_latent_vector,
-                Broadcast_latent_vector, Bitset_latent_vector>(
+                Bitset_latent_vector>(
         "InitializeGraph_healthy");
   }
 

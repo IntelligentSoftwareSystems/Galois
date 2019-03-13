@@ -102,7 +102,7 @@ struct InitializeGraph2 {
 
 #if __OPT_VERSION__ <= 4
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "InitializeGraph2");
 #endif
 
@@ -111,7 +111,7 @@ struct InitializeGraph2 {
 #if __OPT_VERSION__ == 5
     Flags_current_degree.set_write_dst();
     _graph.sync_on_demand<readSource, Reduce_add_current_degree,
-                          Broadcast_current_degree, Bitset_current_degree>(
+                          Bitset_current_degree>(
         Flags_current_degree, "InitializeGraph2");
 #endif
   }
@@ -184,7 +184,7 @@ struct KCoreStep2 {
 #endif
 
 #if __OPT_VERSION__ == 5
-    _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim,
+    _graph.sync_on_demand<readSource, Reduce_add_trim,
                           Bitset_trim>(Flags_trim, "KCore");
 #endif
 
@@ -266,10 +266,10 @@ struct KCoreStep1 {
 #if __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim>("KCore");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeAny, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #elif __OPT_VERSION__ == 4
-      _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #endif
 
@@ -279,7 +279,7 @@ struct KCoreStep1 {
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
       //_graph.sync<writeDestination, readSource, Reduce_add_trim,
-      //Broadcast_trim, Bitset_trim>("KCore");
+      //Bitset_trim>("KCore");
 
       // handle trimming (locally)
       KCoreStep2::go(_graph);

@@ -146,10 +146,10 @@ struct BFS {
       }
 #ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current, true>("BFS");
+                  Bitset_dist_current, true>("BFS");
 #else
       _graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 #endif
 
       galois::runtime::reportStat_Tsum(

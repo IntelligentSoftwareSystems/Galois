@@ -472,7 +472,7 @@ void BackProp(Graph& graph, const uint32_t lastRoundNumber) {
 
     graph.sync<writeDestination, readSource,
                Reduce_pair_wise_add_array_single_depAccumulator,
-               Broadcast_depAccumulator, BitsetDep>(
+               BitsetDep>(
       std::string("DependencySync") + "_" + std::to_string(macroRound)
     );
 

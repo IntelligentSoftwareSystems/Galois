@@ -146,7 +146,7 @@ struct InitializeGraph {
                      galois::loopname(
                          _graph.get_run_identifier("InitializeGraph").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
   }
 
@@ -249,7 +249,6 @@ struct PageRank {
     float priority = delta;
     if (maxRatio > 1) maxRatio = 1;
     galois::GAccumulator<uint32_t> work_items;
-    auto& net = galois::runtime::getSystemNetworkInterface();
     uint32_t prev_work_items = 0;
 
     do {
@@ -278,10 +277,10 @@ struct PageRank {
             galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
 #ifdef __GALOIS_HET_ASYNC__
-      _graph.sync<writeSource, readDestination, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readDestination, Reduce_add_residual,
                   Bitset_residual, true>("PageRank");
 #else
-      _graph.sync<writeSource, readDestination, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readDestination, Reduce_add_residual,
                   Bitset_residual>("PageRank");
 #endif
 

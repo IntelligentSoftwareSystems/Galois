@@ -193,7 +193,7 @@ struct FirstItr_SSSP {
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                Bitset_dist_current>("SSSP");
 
     galois::runtime::reportStat_Tsum(
         "SSSP", "NumWorkItems_" + (_graph.get_run_identifier()),
@@ -260,7 +260,7 @@ struct SSSP {
       }
 
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                  Bitset_dist_current>("SSSP");
 
       /**************************CRASH SITE : start
        * *****************************************/

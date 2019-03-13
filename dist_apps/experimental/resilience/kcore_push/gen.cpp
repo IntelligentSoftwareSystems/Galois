@@ -102,7 +102,7 @@ struct InitializeGraph2 {
               _graph.get_run_identifier("InitializeGraph2").c_str()));
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "InitializeGraph2");
   }
 
@@ -185,7 +185,7 @@ struct InitializeGraph2_recovery {
               _graph.get_run_identifier("InitializeGraph2_recovery").c_str()));
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "InitializeGraph2_recovery");
   }
 
@@ -299,7 +299,7 @@ struct recovery {
 
     // Sync degree
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "RECOVERY_CURRENT_DEGREE");
   }
 
@@ -478,7 +478,7 @@ struct KCoreStep1 {
       // source=destination; not a readAny because any will grab non
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim>("KCore");
 
       // handle trimming (locally)

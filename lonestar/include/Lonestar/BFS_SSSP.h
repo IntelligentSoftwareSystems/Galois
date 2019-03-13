@@ -246,7 +246,7 @@ struct BFS_SSSP {
                 << " unvisited nodes; this is an error if the graph is "
                    "strongly connected\n";
 
-    std::atomic<bool> not_c;
+    std::atomic<bool> not_c(false);
     galois::do_all(galois::iterate(graph), not_consistent(graph, not_c));
 
     if (not_c) {

@@ -140,12 +140,12 @@ struct InitializeGraph {
     // Synced here to avoid syncing again and again, since nout never changes
     // Compiler adds below
     _graph
-        .sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout, Bitset_nout>(
+        .sync_on_demand<readAny, Reduce_add_nout, Bitset_nout>(
             Flags_nout, "InitializeGraph");
 #endif
 
 #if __OPT_VERSION__ <= 4
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
 #endif
   }
@@ -179,9 +179,9 @@ struct PageRank_delta {
 
 #if __OPT_VERSION__ == 5
     // moved to init although compiler adds here
-    //_graph.sync_on_demand<readAny, Reduce_add_nout, Broadcast_nout,
+    //_graph.sync_on_demand<readAny, Reduce_add_nout,
     //                      Bitset_nout>(Flags_nout, "PRdelta");
-    _graph.sync_on_demand<readAny, Reduce_add_residual, Broadcast_residual,
+    _graph.sync_on_demand<readAny, Reduce_add_residual,
                           Bitset_residual>(Flags_residual, "PageRank");
 #endif
 
@@ -264,10 +264,10 @@ struct PageRank {
       _graph.sync<writeAny, readAny, Reduce_add_residual, Broadcast_residual>(
           "PageRank");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
                   Bitset_residual>("PageRank");
 #elif __OPT_VERSION__ == 4
-      _graph.sync<writeSource, readAny, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeSource, readAny, Reduce_add_residual,
                   Bitset_residual>("PageRank");
 #endif
 

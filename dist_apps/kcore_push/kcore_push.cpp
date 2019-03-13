@@ -102,7 +102,7 @@ struct InitializeGraph2 {
               _graph.get_run_identifier("InitializeGraph2").c_str()));
 
     _graph.sync<writeDestination, readSource, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "InitializeGraph2");
   }
 
@@ -246,10 +246,10 @@ struct KCoreStep1 {
       // source/dest nodes (which have degree 0, so they won't have a trim
       // anyways)
 #ifdef __GALOIS_HET_ASYNC__
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim, true>("KCore");
 #else
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #endif
 

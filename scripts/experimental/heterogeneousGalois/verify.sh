@@ -8,12 +8,12 @@ execdirname="."
 execname=$1
 EXEC=${execdirname}/${execname}
 
-inputdirname=/net/ohm/export/cdgc/dist-inputs
+inputdirname=/net/ohm/export/iss/dist-inputs
 #inputdirname=/workspace/dist-inputs
 inputname=$2
 extension=gr
 
-outputdirname=/net/ohm/export/cdgc/dist-outputs
+outputdirname=/net/ohm/export/iss/dist-outputs
 #outputdirname=/workspace/dist-outputs
 
 IFS='_' read -ra EXECP <<< "$execname"
@@ -32,20 +32,16 @@ if [[ ($execname == *"bc"*) ]]; then
 fi
 
 # for bc, if using rmat15, then use all sources output (without ss)
-# TODO currently even rmat15 uses single source, hence rmat16 which doesn't 
-# exist
-if [[ ($execname == *"bc"*) && ($inputname == "rmat16") ]]; then
-  OUTPUT=${outputdirname}/rmat15.bc
+if [[ ($execname == *"bc"*) && ($inputname == "rmat15") ]]; then
+  OUTPUT=${outputdirname}/rmat15.bcbfsall
 fi
 
 MPI=mpiexec
 LOG=.verify_log
 
 FLAGS=
-#FLAGS+=" -doAllKind=DOALL_COUPLED_RANGE"
 # kcore flag
 if [[ $execname == *"kcore"* ]]; then
-  # TODO: update this for non-100 kcore numbers
   FLAGS+=" -kcore=100"
 fi
 if [[ ($execname == *"bfs"*) || ($execname == *"sssp"*) ]]; then
@@ -56,10 +52,14 @@ fi
 
 # bc: if rmat15 is not used, specify single source flags else do
 # all sources for rmat15
-# TODO currently uses rmat16 (doesn't exist) so everything does single source
-if [[ ($execname == *"bc"*) && ! ($inputname == "rmat16") ]]; then
+if [[ ($execname == *"bc"*) && ! ($inputname == "rmat15") ]]; then
   FLAGS+=" -singleSource"
   FLAGS+=" -startNode=`cat ${inputdirname}/${inputname}.source`"
+fi
+
+# batch multiple sources if using mrbc
+if [[ ($execname == *"bc_mr"*) ]]; then
+  FLAGS+=" -numRoundSources=4096"
 fi
 
 source_file=${inputdirname}/source
@@ -79,7 +79,7 @@ INPUT=${inputdirname}/${inputname}.${extension}
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/Galois
 fi
-checker=${ABELIAN_GALOIS_ROOT}/dist_exp/scripts/result_checker.py
+checker=${ABELIAN_GALOIS_ROOT}/scripts/result_checker.py
 #checker=./result_checker.py
 
 hostname=`hostname`
@@ -97,8 +97,9 @@ fi
 pass=0
 fail=0
 failed_cases=""
-#for partition in 1 2 3 4 5 6 7 8 9 10; do
-for partition in 1 2 3 5 6 7 8; do
+#for partition in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
+for partition in 11 12 13 14 15 16; do
+#for partition in 11; do
   CUTTYPE=
 
   if [ $partition -eq 1 ]; then
@@ -121,6 +122,18 @@ for partition in 1 2 3 5 6 7 8; do
     CUTTYPE+=" -partition=od2vc"
   elif [ $partition -eq 10 ]; then
     CUTTYPE+=" -partition=od4vc"
+  elif [ $partition -eq 11 ]; then
+    CUTTYPE+=" -partition=gcvc"
+  elif [ $partition -eq 12 ]; then
+    CUTTYPE+=" -partition=goec"
+  elif [ $partition -eq 13 ]; then
+    CUTTYPE+=" -partition=ghovc"
+  elif [ $partition -eq 14 ]; then
+    CUTTYPE+=" -partition=ginger-o -stateRounds=100"
+  elif [ $partition -eq 15 ]; then
+    CUTTYPE+=" -partition=fennel-o -stateRounds=100"
+  elif [ $partition -eq 16 ]; then
+    CUTTYPE+=" -partition=sugar-o -stateRounds=100"
   fi
 
   for task in $SET; do
@@ -142,7 +155,7 @@ for partition in 1 2 3 5 6 7 8; do
     eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -t=$3 ${PFLAGS} ${CUTTYPE} -verify" >>$LOG 2>&1
 
     eval "sort -nu output_${hostname}_*.log -o output_${hostname}_0.log"
-    eval "python $checker -t=1 $OUTPUT output_${hostname}_0.log &> .output_diff"
+    eval "python $checker -t=0.01 $OUTPUT output_${hostname}_0.log &> .output_diff"
 
     cat .output_diff >> $LOG
     if ! grep -q "SUCCESS" .output_diff ; then
@@ -167,6 +180,18 @@ for partition in 1 2 3 5 6 7 8; do
         failed_cases+="over-decompose 2 cvc $1 devices with $3 threads; "
       elif [ $partition -eq 10 ]; then
         failed_cases+="over-decompose 4 cvc $1 devices with $3 threads; "
+      elif [ $partition -eq 11 ]; then
+        failed_cases+="CuSP cvc $1 devices with $3 threads; "
+      elif [ $partition -eq 12 ]; then
+        failed_cases+="CuSP oec $1 devices with $3 threads; "
+      elif [ $partition -eq 13 ]; then
+        failed_cases+="CuSP hybrid outgoing $1 devices with $3 threads; "
+      elif [ $partition -eq 14 ]; then
+        failed_cases+="CuSP Ginger outgoing $1 devices with $3 threads; "
+      elif [ $partition -eq 15 ]; then
+        failed_cases+="CuSP FENNEL outgoing $1 devices with $3 threads; "
+      elif [ $partition -eq 16 ]; then
+        failed_cases+="CuSP Sugar outgoing $1 devices with $3 threads; "
       fi
     else
       let pass=pass+1

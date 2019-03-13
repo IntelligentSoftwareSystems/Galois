@@ -203,7 +203,7 @@ struct FirstItr_BFS {
     }
 
     _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("BFS");
+                Bitset_dist_current>("BFS");
 
     galois::runtime::reportStat_Tsum(
         regionname, _graph.get_run_identifier("NumWorkItems"), __end - __begin);
@@ -267,7 +267,7 @@ struct BFS {
             galois::loopname(_graph.get_run_identifier("BFS").c_str()));
       }
       _graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 
       /**************************CRASH SITE : start
        * *****************************************/

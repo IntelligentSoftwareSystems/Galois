@@ -106,7 +106,7 @@ struct FirstItr_ConnectedComp {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_comp_current,
-                          Broadcast_comp_current, Bitset_comp_current>(
+                          Bitset_comp_current>(
         Flags_comp_current, "ConnectedComp");
 #endif
 #ifdef __GALOIS_HET_CUDA__
@@ -140,11 +140,11 @@ struct FirstItr_ConnectedComp {
 #elif __OPT_VERSION__ == 3
     // with bitset
     _graph.sync<writeAny, readAny, Reduce_min_comp_current,
-                Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                Bitset_comp_current>("ConnectedComp");
 #elif __OPT_VERSION__ == 4
     // write aware (not read aware, i.e. conservative)
     _graph.sync<writeDestination, readAny, Reduce_min_comp_current,
-                Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                Bitset_comp_current>("ConnectedComp");
 #endif
 
     galois::runtime::reportStat_Tsum(
@@ -191,7 +191,7 @@ struct ConnectedComp {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_comp_current,
-                            Broadcast_comp_current, Bitset_comp_current>(
+                            Bitset_comp_current>(
           Flags_comp_current, "ConnectedComp");
 #endif
 
@@ -229,11 +229,11 @@ struct ConnectedComp {
 #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeDestination, readAny, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 #endif
 
       galois::runtime::reportStat_Tsum(

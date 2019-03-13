@@ -62,11 +62,17 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
                    "Over decomposed by 4 cartesian Vertex-Cut"),
         clEnumValN(CEC, "cec", "Custom edge cut from vertexID mapping"),
         clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
-        clEnumValN(GHIVC, "ghivc", "HIVC using generic interface"),
-        clEnumValN(GOEC, "goec", "oec generic interface"),
-        clEnumValN(GING, "ging", "ginger using cusp"),
+        clEnumValN(GHOVC, "ghovc", "HOVC using CuSP"),
+        clEnumValN(GHIVC, "ghivc", "HIVC using CuSP"),
+        clEnumValN(GOEC, "goec", "oec with CuSP"),
+        clEnumValN(GINGER_O, "ginger-o", "ginger, outgiong edges, using CuSP"),
+        clEnumValN(GINGER_I, "ginger-i", "ginger, incoming edges, using CuSP"),
+        clEnumValN(FENNEL_O, "fennel-o", "fennel, outgoing edge cut, using CuSP"),
+        clEnumValN(FENNEL_I, "fennel-i", "fennel, incoming edge cut, using CuSP"),
+        clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using CuSP"),
         clEnumValEnd),
     cll::init(OEC));
+
 cll::opt<unsigned int>
     VCutThreshold("VCutThreshold",
                   cll::desc("Threshold for high degree edges."),

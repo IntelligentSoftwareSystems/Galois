@@ -209,17 +209,20 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       hasIncomingEdge.resize(base_DistGraph::numHosts);
     }
 
-    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
-    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
-    inspectionTimer.start();
-
+    galois::gPrint("[", base_DistGraph::id, "] Starting graph reading.\n");
     galois::graphs::BufferedGraph<EdgeTy> bufGraph;
+    galois::StatTimer graphReadTimer("GraphReading", GRNAME);
     graphReadTimer.start();
     bufGraph.loadPartialGraph(filename, nodeBegin, nodeEnd, *edgeBegin,
                               *edgeEnd, base_DistGraph::numGlobalNodes,
                               base_DistGraph::numGlobalEdges);
     graphReadTimer.stop();
     bufGraph.resetReadCounters();
+    galois::gPrint("[", base_DistGraph::id, "] Reading graph complete.\n");
+
+
+    galois::StatTimer inspectionTimer("EdgeInspection", GRNAME);
+    inspectionTimer.start();
 
     galois::gstl::Vector<uint64_t> prefixSumOfEdges;
 
@@ -292,12 +295,14 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
       base_DistGraph::numNodesWithEdges = numNodes;
     }
 
-    if (transpose && (numNodes > 0)) {
-      // consider all nodes to have outgoing edges (TODO better way to do this?)
-      // for now it's fine I guess
-      base_DistGraph::numNodesWithEdges = numNodes;
-      base_DistGraph::graph.transpose(GRNAME);
+    if (transpose) {
       base_DistGraph::transposed = true;
+      base_DistGraph::numNodesWithEdges = numNodes;
+      if (numNodes > 0) {
+        // consider all nodes to have outgoing edges (TODO better way to do this?)
+        // for now it's fine I guess
+        base_DistGraph::graph.transpose(GRNAME);
+      }
     }
 
     galois::CondStatTimer<MORE_DIST_STATS> Tthread_ranges("ThreadRangesTime",
@@ -599,6 +604,9 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
         " seconds to read ", allBytesRead, " bytes (",
         allBytesRead / (float)inspectionTimer.get_usec(), " MBPS)\n");
 
+    if (inspectionBarrier) {
+      galois::runtime::getHostBarrier().wait();
+    }
     sendInspectionData(numOutgoingEdges, hasIncomingEdge, hostHasOutgoing);
 
     // setup a single hasIncomingEdge bitvector
@@ -1626,8 +1634,11 @@ class DistGraphGeneric : public DistGraph<NodeTy, EdgeTy> {
     std::vector<std::pair<uint32_t, uint32_t>> mirrorRangesVector;
     // order of nodes locally is masters, outgoing mirrors, incoming mirrors,
     // so just get from numOwned to end
-    mirrorRangesVector.push_back(std::make_pair(base_DistGraph::numOwned,
-                                                numNodes));
+    if (base_DistGraph::numOwned != numNodes) {
+      assert(base_DistGraph::numOwned < numNodes);
+      mirrorRangesVector.push_back(std::make_pair(base_DistGraph::numOwned,
+                                                  numNodes));
+    }
     return mirrorRangesVector;
   }
 

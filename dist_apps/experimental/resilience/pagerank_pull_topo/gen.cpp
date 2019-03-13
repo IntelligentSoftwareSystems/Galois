@@ -151,7 +151,7 @@ struct InitializeGraph {
         galois::steal(), galois::no_stats(),
         galois::loopname(_graph.get_run_identifier("InitializeGraph").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
   }
 
@@ -188,7 +188,7 @@ struct InitializeGraph_crashed {
         galois::loopname(
             _graph.get_run_identifier("InitializeGraph_crashed").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph_crashed");
   }
 
@@ -224,7 +224,7 @@ struct InitializeGraph_healthy {
         galois::loopname(
             _graph.get_run_identifier("InitializeGraph_healthy").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph_healthy");
   }
 
