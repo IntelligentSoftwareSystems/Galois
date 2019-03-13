@@ -70,7 +70,7 @@ def check_results(masterFile, otherFiles, tolerance,
 
   return (offset, errors, mrows, global_error_squared, num_nodes);
 
-def main(masterFile, allFiles_arr, tolerance):
+def main(masterFile, allFiles_arr, tolerance, mean_tolerance):
   offset = 0
   errors = 0
   mrows = 0
@@ -85,7 +85,7 @@ def main(masterFile, allFiles_arr, tolerance):
       break
 
   rmse = (global_error_squared / num_nodes) ** 0.5
-  if (rmse > tolerance):
+  if (rmse > mean_tolerance):
     print "\nRoot mean square error (for first field): ", rmse
 
   if (offset != -1):
@@ -104,7 +104,7 @@ def main(masterFile, allFiles_arr, tolerance):
   if (errors > 0):
     print "\nNo. of mismatches: ", errors
 
-  if (errors > 0) or (offset == -1) or (mrows > 0) or (rmse > tolerance):
+  if (errors > 0) or (offset == -1) or (mrows > 0) or (rmse > mean_tolerance):
     print "\nFAILED\n"
   else:
     print "\nSUCCESS\n"
@@ -115,7 +115,9 @@ if __name__ == "__main__":
   # parse files and an optional tolerance
   parser.add_argument('files', type=str, nargs='+', help='input + output files')
   parser.add_argument('-tolerance', '-t', type=float, nargs=1, default=0.0001,
-                      help='tolerance for difference in fields')
+                      help='tolerance for difference in fields (error)')
+  parser.add_argument('-mean_tolerance', '-m', type=float, nargs=1, default=0.000001,
+                      help='tolerance for root mean square error')
 
   arg = sys.argv
   parsed_arguments = parser.parse_args()
@@ -127,12 +129,7 @@ if __name__ == "__main__":
   print allFiles_arr  
 
   tolerance = parsed_arguments.tolerance
+  mean_tolerance = parsed_arguments.mean_tolerance
 
   print("Starting comparison...")
-
-  # apparently if you pass in a tolerance argument it returns it as a list...
-  # the default is just a float
-  if isinstance(tolerance, list):
-    main(masterFile, allFiles_arr, tolerance[0])
-  else:
-    main(masterFile, allFiles_arr, tolerance)
+  main(masterFile, allFiles_arr, tolerance, mean_tolerance)
