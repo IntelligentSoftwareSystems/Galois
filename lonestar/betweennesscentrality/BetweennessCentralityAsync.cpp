@@ -433,6 +433,7 @@ int main(int argc, char** argv) {
   galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
   galois::gInfo("Note that optimal chunk size may differ depending on input "
                 "graph");
+  galois::runtime::reportStat_Single("BCAsync", "ChunkSize", CHUNK_SIZE);
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();
