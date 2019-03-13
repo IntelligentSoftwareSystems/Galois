@@ -43,6 +43,7 @@
 #include "block/block_store.cuh"
 
 // Device
+#include "device/device_scan.cuh"
 #include "device/device_select.cuh"
 
 // Grid
