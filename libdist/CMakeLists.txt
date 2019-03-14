@@ -1,13 +1,7 @@
 set(sources
         src/DistGalois.cpp
         src/cuda_device.cpp
-        src/Tracer.cpp
         src/DistStats.cpp
-        src/NetworkBuffered.cpp
-        src/NetworkIOMPI.cpp
-        src/NetworkLCI.cpp
-        src/Network.cpp
-        src/Barrier.cpp
         src/SyncStructures.cpp
         src/GlobalObj.cpp
         src/DistributedGraph.cpp
