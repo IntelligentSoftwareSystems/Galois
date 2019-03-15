@@ -83,6 +83,7 @@ distApp(bfs_push_lb)
 
 distApp(cc_pull)
 distApp(cc_push)
+distApp(cc_push_lb)
 
 distApp(kcore_push)
 distApp(kcore_pull)
@@ -94,6 +95,7 @@ distAppNoGPU(sgd)
 
 distApp(sssp_pull)
 distApp(sssp_push)
+distApp(sssp_push_lb)
 
 distAppNoGPU(partition)
 
