@@ -10,8 +10,8 @@ set(sources
 add_library(galois_dist STATIC ${sources})
 add_library(galois_dist_async STATIC ${sources})
 
-target_link_libraries(galois_dist galois_shmem gllvm)
-target_link_libraries(galois_dist_async galois_shmem gllvm)
+target_link_libraries(galois_dist galois_shmem galois_net gllvm)
+target_link_libraries(galois_dist_async galois_shmem galois_net gllvm)
 
 target_compile_definitions(galois_dist_async PRIVATE __GALOIS_HET_ASYNC__=1)
 if (USE_BARE_MPI)
@@ -31,11 +31,13 @@ target_link_libraries(galois_dist_async ${MPI_CXX_LIBRARIES})
 target_include_directories(galois_dist PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libnet/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include 
 )
 target_include_directories(galois_dist_async PUBLIC 
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libnet/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include 
 )
 if (USE_LCI)
