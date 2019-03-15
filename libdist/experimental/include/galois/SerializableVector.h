@@ -21,7 +21,7 @@
 #define _SVECTOR_WRAPPER_H_
 
 #include <vector>
-#include "galois/runtime/Extra_dist_traits.h"
+#include "galois/runtime/ExtraTraits.h"
 
 namespace galois {
 

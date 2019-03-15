@@ -36,7 +36,7 @@
 #include <tuple>
 
 #include <boost/mpl/has_xxx.hpp>
-#include "galois/runtime/Extra_dist_traits.h"
+#include "galois/runtime/ExtraTraits.h"
 
 #include <galois/gdeque.h>
 #include <galois/DynamicBitset.h>
