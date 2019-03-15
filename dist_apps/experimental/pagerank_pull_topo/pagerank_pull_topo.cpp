@@ -135,7 +135,7 @@ struct InitializeGraph {
                      galois::loopname(
                          _graph.get_run_identifier("InitializeGraph").c_str()));
 
-    _graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeDestination, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraph");
   }
 
@@ -225,7 +225,7 @@ struct PageRank {
           galois::loopname(_graph.get_run_identifier("PageRank").c_str()));
 
       _graph.sync<writeSource, readAny, Reduce_add_partialSum,
-                  Broadcast_partialSum, Bitset_partialSum>("PageRank");
+                  Bitset_partialSum>("PageRank");
 
       dga.reset();
       PageRankSum::go(_graph, dga);

@@ -125,7 +125,7 @@ struct FirstItr_SSSP {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_dist_current,
-                          Broadcast_dist_current, Bitset_dist_current>(
+                          Bitset_dist_current>(
         Flags_dist_current, "SSSP");
 #endif
 
@@ -162,11 +162,11 @@ struct FirstItr_SSSP {
 #elif __OPT_VERSION__ == 3
     // with bitset
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                Bitset_dist_current>("SSSP");
 #elif __OPT_VERSION__ == 4
     // write aware (not read aware, i.e. conservative)
     _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                Bitset_dist_current>("SSSP");
 #endif
 
     galois::runtime::reportStat_Tsum(
@@ -213,7 +213,7 @@ struct SSSP {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_dist_current,
-                            Broadcast_dist_current, Bitset_dist_current>(
+                            Bitset_dist_current>(
           Flags_dist_current, "SSSP");
 #endif
 
@@ -251,11 +251,11 @@ struct SSSP {
 #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                  Bitset_dist_current>("SSSP");
 #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("SSSP");
+                  Bitset_dist_current>("SSSP");
 #endif
 
       galois::runtime::reportStat_Tsum(

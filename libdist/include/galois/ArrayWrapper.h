@@ -28,7 +28,7 @@
 #define _ARRAY_WRAPPER_H_
 
 #include <array>
-#include "galois/runtime/Extra_dist_traits.h"
+#include "galois/runtime/ExtraTraits.h"
 
 namespace galois {
 /**

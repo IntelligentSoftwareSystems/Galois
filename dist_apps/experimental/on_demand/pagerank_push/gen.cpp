@@ -208,13 +208,13 @@ struct InitializeGraph {
     Flags_nout.set_write_src();
 
     // moved here from below
-    _graph.sync_on_demand<readSource, Reduce_add_nout, Broadcast_nout,
+    _graph.sync_on_demand<readSource, Reduce_add_nout,
                           Bitset_nout>(Flags_nout, "InitializeGraphNout");
 #endif
 
 #if __OPT_VERSION__ <= 4
     // NOTE: Differs from optimized version as it does sync readAny
-    _graph.sync<writeSource, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync<writeSource, readAny, Reduce_add_nout,
                 Bitset_nout>("InitializeGraphNout");
 #endif
   }
@@ -251,9 +251,9 @@ struct PageRank_delta {
     auto& nodesWithEdges = _graph.allNodesWithEdgesRange();
 
     // moved to init although tech. supposed to be here
-    //_graph.sync_on_demand<readSource, Reduce_add_nout, Broadcast_nout,
+    //_graph.sync_on_demand<readSource, Reduce_add_nout,
     //                      Bitset_nout>(Flags_nout, "PRdelta");
-    _graph.sync_on_demand<readSource, Reduce_add_residual, Broadcast_residual,
+    _graph.sync_on_demand<readSource, Reduce_add_residual,
                           Bitset_residual>(Flags_residual, "PRdelta");
 #endif
 
@@ -351,15 +351,15 @@ struct PageRank {
       _graph.sync<writeAny, readAny, Reduce_add_residual, Broadcast_residual>(
           "PageRank");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_residual, Broadcast_residual,
+      _graph.sync<writeAny, readAny, Reduce_add_residual,
                   Bitset_residual>("PageRank");
 #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_add_residual,
-                  Broadcast_residual, Bitset_residual>("PageRank");
+                  Bitset_residual>("PageRank");
 #endif
 
       //_graph.sync<writeDestination, readSource, Reduce_add_residual,
-      //            Broadcast_residual, Bitset_residual>("PageRank");
+      //            Bitset_residual>("PageRank");
 
       galois::runtime::reportStat(
           "(NULL)", "NumWorkItems_" + (_graph.get_run_identifier()),

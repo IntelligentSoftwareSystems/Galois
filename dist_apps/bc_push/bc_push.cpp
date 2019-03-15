@@ -284,7 +284,7 @@ struct FirstIterationSSSP {
 
     // Next op will read src, current length
     _graph.sync<writeDestination, readSource, Reduce_min_current_length,
-                Broadcast_current_length, Bitset_current_length>("SSSP");
+                Bitset_current_length>("SSSP");
   }
 
   /* Does SSSP, push/filter based */
@@ -359,7 +359,7 @@ struct SSSP {
 
       if (accum_result) {
         _graph.sync<writeDestination, readSource, Reduce_min_current_length,
-                    Broadcast_current_length, Bitset_current_length>("SSSP");
+                    Bitset_current_length>("SSSP");
       } else {
         // write destination, read any, fails.....
         // sync src and dst
@@ -369,13 +369,13 @@ struct SSSP {
           // will lead to incorrect results as it will not sync what is
           // necessary
           _graph.sync<writeDestination, readSource, Reduce_min_current_length,
-                      Broadcast_current_length, Bitset_current_length>("SSSP");
+                      Bitset_current_length>("SSSP");
           _graph.sync<writeDestination, readDestination,
                       Reduce_min_current_length, Broadcast_current_length>(
               "SSSP");
         } else {
           _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                      Broadcast_current_length, Bitset_current_length>("SSSP");
+                      Bitset_current_length>("SSSP");
         }
       }
     } while (accum_result);
@@ -445,12 +445,12 @@ struct PredAndSucc {
 
     // sync for use in NumShortPath calculation
     _graph.sync<writeDestination, readSource, Reduce_add_num_predecessors,
-                Broadcast_num_predecessors, Bitset_num_predecessors>(
+                Bitset_num_predecessors>(
         "PredAndSucc");
 
     // sync now for later DependencyPropagation use
     _graph.sync<writeSource, readSource, Reduce_add_num_successors,
-                Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
+                Bitset_num_successors>("PredAndSucc");
   }
 
   /* Summary:
@@ -621,10 +621,10 @@ struct NumShortestPaths {
       }
 
       // sync to_adds and trim on source
-      _graph.sync<writeDestination, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readSource, Reduce_add_trim,
                   Bitset_trim>("NumShortestPaths");
       _graph.sync<writeDestination, readSource, Reduce_add_to_add,
-                  Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
+                  Bitset_to_add>("NumShortestPaths");
 
       // do predecessor decrementing using trim + dependency changes with
       // to_add
@@ -638,7 +638,7 @@ struct NumShortestPaths {
       // already, i.e. all sources should already have the correct value)
       if (!accum_result) {
         _graph.sync<writeSource, readDestination, Reduce_set_num_shortest_paths,
-                    Broadcast_num_shortest_paths, Bitset_num_shortest_paths>(
+                    Bitset_num_shortest_paths>(
             "NumShortestPaths");
       }
     } while (accum_result);
@@ -743,7 +743,7 @@ struct PropagationFlagUpdate {
     // by this call (through bitset; only set for those cases); the others
     // do not need to be sync'd as they will (or should) all be false already
     _graph.sync<writeSource, readDestination, Reduce_set_propagation_flag,
-                Broadcast_propagation_flag, Bitset_propagation_flag>(
+                Bitset_propagation_flag>(
         "PropagationFlagUpdate");
   }
 
@@ -901,10 +901,10 @@ struct DependencyPropagation {
             galois::no_stats());
       }
 
-      _graph.sync<writeSource, readSource, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readSource, Reduce_add_trim,
                   Bitset_trim>("DependencyPropagation");
       _graph.sync<writeSource, readSource, Reduce_add_to_add_float,
-                  Broadcast_to_add_float, Bitset_to_add_float>(
+                  Bitset_to_add_float>(
           "DependencyPropagation");
 
       // use trim + to add to do appropriate changes
@@ -917,7 +917,7 @@ struct DependencyPropagation {
       if (accum_result) {
         // sync dependency on dest; source should all have same dep
         _graph.sync<writeSource, readDestination, Reduce_set_dependency,
-                    Broadcast_dependency, Bitset_dependency>(
+                    Bitset_dependency>(
             "DependencyPropagation");
       }
     } while (accum_result);

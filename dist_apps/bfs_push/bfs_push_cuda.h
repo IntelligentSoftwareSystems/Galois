@@ -59,7 +59,15 @@ void batch_set_node_dist_current_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id,
                                       uint8_t* v,
                                       DataCommMode data_mode);
+void batch_add_mirror_node_dist_current_cuda(struct CUDA_Context* ctx,
+                                      unsigned from_id,
+                                      uint8_t* v,
+                                      DataCommMode data_mode);
 void batch_add_node_dist_current_cuda(struct CUDA_Context* ctx,
+                                      unsigned from_id,
+                                      uint8_t* v,
+                                      DataCommMode data_mode);
+void batch_min_mirror_node_dist_current_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id,
                                       uint8_t* v,
                                       DataCommMode data_mode);
@@ -105,7 +113,13 @@ void batch_set_mirror_node_dist_old_cuda(struct CUDA_Context* ctx,
 void batch_set_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v,
                                   DataCommMode data_mode);
+void batch_add_mirror_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v,
+                                  DataCommMode data_mode);
 void batch_add_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v,
+                                  DataCommMode data_mode);
+void batch_min_mirror_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v,
                                   DataCommMode data_mode);
 void batch_min_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,

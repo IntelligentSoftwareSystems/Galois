@@ -176,13 +176,13 @@ struct DegreeCounting {
     Flags_current_degree.set_write_src();
     // technically supposed to be elsewhere, but for timer's sake it's here
     _graph.sync_on_demand<readAny, Reduce_add_current_degree,
-                          Broadcast_current_degree, Bitset_current_degree>(
+                          Bitset_current_degree>(
         Flags_current_degree, "DegreeCounting");
 #endif
 
 #if __OPT_VERSION__ <= 4
     _graph.sync<writeSource, readAny, Reduce_add_current_degree,
-                Broadcast_current_degree, Bitset_current_degree>(
+                Bitset_current_degree>(
         "DegreeCounting");
 #endif
   }
@@ -257,7 +257,7 @@ struct DegreeUpdate {
 #if __OPT_VERSION__ == 5
     // current edgree here as well
     _graph
-        .sync_on_demand<readAny, Reduce_add_trim, Broadcast_trim, Bitset_trim>(
+        .sync_on_demand<readAny, Reduce_add_trim, Bitset_trim>(
             Flags_trim, "DegreeUpdate");
 #endif
 
@@ -395,14 +395,14 @@ struct KCore {
 #elif __OPT_VERSION__ == 2
       _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim>("KCore");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeAny, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #elif __OPT_VERSION__ == 4
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim>("KCore");
 #endif
 
-      //_graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      //_graph.sync<writeSource, readAny, Reduce_add_trim,
       //            Bitset_trim>("KCore");
 
       // handle trimming (locally on each node)

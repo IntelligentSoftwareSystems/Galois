@@ -188,7 +188,7 @@ struct BFS {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readDestination, Reduce_min_dist_current,
-                            Broadcast_dist_current, Bitset_dist_current>(
+                            Bitset_dist_current>(
           Flags_dist_current, "BFS");
 #endif
 
@@ -226,16 +226,16 @@ struct BFS {
 #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeSource, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 #endif
 
       // gold standard sync
       //_graph.sync<writeSource, readDestination, Reduce_min_dist_current,
-      //            Broadcast_dist_current, Bitset_dist_current>("BFS");
+      //            Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat(
           "(NULL)", "NumWorkItems_" + (_graph.get_run_identifier()),

@@ -218,10 +218,8 @@ struct ForwardPass {
       // may use a different distance (leading to incorrectness)
       if (moreThanOne) {
         _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                    Broadcast_current_length,
                     Bitset_current_length>("ForwardPass");
         _graph.sync<writeDestination, readSource, Reduce_add_num_shortest_paths,
-                    Broadcast_num_shortest_paths,
                     Bitset_num_shortest_paths>("ForwardPass");
       }
 
@@ -288,8 +286,7 @@ struct MiddleSync {
         galois::no_stats()
       );
 
-      _graph.sync<writeSource, readAny, Reduce_set_num_shortest_paths,
-                  Broadcast_num_shortest_paths>("MiddleSync");
+      _graph.sync<writeSource, readAny, Reduce_set_num_shortest_paths>("MiddleSync");
     }
   }
 
@@ -332,7 +329,7 @@ struct BackwardPass {
 
       if (moreThanOne) {
         _graph.sync<writeSource, readDestination, Reduce_add_dependency,
-                    Broadcast_dependency, Bitset_dependency>("BackwardPass");
+                    Bitset_dependency>("BackwardPass");
       }
     }
   }

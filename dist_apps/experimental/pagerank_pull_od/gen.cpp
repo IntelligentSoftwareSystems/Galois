@@ -202,7 +202,7 @@ struct InitializeGraph {
 
     Flags_nout::set_write_dst();
 
-    //_graph.sync<writeDestination, readAny, Reduce_add_nout, Broadcast_nout,
+    //_graph.sync<writeDestination, readAny, Reduce_add_nout,
     //            Bitset_nout>("InitializeGraph");
   }
 
@@ -234,10 +234,10 @@ struct PageRank_delta {
   void static go(Graph& _graph, galois::DGAccumulator<unsigned int>& dga) {
     auto& allNodes = _graph.allNodesRange();
 
-    _graph.sync_on_demand<Flags_nout, readAny, Reduce_add_nout, Broadcast_nout,
+    _graph.sync_on_demand<Flags_nout, readAny, Reduce_add_nout,
                           Bitset_nout>("PRdelta");
     _graph.sync_on_demand<Flags_residual, readAny, Reduce_add_residual,
-                          Broadcast_residual, Bitset_residual>("PRdelta");
+                          Bitset_residual>("PRdelta");
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {

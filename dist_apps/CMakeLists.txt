@@ -2,6 +2,7 @@ add_library(distbench STATIC src/DistBenchStart.cpp)
 target_include_directories(distbench PUBLIC 
   ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libnet/include
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -79,9 +80,11 @@ distAppNoGPU(weighted_bc)
 
 distApp(bfs_pull)
 distApp(bfs_push)
+distApp(bfs_push_lb)
 
 distApp(cc_pull)
 distApp(cc_push)
+distApp(cc_push_lb)
 
 distApp(kcore_push)
 distApp(kcore_pull)
@@ -93,6 +96,7 @@ distAppNoGPU(sgd)
 
 distApp(sssp_pull)
 distApp(sssp_push)
+distApp(sssp_push_lb)
 
 distAppNoGPU(partition)
 

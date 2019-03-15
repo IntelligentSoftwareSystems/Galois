@@ -38,6 +38,7 @@ set(sources
         src/GraphHelpers.cpp
         src/ParaMeter.cpp
         src/DynamicBitset.cpp
+        src/Tracer.cpp
 )
 
 add_library(galois_shmem STATIC ${sources})

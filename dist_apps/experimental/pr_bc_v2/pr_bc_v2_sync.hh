@@ -146,7 +146,6 @@ struct BitsetAPSP {
 
 GALOIS_SYNC_STRUCTURE_REDUCE_PAIR_WISE_ADD_ARRAY_SINGLE(depAccumulator,
                                                         galois::CopyableAtomic<float>);
-GALOIS_SYNC_STRUCTURE_BROADCAST_VECTOR_SINGLE(depAccumulator,
                                               galois::CopyableAtomic<float>);
 struct BitsetDep {
   static unsigned numBitsets() { return bitset_depAccumulator.size(); }

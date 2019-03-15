@@ -67,7 +67,6 @@ struct Worklist {
   bool f_will_write;
 
   Worklist(size_t nsize) {
-    printf("Worklist size: %llu\n", nsize);
 #ifdef SLOTS
     currslot = 0;
 #endif
