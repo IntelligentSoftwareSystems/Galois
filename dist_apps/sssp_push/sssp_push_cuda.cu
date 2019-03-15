@@ -311,7 +311,6 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         if (local_priority > p_dist_current[src])
         {
           p_dist_old[src] = p_dist_current[src];
-          work_items.reduce( 1);
         }
         else
         {
@@ -395,6 +394,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         index_type jj;
         jj = ns +_np_j;
         {
+          work_items.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;
@@ -441,6 +441,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
           index_type jj;
           jj = _np_w_start +_np_ii;
           {
+            work_items.reduce( 1);
             index_type dst;
             uint32_t new_dist;
             uint32_t old_dist;
@@ -483,6 +484,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         src = _np_closure[nps.fg.src[_np_i]].src;
         jj= nps.fg.itvalue[_np_i];
         {
+          work_items.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;

@@ -262,9 +262,9 @@ struct BFS {
       if (local_priority > snode.dist_current) {
         snode.dist_old = snode.dist_current;
 
-        work_items += 1;
-
         for (auto jj : graph->edges(src)) {
+          work_items += 1;
+
           GNode dst         = graph->getEdgeDst(jj);
           auto& dnode       = graph->getData(dst);
           uint32_t new_dist = 1 + snode.dist_current;

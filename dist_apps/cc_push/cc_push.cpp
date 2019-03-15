@@ -216,9 +216,9 @@ struct ConnectedComp {
     if (snode.comp_old > snode.comp_current) {
       snode.comp_old = snode.comp_current;
 
-      DGAccumulator_accum += 1;
-
       for (auto jj : graph->edges(src)) {
+        DGAccumulator_accum += 1;
+
         GNode dst         = graph->getEdgeDst(jj);
         auto& dnode       = graph->getData(dst);
         uint32_t new_dist = snode.comp_current;
