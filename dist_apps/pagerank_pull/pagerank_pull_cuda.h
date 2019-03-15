@@ -225,25 +225,17 @@ void PageRankSanity_nodesWithEdges_cuda(
 void PageRank_allNodes_cuda(struct CUDA_Context* ctx);
 void PageRank_delta_cuda(unsigned int __begin, unsigned int __end,
                          unsigned int& DGAccumulator_accum,
-                         unsigned int& work_items,
-                         const float local_priority,
                          const float& local_alpha, float local_tolerance,
                          struct CUDA_Context* ctx);
 void PageRank_delta_allNodes_cuda(unsigned int& DGAccumulator_accum,
-                                  unsigned int& work_items,
-                                  const float local_priority,
                                   const float& local_alpha,
                                   float local_tolerance,
                                   struct CUDA_Context* ctx);
 void PageRank_delta_masterNodes_cuda(unsigned int& DGAccumulator_accum,
-                                     unsigned int& work_items,
-                                     const float local_priority,
                                      const float& local_alpha,
                                      float local_tolerance,
                                      struct CUDA_Context* ctx);
 void PageRank_delta_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
-                                        unsigned int& work_items,
-                                        const float local_priority,
                                         const float& local_alpha,
                                         float local_tolerance,
                                         struct CUDA_Context* ctx);
