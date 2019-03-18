@@ -195,11 +195,13 @@ struct PageRank_delta {
     auto& sdata = graph->getData(src);
     sdata.delta = 0;
 
-    if (sdata.residual > this->local_tolerance) {
+    if (sdata.residual > 0) {
       sdata.value += sdata.residual;
-      if (sdata.nout > 0) {
-        sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
-        DGAccumulator_accum += 1;
+      if (sdata.residual > this->local_tolerance) {
+        if (sdata.nout > 0) {
+          sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
+          DGAccumulator_accum += 1;
+        }
       }
       sdata.residual = 0;
     }

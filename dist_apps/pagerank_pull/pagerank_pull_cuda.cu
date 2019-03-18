@@ -263,13 +263,16 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
     if (pop)
     {
       p_delta[src] = 0;
-      if (p_residual[src] > local_tolerance)
+      if (p_residual[src] > 0)
       {
         p_value[src] += p_residual[src];
-        if (p_nout[src] > 0)
+        if (p_residual[src] > local_tolerance)
         {
-          p_delta[src] = p_residual[src] * (1 - local_alpha) / p_nout[src];
-          DGAccumulator_accum.reduce( 1);
+          if (p_nout[src] > 0)
+          {
+            p_delta[src] = p_residual[src] * (1 - local_alpha) / p_nout[src];
+            DGAccumulator_accum.reduce( 1);
+          }
         }
         p_residual[src] = 0;
       }
