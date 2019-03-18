@@ -28,6 +28,7 @@ set(ENABLE_HETERO_GALOIS OFF CACHE BOOL "Enable heterogeneous features")
 set(USE_LCI OFF CACHE BOOL "Use LCI network runtime instead of MPI")
 set(USE_BARE_MPI OFF CACHE BOOL "Use MPI directly (no dedicated network-runtime thread)")
 set(CUDA_CAPABILITY "3.7,6.1" CACHE STRING "Comma-separated CUDA capability version numbers")
+set(REPORT_COMM_STATS OFF CACHE BOOL "Report more detailed statistics of communication")
 ###### General features ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
