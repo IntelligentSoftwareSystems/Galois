@@ -190,12 +190,14 @@ struct PageRank_delta {
   void operator()(WorkItem src) const {
     NodeData& sdata = graph->getData(src);
 
-    if (sdata.residual > this->local_tolerance) {
+    if (sdata.residual > 0) {
       float residual_old = sdata.residual;
       sdata.residual     = 0;
       sdata.value += residual_old;
-      if (sdata.nout > 0) {
-        sdata.delta = residual_old * (1 - local_alpha) / sdata.nout;
+      if (residual_old > this->local_tolerance) {
+        if (sdata.nout > 0) {
+          sdata.delta = residual_old * (1 - local_alpha) / sdata.nout;
+        }
       }
     }
   }

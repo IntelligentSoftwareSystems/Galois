@@ -89,14 +89,17 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
     bool pop  = src < __end;
     if (pop)
     {
-      if (p_residual[src] > local_tolerance)
+      if (p_residual[src] > 0)
       {
         residual_old = p_residual[src];
         p_residual[src] = 0;
         p_value[src] += residual_old;
-        if (p_nout[src] > 0)
+        if (residual_old > local_tolerance)
         {
-          p_delta[src] = residual_old * (1 - local_alpha) / p_nout[src];
+          if (p_nout[src] > 0)
+          {
+            p_delta[src] = residual_old * (1 - local_alpha) / p_nout[src];
+          }
         }
       }
     }
