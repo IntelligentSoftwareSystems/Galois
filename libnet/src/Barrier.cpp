@@ -18,7 +18,7 @@
  */
 
 /**
- * @file libdist/src/Barrier.cpp
+ * @file libnet/src/Barrier.cpp
  *
  * Contains implementation of HostFence and HostBarrier as well as functions
  * that get static singletons of the 2.

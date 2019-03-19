@@ -1,6 +1,6 @@
 add_library(distbench STATIC src/DistBenchStart.cpp)
-target_include_directories(distbench PUBLIC 
-  ${CMAKE_SOURCE_DIR}/libdist/include
+target_include_directories(distbench PUBLIC
+  ${CMAKE_SOURCE_DIR}/libgluon/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
   ${CMAKE_SOURCE_DIR}/libnet/include
   ${CMAKE_SOURCE_DIR}/libllvm/include
@@ -15,11 +15,11 @@ endif()
 target_link_libraries(distbench galois_shmem gllvm)
 
 include_directories(include)
-include_directories(${CMAKE_SOURCE_DIR}/libdist/include)
+include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 if(ENABLE_HETERO_GALOIS)
-  # for debugging 
+  # for debugging
   add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lineinfo)
@@ -35,8 +35,8 @@ endif()
 
 function(distApp name)
   app(${name} ${name}/${name}.cpp DISTSAFE)
-  target_link_libraries(${name} distbench galois_dist)
-  target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  target_link_libraries(${name} distbench galois_gluon)
+  target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libgluon/include)
   if(REPORT_COMM_STATS)
     target_compile_definitions(${name} PRIVATE MORE_COMM_STATS=1)
   endif()
@@ -53,8 +53,8 @@ function(distApp name)
   endif()
 
   app(${name}_async ${name}/${name}.cpp DISTSAFE)
-  target_link_libraries(${name}_async distbench galois_dist_async)
-  target_include_directories(${name}_async PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  target_link_libraries(${name}_async distbench galois_gluon_async)
+  target_include_directories(${name}_async PUBLIC ${CMAKE_SOURCE_DIR}/libgluon/include)
   if(REPORT_COMM_STATS)
     target_compile_definitions(${name}_async PRIVATE MORE_COMM_STATS=1)
   endif()
@@ -74,8 +74,8 @@ endfunction()
 
 function(distAppNoGPU name)
   app(${name} ${name}/${name}.cpp DISTSAFE)
-  target_link_libraries(${name} distbench galois_dist)
-  target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  target_link_libraries(${name} distbench galois_gluon)
+  target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libgluon/include)
   if(USE_BARE_MPI)
     target_compile_definitions(${name} PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
   endif()
