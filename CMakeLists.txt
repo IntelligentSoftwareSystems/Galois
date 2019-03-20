@@ -534,12 +534,10 @@ include(CPack)
 
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
-
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
 set(GALOIS_INCLUDE_DIR)  # Galois include provides
-#get_target_property(defs galois INCLUDE_DIRECTORIES)
+get_target_property(defs galois_shmem INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
   string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)
@@ -549,6 +547,7 @@ foreach(d ${defs})
     set(GALOIS_INCLUDE_DIR ${GALOIS_INCLUDE_DIR} ${d})
   endif()
 endforeach()
+
 install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." COMPONENT dev
   FILES_MATCHING PATTERN "*.h"
   PATTERN ".git" EXCLUDE
