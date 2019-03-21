@@ -553,8 +553,6 @@ install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." 
   PATTERN ".git" EXCLUDE
   PATTERN ".svn" EXCLUDE)
 
-install(TARGETS galois_shmem)
-
 # Galois compiler definitions
 set(galois_defs)
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
