@@ -8,30 +8,30 @@ set(sources
         src/NetworkLCI.cpp
 )
 # new galois net library; link to shared memory galois
-add_library(galois_net STATIC ${sources})
-target_link_libraries(galois_net galois_shmem gllvm)
+add_library(galois_dist STATIC ${sources})
+target_link_libraries(galois_dist galois_shmem gllvm)
 
 if (USE_BARE_MPI)
-  target_compile_definitions(galois_net PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
+  target_compile_definitions(galois_dist PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
 endif()
 
 if (USE_LCI)
-  add_dependencies(galois_net lci)
-  target_link_libraries(galois_net ${LWCI_LIBRARY} -lpsm2)
+  add_dependencies(galois_dist lci)
+  target_link_libraries(galois_dist ${LWCI_LIBRARY} -lpsm2)
 endif()
-target_link_libraries(galois_net ${MPI_CXX_LIBRARIES})
+target_link_libraries(galois_dist ${MPI_CXX_LIBRARIES})
 
-target_include_directories(galois_net PUBLIC 
+target_include_directories(galois_dist PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/include 
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 if (USE_LCI)
-  target_include_directories(galois_net PUBLIC ${LWCI_INCLUDE})
+  target_include_directories(galois_dist PUBLIC ${LWCI_INCLUDE})
 endif()
 
-set_target_properties (galois_net PROPERTIES 
-  INTERFACE_POSITION_INDEPENDENT_CODE On 
+set_target_properties (galois_dist PROPERTIES
+  INTERFACE_POSITION_INDEPENDENT_CODE On
   POSITION_INDEPENDENT_CODE On
 )

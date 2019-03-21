@@ -8,8 +8,8 @@ set(sources
 add_library(galois_gluon STATIC ${sources})
 add_library(galois_gluon_async STATIC ${sources})
 
-target_link_libraries(galois_gluon galois_shmem galois_net gllvm)
-target_link_libraries(galois_gluon_async galois_shmem galois_net gllvm)
+target_link_libraries(galois_gluon galois_shmem galois_dist gllvm)
+target_link_libraries(galois_gluon_async galois_shmem galois_dist gllvm)
 
 if(REPORT_COMM_STATS)
   target_compile_definitions(galois_gluon PRIVATE MORE_COMM_STATS=1)
