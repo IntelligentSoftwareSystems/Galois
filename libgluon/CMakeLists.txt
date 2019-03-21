@@ -33,13 +33,13 @@ target_link_libraries(galois_gluon_async ${MPI_CXX_LIBRARIES})
 target_include_directories(galois_gluon PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libnet/include
+  ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_include_directories(galois_gluon_async PUBLIC
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libnet/include
+  ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 if (USE_LCI)

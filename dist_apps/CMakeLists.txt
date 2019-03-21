@@ -2,7 +2,7 @@ add_library(distbench STATIC src/DistBenchStart.cpp)
 target_include_directories(distbench PUBLIC
   ${CMAKE_SOURCE_DIR}/libgluon/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
-  ${CMAKE_SOURCE_DIR}/libnet/include
+  ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

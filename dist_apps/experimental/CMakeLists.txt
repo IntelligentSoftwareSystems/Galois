@@ -10,7 +10,7 @@ endif()
 
 include_directories(../include)
 include_directories(${CMAKE_SOURCE_DIR}/libgluon/include)
-include_directories(${CMAKE_SOURCE_DIR}/libnet/include)
+include_directories(${CMAKE_SOURCE_DIR}/libdist/include)
 include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 function(distApp name)
