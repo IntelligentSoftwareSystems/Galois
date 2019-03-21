@@ -1,5 +1,4 @@
 set(sources
-        src/DistGalois.cpp
         src/cuda_device.cpp
         src/SyncStructures.cpp
         src/GlobalObj.cpp

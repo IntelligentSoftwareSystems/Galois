@@ -1,5 +1,6 @@
 set(sources
         src/Barrier.cpp
+        src/DistGalois.cpp
         src/DistStats.cpp
         src/Network.cpp
         src/NetworkBuffered.cpp
