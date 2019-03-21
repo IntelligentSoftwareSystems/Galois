@@ -72,7 +72,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost-cpp
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
@@ -100,7 +100,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost-cpp
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
@@ -130,7 +130,7 @@ jobs:
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
           # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
-          conda install -y -q -c conda-forge cmake boost-cpp
+          conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
           cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
