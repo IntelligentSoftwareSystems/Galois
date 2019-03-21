@@ -1,7 +1,6 @@
 set(sources
         src/DistGalois.cpp
         src/cuda_device.cpp
-        src/DistStats.cpp
         src/SyncStructures.cpp
         src/GlobalObj.cpp
         src/DistributedGraph.cpp
