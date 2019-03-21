@@ -43,7 +43,8 @@ set(sources
 
 add_library(galois_shmem STATIC ${sources})
 target_include_directories(galois_shmem PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${GALOIS_RELATIVE_INCLUDE_DIR}>
 )
 
 target_link_libraries(galois_shmem ${Boost_SERIALIZATION_LIBRARY_RELEASE})
@@ -68,12 +69,27 @@ endif()
 
 add_library(galois_shmem_obj OBJECT ${sources})
 target_include_directories(galois_shmem_obj PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}>
 )
 set_target_properties (galois_shmem_obj PROPERTIES 
   INTERFACE_POSITION_INDEPENDENT_CODE On 
   POSITION_INDEPENDENT_CODE On
 )
 
-install(TARGETS galois_shmem DESTINATION "${INSTALL_LIB_DIR}")
+install(DIRECTORY include DESTINATION "${CMAKE_INSTALL_FULL_INCLUDEDIR}/.." COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".git" EXCLUDE
+  PATTERN ".svn" EXCLUDE)
+
+install(TARGETS galois_shmem
+  EXPORT GaloisTargets
+  LIBRARY
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  ARCHIVE
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT lib
+  INCLUDES DESTINATION "${RELATIVE_INCLUDE_FROM_INSTALL_PREFIX}"
+)
 

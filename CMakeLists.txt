@@ -1,4 +1,7 @@
 cmake_minimum_required(VERSION 3.2.0)
+
+include(GNUInstallDirs)
+
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "4")
@@ -40,17 +43,21 @@ set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 
-set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
-set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
-set(INSTALL_INCLUDE_DIR include CACHE PATH "Installation directory for header files")
-set(INSTALL_CMAKE_DIR lib/cmake/Galois CACHE PATH "Installation directory for CMake files")
-# Make relative paths absolute
-foreach(p LIB BIN INCLUDE CMAKE)
-  set(var INSTALL_${p}_DIR)
-  if(NOT IS_ABSOLUTE "${${var}}")
-    set(${var} "${CMAKE_INSTALL_PREFIX}/${${var}}")
-  endif()
-endforeach()
+if(WIN32 AND NOT CYGWIN)
+  set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/CMake")
+else()
+  set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/CMake/Galois")
+endif()
+
+set(INSTALL_CMAKE_DIR "${DEFAULT_INSTALL_CMAKE_DIR}" CACHE PATH "Installation directory for CMake files")
+# Make relative path absolute
+if(NOT IS_ABSOLUTE "${INSTALL_CMAKE_DIR}")
+  set(INSTALL_CMAKE_DIR "${CMAKE_INSTALL_PREFIX}/${INSTALL_CMAKE_DIR}")
+endif()
+
+file(RELATIVE_PATH RELATIVE_INCLUDE_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_INCLUDEDIR}")
+file(RELATIVE_PATH RELATIVE_LIB_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_LIBDIR}")
+file(RELATIVE_PATH RELATIVE_BIN_FROM_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}" "${CMAKE_INSTALL_FULL_BINDIR}")
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features")
@@ -532,27 +539,6 @@ include(CPack)
 #export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
 #export(PACKAGE Galois)
 
-# Galois include files
-file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-
-set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
-set(GALOIS_INCLUDE_DIR)  # Galois include provides
-get_target_property(defs galois_shmem INCLUDE_DIRECTORIES)
-foreach(d ${defs})
-  string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
-  string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)
-  if(NOT ${pos1} EQUAL 0 AND NOT ${pos2} EQUAL 0)
-    set(GALOIS_INCLUDE_DIRS ${GALOIS_INCLUDE_DIRS} ${d})
-  else()
-    set(GALOIS_INCLUDE_DIR ${GALOIS_INCLUDE_DIR} ${d})
-  endif()
-endforeach()
-
-install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." COMPONENT dev
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".git" EXCLUDE
-  PATTERN ".svn" EXCLUDE)
-
 # Galois compiler definitions
 set(galois_defs)
 get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
@@ -567,10 +553,11 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} upper_build_type)
 set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_build_type}}")
 set(GALOIS_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
 
+file(RELATIVE_PATH PATH_FROM_INSTALLED_CMAKE_FILE_TO_PREFIX "${INSTALL_CMAKE_DIR}" "${CMAKE_INSTALL_PREFIX}")
+
 # Generate appropriate CMake files for installation and build trees
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}/GaloisConfig.cmake" @ONLY)
-set(GALOIS_INCLUDE_DIR "\${GALOIS_CMAKE_DIR}/${rel_include_dir}")
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
