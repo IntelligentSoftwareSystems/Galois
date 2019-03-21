@@ -157,7 +157,7 @@ jobs:
           make -j4
   "Arch":
     docker:
-      - image: base/archlinux
+      - image: archlinux/base
     steps:
       - checkout
       - run: |
