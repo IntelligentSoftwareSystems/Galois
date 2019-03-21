@@ -75,3 +75,5 @@ set_target_properties (galois_shmem_obj PROPERTIES
   POSITION_INDEPENDENT_CODE On
 )
 
+install(TARGETS galois_shmem DESTINATION "${INSTALL_LIB_DIR}")
+

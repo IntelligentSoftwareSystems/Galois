@@ -2,17 +2,20 @@
 # It defines the following variables
 #  Galois_INCLUDE_DIRS
 #  Galois_LIBRARIES
+#  Galois_LIBRARY_DIRS
+#  Galois_BIN_DIRS
 #  Galois_CXX_COMPILER
 #  Galois_CXX_FLAGS
 
 get_filename_component(GALOIS_CMAKE_DIR "${CMAKE_CURRENT_LIST_FILE}" PATH)
-set(Galois_INCLUDE_DIRS "@GALOIS_INCLUDE_DIR@")
-set(Galois_INCLUDE_DIRS ${Galois_INCLUDE_DIRS} "@GALOIS_INCLUDE_DIRS@")
+set(Galois_INCLUDE_DIRS "@INSTALL_INCLUDE_DIR@")
 
 if(NOT TARGET galois AND NOT Galois_BINARY_DIR)
   include("${GALOIS_CMAKE_DIR}/GaloisTargets.cmake")
 endif()
 
 set(Galois_LIBRARIES galois_shmem)
+set(Galois_LIBRARY_DIRS "@INSTALL_LIB_DIR@")
+set(Galois_BIN_DIRS "@INSTALL_BIN_DIR@")
 set(Galois_CXX_COMPILER "@GALOIS_CXX_COMPILER@")
 set(Galois_CXX_FLAGS "@GALOIS_FLAGS@")
