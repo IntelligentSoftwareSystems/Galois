@@ -2,6 +2,48 @@
 version = 2
 basepath = /net/ohm/export/iss/inputs
 
+[rmat10]
+flags =
+name = rmat10
+file = scalefree/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.gr
+format = bin/galois
+
+[rmat10-transpose]
+flags =
+name = rmat10-transpose
+file = scalefree/transpose/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.tgr
+format = bin/galois
+
+[rmat10-symmetric]
+flags =
+name = rmat10-sym
+file = scalefree/symmetric/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.sgr
+format = bin/galois
+
+[dblp-triangles]
+flags =
+name = dblp-triangles
+file = stanford/communities/DBLP/com-dblp.wgt32.sym.gr.triangles
+format = triangles
+
+[weighted/bipartite/bgg]
+flags =
+name = bgg
+file = weighted/bipartite/floatEdgeWts/bgg.gr
+format = bin/galois
+
+[meshes/250k.2]
+flags =
+name = 250k
+file = meshes/250k.2
+format = mesh
+
+[meshes/250k.2n]
+flags =
+name = 250kn
+file = meshes/250k.2.node
+format = mesh
+
 [scalefree/rmat8-2e14.gr]
 flags =
 name = rmat8-2e14

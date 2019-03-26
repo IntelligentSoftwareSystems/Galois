@@ -7,11 +7,11 @@ class SharedMemApp(GraphBMKSharedMem):
     most if not all shared memory apps.
     """
     # thread to start from
-    startThread = 0
+    startThread = 40
     # thread to end at (inclusive)
-    endThread = 56
+    endThread = 40
     # step to use for looping through threads
-    step = 7
+    step = 1
 
     def filter_inputs(self, inputs):
         """Ignore inputs that aren't currently supported."""
@@ -64,7 +64,7 @@ class SharedMemApp(GraphBMKSharedMem):
             x.set_arg("-statFile=" +
                       os.path.expandvars(
                         os.path.join(config.get_var("logOutputDirectory"),
-                                     self.getUniqueStatFile(numThreads, 
+                                     self.getUniqueStatFile(numThreads,
                                      nameToAppend))
                       ))
 
@@ -89,10 +89,10 @@ class BarnesHut(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-n=500000")
+            s.set_arg("-n=100000")
             s.set_arg("-steps=1")
             s.set_arg("-seed=0")
-        
+
         return specs
 
 class BCAsync(SharedMemApp):
@@ -105,8 +105,8 @@ class BCAsync(SharedMemApp):
 
         for s in specs:
             # do 5 nodes with edges
-            s.set_arg("-numOfOutSources=5") 
-        
+            s.set_arg("-numOfOutSources=5")
+
         return specs
 
 class BCOuter(SharedMemApp):
@@ -134,8 +134,8 @@ class Clustering(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-numPoints=10000") # num points to cluster
-        
+            s.set_arg("-numPoints=100") # num points to cluster
+
         return specs
 
 class ConnectedComponents(SharedMemApp):
@@ -164,7 +164,7 @@ class GMetis(SharedMemApp):
 
         for s in specs:
             s.set_arg("256") # num of partitions
-        
+
         return specs
 
 class IndependentSet(SharedMemApp):
@@ -184,17 +184,17 @@ class MatrixCompletionSync(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=syncALS") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MatrixCompletionSimple(SharedMemApp):
@@ -207,17 +207,17 @@ class MatrixCompletionSimple(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=simpleALS") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MatrixCompletionEdge(SharedMemApp):
@@ -230,17 +230,17 @@ class MatrixCompletionEdge(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=sgdBlockEdge") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MatrixCompletionJump(SharedMemApp):
@@ -253,17 +253,17 @@ class MatrixCompletionJump(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=sgdBlockJump") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MatrixCompletionByItems(SharedMemApp):
@@ -276,17 +276,17 @@ class MatrixCompletionByItems(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=sgdByItems") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MatrixCompletionByEdges(SharedMemApp):
@@ -299,17 +299,17 @@ class MatrixCompletionByEdges(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=sgdByEdges") # algo type
-            s.set_arg("-lambda=0.001") 
-            s.set_arg("-learningRate=0.01") 
-            s.set_arg("-learningRateFunction=intel") 
-            s.set_arg("-tolerance=0.0001") 
+            s.set_arg("-lambda=0.001")
+            s.set_arg("-learningRate=0.01")
+            s.set_arg("-learningRateFunction=intel")
+            s.set_arg("-tolerance=0.01")
             s.set_arg("-noverify")
             s.set_arg("-useSameLatentVector")
             s.set_arg("-useDetInit")
             if MCCAP:
               s.set_arg("-fixedRounds=8")
               s.set_arg("-maxUpdates=8")
-        
+
         return specs
 
 class MCM(SharedMemApp):
@@ -323,11 +323,11 @@ class MCM(SharedMemApp):
         for s in specs:
             s.set_arg("-abmpAlgo")
             s.set_arg("-inputType=generated")
-            s.set_arg("-n=1000000") # nodes in each bipartite set
-            s.set_arg("-numEdges=100000000") 
-            s.set_arg("-numGroups=10000") 
+            s.set_arg("-n=100") # nodes in each bipartite set
+            s.set_arg("-numEdges=10000")
+            s.set_arg("-numGroups=100")
             s.set_arg("-seed=0") # seed for rng; keep it consistent
-        
+
         return specs
 
 
@@ -340,8 +340,8 @@ class PageRankPull(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
-        
+            s.set_arg("-tolerance=0.01") # pagerank tolerance
+
         return specs
 
 class PageRankPullTopo(SharedMemApp):
@@ -353,9 +353,9 @@ class PageRankPullTopo(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
+            s.set_arg("-tolerance=0.01") # pagerank tolerance
             s.set_arg("-algo=Topo") # pagerank tolerance
-        
+
         return specs
 
 class PageRankPush(SharedMemApp):
@@ -367,8 +367,8 @@ class PageRankPush(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
-        
+            s.set_arg("-tolerance=0.01") # pagerank tolerance
+
         return specs
 
 class PageRankPushSync(SharedMemApp):
@@ -380,9 +380,9 @@ class PageRankPushSync(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-tolerance=0.001") # pagerank tolerance
+            s.set_arg("-tolerance=0.01") # pagerank tolerance
             s.set_arg("-algo=Sync") # pagerank tolerance
-        
+
         return specs
 
 # for galois 2.2 version of pagerank
@@ -395,9 +395,9 @@ class PageRank2Point2(SharedMemApp):
         specs = self.get_default_run_specs(bmkinput, config)
 
         for s in specs:
-            s.set_arg("-graphTranspose=%s" % bmkinput.props.ptranspose) 
+            s.set_arg("-graphTranspose=%s" % bmkinput.props.ptranspose)
             s.set_arg("-maxIterations=1000")
-        
+
         return specs
 
 class PreflowPush(SharedMemApp):
@@ -411,7 +411,7 @@ class PreflowPush(SharedMemApp):
         for s in specs:
             s.set_arg("0") # source id
             s.set_arg("100") # sink id
-        
+
         return specs
 
 class PointsToAnalysis(SharedMemApp):
@@ -419,7 +419,7 @@ class PointsToAnalysis(SharedMemApp):
     benchmark = "pta"
 
 class SpanningTree(SharedMemApp):
-    relativeAppPath = "spanningtree/spanningtree"  
+    relativeAppPath = "spanningtree/spanningtree"
     benchmark = "spanningtree"
 
 class SSSP(SharedMemApp):
@@ -435,7 +435,7 @@ class SSSP(SharedMemApp):
         for s in specs:
             #s.set_arg("-delta=0")
             s.set_arg("-delta=8")
-        
+
         return specs
 
 class SurveyPropagation(SharedMemApp):
@@ -448,15 +448,15 @@ class SurveyPropagation(SharedMemApp):
 
         for s in specs:
             s.set_arg("9") # random generator seed
-            s.set_arg("2000000") # number of vars
-            s.set_arg("6000000") # number of clauses
-            s.set_arg("4") # vars per clause
+            s.set_arg("100") # number of vars
+            s.set_arg("100") # number of clauses
+            s.set_arg("3") # vars per clause
 
             # below are args used by runs on galois website
             #s.set_arg("1000000") # number of vars
             #s.set_arg("3000000") # number of clauses
             #s.set_arg("3") # vars per clause
-       
+
         return specs
 
 class TrianglesNode(SharedMemApp):
@@ -469,7 +469,7 @@ class TrianglesNode(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=nodeiterator")
-        
+
         return specs
 
 class TrianglesEdge(SharedMemApp):
@@ -482,24 +482,24 @@ class TrianglesEdge(SharedMemApp):
 
         for s in specs:
             s.set_arg("-algo=edgeiterator")
-        
+
         return specs
 
 # specification of binaries to run
 # apps present in Galois 2.2
-#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(), 
-#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-#            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(), 
+#BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(), BoruvkaMerge(),
+#            Clustering(), ConnectedComponents(), DelaunayTriangulation(), DMR(),
+#            GMetis(), IndependentSet(), MCM(), PageRankPull(), PageRankPush(),
 #            PreflowPush(), SpanningTree(), SSSP(), SurveyPropagation()]
 
 # single benchmark run
-#BINARIES = [MatrixCompletionSimple()]
+#BINARIES = [SurveyPropagation(), TrianglesNode(), TrianglesEdge()]
 
-BINARIES = [BarnesHut(), BFS(), BCAsync(), BCOuter(), Boruvka(), 
-            ConnectedComponents(), DelaunayTriangulation(), DMR(), 
-            GMetis(), IndependentSet(), MatrixCompletionSync(), 
-            MatrixCompletionSimple(), MatrixCompletionEdge(), 
-            MatrixCompletionJump(), MatrixCompletionByItems(), 
-            MatrixCompletionByEdges(), MCM(), PageRankPull(), PageRankPush(), 
-            PreflowPush(), PointsToAnalysis(), SSSP(), SurveyPropagation(), 
-            TrianglesNode(), TrianglesEdge()] 
+BINARIES = [BarnesHut(), BFS(), BCOuter(), Boruvka(),
+            ConnectedComponents(), DelaunayTriangulation(), DMR(),
+            GMetis(), IndependentSet(), MatrixCompletionSync(),
+            MatrixCompletionSimple(), MatrixCompletionEdge(),
+            MatrixCompletionJump(), MatrixCompletionByItems(),
+            MatrixCompletionByEdges(), MCM(), PageRankPull(), PageRankPush(),
+            PreflowPush(), PointsToAnalysis(), SSSP(), SurveyPropagation(),
+            TrianglesNode(), TrianglesEdge()]
