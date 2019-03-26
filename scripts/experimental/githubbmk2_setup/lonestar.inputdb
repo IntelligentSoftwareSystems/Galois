@@ -1,0 +1,153 @@
+[bmktest2]
+version = 2
+basepath = /net/ohm/export/iss/inputs
+
+[scalefree/rmat8-2e14.gr]
+flags =
+name = rmat8-2e14
+file = scalefree/deprecated/rmat8-2e14.gr
+format = bin/galois
+
+[random/r4-2e26.gr]
+flags =
+name = r4-2e26
+file = random/r4-2e26.gr
+format = bin/galois
+
+[random/r4-2e26.sgr]
+flags =
+name = r4-2e26-symmetric
+file = random/symmetric/r4-2e26.gr
+format = bin/galois
+
+[random/rmat25.rsgr]
+flags =
+name = rmat25-rsymmetric
+file = scalefree/randomized/symmetric/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.srgr
+format = bin/galois
+
+[road/USA-road-d.USA.gr]
+flags =
+name = USA-road-d.USA
+file = road/USA-road-d.USA.gr
+format = bin/galois
+
+[unweighted/uk-2007-05.sgr]
+flags =
+name = uk-2007-05-symmetric
+file = unweighted/uk-2007-05.sgr
+format = bin/galois
+
+[scalefree/symmetric/rmat26.sgr]
+flags =
+name = rmat26-symmetric
+file = scalefree/symmetric/rmat16-2e26-a=0.57-b=0.19-c=0.19-d=.05.sgr
+format = bin/galois
+
+[scalefree/rmat28.gr]
+flags =
+name = rmat28
+file = scalefree/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=.05.gr
+format = bin/galois
+
+[scalefree/random/rmat27.sgr]
+flags =
+name = rmat27-rsymmetric
+file = scalefree/randomized/symmetric/rmat16-2e27-a=0.57-b=0.19-c=0.19-d=.05.srgr
+format = bin/galois
+
+[scalefree/random/rmat28.sgr]
+flags =
+name = rmat28-symmetric
+file = scalefree/randomized/symmetric/rmat16-2e28-a=0.57-b=0.19-c=0.19-d=0.05.srgr
+format = bin/galois
+
+[meshes/r5M]
+flags =
+name = r5M
+file = meshes/r5M
+format = mesh
+
+[meshes/r5Mn]
+flags =
+name = r5Mn
+file = meshes/r5M.node
+format = mesh/nodes
+
+[twitter40]
+flags =
+name = twitter40
+file = unweighted/twitter-WWW10-component.gr
+format = bin/galois
+
+[twitter40-transpose]
+flags =
+name = twitter40-transpose
+file = unweighted/twitter-WWW10-component-transpose.gr
+format = bin/galois
+
+[twitter40-symmetric]
+flags =
+name = twitter40-symmetric
+file = unweighted/twitter-WWW10-component-symmetric.gr
+format = bin/galois
+
+[twitter50]
+flags =
+name = twitter50
+file = unweighted/twitter-ICWSM10-component.gr
+format = bin/galois
+
+[twitter50w]
+flags =
+name = twitter50w
+file = unweighted/withRandomWeights/twitter-ICWSM10-component_withRandomWeights.gr
+format = bin/galois
+
+[twitter50-transpose]
+flags =
+name = twitter50-transpose
+file = unweighted/twitter-ICWSM10-component-transpose.gr
+format = bin/galois
+
+[soc-livejournal]
+flags =
+name = soc-livejournal
+file = unweighted/soc-LiveJournal1.gr
+format = bin/galois
+
+[com-lj]
+flags =
+name = com-lj
+file = stanford/communities/LiveJournal/com-lj.wgt32.sym.gr.triangles
+format = triangles
+
+[weighted/bipartite/yahoo]
+flags =
+name = yahoo-music
+file = weighted/bipartite/yahoo.gr
+format = bin/galois
+
+[weighted/bipartite/netflix]
+flags =
+name = netflix
+file = weighted/bipartite/floatEdgeWts/netflix.gr
+format = bin/galois
+
+[java/pta/tshark_constraints]
+flags =
+name = tshark_constraints
+file = java/pta/tshark_constraints.txt
+format = text
+
+[java/pta/gdb_constraints]
+flags =
+name = gdb_constraints
+file = java/pta/gdb_constraints.txt
+format = text
+
+[nothing]
+flags =
+name = nothing
+file = 
+format = nothing
