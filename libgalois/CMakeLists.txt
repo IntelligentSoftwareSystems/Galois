@@ -41,7 +41,7 @@ set(sources
         src/Tracer.cpp
 )
 
-add_library(galois_shmem STATIC ${sources})
+add_library(galois_shmem ${sources})
 target_include_directories(galois_shmem PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:${GALOIS_RELATIVE_INCLUDE_DIR}>
