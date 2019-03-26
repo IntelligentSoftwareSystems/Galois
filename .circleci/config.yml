@@ -71,7 +71,8 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
@@ -99,7 +100,8 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
@@ -129,7 +131,8 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
@@ -150,6 +153,10 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
+          # The latest conda-forge libcxx package appears to have some issues with CentOS 6.
+          # Work around that by pinning the llvm/clang/libcxx version to 6.
+          # Also pull in the libcxx package even though it's tagged as "broken" for now.
+          # See https://github.com/conda-forge/libcxx-feedstock/issues/35.
           conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 zlib
           conda install -y -q -c conda-forge -c conda-forge/label/broken libcxx=6
           mkdir build
