@@ -49,6 +49,12 @@ else()
   set(DEFAULT_INSTALL_CMAKE_DIR "${CMAKE_INSTALL_LIBDIR}/CMake/Galois")
 endif()
 
+# This option is automatically handled by CMake.
+# It makes add_library build a shared lib unless STATIC is explicitly specified.
+# Putting this here is mostly just a placeholder so people know it's an option.
+# Currently this is really only intended to change anything for the libgalois_shmem target.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "Build shared libraries.")
+
 set(INSTALL_CMAKE_DIR "${DEFAULT_INSTALL_CMAKE_DIR}" CACHE PATH "Installation directory for CMake files")
 # Make relative path absolute
 if(NOT IS_ABSOLUTE "${INSTALL_CMAKE_DIR}")
