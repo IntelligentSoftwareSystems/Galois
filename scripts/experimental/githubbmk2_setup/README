@@ -88,16 +88,8 @@ run bfs with the twitter40 input.
 bfs twitter40
 
 -----
-How to run out of the box
+How to run:
 -----
 
-Set the following environment variables:
-
-BMK_LONESTAR_PATH to the lonestar directory
-BMK_LOGS to wherever you want the logs to go
-
-Then run the following in THIS directory (same as README):
-
-python <path to bmk2/test2.py> run
-
-TODO explain the bmktest2.py file
+defaultrunscript.sh has a default command to start the bmk2 runtime and use the
+config specified in the directory you run it from.
