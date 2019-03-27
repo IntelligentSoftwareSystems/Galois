@@ -1,5 +1,8 @@
 #include <iostream>
+#include <set>
+#include <fstream>
 #include "galois/AtomicHelpers.h"
+#include "galois/DynamicBitset.h"
 #include "galois/Galois.h"
 #include "galois/graphs/LCGraph.h"
 #include "galois/Timer.h"
@@ -10,22 +13,31 @@ namespace cll = llvm::cl;
 
 enum Algo {
     naive = 0,
-    peeling
+    peeling,
+    hindex
 };
 
 static cll::opt<std::string>
     inputFName(cll::Positional, 
             cll::desc("<input graph>"), cll::Required);
 static cll::opt<unsigned int>
-    numThreads("t", cll::desc("Number of threads"), cll::init(1));
+    numThreads("t", cll::desc("Number of threads"), cll::init(56));
 static cll::opt<Algo>
     algo("algo", cll::desc("Choose an algorithm:"),
             cll::values(clEnumVal(naive, "naive"),
-                       clEnumVal(peeling, "peeling")),
-            cll::init(naive));
+                       clEnumVal(peeling, "peeling"),
+                       clEnumVal(hindex, "hindex"), clEnumValEnd),
+            cll::init(hindex));
+static cll::opt<unsigned int>
+    outputP("o", cll::desc("Do you want to print outputs?"), cll::init(0));
 
 typedef uint64_t DegreeTy;
 typedef std::atomic<DegreeTy> aDegreeTy;
+//! Per-Thread-Storage Declaration
+typedef galois::gstl::Vector<DegreeTy> VecTy;
+typedef galois::substrate::PerThreadStorage<VecTy> ThreadLocalData;
+//! Per-Thread-Storage Declaration
+
 
 DegreeTy* kcoreMap;
 
@@ -39,6 +51,8 @@ constexpr static const unsigned CHUNK_SIZE = 64u;
 using Graph =
     galois::graphs::LC_CSR_Graph<aDegreeTy, void>::with_no_lockable<true>::type;
 using GNode = Graph::GraphNode;
+using DynamicBitSet = galois::DynamicBitSet;
+
 
 /**
  * initialize()
@@ -54,8 +68,7 @@ void initialize(Graph &graph) {
                     std::distance(graph.edge_begin(cNode),
                                   graph.edge_end(cNode)));
             },
-            galois::loopname("Initialization"),
-            galois::no_stats() );
+            galois::loopname("Initialization") );
 }
 
 /**
@@ -77,8 +90,7 @@ void initialize(Graph &graph, aDegreeTy& maxDegree, aDegreeTy& minDegree) {
                galois::atomicMin(minDegree, (DegreeTy) cNDegree);
                galois::atomicMax(maxDegree, (DegreeTy) cNDegree);
             },
-            galois::loopname("Initialization"),
-            galois::no_stats() );
+            galois::loopname("Initialization") );
 }
 
 /**
@@ -104,8 +116,7 @@ void initialize(Graph &graph, aDegreeTy& maxDegree,
                galois::atomicMax(maxDegree, (DegreeTy) cNDegree);
                curr.push(cNode);
             },
-            galois::loopname("Initialization"),
-            galois::no_stats() );
+            galois::loopname("Initialization") );
 }
 
 /**
@@ -135,8 +146,7 @@ uint8_t parFindKCore(Graph &graph, DegreeTy k) {
                         cur.emplace(cNode);
                 }
             },
-            galois::steal(),
-            galois::no_stats() );
+            galois::steal() );
 
     // Perform trimming. 
     galois::for_each(galois::iterate(cur.begin(), cur.end()),
@@ -192,8 +202,7 @@ int8_t parFindKCore(Graph &graph, DegreeTy k,
                     }
                 }
             },
-            galois::steal(),
-            galois::no_stats() );
+            galois::steal() );
 
     // Perform trimming. 
     galois::for_each(galois::iterate(curr.begin(), curr.end()),
@@ -277,8 +286,87 @@ DegreeTy peelingCoreness(Graph &graph, galois::InsertBag<GNode>& curr) {
     return cand_k;
 }
 
+bool H(Graph &graph, DynamicBitSet &isDead, GNode cNode,
+            ThreadLocalData &nodesThreadLocal) {
+    auto& adjHs = *nodesThreadLocal.getLocal();
+    adjHs.clear();
+    adjHs.resize(std::distance(graph.edge_begin(cNode),
+                               graph.edge_end(cNode))+1, 0);
+
+    unsigned int idx;
+    for (auto e : graph.edges(cNode)) {
+        GNode neigh = graph.getEdgeDst(e);
+        idx = std::min<DegreeTy>(kcoreMap[cNode], kcoreMap[neigh]);
+        adjHs[idx]++;
+    }
+
+    DegreeTy sum = 0, curH = kcoreMap[cNode];
+    while (curH >= 1) {
+        sum += adjHs[curH];
+        if (sum >= curH) break;
+        curH--;
+    }
+
+    if (kcoreMap[cNode] == curH) {
+        return false;
+    } else if (kcoreMap[cNode] > curH) {
+        kcoreMap[cNode] = curH;
+    }
+
+    for (auto e : graph.edges(cNode)) {
+        GNode neigh = graph.getEdgeDst(e);
+        isDead.reset(neigh);
+    }
+
+    return true;
+}
+
+/**
+ * hIndexCoreness()
+ * @graph: Target graph.
+ *
+ * Find coreness for each node by exploiting h-index method.
+ *
+ * Return: Maximal coreness value.
+ */
+DegreeTy hIndexCoreness(Graph &graph, ThreadLocalData &nodesThreadLocal) {
+    aDegreeTy maxDegree(MIN_DEGREE);
+    DynamicBitSet isDead;
+    isDead.resize(graph.size());
+
+    /* Initially, put all nodes onto the current bag */
+    galois::do_all(galois::iterate(graph), [&](GNode node) {
+            kcoreMap[node] = std::distance(graph.edge_begin(node),
+                                           graph.edge_end(node)); },
+            galois::loopname("HIndexCorenessInitialization"),
+            galois::no_conflicts(),
+            galois::steal());
+
+    bool isChange;
+    do {
+        isChange = false;
+        galois::do_all(galois::iterate(graph.begin(), graph.end()),
+                [&](GNode cNode) {
+                    if (!isDead.test(cNode)) {
+                        isDead.set(cNode);
+                        if (H(graph, isDead, cNode, nodesThreadLocal))
+                            isChange = true;
+                    }
+                },
+                galois::loopname("HIndexCoreness"),
+                galois::steal(),
+                galois::chunk_size<CHUNK_SIZE>() );
+
+        if (!isChange) break;
+    } while(true);
+
+    return maxDegree;
+}
+
 int main(int argc, char** argv) {
     galois::SharedMemSys G;
+    ThreadLocalData nodesThreadLocal;
+
     Graph graph;
     galois::InsertBag<GNode> initBag;
     int coreness = 0;
@@ -295,13 +383,15 @@ int main(int argc, char** argv) {
     numThreads = galois::setActiveThreads(numThreads);
 
     galois::do_all(galois::iterate(0ul, (unsigned long) graph.size()),
-                        [&](unsigned long i){ kcoreMap[i] = 0; });
+                    [&](unsigned long i){ kcoreMap[i] = 0; });
 
     // preallocate
-    //galois::preAlloc((numThreads + (graph.size() * sizeof(unsigned) * 2) /
-    //            galois::runtime::pagePoolSize()) * 8); */
+    /*
+    galois::preAlloc((numThreads + (graph.size() * sizeof(unsigned) * 2) /
+                galois::runtime::pagePoolSize()) * 8);
+                */
 
-    galois::StatTimer Tmain;
+    galois::StatTimer Tmain("RunningTime");
     Tmain.start();
 
     switch (algo) {
@@ -311,14 +401,23 @@ int main(int argc, char** argv) {
         case peeling:
             coreness = peelingCoreness(graph, initBag);
         break;
+        case hindex:
+            coreness = hIndexCoreness(graph, nodesThreadLocal);
+        break;
     }
 
     Tmain.stop();
+
     std::cout << "Graph [" << inputFName << "] has coreness of "
         << coreness << std::endl;
-
-    for (size_t node = 0; node != graph.size(); node++) {
-        std::cout << node << "," << kcoreMap[node] << std::endl;
+    if (outputP) {
+        std::ofstream fp;
+        fp.open("kcore_output", std::ofstream::out);
+        for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ii++) {
+            fp << *ii << "," << kcoreMap[*ii] << std::endl;
+//            std::cout << *ii << "," << kcoreMap[*ii] << std::endl;
+        }
+        fp.close();
     }
 
     delete kcoreMap;
