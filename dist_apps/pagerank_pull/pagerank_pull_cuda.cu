@@ -686,6 +686,7 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
   PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
+  cudaDeviceSynchronize();
   // FP: "6 -> 7;
 }
 void PageRank_allNodes_cuda(struct CUDA_Context*  ctx)
