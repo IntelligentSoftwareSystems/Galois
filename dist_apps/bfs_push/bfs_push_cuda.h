@@ -158,9 +158,11 @@ void BFS_masterNodes_cuda(unsigned int& DGAccumulator_accum,
                           struct CUDA_Context* ctx);
 void BFS_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
                              unsigned int& work_items,
+                             unsigned int & active_vertices,
                              const uint32_t local_priority,
                              struct CUDA_Context* ctx);
 void FirstItr_BFS_cuda(unsigned int __begin, unsigned int __end,
+					   unsigned int & active_vertices,
                        struct CUDA_Context* ctx);
 void FirstItr_BFS_allNodes_cuda(struct CUDA_Context* ctx);
 void FirstItr_BFS_masterNodes_cuda(struct CUDA_Context* ctx);
@@ -178,3 +180,6 @@ void InitializeGraph_masterNodes_cuda(const uint32_t& local_infinity,
 void InitializeGraph_nodesWithEdges_cuda(const uint32_t& local_infinity,
                                          unsigned long long local_src_node,
                                          struct CUDA_Context* ctx);
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx);
+std::string get_num_thread_blocks(struct CUDA_Context* ctx);
+void init_CUDA_stat_context(struct CUDA_Context* ctx);
