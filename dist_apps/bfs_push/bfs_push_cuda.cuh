@@ -63,7 +63,6 @@ void init_CUDA_stat_context(struct CUDA_Context* ctx){
 	dim3 blocks;
 	dim3 threads;
 	kernel_sizing(blocks, threads);
-//ctx->stats.thread_blocks_work.alloc(MAX_THREAD_BLOCKS_PE_SM);
 	ctx->stats.thread_blocks_work.alloc(blocks.x* blocks.y* blocks.z);
 	ctx->stats.thread_blocks_work.zero_gpu();
 }

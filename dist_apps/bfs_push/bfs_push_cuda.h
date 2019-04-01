@@ -131,6 +131,7 @@ void batch_reset_node_dist_old_cuda(struct CUDA_Context* ctx, size_t begin,
 void BFS_cuda(unsigned int __begin, unsigned int __end,
               unsigned int& DGAccumulator_accum, 
               unsigned int& work_items,
+              unsigned int & active_vertices,
               const uint32_t local_priority,
               struct CUDA_Context* ctx);
 void BFSSanityCheck_cuda(unsigned int __begin, unsigned int __end,
@@ -150,10 +151,12 @@ void BFSSanityCheck_nodesWithEdges_cuda(uint64_t& DGAccumulator_sum,
                                         struct CUDA_Context* ctx);
 void BFS_allNodes_cuda(unsigned int& DGAccumulator_accum,
                        unsigned int& work_items,
+                       unsigned int & active_vertices,
                        const uint32_t local_priority,
                        struct CUDA_Context* ctx);
 void BFS_masterNodes_cuda(unsigned int& DGAccumulator_accum,
                           unsigned int& work_items,
+                          unsigned int & active_vertices,
                           const uint32_t local_priority,
                           struct CUDA_Context* ctx);
 void BFS_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
