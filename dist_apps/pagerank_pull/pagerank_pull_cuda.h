@@ -249,3 +249,6 @@ void ResetGraph_masterNodes_cuda(const float& local_alpha,
                                  struct CUDA_Context* ctx);
 void ResetGraph_nodesWithEdges_cuda(const float& local_alpha,
                                     struct CUDA_Context* ctx);
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx);
+std::string get_num_thread_blocks(struct CUDA_Context* ctx);
+void init_CUDA_stat_context(struct CUDA_Context* ctx);

@@ -281,7 +281,7 @@ __global__ void PageRank_delta(CSRGraph graph, unsigned int __begin, unsigned in
   // FP: "17 -> 18;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
 }
-__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual)
+__global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __end, float * p_delta, float * p_residual, DynamicBitset& bitset_residual, uint32_t * thread_block_work)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -334,7 +334,12 @@ __global__ void PageRank(CSRGraph graph, unsigned int __begin, unsigned int __en
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
     // FP: "20 -> 21;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
-    // FP: "21 -> 22;
+    if (threadIdx.x == 0) {
+	//TODO: The index blockIdx.x should be corrected if blockId has other y and z dimension.
+	thread_block_work[blockIdx.x] += _np_mps_total.el[0]+ _np_mps_total.el[1];
+     }    
+
+// FP: "21 -> 22;
     if (threadIdx.x == 0)
     {
       nps.tb.owner = MAX_TB_SIZE + 1;
@@ -665,6 +670,9 @@ void PageRank_delta_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, cons
   PageRank_delta_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, local_alpha, local_tolerance, ctx);
   // FP: "2 -> 3;
 }
+void reset_counters(struct CUDA_Context*  ctx) {
+	ctx->stats.thread_blocks_work.zero_gpu();
+}
 void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
@@ -673,8 +681,9 @@ void PageRank_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Conte
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
+  reset_counters(ctx);
   // FP: "4 -> 5;
-  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()));
+  PageRank <<<blocks, __tb_PageRank>>>(ctx->gg, __begin, __end, ctx->delta.data.gpu_wr_ptr(), ctx->residual.data.gpu_wr_ptr(), *(ctx->residual.is_updated.gpu_rd_ptr()), ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
   // FP: "6 -> 7;
