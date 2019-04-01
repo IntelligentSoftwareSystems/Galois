@@ -128,6 +128,7 @@ void ConnectedComp_cuda(unsigned int __begin, unsigned int __end,
                         struct CUDA_Context* ctx);
 void ConnectedCompSanityCheck_cuda(unsigned int __begin, unsigned int __end,
                                    uint64_t& DGAccumulator_accum,
+				   unsigned int & active_vertices,
                                    struct CUDA_Context* ctx);
 void ConnectedCompSanityCheck_allNodes_cuda(uint64_t& DGAccumulator_accum,
                                             struct CUDA_Context* ctx);
@@ -135,19 +136,23 @@ void ConnectedCompSanityCheck_masterNodes_cuda(uint64_t& DGAccumulator_accum,
                                                struct CUDA_Context* ctx);
 void ConnectedCompSanityCheck_nodesWithEdges_cuda(uint64_t& DGAccumulator_accum,
                                                   struct CUDA_Context* ctx);
-void ConnectedComp_allNodes_cuda(unsigned int& DGAccumulator_accum,
+void ConnectedComp_allNodes_cuda(unsigned int& DGAccumulator_accum, unsigned int & active_vertices,
                                  struct CUDA_Context* ctx);
-void ConnectedComp_masterNodes_cuda(unsigned int& DGAccumulator_accum,
+void ConnectedComp_masterNodes_cuda(unsigned int& DGAccumulator_accum, unsigned int & active_vertices,
                                     struct CUDA_Context* ctx);
-void ConnectedComp_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
+void ConnectedComp_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum, unsigned int & active_vertices,
                                        struct CUDA_Context* ctx);
 void FirstItr_ConnectedComp_cuda(unsigned int __begin, unsigned int __end,
+				unsigned int & active_vertices,
                                  struct CUDA_Context* ctx);
 void FirstItr_ConnectedComp_allNodes_cuda(struct CUDA_Context* ctx);
 void FirstItr_ConnectedComp_masterNodes_cuda(struct CUDA_Context* ctx);
-void FirstItr_ConnectedComp_nodesWithEdges_cuda(struct CUDA_Context* ctx);
+void FirstItr_ConnectedComp_nodesWithEdges_cuda(unsigned int & active_vertices, struct CUDA_Context* ctx);
 void InitializeGraph_cuda(unsigned int __begin, unsigned int __end,
                           struct CUDA_Context* ctx);
 void InitializeGraph_allNodes_cuda(struct CUDA_Context* ctx);
 void InitializeGraph_masterNodes_cuda(struct CUDA_Context* ctx);
 void InitializeGraph_nodesWithEdges_cuda(struct CUDA_Context* ctx);
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx);
+std::string get_num_thread_blocks(struct CUDA_Context* ctx);
+void init_CUDA_stat_context(struct CUDA_Context* ctx);

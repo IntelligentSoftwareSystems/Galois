@@ -615,6 +615,8 @@ void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int
 	*(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
+  cudaDeviceSynchronize();
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
   // FP: "6 -> 7;
 }
 void FirstItr_SSSP_allNodes_cuda(struct CUDA_Context*  ctx)
@@ -674,6 +676,7 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccu
   DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
   // FP: "11 -> 12;
   work_items = *(work_itemsval.cpu_rd_ptr());
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
 }
 void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, unsigned int & active_vertices, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {

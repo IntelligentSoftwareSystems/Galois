@@ -48,10 +48,11 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old, DynamicBitset& bitset_comp_current)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> active_vertices, uint32_t * thread_block_work)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
 
   const unsigned __kernel_tb_size = __tb_FirstItr_ConnectedComp;
   index_type src_end;
@@ -66,7 +67,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, uns
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
-
+  active_vertices.thread_entry();
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
@@ -82,6 +83,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, uns
     if (pop)
     {
       p_comp_old[src] = p_comp_current[src];
+      active_vertices.reduce( 1);
     }
     // FP: "10 -> 11;
     // FP: "13 -> 14;
@@ -102,6 +104,10 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, uns
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
     // FP: "21 -> 22;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
+    if (threadIdx.x == 0) {
+    	//TODO: The index blockIdx.x should be corrected if blockId has other y and z dimension.
+    	thread_block_work[blockIdx.x] += _np_mps_total.el[0]+ _np_mps_total.el[1];
+    }
     // FP: "22 -> 23;
     if (threadIdx.x == 0)
     {
@@ -264,15 +270,17 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int __begin, uns
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "113 -> 114;
 }
-__global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> DGAccumulator_accum)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, uint32_t * p_comp_old, DynamicBitset& bitset_comp_current, HGAccumulator<unsigned int> DGAccumulator_accum, HGAccumulator<unsigned int> active_vertices, uint32_t * thread_block_work)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = __tb_ConnectedComp;
   __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts; 
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -291,6 +299,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
   // FP: "5 -> 6;
   // FP: "6 -> 7;
   DGAccumulator_accum.thread_entry();
+  active_vertices.thread_entry();
   // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -306,6 +315,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
       if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
+	active_vertices.reduce( 1);
       }
       else
       {
@@ -331,6 +341,11 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
     // FP: "26 -> 27;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
+    if (threadIdx.x == 0) {
+		//TODO: The index blockIdx.x should be corrected if blockId has other y and z dimension.
+		thread_block_work[blockIdx.x] += _np_mps_total.el[0]+ _np_mps_total.el[1];
+	}
+
     // FP: "27 -> 28;
     if (threadIdx.x == 0)
     {
@@ -498,6 +513,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
   }
   // FP: "119 -> 120;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "120 -> 121;
 }
 __global__ void ConnectedCompSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_comp_current, HGAccumulator<uint64_t> DGAccumulator_accum)
@@ -560,47 +576,62 @@ void InitializeGraph_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
+void reset_counters(struct CUDA_Context*  ctx) {
+	ctx->stats.thread_blocks_work.zero_gpu();
+}
+void FirstItr_ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
+  reset_counters(ctx);
   // FP: "4 -> 5;
-  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()));
+  Shared<unsigned int> active_verticessval  = Shared<unsigned int>(1);
+  *(active_verticessval.cpu_wr_ptr()) = 0;
+  _active_vertices.rv = active_verticessval.gpu_wr_ptr();
+  FirstItr_ConnectedComp <<<blocks, __tb_FirstItr_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), 
+	ctx->comp_old.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _active_vertices, ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
+  cudaDeviceSynchronize();
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
   // FP: "6 -> 7;
 }
 void FirstItr_ConnectedComp_allNodes_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_ConnectedComp_cuda(0, ctx->gg.nnodes, ctx);
+  unsigned int active_vertices = 0;
+  FirstItr_ConnectedComp_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void FirstItr_ConnectedComp_masterNodes_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ctx);
+  unsigned int active_vertices = 0;
+  FirstItr_ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_ConnectedComp_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
+void FirstItr_ConnectedComp_nodesWithEdges_cuda(unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_ConnectedComp_cuda(0, ctx->numNodesWithEdges, ctx);
+  FirstItr_ConnectedComp_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
   HGAccumulator<unsigned int> _DGAccumulator_accum;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
+  reset_counters(ctx);
   // FP: "4 -> 5;
   Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
@@ -609,29 +640,33 @@ void ConnectedComp_cuda(unsigned int  __begin, unsigned int  __end, unsigned int
   // FP: "7 -> 8;
   _DGAccumulator_accum.rv = DGAccumulator_accumval.gpu_wr_ptr();
   // FP: "8 -> 9;
-  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum);
+  Shared<unsigned int> active_verticessval  = Shared<unsigned int>(1);
+  *(active_verticessval.cpu_wr_ptr()) = 0;
+  _active_vertices.rv = active_verticessval.gpu_wr_ptr();
+  ConnectedComp <<<blocks, __tb_ConnectedComp>>>(ctx->gg, __begin, __end, ctx->comp_current.data.gpu_wr_ptr(), ctx->comp_old.data.gpu_wr_ptr(), *(ctx->comp_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum, _active_vertices, ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
   DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
   // FP: "11 -> 12;
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
 }
-void ConnectedComp_allNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void ConnectedComp_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  ConnectedComp_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, ctx);
+  ConnectedComp_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void ConnectedComp_masterNodes_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void ConnectedComp_masterNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, ctx);
+  ConnectedComp_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void ConnectedComp_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, struct CUDA_Context*  ctx)
+void ConnectedComp_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  ConnectedComp_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, ctx);
+  ConnectedComp_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void ConnectedCompSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_accum, struct CUDA_Context*  ctx)

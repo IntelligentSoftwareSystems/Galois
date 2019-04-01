@@ -25,9 +25,14 @@
 #include "cc_push_cuda.h"
 #include "galois/runtime/cuda/DeviceSync.h"
 
+struct CUDA_Stat_Context {
+	Shared<uint32_t> thread_blocks_work;
+};
+
 struct CUDA_Context : public CUDA_Context_Common {
 	struct CUDA_Context_Field<uint32_t> comp_current;
 	struct CUDA_Context_Field<uint32_t> comp_old;
+	struct CUDA_Stat_Context stats;
 };
 
 struct CUDA_Context* get_CUDA_context(int id) {
@@ -50,6 +55,15 @@ void load_graph_CUDA(struct CUDA_Context* ctx, MarshalGraph &g, unsigned num_hos
 	load_graph_CUDA_field(ctx, &ctx->comp_current, num_hosts);
 	load_graph_CUDA_field(ctx, &ctx->comp_old, num_hosts);
 	reset_CUDA_context(ctx);
+	init_CUDA_stat_context(ctx);
+}
+void init_CUDA_stat_context(struct CUDA_Context* ctx){
+
+	dim3 blocks;
+	dim3 threads;
+	kernel_sizing(blocks, threads);
+	ctx->stats.thread_blocks_work.alloc(blocks.x* blocks.y* blocks.z);
+	ctx->stats.thread_blocks_work.zero_gpu();
 }
 
 void reset_CUDA_context(struct CUDA_Context* ctx) {
@@ -232,4 +246,21 @@ void batch_min_node_comp_old_cuda(struct CUDA_Context* ctx, unsigned from_id, ui
 void batch_reset_node_comp_old_cuda(struct CUDA_Context* ctx, size_t begin, size_t end, uint32_t v) {
 	reset_data_field<uint32_t>(&ctx->comp_old, begin, end, v);
 }
+
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx){
+
+	uint32_t *thread_block_work = ctx->stats.thread_blocks_work.cpu_rd_ptr();
+	std::string thread_block_work_str = "";
+	thread_block_work_str += std::to_string(thread_block_work[0]) ;
+	for (int i = 1; i <  ctx->stats.thread_blocks_work.size(); i++) {
+		thread_block_work_str += "," + std::to_string(thread_block_work[i]) ;
+	}
+	return thread_block_work_str;
+}
+
+std::string get_num_thread_blocks(struct CUDA_Context* ctx){
+
+	return std::to_string(ctx->stats.thread_blocks_work.size());
+}
+
 
