@@ -205,47 +205,6 @@ loadSymmetricDGraph(std::vector<unsigned>& scaleFactor,
 }
 
 /**
- * Loads a 2-way graph into memory.
- * Details/partitioning will be handled in the construct graph call.
- *
- * The user should NOT call this function.
- *
- * @tparam NodeData struct specifying what kind of data the node contains
- * @tparam EdgeData type specifying the type of the edge data
- *
- * @param scaleFactor Vector that specifies how much of the graph each
- * host should get
- * @param cuda_ctx CUDA context of the currently running program; only matters
- * if using GPU
- *
- * @returns Pointer to the loaded 2-way graph
- */
-template <typename NodeData, typename EdgeData>
-static galois::graphs::DistGraph<NodeData, EdgeData, true>*
-loadBDGraph(std::vector<unsigned>& scaleFactor,
-            struct CUDA_Context** cuda_ctx = nullptr) {
-  galois::StatTimer dGraphTimer("GraphConstructTime", "DistBench");
-  dGraphTimer.start();
-
-  galois::graphs::DistGraph<NodeData, EdgeData, true>* loadedGraph = nullptr;
-
-  // make sure that the symmetric graph flag was passed in
-  loadedGraph =
-      galois::graphs::constructTwoWayGraph<NodeData, EdgeData>(scaleFactor);
-  assert(loadedGraph != nullptr);
-
-#ifdef __GALOIS_HET_CUDA__
-  // TODO marshal the incoming edges as well....... (for now we don't have
-  // support for it)
-  marshalGPUGraph(loadedGraph, cuda_ctx);
-#endif
-
-  dGraphTimer.stop();
-
-  return loadedGraph;
-}
-
-/**
  * Loads a graph into memory, setting up heterogeneous execution if
  * necessary. Unlike the dGraph load functions above, this is meant
  * to be exposed to the user.
@@ -295,21 +254,6 @@ symmetricDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
 #else
   return loadSymmetricDGraph<NodeData, EdgeData>(scaleFactor);
-#endif
-}
-
-/**
- * TODO
- */
-template <typename NodeData, typename EdgeData>
-galois::graphs::DistGraph<NodeData, EdgeData, true>*
-twoWayDistGraphInitialization(struct CUDA_Context** cuda_ctx = nullptr) {
-  std::vector<unsigned> scaleFactor;
-#ifdef __GALOIS_HET_CUDA__
-  internal::heteroSetup(scaleFactor);
-  return loadBDGraph<NodeData, EdgeData>(scaleFactor, cuda_ctx);
-#else
-  return loadBDGraph<NodeData, EdgeData>(scaleFactor);
 #endif
 }
 

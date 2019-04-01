@@ -306,7 +306,6 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
       if (p_comp_old[src] > p_comp_current[src])
       {
         p_comp_old[src] = p_comp_current[src];
-        DGAccumulator_accum.reduce( 1);
       }
       else
       {
@@ -385,6 +384,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
         index_type jj;
         jj = ns +_np_j;
         {
+          DGAccumulator_accum.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;
@@ -431,6 +431,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
           index_type jj;
           jj = _np_w_start +_np_ii;
           {
+            DGAccumulator_accum.reduce( 1);
             index_type dst;
             uint32_t new_dist;
             uint32_t old_dist;
@@ -473,6 +474,7 @@ __global__ void ConnectedComp(CSRGraph graph, unsigned int __begin, unsigned int
         src = _np_closure[nps.fg.src[_np_i]].src;
         jj= nps.fg.itvalue[_np_i];
         {
+          DGAccumulator_accum.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;

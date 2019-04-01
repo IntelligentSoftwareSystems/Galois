@@ -115,7 +115,7 @@ Heterogeneous apps have additional command line parameters:
 Specifies the total number of PHYSICAL machines on the system. For example,
 you could have 2 machines with 8 GPUs each for a total of 16 processes,
 but you still would only have 2 machines. Therefore, you would use 
-`-num_nodes=2`.
+`-num_nodes=2`. Note that there **must** be one process per GPU in use.
 
 `-pset=<string>`
 

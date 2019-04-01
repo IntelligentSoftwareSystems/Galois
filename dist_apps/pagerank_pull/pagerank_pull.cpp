@@ -51,16 +51,6 @@ static cll::opt<unsigned int>
                   cll::desc("Maximum iterations: Default 1000"),
                   cll::init(1000));
 
-static cll::opt<float>
-    delta("delta",
-             cll::desc("Shift value for the delta step (default value 0)"), 
-             cll::init(0));
-
-static cll::opt<float>
-    maxRatio("maxRatio",
-             cll::desc("Maximum target ratio (0 to 1) of active nodes in a round to all nodes (default value 1)"), 
-             cll::init(1));
-
 /******************************************************************************/
 /* Graph structure declarations + other initialization */
 /******************************************************************************/
@@ -165,7 +155,6 @@ struct InitializeGraph {
 struct PageRank_delta {
   const float& local_alpha;
   cll::opt<float>& local_tolerance;
-  const float& local_priority;
   Graph* graph;
 
 #ifdef __GALOIS_HET_ASYNC__
@@ -175,18 +164,13 @@ struct PageRank_delta {
 #endif
 
   DGAccumulatorTy& DGAccumulator_accum;
-  galois::GAccumulator<uint32_t>& work_items;
 
   PageRank_delta(const float& _local_alpha, cll::opt<float>& _local_tolerance,
-                 const float& _local_priority,
-                 Graph* _graph, DGAccumulatorTy& _dga,
-                 galois::GAccumulator<uint32_t>& _work_items)
+                 Graph* _graph, DGAccumulatorTy& _dga)
       : local_alpha(_local_alpha), local_tolerance(_local_tolerance),
-        local_priority(_local_priority),
-        graph(_graph), DGAccumulator_accum(_dga), work_items(_work_items) {}
+        graph(_graph), DGAccumulator_accum(_dga) {}
 
-  void static go(Graph& _graph, DGAccumulatorTy& dga,
-      galois::GAccumulator<uint32_t>& work_items, float& priority) {
+  void static go(Graph& _graph, DGAccumulatorTy& dga) {
     const auto& allNodes = _graph.allNodesRange();
 
 #ifdef __GALOIS_HET_CUDA__
@@ -195,15 +179,13 @@ struct PageRank_delta {
       galois::StatTimer StatTimer_cuda(impl_str.c_str(), REGION_NAME);
       StatTimer_cuda.start();
       unsigned int __retval = 0;
-      unsigned int __retval2 = 0;
-      PageRank_delta_allNodes_cuda(__retval, __retval2, priority, alpha, tolerance, cuda_ctx);
+      PageRank_delta_allNodes_cuda(__retval, alpha, tolerance, cuda_ctx);
       dga += __retval;
-      work_items += __retval2;
       StatTimer_cuda.stop();
     } else if (personality == CPU)
 #endif
       galois::do_all(galois::iterate(allNodes.begin(), allNodes.end()),
-                     PageRank_delta{alpha, tolerance, priority, &_graph, dga, work_items},
+                     PageRank_delta{alpha, tolerance, &_graph, dga},
                      galois::no_stats(),
                      galois::loopname(
                          _graph.get_run_identifier("PageRank_delta").c_str()));
@@ -213,16 +195,15 @@ struct PageRank_delta {
     auto& sdata = graph->getData(src);
     sdata.delta = 0;
 
-    if (sdata.residual > this->local_tolerance) {
-      DGAccumulator_accum += 1;
-      if (sdata.residual > this->local_priority) {
-        sdata.value += sdata.residual;
-        work_items += 1;
+    if (sdata.residual > 0) {
+      sdata.value += sdata.residual;
+      if (sdata.residual > this->local_tolerance) {
         if (sdata.nout > 0) {
           sdata.delta = sdata.residual * (1 - local_alpha) / sdata.nout;
+          DGAccumulator_accum += 1;
         }
-        sdata.residual = 0;
       }
+      sdata.residual = 0;
     }
   }
 };
@@ -246,19 +227,10 @@ struct PageRank {
 
     // unsigned int reduced = 0;
 
-    float priority = delta;
-    if (maxRatio > 1) maxRatio = 1;
-    galois::GAccumulator<uint32_t> work_items;
-    uint32_t prev_work_items = 0;
-
     do {
-      if (prev_work_items == 0) priority -= delta;
-      else if (prev_work_items > (maxRatio * _graph.size())) priority += delta;
-
       _graph.set_num_round(_num_iterations);
       dga.reset();
-      work_items.reset();
-      PageRank_delta::go(_graph, dga, work_items, priority);
+      PageRank_delta::go(_graph, dga);
       // reset residual on mirrors
       _graph.reset_mirrorField<Reduce_add_residual>();
 
@@ -284,10 +256,9 @@ struct PageRank {
                   Bitset_residual>("PageRank");
 #endif
 
-      prev_work_items = work_items.reduce();
       galois::runtime::reportStat_Tsum(
           REGION_NAME, "NumWorkItems_" + (_graph.get_run_identifier()),
-          (unsigned long)prev_work_items);
+          (unsigned long)_graph.sizeEdges());
 
       ++_num_iterations;
     } while (
