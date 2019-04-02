@@ -341,26 +341,18 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
-if (GRAPH_LOCATION)
-  if (EXISTS ${GRAPH_LOCATION}/graph_readme.txt)
-    set(BASEINPUT ${GRAPH_LOCATION})
-    MESSAGE(STATUS "Using specified graph location ${GRAPH_LOCATION}")
-  else()
-    MESSAGE(FATAL_ERROR "Specified graph location does not appear to have input: ${GRAPH_LOCATION}")
-  endif()
-elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
-  set(BASEINPUT /net/ohm/export/cdgc/inputs/reference)
-  MESSAGE(STATUS "Using CDGC shared graph folder for inputs")
-elseif(EXISTS /net/ohm/export/iss/inputs/reference/graph_readme.txt)
-  set(BASEINPUT /net/ohm/export/iss/inputs/reference)
-  MESSAGE(STATUS "Using ISS shared graph folder for inputs")
+if(EXISTS "${GRAPH_LOCATION}")
+  MESSAGE(STATUS "USING graph location ${GRAPH_LOCATION}")
+  set(BASEINPUT "${GRAPH_LOCATION}")
+elseif(EXISTS /net/ohm/export/iss/inputs)
+  set(BASEINPUT /net/ohm/export/iss/inputs)
+  MESSAGE(STATUS "Using graph location /net/ohm/export/iss/inputs")
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
   MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
-set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
-
+  
 ###### Global Functions ######
 
 function(add_internal_library name)
