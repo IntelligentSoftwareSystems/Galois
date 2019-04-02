@@ -1,2 +1,11 @@
 app(pagerank-pull PageRank-pull.cpp)
 app(pagerank-push PageRank-push.cpp)
+
+add_test_scale(small pagerank-pull -tolerance=0.01 "${BASEINPUT}/scalefree/transpose/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.tgr")
+#add_test_scale(web pagerank-pull -tolerance=0.01 "${BASEINPUT}/unweighted/twitter-WWW10-component-transpose.gr")
+add_test_scale(topo-small pagerank-pull -tolerance=0.01 -algo=Topo "${BASEINPUT}/scalefree/transpose/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.tgr")
+#add_test_scale(topo-web pagerank-pull -tolerance=0.01 -algo=Topo "${BASEINPUT}/unweighted/twitter-WWW10-component-transpose.gr")
+add_test_scale(small pagerank-push -tolerance=0.01 "${BASEINPUT}/scalefree/transpose/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.tgr")
+#add_test_scale(web pagerank-push -tolerance=0.01 "${BASEINPUT}/unweighted/twitter-WWW10-component-transpose.gr")
+add_test_scale(sync-small pagerank-push -tolerance=0.01 -algo=Sync "${BASEINPUT}/scalefree/transpose/rmat16-2e10-a=0.57-b=0.19-c=0.19-d=.05.tgr")
+#add_test_scale(sync-web pagerank-pull -tolerance=0.01 -algo=Sync "${BASEINPUT}/unweighted/twitter-WWW10-component-transpose.gr")
