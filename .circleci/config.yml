@@ -21,8 +21,12 @@ jobs:
           apt-get -q install -y libboost-all-dev cmake
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -30,11 +34,15 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++
+          apt-get -q install -y libboost-all-dev cmake gcc g++ wget
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Ubuntu-16.04":
     docker:
       - image: ubuntu:16.04
@@ -42,11 +50,15 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev
+          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev wget
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-7-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -66,17 +78,23 @@ jobs:
           source scl_source enable devtoolset-7
           set -e
           # Use miniconda to get recent boost and cmake
-          wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
+          # Use Python 2 to make bmk2 work.
+          wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh
           bash miniconda.sh -b -p $HOME/miniconda
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-7-clang":
     # Clang on CentOS 7
     docker:
@@ -99,12 +117,17 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-6-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -129,12 +152,17 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
-          # conda-forge currently uses devtoolset compilers, so boost binary should be compatible.
+          # conda-forge used to use the devtoolset compilers.
+          # Use the latest boost build that's still ABI compatible there.
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-6-clang-libc++":
     # Clang on CentOS 7
     docker:
@@ -150,12 +178,20 @@ jobs:
           rm miniconda.sh
           export PATH=$HOME/miniconda/bin:$PATH
           source activate
+          # The latest conda-forge libcxx package appears to have some issues with CentOS 6.
+          # Work around that by pinning the llvm/clang/libcxx version to 6.
+          # Also pull in the libcxx package even though it's tagged as "broken" for now.
+          # See https://github.com/conda-forge/libcxx-feedstock/issues/35.
           conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 zlib
           conda install -y -q -c conda-forge -c conda-forge/label/broken libcxx=6
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Arch":
     docker:
       - image: archlinux/base
@@ -166,8 +202,12 @@ jobs:
           pacman -q -S --noconfirm gcc make cmake boost
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Alpine":
     docker:
       - image: frolvlad/alpine-gxx
@@ -177,19 +217,27 @@ jobs:
           apk add --no-cache --no-progress make cmake boost-dev zlib-dev
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "openSUSE":
     docker:
       - image: opensuse/leap:15
     steps:
       - checkout
       - run: |
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Fedora-gcc":
     docker:
       - image: fedora:28
@@ -199,8 +247,12 @@ jobs:
           yum -y -q install zlib-devel boost-devel make cmake gcc-c++
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Fedora-clang":
     docker:
       - image: fedora:28
@@ -213,8 +265,12 @@ jobs:
           yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
  
 workflows:
   version: 2
