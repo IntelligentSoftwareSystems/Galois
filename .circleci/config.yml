@@ -21,8 +21,12 @@ jobs:
           apt-get -q install -y libboost-all-dev cmake
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Ubuntu-18.04":
     docker:
       - image: ubuntu:18.04
@@ -30,11 +34,15 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++
+          apt-get -q install -y libboost-all-dev cmake gcc g++ wget
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Ubuntu-16.04":
     docker:
       - image: ubuntu:16.04
@@ -42,11 +50,15 @@ jobs:
       - checkout
       - run: |
           apt-get -q update -y
-          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev
+          apt-get -q install -y libboost-all-dev cmake gcc g++ zlib1g-dev wget
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-7-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -190,8 +202,12 @@ jobs:
           pacman -q -S --noconfirm gcc make cmake boost
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Alpine":
     docker:
       - image: frolvlad/alpine-gxx
@@ -201,19 +217,27 @@ jobs:
           apk add --no-cache --no-progress make cmake boost-dev zlib-dev
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "openSUSE":
     docker:
       - image: opensuse/leap:15
     steps:
       - checkout
       - run: |
-          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel
+          zypper --non-interactive install make cmake gcc-c++ boost-devel libboost_iostreams1_66_0-devel libboost_serialization1_66_0-devel zlib-devel wget tar gzip
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DBoost_LIBRARY_DIRS=/usr/lib64 -DBOOST_LIBRARYDIR=/usr/lib64 -DBoost_INCLUDE_DIRS=/usr/include -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Fedora-gcc":
     docker:
       - image: fedora:28
@@ -223,8 +247,12 @@ jobs:
           yum -y -q install zlib-devel boost-devel make cmake gcc-c++
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Fedora-clang":
     docker:
       - image: fedora:28
@@ -237,8 +265,12 @@ jobs:
           yum -y -q install zlib-devel boost-devel make cmake clang llvm-devel
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          curl http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz --output small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
  
 workflows:
   version: 2
