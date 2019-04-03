@@ -80,7 +80,7 @@ jobs:
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
           tar -xvzf small_inputs.tar.gz
           rm small_inputs.tar.gz
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs ..
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
           make test || :
   "CentOS-7-clang":
