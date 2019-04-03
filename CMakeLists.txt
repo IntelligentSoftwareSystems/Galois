@@ -75,6 +75,7 @@ set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
 # Enable cross compilation for specific architectures: For eg. -march=knl for knl architecture
 set(USE_ARCH native CACHE STRING "Use specific architecture for cross compilation (Default : native)")
+set(NUM_TEST_THREADS "" CACHE STRING "Number of threads to use for running the tests.")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -341,7 +342,7 @@ add_definitions(-D__STDC_LIMIT_MACROS)
 add_definitions(-D__STDC_CONSTANT_MACROS)
 
 ###### Test Inputs ######
-if(EXISTS "${GRAPH_LOCATION}")
+if(GRAPH_LOCATION AND EXISTS "${GRAPH_LOCATION}")
   MESSAGE(STATUS "USING graph location ${GRAPH_LOCATION}")
   set(BASEINPUT "${GRAPH_LOCATION}")
 elseif(EXISTS /net/ohm/export/iss/inputs)
@@ -361,7 +362,11 @@ endfunction()
 
 include(ProcessorCount)
 function(add_test_scale type app)
-  processorCount(N)
+  if(NUM_TEST_THREADS)
+    set(N ${NUM_TEST_THREADS})
+  else()
+    processorCount(N)
+  endif()
   if (N EQUAL 0)
     set(N 1)
   endif()
