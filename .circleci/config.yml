@@ -110,8 +110,12 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-6-gcc":
     docker:
       # Use an image with sudo enabled so packages can be installed.
@@ -141,8 +145,12 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "CentOS-6-clang-libc++":
     # Clang on CentOS 7
     docker:
@@ -166,8 +174,12 @@ jobs:
           conda install -y -q -c conda-forge -c conda-forge/label/broken libcxx=6
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_CXX_FLAGS="-stdlib=libc++" -DCMAKE_EXE_LINKER_FLAGS="-Wl,-rpath=$HOME/miniconda/lib" -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs -DNUM_TEST_THREADS=2 ..
           make -j4
+          make test || :
   "Arch":
     docker:
       - image: archlinux/base
