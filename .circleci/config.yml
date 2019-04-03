@@ -77,17 +77,12 @@ jobs:
           conda install -y -q -c conda-forge cmake boost-cpp=1.69.0=h3a22d5f_0
           mkdir build
           cd build
-          cmake -DCMAKE_VERBOSE_MAKEFILE=ON ..
+          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
+          tar -xvzf small_inputs.tar.gz
+          rm small_inputs.tar.gz
+          cmake -DCMAKE_VERBOSE_MAKEFILE=ON -DCMAKE_BUILD_TYPE=Release -DGRAPH_LOCATION=$(pwd)/small_inputs ..
           make -j4
-          # Run lonestar apps on small inputs with bmk2.
-          wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar -O small_inputs.tar
-          # small_inputs directory is hard-coded in to scripts/experimental/githubbmk2_setup/lonestar.inputdb
-          tar -xvzf small_inputs.tar
-          rm small_inputs.tar
-          cd ../scripts/experimental/githubbmk2_setup
-          export BMK_LONESTAR_PATH=../../../build/lonestar
-          export BMK_LOGS=../../../build
-          sh defaultrunscript.sh
+          make test || :
   "CentOS-7-clang":
     # Clang on CentOS 7
     docker:
