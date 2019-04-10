@@ -180,10 +180,7 @@ jobs:
           source activate
           # The latest conda-forge libcxx package appears to have some issues with CentOS 6.
           # Work around that by pinning the llvm/clang/libcxx version to 6.
-          # Also pull in the libcxx package even though it's tagged as "broken" for now.
-          # See https://github.com/conda-forge/libcxx-feedstock/issues/35.
-          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 zlib
-          conda install -y -q -c conda-forge -c conda-forge/label/broken libcxx=6
+          conda install -y -q -c conda-forge make cmake boost-cpp clangdev=6 llvmdev=6 llvm-meta=6 libcxx=6 zlib
           mkdir build
           cd build
           wget http://iss.ices.utexas.edu/projects/galois/downloads/small_inputs_for_lonestar_test.tar.gz -O small_inputs.tar.gz
