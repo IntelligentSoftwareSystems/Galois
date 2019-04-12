@@ -285,9 +285,9 @@ struct RecoveryForward {
         );
 
         _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                    Broadcast_current_length, Bitset_current_length>("RECOVERYForwardPass");
+                    Bitset_current_length>("RECOVERYForwardPass");
         _graph.sync<writeDestination, readAny, Reduce_add_path_accum,
-                    Broadcast_path_accum, Bitset_path_accum>("RECOVERYForwardPass");
+                    Bitset_path_accum>("RECOVERYForwardPass");
      
         // path accum operator
         RecoveryPathAccum(_graph);
@@ -299,7 +299,7 @@ struct RecoveryForward {
                     Broadcast_current_length,
                     Bitset_current_length>("RECOVERYForwardPass");
         _graph.sync<writeDestination, readAny, Reduce_add_path_accum,
-                    Broadcast_path_accum, Bitset_path_accum>("RECOVERYForwardPass");
+                    Bitset_path_accum>("RECOVERYForwardPass");
         RecoveryPathAccum(_graph);
       }
     }
@@ -376,9 +376,9 @@ struct ForwardPass {
       // read any because a destination node without the correct distance
       // may use a different distance (leading to incorrectness)
       _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                  Broadcast_current_length, Bitset_current_length>("ForwardPass");
+                  Bitset_current_length>("ForwardPass");
       _graph.sync<writeDestination, readAny, Reduce_add_path_accum,
-                  Broadcast_path_accum, Bitset_path_accum>("ForwardPass");
+                  Bitset_path_accum>("ForwardPass");
 
       PathAccum(_graph);
 
@@ -400,9 +400,9 @@ struct ForwardPass {
           // read any because a destination node without the correct distance
           // may use a different distance (leading to incorrectness)
           _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                      Broadcast_current_length, Bitset_current_length>("ForwardPass");
+                      Bitset_current_length>("ForwardPass");
           _graph.sync<writeDestination, readAny, Reduce_add_path_accum,
-                      Broadcast_path_accum, Bitset_path_accum>("ForwardPass");
+                      Bitset_path_accum>("ForwardPass");
           PathAccum(_graph);
 
           addForward = 1;
@@ -502,7 +502,7 @@ struct RecoveryBackward {
         );
 
         _graph.sync<writeSource, readAny, Reduce_add_dep_accum,
-                    Broadcast_dep_accum, Bitset_dep_accum>("RECOVERYBackwardPass");
+                    Bitset_dep_accum>("RECOVERYBackwardPass");
      
         // path accum operator
         RecoveryDepAccum(_graph);
@@ -511,7 +511,7 @@ struct RecoveryBackward {
       for (unsigned i = backInRound; i > toRepeat; i--) {
         // dummy sync
         _graph.sync<writeSource, readAny, Reduce_add_dep_accum,
-                    Broadcast_dep_accum, Bitset_dep_accum>("RECOVERYBackwardPass");
+                    Bitset_dep_accum>("RECOVERYBackwardPass");
         RecoveryDepAccum(_graph);
       }
     }
@@ -574,7 +574,7 @@ struct BackwardPass {
       );
 
       _graph.sync<writeSource, readAny, Reduce_add_dep_accum,
-                  Broadcast_dep_accum, Bitset_dep_accum>("BackwardPass");
+                  Bitset_dep_accum>("BackwardPass");
       DepAccum(_graph);
 
       if (enableFT && (globalRound == crashIteration)) {
@@ -592,7 +592,7 @@ struct BackwardPass {
           );
     
           _graph.sync<writeSource, readAny, Reduce_add_dep_accum,
-                      Broadcast_dep_accum, Bitset_dep_accum>("BackwardPass");
+                      Bitset_dep_accum>("BackwardPass");
           DepAccum(_graph);
           addBackward = 1;
         } else {

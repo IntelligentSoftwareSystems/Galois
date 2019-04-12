@@ -51,7 +51,11 @@ void batch_set_mirror_node_delta_cuda(struct CUDA_Context* ctx,
                                       DataCommMode data_mode);
 void batch_set_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
+void batch_add_mirror_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                               uint8_t* v, DataCommMode data_mode);
 void batch_add_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                               uint8_t* v, DataCommMode data_mode);
+void batch_min_mirror_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
 void batch_min_node_delta_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
@@ -87,7 +91,13 @@ void batch_set_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
 void batch_set_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               uint8_t* v,
                               DataCommMode data_mode);
+void batch_add_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                              uint8_t* v,
+                              DataCommMode data_mode);
 void batch_add_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                              uint8_t* v,
+                              DataCommMode data_mode);
+void batch_min_mirror_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
                               uint8_t* v,
                               DataCommMode data_mode);
 void batch_min_node_nout_cuda(struct CUDA_Context* ctx, unsigned from_id,
@@ -128,7 +138,13 @@ void batch_set_mirror_node_residual_cuda(struct CUDA_Context* ctx,
 void batch_set_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v,
                                   DataCommMode data_mode);
+void batch_add_mirror_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v,
+                                  DataCommMode data_mode);
 void batch_add_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v,
+                                  DataCommMode data_mode);
+void batch_min_mirror_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v,
                                   DataCommMode data_mode);
 void batch_min_node_residual_cuda(struct CUDA_Context* ctx, unsigned from_id,
@@ -166,7 +182,11 @@ void batch_set_mirror_node_value_cuda(struct CUDA_Context* ctx,
                                       DataCommMode data_mode);
 void batch_set_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
+void batch_add_mirror_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                               uint8_t* v, DataCommMode data_mode);
 void batch_add_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                               uint8_t* v, DataCommMode data_mode);
+void batch_min_mirror_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
 void batch_min_node_value_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                uint8_t* v, DataCommMode data_mode);
@@ -205,25 +225,17 @@ void PageRankSanity_nodesWithEdges_cuda(
 void PageRank_allNodes_cuda(struct CUDA_Context* ctx);
 void PageRank_delta_cuda(unsigned int __begin, unsigned int __end,
                          unsigned int& DGAccumulator_accum,
-                         unsigned int& work_items,
-                         const float local_priority,
                          const float& local_alpha, float local_tolerance,
                          struct CUDA_Context* ctx);
 void PageRank_delta_allNodes_cuda(unsigned int& DGAccumulator_accum,
-                                  unsigned int& work_items,
-                                  const float local_priority,
                                   const float& local_alpha,
                                   float local_tolerance,
                                   struct CUDA_Context* ctx);
 void PageRank_delta_masterNodes_cuda(unsigned int& DGAccumulator_accum,
-                                     unsigned int& work_items,
-                                     const float local_priority,
                                      const float& local_alpha,
                                      float local_tolerance,
                                      struct CUDA_Context* ctx);
 void PageRank_delta_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
-                                        unsigned int& work_items,
-                                        const float local_priority,
                                         const float& local_alpha,
                                         float local_tolerance,
                                         struct CUDA_Context* ctx);
@@ -237,3 +249,6 @@ void ResetGraph_masterNodes_cuda(const float& local_alpha,
                                  struct CUDA_Context* ctx);
 void ResetGraph_nodesWithEdges_cuda(const float& local_alpha,
                                     struct CUDA_Context* ctx);
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx);
+std::string get_num_thread_blocks(struct CUDA_Context* ctx);
+void init_CUDA_stat_context(struct CUDA_Context* ctx);

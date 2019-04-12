@@ -41,7 +41,7 @@ auto& edges = *edgesThreadLocal.getRemote(1);
 @section per_socket Per-Socket Storage
 
 Similar to Per-Thread storage, Galois also provides Per-Socket (or Per-Package) storage, which is at the level of socket (or package). Each socket can have its own copy of a variable to
-to work on and threads in different sockets can simultaneously access the socket-local variable without any race conditions. Also, in NUMA architecture, accessing a variable on a local socket is faster than accessing a variable on a remote socket (see details at @ref numa).
+work on and threads in different sockets can simultaneously access the socket-local variable without any race conditions. Also, in NUMA architecture, accessing a variable on a local socket is faster than accessing a variable on a remote socket (see details at @ref numa).
 
 API for per-socket storage {@link galois::substrate::PerSocketStorage} is similar to per-thread {@link galois::substrate::PerThreadStorage}.
 

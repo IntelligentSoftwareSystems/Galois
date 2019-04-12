@@ -46,6 +46,11 @@ struct APSPReduce {
     return ValTy(a, b, c);
   }
 
+  static bool extract_batch(unsigned, uint8_t*, size_t*,
+                            DataCommMode*) { return false; }
+
+  static bool extract_batch(unsigned, uint8_t*) { return false; }
+
   static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
                                   DataCommMode*) { return false; }
 
@@ -95,43 +100,14 @@ struct APSPReduce {
 
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
+  static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+
   // reset the number of shortest paths (the master will now have it)
   static void reset(uint32_t node_id, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
       node.sourceData[node.roundIndexToSend].shortPathCount = 0;
     }
   }
-};
-
-struct APSPBroadcast {
-  using ValTy = galois::TupleOfThree<uint32_t, uint32_t, ShortPathType>;
-
-  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
-    uint32_t indexToGet = node.roundIndexToSend;
-
-    uint32_t a;
-    uint32_t b;
-    ShortPathType c;
-
-    a = indexToGet;
-    if (indexToGet != infinity) {
-      // get min distance and # shortest paths
-      b = node.sourceData[indexToGet].minDistance;
-      c = node.sourceData[indexToGet].shortPathCount;
-      assert(c != 0); // should not send out 0 for # paths
-    } else {
-      // no-op
-      b = infinity;
-      c = 0;
-    }
-
-    return ValTy(a, b, c);
-  }
-
-  static bool extract_batch(unsigned, uint8_t*, size_t*,
-                            DataCommMode*) { return false; }
-
-  static bool extract_batch(unsigned, uint8_t*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;
@@ -168,6 +144,11 @@ struct DependencyReduce {
     return ValTy(indexToGet, thing);
   }
 
+  static bool extract_batch(unsigned, uint8_t*, size_t*,
+                            DataCommMode*) { return false; }
+
+  static bool extract_batch(unsigned, uint8_t*) { return false; }
+
   static bool extract_reset_batch(unsigned, uint8_t*, size_t*,
                                   DataCommMode*) { return false; }
 
@@ -192,34 +173,14 @@ struct DependencyReduce {
 
   static bool reduce_batch(unsigned, uint8_t*, DataCommMode) { return false; }
 
+  static bool reduce_mirror_batch(unsigned, uint8_t*, DataCommMode) { return false; }
+
   // reset the number of shortest paths (the master will now have it)
   static void reset(uint32_t node_id, struct NodeData &node) {
     if (node.roundIndexToSend != infinity) {
       node.sourceData[node.roundIndexToSend].dependencyValue = 0;
     }
   }
-};
-
-struct DependencyBroadcast {
-  using ValTy = std::pair<uint32_t, float>;
-
-  static ValTy extract(uint32_t node_id, const struct NodeData & node) {
-    uint32_t indexToGet = node.roundIndexToSend;
-
-    float thing;
-    if (indexToGet != infinity) {
-      thing = node.sourceData[indexToGet].dependencyValue;
-    } else {
-      thing = 0;
-    }
-
-    return ValTy(indexToGet, thing);
-  }
-
-  static bool extract_batch(unsigned, uint8_t*, size_t*,
-                            DataCommMode*) { return false; }
-
-  static bool extract_batch(unsigned, uint8_t*) { return false; }
 
   static void setVal(uint32_t node_id, struct NodeData & node, ValTy y) {
     uint32_t rIndex = y.first;

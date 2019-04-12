@@ -135,10 +135,10 @@ struct ConnectedComp {
 
 #ifdef __GALOIS_HET_ASYNC__
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current, true>("ConnectedComp");
+                  Bitset_comp_current, true>("ConnectedComp");
 #else
       _graph.sync<writeSource, readDestination, Reduce_min_comp_current,
-                  Broadcast_comp_current, Bitset_comp_current>("ConnectedComp");
+                  Bitset_comp_current>("ConnectedComp");
 #endif
 
       galois::runtime::reportStat_Tsum(

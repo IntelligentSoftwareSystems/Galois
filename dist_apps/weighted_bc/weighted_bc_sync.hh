@@ -25,7 +25,6 @@
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add, ShortPathType);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add, ShortPathType);
-GALOIS_SYNC_STRUCTURE_BROADCAST(to_add, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(to_add);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -34,7 +33,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(to_add);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add_float, float);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add_float, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(to_add_float, float);
 GALOIS_SYNC_STRUCTURE_BITSET(to_add_float);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -42,7 +40,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(to_add_float);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, ShortPathType);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, ShortPathType);
 GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -51,7 +48,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(num_shortest_paths);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_successors, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_successors, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_successors, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(num_successors);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -60,7 +56,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(num_successors);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_predecessors, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_predecessors, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_predecessors, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(num_predecessors);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -69,7 +64,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(num_predecessors);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(trim, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(trim, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(trim, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(trim);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -78,7 +72,6 @@ GALOIS_SYNC_STRUCTURE_BITSET(trim);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MIN(current_length, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(current_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(current_length, uint32_t);
 GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -86,14 +79,12 @@ GALOIS_SYNC_STRUCTURE_BITSET(current_length);
 ////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(old_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(old_length, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Flag
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(propagation_flag, uint8_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(propagation_flag, uint8_t);
 GALOIS_SYNC_STRUCTURE_BITSET(propagation_flag);
 
 ////////////////////////////////////////////////////////////////////////////
@@ -101,5 +92,4 @@ GALOIS_SYNC_STRUCTURE_BITSET(propagation_flag);
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(dependency, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, float);
 GALOIS_SYNC_STRUCTURE_BITSET(dependency);

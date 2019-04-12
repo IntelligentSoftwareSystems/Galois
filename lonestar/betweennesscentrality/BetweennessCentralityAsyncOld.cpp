@@ -49,9 +49,10 @@ static cll::opt<std::string> sourcesToUse("sourcesToUse",
                                                     "use in BC"),
                                           cll::init(""));
 
-static cll::opt<unsigned int> startNode("startNode",
-                                        cll::desc("Node to start search from"),
-                                        cll::init(0));
+// @todo fix how this works
+//static cll::opt<unsigned int> startNode("startNode",
+//                                        cll::desc("Node to start search from"),
+//                                        cll::init(0));
 
 static cll::opt<unsigned int>
     numOfSources("numOfSources",
@@ -432,6 +433,7 @@ int main(int argc, char** argv) {
   galois::gInfo("Using OBIM chunk size: ", CHUNK_SIZE);
   galois::gInfo("Note that optimal chunk size may differ depending on input "
                 "graph");
+  galois::runtime::reportStat_Single("BCAsync", "ChunkSize", CHUNK_SIZE);
 
   bcExecutor.spfuCount.reset();
   bcExecutor.updateSigmaP1Count.reset();
@@ -497,7 +499,7 @@ int main(int argc, char** argv) {
 
   galois::StatTimer executionTimer;
   executionTimer.start();
-  for (uint32_t i = startNode; i < numOfSources; ++i) {
+  for (uint32_t i = 0; i < numOfSources; ++i) {
     uint32_t sourceToUse = i;
     if (sourceVector.size() != 0) {
       sourceToUse = sourceVector[i];

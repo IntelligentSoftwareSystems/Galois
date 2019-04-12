@@ -17,9 +17,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-/**
- * @file DynamicBitset.cpp
- *
- * All the implementation of the DynamicBitSet class incorporated into
- * DynamicBitset.h
- */
+#include "galois/runtime/SyncStructures.h"
+
+GALOIS_SYNC_STRUCTURE_REDUCE_SET(comp_current, uint32_t);
+GALOIS_SYNC_STRUCTURE_REDUCE_MIN(comp_current, uint32_t);
+GALOIS_SYNC_STRUCTURE_BITSET(comp_current);

@@ -2,6 +2,7 @@ add_library(distbench STATIC src/DistBenchStart.cpp)
 target_include_directories(distbench PUBLIC 
   ${CMAKE_SOURCE_DIR}/libdist/include
   ${CMAKE_SOURCE_DIR}/libgalois/include
+  ${CMAKE_SOURCE_DIR}/libnet/include
   ${CMAKE_SOURCE_DIR}/libllvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
@@ -19,8 +20,8 @@ include_directories(${CMAKE_SOURCE_DIR}/libgalois/include)
 
 if(ENABLE_HETERO_GALOIS)
   # for debugging 
+  add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
-    add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
     set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lineinfo)
 
     add_definitions(-D__GALOIS_DEBUG_WORKLIST__)
@@ -36,6 +37,12 @@ function(distApp name)
   app(${name} ${name}/${name}.cpp DISTSAFE)
   target_link_libraries(${name} distbench galois_dist)
   target_include_directories(${name} PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  if(REPORT_PER_ROUND_STATS)
+    target_compile_definitions(${name} PRIVATE DIST_PER_ROUND_TIMER=1)
+  endif()
+  if(REPORT_COMM_STATS)
+    target_compile_definitions(${name} PRIVATE MORE_COMM_STATS=1)
+  endif()
   if(USE_BARE_MPI)
     target_compile_definitions(${name} PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
   endif()
@@ -51,6 +58,12 @@ function(distApp name)
   app(${name}_async ${name}/${name}.cpp DISTSAFE)
   target_link_libraries(${name}_async distbench galois_dist_async)
   target_include_directories(${name}_async PUBLIC ${CMAKE_SOURCE_DIR}/libdist/include)
+  if(REPORT_PER_ROUND_STATS)
+    target_compile_definitions(${name} PRIVATE DIST_PER_ROUND_TIMER=1)
+  endif()
+  if(REPORT_COMM_STATS)
+    target_compile_definitions(${name}_async PRIVATE MORE_COMM_STATS=1)
+  endif()
   target_compile_definitions(${name}_async PRIVATE __GALOIS_HET_ASYNC__=1)
   if(USE_BARE_MPI)
     target_compile_definitions(${name}_async PRIVATE __GALOIS_BARE_MPI_COMMUNICATION__=1)
@@ -79,9 +92,11 @@ distAppNoGPU(weighted_bc)
 
 distApp(bfs_pull)
 distApp(bfs_push)
+distApp(bfs_push_lb)
 
 distApp(cc_pull)
 distApp(cc_push)
+distApp(cc_push_lb)
 
 distApp(kcore_push)
 distApp(kcore_pull)
@@ -93,6 +108,7 @@ distAppNoGPU(sgd)
 
 distApp(sssp_pull)
 distApp(sssp_push)
+distApp(sssp_push_lb)
 
 distAppNoGPU(partition)
 

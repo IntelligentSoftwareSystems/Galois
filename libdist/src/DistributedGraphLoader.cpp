@@ -39,10 +39,7 @@ cll::opt<bool>
     inputFileSymmetric("symmetricGraph",
                        cll::desc("Set this flag if graph is symmetric"),
                        cll::init(false));
-cll::opt<std::string> partFolder("partFolder",
-                                 cll::desc("path to partitionFolder "
-                                           "(deprecated, do not use)"),
-                                 cll::init(""), cll::Hidden);
+
 cll::opt<PARTITIONING_SCHEME> partitionScheme(
     "partition", cll::desc("Type of partitioning."),
     cll::values(
@@ -50,21 +47,9 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(IEC, "iec", "Incoming Edge-Cut"),
         clEnumValN(HOVC, "hovc", "Outgoing Hybrid Vertex-Cut"),
         clEnumValN(HIVC, "hivc", "Incoming Hybrid Vertex-Cut"),
-        clEnumValN(BOARD2D_VCUT, "2dvc", "2d Checkerboard Vertex-Cut"),
         clEnumValN(CART_VCUT, "cvc", "Cartesian Vertex-Cut of oec"),
         clEnumValN(CART_VCUT_IEC, "cvc-iec", "Cartesian Vertex-Cut of iec"),
-        clEnumValN(CART_VCUT_OLD, "cvc-old", "Cartesian Vertex-Cut oec, old impl"),
-        clEnumValN(JAGGED_CYCLIC_VCUT, "jcvc", "Jagged Cyclic Vertex-Cut"),
-        clEnumValN(JAGGED_BLOCKED_VCUT, "jbvc", "Jagged Blocked Vertex-Cut"),
-        clEnumValN(OVER_DECOMPOSE_2_VCUT, "od2vc",
-                   "Over decomposed by 2 cartesian Vertex-Cut"),
-        clEnumValN(OVER_DECOMPOSE_4_VCUT, "od4vc",
-                   "Over decomposed by 4 cartesian Vertex-Cut"),
         clEnumValN(CEC, "cec", "Custom edge cut from vertexID mapping"),
-        clEnumValN(GCVC, "gcvc", "CVC (oec) using generic interface"),
-        clEnumValN(GHOVC, "ghovc", "HOVC using CuSP"),
-        clEnumValN(GHIVC, "ghivc", "HIVC using CuSP"),
-        clEnumValN(GOEC, "goec", "oec with CuSP"),
         clEnumValN(GINGER_O, "ginger-o", "ginger, outgiong edges, using CuSP"),
         clEnumValN(GINGER_I, "ginger-i", "ginger, incoming edges, using CuSP"),
         clEnumValN(FENNEL_O, "fennel-o", "fennel, outgoing edge cut, using CuSP"),
@@ -72,11 +57,6 @@ cll::opt<PARTITIONING_SCHEME> partitionScheme(
         clEnumValN(SUGAR_O, "sugar-o", "fennel, incoming edge cut, using CuSP"),
         clEnumValEnd),
     cll::init(OEC));
-
-cll::opt<unsigned int>
-    VCutThreshold("VCutThreshold",
-                  cll::desc("Threshold for high degree edges."),
-                  cll::init(1000), cll::Hidden);
 
 cll::opt<std::string>
     vertexIDMapFileName("vertexIDMapFileName",

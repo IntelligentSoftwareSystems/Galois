@@ -1,0 +1,32 @@
+#v1
+barneshut nothing
+bfs rmat10
+bc-outer rmat10
+boruvka rmat10
+boruvka-merge rmat10
+clustering nothing
+connectedcomponents rmat10-sym
+delaunaytriangulation 250kn
+delaunaytriangulation-det 250kn
+dmr 250k
+gmetis rmat10
+independentset rmat10-sym
+matrixcompletion-sync bgg
+matrixcompletion-simple bgg
+matrixcompletion-edge bgg
+matrixcompletion-jump bgg
+matrixcompletion-byitems bgg
+matrixcompletion-byedges bgg
+mcm nothing
+pagerank-pull rmat10-transpose
+pagerank-pull-topo rmat10-transpose
+pagerank-push rmat10
+pagerank-push-sync rmat10
+preflowpush rmat10
+pta gdb_constraints
+spanningtree rmat10
+sssp rmat10
+surveypropagation nothing
+triangles-node dblp-triangles
+triangles-edge dblp-triangles
+

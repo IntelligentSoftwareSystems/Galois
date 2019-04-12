@@ -25,7 +25,6 @@
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add, uint64_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add, uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(to_add, uint64_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // ToAddFloat
@@ -33,7 +32,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(to_add, uint64_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(to_add_float, float);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(to_add_float, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(to_add_float, float);
 
 ////////////////////////////////////////////////////////////////////////////
 // # short paths
@@ -41,7 +39,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(to_add_float, float);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_shortest_paths, uint64_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_shortest_paths, uint64_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, uint64_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Succ
@@ -49,7 +46,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(num_shortest_paths, uint64_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_successors, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_successors, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_successors, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Pred
@@ -57,7 +53,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(num_successors, uint32_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(num_predecessors, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(num_predecessors, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(num_predecessors, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Trim
@@ -65,7 +60,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(num_predecessors, uint32_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(trim, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(trim, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(trim, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Current Lengths
@@ -73,21 +67,18 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(trim, uint32_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_MIN(current_length, uint32_t);
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(current_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(current_length, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Old length
 ////////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(old_length, uint32_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(old_length, uint32_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Flag
 ////////////////////////////////////////////////////////////////////////////
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(propagation_flag, uint8_t);
-GALOIS_SYNC_STRUCTURE_BROADCAST(propagation_flag, uint8_t);
 
 ////////////////////////////////////////////////////////////////////////////
 // Dependency
@@ -95,7 +86,6 @@ GALOIS_SYNC_STRUCTURE_BROADCAST(propagation_flag, uint8_t);
 
 GALOIS_SYNC_STRUCTURE_REDUCE_SET(dependency, float);
 GALOIS_SYNC_STRUCTURE_REDUCE_ADD(dependency, float);
-GALOIS_SYNC_STRUCTURE_BROADCAST(dependency, float);
 
 ////////////////////////////////////////////////////////////////////////////////
 #if __OPT_VERSION__ >= 3

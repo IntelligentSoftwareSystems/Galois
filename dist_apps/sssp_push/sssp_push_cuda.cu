@@ -48,10 +48,11 @@ __global__ void InitializeGraph(CSRGraph graph, unsigned int __begin, unsigned i
   }
   // FP: "8 -> 9;
 }
-__global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current)
+__global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> active_vertices, uint32_t * thread_block_work)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
 
   const unsigned __kernel_tb_size = __tb_FirstItr_SSSP;
   index_type src_end;
@@ -66,7 +67,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int
 
   typedef cub::BlockScan<multiple_sum<2, index_type>, BLKSIZE> BlockScan;
   typedef union np_shared<BlockScan::TempStorage, index_type, struct tb_np, struct warp_np<__kernel_tb_size/32>, struct fg_np<ITSIZE> > npsTy;
-
+  active_vertices.thread_entry();
   // FP: "4 -> 5;
   __shared__ npsTy nps ;
   // FP: "5 -> 6;
@@ -82,6 +83,7 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int
     if (pop)
     {
       p_dist_old[src] = p_dist_current[src];
+      active_vertices.reduce( 1);
     }
     // FP: "10 -> 11;
     // FP: "13 -> 14;
@@ -102,6 +104,10 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
     // FP: "21 -> 22;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
+    if (threadIdx.x == 0) {
+    	//TODO: The index blockIdx.x should be corrected if blockId has other y and z dimension.
+    	thread_block_work[blockIdx.x] += _np_mps_total.el[0]+ _np_mps_total.el[1];
+    }
     // FP: "22 -> 23;
     if (threadIdx.x == 0)
     {
@@ -264,9 +270,10 @@ __global__ void FirstItr_SSSP(CSRGraph graph, unsigned int __begin, unsigned int
     assert(threadIdx.x < __kernel_tb_size);
     src = _np_closure[threadIdx.x].src;
   }
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "113 -> 114;
 }
-__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t local_priority, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum, HGAccumulator<unsigned int> work_items)
+__global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t local_priority, uint32_t * p_dist_current, uint32_t * p_dist_old, DynamicBitset& bitset_dist_current, HGAccumulator<unsigned int> DGAccumulator_accum, HGAccumulator<unsigned int> work_items, HGAccumulator<unsigned int> active_vertices, uint32_t * thread_block_work)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -274,6 +281,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
   const unsigned __kernel_tb_size = __tb_SSSP;
   __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage DGAccumulator_accum_ts;
   __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage work_items_ts;
+  __shared__ cub::BlockReduce<unsigned int, TB_SIZE>::TempStorage active_vertices_ts;
   index_type src_end;
   index_type src_rup;
   // FP: "1 -> 2;
@@ -293,6 +301,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
   // FP: "6 -> 7;
   DGAccumulator_accum.thread_entry();
   work_items.thread_entry();
+  active_vertices.thread_entry();
   // FP: "7 -> 8;
   src_end = __end;
   src_rup = ((__begin) + roundup(((__end) - (__begin)), (blockDim.x)));
@@ -311,7 +320,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         if (local_priority > p_dist_current[src])
         {
           p_dist_old[src] = p_dist_current[src];
-          work_items.reduce( 1);
+          active_vertices.reduce( 1);
         }
         else
         {
@@ -342,6 +351,11 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
     _np_mps.el[1] = _np.size < _NP_CROSSOVER_WP ? _np.size : 0;
     // FP: "26 -> 27;
     BlockScan(nps.temp_storage).ExclusiveSum(_np_mps, _np_mps, _np_mps_total);
+    if (threadIdx.x == 0) {
+		//TODO: The index blockIdx.x should be corrected if blockId has other y and z dimension.
+		thread_block_work[blockIdx.x] += _np_mps_total.el[0]+ _np_mps_total.el[1];
+	}
+
     // FP: "27 -> 28;
     if (threadIdx.x == 0)
     {
@@ -395,6 +409,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         index_type jj;
         jj = ns +_np_j;
         {
+          work_items.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;
@@ -441,6 +456,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
           index_type jj;
           jj = _np_w_start +_np_ii;
           {
+            work_items.reduce( 1);
             index_type dst;
             uint32_t new_dist;
             uint32_t old_dist;
@@ -483,6 +499,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
         src = _np_closure[nps.fg.src[_np_i]].src;
         jj= nps.fg.itvalue[_np_i];
         {
+          work_items.reduce( 1);
           index_type dst;
           uint32_t new_dist;
           uint32_t old_dist;
@@ -507,6 +524,7 @@ __global__ void SSSP(CSRGraph graph, unsigned int __begin, unsigned int __end, c
   // FP: "119 -> 120;
   DGAccumulator_accum.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(DGAccumulator_accum_ts);
   work_items.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(work_items_ts);
+  active_vertices.thread_exit<cub::BlockReduce<unsigned int, TB_SIZE> >(active_vertices_ts);
   // FP: "120 -> 121;
 }
 __global__ void SSSPSanityCheck(CSRGraph graph, unsigned int __begin, unsigned int __end, const uint32_t  local_infinity, uint32_t * p_dist_current, HGAccumulator<uint64_t> DGAccumulator_sum, HGReduceMax<uint32_t> DGMax)
@@ -576,48 +594,64 @@ void InitializeGraph_nodesWithEdges_cuda(const uint32_t & local_infinity, unsign
   InitializeGraph_cuda(0, ctx->numNodesWithEdges, local_infinity, local_src_node, ctx);
   // FP: "2 -> 3;
 }
-void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, struct CUDA_Context*  ctx)
+void reset_counters(struct CUDA_Context*  ctx) {
+	ctx->stats.thread_blocks_work.zero_gpu();
+}
+void FirstItr_SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & active_vertices, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
+  reset_counters(ctx);
   // FP: "4 -> 5;
-  FirstItr_SSSP <<<blocks, __tb_FirstItr_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()));
+  Shared<unsigned int> active_verticessval  = Shared<unsigned int>(1);
+  *(active_verticessval.cpu_wr_ptr()) = 0;
+  _active_vertices.rv = active_verticessval.gpu_wr_ptr();
+  FirstItr_SSSP <<<blocks, __tb_FirstItr_SSSP>>>(ctx->gg, __begin, __end, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), 
+	*(ctx->dist_current.is_updated.gpu_rd_ptr()), _active_vertices, ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "5 -> 6;
   check_cuda_kernel;
+  cudaDeviceSynchronize();
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
   // FP: "6 -> 7;
 }
 void FirstItr_SSSP_allNodes_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_SSSP_cuda(0, ctx->gg.nnodes, ctx);
+  unsigned int active_vertices = 0;
+  FirstItr_SSSP_cuda(0, ctx->gg.nnodes, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void FirstItr_SSSP_masterNodes_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, ctx);
+  unsigned int active_vertices = 0;
+  FirstItr_SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, active_vertices, ctx);
   // FP: "2 -> 3;
 }
 void FirstItr_SSSP_nodesWithEdges_cuda(struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  FirstItr_SSSP_cuda(0, ctx->numNodesWithEdges, ctx);
+  unsigned int active_vertices = 0;
+  FirstItr_SSSP_cuda(0, ctx->numNodesWithEdges, active_vertices, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
+void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccumulator_accum, unsigned int & work_items, unsigned int & active_vertices, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   dim3 blocks;
   dim3 threads;
   HGAccumulator<unsigned int> _DGAccumulator_accum;
   HGAccumulator<unsigned int> _work_items;
+  HGAccumulator<unsigned int> _active_vertices;
   // FP: "1 -> 2;
   // FP: "2 -> 3;
   // FP: "3 -> 4;
   kernel_sizing(blocks, threads);
+  reset_counters(ctx);
   // FP: "4 -> 5;
   Shared<unsigned int> DGAccumulator_accumval  = Shared<unsigned int>(1);
   // FP: "5 -> 6;
@@ -629,30 +663,37 @@ void SSSP_cuda(unsigned int  __begin, unsigned int  __end, unsigned int & DGAccu
   Shared<unsigned int> work_itemsval  = Shared<unsigned int>(1);
   *(work_itemsval.cpu_wr_ptr()) = 0;
   _work_items.rv = work_itemsval.gpu_wr_ptr();
-  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, local_priority, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), *(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum, _work_items);
+  
+  Shared<unsigned int> active_verticessval  = Shared<unsigned int>(1);
+    *(active_verticessval.cpu_wr_ptr()) = 0;
+    _active_vertices.rv = active_verticessval.gpu_wr_ptr();
+
+  SSSP <<<blocks, __tb_SSSP>>>(ctx->gg, __begin, __end, local_priority, ctx->dist_current.data.gpu_wr_ptr(), ctx->dist_old.data.gpu_wr_ptr(), 
+*(ctx->dist_current.is_updated.gpu_rd_ptr()), _DGAccumulator_accum, _work_items, _active_vertices, ctx->stats.thread_blocks_work.gpu_wr_ptr());
   // FP: "9 -> 10;
   check_cuda_kernel;
   // FP: "10 -> 11;
   DGAccumulator_accum = *(DGAccumulator_accumval.cpu_rd_ptr());
   // FP: "11 -> 12;
   work_items = *(work_itemsval.cpu_rd_ptr());
+  active_vertices = *(active_verticessval.cpu_rd_ptr());
 }
-void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
+void SSSP_allNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, unsigned int & active_vertices, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, work_items, local_priority, ctx);
+  SSSP_cuda(0, ctx->gg.nnodes, DGAccumulator_accum, work_items, active_vertices, local_priority, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_masterNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
+void SSSP_masterNodes_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, unsigned int & active_vertices, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, work_items, local_priority, ctx);
+  SSSP_cuda(ctx->beginMaster, ctx->beginMaster + ctx->numOwned, DGAccumulator_accum, work_items, active_vertices, local_priority, ctx);
   // FP: "2 -> 3;
 }
-void SSSP_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, const uint32_t local_priority, struct CUDA_Context*  ctx)
+void SSSP_nodesWithEdges_cuda(unsigned int & DGAccumulator_accum, unsigned int & work_items, unsigned int & active_vertices, const uint32_t local_priority, struct CUDA_Context*  ctx)
 {
   // FP: "1 -> 2;
-  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, work_items, local_priority, ctx);
+  SSSP_cuda(0, ctx->numNodesWithEdges, DGAccumulator_accum, work_items, active_vertices, local_priority, ctx);
   // FP: "2 -> 3;
 }
 void SSSPSanityCheck_cuda(unsigned int  __begin, unsigned int  __end, uint64_t & DGAccumulator_sum, uint32_t & DGMax, const uint32_t & local_infinity, struct CUDA_Context*  ctx)

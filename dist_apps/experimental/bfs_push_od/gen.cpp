@@ -191,7 +191,7 @@ struct FirstItr_BFS {
 
     _graph
         .sync_on_demand<Flags_dist_current, readSource, Reduce_min_dist_current,
-                        Broadcast_dist_current, Bitset_dist_current>("BFS");
+                        Bitset_dist_current>("BFS");
 
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
@@ -255,7 +255,7 @@ struct BFS {
       dga.reset();
 
       _graph.sync_on_demand<Flags_dist_current, readSource,
-                            Reduce_min_dist_current, Broadcast_dist_current,
+                            Reduce_min_dist_current,
                             Bitset_dist_current>("BFS");
 #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) {
@@ -279,7 +279,7 @@ struct BFS {
       Flags_dist_current::set_write_dst();
 
       //_graph.sync<writeDestination, readSource, Reduce_min_dist_current,
-      //            Broadcast_dist_current, Bitset_dist_current>("BFS");
+      //            Bitset_dist_current>("BFS");
 
       galois::runtime::reportStat("(NULL)",
                                   _graph.get_run_identifier("NumWorkItems_"),

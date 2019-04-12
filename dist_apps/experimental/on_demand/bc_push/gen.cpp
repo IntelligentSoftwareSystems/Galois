@@ -259,7 +259,7 @@ struct FirstIterationSSSP {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                          Broadcast_current_length, Bitset_current_length>(
+                          Bitset_current_length>(
         Flags_current_length, "SSSP");
 #endif
 
@@ -288,14 +288,14 @@ struct FirstIterationSSSP {
                 Broadcast_current_length>("SSSP");
 #elif __OPT_VERSION__ == 3
     _graph.sync<writeAny, readAny, Reduce_min_current_length,
-                Broadcast_current_length, Bitset_current_length>("SSSP");
+                Bitset_current_length>("SSSP");
 #elif __OPT_VERSION__ == 4
     _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                Broadcast_current_length, Bitset_current_length>("SSSP");
+                Bitset_current_length>("SSSP");
 #endif
     //// Next op will read src, current length
     //_graph.sync<writeDestination, readAny, Reduce_min_current_length,
-    //            Broadcast_current_length, Bitset_current_length>(
+    //            Bitset_current_length>(
     //            "SSSP");
   }
 
@@ -351,7 +351,7 @@ struct SSSP {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                            Broadcast_current_length, Bitset_current_length>(
+                            Bitset_current_length>(
           Flags_current_length, "SSSP");
 #endif
 
@@ -392,15 +392,15 @@ struct SSSP {
                   Broadcast_current_length>("SSSP");
 #elif __OPT_VERSION__ == 3
       _graph.sync<writeAny, readAny, Reduce_min_current_length,
-                  Broadcast_current_length, Bitset_current_length>("SSSP");
+                  Bitset_current_length>("SSSP");
 #elif __OPT_VERSION__ == 4
       _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-                  Broadcast_current_length, Bitset_current_length>("SSSP");
+                  Bitset_current_length>("SSSP");
 #endif
 
       // if (accum_result) {
       //  _graph.sync<writeDestination, readAny, Reduce_min_current_length,
-      //              Broadcast_current_length, Bitset_current_length>("SSSP");
+      //              Bitset_current_length>("SSSP");
       //} else {
       //  // write destination, read any, fails.....
       //  // sync src and dst
@@ -474,7 +474,7 @@ struct PredAndSucc {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readAny, Reduce_min_current_length,
-                          Broadcast_current_length, Bitset_current_length>(
+                          Bitset_current_length>(
         Flags_current_length, "PredAndSucc");
 #endif
 
@@ -511,16 +511,16 @@ struct PredAndSucc {
                 Broadcast_num_successors>("PredAndSucc");
 #elif __OPT_VERSION__ == 3
     _graph.sync<writeAny, readAny, Reduce_add_num_predecessors,
-                Broadcast_num_predecessors, Bitset_num_predecessors>(
+                Bitset_num_predecessors>(
         "PredAndSucc");
     _graph.sync<writeAny, readAny, Reduce_add_num_successors,
-                Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
+                Bitset_num_successors>("PredAndSucc");
 #elif __OPT_VERSION__ == 4
     _graph.sync<writeDestination, readAny, Reduce_add_num_predecessors,
-                Broadcast_num_predecessors, Bitset_num_predecessors>(
+                Bitset_num_predecessors>(
         "PredAndSucc");
     _graph.sync<writeSource, readAny, Reduce_add_num_successors,
-                Broadcast_num_successors, Bitset_num_successors>("PredAndSucc");
+                Bitset_num_successors>("PredAndSucc");
 #endif
 
     //// sync for use in NumShortPath calculation
@@ -592,18 +592,18 @@ struct NumShortestPathsChanges {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                          Broadcast_current_length, Bitset_current_length>(
+                          Bitset_current_length>(
         Flags_current_length, "NumShortestPathsChanges");
     // FIXME
     // first time needs to be a reduce add; latter times must be reduce set
     // doesn't matter now because bitset isn't being set
     _graph.sync_on_demand<readSource, Reduce_add_num_predecessors,
-                          Broadcast_num_predecessors, Bitset_num_predecessors>(
+                          Bitset_num_predecessors>(
         Flags_num_predecessors, "NumShortestPathsChanges");
-    _graph.sync_on_demand<readSource, Reduce_add_to_add, Broadcast_to_add,
+    _graph.sync_on_demand<readSource, Reduce_add_to_add,
                           Bitset_to_add>(Flags_to_add,
                                          "NumShortestPathsChanges");
-    _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim,
+    _graph.sync_on_demand<readSource, Reduce_add_trim,
                           Bitset_trim>(Flags_trim, "NumShortestPathsChanges");
 #endif
 
@@ -717,10 +717,10 @@ struct NumShortestPaths {
 #if __OPT_VERSION__ == 5
       _graph
           .sync_on_demand<readSource, Reduce_set_propagation_flag,
-                          Broadcast_propagation_flag, Bitset_propagation_flag>(
+                          Bitset_propagation_flag>(
               Flags_propagation_flag, "NumShortestPaths");
       _graph.sync_on_demand<readAny, Reduce_min_current_length,
-                            Broadcast_current_length, Bitset_current_length>(
+                            Bitset_current_length>(
           Flags_current_length, "NumShortestPaths");
       _graph.sync_on_demand<readSource, Reduce_set_num_shortest_paths,
                             Broadcast_num_shortest_paths,
@@ -763,22 +763,22 @@ struct NumShortestPaths {
       _graph.sync<writeAny, readAny, Reduce_add_to_add, Broadcast_to_add>(
           "NumShortestPaths");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeAny, readAny, Reduce_add_trim,
                   Bitset_trim>("NumShortestPaths");
-      _graph.sync<writeAny, readAny, Reduce_add_to_add, Broadcast_to_add,
+      _graph.sync<writeAny, readAny, Reduce_add_to_add,
                   Bitset_to_add>("NumShortestPaths");
 #elif __OPT_VERSION__ == 4
-      _graph.sync<writeDestination, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeDestination, readAny, Reduce_add_trim,
                   Bitset_trim>("NumShortestPaths");
       _graph.sync<writeDestination, readAny, Reduce_add_to_add,
-                  Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
+                  Bitset_to_add>("NumShortestPaths");
 #endif
 
       // sync to_adds and trim on source
       //_graph.sync<writeDestination, readAny, Reduce_add_trim,
-      //            Broadcast_trim, Bitset_trim>("NumShortestPaths");
+      //            Bitset_trim>("NumShortestPaths");
       //_graph.sync<writeDestination, readAny, Reduce_add_to_add,
-      //            Broadcast_to_add, Bitset_to_add>("NumShortestPaths");
+      //            Bitset_to_add>("NumShortestPaths");
 
       // do predecessor decrementing using trim + dependency changes with
       // to_add
@@ -888,10 +888,10 @@ struct PropagationFlagUpdate {
 // FINE; needs to be read any due to all nodes loop
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                          Broadcast_current_length, Bitset_current_length>(
+                          Bitset_current_length>(
         Flags_current_length, "PropagationFlagUpdate");
     _graph.sync_on_demand<readSource, Reduce_add_num_successors,
-                          Broadcast_num_successors, Bitset_num_successors>(
+                          Bitset_num_successors>(
         Flags_num_successors, "PropagationFlagUpdate");
 #endif
 
@@ -969,18 +969,18 @@ struct DependencyPropChanges {
 // must all be read any, all nodes loop without edges
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_current_length,
-                          Broadcast_current_length, Bitset_current_length>(
+                          Bitset_current_length>(
         Flags_current_length, "DependencyPropChanges");
     _graph.sync_on_demand<readSource, Reduce_set_num_successors,
-                          Broadcast_num_successors, Bitset_num_successors>(
+                          Bitset_num_successors>(
         Flags_num_successors, "DependencyPropChanges");
     _graph.sync_on_demand<readSource, Reduce_add_to_add_float,
-                          Broadcast_to_add_float, Bitset_to_add_float>(
+                          Bitset_to_add_float>(
         Flags_to_add_float, "DependencyPropChanges");
-    _graph.sync_on_demand<readSource, Reduce_add_trim, Broadcast_trim,
+    _graph.sync_on_demand<readSource, Reduce_add_trim,
                           Bitset_trim>(Flags_trim, "DependencyPropChanges");
     _graph.sync_on_demand<readSource, Reduce_set_propagation_flag,
-                          Broadcast_propagation_flag, Bitset_propagation_flag>(
+                          Bitset_propagation_flag>(
         Flags_propagation_flag, "NumShortestPaths");
 #endif
 
@@ -1103,21 +1103,21 @@ struct DependencyPropagation {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readAny, Reduce_min_current_length,
-                            Broadcast_current_length, Bitset_current_length>(
+                            Bitset_current_length>(
           Flags_current_length, "DependencyPropagation");
       _graph.sync_on_demand<readSource, Reduce_set_num_successors,
-                            Broadcast_num_successors, Bitset_num_successors>(
+                            Bitset_num_successors>(
           Flags_num_successors, "DependencyPropagation");
       _graph.sync_on_demand<readAny, Reduce_add_num_shortest_paths,
                             Broadcast_num_shortest_paths,
                             Bitset_num_shortest_paths>(Flags_num_shortest_paths,
                                                        "DependencyPropagation");
       _graph.sync_on_demand<readDestination, Reduce_set_dependency,
-                            Broadcast_dependency, Bitset_dependency>(
+                            Bitset_dependency>(
           Flags_dependency, "DependencyPropagation");
       _graph
           .sync_on_demand<readDestination, Reduce_set_propagation_flag,
-                          Broadcast_propagation_flag, Bitset_propagation_flag>(
+                          Bitset_propagation_flag>(
               Flags_propagation_flag, "NumShortestPaths");
 #endif
 
@@ -1157,21 +1157,21 @@ struct DependencyPropagation {
       _graph.sync<writeAny, readAny, Reduce_add_to_add_float,
                   Broadcast_to_add_float>("DependencyPropagation");
 #elif __OPT_VERSION__ == 3
-      _graph.sync<writeAny, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeAny, readAny, Reduce_add_trim,
                   Bitset_trim>("DependencyPropagation");
       _graph.sync<writeAny, readAny, Reduce_add_to_add_float,
-                  Broadcast_to_add_float, Bitset_to_add_float>(
+                  Bitset_to_add_float>(
           "DependencyPropagation");
 #elif __OPT_VERSION__ == 4
-      _graph.sync<writeSource, readAny, Reduce_add_trim, Broadcast_trim,
+      _graph.sync<writeSource, readAny, Reduce_add_trim,
                   Bitset_trim>("DependencyPropagation");
       _graph.sync<writeSource, readAny, Reduce_add_to_add_float,
-                  Broadcast_to_add_float, Bitset_to_add_float>(
+                  Bitset_to_add_float>(
           "DependencyPropagation");
 #endif
 
       //_graph.sync<writeSource, readAny, Reduce_add_trim,
-      //            Broadcast_trim, Bitset_trim>("DependencyPropagation");
+      //            Bitset_trim>("DependencyPropagation");
       //_graph.sync<writeSource, readAny, Reduce_add_to_add_float,
       //            Broadcast_to_add_float,
       //            Bitset_to_add_float>("DependencyPropagation");

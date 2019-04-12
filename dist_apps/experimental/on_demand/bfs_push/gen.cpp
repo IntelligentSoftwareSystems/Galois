@@ -131,7 +131,7 @@ struct FirstItr_BFS {
 
 #if __OPT_VERSION__ == 5
     _graph.sync_on_demand<readSource, Reduce_min_dist_current,
-                          Broadcast_dist_current, Bitset_dist_current>(
+                          Bitset_dist_current>(
         Flags_dist_current, "BFS");
 #endif
 
@@ -167,11 +167,11 @@ struct FirstItr_BFS {
 #elif __OPT_VERSION__ == 3
     // with bitset
     _graph.sync<writeAny, readAny, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("BFS");
+                Bitset_dist_current>("BFS");
 #elif __OPT_VERSION__ == 4
     // write aware (not read aware, i.e. conservative)
     _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
-                Broadcast_dist_current, Bitset_dist_current>("BFS");
+                Bitset_dist_current>("BFS");
 #endif
 
     galois::runtime::reportStat_Tsum(
@@ -215,7 +215,7 @@ struct BFS {
 
 #if __OPT_VERSION__ == 5
       _graph.sync_on_demand<readSource, Reduce_min_dist_current,
-                            Broadcast_dist_current, Bitset_dist_current>(
+                            Bitset_dist_current>(
           Flags_dist_current, "BFS");
 // TODO would compiler insert dist_old on demand sync here?
 #endif
@@ -253,11 +253,11 @@ struct BFS {
 #elif __OPT_VERSION__ == 3
       // with bitset
       _graph.sync<writeAny, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 #elif __OPT_VERSION__ == 4
       // write aware (not read aware, i.e. conservative)
       _graph.sync<writeDestination, readAny, Reduce_min_dist_current,
-                  Broadcast_dist_current, Bitset_dist_current>("BFS");
+                  Bitset_dist_current>("BFS");
 #endif
 
       galois::runtime::reportStat_Tsum(

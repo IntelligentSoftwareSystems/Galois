@@ -1,0 +1,95 @@
+-----
+bmk2.cfg
+-----
+
+Setup the path to the built apps (Lonestar build directory) and where to output
+logs for each benchmark here under pathToApps and logOutputDirectory.
+
+-----
+bmktest2.py
+-----
+
+This file defines all the benchmarks to be run. Each benchmark is defined as a
+class that inherits from SharedMemApp.
+
+The runtime looks for relativeAppPath, which points to the executable, and
+benchmark, which is the name given to that benchmark when outputting things
+and, more importantly, the name used to refer to said benchmark run by bmk2 in
+other files.
+
+If any arguments to that benchmark need to be specified, you define the
+get_run_spec function to add args. See examples there in the current bmktest2.py
+file to get a feel of how to do it.
+
+The SharedMemApp parent class is where default parameters such as threads
+are specified. startThread, endThread, and step are the variables to edit
+for this purpose.
+
+The benchmarks that will be run are specified in the BINARIES array. For
+example, the below definition will run BarnesHut and BFS:
+
+BINARIES = [BarnesHut(), BFS()]
+
+-----
+lonestar.inputdb
+-----
+
+Inputs to benchmarks are specified here.
+
+To begin, change the "basepath" variable in the header to point to the root
+directory where are inputs are stored.
+
+The format for specifying an input is as follows:
+
+[<input name>]
+flags =
+name = <name to refer to input as in bmk2>
+file = <relative path to file from root input directory "basepath">
+format = file format
+
+There are a couple of file formats to be aware of:
+
+bin/galois = binary galois format
+mesh/nodes = mesh format
+triangles = format for triangle counting
+text = text format (for things like points-to-analysis)
+nothing = no file is passed in (for things like self generated input)
+
+-----
+lonestar.inputprops
+-----
+
+Additional properties for certain inputs can be specified in the inputprops
+file.
+
+[<same input name used in header for input in inputdb>]
+<additional property>=<what additional property is>
+
+For example, I can specify the transpose graph as following:
+
+[soc-livejournal]
+ptranspose=/net/ohm/export/iss/inputs/unweighted/soc-LiveJournal1.ptgr
+
+It can then be referred to in the bmktest2.py python script as the example
+below shows:
+
+s.set_arg("-graphTranspose=%s" % bmkinput.props.ptranspose)
+
+-----
+lonestar.bispec
+-----
+
+This file is where one specifies which input to run with a particular bmk2
+benchmark. Use the name given in the benchmark variable in bmktest2 to
+refer to a benchmark and the name given under the name variable in
+lonestar.inputdb to refer to an input. For example, the below lines says to
+run bfs with the twitter40 input.
+
+bfs twitter40
+
+-----
+How to run:
+-----
+
+defaultrunscript.sh has a default command to start the bmk2 runtime and use the
+config specified in the directory you run it from.

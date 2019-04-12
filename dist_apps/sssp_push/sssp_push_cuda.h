@@ -58,7 +58,13 @@ void batch_set_mirror_node_dist_current_cuda(
 void batch_set_node_dist_current_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id, uint8_t* v,
                                       DataCommMode data_mode);
+void batch_add_mirror_node_dist_current_cuda(struct CUDA_Context* ctx,
+                                      unsigned from_id, uint8_t* v,
+                                      DataCommMode data_mode);
 void batch_add_node_dist_current_cuda(struct CUDA_Context* ctx,
+                                      unsigned from_id, uint8_t* v,
+                                      DataCommMode data_mode);
+void batch_min_mirror_node_dist_current_cuda(struct CUDA_Context* ctx,
                                       unsigned from_id, uint8_t* v,
                                       DataCommMode data_mode);
 void batch_min_node_dist_current_cuda(struct CUDA_Context* ctx,
@@ -102,7 +108,13 @@ void batch_set_mirror_node_dist_old_cuda(struct CUDA_Context* ctx,
 void batch_set_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v, size_t v_size,
                                   DataCommMode data_mode);
+void batch_add_mirror_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v, size_t v_size,
+                                  DataCommMode data_mode);
 void batch_add_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
+                                  uint8_t* v, size_t v_size,
+                                  DataCommMode data_mode);
+void batch_min_mirror_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
                                   uint8_t* v, size_t v_size,
                                   DataCommMode data_mode);
 void batch_min_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
@@ -111,7 +123,7 @@ void batch_min_node_dist_old_cuda(struct CUDA_Context* ctx, unsigned from_id,
 void batch_reset_node_dist_old_cuda(struct CUDA_Context* ctx, size_t begin,
                                     size_t end, uint32_t v);
 
-void FirstItr_SSSP_cuda(unsigned int __begin, unsigned int __end,
+void FirstItr_SSSP_cuda(unsigned int __begin, unsigned int __end, unsigned int & active_vertices,
                         struct CUDA_Context* ctx);
 void FirstItr_SSSP_allNodes_cuda(struct CUDA_Context* ctx);
 void FirstItr_SSSP_masterNodes_cuda(struct CUDA_Context* ctx);
@@ -132,6 +144,7 @@ void InitializeGraph_nodesWithEdges_cuda(const uint32_t& local_infinity,
 void SSSP_cuda(unsigned int __begin, unsigned int __end,
                unsigned int& DGAccumulator_accum, 
                unsigned int& work_items,
+	       unsigned int & active_vertices,
                const uint32_t local_priority,
                struct CUDA_Context* ctx);
 void SSSPSanityCheck_cuda(unsigned int __begin, unsigned int __end,
@@ -151,13 +164,19 @@ void SSSPSanityCheck_nodesWithEdges_cuda(uint64_t& DGAccumulator_sum,
                                          struct CUDA_Context* ctx);
 void SSSP_allNodes_cuda(unsigned int& DGAccumulator_accum,
                         unsigned int& work_items,
+			unsigned int & active_vertices,
                         const uint32_t local_priority,
                         struct CUDA_Context* ctx);
 void SSSP_masterNodes_cuda(unsigned int& DGAccumulator_accum,
                            unsigned int& work_items,
+			   unsigned int & active_vertices,
                            const uint32_t local_priority,
                            struct CUDA_Context* ctx);
 void SSSP_nodesWithEdges_cuda(unsigned int& DGAccumulator_accum,
                               unsigned int& work_items,
+			      unsigned int & active_vertices,
                               const uint32_t local_priority,
                               struct CUDA_Context* ctx);
+std::string get_thread_block_work_into_string(struct CUDA_Context* ctx);
+std::string get_num_thread_blocks(struct CUDA_Context* ctx);
+void init_CUDA_stat_context(struct CUDA_Context* ctx);
