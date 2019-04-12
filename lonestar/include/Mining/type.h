@@ -77,69 +77,35 @@ struct Element_In_Tuple {
 	BYTE edge_label;
 	BYTE vertex_label;
 	BYTE history_info;
-
 	Element_In_Tuple() { }
-
+	Element_In_Tuple(VertexId _vertex_id) :
+		vertex_id(_vertex_id), key_index(0), edge_label(0), vertex_label(0), history_info(0) { }
 	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label) :
-		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) {
-	}
-
+		vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(0) { }
 	Element_In_Tuple(VertexId _vertex_id, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
-				vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) {
-	}
-
+				vertex_id(_vertex_id), key_index(0), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
 	Element_In_Tuple(VertexId _vertex_id, BYTE _key_index, BYTE _edge_label, BYTE _vertex_label, BYTE _history) :
-		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) {
-	}
-
-	~Element_In_Tuple(){
-	}
-
+		vertex_id(_vertex_id), key_index(_key_index), edge_label(_edge_label), vertex_label(_vertex_label), history_info(_history) { }
+	~Element_In_Tuple() { }
 	inline void set_vertex_id(VertexId new_id) {
 		vertex_id = new_id;
 	}
-
 	inline int cmp(const Element_In_Tuple& other) const {
 		//compare vertex id
-		if(vertex_id < other.vertex_id){
-			return -1;
-		}
-		if(vertex_id > other.vertex_id){
-			return 1;
-		}
-
+		if(vertex_id < other.vertex_id) return -1;
+		if(vertex_id > other.vertex_id) return 1;
 		//compare history info
-		if(history_info < other.history_info){
-			return -1;
-		}
-		if(history_info > other.history_info){
-			return 1;
-		}
-
+		if(history_info < other.history_info) return -1;
+		if(history_info > other.history_info) return 1;
 		//compare vertex label
-		if(vertex_label < other.vertex_label){
-			return -1;
-		}
-		if(vertex_label > other.vertex_label){
-			return 1;
-		}
-
+		if(vertex_label < other.vertex_label) return -1;
+		if(vertex_label > other.vertex_label) return 1;
 		//compare edge label
-		if(edge_label < other.edge_label){
-			return -1;
-		}
-		if(edge_label > other.edge_label){
-			return 1;
-		}
-
+		if(edge_label < other.edge_label) return -1;
+		if(edge_label > other.edge_label) return 1;
 		//compare index
-		if(key_index < other.key_index){
-			return -1;
-		}
-		if(key_index > other.key_index){
-			return 1;
-		}
-
+		if(key_index < other.key_index) return -1;
+		if(key_index > other.key_index) return 1;
 		return 0;
 	}
 };
@@ -166,8 +132,28 @@ inline std::ostream & operator<<(std::ostream & strm, const std::vector<Element_
 
 struct Base_Element {
 	VertexId id;
-	Base_Element(VertexId _vertex_id) : id(_vertex_id){}
-	~Base_Element(){}
+	//Base_Element() : id(0) {}
+	Base_Element(VertexId vid) : id(vid) {}
+	~Base_Element() {}
 };
+
+inline std::ostream & operator<<(std::ostream & strm, const Base_Element& element) {
+	strm << "[" << element.id << "]";
+	return strm;
+}
+
+inline std::ostream & operator<<(std::ostream & strm, const std::vector<Base_Element>& tuple) {
+	if(tuple.empty()){
+		strm << "(empty)";
+		return strm;
+	}
+	strm << "(";
+	for(auto it = tuple.begin(); it != tuple.end() - 1; ++it) {
+		strm << (*it) << ", ";
+	}
+	strm << tuple.back();
+	strm << ")";
+	return strm;
+}
 
 #endif /* CORE_TYPE_HPP_ */

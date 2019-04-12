@@ -33,7 +33,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "Mining/miner.h"
+#define ENABLE_LABEL 1
 
 const char* name = "FSM";
 const char* desc = "Frequent subgraph mining";
@@ -45,8 +45,8 @@ enum Algo {
 };
 
 namespace cll = llvm::cl;
-static cll::opt<std::string>
-inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
 	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
@@ -55,63 +55,40 @@ static cll::opt<unsigned> k("k",
 	cll::desc("max number of vertices in k-motif (default value 0)"), cll::init(0));
 static cll::opt<unsigned> minsup("minsup",
 	cll::desc("minimum suuport (default value 0)"), cll::init(0));
-typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
+typedef galois::graphs::LC_CSR_Graph<uint32_t, uint32_t>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
+int total_num = 0;
+
+#include "Mining/miner.h"
+#include "Lonestar/mgraph.h"
+#include "Mining/util.h"
 
 void init(Graph& graph, EmbeddingQueue &queue) {
+	//print_graph(graph);
 	printf("\n=============================== Init ===============================\n\n");
 	galois::do_all(
-		galois::iterate(graph),
+		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
-			// for each vertex
 			auto& src_label = graph.getData(src);
-			Graph::edge_iterator first = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-			Graph::edge_iterator last = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-			// foe each edge of this vertex
-			for (auto e = first; e != last; ++ e) {
+			//Graph::edge_iterator first = graph.edge_begin(src);
+			//Graph::edge_iterator last = graph.edge_end(src);
+			//for (auto e = first; e != last; ++ e) {
+			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
-				auto& dst_label = graph.getData(dst);
-				Embedding new_tuple;
-				new_tuple.push_back(Element_In_Tuple(src, 0, src_label));
-				new_tuple.push_back(Element_In_Tuple(dst, 0, dst_label));
-				if(!Pattern::is_automorphism_init(new_tuple)) {
-					queue.push_back(new_tuple);
+				if (src < dst) {
+					auto& dst_label = graph.getData(dst);
+					Embedding new_emb;
+					new_emb.push_back(Element_In_Tuple(src, 0, src_label));
+					new_emb.push_back(Element_In_Tuple(dst, 0, dst_label));
+				//if(!Pattern::is_automorphism_init(new_emb)) {
+					queue.push_back(new_emb);
 				}
 			}
 		},
 		galois::chunk_size<512>(), galois::steal(),
 		galois::loopname("Initialization")
 	);
-}
-
-void construct_edgelist(Graph& graph, std::vector<LabeledEdge> &edgelist) {
-	for (Graph::iterator it = graph.begin(); it != graph.end(); it ++) {
-//	galois::do_all(
-//		galois::iterate(graph),
-//		[&](const GNode& src) {
-			// for each vertex
-			GNode src = *it;
-			auto& src_label = graph.getData(src);
-			Graph::edge_iterator first = graph.edge_begin(src, galois::MethodFlag::UNPROTECTED);
-			Graph::edge_iterator last = graph.edge_end(src, galois::MethodFlag::UNPROTECTED);
-			// foe each edge of this vertex
-			for (auto e = first; e != last; ++ e) {
-				GNode dst = graph.getEdgeDst(e);
-				auto& dst_label = graph.getData(dst);
-				LabeledEdge edge(src, dst, src_label, dst_label);
-				edgelist.push_back(edge);
-			}
-		}
-//	);
-	assert(edgelist.size() == graph.sizeEdges());
-}
-
-void printout_tuples(int level, Miner& miner, EmbeddingQueue& queue) {
-	int num_tuples = std::distance(queue.begin(), queue.end());
-	unsigned tuple_size = miner.get_sizeof_tuple();
-	std::cout << "Number of tuples in level " << level << ": " << num_tuples << " (tuple_size=" << tuple_size << ")" << std::endl;
-	for (EmbeddingQueue::iterator it = queue.begin(); it != queue.end(); it ++)
-		miner.printout_tuple(level, *it);
+	//}
 }
 
 void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
@@ -159,42 +136,45 @@ void aggregator(Miner& miner, EmbeddingQueue& queue, CgMap& cg_map) {
 				cg_map[element.first] = element.second;
 		}
 	}
+	for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
+		if (it->second >= minsup) total_num ++;
 }
 
-void filter(Miner& miner, EmbeddingQueue& queue, EmbeddingQueue& filtered_queue, int minsup, CgMap cg_map) {
+void filter(Miner& miner, EmbeddingQueue& in_queue, EmbeddingQueue& out_queue, CgMap cg_map) {
+	//miner.filter_all(in_queue, out_queue, cg_map);
+	///*
+	std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
+		<< std::distance(in_queue.begin(), in_queue.end()) << "\n";
 	galois::for_each(
-		galois::iterate(queue),
-		[&](const Embedding& emb, auto& ctx) {
-			miner.filter_each(emb, filtered_queue, minsup, cg_map);
+		galois::iterate(in_queue),
+		[&](Embedding& emb, auto& ctx) {
+			miner.filter_each(emb, out_queue, cg_map);
 		},
 		galois::chunk_size<128>(), galois::steal(), galois::no_conflicts(),
 		galois::wl<galois::worklists::PerSocketChunkFIFO<128>>(),
 		galois::loopname("Filter")
 	);
+	//*/
 }
 
 #define DEBUG 0
 #define SHOW_OUTPUT 0
-void FsmSolver(Graph& graph) {
-	std::cout << "k = " << k << std::endl;
-	std::cout << "minsup = " << minsup << std::endl;
-	std::vector<LabeledEdge> edge_list;
-	construct_edgelist(graph, edge_list);
+void FsmSolver(Graph &graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
 	EmbeddingQueue queue, filtered_queue;
 	init(graph, queue);
-	unsigned sizeof_tuple = 2 * sizeof(Element_In_Tuple);
-	Miner miner(true, sizeof_tuple, graph.size(), graph.sizeEdges(), edge_list);
-	if(DEBUG) printout_tuples(0, miner, queue);
+	if(DEBUG) printout_embeddings(0, miner, queue);
 
 	std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 	CgMap cg_map; // canonical graph map
 	aggregator(miner, queue, cg_map);
+	//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
+	//	<< std::distance(queue.begin(), queue.end()) << "\n";
 	if(SHOW_OUTPUT) miner.printout_agg(cg_map);
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
-	filter(miner, queue, filtered_queue, minsup, cg_map);
-	if(DEBUG) printout_tuples(0, miner, filtered_queue);
+	filter(miner, queue, filtered_queue, cg_map);
+	if(DEBUG) printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
 	while (level < k) {
@@ -204,50 +184,82 @@ void FsmSolver(Graph& graph) {
 		galois::for_each(
 			galois::iterate(filtered_queue),
 			[&](const Embedding& embedding, auto& ctx) {
-				miner.join_each(k, embedding, queue);
+				miner.extend_edge(k, embedding, queue);
 			},
 			galois::chunk_size<128>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<128>>(),
 			galois::loopname("Join")
 		);
-		miner.update_tuple_size();
-		if(DEBUG) printout_tuples(level, miner, queue);
+		miner.update_embedding_size();
+		if(DEBUG) printout_embeddings(level, miner, queue);
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
 		aggregator(miner, queue, cg_map);
+		//std::cout << "num_patterns: " << cg_map.size() << " num_embeddings: " 
+		//	<< std::distance(queue.begin(), queue.end()) << "\n";
 		if(SHOW_OUTPUT) miner.printout_agg(cg_map);
 
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
-		filter(miner, queue, filtered_queue, minsup, cg_map);
-		if(DEBUG) printout_tuples(level, miner, filtered_queue);
+		filter(miner, queue, filtered_queue, cg_map);
+		if(DEBUG) printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
 	std::cout << "\n=============================== Done ===============================\n\n";
+	std::cout << "Number of frequent subgraphs (minsup=" << minsup << "): " << total_num << "\n";
 }
 
 int main(int argc, char** argv) {
 	galois::SharedMemSys G;
 	LonestarStart(argc, argv, name, desc, url);
 	Graph graph;
+	MGraph mgraph;
 	galois::StatTimer Tinitial("GraphReadingTime");
-	//galois::gPrint("Start readGraph\n");
 	Tinitial.start();
-	//galois::gPrint("Start loading", inputFilename, "\n");
-	galois::graphs::readGraph(graph, inputFilename);
-	for (GNode n : graph)
-		//graph.getData(n) = 1;
-		graph.getData(n) = rand() % 10 + 1;
+	if (filetype == "txt") {
+		printf("Reading .lg file: %s\n", filename.c_str());
+		std::ifstream in;
+		in.open(filename.c_str(), std::ios::in);
+		mgraph.read_txt(in);
+		in.close();
+		genGraph(mgraph, graph);
+	} else if (filetype == "adj") {
+		printf("Reading .adj file: %s\n", filename.c_str());
+		std::ifstream in;
+		in.open(filename.c_str(), std::ios::in);
+		mgraph.read_adj(in);
+		in.close();
+		genGraph(mgraph, graph);
+	} else if (filetype == "gr") {
+		printf("Reading .gr file: %s\n", filename.c_str());
+		galois::graphs::readGraph(graph, filename);
+		for (GNode n : graph) {
+			graph.getData(n) = rand() % 10 + 1;
+			for (auto e : graph.edges(n)) {
+				graph.getEdgeData(e) = 1;
+			}
+		}
+	} else { printf("Unkown file format\n"); exit(1); }
+	//print_graph(graph);
+	std::vector<LabeledEdge> edge_list;
+	//std::cout << "constructing edge_list" << std::endl;
+	construct_edgelist(graph, edge_list);
 	Tinitial.stop();
-	//galois::gPrint("Done readGraph\n");
+	std::cout << "k = " << k << std::endl;
+	std::cout << "minsup = " << minsup << std::endl;
+	std::cout << "num_threads = " << numThreads << std::endl;
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
+	//print_graph(graph);
+	unsigned sizeof_emb = 2 * sizeof(Element_In_Tuple);
+	Miner miner(true, sizeof_emb, &graph, edge_list);
+	miner.set_threshold(minsup);
 	galois::reportPageAlloc("MeminfoPre");
 	galois::StatTimer T;
 	T.start();
 	switch (algo) {
 		case nodeiterator:
-			FsmSolver(graph);
+			FsmSolver(graph, miner);
 			break;
 		case edgeiterator:
 			break;
