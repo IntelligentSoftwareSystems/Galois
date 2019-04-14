@@ -164,6 +164,7 @@ public:
 		}
 		else sm[emb] = 1;
 	}
+	// aggregate embeddings into quick patterns
 	void quick_aggregate_each(const Embedding& emb, QpMap& qp_map) {
 		Quick_Pattern qp(sizeof_tuple);
 		turn_quick_pattern_pure(emb, qp, label_flag);
@@ -174,14 +175,16 @@ public:
 			qp_map[qp] = 1;
 		}
 	}
-	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& canonical_graphs_agg) {
+	// aggregate quick patterns into canonical patterns
+	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& cg_map) {
 		Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
 		qp.clean();
-		if (canonical_graphs_agg.find(*cg) != canonical_graphs_agg.end()) {
-			canonical_graphs_agg[*cg] = canonical_graphs_agg[*cg] + num;
-		} else canonical_graphs_agg[*cg] = num;
+		if (cg_map.find(*cg) != cg_map.end()) {
+			cg_map[*cg] = cg_map[*cg] + num;
+		} else cg_map[*cg] = num;
 		delete cg;
 	}
+	// check if the pattern of each embedding in the queue is frequent
 	void filter_all(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMap &cg_map) {
 		for (auto emb : in_queue) {
 			Quick_Pattern qp(sizeof_tuple);
@@ -195,7 +198,6 @@ public:
 			delete cf;
 		}
 	}
-
 	// filtering for FSM
 	// check if the pattern of this embedding is frequent
 	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMap &cg_map) {

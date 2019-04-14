@@ -40,6 +40,7 @@ public:
 	std::istream &read_txt(std::istream &is) {
 		char line[1024];
 		std::vector<std::string> result;
+		std::set<std::pair<int,int> > edge_set;
 		//clear();
 		while(true) {
 			unsigned pos = is.tellg();
@@ -65,8 +66,15 @@ public:
 						<< "; to: " << to << "; vertex count: " << labels_.size() << std::endl;
 					exit(1);
 				}
-				el.push_back(MEdge(from, to, elabel));
-				if(directed_ == false) el.push_back(MEdge(to, from, elabel));
+				if (from == to) continue; // remove self-loop
+				if (edge_set.find(std::pair<int, int>(from, to)) == edge_set.end()) {
+					edge_set.insert(std::pair<int, int>(from, to));
+					el.push_back(MEdge(from, to, elabel));
+					if(directed_ == false) {
+						edge_set.insert(std::pair<int, int>(to, from));
+						el.push_back(MEdge(to, from, elabel));
+					}
+				}
 			}
 		}
 		num_vertices_ = labels_.size();
@@ -78,36 +86,25 @@ public:
 	std::istream &read_adj(std::istream &is) {
 		char line[1024];
 		std::vector<std::string> result;
-		//clear();
-		int vertex_id;
-		//unsigned pos = is.tellg();
-		is.getline(line, 1024);
-		result.clear();
-		split(line, result);
-		if(result.empty()) {
-			std::cerr << "Empty first line" << std::endl;
-		} else {
-			num_vertices_ = atoi(result[0].c_str());
-			num_edges_ = atoi(result[1].c_str());
-		}
-		vertex_id = 0;
-		while(true) {
+		while(is.getline(line, 1024)) {
 			//pos = is.tellg();
-			if(!is.getline(line, 1024)) break;
 			result.clear();
 			split(line, result);
-			if(result.empty()) {
-			} else {
-				labels_.resize(vertex_id + 1);
-				labels_[vertex_id] = atoi(result[0].c_str()) - 1;
-				//(*this)[vertex_id].global_vid = vertex_id;
-				for(size_t i = 1; i < result.size(); i++) {
-					int to = atoi(result[i++].c_str()) - 1;
-					int elabel = atoi(result[i].c_str()) - 1;
-					el.push_back(MEdge(vertex_id, to, elabel));
-				}
+			int src = atoi(result[0].c_str());
+			labels_.resize(src + 1);
+			labels_[src] = atoi(result[1].c_str());
+			int elabel = 0;
+			std::set<std::pair<int, int> > neighbors;
+			for(size_t i = 2; i < result.size(); i++) {
+				int dst = atoi(result[i].c_str());
+				if (src == dst) continue; // remove self-loop
+#ifdef USE_ELABEL
+				elabel = atoi(result[i].c_str());
+#endif
+				neighbors.insert(std::pair<int, int>(dst, elabel)); // remove redundant edge
 			}
-			vertex_id++;
+			for (std::set<std::pair<int, int> >::iterator it = neighbors.begin(); it != neighbors.end(); ++it)
+				el.push_back(MEdge(src, it->first, it->second));
 		}
 		num_vertices_ = labels_.size();
 		num_edges_ = el.size();
