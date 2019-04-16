@@ -115,7 +115,7 @@ void KclSolver(Graph& graph, Miner &miner) {
 		galois::for_each(
 			galois::iterate(queue2),
 			[&](BaseEmbedding& emb, auto& ctx) {
-				miner.aggregate_each_clique(emb, *(lmap.getLocal()), queue);
+				miner.aggregate_clique_each(emb, *(lmap.getLocal()), queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),

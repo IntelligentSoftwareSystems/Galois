@@ -84,12 +84,14 @@ public:
 			}
 		}
 	}
+	// given an embedding, extend it with one more vertex. Used for k-cliques
 	void extend_vertex(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		int n = emb.size();
 		for(int i = 0; i < n; ++i) {
 			int id = emb[i];
 			for(auto e : graph->edges(id)) {
 				GNode dst = graph->getEdgeDst(e);
+				// extend vertex in ascending order to avoid unnecessary enumeration
 				if(dst > emb[n-1]) {
 					emb.push_back(dst);
 					queue.push_back(emb);
@@ -98,51 +100,52 @@ public:
 			}
 		}
 	}
-	void aggregate(EmbeddingQueue queue) {
-		quick_patterns_agg.clear();
+	void quick_aggregate(EmbeddingQueue queue, QpMap qp_map) {
+		qp_map.clear();
 		for (auto emb : queue) {
 			Quick_Pattern qp(sizeof_tuple);
 			turn_quick_pattern_pure(emb, qp, label_flag);
-			// update counting for this quick pattern
-			if (quick_patterns_agg.find(qp) != quick_patterns_agg.end()) {
-				// if this quick pattern already exists, increase its count
-				quick_patterns_agg[qp] += 1;
+			if (qp_map.find(qp) != qp_map.end()) {
+				qp_map[qp] += 1;
 				qp.clean();
-				// otherwise add this quick pattern into the map, and set the count as one
-			} else { quick_patterns_agg[qp] = 1; }
-		}
-		canonical_graphs_agg.clear();
-		// for each quick patter
-		for (auto it = quick_patterns_agg.begin(); it != quick_patterns_agg.end(); ++it) {
-			Quick_Pattern qp = it->first;
-			unsigned s = it->second;
-			// turn it into a canonical graph (i.e. real pattern)
-			Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
-			qp.clean();
-			// if this pattern already exists, increase its count
-			if (canonical_graphs_agg.find(*cg) != canonical_graphs_agg.end()) {
-				canonical_graphs_agg[*cg] = canonical_graphs_agg[*cg] + s;
-			} else {
-				// otherwise add this pattern into the map, and set the count as 's'
-				canonical_graphs_agg[*cg] = s;
-			}
-			delete cg;
+			} else { qp_map[qp] = 1; }
 		}
 	}
-	void canonical_aggregate(QpMap qp_map) {
-		canonical_graphs_agg.clear();
+	// aggregate embeddings into quick patterns
+	void quick_aggregate_each(const Embedding& emb, QpMap& qp_map) {
+		Quick_Pattern qp(sizeof_tuple);
+		turn_quick_pattern_pure(emb, qp, label_flag);
+		// update count for this quick pattern
+		if (qp_map.find(qp) != qp_map.end()) {
+			// if this quick pattern already exists, increase its count
+			qp_map[qp] += 1;
+			qp.clean();
+		// otherwise add this quick pattern into the map, and set the count as one
+		} else qp_map[qp] = 1;
+	}
+	void canonical_aggregate(QpMap qp_map, CgMap cg_map) {
 		for (auto it = qp_map.begin(); it != qp_map.end(); ++it) {
 			Quick_Pattern qp = it->first;
 			unsigned s = it->second;
 			Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
 			qp.clean();
-			if (canonical_graphs_agg.find(*cg) != canonical_graphs_agg.end()) {
-				canonical_graphs_agg[*cg] = canonical_graphs_agg[*cg] + s;
-			} else {
-				canonical_graphs_agg[*cg] = s;
-			}
+			if (cg_map.find(*cg) != cg_map.end()) {
+				cg_map[*cg] = cg_map[*cg] + s;
+			} else cg_map[*cg] = s;
 			delete cg;
 		}
+	}
+	// aggregate quick patterns into canonical patterns
+	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& cg_map) {
+		// turn the quick pattern into its canonical pattern
+		Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
+		qp.clean();
+		// if this pattern already exists, increase its count
+		if (cg_map.find(*cg) != cg_map.end()) {
+			cg_map[*cg] = cg_map[*cg] + num;
+		// otherwise add this pattern into the map, and set the count as 's'
+		} else cg_map[*cg] = num;
+		delete cg;
 	}
 	void aggregate_clique(BaseEmbeddingQueue &in_queue, BaseEmbeddingQueue &out_queue) {
 		SimpleMap simple_agg;
@@ -158,9 +161,11 @@ public:
 			else simple_agg[emb] = 1;
 		}
 	}
-	void aggregate_each_clique(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
+	// check each embedding to find the cliques
+	void aggregate_clique_each(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
 		auto it = sm.find(emb);
 		if(it != sm.end()) {
+			// check if this is a clique
 			if(it->second == it->first.size() - 2) {
 				out_queue.push_back(emb);
 				sm.erase(it);
@@ -169,28 +174,8 @@ public:
 		}
 		else sm[emb] = 1;
 	}
-	// aggregate embeddings into quick patterns
-	void quick_aggregate_each(const Embedding& emb, QpMap& qp_map) {
-		Quick_Pattern qp(sizeof_tuple);
-		turn_quick_pattern_pure(emb, qp, label_flag);
-		if (qp_map.find(qp) != qp_map.end()) {
-			qp_map[qp] += 1;
-			qp.clean();
-		} else {
-			qp_map[qp] = 1;
-		}
-	}
-	// aggregate quick patterns into canonical patterns
-	void canonical_aggregate_each(Quick_Pattern qp, int num, CgMap& cg_map) {
-		Canonical_Graph* cg = Pattern::turn_canonical_graph(qp, false);
-		qp.clean();
-		if (cg_map.find(*cg) != cg_map.end()) {
-			cg_map[*cg] = cg_map[*cg] + num;
-		} else cg_map[*cg] = num;
-		delete cg;
-	}
 	// check if the pattern of each embedding in the queue is frequent
-	void filter_all(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMap &cg_map) {
+	void filter(EmbeddingQueue &in_queue, EmbeddingQueue &out_queue, CgMap &cg_map) {
 		for (auto emb : in_queue) {
 			Quick_Pattern qp(sizeof_tuple);
 			turn_quick_pattern_pure(emb, qp, label_flag);
@@ -204,7 +189,7 @@ public:
 		}
 	}
 	// filtering for FSM
-	// check if the pattern of this embedding is frequent
+	// check if the pattern of a given embedding is frequent, if yes, insert it to the queue
 	void filter_each(Embedding &emb, EmbeddingQueue &out_queue, CgMap &cg_map) {
 		// find the quick pattern of this embedding
 		Quick_Pattern qp(sizeof_tuple);
@@ -246,10 +231,6 @@ public:
 		std::cout << emb[emb.size() - 1];
 		std::cout << ")\n";
 	}
-	void printout_agg() {
-		for (auto it = canonical_graphs_agg.begin(); it != canonical_graphs_agg.end(); ++it)
-			std::cout << "{" << it->first << " --> " << it->second << std::endl;
-	}
 	void printout_agg(CgMap cg_map) {
 		for (auto it = cg_map.begin(); it != cg_map.end(); ++it)
 			std::cout << "{" << it->first << " --> " << it->second << std::endl;
@@ -260,8 +241,6 @@ private:
 	int sizeof_tuple;
 	unsigned threshold;
 	Graph *graph;
-	QpMap quick_patterns_agg;
-	CgMap canonical_graphs_agg;
 #if 0
 	std::vector<LabeledEdge> edge_list;
 /*

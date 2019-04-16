@@ -106,7 +106,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 		galois::for_each(
 			galois::iterate(queue),
 			[&](const Embedding& emb, auto& ctx) {
-				miner.extend_edge(k, emb, queue2);
+				miner.extend_edge(k, emb, queue2); // edge extension
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
@@ -119,58 +119,60 @@ void MotifSolver(Graph& graph, Miner &miner) {
 
 		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
 		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
-		//miner.aggregate(queue); // sequential implementaion
+		QpMap qp_map; // quick patterns map
+		//miner.quick_aggregate(queue, qp_map); // sequential implementaion
 
-		// Parallel aggregation
-		LocalQpMap quick_pattern_localmap;
-		QpMap quick_patterns_map;
+		// Parallel quick pattern aggregation
+		LocalQpMap qp_localmap; // quick patterns local map for each thread
 		galois::for_each(
 			galois::iterate(queue),
 			[&](const Embedding& emb, auto& ctx) {
-				miner.quick_aggregate_each(emb, *(quick_pattern_localmap.getLocal()));
+				miner.quick_aggregate_each(emb, *(qp_localmap.getLocal())); // quick pattern aggregation
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("QuickAggregation")
 		);
-		for (unsigned i = 0; i < quick_pattern_localmap.size(); i++) {
-			QpMap qp_map = *quick_pattern_localmap.getLocal(i);
-			for (auto element : qp_map) {
-				if (quick_patterns_map.find(element.first) != quick_patterns_map.end())
-					quick_patterns_map[element.first] += element.second;
+		// merging results sequentially
+		for (unsigned i = 0; i < qp_localmap.size(); i++) {
+			QpMap qp_lmap = *qp_localmap.getLocal(i);
+			for (auto element : qp_lmap) {
+				if (qp_map.find(element.first) != qp_map.end())
+					qp_map[element.first] += element.second;
 				else
-					quick_patterns_map[element.first] = element.second;
+					qp_map[element.first] = element.second;
 			}
 		}
 
 		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
-		//miner.canonical_aggregate(quick_patterns_map);
+		CgMap cg_map; // canonical graph map
+		//miner.canonical_aggregate(qp_map, cg_map);
 		/*
 		// sequential implementation
-		for (auto qp = quick_patterns_map.begin(); qp != quick_patterns_map.end(); ++ qp) {
+		for (auto qp = qp_map.begin(); qp != qp_map.end(); ++ qp) {
 			Quick_Pattern subgraph = qp->first;
 			int count = qp->second;
 			miner.canonical_aggregate_each(subgraph, count, cg_map);
 		}
 		//*/
 
-		// Parallel aggregation
+		// Parallel canonical pattern aggregation
 		LocalCgMap cg_localmap; // canonical graph local map for each thread
-		CgMap cg_map; // canonical graph map
 		galois::do_all(
-			galois::iterate(quick_patterns_map),
+			galois::iterate(qp_map),
 			[&](std::pair<Quick_Pattern, int> qp) {
 				Quick_Pattern subgraph = qp.first;
 				int count = qp.second;
-				miner.canonical_aggregate_each(subgraph, count, *(cg_localmap.getLocal()));
+				miner.canonical_aggregate_each(subgraph, count, *(cg_localmap.getLocal())); // canonical pattern aggregation
 			},
-			galois::chunk_size<128>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<128>>(),
+			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
+			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
 			galois::loopname("CanonicalAggregation")
 		);
+		// merging results sequentially
 		for (unsigned i = 0; i < cg_localmap.size(); i++) {
-			CgMap cgm = *cg_localmap.getLocal(i);
-			for (auto element : cgm) {
+			CgMap cg_lmap = *cg_localmap.getLocal(i);
+			for (auto element : cg_lmap) {
 				if (cg_map.find(element.first) != cg_map.end())
 					cg_map[element.first] += element.second;
 				else
@@ -178,7 +180,7 @@ void MotifSolver(Graph& graph, Miner &miner) {
 			}
 		}
 		miner.printout_agg(cg_map);
-		std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << quick_patterns_map.size()
+		std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << qp_map.size()
 			<< " num_embeddings: " << std::distance(queue.begin(), queue.end()) << "\n";
 		level ++;
 	}
