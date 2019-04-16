@@ -8,19 +8,6 @@ void print_graph(Graph &graph) {
 	}
 }
 
-void construct_edgelist(Graph& graph, std::vector<LabeledEdge> &edgelist) {
-	for (GNode src : graph) {
-		auto& src_label = graph.getData(src);
-		for (auto e : graph.edges(src)) {
-			GNode dst = graph.getEdgeDst(e);
-			auto& dst_label = graph.getData(dst);
-			LabeledEdge edge(src, dst, src_label, dst_label);
-			edgelist.push_back(edge);
-		}
-	}
-	assert(edgelist.size() == graph.sizeEdges());
-}
-
 void genGraph(MGraph &mg, Graph &g) {
 	g.allocateFrom(mg.num_vertices(), mg.num_edges());
 	g.constructNodes();

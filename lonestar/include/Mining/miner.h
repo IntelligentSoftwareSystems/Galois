@@ -39,8 +39,9 @@ namespace std {
 
 class Miner {
 public:
-	Miner(bool label_f, int tuple_size, Graph *g, std::vector<LabeledEdge> edge_list) : label_flag(label_f), sizeof_tuple(tuple_size) {
+	Miner(bool label_f, int tuple_size, Graph *g) : label_flag(label_f), sizeof_tuple(tuple_size) {
 		graph = g;
+		//construct_edgelist();
 		//edge_hashmap.resize(g->size());
 		//build_edge_hashmap(g->sizeEdges(), 0, edge_list);
 	}
@@ -83,16 +84,16 @@ public:
 			}
 		}
 	}
-	void extend_clique(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
+	void extend_vertex(BaseEmbedding emb, BaseEmbeddingQueue &queue) {
 		int n = emb.size();
 		for(int i = 0; i < n; ++i) {
 			int id = emb[i];
 			for(auto e : graph->edges(id)) {
 				GNode dst = graph->getEdgeDst(e);
-				BaseEmbedding out_emb = emb;
 				if(dst > emb[n-1]) {
-					out_emb.push_back(dst);
-					queue.push_back(out_emb);
+					emb.push_back(dst);
+					queue.push_back(emb);
+					emb.pop_back();
 				}
 			}
 		}
@@ -157,10 +158,14 @@ public:
 			else simple_agg[emb] = 1;
 		}
 	}
-	void aggregate_each_clique(BaseEmbedding &emb, SimpleMap& sm) {
+	void aggregate_each_clique(BaseEmbedding emb, SimpleMap& sm, BaseEmbeddingQueue &out_queue) {
 		auto it = sm.find(emb);
 		if(it != sm.end()) {
-			sm[emb] += 1;
+			if(it->second == it->first.size() - 2) {
+				out_queue.push_back(emb);
+				sm.erase(it);
+			}
+			else sm[emb] += 1;
 		}
 		else sm[emb] = 1;
 	}
@@ -258,6 +263,21 @@ private:
 	QpMap quick_patterns_agg;
 	CgMap canonical_graphs_agg;
 #if 0
+	std::vector<LabeledEdge> edge_list;
+/*
+	void construct_edgelist() {
+		for (GNode src : *graph) {
+			auto& src_label = graph->getData(src);
+			for (auto e : graph->edges(src)) {
+				GNode dst = graph->getEdgeDst(e);
+				auto& dst_label = graph->getData(dst);
+				LabeledEdge edge(src, dst, src_label, dst_label);
+				edge_list.push_back(edge);
+			}
+		}
+		assert(edge_list.size() == graph->sizeEdges());
+	}
+*/
 	std::vector<Embedding> edge_hashmap;
 	void build_edge_hashmap(int n_edges, int start_vertex, std::vector<LabeledEdge> edge_list) {
 		for(int pos = 0; pos < n_edges; pos ++) {
@@ -311,8 +331,6 @@ private:
 			} else element.set_vertex_id(iterator->second);
 		}
 	}
-
-
 	inline bool is_automorphism(Embedding & sub_graph, BYTE history, VertexId src, VertexId dst, const bool vertex_existed) {
 		//check with the first element
 		if(dst < sub_graph.front().vertex_id) return true;
@@ -352,15 +370,14 @@ private:
 
 // print out the embeddings in the task queue
 #ifdef USE_SIMPLE
-void printout_embeddings(int level, Miner& miner, BaseEmbeddingQueue& queue) {
+void printout_embeddings(int level, Miner& miner, BaseEmbeddingQueue& queue, bool verbose = false) {
 #else
-void printout_embeddings(int level, Miner& miner, EmbeddingQueue& queue) {
+void printout_embeddings(int level, Miner& miner, EmbeddingQueue& queue, bool verbose = false) {
 #endif
 	int num_embeddings = std::distance(queue.begin(), queue.end());
 	unsigned embedding_size = miner.get_sizeof_embedding();
 	std::cout << "Number of embeddings in level " << level << ": " << num_embeddings << " (embedding_size=" << embedding_size << ")" << std::endl;
-	for (auto embedding : queue)
-		miner.printout_embedding(level, embedding);
+	if(verbose) for (auto embedding : queue) miner.printout_embedding(level, embedding);
 }
 
 #endif /* MINER_HPP_ */

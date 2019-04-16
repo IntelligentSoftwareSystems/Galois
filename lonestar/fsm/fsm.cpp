@@ -174,7 +174,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 
 	std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 	filter(miner, queue, filtered_queue, cg_map);
-	if(DEBUG) printout_embeddings(0, miner, filtered_queue);
+	printout_embeddings(0, miner, filtered_queue);
 	unsigned level = 1;
 
 	while (level < k) {
@@ -191,7 +191,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 			galois::loopname("Join")
 		);
 		miner.update_embedding_size();
-		if(DEBUG) printout_embeddings(level, miner, queue);
+		printout_embeddings(level, miner, queue);
 
 		std::cout << "\n----------------------------------- Aggregating -----------------------------------\n";
 		cg_map.clear();
@@ -203,7 +203,7 @@ void FsmSolver(Graph &graph, Miner &miner) {
 		std::cout << "\n------------------------------------ Filtering ------------------------------------\n";
 		filtered_queue.clear();
 		filter(miner, queue, filtered_queue, cg_map);
-		if(DEBUG) printout_embeddings(level, miner, filtered_queue);
+		printout_embeddings(level, miner, filtered_queue);
 		level ++;
 	}
 	std::cout << "\n=============================== Done ===============================\n\n";
@@ -219,17 +219,11 @@ int main(int argc, char** argv) {
 	Tinitial.start();
 	if (filetype == "txt") {
 		printf("Reading .lg file: %s\n", filename.c_str());
-		std::ifstream in;
-		in.open(filename.c_str(), std::ios::in);
-		mgraph.read_txt(in);
-		in.close();
+		mgraph.read_txt(filename.c_str());
 		genGraph(mgraph, graph);
 	} else if (filetype == "adj") {
 		printf("Reading .adj file: %s\n", filename.c_str());
-		std::ifstream in;
-		in.open(filename.c_str(), std::ios::in);
-		mgraph.read_adj(in);
-		in.close();
+		mgraph.read_adj(filename.c_str());
 		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
 		printf("Reading .gr file: %s\n", filename.c_str());
@@ -241,10 +235,6 @@ int main(int argc, char** argv) {
 			}
 		}
 	} else { printf("Unkown file format\n"); exit(1); }
-	//print_graph(graph);
-	std::vector<LabeledEdge> edge_list;
-	//std::cout << "constructing edge_list" << std::endl;
-	construct_edgelist(graph, edge_list);
 	Tinitial.stop();
 	std::cout << "k = " << k << std::endl;
 	std::cout << "minsup = " << minsup << std::endl;
@@ -252,20 +242,12 @@ int main(int argc, char** argv) {
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
 	//print_graph(graph);
 	unsigned sizeof_emb = 2 * sizeof(Element_In_Tuple);
-	Miner miner(true, sizeof_emb, &graph, edge_list);
+	Miner miner(true, sizeof_emb, &graph);
 	miner.set_threshold(minsup);
 	galois::reportPageAlloc("MeminfoPre");
 	galois::StatTimer T;
 	T.start();
-	switch (algo) {
-		case nodeiterator:
-			FsmSolver(graph, miner);
-			break;
-		case edgeiterator:
-			break;
-		default:
-			std::cerr << "Unknown algo: " << algo << "\n";
-	}
+	FsmSolver(graph, miner);
 	T.stop();
 	galois::reportPageAlloc("MeminfoPost");
 	return 0;

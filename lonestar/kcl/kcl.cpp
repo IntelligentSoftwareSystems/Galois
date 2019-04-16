@@ -32,23 +32,28 @@
 #include <algorithm>
 #include <iostream>
 #include <fstream>
+#define USE_SIMPLE
 #define DEBUG 0
 #define ENABLE_LABEL 0
 
-const char* name = "Motif";
-const char* desc = "Counts the motifs in a graph";
+const char* name = "Kcl";
+const char* desc = "Counts the K-Cliques in a graph";
 const char* url  = 0;
+
 enum Algo {
 	nodeiterator,
 	edgeiterator,
 };
+
 namespace cll = llvm::cl;
 static cll::opt<std::string> filetype(cll::Positional, cll::desc("<filetype>"), cll::Required);
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<filename>"), cll::Required);
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"), cll::values(
 	clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator"),
-	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd), cll::init(Algo::nodeiterator));
-static cll::opt<unsigned> k("k", cll::desc("max number of vertices in k-motif(default value 0)"), cll::init(0));
+	clEnumValN(Algo::edgeiterator, "edgeiterator", "Edge Iterator"), clEnumValEnd),
+	cll::init(Algo::nodeiterator));
+static cll::opt<unsigned> k("k",
+	cll::desc("max number of vertices in k-clique (default value 3)"), cll::init(3));
 typedef galois::graphs::LC_CSR_Graph<uint32_t, void>::with_numa_alloc<true>::type ::with_no_lockable<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -56,131 +61,83 @@ typedef Graph::GraphNode GNode;
 #include "Lonestar/mgraph.h"
 #include "Mining/util.h"
 #define CHUNK_SIZE 256
+
 // insert edges into the worklist (task queue)
-void initialization(Graph& graph, EmbeddingQueue &queue) {
-	printf("\n=============================== Init ===============================\n\n");
+void initialization(Graph& graph, BaseEmbeddingQueue &queue) {
+	printf("\n=============================== Init ===============================\n");
 	galois::do_all(
-		//galois::iterate(graph),
 		galois::iterate(graph.begin(), graph.end()),
 		[&](const GNode& src) {
-			// for each vertex
-			//auto& src_label = graph.getData(src);
-			//Graph::edge_iterator first = graph.edge_begin(src);
-			//Graph::edge_iterator last = graph.edge_end(src);
-			// for each edge of this vertex
-			//for (auto e = first; e != last; ++ e) {
 			for (auto e : graph.edges(src)) {
 				GNode dst = graph.getEdgeDst(e);
-				//auto& dst_label = graph.getData(dst);
-				if(src < dst) {
-					// create a new embedding
-					Embedding new_emb;
-					new_emb.push_back(Element_In_Tuple(src));
-					new_emb.push_back(Element_In_Tuple(dst));
+				if (src < dst) {
+					BaseEmbedding new_emb;
+					new_emb.push_back(src);
+					new_emb.push_back(dst);
 					queue.push_back(new_emb);
 				}
 			}
 		},
-		galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
-		galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-		galois::loopname("Initialization")
+		galois::chunk_size<512>(), galois::steal(), galois::loopname("Initialization")
 	);
 }
 
-void MotifSolver(Graph& graph, Miner &miner) {
+void KclSolver(Graph& graph, Miner &miner) {
 	std::cout << "=============================== Start ===============================\n";
-	// task queues. double buffering
-	EmbeddingQueue queue, queue2;
-	// initialize the task queue
+	BaseEmbeddingQueue queue, queue2;
 	initialization(graph, queue);
-	if(DEBUG) printout_embeddings(0, miner, queue);
+	printout_embeddings(0, miner, queue, DEBUG);
 	unsigned level = 1;
-	int queue_size = std::distance(queue.begin(), queue.end());
-	std::cout << "Queue size = " << queue_size << std::endl;
-
-	// a level-by-level approach for Apriori search space (breadth first seach)
-	while (level < k) {
+	while (level < k-1) {
 		std::cout << "\n============================== Level " << level << " ==============================\n";
 		std::cout << "\n------------------------------------- Step 1: Joining -------------------------------------\n";
-		// for each embedding in the task queue, do the edge-extension operation
+		queue2.clear();
 		galois::for_each(
 			galois::iterate(queue),
-			[&](const Embedding& emb, auto& ctx) {
-				miner.extend_edge(k, emb, queue2);
+			[&](const BaseEmbedding& emb, auto& ctx) {
+				miner.extend_vertex(emb, queue2);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("Join")
+			galois::loopname("ExtendVertex")
 		);
-		miner.update_embedding_size(); // increase the embedding size since one more edge added
-		queue.swap(queue2);
-		queue2.clear();
-		printout_embeddings(level, miner, queue);
+		miner.update_base_embedding_size(); // increase the embedding size since one more edge added
+		printout_embeddings(level, miner, queue2, DEBUG);
 
 		std::cout << "\n----------------------------------- Step 2: Aggregation -----------------------------------\n";
-		// Sub-step 1: aggregate on quick patterns: gather embeddings into different quick patterns
-		//miner.aggregate(queue); // sequential implementaion
-
+		queue.clear();
+#if 0
+		miner.aggregate_clique(queue2, queue); // sequential implementaion
+#else
 		// Parallel aggregation
-		LocalQpMap quick_pattern_localmap;
-		QpMap quick_patterns_map;
+		LocalSimpleMap lmap;
+		SimpleMap map;
 		galois::for_each(
-			galois::iterate(queue),
-			[&](const Embedding& emb, auto& ctx) {
-				miner.quick_aggregate_each(emb, *(quick_pattern_localmap.getLocal()));
+			galois::iterate(queue2),
+			[&](BaseEmbedding& emb, auto& ctx) {
+				miner.aggregate_each_clique(emb, *(lmap.getLocal()), queue);
 			},
 			galois::chunk_size<CHUNK_SIZE>(), galois::steal(), galois::no_conflicts(),
 			galois::wl<galois::worklists::PerSocketChunkFIFO<CHUNK_SIZE>>(),
-			galois::loopname("QuickAggregation")
+			galois::loopname("Aggregation")
 		);
-		for (unsigned i = 0; i < quick_pattern_localmap.size(); i++) {
-			QpMap qp_map = *quick_pattern_localmap.getLocal(i);
-			for (auto element : qp_map) {
-				if (quick_patterns_map.find(element.first) != quick_patterns_map.end())
-					quick_patterns_map[element.first] += element.second;
-				else
-					quick_patterns_map[element.first] = element.second;
+		for (unsigned i = 0; i < lmap.size(); i++) {
+			SimpleMap sm = *lmap.getLocal(i);
+			for (auto element : sm) {
+				auto it = map.find(element.first);
+				if (it != map.end()) {
+					if(it->second + element.second == it->first.size() - 1) {
+						queue.push_back(it->first);
+						map.erase(it);
+					} else map[element.first] += element.second;
+				} else
+					map[element.first] = element.second;
 			}
 		}
-
-		// Sub-step 2: aggregate on canonical patterns: gather quick patterns into different canonical patterns
-		//miner.canonical_aggregate(quick_patterns_map);
-		/*
-		// sequential implementation
-		for (auto qp = quick_patterns_map.begin(); qp != quick_patterns_map.end(); ++ qp) {
-			Quick_Pattern subgraph = qp->first;
-			int count = qp->second;
-			miner.canonical_aggregate_each(subgraph, count, cg_map);
-		}
-		//*/
-
-		// Parallel aggregation
-		LocalCgMap cg_localmap; // canonical graph local map for each thread
-		CgMap cg_map; // canonical graph map
-		galois::do_all(
-			galois::iterate(quick_patterns_map),
-			[&](std::pair<Quick_Pattern, int> qp) {
-				Quick_Pattern subgraph = qp.first;
-				int count = qp.second;
-				miner.canonical_aggregate_each(subgraph, count, *(cg_localmap.getLocal()));
-			},
-			galois::chunk_size<128>(), galois::steal(), galois::no_conflicts(),
-			galois::wl<galois::worklists::PerSocketChunkFIFO<128>>(),
-			galois::loopname("CanonicalAggregation")
-		);
-		for (unsigned i = 0; i < cg_localmap.size(); i++) {
-			CgMap cgm = *cg_localmap.getLocal(i);
-			for (auto element : cgm) {
-				if (cg_map.find(element.first) != cg_map.end())
-					cg_map[element.first] += element.second;
-				else
-					cg_map[element.first] = element.second;
-			}
-		}
-		miner.printout_agg(cg_map);
-		std::cout << "num_patterns: " << cg_map.size() << " num_quick_patterns: " << quick_patterns_map.size()
-			<< " num_embeddings: " << std::distance(queue.begin(), queue.end()) << "\n";
+#endif
+		printout_embeddings(level, miner, queue, DEBUG);
 		level ++;
+		//std::cout << "Number of " << level+1 << "-cliques is: " << std::distance(queue.begin(), queue.end()) << "\n";
 	}
 	std::cout << "\n=============================== Done ===============================\n\n";
 }
@@ -200,15 +157,17 @@ int main(int argc, char** argv) {
 		printf("Reading .adj file: %s\n", filename.c_str());
 		mgraph.read_adj(filename.c_str());
 		genGraph(mgraph, graph);
+	} else if (filetype == "mtx") {
+		printf("Reading .mtx file: %s\n", filename.c_str());
+		mgraph.read_mtx(filename.c_str(), true); //symmetrize
+		genGraph(mgraph, graph);
 	} else if (filetype == "gr") {
 		printf("Reading .gr file: %s\n", filename.c_str());
 		galois::graphs::readGraph(graph, filename);
 		for (GNode n : graph) graph.getData(n) = 1;
 	} else { printf("Unkown file format\n"); exit(1); }
 	//print_graph(graph);
-	// the initial size of a embedding is 2 (nodes) for single-edge embeddings
-	unsigned sizeof_embedding = 2 * sizeof(Element_In_Tuple);
-	// a miner defines the operators (join and aggregation)
+	unsigned sizeof_embedding = 2 * sizeof(SimpleElement);
 	Miner miner(false, sizeof_embedding, &graph);
 	Tinitial.stop();
 	galois::gPrint("num_vertices ", graph.size(), " num_edges ", graph.sizeEdges(), "\n");
@@ -217,7 +176,7 @@ int main(int argc, char** argv) {
 	T.start();
 	switch (algo) {
 		case nodeiterator:
-			MotifSolver(graph, miner);
+			KclSolver(graph, miner);
 			break;
 		case edgeiterator:
 			break;
